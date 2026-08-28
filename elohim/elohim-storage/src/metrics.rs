@@ -1439,6 +1439,19 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Which plane each acquisition `GetContent` was dispatched on. Read beside
+    /// [`ACQUISITION_OUTCOMES`] and `elohim_iroh_blob_fetches_total`: a dual mesh
+    /// where `{transport="iroh"}` stays flat has iroh wired but idle on the pull
+    /// leg (the 2026-08-28 fleet shape); labels are the two planes, never a peer.
+    pub static ref ACQUISITION_DISPATCH: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_dispatch_total",
+            "Acquisition (pull-leg) GetContent dispatches by transport plane.",
+        ),
+        &["transport"],
+    )
+    .unwrap();
+
     /// Acquisition reconcile tick outcomes. This is deliberately separate from
     /// [`ACQUISITION_OUTCOMES`]: fetch outcomes answer whether requested bytes
     /// arrived, while this counter answers whether the local desired-set pass
@@ -2334,6 +2347,7 @@ pub fn register_all() {
             .inc_by(0);
         let _ = REGISTRY.register(Box::new(SYNC_FETCH_WINDOW_REQUEUED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_DISPATCH.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
         {
             use seam_contracts::ReasonLabel as _;
@@ -3068,6 +3082,11 @@ pub fn set_acquisition_reconcile_completed(active_pins: usize) {
 /// in-flight slot outright (see the catch-all arm in `p2p::mod`).
 pub fn inc_acquisition_outcome(outcome: &str) {
     ACQUISITION_OUTCOMES.with_label_values(&[outcome]).inc();
+}
+
+/// Count one acquisition dispatch on `transport` (`libp2p` | `iroh`).
+pub fn inc_acquisition_dispatch(transport: &str) {
+    ACQUISITION_DISPATCH.with_label_values(&[transport]).inc();
 }
 
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.

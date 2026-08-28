@@ -29,6 +29,7 @@
 //! ```
 
 pub mod acquisition;
+pub mod acquisition_dispatch; // pull-leg dispatch planning across libp2p + iroh (row 13)
 pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
@@ -832,6 +833,9 @@ pub struct P2PNode {
     /// drain. Without it, `peers[position % peers.len()]` pins every RETRY of a
     /// given item to the SAME peer — see [`rotated_peer_index`].
     acquisition_rotation: Arc<std::sync::atomic::AtomicUsize>,
+    /// GetContent fetches in flight on the iroh plane (the libp2p ones are the
+    /// `pending_acquisition_fetches` map); both count against the dispatch budget.
+    acquisition_iroh_in_flight: Arc<std::sync::atomic::AtomicUsize>,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// T7 (head-plane trust-gradient program): process-lifetime
@@ -2886,6 +2890,7 @@ impl P2PNode {
             )),
             acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition_rotation: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            acquisition_iroh_in_flight: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             extraction_cache: None,
             memo_store: None,
             #[cfg(feature = "graph-native")]
@@ -5552,173 +5557,47 @@ impl P2PNode {
                                     }
                                     ShardResponse::Content(record) => {
                                         let content_id = record.id.clone();
-                                        // Capture blob_hash before record is moved into input.
-                                        let blob_hash_opt = record.blob_hash.clone();
                                         debug!(id = %content_id, "Received content record from peer");
-                                        // Remove the in-flight tracking entry (success path)
                                         self.pending_replication_fetches
                                             .lock()
                                             .await
                                             .remove(&request_id);
-                                        // Also remove from acquisition in-flight (if that stream dispatched it)
                                         self.pending_acquisition_fetches
                                             .lock()
                                             .await
                                             .remove(&request_id);
-
-                                        let pool = match self.db_pool.as_ref() {
-                                            Some(p) => p,
-                                            None => {
-                                                self.replication_state
-                                                    .mark_failed(&content_id)
-                                                    .await;
-                                                crate::metrics::inc_acquisition_outcome(
-                                                    "no_db_pool",
-                                                );
-                                                self.acquisition.mark_failed(&content_id).await;
-                                                return;
-                                            }
-                                        };
-                                        let mut conn = match pool.get() {
-                                            Ok(c) => c,
-                                            Err(_) => {
-                                                self.replication_state
-                                                    .mark_failed(&content_id)
-                                                    .await;
-                                                crate::metrics::inc_acquisition_outcome(
-                                                    "no_db_conn",
-                                                );
-                                                self.acquisition.mark_failed(&content_id).await;
-                                                return;
-                                            }
-                                        };
-
-                                        let input = crate::db::content_diesel::CreateContentInput {
-                                            id: record.id,
-                                            title: record.title,
-                                            description: record.description,
-                                            content_type: record.content_type,
-                                            content_format: record.content_format,
-                                            blob_hash: record.blob_hash,
-                                            blob_cid: record.blob_cid,
-                                            content_size_bytes: record.content_size_bytes,
-                                            metadata_json: record.metadata_json,
-                                            reach: record.reach,
-                                            created_by: record.created_by,
-                                            tags: record.tags,
-                                            content_body: record.content_body,
-                                            // Provenance is stamped by the drain
-                                            // (p2p_published_at) post-arrival; no
-                                            // ingest anchor on the replication path.
-                                            dht_anchor_hash: None,
-                                        };
-
-                                        let app_ctx = crate::db::AppContext::default_lamad();
-                                        match crate::db::content_diesel::bulk_create_content(
-                                            &mut conn,
-                                            &app_ctx,
-                                            vec![input],
-                                        ) {
-                                            Ok(result) => {
-                                                if result.inserted > 0 || result.skipped > 0 {
-                                                    self.replication_state
-                                                        .mark_completed(&content_id)
-                                                        .await;
-                                                    // Byte-arrival fan-out: acquisition stream gets
-                                                    // the completion regardless of which stream
-                                                    // requested the fetch (cheap no-op if no pin
-                                                    // wants this id — spec §4.2 R-A).
-                                                    self.acquisition
-                                                        .mark_completed(&content_id)
-                                                        .await;
-                                                    crate::metrics::inc_acquisition_outcome(
-                                                        "fetched",
+                                        // Transport-neutral store (shared with the iroh pull
+                                        // leg — see `acquire_over_iroh`); the two libp2p-only
+                                        // tails (kad head record, quilt-draw blob pull over the
+                                        // same libp2p peer) stay here.
+                                        let ctx = self.acquisition_ingest_ctx();
+                                        if let StoredRecord::Stored { blob_hash, .. } =
+                                            store_acquired_record(&ctx, *record).await
+                                        {
+                                            self.publish_epr_head_record(&content_id).await;
+                                            if let Some(ref hash) = blob_hash {
+                                                if !hash.is_empty()
+                                                    && !self.blob_store.exists(hash).await
+                                                {
+                                                    let pull_request =
+                                                        ShardRequest::Get { hash: hash.clone() };
+                                                    let mut swarm = self.swarm.write().await;
+                                                    let pull_id = swarm
+                                                        .behaviour_mut()
+                                                        .shard_protocol
+                                                        .send_request(&peer, pull_request);
+                                                    drop(swarm);
+                                                    self.pending_blob_pulls.lock().await.insert(
+                                                        pull_id,
+                                                        (content_id.clone(), hash.clone()),
                                                     );
-
-                                                    // Republish EPR Head so other peers can discover from us
-                                                    if let Some(head_bytes) =
-                                                        self.resolve_epr_head_locally(&content_id)
-                                                    {
-                                                        let key = RecordKey::new(&format!(
-                                                            "epr:{}",
-                                                            content_id
-                                                        ));
-                                                        let dht_record = Record {
-                                                            key,
-                                                            value: head_bytes,
-                                                            publisher: Some(
-                                                                *self.identity.peer_id(),
-                                                            ),
-                                                            expires: None,
-                                                        };
-                                                        let mut swarm = self.swarm.write().await;
-                                                        let _ = swarm
-                                                            .behaviour_mut()
-                                                            .kademlia
-                                                            .put_record(
-                                                                dht_record,
-                                                                libp2p::kad::Quorum::One,
-                                                            );
-                                                    }
-
-                                                    // Pull the blob bytes from the same peer that
-                                                    // served the content record, if this content
-                                                    // has an associated blob and we don't have it.
-                                                    //
-                                                    // This is the missing link: replication was
-                                                    // previously metadata-only.  The quilt draw
-                                                    // completes the pantry stock on each peer.
-                                                    if let Some(ref hash) = blob_hash_opt {
-                                                        if !hash.is_empty()
-                                                            && !self.blob_store.exists(hash).await
-                                                        {
-                                                            let pull_request = ShardRequest::Get {
-                                                                hash: hash.clone(),
-                                                            };
-                                                            let mut swarm =
-                                                                self.swarm.write().await;
-                                                            let pull_id = swarm
-                                                                .behaviour_mut()
-                                                                .shard_protocol
-                                                                .send_request(&peer, pull_request);
-                                                            drop(swarm);
-                                                            self.pending_blob_pulls
-                                                                .lock()
-                                                                .await
-                                                                .insert(
-                                                                    pull_id,
-                                                                    (
-                                                                        content_id.clone(),
-                                                                        hash.clone(),
-                                                                    ),
-                                                                );
-                                                            info!(
-                                                                content_id = %content_id,
-                                                                blob_hash = %hash,
-                                                                source_peer = %peer,
-                                                                "quilt draw: pulling blob from peer after content replication"
-                                                            );
-                                                        }
-                                                    }
-                                                } else {
-                                                    self.replication_state
-                                                        .mark_failed(&content_id)
-                                                        .await;
-                                                    crate::metrics::inc_acquisition_outcome(
-                                                        "blob_unavailable",
+                                                    info!(
+                                                        content_id = %content_id,
+                                                        blob_hash = %hash,
+                                                        source_peer = %peer,
+                                                        "quilt draw: pulling blob from peer after content replication"
                                                     );
-                                                    self.acquisition.mark_failed(&content_id).await;
                                                 }
-                                            }
-                                            Err(e) => {
-                                                warn!(id = %content_id, error = %e, "Failed to store replicated content");
-                                                self.replication_state
-                                                    .mark_failed(&content_id)
-                                                    .await;
-                                                crate::metrics::inc_acquisition_outcome(
-                                                    "store_failed",
-                                                );
-                                                self.acquisition.mark_failed(&content_id).await;
                                             }
                                         }
                                         self.replication_state.update_caught_up().await;
@@ -9548,15 +9427,32 @@ impl P2PNode {
     /// exhausts its retry budget having probed 1/6 of the fabric. The rotation
     /// offset advances once per drain so successive retries walk distinct peers.
     async fn drain_acquisition_queue(&self) {
+        use acquisition_dispatch::{plan_acquisition_targets, AcquisitionTarget};
         let budget = reconcile_rails::DispatchBudget::new(acquisition::MAX_ACQUISITION_INFLIGHT);
         let peers: Vec<PeerId> = {
             let swarm = self.swarm.read().await;
             swarm.connected_peers().cloned().collect()
         };
-        if peers.is_empty() {
-            return; // peer-gated (R-E)
+        // Both planes feed the target set: libp2p-connected peers plus the iroh peer
+        // book (row 13 — the pull leg was libp2p-only, so a pure-iroh mesh never
+        // drained and a dual mesh moved no bulk bytes over iroh).
+        #[cfg(feature = "p2p-iroh")]
+        let targets: Vec<AcquisitionTarget> = {
+            let entries = crate::p2p_iroh::iroh_fetch_leg()
+                .map(|leg| leg.book().snapshot(Some(&leg.endpoint().node_id())))
+                .unwrap_or_default();
+            plan_acquisition_targets(&peers, &entries, *acquisition_prefer_iroh())
+        };
+        #[cfg(not(feature = "p2p-iroh"))]
+        let targets: Vec<AcquisitionTarget> =
+            plan_acquisition_targets(&peers, *acquisition_prefer_iroh());
+        if targets.is_empty() {
+            return; // peer-gated (R-E) — on either plane
         }
-        let in_flight = self.pending_acquisition_fetches.lock().await.len();
+        let in_flight = self.pending_acquisition_fetches.lock().await.len()
+            + self
+                .acquisition_iroh_in_flight
+                .load(std::sync::atomic::Ordering::Relaxed);
         let available = budget.available(in_flight);
         if available == 0 {
             return;
@@ -9581,18 +9477,38 @@ impl P2PNode {
                 skipped += 1;
                 continue;
             }
-            let peer = peers[rotated_peer_index(rotation, i, peers.len())];
-            let request = ShardRequest::GetContent { id: id.clone() };
-            let mut swarm = self.swarm.write().await;
-            let request_id = swarm
-                .behaviour_mut()
-                .shard_protocol
-                .send_request(&peer, request);
-            drop(swarm);
-            self.pending_acquisition_fetches
-                .lock()
-                .await
-                .insert(request_id, id.clone());
+            let target = &targets[rotated_peer_index(rotation, i, targets.len())];
+            crate::metrics::inc_acquisition_dispatch(target.transport());
+            match target {
+                AcquisitionTarget::Libp2p(peer) => {
+                    let request = ShardRequest::GetContent { id: id.clone() };
+                    let mut swarm = self.swarm.write().await;
+                    let request_id = swarm
+                        .behaviour_mut()
+                        .shard_protocol
+                        .send_request(peer, request);
+                    drop(swarm);
+                    self.pending_acquisition_fetches
+                        .lock()
+                        .await
+                        .insert(request_id, id.clone());
+                }
+                #[cfg(feature = "p2p-iroh")]
+                AcquisitionTarget::Iroh { label, addr } => {
+                    // `Swarm` is not `Sync`, so the task captures only the
+                    // transport-neutral ingest context — never `self`.
+                    let ctx = self.acquisition_ingest_ctx();
+                    let counter = self.acquisition_iroh_in_flight.clone();
+                    let id = id.clone();
+                    let label = label.clone();
+                    let addr = addr.clone();
+                    counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    tokio::spawn(async move {
+                        acquire_over_iroh(ctx, id, label, addr).await;
+                        counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    });
+                }
+            }
             sent += 1;
         }
         if skipped > 0 {
@@ -9600,6 +9516,39 @@ impl P2PNode {
                 sent,
                 skipped, "Acquisition dispatch: skipped no-longer-wanted items"
             );
+        }
+    }
+
+    /// Snapshot the deps the transport-neutral acquisition ingest needs. Cheap
+    /// (Arc/handle clones); built per dispatch so a spawned iroh task never
+    /// holds `self` (the swarm is not `Sync`).
+    fn acquisition_ingest_ctx(&self) -> AcquisitionIngestCtx {
+        AcquisitionIngestCtx {
+            db_pool: self.db_pool.clone(),
+            replication_state: self.replication_state.clone(),
+            acquisition: self.acquisition.clone(),
+            blob_store: self.blob_store.clone(),
+            self_cid: self.config.self_cid.clone().unwrap_or_default(),
+        }
+    }
+
+    /// Publish the freshly acquired content's EPR head as a kad record — the
+    /// libp2p-only tail of ingest (the iroh plane announces heads on its own
+    /// manifest board; an iroh-acquired row is announced there by the announcer).
+    async fn publish_epr_head_record(&self, content_id: &str) {
+        if let Some(head_bytes) = self.resolve_epr_head_locally(content_id) {
+            let key = RecordKey::new(&format!("epr:{}", content_id));
+            let dht_record = Record {
+                key,
+                value: head_bytes,
+                publisher: Some(*self.identity.peer_id()),
+                expires: None,
+            };
+            let mut swarm = self.swarm.write().await;
+            let _ = swarm
+                .behaviour_mut()
+                .kademlia
+                .put_record(dht_record, libp2p::kad::Quorum::One);
         }
     }
 
@@ -10174,4 +10123,218 @@ mod view_federation_offloop_tests {
             "the permit must be held ACROSS the slice-build, or it caps nothing"
         );
     }
+}
+
+/// Is iroh preferred for the pull leg? Read once (env `ELOHIM_ACQUISITION_IROH`).
+fn acquisition_prefer_iroh() -> &'static bool {
+    static PREFER: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    PREFER.get_or_init(acquisition_dispatch::prefer_iroh_from_env)
+}
+
+/// The deps a content-record ingest needs, independent of the plane the record
+/// arrived on. `Clone` + `Send` so the iroh pull task can own one.
+#[derive(Clone)]
+struct AcquisitionIngestCtx {
+    db_pool: Option<DbPool>,
+    replication_state: replication::ReplicationState,
+    acquisition: acquisition::AcquisitionState,
+    blob_store: Arc<BlobStore>,
+    self_cid: String,
+}
+
+enum StoredRecord {
+    Stored {
+        #[allow(dead_code)]
+        content_id: String,
+        blob_hash: Option<String>,
+    },
+    Failed,
+}
+
+/// Store an acquired content record and settle the acquisition/replication
+/// trackers exactly as the libp2p arm always has. Transport-neutral: the
+/// libp2p `ShardResponse::Content` arm and the iroh pull task both call it.
+async fn store_acquired_record(
+    ctx: &AcquisitionIngestCtx,
+    record: crate::p2p::shard_protocol::ContentRecord,
+) -> StoredRecord {
+    let content_id = record.id.clone();
+    let blob_hash_opt = record.blob_hash.clone();
+    let pool = match ctx.db_pool.as_ref() {
+        Some(p) => p,
+        None => {
+            ctx.replication_state.mark_failed(&content_id).await;
+            crate::metrics::inc_acquisition_outcome("no_db_pool");
+            ctx.acquisition.mark_failed(&content_id).await;
+            return StoredRecord::Failed;
+        }
+    };
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => {
+            ctx.replication_state.mark_failed(&content_id).await;
+            crate::metrics::inc_acquisition_outcome("no_db_conn");
+            ctx.acquisition.mark_failed(&content_id).await;
+            return StoredRecord::Failed;
+        }
+    };
+    let input = crate::db::content_diesel::CreateContentInput {
+        id: record.id,
+        title: record.title,
+        description: record.description,
+        content_type: record.content_type,
+        content_format: record.content_format,
+        blob_hash: record.blob_hash,
+        blob_cid: record.blob_cid,
+        content_size_bytes: record.content_size_bytes,
+        metadata_json: record.metadata_json,
+        reach: record.reach,
+        created_by: record.created_by,
+        tags: record.tags,
+        content_body: record.content_body,
+        dht_anchor_hash: None,
+    };
+    let app_ctx = crate::db::AppContext::default_lamad();
+    match crate::db::content_diesel::bulk_create_content(&mut conn, &app_ctx, vec![input]) {
+        Ok(result) => {
+            if result.inserted > 0 || result.skipped > 0 {
+                ctx.replication_state.mark_completed(&content_id).await;
+                ctx.acquisition.mark_completed(&content_id).await;
+                crate::metrics::inc_acquisition_outcome("fetched");
+                StoredRecord::Stored {
+                    content_id,
+                    blob_hash: blob_hash_opt,
+                }
+            } else {
+                ctx.replication_state.mark_failed(&content_id).await;
+                crate::metrics::inc_acquisition_outcome("blob_unavailable");
+                ctx.acquisition.mark_failed(&content_id).await;
+                StoredRecord::Failed
+            }
+        }
+        Err(e) => {
+            warn!(id = %content_id, error = %e, "Failed to store replicated content");
+            ctx.replication_state.mark_failed(&content_id).await;
+            crate::metrics::inc_acquisition_outcome("store_failed");
+            ctx.acquisition.mark_failed(&content_id).await;
+            StoredRecord::Failed
+        }
+    }
+}
+
+/// The iroh pull leg for one queued content id: `GetContent` over the shard
+/// ALPN, then — for a blob-backed row we do not hold — the quilt-draw blob
+/// pull over the SAME peer, landing through `finalize_quilt_draw` (verify-first,
+/// like the libp2p arm). Bounded: one request per step, each under a timeout.
+#[cfg(feature = "p2p-iroh")]
+async fn acquire_over_iroh(
+    ctx: AcquisitionIngestCtx,
+    content_id: String,
+    label: String,
+    addr: iroh::NodeAddr,
+) {
+    use crate::p2p_iroh::IrohShardClient;
+    const CONTENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+    const BLOB_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
+    let Some(leg) = crate::p2p_iroh::iroh_fetch_leg() else {
+        // Planned while the leg existed; cannot happen after registration, but the
+        // honest disposition is a failed attempt the rotation retries elsewhere.
+        crate::metrics::inc_acquisition_outcome("fetch_error");
+        ctx.acquisition.mark_failed(&content_id).await;
+        return;
+    };
+    let client = IrohShardClient::new(leg.endpoint());
+    let request = ShardRequest::GetContent {
+        id: content_id.clone(),
+    };
+    let response =
+        tokio::time::timeout(CONTENT_TIMEOUT, client.request(addr.clone(), &request)).await;
+    let record = match response {
+        Ok(Ok(ShardResponse::Content(record))) => record,
+        Ok(Ok(ShardResponse::ContentNotFound)) => {
+            crate::metrics::inc_acquisition_outcome("fetch_error");
+            ctx.acquisition.mark_failed(&content_id).await;
+            ctx.replication_state.update_caught_up().await;
+            return;
+        }
+        Ok(Ok(other)) => {
+            debug!(id = %content_id, peer = %label, response = ?std::mem::discriminant(&other), "iroh acquisition: unexpected response");
+            crate::metrics::inc_acquisition_outcome("fetch_error");
+            ctx.acquisition.mark_failed(&content_id).await;
+            return;
+        }
+        Ok(Err(e)) => {
+            debug!(id = %content_id, peer = %label, error = %e, "iroh acquisition: request failed");
+            crate::metrics::inc_acquisition_outcome("fetch_error");
+            ctx.acquisition.mark_failed(&content_id).await;
+            return;
+        }
+        Err(_) => {
+            debug!(id = %content_id, peer = %label, "iroh acquisition: request timed out");
+            crate::metrics::inc_acquisition_outcome("fetch_error");
+            ctx.acquisition.mark_failed(&content_id).await;
+            return;
+        }
+    };
+    debug!(id = %content_id, peer = %label, transport = "iroh", "Received content record from peer");
+    if let StoredRecord::Stored { blob_hash, .. } = store_acquired_record(&ctx, *record).await {
+        if let Some(hash) = blob_hash.filter(|h| !h.is_empty()) {
+            if !ctx.blob_store.exists(&hash).await {
+                info!(
+                    content_id = %content_id,
+                    blob_hash = %hash,
+                    source_peer = %label,
+                    transport = "iroh",
+                    "quilt draw: pulling blob from peer after content replication"
+                );
+                let pull = ShardRequest::Get { hash: hash.clone() };
+                match tokio::time::timeout(BLOB_TIMEOUT, client.request(addr, &pull)).await {
+                    Ok(Ok(ShardResponse::Data(data))) => {
+                        let landed = match ctx.db_pool.as_ref().map(|p| p.get()) {
+                            Some(Ok(mut conn)) => {
+                                crate::p2p::blob_fetch::finalize_quilt_draw(
+                                    &mut conn,
+                                    &hash,
+                                    &label,
+                                    &data,
+                                    &ctx.self_cid,
+                                    &ctx.blob_store,
+                                )
+                                .await
+                            }
+                            _ => ctx.blob_store.store(&data).await.map(|_| true),
+                        };
+                        match landed {
+                            Ok(true) => {
+                                crate::metrics::inc_iroh_blob_fetch("ok");
+                                info!(content_id = %content_id, blob_hash = %hash, size = data.len(), source_peer = %label, transport = "iroh", "quilt draw: blob stocked + serve-blob delivery event booked");
+                            }
+                            Ok(false) => {
+                                crate::metrics::inc_iroh_blob_fetch("hash_mismatch");
+                                warn!(content_id = %content_id, blob_hash = %hash, source_peer = %label, transport = "iroh", "quilt draw: pulled bytes failed hash verification; discarded");
+                            }
+                            Err(e) => {
+                                crate::metrics::inc_iroh_blob_fetch("error");
+                                warn!(content_id = %content_id, blob_hash = %hash, error = %e, transport = "iroh", "quilt draw: finalize_quilt_draw failed");
+                            }
+                        }
+                    }
+                    Ok(Ok(ShardResponse::NotFound)) => {
+                        crate::metrics::inc_iroh_blob_fetch("not_found");
+                        warn!(content_id = %content_id, blob_hash = %hash, source_peer = %label, transport = "iroh", "quilt draw: peer served the record but not its blob");
+                    }
+                    Ok(Ok(_)) | Ok(Err(_)) => {
+                        crate::metrics::inc_iroh_blob_fetch("error");
+                        warn!(content_id = %content_id, blob_hash = %hash, source_peer = %label, transport = "iroh", "quilt draw: blob pull failed at transport level");
+                    }
+                    Err(_) => {
+                        crate::metrics::inc_iroh_blob_fetch("error");
+                        warn!(content_id = %content_id, blob_hash = %hash, source_peer = %label, transport = "iroh", "quilt draw: blob pull timed out");
+                    }
+                }
+            }
+        }
+    }
+    ctx.replication_state.update_caught_up().await;
 }
