@@ -4,7 +4,10 @@
   "jenkinsPath": "genesis/Jenkinsfile",
   "manualOnly": false,
   "triggersGenesis": false,
-  "dependsOn": ["elohim-edge", "elohim"],
+  "dependsOn": [
+    "elohim-edge",
+    "elohim"
+  ],
   "description": "Content seeding and validation",
   "steps": {
     "validate-seeds": {
@@ -15,10 +18,14 @@
           "elohim/sdk/schemas/**",
           "elohim/sdk/domains/**"
         ],
-        "buildProcess": ["genesis/Jenkinsfile"]
+        "buildProcess": [
+          "genesis/Jenkinsfile"
+        ]
       },
       "outputs": {
-        "artifacts": ["validated-seeds"],
+        "artifacts": [
+          "validated-seeds"
+        ],
         "verify": null
       },
       "depends": [],
@@ -30,11 +37,17 @@
     "seed-content": {
       "description": "Seed validated content to target environment",
       "inputs": {
-        "sources": ["genesis/manifests/cluster-state.yaml"],
-        "buildProcess": ["genesis/Jenkinsfile"]
+        "sources": [
+          "genesis/manifests/cluster-state.yaml"
+        ],
+        "buildProcess": [
+          "genesis/Jenkinsfile"
+        ]
       },
       "outputs": {
-        "artifacts": ["seeded-content"],
+        "artifacts": [
+          "seeded-content"
+        ],
         "verify": null
       },
       "depends": [
@@ -51,12 +64,21 @@
     "schema-validate": {
       "description": "Validate seed data against protocol schemas",
       "inputs": {
-        "sources": ["genesis/seeds/**", "elohim/sdk/schemas/**"],
+        "sources": [
+          "genesis/seeds/**",
+          "elohim/sdk/schemas/**"
+        ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Schema Validate", "function": null }
+      "executor": {
+        "stage": "Schema Validate",
+        "function": null
+      }
     },
     "schema-codegen": {
       "description": "Verify schema codegen is fresh",
@@ -70,33 +92,62 @@
         ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Schema Codegen", "function": null }
+      "executor": {
+        "stage": "Schema Codegen",
+        "function": null
+      }
     },
     "constants-sync": {
       "description": "Verify constants sync between schema enums, generated code, and seed data",
       "inputs": {
         "sources": [
-          "genesis/data/**",
+          "genesis/data/humans/**",
+          "genesis/data/presences/**",
+          "genesis/data/devices/**",
+          "genesis/data/collectives/**",
+          "genesis/data/account-packages/**",
+          "genesis/data/lamad/**",
+          "genesis/data/shefa/**",
+          "genesis/data/stories/**",
+          "genesis/data/rakia/**",
+          "genesis/data/entities.json",
           "elohim/sdk/schemas/**/*enum*",
           "**/generated/schema-enums*"
         ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Constants Sync", "function": null }
+      "executor": {
+        "stage": "Constants Sync",
+        "function": null
+      }
     },
     "lint-a2o": {
       "description": "Lint and typecheck a2o E2E framework",
       "inputs": {
-        "sources": ["genesis/a2o/**"],
+        "sources": [
+          "genesis/a2o/**"
+        ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Lint A2O", "function": null }
+      "executor": {
+        "stage": "Lint A2O",
+        "function": null
+      }
     },
     "gherkin-prepush-lint": {
       "description": "Parse every A2O Gherkin feature before E2E execution",
@@ -108,16 +159,31 @@
         ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Lint Gherkin", "function": null }
+      "executor": {
+        "stage": "Lint Gherkin",
+        "function": null
+      }
     },
     "gate-genesis": {
       "description": "Catch-all trigger for genesis directory quality gate (excludes orchestrator CI glue)",
       "inputs": {
         "sources": [
           "genesis/seeds/**",
-          "genesis/data/**",
+          "genesis/data/humans/**",
+          "genesis/data/presences/**",
+          "genesis/data/devices/**",
+          "genesis/data/collectives/**",
+          "genesis/data/account-packages/**",
+          "genesis/data/lamad/**",
+          "genesis/data/shefa/**",
+          "genesis/data/stories/**",
+          "genesis/data/rakia/**",
+          "genesis/data/entities.json",
           "genesis/a2o/**",
           "genesis/seeder/**",
           "genesis/scripts/**",
@@ -125,42 +191,80 @@
         ],
         "buildProcess": []
       },
-      "outputs": { "artifacts": [], "verify": null },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
       "depends": [],
-      "executor": { "stage": "Gate Genesis", "function": null }
+      "executor": {
+        "stage": "Gate Genesis",
+        "function": null
+      }
     }
   },
   "gate": {
     "projects": {
       "genesis": {
         "dir": "genesis/seeder",
-        "steps": ["validate-seeds", "seed-content", "gate-genesis"],
-        "run": { "kind": "just", "recipe": "gate" }
+        "steps": [
+          "validate-seeds",
+          "seed-content",
+          "gate-genesis"
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate"
+        }
       },
       "schema-validate": {
         "dir": ".",
-        "steps": ["schema-validate"],
-        "run": { "kind": "root-just", "recipe": "_gate-schema-validate" }
+        "steps": [
+          "schema-validate"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-schema-validate"
+        }
       },
       "schema-codegen": {
         "dir": ".",
-        "steps": ["schema-codegen"],
-        "run": { "kind": "root-just", "recipe": "_gate-schema-codegen" }
+        "steps": [
+          "schema-codegen"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-schema-codegen"
+        }
       },
       "constants-sync": {
         "dir": ".",
-        "steps": ["constants-sync"],
-        "run": { "kind": "root-just", "recipe": "_gate-constants-sync" }
+        "steps": [
+          "constants-sync"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-constants-sync"
+        }
       },
       "genesis-a2o": {
         "dir": "genesis/a2o",
-        "steps": ["lint-a2o"],
-        "run": { "kind": "root-just", "recipe": "_gate-genesis-a2o" }
+        "steps": [
+          "lint-a2o"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-genesis-a2o"
+        }
       },
       "gherkin-prepush-lint": {
         "dir": "genesis/a2o",
-        "steps": ["gherkin-prepush-lint"],
-        "run": { "kind": "root-just", "recipe": "_gate-gherkin-prepush-lint" }
+        "steps": [
+          "gherkin-prepush-lint"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-gherkin-prepush-lint"
+        }
       },
       "reach-drift": {
         "dir": ".",
@@ -170,20 +274,31 @@
             "genesis/data/lamad/paths/**",
             "elohim/sdk/schemas/v1/enums/reach.schema.json"
           ],
-          "buildProcess": ["genesis/seeder/scripts/check-reach-drift.mjs"]
+          "buildProcess": [
+            "genesis/seeder/scripts/check-reach-drift.mjs"
+          ]
         },
-        "run": { "kind": "root-just", "recipe": "_gate-reach-drift" }
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-reach-drift"
+        }
       },
       "domain-types": {
         "dir": ".",
         "inputs": {
-          "sources": ["elohim/sdk/**"],
+          "sources": [
+            "elohim/sdk/**"
+          ],
           "buildProcess": []
         },
         "run": {
           "kind": "root-just",
           "recipe": "_gate-domain-types",
-          "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
+          "cargo": {
+            "workspace": "elohim",
+            "profile": "dev",
+            "rustflags": ""
+          }
         }
       }
     }
