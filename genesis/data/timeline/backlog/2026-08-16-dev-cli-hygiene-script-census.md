@@ -139,3 +139,15 @@ by count alone; the next removal requires a consumer migration or deadness proof
 - 2026-08-21: `just mesh prologue` added — the Act I Prologue (`app/elohim-app/scripts/hc-mesh-prologue.sh`, sourced from `hc-mesh.sh`'s `mesh_seed_env`): named `CONDUCTOR_URLS` cast, landing seed via both doorways, operator-bindings → projections, per-host bundle staging (browser + server, `DECLARE_ONLY` propagation to B), the CI-order substrate chain, and the household fixture manifest (`processControl: true`). `hc-mesh.sh` is now safe to `source` (dispatch guarded); storage peers get `ALLOW_SEED_NETWORK_STAKES=1`/`ALLOW_SEED_DELEGATES_COMPUTE=1`, doorways `API_KEY_ADMIN`. Born from the 2026-08-21 mesh inventory (backlog `mesh-prologue-cast-and-env-gaps`).
 - 2026-08-21: `just test mesh [scope]` added — the Act I a2o lane against `just mesh` (cucumber `mesh` profile + paths-less scoped config; env from `hc-mesh.sh mesh_seed_env`). `@act:` tags resolve via `substrate-scope.ts` against the act cluster-state files; undeclared caps warn. Spec `genesis/a2o/LAYERS.md`.
 - 2026-08-24: `just mesh recovery-matrix` added — cycles the checked-in eight-row recovery scenario library across warm/cold shapes and repeated runs, alternating the recovering slot and reshaping only for peer/doorway-count changes. The source-only parser/role tests run before its Task 2 per-peer transport and Task 5 recovery-primitive dependencies land; live cycles require both interfaces.
+
+## 2026-08-28 — M0 pawls (spec ratchet-to-delivery-dataplane-sdk-lanes)
+
+Verbs gained arms, no new scripts: `just mesh storage-restart <peer…>` / `conductors-restart` (pass-through to
+hc-mesh.sh's existing actions — a shift no longer has to know the script), `just seed apply mesh content`
+(env from hc-mesh.sh `mesh_seed_env`, the same block `just test mesh` reads), `just dev conductor alpha`
+(the arm previously ignored `profile` — every "join-alpha conductor" start was an isolated node). New
+pre-push leg `genesis/orchestrator/scripts/t2-receipt.sh` (warn-only). Coupled context synced: root
+CLAUDE.md Build & Test block. NOT yet synced: `.claude/skills/hc-dev-orchestrator/SKILL.md` — it is a
+package projection (`.epr-meta/elohim/packages/skills/hc-dev-orchestrator.json`) mid-edit in a sibling
+session on 2026-08-28; fold the knobs (`CONDUCTOR_ARC_FACTOR`, `CONDUCTOR_APP_PORT`, `MESH_HAPP_PATH`,
+`RECOVERY_REPORTS_DIR`, `T2_RECEIPT`) into the package, then project, once that WIP lands.
