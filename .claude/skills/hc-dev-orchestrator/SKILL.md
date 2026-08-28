@@ -115,7 +115,22 @@ false red. Reshape retries per shape are bounded by
 `MESH_RECOVERY_RESHAPE_RETRIES` (default 1); once exhausted, every scenario
 still needing that shape gets `FAIL(reshape)` rows instead of another
 regenerate attempt, and `DOORWAY_B_PORT` (default 8889) is honored alongside
-`DOORWAY_PORT` throughout. `hc-mesh-recovery.sh`'s backpressure witness reads
+`DOORWAY_PORT` throughout.
+
+**The sign-in portal (`MESH_PORTAL`, `THRESHOLD_PORT`).** The doorway forwards
+`/threshold/*` to `THRESHOLD_URL` with the path INTACT, and its binary default is
+`http://localhost:8081`; on the fleet that is the `doorway-app` nginx sidecar. `mesh start`
+now serves `doorway-app` on `THRESHOLD_PORT` (default 8081) under `/threshold`, so
+`http://localhost:$DOORWAY_PORT/threshold/login` answers exactly as the deployed sidecar
+does. `MESH_PORTAL=0` skips it. Without it that path is a **502**, and because
+`GET /auth/authorize` 302s every unauthenticated caller to `/threshold/login`, the whole
+OAuth authorization-code flow dead-ends locally — which is why the chaperone portal was
+never exercisable before a push. It is launched detached and NOT waited on (~40s to first
+paint; nothing else in the mesh depends on it), its port joins `mesh_owned_ports` so
+`mesh stop` reaps it, and `mesh status` probes it THROUGH the doorway — a 502 there means
+the proxy has no portal behind it. Drive it through the doorway, never against
+`THRESHOLD_PORT` directly: `doorway-app`'s `environment.doorwayUrl` is `''` (same-origin),
+so its API calls follow whatever serves it and would 404 against the dev server. `hc-mesh-recovery.sh`'s backpressure witness reads
 the CONDUCTOR log (`$LOCAL_DEV_DIR/.sandbox_run_log[.<peer>]`) for
 `conductor_receipt_max_s` (JSON `null` when no receipt-latency line falls in
 the window) and records `conductor_receipt_scope` per peer (`per-peer` vs
