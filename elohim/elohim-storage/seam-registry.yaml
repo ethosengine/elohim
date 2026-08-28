@@ -2317,7 +2317,7 @@ decisionPoints:
           revocation plane on KeyStewardship).
       - id: C8
         status: partial
-        gapNote: >
+        justification: >
           The predicate is un-metered: it returns a typed ProofError but increments no
           counter, so a runtime cannot distinguish an encoding-mismatch storm (a
           misconfigured client) from signature failures (a possible attack) without reading
@@ -2327,7 +2327,7 @@ decisionPoints:
           same commit that gives it its first caller.
       - id: C9
         status: partial
-        gapNote: >
+        justification: >
           A key rotated AWAY still verifies here — the predicate reads the key material
           embedded in the identity and consults no lineage. Correct for a pure signature
           check, but the consuming session surface MUST additionally check lineage currency

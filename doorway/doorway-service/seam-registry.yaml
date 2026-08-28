@@ -2025,3 +2025,95 @@ decisionPoints:
       - path: doorway/doorway-service/src/auth/http_permission.rs
         testName: authenticated_jwt_resolves_authenticated
         kind: unit
+
+  # Registered at birth 2026-08-28 per the seam birth rule: a new route may not
+  # be born unregistered. Two placement decisions carry its security properties —
+  # see `notes`.
+  - name: handle_auth_discovery
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/routes/auth_discovery.rs
+      modulePath: routes::auth_discovery::handle_auth_discovery
+      line: 101
+    summary: >
+      GET /.well-known/elohim-auth — the unauthenticated document an app reads INSTEAD of
+      carrying auth configuration. Answers two things from the origin a page was already
+      served from: the sign-in portal, and the endpoints it talks to afterwards (including
+      session-token/exchange-session, the cross-app handoff pair a client cannot invent).
+      Every value is an origin-RELATIVE path.
+    notes: >
+      (1) `/.well-known/` rather than `/auth/config`: AUTH_OWNED_PATHS is exact-match, so an
+      unowned `/auth/*` path falls through to the EPR router and answers 200 text/html with
+      the SPA shell — measured — handing a client a JSON parse error instead of a branchable
+      absence. `/.well-known/` is already in `is_service_path`, so an unknown path there 404s
+      honestly; fail-open here is worse than absence. (2) Relative paths only: a discovery
+      document that could name another origin is an open-redirect primitive, and this one
+      cannot express one. `portalHostUrl` is deliberately excluded — per-human session state
+      that must be attested in that human's own record, not advertised publicly. The client
+      half of this class is live and filed in
+      genesis/data/timeline/backlog/security-client-doorway-origin-synthesis-credential-exfil.md
+      The honest-absence behaviour is additionally covered end-to-end by the a2o scenario "An
+      unknown well-known path is refused rather than answered with the app shell"
+      (genesis/a2o/features/auth/auth-discovery.feature); it is not listed under contractTests
+      because that schema field takes an identifier, not a scenario title.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Web2 projection plane. It describes THIS doorway's own HTTP auth surface and nothing
+          about the notary or head plane. Configuration discovery, not substrate truth — no DHT
+          read, no entity.
+      - id: C4
+        status: answered
+        justification: >
+          Honest absence is the whole reason for the path choice. An unknown `/.well-known/*`
+          path 404s rather than being answered with the app shell, so a client can branch on
+          absence instead of failing to parse HTML. Pinned by the a2o scenario "An unknown
+          well-known path is refused rather than answered with the app shell".
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded by construction: a pure serialization of compile-time constants plus one
+          Option<String> clone. No I/O, no conductor call, nothing that scales.
+      - id: C7
+        status: answered
+        justification: >
+          Advertise/serve symmetry is the live risk here — every path it advertises is an exact
+          entry in AUTH_OWNED_PATHS, so advertising a route that answers with the SPA shell
+          would BE the defect. Held by the unit test plus the a2o scenario; the two lists are
+          still hand-synced, which is the residue.
+      - id: C12
+        status: answered
+        justification: >
+          Unauthenticated BY DESIGN: it names public endpoints and no secrets, and a human who
+          cannot yet authenticate is exactly who needs to read it. The authorization question it
+          does carry — can this document redirect anyone anywhere — is answered structurally:
+          relative paths only, so no foreign origin is expressible.
+      - id: C2
+        status: n-a
+        justification: >
+          Establishes no authority ordering; it is a read-only description of endpoints.
+      - id: C5
+        status: partial
+        justification: >
+          The document is evidence-shaped but UNSIGNED, so it is self-asserted by whoever answers
+          the DNS name. The Ed25519 key is already published at /.well-known/doorway-keys
+          (routes/federation.rs:173); signing the body and verifying against that JWKS is what
+          closes a MITM or stale-DNS rewrite. The relative-path constraint bounds the damage — a
+          rewritten document still cannot name another origin — but does not eliminate it.
+      - id: C8
+        status: partial
+        justification: >
+          Un-metered: no counter distinguishes a client that found the document from one that
+          fell back. Deliberate while it has no in-tree consumer — a meter with no reader is the
+          instrument-with-no-reader anti-pattern. Wire it when the client module lands.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_discovery.rs
+        testName: every_advertised_location_is_origin_relative
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_discovery.rs
+        testName: a_protocol_relative_location_would_be_rejected
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_discovery.rs
+        testName: the_document_carries_the_endpoints_a_client_cannot_guess
+        kind: unit
