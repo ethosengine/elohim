@@ -2080,8 +2080,10 @@ decisionPoints:
         justification: >
           Advertise/serve symmetry is the live risk here — every path it advertises is an exact
           entry in AUTH_OWNED_PATHS, so advertising a route that answers with the SPA shell
-          would BE the defect. Held by the unit test plus the a2o scenario; the two lists are
-          still hand-synced, which is the residue.
+          would BE the defect. No longer hand-synced residue: `every_advertised_endpoint_is_an_owned_auth_path`
+          asserts `AuthEndpoints::current()` is a subset of AUTH_OWNED_PATHS at `cargo test`, and the a2o
+          scenario re-checks it against a running doorway by content type. Detector-controlled — injecting an
+          unowned path fails the guard by name.
       - id: C12
         status: answered
         justification: >
@@ -2112,8 +2114,14 @@ decisionPoints:
         testName: every_advertised_location_is_origin_relative
         kind: unit
       - path: doorway/doorway-service/src/routes/auth_discovery.rs
-        testName: a_protocol_relative_location_would_be_rejected
+        testName: the_relative_location_guard_catches_an_escaping_document
         kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: every_advertised_endpoint_is_an_owned_auth_path
+        kind: unit
+      - path: doorway/doorway-service/tests/schema_contract.rs
+        testName: auth_discovery_schema_refuses_a_foreign_origin
+        kind: integration
       - path: doorway/doorway-service/src/routes/auth_discovery.rs
         testName: the_document_carries_the_endpoints_a_client_cannot_guess
         kind: unit

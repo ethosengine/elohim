@@ -2530,7 +2530,7 @@ pub(crate) fn is_reserved_url_path(url_path: &str) -> bool {
 /// MUST stay in sync with the match arms in
 /// `routes::auth_routes::handle_auth_request`. (Follow-up: lift both off a shared
 /// routing table so this can't drift — tracked in the shift's sprint result.)
-const AUTH_OWNED_PATHS: &[&str] = &[
+pub(crate) const AUTH_OWNED_PATHS: &[&str] = &[
     "/auth/register",
     "/auth/login",
     "/auth/logout",
@@ -2552,6 +2552,39 @@ const AUTH_OWNED_PATHS: &[&str] = &[
     "/auth/elohim-verify/start",
     "/auth/elohim-verify/answer",
 ];
+
+#[cfg(test)]
+mod auth_discovery_symmetry {
+    use super::AUTH_OWNED_PATHS;
+    use crate::routes::auth_discovery::AuthEndpoints;
+
+    /// Advertise/serve symmetry, enforced instead of hand-synced.
+    ///
+    /// `/.well-known/elohim-auth` publishes a list of endpoints an app is told
+    /// it can call. AUTH_OWNED_PATHS decides which `/auth/*` paths this doorway
+    /// actually answers — everything else falls through to the EPR router and is
+    /// served the SPA shell. Two hand-maintained lists that must agree, and the
+    /// failure is silent: the document keeps advertising a path that now returns
+    /// a web page, and a client following it gets HTML where it expected JSON.
+    ///
+    /// The a2o scenario catches this against a running doorway; this catches it
+    /// at `cargo test`, before anything is deployed to catch it on.
+    #[test]
+    fn every_advertised_endpoint_is_an_owned_auth_path() {
+        let advertised = AuthEndpoints::current().paths();
+        let orphans: Vec<&str> = advertised
+            .iter()
+            .copied()
+            .filter(|p| !AUTH_OWNED_PATHS.contains(p))
+            .collect();
+        assert!(
+            orphans.is_empty(),
+            "the discovery document advertises {orphans:?}, which this doorway does NOT own — \
+             a client following the document would be served the SPA shell instead of the auth \
+             layer. Add them to AUTH_OWNED_PATHS or stop advertising them."
+        );
+    }
+}
 
 /// True iff the doorway auth layer owns `path` (exact match, query stripped).
 pub(crate) fn is_auth_owned_path(path: &str) -> bool {
@@ -5167,7 +5200,15 @@ async fn handle_request(
         // is_service_path) so an unknown path 404s honestly; /auth/config falls
         // through to the SPA and hands clients a parse error instead.
         (Method::GET, "/.well-known/elohim-auth") => {
-            to_boxed(routes::auth_discovery::handle_auth_discovery(Arc::clone(&state)))
+            let inm = req
+                .headers()
+                .get(hyper::header::IF_NONE_MATCH)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
+            to_boxed(routes::auth_discovery::handle_auth_discovery(
+                Arc::clone(&state),
+                inm.as_deref(),
+            ))
         }
 
         // Doorway public signing keys (JWKS format) for federation

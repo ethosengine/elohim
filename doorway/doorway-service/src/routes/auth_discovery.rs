@@ -34,6 +34,7 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use crate::server::AppState;
 
@@ -63,6 +64,24 @@ pub struct AuthEndpoints {
 }
 
 impl AuthEndpoints {
+    /// Every path this document advertises, for the symmetry guard in
+    /// `server/http.rs` that asserts each one is an owned auth path. Kept beside
+    /// the fields so adding an endpoint without adding it here is visible.
+    pub fn paths(&self) -> [&'static str; 10] {
+        [
+            self.register,
+            self.login,
+            self.logout,
+            self.refresh,
+            self.me,
+            self.authorize,
+            self.token,
+            self.session_token,
+            self.exchange_session,
+            self.portal_host,
+        ]
+    }
+
     /// Public so the schema-contract test can build the same document the
     /// handler serves, rather than a hand-copied stand-in of it.
     pub const fn current() -> Self {
@@ -98,11 +117,26 @@ pub struct AuthDiscovery {
 /// The doorway-hosted sign-in portal, served by doorway-app under `/threshold/*`.
 const PORTAL_PATH: &str = "/threshold/login";
 
+/// Does an `If-None-Match` header match our current ETag?
+///
+/// The header is a comma-separated LIST (RFC 9110 §13.1.2) and `*` matches any
+/// current representation, so a naive string equality answers 200 to a
+/// well-formed conditional request and the validator silently never fires.
+fn etag_matches(if_none_match: &str, current: &str) -> bool {
+    if_none_match
+        .split(',')
+        .map(str::trim)
+        .any(|candidate| candidate == "*" || candidate == current)
+}
+
 /// `GET /.well-known/elohim-auth`
 ///
 /// Unauthenticated by design: it names public endpoints and no secrets, and a
 /// human who cannot yet authenticate is exactly who needs to read it.
-pub fn handle_auth_discovery(state: Arc<AppState>) -> Response<Full<Bytes>> {
+pub fn handle_auth_discovery(
+    state: Arc<AppState>,
+    if_none_match: Option<&str>,
+) -> Response<Full<Bytes>> {
     let body = AuthDiscovery {
         version: 1,
         doorway_id: state.args.doorway_id.clone(),
@@ -111,14 +145,34 @@ pub fn handle_auth_discovery(state: Arc<AppState>) -> Response<Full<Bytes>> {
     };
 
     match serde_json::to_string_pretty(&body) {
-        Ok(json) => Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", "application/json")
-            // Short: a doorway that gains a portal should not be shadowed by a
-            // client's cached "no portal" answer for an hour.
-            .header("Cache-Control", "public, max-age=300")
-            .body(Full::new(Bytes::from(json)))
-            .unwrap(),
+        Ok(json) => {
+            // Revalidate-first with an ETag over the body, matching
+            // /chrome/omni-element.js on this same doorway. A cached
+            // "here is where you sign in" answer that outlives a portal move is
+            // exactly the upgrade this document exists to make cheap — so
+            // clients re-ask every time and skip the body when nothing changed.
+            let etag = format!("\"{:x}\"", Sha256::digest(json.as_bytes()));
+
+            // Honour the validator we emit. Without this the ETag is decoration:
+            // `must-revalidate` makes every client re-ask on every navigation, and
+            // each of those would re-send the whole body unchanged.
+            if if_none_match.is_some_and(|v| etag_matches(v, &etag)) {
+                return Response::builder()
+                    .status(StatusCode::NOT_MODIFIED)
+                    .header("Cache-Control", "public, max-age=0, must-revalidate")
+                    .header("ETag", etag)
+                    .body(Full::new(Bytes::new()))
+                    .unwrap();
+            }
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "application/json")
+                .header("Cache-Control", "public, max-age=0, must-revalidate")
+                .header("ETag", etag)
+                .body(Full::new(Bytes::from(json)))
+                .unwrap()
+        }
         Err(e) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("Content-Type", "application/json")
@@ -210,6 +264,20 @@ mod tests {
                 "the guard failed to catch a document escaping its origin via {hostile:?} —                  it would pass a discovery document that can aim a Login button anywhere"
             );
         }
+    }
+
+    #[test]
+    fn a_matching_validator_is_recognised_in_every_legal_header_shape() {
+        let tag = "\"abc123\"";
+        assert!(etag_matches(tag, tag), "the simple case must match");
+        assert!(etag_matches("*", tag), "`*` matches any current representation");
+        assert!(
+            etag_matches("\"other\", \"abc123\"", tag),
+            "If-None-Match is a LIST — a naive equality check answers 200 to a well-formed \
+             conditional request and the validator never fires"
+        );
+        assert!(!etag_matches("\"stale\"", tag), "a stale validator must NOT match");
+        assert!(!etag_matches("", tag), "an empty header must not match");
     }
 
     #[test]
