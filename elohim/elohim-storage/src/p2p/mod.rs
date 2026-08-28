@@ -6333,7 +6333,10 @@ impl P2PNode {
                     request_id,
                     response,
                 } => {
-                    crate::metrics::inc_sync_request_outcome("ok");
+                    crate::metrics::inc_sync_request_outcome(
+                        "ok",
+                        self.peer_trust_cache.peer_class_for(&peer),
+                    );
                     self.handle_sync_response(peer, request_id, response).await;
                 }
             },
@@ -6348,11 +6351,13 @@ impl P2PNode {
                 // Task #9's surface: persistent per-peer sync-request failures used
                 // to exist ONLY as this warn line, so a peer whose sync requests
                 // always time out was indistinguishable from a healthy one in
-                // Prometheus. The label set is result-only (bounded) — peer
-                // identity stays in the log line above, where cardinality is free.
-                crate::metrics::inc_sync_request_outcome(sync_round::outbound_failure_label(
-                    &error,
-                ));
+                // Prometheus. The label set stays bounded (result × peer_class,
+                // never a raw peer id) — peer identity stays in the log line
+                // above, where cardinality is free.
+                crate::metrics::inc_sync_request_outcome(
+                    sync_round::outbound_failure_label(&error),
+                    self.peer_trust_cache.peer_class_for(&peer),
+                );
                 // Drop any page cursor for the failed request so the map stays
                 // bounded by genuinely in-flight requests.
                 self.doc_list_cursors.lock().await.remove(&request_id);

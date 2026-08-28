@@ -1501,18 +1501,31 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Outbound sync request outcomes. Deliberately labelled by RESULT ONLY, never
-    /// by peer: a peer-id label is an unbounded-cardinality bomb on a real mesh.
-    /// Peer identity stays in the log line at the same site. label: result = "ok" |
+    /// Outbound sync request outcomes. Deliberately NEVER labelled by raw peer
+    /// id: that is an unbounded-cardinality bomb on a real mesh. Peer identity
+    /// stays in the log line at the same site. label: result = "ok" |
     /// "timeout" | "connection_closed" | "dial_failure" | "unsupported_protocols" |
     /// "io" — the same closed vocabulary as `elohim_view_federation_outbound_total`,
     /// so the two planes read the same way.
+    ///
+    /// Second label: peer_class — a BOUNDED substitute for peer identity, so
+    /// trust can be priced without paying the cardinality cost ("you cannot
+    /// price a relationship you cannot observe"). Derived from
+    /// `PeerTrustCache::peer_class_for`: the cached `VerifiedTrustContext`'s
+    /// `reach_ceiling`, clamped to the closed
+    /// [`crate::generated_enums::CORE_REACH_LEVELS`] vocabulary (an
+    /// unrecognised string lands on `"other"`, never mints its own label —
+    /// the same clamp `inc_projection_reconcile_reach_narrowed` applies to
+    /// wire-derived reach) — or `"unverified"` when no trust context is
+    /// cached for the peer. The label set stays bounded by
+    /// `|CORE_REACH_LEVELS| + "other" + "unverified"` regardless of mesh size.
     pub static ref SYNC_REQUEST_OUTCOMES: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_sync_request_outcomes_total",
-            "Outbound sync request outcomes by result (ok vs failure variant).",
+            "Outbound sync request outcomes by result (ok vs failure variant) and peer_class \
+             (bounded reach-tier classification, never a raw peer id).",
         ),
-        &["result"],
+        &["result", "peer_class"],
     )
     .unwrap();
 
@@ -2312,6 +2325,13 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
+        // Pre-touch the always-live combination so the series renders before
+        // the first real sync round completes — an operator dashboarding
+        // "any successful sync request from an unverified peer" must find the
+        // series, not infer absence from a metric that has never fired.
+        SYNC_REQUEST_OUTCOMES
+            .with_label_values(&["ok", "unverified"])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(SYNC_FETCH_WINDOW_REQUEUED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
@@ -2958,11 +2978,14 @@ pub fn add_sync_docs_enumerated(n: u64) {
 }
 
 /// Record one outbound sync request outcome ("ok" | "timeout" |
-/// "connection_closed" | "dial_failure" | "unsupported_protocols" | "io").
-/// Result-only by design — see [`SYNC_REQUEST_OUTCOMES`] on why there is no peer
-/// label.
-pub fn inc_sync_request_outcome(result: &str) {
-    SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
+/// "connection_closed" | "dial_failure" | "unsupported_protocols" | "io"),
+/// classified by `peer_class` — see [`SYNC_REQUEST_OUTCOMES`] on why that is a
+/// bounded reach-tier classification (from `PeerTrustCache::peer_class_for`)
+/// rather than a raw peer id.
+pub fn inc_sync_request_outcome(result: &str, peer_class: &str) {
+    SYNC_REQUEST_OUTCOMES
+        .with_label_values(&[result, peer_class])
+        .inc();
 }
 
 /// Record one document re-queued by the bounded sync-fetch window after a
@@ -4467,7 +4490,12 @@ mod tests {
             "unsupported_protocols",
             "io",
         ] {
-            inc_sync_request_outcome(result);
+            // peer_class exercised across the bounded vocabulary: a reach
+            // tier, the "other" clamp bucket, and "unverified" (no cached
+            // trust context) — never a raw peer id.
+            for peer_class in ["trusted", "other", "unverified"] {
+                inc_sync_request_outcome(result, peer_class);
+            }
         }
         // Acquisition (the `pull` leg). Measured 2026-07-25: alpha 29/29 failed,
         // beta 5/5 failed, fetched=0 on both — a 100% dead leg whose ONLY signal
@@ -4617,6 +4645,24 @@ mod tests {
         assert!(
             text.contains("elohim_sync_request_outcomes_total"),
             "sync request-outcome counter missing:\n{text}"
+        );
+        // peer_class: the bounded reach-tier classification that makes the
+        // sync edge priceable without an unbounded peer-id label.
+        assert!(
+            text.contains(
+                "elohim_sync_request_outcomes_total{peer_class=\"unverified\",result=\"ok\"}"
+            ),
+            "sync request-outcome must carry peer_class=unverified for an uncached peer:\n{text}"
+        );
+        assert!(
+            text.contains(
+                "elohim_sync_request_outcomes_total{peer_class=\"trusted\",result=\"ok\"}"
+            ),
+            "sync request-outcome must carry the reach-tier peer_class for a cached peer:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_sync_request_outcomes_total{peer_class=\"other\",result=\"ok\"}"),
+            "an out-of-vocabulary reach_ceiling must clamp to peer_class=other:\n{text}"
         );
         assert!(
             text.contains("elohim_sync_fetch_window_requeued_total"),
