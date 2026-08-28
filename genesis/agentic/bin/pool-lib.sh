@@ -1063,6 +1063,7 @@ policy_family_ttl_days() {
 }
 
 policy_family_max_gb() { policy_get ".families[\"$1\"].max_gb" 0; }
+policy_keep_warm_slot_days() { policy_get '.keep_warm_slot_days' 7; }
 
 # ---------------------------------------------------------------------------
 # Enforce guards — what enforce_pool must never touch.
@@ -1084,6 +1085,31 @@ slot_locked() {
   done
   return 1
 }
+
+# A slot whose built binary is the running image of a live process (the local
+# mesh runs elohim-storage/doorway straight out of their pool slots). A lock
+# says "cargo is writing here"; this says "something is executing from here".
+# Evicting such a slot would not crash the process (the inode lives until
+# close) but it strands the restart path (`hc-mesh.sh storage-restart`
+# re-execs the recorded exe), so eviction treats it as in-use.
+slot_exec_busy() {
+  local slot="${1:-}" pid_dir exe
+  [ -n "$slot" ] || return 1
+  for pid_dir in /proc/[0-9]*; do
+    exe="$(readlink "$pid_dir/exe" 2>/dev/null)" || continue
+    case "$exe" in "$slot"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+# Operator-manual per-slot pin: `touch <slot>/.pin` exempts ONE slot from every
+# automatic eviction (keep-warm trim, LRU budget) without pinning its whole
+# family. For slots whose rebuild cost dwarfs their footprint (the fork
+# conductor: ~3G on disk, ~45 min to rebuild).
+slot_pinned() { [ -n "${1:-}" ] && [ -e "$1/.pin" ]; }
+
+# In use = cargo holds the build lock OR a live process executes from it.
+slot_in_use() { slot_locked "$1" || slot_exec_busy "$1"; }
 
 # A family is busy when any of its slots is locked, or any live process has
 # its CWD inside the family tree.
@@ -1292,8 +1318,9 @@ prune_stale_artifact_hashes() {
 #
 # Unconditional hygiene (junk by definition — runs every time):
 #   1. stale incremental hash dirs   (> stale_incremental_days)
-#   2. stale artifact-hash copies    (keep newest K per stem; SKIPS protected
-#      and busy families — the active family's newest hash may be mid-use)
+#   2. stale artifact-hash copies    (keep newest K per stem; skips BUSY
+#      families only — protected families are included: their newest hash
+#      and hardlink-uplifted current artifacts survive by construction)
 #   3. legacy native targets outside the pool + stale node_modules
 # Disposition pass (the operator's standing decisions):
 #   4. evict-on-merge families whose <fam>/* branches are all merged;
@@ -1303,7 +1330,9 @@ prune_stale_artifact_hashes() {
 #      oldest unprotected unlocked slot (release profiles biased to go first)
 #
 # Guards at every destructive step: protected families (active session +
-# live-PID worktrees) are never touched; flock'd slots are never touched;
+# live-PID worktrees) are never EVICTED — only their own keep-warm bound
+# applies, slot-granular; in-use slots (flock held, or a live process
+# executing from the slot) and pinned slots (<slot>/.pin) are never touched;
 # a pool-level flock makes concurrent enforce runs a no-op.
 #
 # enforce_pool <apply:0|1> <quiet:0|1>   (apply=0 → dry-run, prints plan)
@@ -1343,11 +1372,15 @@ enforce_pool() {
     say "1 stale-incrementals: clean"
   fi
 
-  # -- 2. stale artifact hashes (unprotected, non-busy families only) -------
+  # -- 2. stale artifact hashes (non-busy families; protected families INCLUDED)
+  # Superseded hashes are junk by definition: the newest per stem and every
+  # hardlink-uplifted current artifact survive, so the active family's warm
+  # cache is untouched. Protection used to skip this step, which is how the
+  # active family carried 8.5G of dead hashes for weeks (2026-08-28). The one
+  # real hazard is a cargo mid-build, and family_busy already guards that.
   local keep min_mb min_age_h
   keep="$(policy_hash_keep)"; min_mb="$(policy_hash_min_mb)"; min_age_h="$(policy_hash_min_age_hours)"
   for fam in $(list_families); do
-    case " $protected " in *" $fam "*) say "2 hash-gc $fam: skipped (protected)"; continue ;; esac
     if family_busy "$fam"; then say "2 hash-gc $fam: skipped (busy)"; continue; fi
     local b2
     b2="$(stale_artifact_hash_bytes "$POOL_ROOT/family/$fam" "$keep" "$min_mb" "$min_age_h")"
@@ -1375,15 +1408,21 @@ enforce_pool() {
 
   # -- 4. dispositions -------------------------------------------------------
   for fam in $(list_families); do
-    case " $protected " in *" $fam "*) continue ;; esac
-    if family_busy "$fam"; then say "4 $fam: skipped (busy)"; continue; fi
-    if family_has_linked_slots "$fam"; then
-      say "4 $fam: skipped (linked slot lifecycle is operator-owned)"
-      continue
-    fi
     local disp fd fb
     disp="$(policy_family_disposition "$fam")"
     fd="$POOL_ROOT/family/$fam"
+    # Protection exempts a family from EVICTION (evict-on-merge / ttl / LRU),
+    # not from its own keep-warm bound: the active family is the one that
+    # grows, so a cap that pauses while anyone is working never binds (dev
+    # sat at 96G under a 60G cap — 2026-08-28). keep-warm trims are
+    # slot-granular and skip every in-use / pinned / linked / freshest-per-
+    # crate slot, so they are safe on the family you are working in.
+    case " $protected " in *" $fam "*) [ "$disp" = keep-warm ] || continue ;; esac
+    if family_busy "$fam"; then say "4 $fam: skipped (busy)"; continue; fi
+    if family_has_linked_slots "$fam" && [ "$disp" != keep-warm ]; then
+      say "4 $fam: skipped (linked slot lifecycle is operator-owned)"
+      continue
+    fi
     case "$disp" in
       evict-on-merge)
         if family_all_merged "$fam"; then
@@ -1409,7 +1448,11 @@ enforce_pool() {
         local cap
         cap="$(policy_family_max_gb "$fam")"
         if [ "${cap:-0}" -gt 0 ]; then
+          # The trim loop runs in this shell (its candidate list is the
+          # process substitution), so the freed tally survives the call.
+          ENFORCE_TRIM_FREED_B=0
           trim_family_to_gb "$fam" "$cap" "$apply" "$quiet"
+          freed=$((freed + ENFORCE_TRIM_FREED_B))
         fi
         ;;
       pin) : ;;
@@ -1477,11 +1520,16 @@ $victim"
   return 0
 }
 
-# Trim a keep-warm family down to its max_gb: release slots first (oldest
-# first), then oldest dev slots. Locked slots are skipped. The FRESHEST slot
-# always survives — "keep-warm" means the primary warm cache is never
-# evicted, even when it alone exceeds the cap (the cap then becomes
-# best-effort; profile shrink is the durable fix for oversized slots).
+# Trim a keep-warm family down to its max_gb. What survives, always:
+#   - the freshest slot of every workspace key (crate dir) built within
+#     keep_warm_slot_days — one warm cache per crate you are actually working
+#     on, never just one per family (a monorepo family holds many crates);
+#   - pinned slots (<slot>/.pin), linked slots, and in-use slots (cargo lock
+#     held, or a live process executing from the slot — the local mesh runs
+#     out of its slots).
+# Everything else is a candidate: release-profile slots first (oldest first),
+# then the rest oldest first, until the family is under its cap. A cap that
+# cannot be met by evicting candidates is reported, never forced.
 trim_family_to_gb() {
   local fam="$1" cap_gb="$2" apply="${3:-0}" quiet="${4:-0}"
   local say
@@ -1492,37 +1540,47 @@ trim_family_to_gb() {
   local size
   size="$(dir_disk_bytes "$fd")"
   [ "${size:-0}" -le "$cap_b" ] && return 0
-  # Identify the freshest slot — the one keep-warm exists to protect.
-  local freshest="" freshest_t=0 s t
-  while IFS= read -r s; do
-    [ -n "$s" ] || continue
-    t="$(slot_age_epoch "$s")"
-    if [ "${t:-0}" -gt "$freshest_t" ]; then freshest_t="$t"; freshest="$s"; fi
-  done < <(list_slots_for_family "$fam")
-  say "4 $fam: keep-warm over cap ($(human_bytes "$size") > ${cap_gb}G) — trimming (freshest slot kept: ${freshest:-none})"
-  local slot
+  local window_days cutoff
+  window_days="$(policy_keep_warm_slot_days)"
+  cutoff=$(( $(date +%s) - window_days * 86400 ))
+  # Freshest slot per workspace key (the slot's parent dir), if within window.
+  local keep="" key s t best best_t
+  for key in $(list_slots_for_family "$fam" | xargs -r -n1 dirname | sort -u); do
+    best=""; best_t=0
+    for s in "$key"/*; do
+      [ -d "$s" ] || continue
+      t="$(slot_age_epoch "$s")"
+      if [ "${t:-0}" -gt "$best_t" ]; then best_t="$t"; best="$s"; fi
+    done
+    if [ -n "$best" ] && [ "$best_t" -ge "$cutoff" ]; then
+      keep="${keep}${best}
+"
+    fi
+  done
+  say "4 $fam: keep-warm over cap ($(human_bytes "$size") > ${cap_gb}G) — trimming; warm set kept (freshest per crate built <${window_days}d): $(printf '%s' "$keep" | grep -c .)"
+  local slot sb
   while IFS= read -r slot; do
     [ -n "$slot" ] || continue
     [ "${size:-0}" -le "$cap_b" ] && break
-    [ "$slot" = "$freshest" ] && continue
     [ -L "$slot" ] && continue
-    if slot_locked "$slot"; then continue; fi
-    local sb
+    if printf '%s' "$keep" | grep -qxF -- "$slot"; then continue; fi
+    if slot_pinned "$slot"; then continue; fi
+    if slot_in_use "$slot"; then say "4 $fam: keep $slot (in use)"; continue; fi
     sb="$(dir_disk_bytes "$slot")"
-    say "4 $fam: trim $slot ($(human_bytes "$sb"))"
+    say "4 $fam: trim $slot ($(human_bytes "$sb"), last built $(date -u -d @"$(slot_age_epoch "$slot")" +%F))"
     if [ "$apply" = 1 ]; then
-      rm -rf "$slot" && { size=$((size - sb)); enforce_log keep-warm-trim "$slot" "$sb"; }
+      rm -rf "$slot" && { size=$((size - sb)); ENFORCE_TRIM_FREED_B=$((ENFORCE_TRIM_FREED_B + sb)); enforce_log keep-warm-trim "$slot" "$sb"; }
     else
       size=$((size - sb))
     fi
   done < <(
-    # order: release profile slots oldest-first, then dev slots oldest-first
+    # order: release profile slots oldest-first, then the rest oldest-first
     for s in $(list_slots_for_family "$fam"); do
       printf '%s\t%s\t%s\n' "$(case "$s" in */release) echo 0 ;; *) echo 1 ;; esac)" "$(slot_age_epoch "$s")" "$s"
     done | sort -t"$(printf '\t')" -k1,1n -k2,2n | cut -f3
   )
   if [ "${size:-0}" -gt "$cap_b" ]; then
-    say "4 $fam: still over cap after trim ($(human_bytes "$size") > ${cap_gb}G) — freshest slot preserved by keep-warm; shrink it via build profiles, not eviction"
+    say "4 $fam: still over cap after trim ($(human_bytes "$size") > ${cap_gb}G) — the warm-per-crate set alone exceeds the cap; shrink it via build profiles or raise families.$fam.max_gb"
   fi
 }
 
@@ -1545,7 +1603,7 @@ pick_lru_slot() {
       [ -n "$slot" ] || continue
       case "$skip" in *"$slot"*) continue ;; esac
       [ -L "$slot" ] && continue
-      if slot_locked "$slot"; then continue; fi
+      if slot_pinned "$slot" || slot_in_use "$slot"; then continue; fi
       t="$(slot_age_epoch "$slot")"
       case "$slot" in */release) t=$((t - 2592000)) ;; esac
       if [ "${t:-0}" -lt "$best_t" ]; then best_t="$t"; best="$slot"; fi

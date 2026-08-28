@@ -7,6 +7,9 @@
   "artifact_hash_keep": 1,
   "artifact_min_mb": 64,
   "artifact_min_age_hours": 6,
+  "keep_warm_slot_days": 7,
+  "_keep_warm_slot_days": "keep-warm trim survivors: the freshest slot per crate (workspace key) built within this many days is always kept; colder keys become candidates oldest-first. Per-slot operator pin: `touch <slot>/.pin` (e.g. the fork conductor — ~3G, ~45 min rebuild).",
+  "_evidence_2026_08_28": "The pool is a cluster-stability control, not only disk hygiene: the workspace PV lives on the root fs of the host that runs the only k8s control plane; a netconsole trace (2026-08-28 23:00Z) showed kswapd soft-locked in ext4_es_scan/__es_shrink (extent-status shrinker, cost ∝ inode count + fragmentation) — 14 CPUs followed, cluster API down for hours, 17th freeze. The pool held 341K of the PV's ~1.02M inodes (126G) and its churn fragments the extent tree. Two enforcement gaps let it grow: hash-gc and the keep-warm cap both skipped the ACTIVE family (dev sat at 96G under a 60G cap). Both now apply slot-granularly with in-use/pin guards.",
   "families": {
     "shift": { "disposition": "evict-on-merge" },
     "sprint": { "disposition": "evict-on-merge" },
@@ -18,7 +21,7 @@
   },
   "_dispositions": {
     "evict-on-merge": "auto-evicted when EVERY local+remote branch under <family>/* is merged into dev AND no live worktree/PIDs reference the family. Active session's family is always protected regardless.",
-    "keep-warm": "never fully evicted; trimmed to max_gb (release slots first, then oldest dev slots) when over.",
+    "keep-warm": "never evicted as a family — and trimmed to max_gb EVEN WHILE ACTIVE (the active family is the one that grows; a cap that pauses during work never binds). Survivors: freshest slot per crate built within keep_warm_slot_days, pinned (<slot>/.pin), linked, and in-use slots (cargo lock held or a live process executing from the slot). Candidates go release-profile-first, then oldest-first. Unmeetable caps are reported, never forced.",
     "ttl": "evicted after ttl_days with no filesystem activity anywhere in the family tree.",
     "pin": "never touched by enforce (operator-manual only)."
   }

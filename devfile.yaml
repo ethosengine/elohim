@@ -21,6 +21,43 @@ metadata:
   language: Polyglot
   version: 2.0.0
 
+# Pod-level overrides — DevWorkspace `spec.template.attributes.pod-overrides`,
+# strategic-merge-patched into the workspace pod by the DevWorkspace operator.
+attributes:
+  pod-overrides:
+    spec:
+      securityContext:
+        # Che sets fsGroup: 1234 on the pod. With the default policy (Always)
+        # kubelet recursively chowns EVERY file on the workspace PV at each
+        # start — ~1.02M inodes / 174G. That full-tree walk lands on the host
+        # the cluster control plane runs on; on 2026-08-28 a netconsole trace
+        # tied that host's freezes to kswapd wedged in ext4's extent-status
+        # shrinker, whose cost scales with inode count. OnRootMismatch stats
+        # the volume root only and skips the walk when its group already
+        # matches (it does — the tree is 1234-owned). Operator-requested.
+        fsGroupChangePolicy: OnRootMismatch
+      # ── Cargo target pool on its OWN volume — HELD until the operator
+      # provisions the claim. An unresolvable PVC leaves the pod Pending
+      # (workspace-killing), so this stays commented until step 1 is done.
+      # Why: ~126G / 341K inodes of constantly rewritten build artifacts is
+      # what inflates and fragments the ext4 extent tree on the control-plane
+      # host (same kswapd trace). Che consolidates devfile `volume` components
+      # into the single workspace PVC, so a separate filesystem needs a
+      # pre-provisioned claim mounted through overrides. Handshake:
+      #   1. operator creates PVC `cargo-target-pool` (≥150Gi, its own
+      #      filesystem) in this workspace's namespace;
+      #   2. uncomment `volumes:` here AND the `volumeMounts` override on the
+      #      `tools` component below, then restart — the pool root path is
+      #      unchanged, so nothing else moves;
+      #   3. after the first warm build, `rm -rf` the old
+      #      /projects/.cargo-target-pool contents from a shell that sees the
+      #      unmounted PV (or let the operator reclaim it) — the mount shadows
+      #      it, it does not free it.
+      # volumes:
+      #   - name: cargo-target-pool
+      #     persistentVolumeClaim:
+      #       claimName: cargo-target-pool
+
 projects:
   - name: elohim
     git:
@@ -49,6 +86,13 @@ projects:
 
 components:
   - name: tools
+    # Pairs with the held `cargo-target-pool` volume in pod-overrides above.
+    # Uncomment together with it, never alone.
+    # attributes:
+    #   controller.devfile.io/container-overrides: |
+    #     volumeMounts:
+    #       - name: cargo-target-pool
+    #         mountPath: /projects/.cargo-target-pool
     container:
       # Image build source: https://github.com/ethosengine/che-devworkspaces
       #   containers/udi-plus/Dockerfile   — base: claude-code, SonarQube MCP jar,
