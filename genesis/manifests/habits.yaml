@@ -105,6 +105,13 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-28f (transport-parity check; NO status flip). Row 13 landed:
+      the pull leg dispatches across libp2p + the iroh book (iroh preferred for a
+      dual peer), GetContent + quilt-draw blob pull over the iroh shard ALPN. Dual
+      household mesh, warm jessica<-matthew: 58 s PASS P0-P4,
+      acquisition_dispatch{iroh}=3 {libp2p}=8, iroh_blob_fetches{ok}=3 — first bulk
+      bytes on iroh. homo-iroh stays red past P0 (no P2PNode -> no projection loop;
+      backlog iroh-only-content-projection-loop-gap). Mesh now runs dual by default.
       DELTA 2026-08-28e (M0 pawls, NO status flip). Lane R rung R3: the recovery
       timeline is durable (genesis/a2o/reports/recovery/, /tmp symlink; first record
       warm jessica<-matthew 62 s libp2p). Lane D rung D2: pre-push T2-receipt leg

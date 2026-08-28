@@ -70,6 +70,13 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-28f (transport-parity check; NO status flip). Row 13 landed:
+the pull leg dispatches across libp2p + the iroh book (iroh preferred for a
+dual peer), GetContent + quilt-draw blob pull over the iroh shard ALPN. Dual
+household mesh, warm jessica<-matthew: 58 s PASS P0-P4,
+acquisition_dispatch{iroh}=3 {libp2p}=8, iroh_blob_fetches{ok}=3 — first bulk
+bytes on iroh. homo-iroh stays red past P0 (no P2PNode -> no projection loop;
+backlog iroh-only-content-projection-loop-gap). Mesh now runs dual by default.
 DELTA 2026-08-28e (M0 pawls, NO status flip). Lane R rung R3: the recovery
 timeline is durable (genesis/a2o/reports/recovery/, /tmp symlink; first record
 warm jessica<-matthew 62 s libp2p). Lane D rung D2: pre-push T2-receipt leg

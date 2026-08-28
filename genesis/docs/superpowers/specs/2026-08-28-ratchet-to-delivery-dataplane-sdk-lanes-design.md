@@ -53,7 +53,7 @@ Legend: 🟢 locked · 🟡 green-unlocked (no pawl) or partial · 🔴 red · �
 |---|---|---|---|---|
 | R1 | `cargo test --test sync_libp2p_convergence`, `--test household_resilience` (elohim-storage) | T1 `just gate` | 🟢 storage gate green (08-28, lib 3,009/3,009) | hold |
 | R2 | saga 11/11 — `just test mesh` `--profile saga` → `just status saga` | T2 | 🟢 11/11, run `20260828T044708Z-6e4fa438` | hold; re-prove per transport pair (P2) |
-| R3 | warm/cold recovery `time_to_recover` durable — `just mesh recovery <shape> <peer>` → `genesis/a2o/reports/recovery/recovery-timeline.jsonl` (`/tmp` path is a symlink) | T2 | 🟡 DURABLE since M0 (2026-08-28): warm jessica←matthew 62 s on libp2p, 1 record; dual rows need a storage binary built with `p2p-iroh` | N=3 per shape × transport |
+| R3 | warm/cold recovery `time_to_recover` durable — `just mesh recovery <shape> <peer>` → `genesis/a2o/reports/recovery/recovery-timeline.jsonl` (`/tmp` path is a symlink) | T2 | 🟡 DURABLE since M0 (2026-08-28): warm jessica←matthew 62 s libp2p · 58 s dual · 902 s FAIL homo-iroh (P0 only); 3 records; mesh runs dual by default (`STORAGE_BIN` dev-slot fallback) | N=3 per shape × transport |
 | R4 | local quiesce sustained on the seeded corpus — `just mesh quiesce` (io_baseline within 2×) | T2 | 🔴 FAIL(deadline) sweep 21 actionable 65 (W4, 08-28) | PASS N=3 |
 | R5 | plateau rows have names — `/p2p/status.syncVerdicts`, `elohim_sync_verdict_total{reason}` | T1 test + T2 read | ⚪ does not exist (`sync_gate.verdict()` is the pause verdict) | reason counts recorded at the plateau |
 | R6 | heal under injected admission pressure — `healed`/sweep > 0 every sweep | T2 (pressure profile) | ⚪ never exercised locally | > 0 N=3 |
@@ -71,7 +71,7 @@ Open: 8 of 11 (R1, R2 locked; R3 durable since M0, 1 of N=3).
 |---|---|---|---|---|
 | P1 | three homogeneous transports converge — `just mesh matrix` / `@concern:transport-parity` | T2 | 🟢 3/3/3, p50 56.6/58.6/56.7 s (08-25) | hold |
 | P2 | all 8 recovery scenarios present and truthful — `transport-recovery-measurements.feature` | T2 (after R3) | 🔴 feature `@wip`; series lost | un-`@wip`, N=3 |
-| P3 | `homo-iroh` warm/cold P0–P4 green | T2 matrix | 🔴 P3/P4 fail (pull queue libp2p-only) | green |
+| P3 | `homo-iroh` warm/cold P0–P4 green; dual pull leg carries bytes on iroh | T2 matrix | 🟡 row 13 landed 2026-08-28: dual warm 58 s PASS with `acquisition_dispatch{iroh}` 3 / `iroh_blob_fetches{ok}` 3; `homo-iroh` P0 green (iroh doc-sync), P1–P4 red — pure iroh hosts no projection loop (backlog `iroh-only-content-projection-loop-gap`) | homo-iroh green |
 | P4 | `PathObservation`/`select_path` live — `elohim_transport_route_total{reason}` on both planes | T1 contract tests + T2 | ⚪ spec-only (rows 1–4) | non-zero both planes; C4 honest-absence test green |
 | P5 | sovereign peer joins alpha and is visible — `@concern:sovereign-peer-join` sc1 (join) · sc5 (hosted read == peer read) | T3 (`just dev conductor alpha`, fork iroh pair, `ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available`) | 🟡 sc1 GREEN ×4 (M0, fork pair; a stock tx5 join is listed-but-unconnected and now refused) · sc5 RED in both arc modes — every live alpha agent-info advertises `storageArc: null`, so a remote read has no authority (backlog `sovereign-peer-network-read-no-authorities`) | sc5 green once the fleet advertises arcs |
 | P6 | sovereign peer's authored node served by the fleet — sc3 | T3 | 🔴 404 for 4 min (P1 gap) | 200 through doorway-alpha |
