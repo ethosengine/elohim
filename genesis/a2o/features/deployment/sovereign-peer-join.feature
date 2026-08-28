@@ -64,6 +64,13 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     ids authored on the network rather than only from other storages.
     Scenarios without that marker describe behaviour that has been observed
     to hold or is expected to hold once wired.
+  - A node's "id" is the author-chosen name it is created under and looked
+    up by (for the landing page, literally `elohim-host-landing`); it is not
+    a hash and does not change when the node's bytes do.
+  - A RED scenario whose steps ARE wired (no @wip) is run, and it fails: the
+    run's report counts it failed, and the lane that runs it reads red until
+    the named capability lands. That is the point — a wired RED scenario is
+    a measurement, not a placeholder.
   - A "content hash" is the content-addressed identifier of the node's
     stored bytes (the node's blob CID when it is blob-backed, otherwise a
     SHA-256 of its body text) — the same value however the node is read,
