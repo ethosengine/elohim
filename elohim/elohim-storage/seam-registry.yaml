@@ -2266,3 +2266,86 @@ decisionPoints:
       unblock as http-reach-enforcement-gap — no above-community blob-bearing row exists in any
       seeded corpus today, so it refuses nothing real. Both are named in the backlog row rather
       than discovered later.
+  - name: verify_session_proof
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/session_proof.rs
+      modulePath: services::session_proof::verify_session_proof
+      line: 199
+    summary: >
+      The peer-native session-establishment predicate: does the caller hold the Ed25519
+      private key for the canonical `uhCAk…` agent identity they name, demonstrated by a
+      domain-separated `verify_strict` signature over a challenge. This is the local-first
+      foundation for auth that has no doorway, no DNS and no redirect in the path — a
+      runtime you own (self, on your own device) or a runtime you are a guest on under
+      shared device custody (a family member's peer, guest-profile shaped). It answers ONLY
+      key control at signing time; nonce freshness/single-use is the caller's, social
+      identity is HumanityWitness/attestation:*, lineage currency is KeyStewardship, and
+      what a proven guest may then DO is imagodei DevicePolicy.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          This predicate IS the consent/authorization floor for the native path, replacing
+          an ASSERTION with a PROOF. The surfaces it is the foundation for currently accept
+          a self-named identity outright: POST /session (handle_create_session) deserializes
+          a body naming human_id + agent_pub_key and creates an ACTIVE session with no
+          token, cookie or origin check, and extract_agent_key returns X-Agent-Id verbatim.
+          A signature over a domain-separated challenge is checkable by the runtime alone,
+          which is what the no-doorway case requires — a doorway-minted bearer cannot serve
+          where there is no doorway to mint one.
+      - id: C4
+        status: answered
+        justification: >
+          Every refusal is a positive, typed observation with its own ProofError arm, and
+          crucially an ENCODING fault is never reported as a signature failure. That
+          separation is the whole point: handle_add_portal_host compares a hex raw-39
+          agent_key_hex() against a `uhCAk…` identity — a comparison that can never succeed
+          — and it surfaces as 503 BROWSER_WRITE_PATH_PENDING, an encoding bug wearing an
+          authorization costume. Pinned by a_raw_base64_key_is_refused_as_an_encoding_fault
+          and a_hex_raw39_key_is_refused_as_an_encoding_fault.
+      - id: C6a
+        status: answered
+        justification: >
+          Pure function over three byte slices — no I/O, no conductor call, no retry ladder,
+          no allocation beyond one domain-prefixed message buffer. Bounded by construction.
+      - id: C2
+        status: n-a
+        justification: >
+          Establishes no authority ordering — it answers one boolean about one signature.
+          Monotonicity belongs to whatever consumes the verdict (session lifecycle, and the
+          revocation plane on KeyStewardship).
+      - id: C8
+        status: partial
+        gapNote: >
+          The predicate is un-metered: it returns a typed ProofError but increments no
+          counter, so a runtime cannot distinguish an encoding-mismatch storm (a
+          misconfigured client) from signature failures (a possible attack) without reading
+          logs. Deliberate for this slice — the predicate has no call site yet, and a meter
+          with no caller is an instrument with no reader. Wire a
+          elohim_session_proof_refused_total{reason} over the ProofError vocabulary in the
+          same commit that gives it its first caller.
+      - id: C9
+        status: partial
+        gapNote: >
+          A key rotated AWAY still verifies here — the predicate reads the key material
+          embedded in the identity and consults no lineage. Correct for a pure signature
+          check, but the consuming session surface MUST additionally check lineage currency
+          against KeyStewardship, or a revoked device key establishes a session forever.
+          Named here so the consumer cannot inherit this gap silently.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/session_proof.rs
+        testName: a_real_signature_over_the_challenge_verifies
+        kind: unit
+      - path: elohim/elohim-storage/src/services/session_proof.rs
+        testName: another_agents_signature_is_refused
+        kind: unit
+      - path: elohim/elohim-storage/src/services/session_proof.rs
+        testName: a_signature_from_another_elohim_domain_is_refused
+        kind: unit
+      - path: elohim/elohim-storage/src/services/session_proof.rs
+        testName: a_raw_base64_key_is_refused_as_an_encoding_fault
+        kind: unit
+      - path: elohim/elohim-storage/src/services/session_proof.rs
+        testName: a_small_order_public_key_is_refused
+        kind: unit
