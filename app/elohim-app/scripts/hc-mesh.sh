@@ -49,6 +49,13 @@
 #   MESH_DOORWAYS    0 skips mongod and both doorways; storage peers launch
 #                   without ELOHIM_DOORWAY_URL (default: 1).
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
+#   MESH_PORTAL     0 skips the doorway sign-in portal (default: 1). The doorway proxies
+#                   /threshold/* to THRESHOLD_URL as-is; without something listening there
+#                   /threshold/login is a 502 and the chaperone portal cannot be exercised
+#                   locally at all. Serving it is what lets the browser a2o lane validate a
+#                   real login before anything is pushed.
+#   THRESHOLD_PORT  Port the portal listens on (default: 8081 — the doorway's own
+#                   THRESHOLD_URL default, so both doorways proxy to one portal).
 #   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT  health-watchdog listener ports (default 8079 / 8089;
 #                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
 #                   its own OS-thread runtime; unset ⇒ liveness rides the MAIN listener and the watchdog
@@ -173,6 +180,8 @@ export MESH_PEER_TRANSPORTS
 MESH_DOORWAYS="${MESH_DOORWAYS:-1}"
 MESH_DOORWAYS_EFFECTIVE="$MESH_DOORWAYS"
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
+MESH_PORTAL="${MESH_PORTAL:-1}"
+THRESHOLD_PORT="${THRESHOLD_PORT:-8081}"
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
 DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
 DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
@@ -258,7 +267,7 @@ mesh_owned_ports() {
   # Doorway/mongo ports remain owned even when the NEXT requested shape has
   # MESH_DOORWAYS=0; stop must still reap a previously doorway-backed shape.
   printf '%s\n' "$DOORWAY_PORT" "$DOORWAY_B_PORT" \
-    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT"
+    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT" "$THRESHOLD_PORT"
   local i=0
   for _ in "${PEERS[@]}"; do
     printf '%s\n' "$(admin_port "$i")" "$(app_port "$i")" \
@@ -272,6 +281,7 @@ refresh_mesh_pidfiles() {
   record_listener_pid doorway a "$DOORWAY_PORT" || true
   record_listener_pid doorway b "$DOORWAY_B_PORT" || true
   record_listener_pid mongod mesh "$MONGO_PORT" || true
+  record_listener_pid portal mesh "$THRESHOLD_PORT" || true
   for name in "${PEERS[@]}"; do
     record_listener_pid conductor "$name" "$(admin_port "$i")" || true
     record_listener_pid storage "$name" "$(http_port "$i")" || true
@@ -858,6 +868,16 @@ status_all() {
     curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
     printf "doorwayB :%s " "${DOORWAY_B_PORT:-8889}"
     curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
+    printf "portal   :%s " "$THRESHOLD_PORT"
+    if curl -s -m 2 -o /dev/null "http://localhost:$DOORWAY_PORT/threshold/login"; then
+      case "$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://localhost:$DOORWAY_PORT/threshold/login")" in
+        200) echo "UP (/threshold/login serves through the doorway)" ;;
+        502) echo "down (doorway proxies /threshold/* here; nothing listening)" ;;
+        *)   echo "down" ;;
+      esac
+    else
+      echo "down"
+    fi
   else
     echo "doorways: disabled (MESH_DOORWAYS=0)"
   fi
@@ -1659,6 +1679,36 @@ EOF
   else
     record_listener_pid doorway b "$DOORWAY_B_PORT" || true
     echo "doorway B already up on :$DOORWAY_B_PORT"
+  fi
+
+  # 1c. The doorway sign-in portal (doorway-app). The doorway forwards /threshold/*
+  # to THRESHOLD_URL with the path INTACT (doorway-service/src/routes/threshold.rs),
+  # and its default is http://localhost:8081 — so serving doorway-app there under
+  # /threshold makes the chaperone portal reachable at
+  # http://localhost:$DOORWAY_PORT/threshold/login exactly as the deployed sidecar
+  # serves it. Without this the path is a 502 and no browser scenario can exercise
+  # a real login locally.
+  #
+  # The SPA calls the doorway SAME-ORIGIN (doorway-app environment.doorwayUrl is
+  # ''), so it must be driven through the doorway, never against this port directly
+  # -- there its API calls would hit the dev server and 404.
+  #
+  # Started detached and NOT waited on: the dev server takes ~40s to become ready
+  # and nothing else in the mesh depends on it, so blocking here would tax every
+  # `mesh start` for a surface most runs never touch.
+  if [ "$MESH_PORTAL" = "1" ]; then
+    if curl -s -m 2 -o /dev/null "http://127.0.0.1:$THRESHOLD_PORT/threshold/"; then
+      record_listener_pid portal mesh "$THRESHOLD_PORT" || true
+      echo "portal already up on :$THRESHOLD_PORT"
+    elif [ -d "$REPO_ROOT/doorway/doorway-app/node_modules" ] || [ -d "$REPO_ROOT/node_modules" ]; then
+      ( cd "$REPO_ROOT/doorway/doorway-app" && \
+        nohup pnpm exec ng serve --port "$THRESHOLD_PORT" --serve-path /threshold \
+          --host 127.0.0.1 > "$LOGDIR/portal.log" 2>&1 & \
+        record_mesh_pid portal mesh "$!" || true )
+      echo "portal starting on :$THRESHOLD_PORT (doorway-app; ~40s to first paint, log: $LOGDIR/portal.log)"
+    else
+      echo "portal SKIPPED: no node_modules for doorway-app — run pnpm install (set MESH_PORTAL=0 to silence)" >&2
+    fi
   fi
   fi
 

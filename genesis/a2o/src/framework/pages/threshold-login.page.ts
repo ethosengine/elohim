@@ -23,6 +23,21 @@ export class ThresholdLoginPage extends BasePage {
     await this.testId(THRESHOLD.SUBMIT).click();
   }
 
+  /**
+   * Every control the human needs to sign in is actually on the page.
+   *
+   * `waitForReady` only proves the identifier input arrived; a portal that
+   * rendered the identifier and nothing else would pass it. Used by the
+   * render half of the portal e2e, whose whole point is that a painted form
+   * and a working sign-in are two different claims.
+   */
+  async formIsRendered(): Promise<boolean> {
+    for (const id of [THRESHOLD.IDENTIFIER, THRESHOLD.PASSWORD, THRESHOLD.SUBMIT]) {
+      if (!(await this.testId(id).isVisible())) return false;
+    }
+    return true;
+  }
+
   /** Check whether the error banner is currently visible. */
   async hasError(): Promise<boolean> {
     return this.testId(THRESHOLD.ERROR).isVisible();
