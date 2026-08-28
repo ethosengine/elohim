@@ -71,7 +71,7 @@ Open: 8 of 11 (R1, R2 locked; R3 durable since M0, 1 of N=3).
 |---|---|---|---|---|
 | P1 | three homogeneous transports converge — `just mesh matrix` / `@concern:transport-parity` | T2 | 🟢 3/3/3, p50 56.6/58.6/56.7 s (08-25) | hold |
 | P2 | all 8 recovery scenarios present and truthful — `transport-recovery-measurements.feature` | T2 (after R3) | 🔴 feature `@wip`; series lost | un-`@wip`, N=3 |
-| P3 | `homo-iroh` warm/cold P0–P4 green; dual pull leg carries bytes on iroh | T2 matrix | 🟡 row 13 landed 2026-08-28: dual warm 58 s PASS with `acquisition_dispatch{iroh}` 3 / `iroh_blob_fetches{ok}` 3; `homo-iroh` P0 green (iroh doc-sync), P1–P4 red — pure iroh hosts no projection loop (backlog `iroh-only-content-projection-loop-gap`) | homo-iroh green |
+| P3 | `homo-iroh` warm/cold P0–P4 green; dual pull leg carries bytes on iroh | T2 matrix | 🟢 2026-08-28: dual warm 58 s PASS (`acquisition_dispatch{iroh}` 3, `iroh_blob_fetches{ok}` 3); **pure-iroh warm jessica←matthew PASS P0–P4 in 258 s** (durable record 22:54:08Z) after the pull core + heal-on-read parity + shard responder alias + composite manifest pivot (`b9c9ad477`). Cold shape and N=3 still to take | cold green; N=3 per shape |
 | P4 | `PathObservation`/`select_path` live — `elohim_transport_route_total{reason}` on both planes | T1 contract tests + T2 | ⚪ spec-only (rows 1–4) | non-zero both planes; C4 honest-absence test green |
 | P5 | sovereign peer joins alpha and is visible — `@concern:sovereign-peer-join` sc1 (join) · sc5 (hosted read == peer read) | T3 (`just dev conductor alpha`, fork iroh pair, `ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available`) | 🟡 sc1 GREEN ×4 (M0, fork pair; a stock tx5 join is listed-but-unconnected and now refused) · sc5 RED in both arc modes — every live alpha agent-info advertises `storageArc: null`, so a remote read has no authority (backlog `sovereign-peer-network-read-no-authorities`) | sc5 green once the fleet advertises arcs |
 | P6 | sovereign peer's authored node served by the fleet — sc3 | T3 | 🔴 404 for 4 min (P1 gap) | 200 through doorway-alpha |
@@ -80,7 +80,7 @@ Open: 8 of 11 (R1, R2 locked; R3 durable since M0, 1 of N=3).
 | P9 | a second binary participates (Tauri steward or `steward/node`) in the household mesh | T2 | ⚪ builds in CI, runs nowhere | one steward peer in a matrix row |
 | P10 | **delivery**: a workspace peer authors and a browser reads it through both doorways | T3 → T4 | 🔴 | sc3 + `served-projected-head` green |
 
-Open: 9 of 10.
+Open: 8 of 10 (P1, P3 locked).
 
 ## Lane F — Federation (habits: `notary-authority`, `reach-enforced-everywhere`, `identity-cross-signed`, `doorway-failover`)
 
@@ -141,7 +141,7 @@ The SDK's promise decomposes into four planes; a developer can stop thinking abo
 | **REA** (every value-touching act is a bounded, witnessed event) | declare a coupling, the event appears | S5 partial (app-side harness); `bounded_by` commitments live; `bridges/valueflows` live | S5 substrate-side conformance, S6 (CLAIM/BECOME/RENEW), P7/P8 (attribution rides a cross-signed binding), F6 (adopt-before-author fed) |
 | **Projection** (doorways make truth legible; never own it) | serve through any doorway, identical answer | F2/F3 locked; SSR trust-scoped cache | F4/F5 (uniform deploy without the per-host crutch; seed ≠ admin), F8–F10 (reach on every egress; fleet measures it), S7 (app-declared views), D3–D5 (a lane that sees a browser) |
 
-**Counts (open rungs):** R 8/11 · P 9/10 · F 7/10 · D 5/7 · S 8/10 → **37 open of 48**, 11 locked (M0 2026-08-28: R3 durable, D2 locked; P5 half — sc1 green, sc5 at the no-authorities ceiling). The three rungs that unlock the most downstream: **R5** (names the plateau — gates R4, R6, R7, F6), **S3** (first honest developer round-trip — gates S9, S10), **F9/D3** (a fleet lane that measures anything — gates F10, D5, D7).
+**Counts (open rungs):** R 8/11 · P 8/10 · F 7/10 · D 5/7 · S 8/10 → **36 open of 48**, 12 locked (M0 2026-08-28: R3 durable, D2 locked; P5 half — sc1 green, sc5 at the no-authorities ceiling; M4 row 13 + pure-iroh parity: P3 locked). The three rungs that unlock the most downstream: **R5** (names the plateau — gates R4, R6, R7, F6), **S3** (first honest developer round-trip — gates S9, S10), **F9/D3** (a fleet lane that measures anything — gates F10, D5, D7).
 
 ## The moves (what advances which rungs)
 

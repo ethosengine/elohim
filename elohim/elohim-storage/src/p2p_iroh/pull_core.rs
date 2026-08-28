@@ -74,6 +74,11 @@ pub struct IrohPullCore {
     gap_in_flight: Arc<AtomicUsize>,
     pin_in_flight: Arc<AtomicUsize>,
     rotation: AtomicUsize,
+    // bounded-work: one ListContent walk per book peer per `list_every` tick, each walk
+    // page-bounded by `next_doc_list_offset` (MAX_SYNC_LIST_OFFSET) and per-request by
+    // LIST_TIMEOUT; a failed walk parks the peer for LIST_BACKOFF so an unreachable peer
+    // costs one request per cadence. Dispatch is capped by MAX_REPLICATION_INFLIGHT /
+    // MAX_ACQUISITION_INFLIGHT; nothing here retries an uncancellable conductor call.
     list_backoff: Mutex<HashMap<NodeId, Instant>>,
     status_tx: watch::Sender<IrohPullStatus>,
 }

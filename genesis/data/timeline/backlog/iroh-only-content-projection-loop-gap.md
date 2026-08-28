@@ -7,7 +7,7 @@ title: "Pure-iroh storage syncs documents but never projects them into content r
 slug: "iroh-only-content-projection-loop-gap"
 written: "2026-08-28"
 author: "M4 row-13 cut (post M0 shift)"
-status: "open"
+status: "done"
 priority: "medium"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -41,3 +41,21 @@ Host the acquisition/projection loop on a transport-neutral runtime seam (the `A
 The remaining libp2p bindings are the queue owner, the inventory-gap producer, the kad head-record
 publish, and the `/p2p/status.pull` projection. Until then `homo-iroh` is expected red past P0 in
 `transport-recovery-measurements.feature`; the fleet (dual) is not affected.
+
+## Cured (2026-08-28, `b9c9ad477`) — homo-iroh warm recovery PASS P0–P4 in 258 s
+
+Four parity defects, each measured red then green on the household mesh with all three storages iroh-only:
+1. **No pull loop** → `p2p_iroh::pull_core` (ListContent pages → gaps → GetContent → shared ingest → quilt-draw
+   blob pull; pin reconcile; `/p2p/status` carries `replication` + `pull` in iroh mode). P3 green at 22:11Z.
+2. **Heal-on-read gated on the libp2p handle** → iroh-only nodes race the iroh book (inert libp2p sender).
+3. **Shard responder blind to iroh-staged blobs** → sha256→blake3 alias fallback, verify-before-serve.
+4. **No composite pivot on the iroh leg** → `ShardRequest::GetManifest` / `ShardResponse::Manifest` on the
+   shard protocol (both planes); the iroh leg asks on an honest NotFound and the Q4 swarm shard-fetch
+   reassembles. P2 green at 22:54Z (landing composite reassembled from shards over iroh).
+
+Residual named, not a defect: the quilt-draw finalizer stamps `blob_hash` to the verified bytes, so a
+recovering peer can be MORE precise than a survivor whose declared CID never landed — the
+blobHash/serverBlobHash join-key duality; the harness's P1 equality reads it as a mismatch only when the
+survivor itself holds a declared-but-unlanded CID. Follow-ups: cold shape + N=3 per pair; write-time
+custody push (`handle_db_content_list/bulk`) is still libp2p-only; converge the two pull drivers
+(P2PNode's and pull_core) into one transport-neutral core.

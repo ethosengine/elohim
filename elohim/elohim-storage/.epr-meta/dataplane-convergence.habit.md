@@ -70,6 +70,12 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-28g (transport-parity check; NO status flip). Pure-iroh
+parity landed (b9c9ad477): pull core, heal-on-read without a libp2p
+handle, shard responder alias fallback, composite manifest pivot. homo-iroh
+warm jessica<-matthew: PASS P0-P4 in 258 s (durable record 22:54:08Z),
+from P0-only 901 s FAIL the same evening. Lane P rung P3 locked for the
+warm shape; cold + N=3 outstanding. Full storage lib suite 3166/0.
 DELTA 2026-08-28f (transport-parity check; NO status flip). Row 13 landed:
 the pull leg dispatches across libp2p + the iroh book (iroh preferred for a
 dual peer), GetContent + quilt-draw blob pull over the iroh shard ALPN. Dual

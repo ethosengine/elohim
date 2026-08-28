@@ -105,6 +105,12 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-28g (transport-parity check; NO status flip). Pure-iroh
+      parity landed (b9c9ad477): pull core, heal-on-read without a libp2p
+      handle, shard responder alias fallback, composite manifest pivot. homo-iroh
+      warm jessica<-matthew: PASS P0-P4 in 258 s (durable record 22:54:08Z),
+      from P0-only 901 s FAIL the same evening. Lane P rung P3 locked for the
+      warm shape; cold + N=3 outstanding. Full storage lib suite 3166/0.
       DELTA 2026-08-28f (transport-parity check; NO status flip). Row 13 landed:
       the pull leg dispatches across libp2p + the iroh book (iroh preferred for a
       dual peer), GetContent + quilt-draw blob pull over the iroh shard ALPN. Dual
