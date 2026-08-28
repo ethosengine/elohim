@@ -5,7 +5,7 @@ invariant: >
   Serving-critical content state converges peer-to-peer; no per-host
   imperative write is load-bearing. A peer that missed a deploy heals.
 status: red
-active: false
+active: true
 checks:
   - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature)"
   - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
@@ -70,6 +70,13 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-28d (ACTIVE; NO status flip). Swapped into the WIP fence in
+place of doorway-failover (green, run-identified 2026-08-25b). Campaign
+spec ratchet-to-delivery-dataplane-sdk-lanes lays five ratchet lanes
+(R/P/F/D/S, 48 rungs, 9 locked / 39 open) with this habit's fleet red as
+R7 and its local reproduction as R4; first move M0 (pawls: mesh restart
+arms, mesh seed profile, T2 receipt banner, durable recovery timeline,
+sovereign-peer sc1+5), then M1 names the plateau (syncVerdicts, R5).
 DELTA 2026-08-28c (measurement hygiene cure fleet-PROVEN; NO status flip): genesis #1515 and #1516 both measured 2 failed / 274 (from 6) once the pipeline stopped bouncing doorway-alpha before its own E2E — ad90163c7 replaced the pod-delete with a two-tick wait + `x-epr-router: dispatched` proof (the router has self-healed every 30 s since 379668123); #1516's log: "EprRouter populated without a restart … zero pod churn". The 6-vs-2 swing on identical code (#1514 vs #1513/#1515) was fleet churn: the shem edgenode containers exit 139 several times an hour (backlog runtime-shem-edgenode-container-exit-139-chronic) and docs-only pushes had been dispatching seed storms (genesis manifest `genesis/data/**` narrowed, 4f4785e03). The habit's own fleet red is unchanged and honest: inventory-convergence `alpha-A p2p.caughtUp` false on every run. Stays red.
 
 ---

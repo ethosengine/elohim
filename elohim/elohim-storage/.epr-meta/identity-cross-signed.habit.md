@@ -30,6 +30,15 @@ retire-when: >
   type itself carries the cross-signature — so no economic attribution can be constructed
   from a self-asserted one even by a caller trying to.
 ---
+DELTA 2026-08-28 (STAYS RED; first_move CORRECTED, not advanced). The
+first_move text below is stale: C2-S2 landed 2026-08-19 as
+p2p/binding_mint.rs (2aedf0947) — transport half signed with the libp2p
+keypair, agent half via sign_for_agent, encode_proof, self-classified
+cross_signed, spawned from main.rs, default-ON. The open rung is the
+2026-08-20c one: read bindings_examined{enforce} on a deploy that carries
+the counters (joins absent vs bindings absent), then decide the iroh
+transport half under dual. Recorded as `epr flow note --kind correction`;
+campaign spec ratchet-to-delivery-dataplane-sdk-lanes, lane P rung P8.
 DELTA 2026-08-20c (STAYS RED; the flip measure was unfalsifiable and now
 is not — a measure fix, never a status change). The live check read
 `unverified{enforce} == 0` alone, which is satisfied by two opposite fleet

@@ -8,7 +8,7 @@ invariant: >
   through a sibling's shed, and whichever serves resolves the same
   declared head. Federation failover, not per-host luck.
 status: green
-active: true
+active: false
 checks:
   - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — @act:i, so its authority is the household lane: `just test mesh features/dataplane/doorway-failover.feature` against the built binaries, run-identified report under genesis/a2o/reports/. It is HELD on the edge Dataplane Validation stage by LAYERS.md design (Act II drops owned-substrate) — a fleet build number can never measure it; the fleet contributes only the deploy that carries the same commit.)"
 refs:
