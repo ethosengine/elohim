@@ -11,6 +11,45 @@ use crate::views::ContentGraphView;
 
 use super::events::{EventBus, StorageEvent};
 
+/// Relationship types this service accepts.
+///
+/// The lamad manifest (`elohim/sdk/domains/lamad/manifest/relationships.json`)
+/// is the SOURCE OF TRUTH for this vocabulary — the seeder's extractor emits
+/// exactly its ids (generated `manifest-types.ts`). This list is the manifest's
+/// eleven ids PLUS the legacy ids rows already carry (kept so stored rows stay
+/// readable); the `manifest_relationship_vocabulary_is_accepted` test pins
+/// "manifest ⊆ accepted" so the two cannot drift apart silently again — until
+/// 2026-08-28 they had (5 of 11 in common) and every local `seed apply`
+/// dropped its whole relationship graph on `HTTP 400 relationship_type
+/// 'EXTENDS' is not valid`.
+pub const VALID_RELATIONSHIP_TYPES: &[&str] = &[
+    // manifest/relationships.json (canonical)
+    "CONTAINS",
+    "BELONGS_TO",
+    "DESCRIBES",
+    "IMPLEMENTS",
+    "VALIDATES",
+    "RELATES_TO",
+    "REFERENCES",
+    "DEPENDS_ON",
+    "REQUIRES",
+    "FOLLOWS",
+    "ATTACHED_TO",
+    // legacy ids already persisted by earlier seeders / migrations
+    "PREREQUISITE",
+    "FOLLOWUP",
+    "SIBLING",
+    "PARENT",
+    "CHILD",
+    "SIMILAR_TO",
+    "CONTRASTS_WITH",
+    "ELABORATES",
+    "SUMMARIZES",
+    "EXAMPLE_OF",
+    "DEFINITION_OF",
+];
+
+
 /// Relationship service for content graph operations
 pub struct RelationshipService {
     pool: DbPool,
@@ -271,28 +310,10 @@ impl RelationshipService {
         }
 
         // Validate relationship_type
-        let valid_types = [
-            "RELATES_TO",
-            "CONTAINS",
-            "DEPENDS_ON",
-            "IMPLEMENTS",
-            "REFERENCES",
-            "PREREQUISITE",
-            "FOLLOWUP",
-            "SIBLING",
-            "PARENT",
-            "CHILD",
-            "SIMILAR_TO",
-            "CONTRASTS_WITH",
-            "ELABORATES",
-            "SUMMARIZES",
-            "EXAMPLE_OF",
-            "DEFINITION_OF",
-        ];
-        if !valid_types.contains(&input.relationship_type.as_str()) {
+        if !VALID_RELATIONSHIP_TYPES.contains(&input.relationship_type.as_str()) {
             return Err(StorageError::InvalidInput(format!(
                 "relationship_type '{}' is not valid. Valid types: {:?}",
-                input.relationship_type, valid_types
+                input.relationship_type, VALID_RELATIONSHIP_TYPES
             )));
         }
 
@@ -462,5 +483,29 @@ mod tests {
         // Flat read: total_nodes is the neighbour count, children stays empty.
         assert_eq!(graph.total_nodes, graph.related.len());
         assert!(graph.related.iter().all(|n| n.children.is_empty()));
+    }
+}
+
+#[cfg(test)]
+mod relationship_vocabulary_tests {
+    use super::VALID_RELATIONSHIP_TYPES;
+
+    /// The lamad manifest is the source of truth for relationship ids; this
+    /// service must accept every id it declares. Reads the manifest at compile
+    /// time so a new manifest id without a matching entry here fails the build's
+    /// tests instead of failing the next `seed apply` with an HTTP 400.
+    #[test]
+    fn manifest_relationship_vocabulary_is_accepted() {
+        let manifest = include_str!("../../../sdk/domains/lamad/manifest/relationships.json");
+        let parsed: serde_json::Value = serde_json::from_str(manifest).expect("relationships.json parses");
+        let ids: Vec<&str> = parsed
+            .as_object()
+            .expect("relationships.json is an object keyed by relationship id")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert!(ids.len() >= 11, "manifest lost relationship ids: {ids:?}");
+        let missing: Vec<&&str> = ids.iter().filter(|id| !VALID_RELATIONSHIP_TYPES.contains(id)).collect();
+        assert!(missing.is_empty(), "manifest relationship ids not accepted by relationship_service: {missing:?}");
     }
 }

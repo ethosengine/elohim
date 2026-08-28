@@ -334,6 +334,7 @@ const timer = new PerformanceTimer();
 // Data directory is sibling to seeder: elohim/genesis/data/lamad
 // Seeder is at: elohim/genesis/seeder/src/seed.ts
 import { fileURLToPath } from 'url';
+import { RelationshipRemapLedger, canonicalRelationshipType } from './relationship-vocabulary.js';
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
 const GENESIS_DIR = path.resolve(SEEDER_DIR, '..'); // Go up from seeder/ to genesis/
@@ -1368,6 +1369,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // ========================================
       timer.startPhase('Relationship Import');
       console.log(`\n🔗 Extracting relationships from content...`);
+      const remapLedger = new RelationshipRemapLedger();
 
       // Extract relationships from content items
       const relationships: Array<{
@@ -1408,7 +1410,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
         if (Array.isArray(meta.relationships)) {
           for (const rel of meta.relationships as Array<Record<string, unknown>>) {
             const targetId = (rel.target || rel.targetId || rel.target_id) as string | undefined;
-            const relType = ((rel.type || rel.relationship_type || 'RELATES_TO') as string);
+            // Authored types are prose-shaped (`extends`, `prereq`); storage accepts
+            // only the manifest vocabulary — canonicalize, count remaps, never drop.
+            const canonical = canonicalRelationshipType(rel.type || rel.relationship_type);
+            remapLedger.note(canonical);
+            const relType = canonical.type;
             if (targetId && item.id !== targetId) {
               const key = `${item.id}:${targetId}:${relType}`;
               if (!seen.has(key)) {
@@ -1417,7 +1423,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   schemaVersion: 1,
                   sourceId: item.id,
                   targetId: targetId,
-                  relationshipType: relType.toUpperCase(),
+                  relationshipType: relType,
                   confidence: (rel.confidence as number) ?? 1.0,
                   inferenceSource: (rel.inference_source as string) || 'explicit',
                 });
@@ -1429,6 +1435,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
       if (relationships.length > 0) {
         console.log(`   Found ${relationships.length} relationships to create`);
+        const remaps = remapLedger.summary();
+        if (remaps) console.log(`   ↪ authored types canonicalized to the manifest vocabulary: ${remaps}`);
         console.log(`   📤 Bulk creating relationships...`);
 
         try {
