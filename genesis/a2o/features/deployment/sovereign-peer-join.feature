@@ -40,8 +40,8 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     session: it creates that person's agent on a conductor it controls and
     hands the browser a token to use it. If doorway alpha provisioned for a
     workspace session, a workspace login would become a fleet-hosted identity.
-  - A "fixture human" is one of the fleet's seeded test personas (Terrance,
-    Susan, …) whose accounts exist so tests can log in through doorway alpha.
+  - A "fixture human" is one of the fleet's seeded test personas (Jessica,
+    Terrance, Susan, …) whose accounts exist so tests can log in through doorway alpha.
     Logging in as one through the normal hosted login is the sanctioned way to
     reach test content; it is NOT the same as a conductor presenting itself as
     that person on the network, which this story forbids.
@@ -53,17 +53,32 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     ("within 10 minutes") is the fleet's own agent-announcement interval, which
     is slower than propagation and outside the workspace's control.
   - Status vocabulary: a scenario tagged @wip has steps not yet wired to the
-    test harness (the join and same-read scenarios were wired 2026-08-28 and
-    run on the T3 hybrid rung: `just dev conductor alpha`, then the
-    a2o run with ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available). Independently
-    of that, a scenario title ending
+    test harness. Independently of that, a scenario title ending
     "(RED — the gap)" is one whose behaviour is KNOWN not to hold today — it is
-    written to fail until a named capability lands. Scenarios without that
-    marker describe behaviour that has been observed to hold (the join scenario
-    was exercised by hand on 2026-08-28) or is expected to hold once wired.
+    written to fail until a named capability lands. The capability both RED
+    scenarios below wait on is the same one: the fleet's conductors must
+    advertise a storage arc for their agents (today every live agent-info in
+    the fleet's bootstrap store carries none, so no conductor is an authority
+    for any hash — a remote read finds nobody to ask, and a workspace-authored
+    entry has nobody to be fetched by), and the fleet's storage must discover
+    ids authored on the network rather than only from other storages.
+    Scenarios without that marker describe behaviour that has been observed
+    to hold or is expected to hold once wired.
+  - A "content hash" is the content-addressed identifier of the node's
+    stored bytes (the node's blob CID when it is blob-backed, otherwise a
+    SHA-256 of its body text) — the same value however the node is read,
+    so two reads agree exactly when they returned the same bytes.
+  - The bootstrap endpoint is served by doorway alpha itself; the signal (or,
+    on the fleet's current transport, relay) endpoint is a separate fleet-level
+    service at its own address. `@act:ii` places this story on the
+    neighbourhood act of the suite; `@concern:` names its cross-cutting
+    concern for traceability.
   - "the workspace conductor has joined the alpha network" means: all three
     checks of the join scenario below hold for it. Every scenario that starts
     from that state says so with exactly that phrase.
+
+  # How to run (T3 hybrid rung): `just dev conductor alpha` (fork iroh pair), then the a2o run with
+  # ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available and ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=<act-2 lane file>.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA" (the address the fleet's doorway is reachable at, read from the environment)
@@ -80,7 +95,8 @@ Feature: A developer's own conductor joins the alpha network as a real peer
   Scenario: A locally built bundle with a different fingerprint is refused before it can join
     Given a workspace conductor that has NOT installed any bundle yet
     And a locally built application bundle whose fingerprint differs from the one doorway "alpha" runs
-    When the developer starts the workspace conductor pointed at doorway "alpha" without explicitly choosing the local bundle (an override exists for developers who knowingly want a private, partitioned network; that path is outside this story)
+    # Note: an override exists for developers who knowingly want a private, partitioned network; that path is outside this story.
+    When the developer starts the workspace conductor pointed at doorway "alpha" without explicitly choosing the local bundle
     Then the start-up stops before installing the local bundle
     And the developer sees a message naming the deployed bundle as the one to install and the two fingerprints that differ
 
@@ -100,7 +116,7 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     Then doorway "alpha" refuses it as unauthenticated and provisions nothing, so the workspace login never becomes a fleet-hosted identity
     And the same token still provisions on the workspace conductor when presented to the workspace doorway — the fleet's refusal did not invalidate it
 
-  Scenario: A hosted login on alpha and the workspace peer read the same node the same way
+  Scenario: A hosted login on alpha and the workspace peer read the same node the same way (RED — the gap)
     Given the workspace conductor has joined the alpha network
     And the developer is logged in on doorway "alpha" as fixture human "Jessica" through the normal hosted login
     When the developer reads "elohim-host-landing" through doorway "alpha" as Jessica
