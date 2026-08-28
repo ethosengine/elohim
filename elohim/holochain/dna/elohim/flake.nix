@@ -60,14 +60,20 @@
                 # (elohim-holochain #1403, 2026-08-27). A dead cache must cost a
                 # cold compile, never a red build — so probe, and fall through
                 # to un-wrapped cargo with a loud line when the probe fails.
-                if timeout 30 /usr/local/bin/sccache --start-server >/dev/null 2>&1 \
-                   || timeout 15 /usr/local/bin/sccache --show-stats >/dev/null 2>&1; then
+                # `--start-server` forks the daemon and returns 0 BEFORE the daemon
+                # touches storage (elohim-holochain #1404 armed the wrapper on that
+                # false OK and died one line later), so the probe must be the same
+                # call cargo makes first: `sccache rustc -vV`. That reaches the
+                # storage read and fails exactly when the build would.
+                /usr/local/bin/sccache --stop-server >/dev/null 2>&1 || true
+                if timeout 90 /usr/local/bin/sccache rustc -vV >/dev/null 2>&1; then
                   export RUSTC_WRAPPER=sccache
-                  echo "  RUSTC_WRAPPER=$RUSTC_WRAPPER (server probe OK)"
+                  echo "  RUSTC_WRAPPER=$RUSTC_WRAPPER (sccache rustc -vV probe OK)"
                 else
                   unset RUSTC_WRAPPER
-                  echo "  RUSTC_WRAPPER NOT SET — sccache server failed to start (dead cache credential?); cold compile instead of a red build"
-                  echo "  probe stderr: $(timeout 15 /usr/local/bin/sccache --start-server 2>&1 | tail -2 | tr '\n' ' ')"
+                  /usr/local/bin/sccache --stop-server >/dev/null 2>&1 || true
+                  echo "  RUSTC_WRAPPER NOT SET — sccache cannot reach its cache storage (dead credential?); cold compile instead of a red build"
+                  echo "  probe stderr: $(timeout 60 /usr/local/bin/sccache rustc -vV 2>&1 | grep -iE 'error|denied' | head -2 | tr '\n' ' ')"
                 fi
                 echo "  SCCACHE_BUCKET=''${SCCACHE_BUCKET:-<unset>}"
                 echo "  SCCACHE_ENDPOINT=''${SCCACHE_ENDPOINT:-<unset>}"
