@@ -79,3 +79,5 @@ knows an edge is trusted and treats failure there as *more* significant. Reachin
 tolerance is a tell that the pricing signal is missing; fix the signal first.
 **You cannot price a relationship you cannot observe** — so an error that erases which
 edge failed and how is a performance defect, not just a logging one.
+
+**Measured 2026-08-28 (household mesh, binaries with the `peer_class` label):** every outbound sync request classifies `peer_class="public"` — the ambient trust handshake is a stub (sender: libp2p peer id as agent key, empty CID lists; receiver: asserts `agent_verified: true`, ceiling `public`, never calls `verify_trust_context`, which has zero callers). The gradient's pricing input does not exist on the dataplane yet; the label makes that absence measurable. Missing node: verifiable identity + relationship CIDs in the handshake, blocked on the transport-id→agent_cid resolver (self-asserted bindings). Backlog: sync-edge-susan-timeouts-per-edge-observability.
