@@ -3235,7 +3235,7 @@ async fn async_main(
             },
         ));
         let shard_backend: Arc<dyn elohim_storage::p2p_iroh::ShardBackend> =
-            Arc::new(ShardServiceBackend::new(shard_service));
+            Arc::new(ShardServiceBackend::new(shard_service.clone()));
         let shard_handler = IrohShardProtocol::new(shard_backend);
 
         // View-federation backend — transport-neutral service that
@@ -3344,6 +3344,9 @@ async fn async_main(
                 );
                 // Cutover gate #2 (Plan 2): clone blob store for HTTP server wiring.
                 let iroh_blob_store_for_http = Arc::new(node.store().clone());
+                // Parity (2026-08-28): the shard responder serves iroh-staged blobs
+                // to peers by alias, exactly as HTTP `/blob` serves them locally.
+                shard_service.set_iroh_store(iroh_blob_store_for_http.clone());
                 (
                     Some(node),
                     Some(iroh_blob_store_for_http),
@@ -3369,6 +3372,8 @@ async fn async_main(
     // fetch. Created whenever an iroh node exists; handed to the libp2p node
     // as the manifest sink so gossipsub-delivered manifests land in it too.
     #[cfg(feature = "p2p-iroh")]
+    #[cfg(feature = "p2p-iroh")]
+    let mut iroh_pull_core: Option<Arc<elohim_storage::p2p_iroh::IrohPullCore>> = None;
     let iroh_peer_book: Option<elohim_storage::p2p_iroh::IrohPeerBook> = _iroh_node
         .as_ref()
         .map(|_| elohim_storage::p2p_iroh::IrohPeerBook::new());
@@ -3453,6 +3458,23 @@ async fn async_main(
                 inventory_fetch,
             },
         );
+
+        // Pure-iroh pull leg. In dual mode the libp2p node owns replication +
+        // acquisition (and dispatches its iroh targets itself); with no libp2p
+        // node this core is the only thing that turns a peer's inventory into
+        // rows and settles `pull.caughtUp` — see p2p_iroh::pull_core.
+        if p2p_node.is_none() {
+            let core = elohim_storage::p2p_iroh::IrohPullCore::new(
+                receive_pool.clone(),
+                blob_store.clone(),
+                config.self_cid.clone().unwrap_or_default(),
+            );
+            core.clone().spawn(
+                std::time::Duration::from_secs(60),
+                std::time::Duration::from_secs(30),
+            );
+            iroh_pull_core = Some(core);
+        }
 
         // Announce this node's iroh NodeAddr on the gossip fan-out. Published
         // through the DUAL publisher when libp2p is co-resident (that is the
@@ -3714,6 +3736,10 @@ async fn async_main(
     // No effect on libp2p, where `p2p_handle.status()` stays authoritative.
     if let Some(ref transport) = node_transport {
         http_server = http_server.with_node_transport(transport.clone());
+    }
+    #[cfg(feature = "p2p-iroh")]
+    if let Some(core) = iroh_pull_core.clone() {
+        http_server = http_server.with_iroh_pull(core);
     }
 
     if args.embedded_conductor {

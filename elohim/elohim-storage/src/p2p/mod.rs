@@ -9504,7 +9504,7 @@ impl P2PNode {
                     let addr = addr.clone();
                     counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     tokio::spawn(async move {
-                        acquire_over_iroh(ctx, id, label, addr).await;
+                        acquire_over_iroh(ctx, id, label, addr, PullKind::Pin).await;
                         counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                     });
                 }
@@ -10134,15 +10134,15 @@ fn acquisition_prefer_iroh() -> &'static bool {
 /// The deps a content-record ingest needs, independent of the plane the record
 /// arrived on. `Clone` + `Send` so the iroh pull task can own one.
 #[derive(Clone)]
-struct AcquisitionIngestCtx {
-    db_pool: Option<DbPool>,
-    replication_state: replication::ReplicationState,
-    acquisition: acquisition::AcquisitionState,
-    blob_store: Arc<BlobStore>,
-    self_cid: String,
+pub(crate) struct AcquisitionIngestCtx {
+    pub(crate) db_pool: Option<DbPool>,
+    pub(crate) replication_state: replication::ReplicationState,
+    pub(crate) acquisition: acquisition::AcquisitionState,
+    pub(crate) blob_store: Arc<BlobStore>,
+    pub(crate) self_cid: String,
 }
 
-enum StoredRecord {
+pub(crate) enum StoredRecord {
     Stored {
         #[allow(dead_code)]
         content_id: String,
@@ -10154,7 +10154,7 @@ enum StoredRecord {
 /// Store an acquired content record and settle the acquisition/replication
 /// trackers exactly as the libp2p arm always has. Transport-neutral: the
 /// libp2p `ShardResponse::Content` arm and the iroh pull task both call it.
-async fn store_acquired_record(
+pub(crate) async fn store_acquired_record(
     ctx: &AcquisitionIngestCtx,
     record: crate::p2p::shard_protocol::ContentRecord,
 ) -> StoredRecord {
@@ -10222,16 +10222,42 @@ async fn store_acquired_record(
     }
 }
 
+/// Settle a failed pull on the tracker its queue belongs to. A gap failure keeps
+/// `caught_up` honest via `ReplicationState::mark_failed`; a pin failure walks the
+/// pin's retry budget via `AcquisitionState::mark_failed` (no-op for untracked ids).
+#[cfg(feature = "p2p-iroh")]
+async fn settle_pull_failure(ctx: &AcquisitionIngestCtx, content_id: &str, kind: PullKind) {
+    match kind {
+        PullKind::Gap => {
+            ctx.replication_state.mark_failed(content_id).await;
+            ctx.replication_state.update_caught_up().await;
+        }
+        PullKind::Pin => ctx.acquisition.mark_failed(content_id).await,
+    }
+}
+
+/// Which queue a pull came from — decides which tracker a failure settles
+/// (the libp2p arm keys the same decision off its two pending maps).
+#[cfg(feature = "p2p-iroh")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PullKind {
+    /// A replication gap (peer inventory named an id we lack) — settles `ReplicationState`.
+    Gap,
+    /// A pin want (acquisition reconcile) — settles `AcquisitionState`.
+    Pin,
+}
+
 /// The iroh pull leg for one queued content id: `GetContent` over the shard
 /// ALPN, then — for a blob-backed row we do not hold — the quilt-draw blob
 /// pull over the SAME peer, landing through `finalize_quilt_draw` (verify-first,
 /// like the libp2p arm). Bounded: one request per step, each under a timeout.
 #[cfg(feature = "p2p-iroh")]
-async fn acquire_over_iroh(
+pub(crate) async fn acquire_over_iroh(
     ctx: AcquisitionIngestCtx,
     content_id: String,
     label: String,
     addr: iroh::NodeAddr,
+    kind: PullKind,
 ) {
     use crate::p2p_iroh::IrohShardClient;
     const CONTENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
@@ -10241,7 +10267,7 @@ async fn acquire_over_iroh(
         // Planned while the leg existed; cannot happen after registration, but the
         // honest disposition is a failed attempt the rotation retries elsewhere.
         crate::metrics::inc_acquisition_outcome("fetch_error");
-        ctx.acquisition.mark_failed(&content_id).await;
+        settle_pull_failure(&ctx, &content_id, kind).await;
         return;
     };
     let client = IrohShardClient::new(leg.endpoint());
@@ -10254,26 +10280,26 @@ async fn acquire_over_iroh(
         Ok(Ok(ShardResponse::Content(record))) => record,
         Ok(Ok(ShardResponse::ContentNotFound)) => {
             crate::metrics::inc_acquisition_outcome("fetch_error");
-            ctx.acquisition.mark_failed(&content_id).await;
+            settle_pull_failure(&ctx, &content_id, kind).await;
             ctx.replication_state.update_caught_up().await;
             return;
         }
         Ok(Ok(other)) => {
             debug!(id = %content_id, peer = %label, response = ?std::mem::discriminant(&other), "iroh acquisition: unexpected response");
             crate::metrics::inc_acquisition_outcome("fetch_error");
-            ctx.acquisition.mark_failed(&content_id).await;
+            settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
         Ok(Err(e)) => {
             debug!(id = %content_id, peer = %label, error = %e, "iroh acquisition: request failed");
             crate::metrics::inc_acquisition_outcome("fetch_error");
-            ctx.acquisition.mark_failed(&content_id).await;
+            settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
         Err(_) => {
             debug!(id = %content_id, peer = %label, "iroh acquisition: request timed out");
             crate::metrics::inc_acquisition_outcome("fetch_error");
-            ctx.acquisition.mark_failed(&content_id).await;
+            settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
     };

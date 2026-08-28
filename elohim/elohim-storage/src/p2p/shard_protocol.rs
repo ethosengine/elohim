@@ -41,6 +41,11 @@ pub enum ShardRequest {
     },
     /// Get a full content record by ID (metadata + body, not just blob bytes)
     GetContent { id: String },
+    /// Ask for the shard manifest of a composite (RS-sharded) blob — the
+    /// pivot a whole-bytes `Get` miss takes on the iroh plane, mirroring the
+    /// libp2p blob protocol's `BlobFetchReply::Manifest`. Appended last so an
+    /// older peer never receives it unless it asked (positional codec).
+    GetManifest { hash: String },
 }
 
 /// Lightweight content summary for inventory listing
@@ -96,6 +101,9 @@ pub enum ShardResponse {
     Content(Box<ContentRecord>),
     /// Content not found
     ContentNotFound,
+    /// A durable shard manifest for the requested composite hash (boxed —
+    /// see `FetchOutcome::Manifest`). Only ever sent in reply to `GetManifest`.
+    Manifest(Box<crate::sharding::ShardManifest>),
 }
 
 impl ShardResponse {
@@ -108,6 +116,7 @@ impl ShardResponse {
     pub fn summary(&self) -> String {
         match self {
             Self::Data(bytes) => format!("Data({} bytes)", bytes.len()),
+            Self::Manifest(m) => format!("Manifest({} shards)", m.shard_hashes.len()),
             Self::Have(has) => format!("Have({has})"),
             Self::PushAck => "PushAck".to_string(),
             Self::NotFound => "NotFound".to_string(),

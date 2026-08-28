@@ -555,6 +555,8 @@ pub fn enrich_candidates(
                 .find(|entry| {
                     entry.libp2p_peer_id.as_deref() == Some(peer_id.as_str())
                         || entry.agent_cid.as_deref() == Some(peer_id.as_str())
+                        // pure-iroh fallback candidates are labelled by node id
+                        || entry.addr.node_id.to_string() == *peer_id
                 })
                 .map(|entry| entry.addr.clone());
             FetchCandidate {
@@ -690,12 +692,43 @@ async fn race_both_planes(
         let wire = wire_addr.clone();
         in_flight.push(
             async move {
-                match tokio::time::timeout(per_peer_timeout, leg.fetch(addr, &wire)).await {
+                match tokio::time::timeout(per_peer_timeout, leg.fetch(addr.clone(), &wire)).await {
                     Err(_) => {
                         // A timeout cannot distinguish a stalled dial from a
                         // stalled transfer; "error" is the honest label.
                         crate::metrics::inc_iroh_blob_fetch("error");
                         FetchOutcome::Miss
+                    }
+                    Ok(Err(crate::p2p_iroh::IrohBlobFetchError::NotFound(_))) => {
+                        crate::metrics::inc_iroh_blob_fetch("not_found");
+                        // Composite pivot (parity with the libp2p leg): an honest
+                        // whole-bytes miss may still be a peer holding the blob as
+                        // RS shards — ask for the manifest over the same ALPN.
+                        let req = crate::p2p::shard_protocol::ShardRequest::GetManifest {
+                            hash: wire.clone(),
+                        };
+                        let client = crate::p2p_iroh::IrohShardClient::new(leg.endpoint());
+                        match tokio::time::timeout(per_peer_timeout, client.request(addr, &req))
+                            .await
+                        {
+                            Ok(Ok(crate::p2p::shard_protocol::ShardResponse::Manifest(
+                                manifest,
+                            ))) if manifest.blob_hash == wire => {
+                                tracing::debug!(
+                                    target: "recovery::transport",
+                                    blob_hash = %wire,
+                                    source_peer = %peer_id,
+                                    transport = "iroh",
+                                    shards = manifest.shard_hashes.len(),
+                                    "peer answered with a shard manifest instead of bytes"
+                                );
+                                FetchOutcome::Manifest {
+                                    manifest,
+                                    source_peer: peer_id,
+                                }
+                            }
+                            _ => FetchOutcome::Miss,
+                        }
                     }
                     Ok(Err(e)) => {
                         crate::metrics::inc_iroh_blob_fetch(e.metric_result());

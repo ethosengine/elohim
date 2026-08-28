@@ -33,6 +33,15 @@ use crate::p2p::shard_protocol::{self, ShardRequest, ShardResponse};
 pub struct ShardService {
     blob_store: Arc<BlobStore>,
     db_pool: Option<DbPool>,
+    /// The iroh (BLAKE3) blob store, bound after the iroh node exists. A blob
+    /// staged through the iroh cutover lives HERE, with only a sha256→blake3
+    /// alias in `peer_blob_inventory`; HTTP `/blob` resolves that alias, and
+    /// until 2026-08-28 this responder did not — so a peer could serve its own
+    /// landing bundle over HTTP and answer `NotFound` to every peer asking for
+    /// the same bytes over the shard protocol (measured: homo-iroh P2 red,
+    /// 349 iroh blob fetches `not_found` against a survivor holding the blob).
+    #[cfg(feature = "p2p-iroh")]
+    iroh_store: std::sync::OnceLock<Arc<crate::p2p_iroh::IrohBlobStore>>,
 }
 
 impl std::fmt::Debug for ShardService {
@@ -48,7 +57,16 @@ impl ShardService {
         Self {
             blob_store,
             db_pool,
+            #[cfg(feature = "p2p-iroh")]
+            iroh_store: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Bind the iroh blob store once it exists (the shard responder is built
+    /// before the iroh node). Idempotent; the first binding wins.
+    #[cfg(feature = "p2p-iroh")]
+    pub fn set_iroh_store(&self, store: Arc<crate::p2p_iroh::IrohBlobStore>) {
+        let _ = self.iroh_store.set(store);
     }
 
     /// Dispatch a [`ShardRequest`].
@@ -63,6 +81,7 @@ impl ShardService {
                 limit,
             } => self.handle_list_content(reach_filter, offset, limit),
             ShardRequest::GetContent { id } => self.handle_get_content(id),
+            ShardRequest::GetManifest { hash } => self.handle_get_manifest(hash),
         }
     }
 
@@ -74,9 +93,80 @@ impl ShardService {
                 ShardResponse::Data(data)
             }
             Err(_) => {
+                #[cfg(feature = "p2p-iroh")]
+                if let Some(data) = self.get_via_iroh_alias(&hash).await {
+                    info!(hash = %hash, size = data.len(), "Serving shard from the iroh store (sha256→blake3 alias)");
+                    return ShardResponse::Data(data);
+                }
                 debug!(hash = %hash, "Shard not found");
                 ShardResponse::NotFound
             }
+        }
+    }
+
+    /// Serve a sha256-addressed blob from the iroh store when the sha256 store
+    /// misses: resolve the alias `peer_blob_inventory` keeps for blobs staged
+    /// through the iroh cutover, then read the BLAKE3 object. `None` when there
+    /// is no iroh store, no pool, no alias, or no such object — never an error.
+    #[cfg(feature = "p2p-iroh")]
+    async fn get_via_iroh_alias(&self, hash: &str) -> Option<Vec<u8>> {
+        let iroh = self.iroh_store.get()?;
+        let pool = self.db_pool.as_ref()?;
+        let normalized = match BlobStore::parse_content_address(hash) {
+            Ok(h) => format!("sha256-{}", h),
+            Err(_) => return None,
+        };
+        let alias = {
+            let mut conn = pool.get().ok()?;
+            crate::db::peer_blob_inventory::lookup_blake3_for_sha256(&mut conn, &normalized)
+                .ok()
+                .flatten()?
+        };
+        let hex = alias.strip_prefix("blake3-").unwrap_or(&alias);
+        let iroh_hash: iroh_blobs::Hash = hex.parse().ok()?;
+        match iroh.get_bytes(iroh_hash).await {
+            Ok(bytes) => {
+                // Serve only bytes that ARE the requested address. An alias can
+                // point at a reassembled composite (RS-sharded bundle) whose
+                // sha256 is not the composite's name — those are healed through
+                // the shard manifest, never as whole bytes under this name.
+                if crate::p2p::blob_fetch::verify_blob_hash(&bytes, &normalized) {
+                    Some(bytes.to_vec())
+                } else {
+                    debug!(hash = %hash, alias = %alias, "iroh alias bytes do not hash to the requested address (composite?) — not served");
+                    None
+                }
+            }
+            Err(e) => {
+                debug!(hash = %hash, alias = %alias, error = %e, "iroh store miss for aliased blob");
+                None
+            }
+        }
+    }
+
+    /// The composite pivot: a peer that holds a blob only as RS shards (its
+    /// whole-bytes `Get` misses) answers with the durable manifest so the
+    /// requester can shard-fetch — what the libp2p blob protocol has always done
+    /// with `BlobFetchReply::Manifest`; now on the shard protocol for BOTH planes.
+    fn handle_get_manifest(&self, hash: String) -> ShardResponse {
+        let Some(pool) = self.db_pool.as_ref() else {
+            return ShardResponse::NotFound;
+        };
+        let Ok(mut conn) = pool.get() else {
+            return ShardResponse::NotFound;
+        };
+        match crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, &hash) {
+            Ok(Some(row)) => match crate::db::shard_manifests::hydrate_manifest(&row) {
+                Ok(manifest) => {
+                    info!(hash = %hash, shards = manifest.shard_hashes.len(), "Serving shard manifest");
+                    ShardResponse::Manifest(Box::new(manifest))
+                }
+                Err(e) => {
+                    debug!(hash = %hash, error = %e, "shard manifest row failed to hydrate");
+                    ShardResponse::NotFound
+                }
+            },
+            _ => ShardResponse::NotFound,
         }
     }
 

@@ -388,6 +388,12 @@ pub struct HttpServer {
     /// is unchanged and authoritative; this is only the fallback. `None` when no
     /// transport identity was resolved (P2P disabled / key load failed).
     node_transport: Option<Arc<dyn crate::node_transport::NodeTransport>>,
+    /// Pure-iroh pull leg (replication gaps + pin acquisition) — `Some` only when
+    /// no libp2p `p2p_handle` exists; `/p2p/status` serves its `replication`/`pull`
+    /// blocks so the seeder's caughtUp poll and the recovery harness read iroh mode
+    /// exactly as they read libp2p.
+    #[cfg(feature = "p2p-iroh")]
+    iroh_pull: Option<Arc<crate::p2p_iroh::IrohPullCore>>,
     /// Counter — number of `GET /blob` requests served from iroh.
     /// Read by parity-soak diagnostics; never reset at runtime.
     blob_iroh_served_count: Arc<std::sync::atomic::AtomicU64>,
@@ -816,6 +822,8 @@ impl HttpServer {
             self_transport_manifest: None,
             self_peer_id: "unknown-peer".to_string(),
             node_transport: None,
+            #[cfg(feature = "p2p-iroh")]
+            iroh_pull: None,
             blob_iroh_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             #[cfg(feature = "graph-native")]
@@ -1021,6 +1029,13 @@ impl HttpServer {
         transport: Arc<dyn crate::node_transport::NodeTransport>,
     ) -> Self {
         self.node_transport = Some(transport);
+        self
+    }
+
+    /// Wire the pure-iroh pull core (iroh-only mode). See `p2p_iroh::pull_core`.
+    #[cfg(feature = "p2p-iroh")]
+    pub fn with_iroh_pull(mut self, core: Arc<crate::p2p_iroh::IrohPullCore>) -> Self {
+        self.iroh_pull = Some(core);
         self
     }
 
@@ -3835,7 +3850,18 @@ impl HttpServer {
         // Requires P2P feature + db pool; otherwise we degrade to NotFound,
         // exactly as the pre-refactor handler did.
         #[cfg(feature = "p2p")]
-        if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
+        // Heal-on-read races peers on BOTH planes. Parity (2026-08-28): with no
+        // libp2p handle (pure-iroh mode) the branch used to be skipped entirely,
+        // so every local miss was a 404 and `homo-iroh` could never pass P2. It
+        // now runs whenever a plane exists: the libp2p handle supplies its
+        // connected set + command sender; without one, an inert sender and an
+        // empty connected set make `race_fetch_dual` plan an iroh-only race.
+        #[cfg(feature = "p2p-iroh")]
+        let iroh_leg_ready = crate::p2p_iroh::iroh_fetch_leg().is_some();
+        #[cfg(not(feature = "p2p-iroh"))]
+        let iroh_leg_ready = false;
+        let handle = self.p2p_handle.as_ref();
+        if let (true, Some(ref pool)) = (handle.is_some() || iroh_leg_ready, &self.db_pool) {
             // Short hash prefix for log correlation across legs without
             // dumping the full 64-char hex on every line.
             let hash_prefix: String = hash.chars().take(20).collect();
@@ -3925,12 +3951,38 @@ impl HttpServer {
             // Snapshot the connected-peer set via ListPeers command once;
             // used both as the race_fetch membership filter and (on empty
             // inventory) as the connected-fallback candidate set.
-            let connected_peers: Vec<String> = handle
-                .list_peers()
-                .await
-                .into_iter()
-                .map(|p| p.peer_id)
-                .collect();
+            let connected_peers: Vec<String> = match handle {
+                Some(h) => h
+                    .list_peers()
+                    .await
+                    .into_iter()
+                    .map(|p| p.peer_id)
+                    .collect(),
+                None => Vec::new(),
+            };
+            // Pure-iroh fallback: the book's dialable peers, by the label
+            // `enrich_candidates` can join (libp2p id, agent cid, or node id).
+            #[cfg(feature = "p2p-iroh")]
+            let iroh_book_peers: Vec<String> = if handle.is_none() {
+                crate::p2p_iroh::iroh_fetch_leg()
+                    .map(|leg| {
+                        let me = leg.endpoint().node_id();
+                        leg.book()
+                            .snapshot(Some(&me))
+                            .into_iter()
+                            .map(|e| {
+                                e.libp2p_peer_id
+                                    .or(e.agent_cid)
+                                    .unwrap_or_else(|| e.addr.node_id.to_string())
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            #[cfg(not(feature = "p2p-iroh"))]
+            let iroh_book_peers: Vec<String> = Vec::new();
 
             // Connected-fallback: when gossipsub inventory publish has failed
             // (alpha after pod restarts: `InsufficientPeers`, no fresh row for
@@ -3948,6 +4000,10 @@ impl HttpServer {
                 let mut capped = connected_peers.clone();
                 capped.truncate(CONNECTED_FALLBACK_CAP);
                 (capped, "connected-fallback")
+            } else if !iroh_book_peers.is_empty() {
+                let mut capped = iroh_book_peers.clone();
+                capped.truncate(CONNECTED_FALLBACK_CAP);
+                (capped, "iroh-book-fallback")
             } else {
                 // Distinct label: a structured `source=connected-fallback` next
                 // to "no connected peers" reads as the fallback having fired.
@@ -3955,7 +4011,15 @@ impl HttpServer {
             };
 
             if !candidates.is_empty() {
-                let cmd_tx = handle.command_sender();
+                let cmd_tx = match handle {
+                    Some(h) => h.command_sender(),
+                    None => {
+                        // Inert: no libp2p plane. Receiver dropped, so a libp2p
+                        // leg (never planned with an empty connected set) fails fast.
+                        let (tx, _rx) = tokio::sync::mpsc::channel(1);
+                        tx
+                    }
+                };
                 let parallelism = self.fetch_blob_parallelism;
                 let per_peer_timeout =
                     std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
@@ -4291,7 +4355,20 @@ impl HttpServer {
             .as_ref()
             .and_then(|t| t.status_peer_id())
         {
-            let body = serde_json::json!({ "peerId": peer_id });
+            // Pure-iroh mode: the pull leg's status rides here so `pull.caughtUp` /
+            // `replication` read the same on iroh as on libp2p (parity, 2026-08-28).
+            let mut body = serde_json::json!({ "peerId": peer_id, "irohNodeId": peer_id });
+            #[cfg(feature = "p2p-iroh")]
+            if let Some(core) = self.iroh_pull.as_ref() {
+                let st = core.status();
+                if let Ok(v) = serde_json::to_value(&st) {
+                    if let (Some(obj), Some(extra)) = (body.as_object_mut(), v.as_object()) {
+                        for (k, val) in extra {
+                            obj.insert(k.clone(), val.clone());
+                        }
+                    }
+                }
+            }
             return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")

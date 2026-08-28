@@ -79,6 +79,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_manifest_without_pool_is_an_honest_not_found() {
+        // The composite pivot (2026-08-28): a peer with no DB pool cannot hold
+        // manifests, so it answers NotFound — the iroh leg then records a miss
+        // instead of an error, exactly as a whole-bytes miss would.
+        let backend = fresh_backend().await;
+        match backend
+            .handle(ShardRequest::GetManifest {
+                hash: "sha256-0000000000000000000000000000000000000000000000000000000000000000"
+                    .into(),
+            })
+            .await
+        {
+            ShardResponse::NotFound => {}
+            other => panic!("expected NotFound, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn list_content_without_pool_errors() {
         let backend = fresh_backend().await;
         match backend

@@ -39,6 +39,7 @@ pub mod observation_backend;
 pub mod parity_harness;
 pub mod peer_book;
 pub mod peer_map;
+pub mod pull_core; // pure-iroh pull leg (replication gaps + pin acquisition + /p2p/status.pull)
 pub mod shard;
 pub mod shard_backend;
 pub mod sync;
@@ -49,6 +50,7 @@ pub mod view_fed_backend;
 
 pub use announce_change::{announce_local_change, spawn_iroh_announce_bridge, IrohAnnounceInputs};
 pub use announcer::{spawn_transport_manifest_announcer, AnnouncerInputs};
+pub use pull_core::{IrohPullCore, IrohPullStatus};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
     IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
