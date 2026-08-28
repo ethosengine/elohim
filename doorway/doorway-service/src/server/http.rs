@@ -5162,6 +5162,14 @@ async fn handle_request(
             )
         }
 
+        // Auth discovery — the origin-relative document an app reads instead of
+        // carrying auth config. Deliberately under /.well-known/ (already in
+        // is_service_path) so an unknown path 404s honestly; /auth/config falls
+        // through to the SPA and hands clients a parse error instead.
+        (Method::GET, "/.well-known/elohim-auth") => {
+            to_boxed(routes::auth_discovery::handle_auth_discovery(Arc::clone(&state)))
+        }
+
         // Doorway public signing keys (JWKS format) for federation
         (Method::GET, "/.well-known/doorway-keys") => {
             to_boxed(routes::handle_doorway_keys(Arc::clone(&state)))

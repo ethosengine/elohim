@@ -7,6 +7,7 @@ pub mod admin_dev;
 pub mod admin_users;
 pub mod api;
 pub mod apps;
+pub mod auth_discovery;
 pub mod auth_routes;
 pub mod blob;
 pub mod bootstrap_coherence;
