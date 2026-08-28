@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:auth-discovery",
+  "title": "AuthDiscovery",
+  "description": "Source of truth: doorway operational configuration (Operational, Category C). GET /.well-known/elohim-auth — the unauthenticated document an app reads INSTEAD of carrying auth configuration, so a page needs to know only the origin it was served from. Reconstructed per request from the doorway's own route table; never persisted, never notarized. EVERY location it names is an origin-RELATIVE path: a discovery document that could name another origin would be an open-redirect primitive, and this shape makes a foreign origin unexpressible rather than merely rejected at the client. Deliberately excludes portalHostUrl — a graduated steward's portal does live on another origin, but it is per-human, arrives on GET /auth/me, and must be attested in that human's own record rather than advertised publicly. Rust wire authority: doorway/doorway-service/src/routes/auth_discovery.rs AuthDiscovery (validated by that crate's tests/schema_contract.rs).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "portal", "endpoints"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Document shape version. Bump when a client could misread an older body."
+    },
+    "doorwayId": {
+      "type": "string",
+      "description": "Which doorway answered. Omitted (never null) when the doorway carries no configured id, so a client can branch on presence without a null check."
+    },
+    "portal": {
+      "$ref": "#/$defs/relativePath",
+      "description": "Where to SEND a human to sign in — the doorway-hosted portal page."
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The auth endpoints this doorway serves. Every entry is an exact member of AUTH_OWNED_PATHS in doorway-service/src/server/http.rs; advertising a path that is not owned would answer with the SPA shell instead, which is the advertise/serve asymmetry this document must never introduce.",
+      "required": [
+        "register",
+        "login",
+        "logout",
+        "refresh",
+        "me",
+        "authorize",
+        "token",
+        "sessionToken",
+        "exchangeSession",
+        "portalHost"
+      ],
+      "properties": {
+        "register": { "$ref": "#/$defs/relativePath" },
+        "login": { "$ref": "#/$defs/relativePath" },
+        "logout": { "$ref": "#/$defs/relativePath" },
+        "refresh": { "$ref": "#/$defs/relativePath" },
+        "me": { "$ref": "#/$defs/relativePath" },
+        "authorize": {
+          "$ref": "#/$defs/relativePath",
+          "description": "RFC-6749 authorization endpoint."
+        },
+        "token": {
+          "$ref": "#/$defs/relativePath",
+          "description": "RFC-6749 token endpoint."
+        },
+        "sessionToken": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Mints the opaque single-use token that carries a session to a sibling app."
+        },
+        "exchangeSession": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Redeems a token minted by sessionToken."
+        },
+        "portalHost": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Where a graduated steward's own portal is discovered, per human."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "description": "An origin-relative path. Must begin with a single '/' — a protocol-relative '//host/x' names ANOTHER origin while passing a naive leading-slash check, so it is excluded by pattern rather than by convention.",
+      "pattern": "^/(?!/).*$",
+      "minLength": 1
+    }
+  }
+}

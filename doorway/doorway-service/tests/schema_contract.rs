@@ -16,6 +16,7 @@ use doorway::routes::auth_routes::{
     AccountResponse, AuthResponse, AuthorityRef, ExchangeSessionResponse, HumanProfileResponse,
     MeResponse, SessionTokenResponse,
 };
+use doorway::routes::auth_discovery::{AuthDiscovery, AuthEndpoints};
 use doorway::routes::health::P2PHealth;
 use doorway::routes::self_healing::{
     AdmissionView, ConductorView, PeerView, ProjectorView, RenderView, SelfHealingView,
@@ -630,4 +631,60 @@ fn stability_status_view_populated_matches_schema() {
     };
     let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/stability-status-view.schema.json", &json);
+}
+
+// ── AuthDiscovery (GET /.well-known/elohim-auth) ────────────────────────
+
+/// The shape an app reads instead of carrying auth configuration.
+#[test]
+fn auth_discovery_matches_schema() {
+    let doc = AuthDiscovery {
+        version: 1,
+        doorway_id: Some("alpha-elohim-host".to_string()),
+        portal: "/threshold/login",
+        endpoints: AuthEndpoints::current(),
+    };
+
+    let json = serde_json::to_value(&doc).unwrap();
+    validate_against_schema("views/auth-discovery.schema.json", &json);
+}
+
+/// A doorway with no configured id omits the field rather than sending null,
+/// so a client can branch on presence.
+#[test]
+fn auth_discovery_without_doorway_id_matches_schema() {
+    let doc = AuthDiscovery {
+        version: 1,
+        doorway_id: None,
+        portal: "/threshold/login",
+        endpoints: AuthEndpoints::current(),
+    };
+
+    let json = serde_json::to_value(&doc).unwrap();
+    assert!(json.get("doorwayId").is_none(), "absent id must be omitted, not null");
+    validate_against_schema("views/auth-discovery.schema.json", &json);
+}
+
+/// THE security property, pinned at the SCHEMA boundary rather than only in the
+/// crate: the `relativePath` pattern must refuse a document that escapes its own
+/// origin. A discovery document that could name another origin would let whoever
+/// answers it aim a Login button at an attacker's portal.
+#[test]
+fn auth_discovery_schema_refuses_a_foreign_origin() {
+    for hostile in ["https://evil.tld/login", "//evil.tld/login"] {
+        let doc = AuthDiscovery {
+            version: 1,
+            doorway_id: Some("alpha-elohim-host".to_string()),
+            portal: hostile,
+            endpoints: AuthEndpoints::current(),
+        };
+        let json = serde_json::to_value(&doc).unwrap();
+        let schema = load_schema("views/auth-discovery.schema.json");
+        let compiled = jsonschema::validator_for(&schema).expect("schema compiles");
+        assert!(
+            !compiled.is_valid(&json),
+            "the schema accepted a discovery document naming {hostile:?} — the relativePath \
+             pattern is the wire-level guard against an open-redirect primitive"
+        );
+    }
 }

@@ -78,6 +78,7 @@ export * from './views/accumulation-status';
 export * from './views/agent-peer-binding-view';
 export * from './views/atom-version-chain';
 export * from './views/attestation-view';
+export * from './views/auth-discovery';
 export * from './views/auth-response';
 export * from './views/authority-ref';
 export * from './views/bounds-validation-result-view';

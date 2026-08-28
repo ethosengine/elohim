@@ -63,7 +63,9 @@ pub struct AuthEndpoints {
 }
 
 impl AuthEndpoints {
-    const fn current() -> Self {
+    /// Public so the schema-contract test can build the same document the
+    /// handler serves, rather than a hand-copied stand-in of it.
+    pub const fn current() -> Self {
         Self {
             register: "/auth/register",
             login: "/auth/login",
@@ -145,39 +147,69 @@ mod tests {
     /// name another origin, so it cannot become an open-redirect primitive.
     #[test]
     fn every_advertised_location_is_origin_relative() {
-        fn assert_relative(v: &serde_json::Value, path: &str) {
+        assert_eq!(
+            foreign_locations(&doc()),
+            Vec::<String>::new(),
+            "the discovery document advertises a location outside its own origin — that makes \
+             it an open-redirect primitive"
+        );
+    }
+
+    /// Walk a serialized document and return every location that escapes the
+    /// origin. Shared by the guard test and its detector-control below, so the
+    /// control exercises the SAME walker the guard relies on.
+    fn foreign_locations(doc: &serde_json::Value) -> Vec<String> {
+        fn walk(v: &serde_json::Value, path: &str, out: &mut Vec<String>) {
             match v {
                 serde_json::Value::String(s) => {
-                    // Only check location-shaped fields; doorwayId is a name.
-                    if s.starts_with('/') || s.contains("://") {
-                        assert!(
-                            s.starts_with('/') && !s.starts_with("//"),
-                            "{path} advertises a non-relative location: {s:?} — a discovery \
-                             document that can name another origin is an open redirect"
-                        );
+                    let location_shaped = s.starts_with('/') || s.contains("://");
+                    // `//host/x` names ANOTHER origin while passing a naive
+                    // leading-slash check — the classic bypass.
+                    if location_shaped && (!s.starts_with('/') || s.starts_with("//")) {
+                        out.push(format!("{path} = {s}"));
                     }
                 }
                 serde_json::Value::Object(m) => {
                     for (k, sub) in m {
-                        assert_relative(sub, &format!("{path}.{k}"));
+                        walk(sub, &format!("{path}.{k}"), out);
                     }
                 }
                 _ => {}
             }
         }
-        assert_relative(&doc(), "$");
+        let mut out = Vec::new();
+        walk(doc, "$", &mut out);
+        out
     }
 
-    /// A protocol-relative URL (`//evil.tld/x`) is the classic bypass of a
-    /// "starts with /" check — pinned so a future edit cannot slip one in.
+    /// DETECTOR CONTROL for the guard above.
+    ///
+    /// The guard only means something if the walker would actually FAIL on a
+    /// document that escapes the origin — a check that can never fire is the
+    /// mirrored-test shape the seam census exists to catch. So this feeds
+    /// hostile values through the REAL `AuthDiscovery` type and its real
+    /// serializer, rather than asserting a hand-written predicate against a
+    /// literal, and requires each one to be caught.
     #[test]
-    fn a_protocol_relative_location_would_be_rejected() {
-        let hostile = serde_json::json!({ "portal": "//evil.tld/login" });
-        let caught = std::panic::catch_unwind(|| {
-            let s = hostile["portal"].as_str().unwrap();
-            assert!(s.starts_with('/') && !s.starts_with("//"));
-        });
-        assert!(caught.is_err(), "the relative-location check must reject //host");
+    fn the_relative_location_guard_catches_an_escaping_document() {
+        for hostile in [
+            "//evil.tld/login",
+            "https://evil.tld/login",
+            "http://evil.tld/login",
+        ] {
+            let escaping = AuthDiscovery {
+                version: 1,
+                doorway_id: Some("alpha-elohim-host".to_string()),
+                portal: hostile,
+                endpoints: AuthEndpoints::current(),
+            };
+            let doc = serde_json::to_value(&escaping).expect("serializes");
+            let caught = foreign_locations(&doc);
+            assert!(
+                caught.iter().any(|c| c.contains(hostile)),
+                "the guard failed to catch a document escaping its origin via {hostile:?} —                  it would pass a discovery document that can aim a Login button anywhere"
+            );
+        }
     }
 
     #[test]

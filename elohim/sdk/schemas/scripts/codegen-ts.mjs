@@ -54,6 +54,10 @@ const INTERFACE_FILES = [
   { src: 'inputs/create-economic-event-input.ts', dest: 'create-economic-event-input.ts' },
   { src: 'inputs/create-attestation-input.ts', dest: 'create-attestation-input.ts' },
   { src: 'views/content-view.ts', dest: 'content-view.ts' },
+  // Auth discovery — GET /.well-known/elohim-auth. The zero-config document an
+  // app reads instead of carrying a login path; generated so the client type and
+  // the Rust wire shape cannot drift.
+  { src: 'views/auth-discovery.ts', dest: 'auth-discovery.ts' },
   // Notary-HEAD authority answer (HEAD-election, Plan C3 / Leg 3) — GET/POST
   // /db/content/{id}/head. Schema basename content-head.schema.json → content-head.ts.
   { src: 'views/content-head.ts', dest: 'content-head-view.ts' },
