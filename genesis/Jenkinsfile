@@ -1079,7 +1079,17 @@ def seedProjectionsStage() {
             // Bash body lives in genesis/scripts/ci/restart-doorway-epr.sh
             // (extracted 2026-06-10: CPS method-size hard limit — the pod-delete
             // + public-boundary rollout-wait heredoc was ~6KB of this method).
-            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/restart-doorway-epr.sh' '${namespace}' '${deployment}' '${doorwayHost}'"
+            // Bounded on ACTIVITY, not wall clock: the script itself caps its
+            // rollout wait at 6 min (72 x 5 s polls) and prints a line per poll,
+            // so a silent gap here is never the script — it is the controller
+            // losing the agent (genesis #1511, 2026-08-28: a Jenkins controller
+            // restart during this wait left the step idle for 41 min and the
+            // outer 90-min pipeline timeout consumed the whole run). Fail THIS
+            // step in minutes, UNSTABLE via the enclosing catchError, so the
+            // E2E verification that follows still runs.
+            timeout(time: 8, unit: 'MINUTES', activity: true) {
+                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/restart-doorway-epr.sh' '${namespace}' '${deployment}' '${doorwayHost}'"
+            }
         } else {
             echo "Skipping doorway pod restart — unrecognized doorwayHost: ${doorwayHost}"
         }

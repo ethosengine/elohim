@@ -51,9 +51,24 @@
               if [ -x /usr/local/bin/sccache ]; then
                 echo "  /usr/local/bin/sccache: present ($(/usr/local/bin/sccache --version 2>&1 | head -1))"
                 export PATH=/usr/local/bin:$PATH
-                export RUSTC_WRAPPER=sccache
                 export SCCACHE_LOG=''${SCCACHE_LOG:-warn}
-                echo "  RUSTC_WRAPPER=$RUSTC_WRAPPER"
+                # Arm the wrapper only if the cache SERVER can actually start.
+                # A dead S3/Garage credential makes `sccache --start-server`
+                # fail with AccessDenied; if RUSTC_WRAPPER is set anyway, the
+                # very first `cargo metadata` dies (`sccache rustc -vV` exit 2)
+                # and the whole DNA build is red in 85 s before any compile
+                # (elohim-holochain #1403, 2026-08-27). A dead cache must cost a
+                # cold compile, never a red build — so probe, and fall through
+                # to un-wrapped cargo with a loud line when the probe fails.
+                if timeout 30 /usr/local/bin/sccache --start-server >/dev/null 2>&1 \
+                   || timeout 15 /usr/local/bin/sccache --show-stats >/dev/null 2>&1; then
+                  export RUSTC_WRAPPER=sccache
+                  echo "  RUSTC_WRAPPER=$RUSTC_WRAPPER (server probe OK)"
+                else
+                  unset RUSTC_WRAPPER
+                  echo "  RUSTC_WRAPPER NOT SET — sccache server failed to start (dead cache credential?); cold compile instead of a red build"
+                  echo "  probe stderr: $(timeout 15 /usr/local/bin/sccache --start-server 2>&1 | tail -2 | tr '\n' ' ')"
+                fi
                 echo "  SCCACHE_BUCKET=''${SCCACHE_BUCKET:-<unset>}"
                 echo "  SCCACHE_ENDPOINT=''${SCCACHE_ENDPOINT:-<unset>}"
                 echo "  PATH=$PATH"
