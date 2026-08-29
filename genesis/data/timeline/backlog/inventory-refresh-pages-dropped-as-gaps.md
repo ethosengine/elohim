@@ -96,3 +96,8 @@ header) is deferred: msgpack positional structs make a trailing field a mixed-ve
 
 Also on the way: the mesh's restart guard read two a2o fixture rows with `sha256-…` anchors as a "zome input
 shape mismatch" and refused every restart — the probe now picks a row whose anchor is an action hash (`uhCkk…`).
+
+Live publisher-restart run (19:22:53, receivers' cursor 1092 vs sequences from 1): james back to 3535 at
+matthew's second refresh, jessica at its third (the first refresh's deltas arrived before its snapshot re-based
+the cursor and read as replay — bounded to one refresh). Recovery ≤ 3 refreshes; before this cut it was
+cursor/78 refreshes.

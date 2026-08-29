@@ -50,3 +50,13 @@ A concurrent session's `cargo test` correctly makes the family `busy` — wait, 
 Measured on the first apply (2026-08-28 23:57Z): pool 125G→87G, pool inodes 341,508→202,513,
 host `ext4_inode_cache` 1,137,138→991,724. Enforce reported "freed 0B" for keep-warm trims — fixed.
 - 2026-08-29 post-restart (workspace recreated from devfile): `fsGroupChangePolicy: OnRootMismatch` present in `$DEVWORKSPACE_FLATTENED_DEVFILE` (`/devworkspace-metadata/flattened.devworkspace.yaml` — the in-pod way to confirm a pod-override landed without kubectl). Host `ext4_inode_cache` 740,556 (was 1,137,138), `/projects` inodes 1,936,009, pool 85G, conductor `.pin` survived. Container-level load avg is the HOST's (25 with nothing running here).
+- **2026-08-29 RAM, not disk, killed the workspace:** the pod's memory cgroup is **31 GiB hard**
+  (`memory.max`; `/proc/meminfo`/`free` show the 64 GB node and lie). `cargo clippy --all-targets` on
+  elohim-storage links the 3.2k-test binaries with ~7 parallel `rust-lld` (~1.5 GB) on top of one
+  `rustc` at 4.3 GB; with three mesh conductors (~6–7 GB each) + IDE Java + claude sessions resident,
+  the OOM-killer first took background cargo chains (why they "were stopped" all afternoon — highest
+  oom_score) and at 17:12 took PID 1 (whole container restart, mesh + /tmp gone). Rules: set
+  `CARGO_BUILD_JOBS=4` (or `-j4`) for clippy/test while the mesh is up; never run the two feature-set
+  clippies back-to-back with conductors resident; read `/sys/fs/cgroup/.../memory.current` vs
+  `memory.max` before heavy cargo. A RAM guard mirroring the disk-guard (soft ~24 GB kill newest
+  rustc/lld + marker, hard ~28 GB PreToolUse DENY) is designed but not built.
