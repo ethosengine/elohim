@@ -26,3 +26,12 @@ Folds the git push/branch/worktree discipline cluster — the rules governing wh
 emptied sweep A's staged index mid-flight, and B's `git add` of its own file landed inside A's commit (A had to
 amend it out). One index per worktree: serialize commits (one committer at a time) or give each integrating
 agent `isolation: worktree`; never run two path-limited committers concurrently in the same checkout.
+
+**2026-08-29 — the ci-harvest DISPATCH line fires in EVERY open session, so a fresh fingerprint gets two
+cures at once.** Session A (this one) and session B (elohim-3c) both reached for `portal-login-step-domain-scoped-identifier`
+within the hour; B's rewrite silently overwrote A's untracked `src/framework/doorway-identity.ts`, rewrote A's step
+edit and deleted A's `__tests__/` dir before A could commit — A's `git add` then failed on a missing path. Rule: run
+`ListAgents` before taking a harvest fingerprint; if a sibling is `busy`, message it and claim disjoint files
+(read-set ∩ write-set = ∅), and commit each landed piece immediately rather than batching — untracked work in a
+shared worktree has no owner. Ceding to the sounder cure (B read the doorway's own answer back; A derived it) is the
+coherent move; correct your backlog row so it doesn't claim the superseded variant.
