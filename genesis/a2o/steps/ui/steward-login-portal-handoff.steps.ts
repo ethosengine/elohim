@@ -60,6 +60,7 @@ import { Human } from '../../src/framework/human.js';
 import { ThresholdLoginPage } from '../../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { localPart } from '../../src/framework/doorway-identity.js';
 
 // ---------------------------------------------------------------------------
 // contentIds keys — captured login response + registered portal host
@@ -200,8 +201,15 @@ async function grantStewardFixture(
   // Resolve the Mongo _id from the admin users list (keyed by identifier).
   const adminClient = new DoorwayClient(doorway);
   adminClient.setToken(adminToken);
-  const list = await adminClient.adminListUsers({ search: identifier, limit: 50 });
-  const entry = list.users.find(u => u.identifier === identifier);
+  // Match on the LOCAL PART, never the whole string. A doorway re-qualifies an
+  // identifier with its OWN gateway domain on register and login, so the fixture
+  // `matthew.dowell@alpha.elohim.host` is stored as `matthew.dowell@localhost`
+  // on the household mesh and as `…@alpha.elohim.host` on the fleet. An exact
+  // match therefore passes on one substrate and fails on the other, which is
+  // exactly the class of defect the mesh exists to catch BEFORE the fleet does.
+  const wanted = localPart(identifier);
+  const list = await adminClient.adminListUsers({ search: wanted, limit: 50 });
+  const entry = list.users.find(u => localPart(u.identifier) === wanted);
   if (!entry) {
     throw new Error(
       `Cannot grant stewardship: user "${identifier}" not found in the admin users list. ` +

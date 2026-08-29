@@ -71,6 +71,7 @@ import { Human } from '../../src/framework/human.js';
 import { SHELL, ThresholdLoginPage } from '../../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { localPart } from '../../src/framework/doorway-identity.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -195,8 +196,15 @@ async function grantStewardFixture(
 ): Promise<void> {
   const adminClient = new DoorwayClient(doorway);
   adminClient.setToken(adminToken);
-  const list = await adminClient.adminListUsers({ search: identifier, limit: 50 });
-  const entry = list.users.find(u => u.identifier === identifier);
+  // Match on the LOCAL PART, never the whole string. A doorway re-qualifies an
+  // identifier with its OWN gateway domain on register and login, so the fixture
+  // `matthew.dowell@alpha.elohim.host` is stored as `matthew.dowell@localhost`
+  // on the household mesh and as `…@alpha.elohim.host` on the fleet. An exact
+  // match therefore passes on one substrate and fails on the other, which is
+  // exactly the class of defect the mesh exists to catch BEFORE the fleet does.
+  const wanted = localPart(identifier);
+  const list = await adminClient.adminListUsers({ search: wanted, limit: 50 });
+  const entry = list.users.find(u => localPart(u.identifier) === wanted);
   assert.ok(
     entry,
     `Cannot grant stewardship: user "${identifier}" not found in the admin users list. ` +
@@ -306,7 +314,16 @@ async function loginViaDoorwayOAuth(
   human: Human,
   appUrl: string
 ): Promise<void> {
-  await device.page.goto(`${appUrl}${LOGIN_PATH}`, { waitUntil: 'domcontentloaded' });
+  // The doorway's portal is where a hosted human signs in — it owns the password
+  // and the session. Navigating to the app's own login route and waiting for the
+  // portal's form asserted an OAuth redirect the app does not perform: it renders
+  // sign-in inline through the shared elohim-imagodei elements, deliberately
+  // ("ZERO third portal"). Going to the portal directly makes the next failure an
+  // honest one — about the session reaching the app, not about a missing form.
+  const doorwayOrigin = new URL(appUrl).origin;
+  await device.page.goto(`${doorwayOrigin}${THRESHOLD_PATH}?returnUrl=${encodeURIComponent('/')}`, {
+    waitUntil: 'domcontentloaded',
+  });
 
   const loginPage = new ThresholdLoginPage(device.page);
   await loginPage.login(human.credentials.identifier, human.credentials.password);
