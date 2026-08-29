@@ -49,3 +49,4 @@ rate), deps cache fine. `RUSTC_WRAPPER` stays '' per the 2026-07-03 decision; fl
 A concurrent session's `cargo test` correctly makes the family `busy` — wait, never override.
 Measured on the first apply (2026-08-28 23:57Z): pool 125G→87G, pool inodes 341,508→202,513,
 host `ext4_inode_cache` 1,137,138→991,724. Enforce reported "freed 0B" for keep-warm trims — fixed.
+- 2026-08-29 post-restart (workspace recreated from devfile): `fsGroupChangePolicy: OnRootMismatch` present in `$DEVWORKSPACE_FLATTENED_DEVFILE` (`/devworkspace-metadata/flattened.devworkspace.yaml` — the in-pod way to confirm a pod-override landed without kubectl). Host `ext4_inode_cache` 740,556 (was 1,137,138), `/projects` inodes 1,936,009, pool 85G, conductor `.pin` survived. Container-level load avg is the HOST's (25 with nothing running here).
