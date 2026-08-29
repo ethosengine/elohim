@@ -70,6 +70,24 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-29c (FLEET CONFIRM of the 2026-08-29 batch; NO status flip —
+the habit's own fleet leg is still red on federation-deploy). Push
+38eb75677..71f310ce6 (37 commits) → orchestrator #1742: edge #1389 built,
+pushed and deployed elohim-storage-iroh:1.0.0-dev-71f310ce to 7/7 alpha
+peers + 2/2 doorways Ready (dual). Dataplane Validation read A-caughtUp=True
+AND B-caughtUp=True for its whole 45-min gate — the first run both storages
+read caught-up — but A-quiesced never held (actionable never drained to
+tol 2) so the gate DID-NOT-MEASURE (post-deploy churn). No
+elohim_transport_route_total / acquisition_dispatch_total series yet on
+the fleet: nothing was routed in the window (genesis #1518's upload, the
+first routed shard push, failed upstream on the doorway rollout collision;
+retrigger d0b3efe30 pending). Local 3.4k-corpus delta: per-op iroh wins
+(bulk ~7x, small ~25x); recovery/quiesce wall-clock cadence-bound. Portal
+lane: Act II twins for auth-discovery + doorway-portal-login landed in the
+genesis E2E legs (proven 4/4 + 2/2 on the mesh). Ledger rows filed:
+content-id-with-spaces-unreachable-by-id, transport-route-metrics-
+pretouch-zero, elohim-app-gate-lint-debt-blocks-push,
+doorway-schema-contract-test-runs-nowhere, seed-relationship-type-step.
 DELTA 2026-08-29b (M4 transport self-awareness; NO status flip). Landed
 spec 2026-08-24 §3.1: p2p::transport_paths (PathObservation ring keyed by
 the cross-plane peer label; select_path pure predicate, registry row, C3/C4
