@@ -49,3 +49,10 @@ the 258 s homo-iroh warm PASS of 2026-08-28 — compare within arms from here on
 content` exits 1 on its conductor post-flight — "1/3433 entries written" — while the doorway→storage import
 reports 3433 inserted / 8920 relationships; the local seed never DHT-anchors, so read storage, not the seeder's rc.)
 Defect 3 (seed slug normalisation) stays open.
+
+## 2026-08-29 same class, second route: `/sync/v1/{hAppId}/docs/{docId}` does not percent-decode `docId`
+
+`GET /sync/v1/elohim/docs/node%3Ascenario-…%20…` → `{"error":"Document not found: node:scenario-…%20…"}` — the
+`%20` reaches the DocStore lookup verbatim, so no space-id doc can be read over HTTP (the heads route works for
+space-free ids). Same cure as defect 1: `decode_path_id` at the leaf. Not taken in the shape-3 cut; it blocked an
+investigation read, not a dataplane path.

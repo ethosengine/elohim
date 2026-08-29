@@ -98,3 +98,27 @@ boot seed → `book_warm` at 1 ms; pull-leg dispatch iroh 274 / libp2p 29 (this 
 single-plane: 225 / 73 — libp2p's share fell 24.5 % → 9.6 %), route `best_rtt` iroh 27 : libp2p 3, `prior_iroh` 2.
 Fleet read: `first_drain_total{outcome="book_warm"}` should be 1 per boot on every dual peer with a doorway; a
 `{boot,empty}` column that stays non-zero names a doorway whose board is not being posted to.
+
+## 2026-08-29 recovery on the shape-3 binary: NOT-RECOVERED 915 s, P1 plateau 134 — half records, not the boot seed
+
+`just mesh recovery warm jessica` (labels cut=shape3-2026-08-29 seed=doorway-boot): P0/P2/P3/P4 green, P1 stuck at
+140→134 `<id>=null` rows. Warm recovery WIPES the content db (script: "wipe DocStore + content db + blobs"), so
+jessica re-acquired the whole corpus from the two survivors. The 134 rows were re-inserted by the acquisition store
+at 14:43:53–14:44:12 (`created_at == updated_at`, SQLite default stamp = `bulk_create_content`) with `blob_hash`
+NULL and `blob_cid` set — the served record was HALF, because the best-RTT survivor (james, iroh) held only a half
+row for them: james had restarted 2 min after the seed set matthew's `blob_hash` and projected those rows from
+matthew's sync docs before its own pull reached them. This morning both survivors were converged → 439 s PASS.
+Neither boot seed nor first-drain timing is in the chain (these ids never appear in any acquisition line before
+14:43); the pull leg would have done the same at 10 s.
+
+Why the half rows never healed: `reverse_project_content_doc` is EDGE-triggered on doc changes. jessica's doc for
+the row landed at 14:42:49 (row absent → heal no-ops "the replication plane's job"); the half row landed at 14:43:53;
+no further doc change → never re-read. The doc DID hold the hash (every reverse heal on jessica reads
+`from None → bafkrei…`; heads present for the half rows). Cure landed: `sync::projector::heal_half_rows_from_docs`
+— level-triggered, keyset-paged sweep (200 half rows per sync round, wraps) that asks each half row's doc; a doc
+without a blobHash leaves the legitimate half state alone (matthew itself has 1369 declared-but-unuploaded rows).
+Counted in `elohim_sync_half_row_heal_total{outcome}` (pre-touched). Test pins heal / leave-alone / cursor wrap.
+
+Also found on the way, filed separately: `inventory-refresh-pages-dropped-as-gaps` (a dual-mode peer's view of a
+neighbour's blob inventory sits at ~9 % — 77-page refresh, out-of-order pages dropped as gaps, snapshot request is
+a placeholder).

@@ -1354,6 +1354,22 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Level-triggered heal of HALF content rows (declared `blob_cid`, no local
+    /// `blob_hash`) from their converged sync docs. label: outcome = "scanned" |
+    /// "healed" (doc carried a blobHash the row lacked) | "no_doc_hash" (no doc,
+    /// or the doc has no blobHash either — the legitimate half state) |
+    /// "failed". Pre-touched at zero. A `healed` that keeps climbing names a
+    /// peer whose pull leg keeps landing half records; see backlog
+    /// `pull-leg-drains-before-iroh-book-warms` (2026-08-29 measured section).
+    pub static ref SYNC_HALF_ROW_HEAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_half_row_heal_total",
+            "Half content rows visited by the doc-heal sweep, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// iroh-gossip membership transitions on inbound topics. label:
     /// direction = "up" | "down". `up` staying at zero = the plane has no
     /// neighbors and every iroh publish is a shout into a void.
@@ -2405,6 +2421,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_DISPATCH.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_FIRST_DRAIN.clone()));
         let _ = REGISTRY.register(Box::new(IROH_DOORWAY_BOOTSTRAP_READS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_HALF_ROW_HEAL.clone()));
+        for outcome in SYNC_HALF_ROW_HEAL_OUTCOMES {
+            SYNC_HALF_ROW_HEAL.with_label_values(&[outcome]).reset();
+        }
         for phase in IROH_DOORWAY_BOOTSTRAP_PHASES {
             for result in IROH_DOORWAY_BOOTSTRAP_READ_RESULTS {
                 IROH_DOORWAY_BOOTSTRAP_READS
@@ -3200,6 +3220,14 @@ pub const IROH_DOORWAY_BOOTSTRAP_PHASES: &[&str] = &["boot", "watch"];
 /// `result` vocabulary of `IROH_DOORWAY_BOOTSTRAP_READS` — pre-touched at
 /// zero so a boot that never seeded is a visible 0, not a missing series.
 pub const IROH_DOORWAY_BOOTSTRAP_READ_RESULTS: &[&str] = &["seeded", "none_accepted", "empty"];
+
+/// `outcome` vocabulary of `SYNC_HALF_ROW_HEAL`, pre-touched at zero.
+pub const SYNC_HALF_ROW_HEAL_OUTCOMES: &[&str] = &["scanned", "healed", "no_doc_hash", "failed"];
+
+/// One half row visited by the doc-heal sweep.
+pub fn inc_sync_half_row_heal(outcome: &str) {
+    SYNC_HALF_ROW_HEAL.with_label_values(&[outcome]).inc();
+}
 
 /// One doorway board read by the iroh bootstrap joiner (see
 /// `IROH_DOORWAY_BOOTSTRAP_READS` for the label vocabulary).

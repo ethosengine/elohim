@@ -1779,6 +1779,33 @@ pub fn content_ids_present(
     Ok(found.into_iter().collect())
 }
 
+/// Ids of HALF rows — a declared blob (`blob_cid`) with no locally derived
+/// `blob_hash` — in id order after `after`, at most `limit`. The level-triggered
+/// heal sweep (`sync::projector::heal_half_rows_from_docs`) pages through these
+/// with a keyset cursor so a corpus-sized set is visited round-robin, a bounded
+/// slice per tick, and the tail is never starved by the head.
+///
+/// bounded-work: one indexed range scan, `limit` rows.
+pub fn list_half_blob_row_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    after: Option<&str>,
+    limit: i64,
+) -> QueryResult<Vec<String>> {
+    let mut q = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::blob_cid.is_not_null())
+        .filter(content::blob_hash.is_null())
+        .into_boxed();
+    if let Some(after) = after {
+        q = q.filter(content::id.gt(after));
+    }
+    q.order(content::id.asc())
+        .limit(limit.max(1))
+        .select(content::id)
+        .load(conn)
+}
+
 /// Which of `ids` exist locally AND carry the given `reach` (provide-loop gate).
 ///
 /// The provide reconciler must only offer to the commons what is GENUINELY

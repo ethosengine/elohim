@@ -3946,6 +3946,20 @@ async fn async_main(
                 // is the explicit opt-out. Spawned (not awaited) so it never
                 // delays serving readiness; batched + yielding internally so it
                 // doesn't starve the write path.
+                // Level-triggered twin of the reverse heal: half rows (declared
+                // blob_cid, no blob_hash) are re-read against their converged
+                // docs, one bounded slice per sync round. The edge-triggered heal
+                // no-ops when the doc lands before the row (measured 2026-08-29:
+                // 134 rows stayed blobHash:null for a whole recovery while the
+                // doc held the hash). Spawned ONCE — the SyncManager is shared.
+                elohim_storage::sync::projector::spawn_half_row_heal_sweep(
+                    node.sync_manager().clone(),
+                    pool.clone(),
+                    elohim_storage::p2p::sync_round::round_interval(Some(
+                        config.sync_interval_secs,
+                    )),
+                );
+                info!("Half-row heal sweep spawned — half rows re-read against their docs each sync round");
                 let backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
                 if elohim_storage::sync::projector::backfill_enabled(backfill_env.as_deref()) {
                     let backfill_sync = node.sync_manager().clone();
@@ -4069,6 +4083,16 @@ async fn async_main(
                     // projection — including a live producer projection that landed
                     // between a racer's load and its save, whose announce has already
                     // gone out on the wire. No mode check is needed (or possible) here.
+                    // Same sweep for the pure-iroh shape (the guard above keeps
+                    // this from double-spawning in dual mode).
+                    elohim_storage::sync::projector::spawn_half_row_heal_sweep(
+                        iroh_sync.clone(),
+                        pool.clone(),
+                        elohim_storage::p2p::sync_round::round_interval(Some(
+                            config.sync_interval_secs,
+                        )),
+                    );
+                    info!("Half-row heal sweep spawned (iroh) — half rows re-read against their docs each sync round");
                     let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
                     if elohim_storage::sync::projector::backfill_enabled(
                         iroh_backfill_env.as_deref(),

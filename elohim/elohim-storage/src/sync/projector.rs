@@ -368,6 +368,126 @@ pub async fn project_content_doc_reconcile(
     Ok(true)
 }
 
+/// One sweep batch of the half-row heal.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct HalfRowHealStats {
+    pub scanned: usize,
+    pub healed: usize,
+    pub no_doc_hash: usize,
+    pub failed: usize,
+}
+
+/// Half rows visited per sweep tick. Sized like the back-fill page: a corpus
+/// with ~1.4k legitimate half rows (measured 2026-08-29, household mesh) is
+/// visited end-to-end in ~7 ticks, and each visit is one sled field read.
+pub const HALF_ROW_HEAL_BATCH: i64 = 200;
+
+/// Level-triggered heal of HALF rows from their converged docs — the
+/// reconciliation-controller twin of `reverse_project_content_doc`.
+///
+/// The reverse heal is EDGE-triggered: it runs when a doc's changes land, and
+/// no-ops when the row is absent at that moment ("the replication plane's
+/// job"). Measured 2026-08-29 (household mesh, warm recovery jessica): the doc
+/// arrived at 14:42:49, the row landed at 14:43:53 as a HALF record (the
+/// pull leg's best-RTT survivor held only a half row itself), and nothing
+/// ever re-read that row against the doc it already had — 134 rows stayed
+/// `blobHash: null` for the whole 915 s run while the doc held the hash. This
+/// sweep visits half rows in id order, `batch` per call, and asks the doc;
+/// a doc without a blobHash leaves the row alone (the legitimate half state:
+/// a declared blob nobody has uploaded yet). Returns the keyset cursor to
+/// continue from, or `None` when the set is exhausted (the caller wraps).
+///
+/// bounded-work: `batch` rows, one doc-field read each; heals go through
+/// `update_content`'s coalesce (an amber write never clobbers green).
+pub async fn heal_half_rows_from_docs(
+    sync: &SyncManager,
+    pool: &DbPool,
+    after: Option<&str>,
+    batch: i64,
+) -> Result<(HalfRowHealStats, Option<String>), StorageError> {
+    let ids = {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        let ctx = AppContext::default_lamad();
+        content_diesel::list_half_blob_row_ids(&mut conn, &ctx, after, batch)?
+    };
+    let mut stats = HalfRowHealStats::default();
+    for id in &ids {
+        stats.scanned += 1;
+        crate::metrics::inc_sync_half_row_heal("scanned");
+        match reverse_project_content_doc(sync, pool, &content_doc_id(id)).await {
+            Ok(true) => {
+                stats.healed += 1;
+                crate::metrics::inc_sync_half_row_heal("healed");
+            }
+            Ok(false) => {
+                stats.no_doc_hash += 1;
+                crate::metrics::inc_sync_half_row_heal("no_doc_hash");
+            }
+            Err(e) => {
+                stats.failed += 1;
+                crate::metrics::inc_sync_half_row_heal("failed");
+                tracing::debug!(
+                    target: "elohim_storage::sync_heal",
+                    content_id = %id, error = %e,
+                    "half-row heal: doc read/heal failed — retried next sweep"
+                );
+            }
+        }
+    }
+    let exhausted = (ids.len() as i64) < batch.max(1);
+    let cursor = if exhausted { None } else { ids.last().cloned() };
+    Ok((stats, cursor))
+}
+
+/// Spawn the half-row heal sweep: one `HALF_ROW_HEAL_BATCH` slice per
+/// `interval`, keyset cursor carried across ticks and wrapped at the end of
+/// the set. Spawn ONCE per process — the SyncManager is shared across planes.
+pub fn spawn_half_row_heal_sweep(
+    sync: Arc<SyncManager>,
+    pool: DbPool,
+    interval: std::time::Duration,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut cursor: Option<String> = None;
+        loop {
+            ticker.tick().await;
+            match heal_half_rows_from_docs(&sync, &pool, cursor.as_deref(), HALF_ROW_HEAL_BATCH)
+                .await
+            {
+                Ok((stats, next)) => {
+                    if stats.healed > 0 || stats.failed > 0 {
+                        tracing::info!(
+                            target: "elohim_storage::sync_heal",
+                            scanned = stats.scanned, healed = stats.healed,
+                            no_doc_hash = stats.no_doc_hash, failed = stats.failed,
+                            "half-row heal sweep: rows re-read against their docs"
+                        );
+                    } else {
+                        tracing::debug!(
+                            target: "elohim_storage::sync_heal",
+                            scanned = stats.scanned, no_doc_hash = stats.no_doc_hash,
+                            "half-row heal sweep: nothing to heal in this slice"
+                        );
+                    }
+                    cursor = next;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "elohim_storage::sync_heal",
+                        error = %e,
+                        "half-row heal sweep: slice failed — retried next tick"
+                    );
+                    cursor = None;
+                }
+            }
+        }
+    })
+}
+
 /// Outcome of a corpus back-fill pass.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BackfillStats {
@@ -1113,6 +1233,116 @@ mod tests {
                 .unwrap(),
             "lamad"
         );
+    }
+
+    /// The level-triggered heal: a HALF row whose doc already holds a blobHash
+    /// is healed by the sweep (the edge-triggered reverse heal missed it because
+    /// the row landed after the doc); a half row whose doc has no blobHash is
+    /// left alone; the keyset cursor pages the set and wraps.
+    #[tokio::test]
+    async fn half_row_heal_sweep_reads_rows_against_their_docs_and_pages() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let cid_a = "bafkrei-half-a-cid".to_string();
+
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, blob_cid, blob_hash) in [
+                ("half-a", Some(cid_a.clone()), None),
+                ("half-b", Some("bafkrei-half-b-cid".to_string()), None),
+                (
+                    "full-c",
+                    Some("bafkrei-full-c".to_string()),
+                    Some("bafkrei-full-c".to_string()),
+                ),
+            ] {
+                let input = CreateContentInput {
+                    id: id.to_string(),
+                    title: id.to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash,
+                    blob_cid,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: None,
+                };
+                content_diesel::create_content(&mut conn, &ctx, input).unwrap();
+            }
+        }
+        // half-a's doc converged from a peer that holds the bytes: it carries
+        // the blobHash. half-b's doc came from a half row: no blobHash.
+        let mut full_a = sample_content("half-a", "half-a");
+        full_a.blob_cid = Some(cid_a.clone());
+        full_a.blob_hash = Some(cid_a.clone());
+        super::project_content_doc(&sync, &full_a).await.unwrap();
+        let mut half_b = sample_content("half-b", "half-b");
+        half_b.blob_cid = Some("bafkrei-half-b-cid".to_string());
+        super::project_content_doc(&sync, &half_b).await.unwrap();
+
+        // Batch of 1 exercises the cursor: half-a first (id order).
+        let (s1, c1) = super::heal_half_rows_from_docs(&sync, &pool, None, 1)
+            .await
+            .unwrap();
+        assert_eq!(
+            s1,
+            super::HalfRowHealStats {
+                scanned: 1,
+                healed: 1,
+                no_doc_hash: 0,
+                failed: 0
+            }
+        );
+        assert_eq!(c1.as_deref(), Some("half-a"));
+        {
+            let mut conn = pool.get().unwrap();
+            let row = content_diesel::get_content(
+                &mut conn,
+                &ctx,
+                "half-a",
+                content_diesel::MinTrust::Invisible,
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(
+                row.blob_hash.as_deref(),
+                Some(cid_a.as_str()),
+                "the doc's blobHash healed the half row"
+            );
+        }
+        let (s2, c2) = super::heal_half_rows_from_docs(&sync, &pool, c1.as_deref(), 1)
+            .await
+            .unwrap();
+        assert_eq!(
+            s2,
+            super::HalfRowHealStats {
+                scanned: 1,
+                healed: 0,
+                no_doc_hash: 1,
+                failed: 0
+            }
+        );
+        assert_eq!(c2.as_deref(), Some("half-b"));
+        // Past the end: nothing left, cursor wraps to None. full-c was never a
+        // candidate (it has a blob_hash), and half-a is no longer half.
+        let (s3, c3) = super::heal_half_rows_from_docs(&sync, &pool, c2.as_deref(), 1)
+            .await
+            .unwrap();
+        assert_eq!(s3.scanned, 0);
+        assert!(c3.is_none());
+        let (s4, _) = super::heal_half_rows_from_docs(&sync, &pool, None, 10)
+            .await
+            .unwrap();
+        assert_eq!(s4.scanned, 1, "only half-b remains half");
     }
 
     /// End-to-end back-fill over a real (in-memory) SQL corpus: the first pass
