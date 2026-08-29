@@ -37,7 +37,7 @@ import {
   AdjustmentReasoning,
 } from '@app/shefa/models/insurance-mutual.model';
 
-import { ECONOMIC_EVENT_FACTORY, type IEconomicEventFactory } from '../interfaces';
+import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
 
 import type { AgreementMetadata } from '../generated/metadata-types';
 

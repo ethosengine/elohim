@@ -31,7 +31,6 @@ import type {
   OpinionClusterView,
   ParticipantPositionView,
   SensemakingResultView,
-  StatementMetricsView,
 } from '@elohim/storage-client/generated';
 
 /**
@@ -796,25 +795,6 @@ function mapStatementViewToStatement(sv: StatementView): Statement {
     text: sv.text,
     author: sv.humanId,
     createdAt: sv.createdAt ? new Date(sv.createdAt) : undefined,
-  };
-}
-
-/**
- * Map a StatementVoteView from the storage-client to the component's StatementVote type.
- * The backend stores vote as a string ('agree'|'disagree'|'pass');
- * the component expects a numeric value: 1 (agree), -1 (disagree), 0 (pass).
- */
-function mapStatementVoteViewToVote(vv: StatementVoteView): StatementVote {
-  const VOTE_VALUE_MAP: Record<string, number> = {
-    agree: 1,
-    disagree: -1,
-    pass: 0,
-  };
-  return {
-    participantId: vv.humanId,
-    statementId: vv.statementId,
-    value: VOTE_VALUE_MAP[vv.vote] ?? 0,
-    timestamp: vv.createdAt ? new Date(vv.createdAt) : undefined,
   };
 }
 

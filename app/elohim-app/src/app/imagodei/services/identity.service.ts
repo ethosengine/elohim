@@ -27,7 +27,6 @@ import {
   type HumanProfile,
   type HumanEntry,
   type HumanSessionResult,
-  type HumanUpdateResult,
   type RegisterHumanRequest,
   type UpdateProfileRequest,
   type RegisterHumanPayload,

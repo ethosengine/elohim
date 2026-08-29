@@ -241,9 +241,6 @@ export class AgentService implements OnDestroy {
           attestationsEarned: [],
         };
 
-        // Check if this is starting a new path
-        const isNewPath = !existingProgress;
-
         if (!progress.completedStepIndices.includes(stepIndex)) {
           progress.completedStepIndices.push(stepIndex);
           progress.completedStepIndices.sort((a, b) => a - b);

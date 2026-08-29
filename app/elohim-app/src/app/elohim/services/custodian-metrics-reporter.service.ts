@@ -2,7 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 // @coverage: 14.7% (2026-02-24)
 
-import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
+import { CUSTODIAN_METRICS, type CustodianMetrics } from '@app/shefa';
 
 import { PerformanceMetricsService } from './performance-metrics.service';
 

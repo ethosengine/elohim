@@ -19,7 +19,7 @@ import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
-import { PathView, PathStep, parsePathView } from '@app/lamad/models/learning-path.model';
+import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
 
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
@@ -191,34 +191,6 @@ interface RawChapterData {
   orderIndex?: number;
   estimatedDuration?: string;
   steps?: RawStepData[];
-}
-
-/** Raw path data from storage/API before transformation */
-interface RawPathData {
-  id: string;
-  docId?: string;
-  version?: string;
-  title?: string;
-  description?: string;
-  purpose?: string;
-  difficulty?: string;
-  estimatedDuration?: string;
-  visibility?: string;
-  pathType?: string;
-  thumbnailUrl?: string | null;
-  thumbnailAlt?: string;
-  tags?: string[];
-  createdBy?: string;
-  contributors?: string[];
-  steps?: RawStepData[];
-  chapters?: RawChapterData[];
-  stepCount?: number;
-  chapterCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  metadata?: Record<string, unknown>;
-  path?: RawPathData;
-  ungroupedSteps?: RawStepData[];
 }
 
 /** Raw relationship from storage/API */

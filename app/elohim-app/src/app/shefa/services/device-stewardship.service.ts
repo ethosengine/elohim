@@ -19,13 +19,12 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { TauriAuthService } from '@app/imagodei/services/tauri-auth.service';
 
-import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../interfaces';
+import { COMPUTE_DASHBOARD } from '../interfaces';
 import {
   type DeviceCategory,
   type StewardedDevice,
   type DeviceStewardshipState,
   createEmptyDeviceStewardshipState,
-  mapNodeClusterStatusToDeviceStatus,
   detectPlatform,
 } from '../models/device-stewardship.model';
 

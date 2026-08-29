@@ -212,7 +212,14 @@ module.exports = tseslint.config(
       "no-console": ["error", { allow: ["warn", "error"] }],    // S106 - No console.log
       "prefer-const": "error",                                   // S3353 - Prefer const
       "no-var": "error",                                         // S3504 - Use let/const
-      "eqeqeq": ["error", "always"],                            // S1244 - Use === instead of ==
+      // S1244 - Use === instead of ==, EXCEPT against null. `x == null` is the
+      // deliberate "null or undefined" idiom and every one of this app's 13
+      // violations was that idiom, several inside type predicates
+      // (`filter((n): n is number => n != null)`). Rewriting those to `!==`
+      // would let `undefined` through a guard asserting `is number` -- a real
+      // bug introduced to satisfy a style rule. The null exemption is the
+      // standard way to say this; `==` against anything else stays an error.
+      "eqeqeq": ["error", "always", { null: "ignore" }],
       "no-eval": "error",                                        // S1523 - No eval
       "no-implied-eval": "error",                               // No implied eval
       "no-new-func": "error",                                   // No Function constructor

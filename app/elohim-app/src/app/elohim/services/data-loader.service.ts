@@ -52,7 +52,6 @@ import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
 
-import type { IGovernance } from '@elohim/service';
 import type {
   GovernanceStateView,
   ChallengeView,
