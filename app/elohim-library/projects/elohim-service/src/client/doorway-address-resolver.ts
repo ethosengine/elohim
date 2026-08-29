@@ -7,7 +7,20 @@
  * request retry or stickiness semantics.
  */
 
-export type DoorwayResolutionSource = 'config' | 'registration' | 'pkarr';
+/**
+ * Where an address came from — and, for a federation row, how much its own
+ * claim about itself is worth.
+ *
+ * `registration` is a signed record: identity_root + signing_key + serial +
+ * signature, sourced from the infrastructure DHT. `federation-gossip` is the
+ * same endpoint's OTHER half — rows merged in over HTTP with all four of those
+ * set to None (`doorway-service/src/routes/federation.rs`). They are separate
+ * words because calling an unsigned row `config` claims an operator chose it,
+ * and calling it `registration` claims a signature that is not there. It is a
+ * fine address to try a plain GET against and a bad one to send a credential
+ * to, and only a distinct label lets a caller act on the difference.
+ */
+export type DoorwayResolutionSource = 'config' | 'registration' | 'federation-gossip' | 'pkarr';
 
 export interface DoorwayEndpoint {
   /** gateway, bootstrap, or signal */

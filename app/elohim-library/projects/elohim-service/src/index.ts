@@ -197,3 +197,9 @@ export type {
 export * from './angular/utils/access-control.helper';
 export * from './angular/utils/epr-ref';
 export * from './angular/utils/bundle-route-context';
+
+// Keep — the framework-free client control surface (identity · storage · keys ·
+// recovery), reachable as `@elohim/service/keep` through the `@elohim/service/*`
+// tsconfig paths that already exist in elohim-app and doorway-app. Exported here
+// too so a consumer importing the package root sees one surface, not two.
+export * from './keep/index.js';

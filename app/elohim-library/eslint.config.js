@@ -214,6 +214,30 @@ module.exports = tseslint.config(
   },
 
   // ================================================================
+  // 2b. GENERATED CODE (projects/elohim-service/src/generated)
+  // ================================================================
+  // These files are emitted from the protocol view schemas by
+  // `pnpm run schema:codegen:ts` and carry a DO-NOT-EDIT banner. A style rule
+  // that fires here cannot be satisfied without hand-editing a file the next
+  // codegen run overwrites, so it is not a finding — it is an unfixable error
+  // that reds the gate for everyone. The rules below are switched off for this
+  // directory ONLY; correctness rules stay on, because a generator CAN emit
+  // something genuinely wrong.
+  //
+  // `redundant-type-aliases` fires on `export type RelativePath = string`,
+  // which is a named constraint in the schema (`$defs.relativePath`, carrying
+  // the pattern that makes a foreign origin unexpressible) flattened by codegen
+  // into its base type. The name is the point; only the emitted TypeScript
+  // looks redundant.
+  {
+    files: ["projects/elohim-service/src/generated/**/*.ts"],
+    rules: {
+      "sonarjs/redundant-type-aliases": "off",
+      "@typescript-eslint/consistent-indexed-object-style": "off",
+    }
+  },
+
+  // ================================================================
   // 3. LAMAD-UI + HTML5-APP-PLUGIN (Angular library — bundler moduleResolution)
   // ================================================================
   {

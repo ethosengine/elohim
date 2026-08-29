@@ -370,7 +370,7 @@ _gate-selftest-env:
 
 _gate-elohim-library:
     cd app/elohim-library && pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src
-    cd app/elohim-library/projects/elohim-service && pnpm exec tsc --noEmit && pnpm exec vitest run
+    cd app/elohim-library/projects/elohim-service && pnpm exec tsc --noEmit && pnpm exec tsc --noEmit -p tsconfig.spec.json && pnpm exec vitest run
 
 _gate-elohim-storybook:
     cd app/elohim-library && pnpm run build-storybook && pnpm run test-storybook:ci
