@@ -224,6 +224,11 @@ module.exports = tseslint.config(
   // directory ONLY; correctness rules stay on, because a generator CAN emit
   // something genuinely wrong.
   //
+  // Only rules the generator does NOT already suppress per-file belong here:
+  // codegen emits its own `/* eslint-disable @typescript-eslint/consistent-
+  // indexed-object-style */` banner, and disabling the same rule twice makes
+  // that banner an "unused eslint-disable directive" warning on every file.
+  //
   // `redundant-type-aliases` fires on `export type RelativePath = string`,
   // which is a named constraint in the schema (`$defs.relativePath`, carrying
   // the pattern that makes a foreign origin unexpressible) flattened by codegen
@@ -233,7 +238,6 @@ module.exports = tseslint.config(
     files: ["projects/elohim-service/src/generated/**/*.ts"],
     rules: {
       "sonarjs/redundant-type-aliases": "off",
-      "@typescript-eslint/consistent-indexed-object-style": "off",
     }
   },
 

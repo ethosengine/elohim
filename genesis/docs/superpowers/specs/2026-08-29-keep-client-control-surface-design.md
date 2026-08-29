@@ -87,6 +87,22 @@ reachable from the barrel — an unreachable file is one the boundary walk never
 `tsconfig.spec.json` leg was added to `_gate-elohim-library`, which had never type-checked a single
 spec in this project.
 
+**Slice 2 has landed.** `Answer<T>` and `readAuthDiscovery` — the discovery document's first
+production reader anywhere (its only reader was an a2o step). Measured against both live mesh
+doorways: alpha and apex both `present`, 10 endpoints, `pathDrift` NONE, `portalUrl` resolving on
+the serving origin, and an unowned base correctly `absent(not-found)` rather than unreachable.
+
+One design decision was taken AGAINST this document's own recommendation, and the reason belongs
+here. The design proposed a fourth `refused` state on `Answer<T>`. The shared Rust contract
+(`crates/seam-contracts/src/answer.rs`) argues explicitly for three, because "keeping the state set
+at three is what lets every seam share one vocabulary", and pairs `Answer` with a reason enum
+instead. The objection the fourth state answers is real — collapsing "this peer rejected who I am"
+into `unreachable` misinforms, since `unreachable` means absence is NOT established — but it is
+answered just as well by making the reason REQUIRED on every non-present variant.
+`{state:'unreachable', reason:'refused'}` carries exactly what a fourth variant would, cannot be
+produced by accident, and keeps one state set across both languages. Requiring the pairing is
+closer to the Rust design than adding a variant would be.
+
 **Not yet landed from slice 1:** the provider flip in `app/elohim-app/src/app/app.config.ts` that
 binds `DOORWAY_ADDRESS_RESOLVER` to the register. It is one line and it is what makes the register
 live; it is held because a push touching `app/elohim-app` is refused by that project's 590
