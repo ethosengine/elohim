@@ -115,8 +115,11 @@ When(
     const device = requirePlaywrightDevice(this, humanName);
     const human = this.getHuman(humanName);
 
-    // Navigate to app login — this triggers OAuth redirect to doorway
-    await device.navigate(LOGIN_PATH);
+    // A HOSTED human signs in at their doorway's own portal — the doorway is the
+    // identity provider, and it is the only surface that ever sees the password.
+    // `returnUrl` brings the browser back to the app afterwards, which is what
+    // makes the app-shell assertion below meaningful.
+    await device.navigate(`${THRESHOLD_PATH}?returnUrl=${encodeURIComponent('/')}`);
 
     // Fill credentials and submit via page object
     const loginPage = new ThresholdLoginPage(device.page);
@@ -143,8 +146,8 @@ When(
     const device = requirePlaywrightDevice(this, humanName);
     const human = this.getHuman(humanName);
 
-    // Navigate to app login — triggers OAuth redirect to doorway
-    await device.navigate(LOGIN_PATH);
+    // Same surface as the happy path — the doorway's portal owns the password.
+    await device.navigate(`${THRESHOLD_PATH}?returnUrl=${encodeURIComponent('/')}`);
 
     // Fill with correct identifier but wrong password via page object
     const loginPage = new ThresholdLoginPage(device.page);

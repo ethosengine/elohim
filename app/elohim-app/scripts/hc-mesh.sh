@@ -1725,7 +1725,14 @@ EOF
       echo "portal already up on :$THRESHOLD_PORT"
     elif [ -d "$REPO_ROOT/doorway/doorway-app/node_modules" ] || [ -d "$REPO_ROOT/node_modules" ]; then
       ( cd "$REPO_ROOT/doorway/doorway-app" && \
+        # --live-reload=false: the doorway PROXIES /threshold/* to this server, and
+        # a hot-reload WebSocket cannot traverse that proxy — it fails the
+        # handshake against the proxied 200 and emits console errors on every
+        # page. Those errors are indistinguishable from product errors to the
+        # browser a2o lane, which asserts a clean console after login. A portal
+        # that is only ever reached through the proxy has no use for HMR anyway.
         nohup pnpm exec ng serve --port "$THRESHOLD_PORT" --serve-path /threshold \
+          --live-reload false \
           --host 127.0.0.1 > "$LOGDIR/portal.log" 2>&1 & \
         record_mesh_pid portal mesh "$!" || true )
       echo "portal starting on :$THRESHOLD_PORT (doorway-app; ~40s to first paint, log: $LOGDIR/portal.log)"

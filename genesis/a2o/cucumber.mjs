@@ -75,6 +75,27 @@ export default function () {
       worldParameters: { env: 'mesh' },
       tags: '@e2e and not @wip and not @browser and not @browser-only',
     },
+    // Act I, THE PORTAL. The browser half of the household lane, split out only
+    // because it needs a real browser (`E2E_DEVICE_MODE=playwright`) — the
+    // scenarios are the same act against the same mesh.
+    //
+    // It exists because `mesh` above excludes @browser, so until now NOTHING ran
+    // the sign-in portal against a mesh this run owns: the only browser profile
+    // pointed at `env: 'alpha'`, the deployed fleet. That is the gap hc-mesh.sh
+    // names when it says serving the portal "is what lets the browser a2o lane
+    // validate a real login before anything is pushed" — the serving was there,
+    // the lane to use it was not.
+    //
+    // Needs `just mesh start` (which serves the portal on THRESHOLD_PORT and
+    // proxies it at <doorway>/threshold) + `just mesh prologue` (the cast), and
+    // E2E_APP_URL pointed at the doorway, which serves the app itself on the
+    // mesh so app and portal share one origin.
+    'mesh-browser': {
+      ...base,
+      paths: ['features/**/*.feature'],
+      worldParameters: { env: 'mesh', deviceMode: 'playwright' },
+      tags: '@e2e and not @wip and (@browser or @browser-only)',
+    },
     alpha: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'alpha' } },
     local: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'local' } },
     browser: {
