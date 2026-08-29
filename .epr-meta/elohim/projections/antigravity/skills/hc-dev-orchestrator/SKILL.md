@@ -2,7 +2,7 @@
 name: hc-dev-orchestrator
 description: START and manage the Elohim P2P Framework local DEVELOPMENT STACK — runs conductor (identity/provenance), storage (content), doorway (unified API) as a coordinated service trio. Use when "start the local dev stack", "spin up holochain locally", "why isn't the conductor reachable", "is the doorway alive?", or checking service health during development. NOT for desktop Tauri shell knowledge (use tauri-desktop).
 metadata:
-  runtime: codex
+  runtime: antigravity
   sourceRuntime: claude
   master: package
   sourcePath: .epr-meta/elohim/packages/skills/hc-dev-orchestrator.json

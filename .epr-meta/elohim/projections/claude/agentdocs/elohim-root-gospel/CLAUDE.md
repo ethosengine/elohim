@@ -29,12 +29,16 @@ just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
 just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped)
 just dev start                # isolated conductor + storage + doorway
+just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; a stock tx5 join is refused)
 just mesh status              # local multi-peer mesh
+just mesh storage-restart <peer…> | conductors-restart   # restart arms (export MESH_TRANSPORT_BACKEND for the run; MESH_HAPP_PATH installs the deployed bundle)
 MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
+MESH_PORTAL=0 just mesh start  # skip the doorway sign-in portal (default: served on THRESHOLD_PORT 8081)
 just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)
 just mesh recovery <warm|cold> <peer> [--label k=v]  # single warm/cold recovery run (hc-mesh-recovery.sh)
 just mesh recovery-matrix     # recovery scenario library × warm/cold shapes × runs (MESH_PEER_TRANSPORTS in hc-mesh.sh + hc-mesh-recovery.sh)
 just seed validate            # non-writing schema validation
+just seed apply mesh content  # seed the household mesh THIS host owns (env from hc-mesh.sh mesh_seed_env)
 just look page <url>          # eyes-first render
 just status habits
 just codegen all verify
@@ -44,6 +48,12 @@ The eight stable verbs are `gate`, `test`, `dev`, `mesh`, `seed`,
 `look`, `status`, and `codegen`. Their parameters replace package-specific
 name matrices; package scripts remain implementation details for CI and focused
 specialist work.
+
+Recovery / quiesce evidence is durable: `just mesh recovery …` and `just mesh quiesce` write under
+`genesis/a2o/reports/recovery/` (gitignored, persistent) and leave `/tmp/elohim-local-mesh/*` as symlinks.
+Pre-push carries a warn-only **T2 receipt** leg: a dataplane change (`elohim-storage/src/{p2p,sync,reconcile,p2p_iroh}`,
+`doorway-service/src`) with no household sprint-report newer than it prints `NO-T2-RECEIPT` naming `just test mesh`
+(`T2_RECEIPT=strict` refuses) — the evidence ladder's ascend-only rule at push time.
 
 `build-manifest.json gate.projects` owns local gate detection and typed
 execution. Both `just gate` and pre-push use
