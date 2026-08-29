@@ -181,20 +181,43 @@ fn check_runtime_abis(report: &mut Report, root: &Path) {
         ));
     }
 
-    if root.join(".agents/skills").is_dir() {
+    let codex_skill_count = projected_skill_count(&root.join(".codex/skills"));
+    if codex_skill_count > 0 {
         report.push(Finding::new(
             "runtime.codex-skills",
             FindingStatus::Pass,
-            "stock Codex repository skill root is projected",
+            format!("{codex_skill_count} Codex repository skills are projected"),
         ));
     } else {
         report.push(
             Finding::new(
                 "runtime.codex-skills",
                 FindingStatus::Warn,
-                "stock Codex expects repository skills under `.agents/skills`",
+                "no Codex repository skills are projected under `.codex/skills`",
             )
             .remediation("project package-authoritative skills to the current Codex runtime ABI"),
+        );
+    }
+
+    let antigravity_skill_count = projected_skill_count(&root.join(".agents/skills"));
+    if antigravity_skill_count > 0 {
+        report.push(Finding::new(
+            "runtime.antigravity-skills",
+            FindingStatus::Pass,
+            format!(
+                "{antigravity_skill_count} Antigravity workspace skills are projected under `.agents/skills`"
+            ),
+        ));
+    } else {
+        report.push(
+            Finding::new(
+                "runtime.antigravity-skills",
+                FindingStatus::Warn,
+                "no Antigravity workspace skills are projected under `.agents/skills`",
+            )
+            .remediation(
+                "project package-authoritative skills to Antigravity's documented workspace ABI",
+            ),
         );
     }
 
@@ -249,6 +272,16 @@ fn check_runtime_abis(report: &mut Report, root: &Path) {
     }
 }
 
+fn projected_skill_count(root: &Path) -> usize {
+    fs::read_dir(root)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(std::result::Result::ok)
+        .filter(|entry| entry.path().join("SKILL.md").is_file())
+        .count()
+}
+
 #[cfg(unix)]
 fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
@@ -260,4 +293,40 @@ fn is_executable(path: &Path) -> bool {
 #[cfg(not(unix))]
 fn is_executable(path: &Path) -> bool {
     path.is_file()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_and_antigravity_skill_roots_are_reported_independently() {
+        let root = tempfile::tempdir().unwrap();
+        for path in [
+            ".codex/skills/codex-only/SKILL.md",
+            ".agents/skills/antigravity-only/SKILL.md",
+        ] {
+            let path = root.path().join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "---\nname: example\n---\n").unwrap();
+        }
+
+        let mut report = Report::new("doctor-test", root.path());
+        check_runtime_abis(&mut report, root.path());
+
+        let codex = report
+            .findings
+            .iter()
+            .find(|finding| finding.code == "runtime.codex-skills")
+            .unwrap();
+        let antigravity = report
+            .findings
+            .iter()
+            .find(|finding| finding.code == "runtime.antigravity-skills")
+            .unwrap();
+        assert_eq!(codex.status, FindingStatus::Pass);
+        assert!(codex.summary.starts_with("1 Codex"));
+        assert_eq!(antigravity.status, FindingStatus::Pass);
+        assert!(antigravity.summary.starts_with("1 Antigravity"));
+    }
 }
