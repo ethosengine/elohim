@@ -460,6 +460,22 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                                 snapshot.sequence as i64 + 1,
                             );
                         }
+                        Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Rebased) => {
+                            crate::metrics::inc_inventory_page("snapshot", "rebased");
+                            info!(
+                                target: "elohim_storage::inventory",
+                                from = %source,
+                                peer_id = %snapshot.peer_id,
+                                sequence = snapshot.sequence,
+                                "Inventory publisher restarted — cursor re-based to its new sequence"
+                            );
+                            flush_held_pages(
+                                ctx,
+                                &mut conn,
+                                &snapshot.peer_id,
+                                snapshot.sequence as i64 + 1,
+                            );
+                        }
                         Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Deduplicated) => {
                             crate::metrics::inc_inventory_page("snapshot", "deduplicated");
                             // The cursor advanced to this sequence even though the
@@ -577,6 +593,11 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                                         peer_id = %peer, expected, received,
                                         "Inventory delta ahead of the cursor — held for in-order apply"
                                     );
+                                    // `expected` IS the cursor + 1: a page held there
+                                    // (an earlier apply that failed transiently, or the
+                                    // other plane's copy) applies now, and everything
+                                    // contiguous behind it.
+                                    flush_held_pages(ctx, &mut conn, &peer, expected);
                                 }
                                 StashOutcome::Duplicate => {
                                     crate::metrics::inc_inventory_page("delta", "duplicate");
@@ -594,11 +615,18 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                                 }
                             }
                         }
-                        Err(e) => warn!(
-                            target: "elohim_storage::inventory",
-                            error = %e,
-                            "apply_delta failed"
-                        ),
+                        Err(e) => {
+                            // A transient failure (SQLite busy under a burst) must
+                            // not lose the page: held like an early one, it is
+                            // retried by the next arrival's flush from `expected`.
+                            crate::metrics::inc_inventory_page("delta", "failed");
+                            warn!(
+                                target: "elohim_storage::inventory",
+                                error = %e,
+                                "apply_delta failed — page held for retry"
+                            );
+                            crate::p2p::inventory_reorder::with_reorder(|r| r.stash(delta));
+                        }
                     }
                 }
                 Err(e) => warn!(

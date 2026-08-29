@@ -1399,6 +1399,22 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Inventory refresh pages on the PUBLISH side, by outcome: "sent" |
+    /// "deferred" (publisher backpressure — retried next pacer tick) |
+    /// "superseded" (a newer refresh replaced pages still in the backlog) |
+    /// "serialize_failed". Pre-touched. Fleet read beside the receive-side
+    /// `elohim_inventory_pages_total`: `sent` per refresh should equal the
+    /// publisher's `page_count`; `superseded` climbing = the pacer is slower
+    /// than the refresh cadence.
+    pub static ref INVENTORY_PAGES_PUBLISHED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_inventory_pages_published_total",
+            "Inventory refresh pages handed to the gossip publishers, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// iroh-gossip membership transitions on inbound topics. label:
     /// direction = "up" | "down". `up` staying at zero = the plane has no
     /// neighbors and every iroh publish is a shout into a void.
@@ -2452,6 +2468,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_DOORWAY_BOOTSTRAP_READS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_HALF_ROW_HEAL.clone()));
         let _ = REGISTRY.register(Box::new(INVENTORY_PAGES.clone()));
+        let _ = REGISTRY.register(Box::new(INVENTORY_PAGES_PUBLISHED.clone()));
+        for outcome in ["sent", "deferred", "superseded", "serialize_failed"] {
+            INVENTORY_PAGES_PUBLISHED
+                .with_label_values(&[outcome])
+                .reset();
+        }
         for kind in ["snapshot", "delta"] {
             for outcome in INVENTORY_PAGE_OUTCOMES {
                 INVENTORY_PAGES.with_label_values(&[kind, outcome]).reset();
@@ -3264,6 +3286,7 @@ pub const IROH_DOORWAY_BOOTSTRAP_READ_RESULTS: &[&str] = &["seeded", "none_accep
 pub const INVENTORY_PAGE_OUTCOMES: &[&str] = &[
     "applied",
     "deduplicated",
+    "rebased",
     "replay",
     "buffered",
     "flushed",
@@ -3271,6 +3294,13 @@ pub const INVENTORY_PAGE_OUTCOMES: &[&str] = &[
     "overflow",
     "failed",
 ];
+
+/// One inventory refresh page on the publish side, by outcome.
+pub fn inc_inventory_page_published(outcome: &str) {
+    INVENTORY_PAGES_PUBLISHED
+        .with_label_values(&[outcome])
+        .inc();
+}
 
 /// One inventory refresh page, by kind and receiver outcome.
 pub fn inc_inventory_page(kind: &str, outcome: &str) {

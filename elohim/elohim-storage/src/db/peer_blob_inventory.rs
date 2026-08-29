@@ -71,6 +71,30 @@ pub fn apply_snapshot(
             .first::<(i64, String, Option<String>)>(conn)
             .optional()?;
 
+        // ── Publisher restart ───────────────────────────────────────────────
+        // A restarted publisher allocates sequences from 1 again. Its snapshot
+        // page is byte-identical to the one we last applied (same first page of
+        // the same corpus), so the fingerprint fast-path below would keep the
+        // OLD high cursor and every fresh delta would read as a replay —
+        // measured 2026-08-29 (household mesh): receivers' view of a restarted
+        // peer collapsed 3535 -> 46 hashes and stayed there (cursor 937 against
+        // sequences 1..546). A snapshot more than PUBLISHER_RESTART_GAP below
+        // the cursor is that restart: re-base the cursor to it so the deltas
+        // that follow apply. A replayed OLD snapshot inside the gap still
+        // dedups; one outside it could only come from a publisher that also
+        // reset — the same case.
+        if let Some((last_seq, ref last_updated, ref last_hash)) = existing {
+            if sequence + PUBLISHER_RESTART_GAP < last_seq {
+                let same_content = last_hash.as_deref() == Some(content_hash.as_str());
+                if same_content {
+                    upsert_cursor(conn, peer_id, sequence, last_updated, Some(&content_hash))?;
+                    return Ok(SnapshotApplyOutcome::Rebased);
+                }
+                // Different content: fall through to the full replace below,
+                // which sets the cursor to `sequence` anyway.
+            }
+        }
+
         // ── Idempotent fast-path ────────────────────────────────────────────
         if let Some((last_seq, ref last_updated, Some(ref last_hash))) = existing {
             if *last_hash == content_hash {
@@ -137,7 +161,19 @@ pub fn apply_snapshot(
         }
 
         // Update cursor and record the fingerprint of the applied set. Snapshots
-        // always advance the cursor to their sequence (accept-regardless-of-sequence).
+        // always advance the cursor to their sequence (accept-regardless-of-sequence)
+        // — which is also how a restarted publisher whose last snapshot was
+        // followed by deltas (fingerprint cleared) gets re-based: the set is
+        // replaced and the cursor moves DOWN to the new run's sequence. Name it.
+        if let Some((last_seq, _, _)) = existing {
+            if sequence + PUBLISHER_RESTART_GAP < last_seq {
+                tracing::info!(
+                    target: "elohim_storage::inventory",
+                    peer_id = %peer_id, sequence, rebased_from = last_seq,
+                    "Inventory publisher restarted — set replaced and cursor re-based (applied path)"
+                );
+            }
+        }
         upsert_cursor(conn, peer_id, sequence, snapshot_at, Some(&content_hash))?;
 
         Ok(SnapshotApplyOutcome::Applied)
@@ -456,7 +492,16 @@ pub enum SnapshotApplyOutcome {
     Applied,
     /// Byte-identical to the last-applied set: no set churn, no re-score needed.
     Deduplicated,
+    /// Byte-identical set at a sequence far below the cursor: the publisher
+    /// restarted; the cursor was re-based to this sequence (no set churn).
+    Rebased,
 }
+
+/// How far below the cursor a snapshot must land to read as a publisher
+/// restart rather than a reordered echo. Two full refreshes on the measured
+/// corpus (77 pages) — an echo never lags that far; a restart always does
+/// once the old run published more than this.
+pub const PUBLISHER_RESTART_GAP: i64 = 200;
 
 /// How stale the freshness clock may get before a deduplicated snapshot triggers
 /// a cheap `last_seen_at` touch. Kept well under the inventory freshness window
@@ -1157,5 +1202,57 @@ mod tests {
         let rows = lookup_hosts(&mut conn, "sha256-aa00", "2026-05-09T00:00:00Z").unwrap();
         assert_eq!(rows.len(), 1);
         assert!(rows[0].blake3_hash.is_none());
+    }
+
+    /// A restarted publisher (sequences from 1 again) must not leave the
+    /// receiver's cursor at the old run's high-water mark: its byte-identical
+    /// snapshot re-bases the cursor so the deltas that follow apply.
+    #[test]
+    fn a_publisher_restart_rebases_the_cursor() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let peer = "restarting-peer";
+        let page0 = vec!["h-a".to_string(), "h-b".to_string()];
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, 1000, "2026-08-29T19:00:00Z").unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        assert_eq!(
+            apply_delta(
+                &mut conn,
+                peer,
+                &["h-c".to_string()],
+                &[],
+                1001,
+                "2026-08-29T19:00:01Z"
+            )
+            .unwrap(),
+            DeltaApplyOutcome::Applied
+        );
+        // Publisher restarts: same first page at sequence 3.
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, 3, "2026-08-29T19:05:00Z").unwrap(),
+            SnapshotApplyOutcome::Rebased
+        );
+        assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(3));
+        // Its next delta applies instead of reading as a replay.
+        assert_eq!(
+            apply_delta(
+                &mut conn,
+                peer,
+                &["h-d".to_string()],
+                &[],
+                4,
+                "2026-08-29T19:05:01Z"
+            )
+            .unwrap(),
+            DeltaApplyOutcome::Applied
+        );
+        // A reordered echo inside the gap still dedups without moving the cursor back.
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, 2, "2026-08-29T19:05:02Z").unwrap(),
+            SnapshotApplyOutcome::Deduplicated
+        );
+        assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(4));
     }
 }

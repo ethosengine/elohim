@@ -88,7 +88,9 @@ pub fn install_content_touch_sink(tx: tokio::sync::mpsc::Sender<String>) -> bool
 /// Capacity of the touch channel: a seed-sized burst (~3.4k) fits twice over.
 pub const CONTENT_TOUCH_CAPACITY: usize = 8192;
 
-fn notify_content_touched(id: &str) {
+/// Announce a content-row write made without an `EventBus` in reach (see
+/// [`install_content_touch_sink`]). Safe to call from any writer.
+pub fn notify_content_touched(id: &str) {
     if let Some(tx) = CONTENT_TOUCH_TX.get() {
         match tx.try_send(id.to_string()) {
             Ok(()) => crate::metrics::inc_content_touch("sent"),

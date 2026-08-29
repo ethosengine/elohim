@@ -7204,6 +7204,10 @@ impl HttpServer {
             Some(declared.declared_at),
             Some(patch),
         )?;
+        // The declared head is a projected doc field (`headActionHash`); a stamp
+        // that never announced left ~300 docs per peer missing it until the next
+        // cold-start back-fill (measured 2026-08-29: `filled=headActionHash=318`).
+        crate::rea_projection::notify_content_touched(content_id);
 
         // 200 with the fresh HEAD answer, re-read from the stamped row.
         match db::content_diesel::get_content_with_tags(
@@ -7390,6 +7394,10 @@ impl HttpServer {
             Some(declared.declared_at),
             Some(patch),
         )?;
+        // The declared head is a projected doc field (`headActionHash`); a stamp
+        // that never announced left ~300 docs per peer missing it until the next
+        // cold-start back-fill (measured 2026-08-29: `filled=headActionHash=318`).
+        crate::rea_projection::notify_content_touched(content_id);
 
         // Pattern Z.B.1 bridge — the SAME refresh the direct-PATCH arm applies
         // after ContentService::update. `stamp_declared_head` mirrors blob_cid

@@ -940,6 +940,12 @@ pub struct P2PNode {
     /// Replaced by `DualGossipPublisher` via `with_gossip_publisher()` when the
     /// iroh stack is running — fans out to both libp2p and iroh simultaneously.
     gossip_publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
+    /// Inventory refresh pages not yet published — drained `INVENTORY_PAGES_PER_TICK`
+    /// per `INVENTORY_PACER_INTERVAL` so a 77-page refresh never overruns the
+    /// 64-slot command channel the swarm loop itself drains (measured
+    /// 2026-08-29: pages 63–76 of every refresh were lost on both planes; the
+    /// receivers held a contiguous 0–62). A new refresh supersedes the backlog.
+    inventory_page_backlog: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
     /// W2A / T22: sealing public keys for `services::back_prop::record_predecessor`.
     ///
     /// Injected via `with_sealing_keys()` when the 2-of-2 sealing infra is
@@ -3042,6 +3048,7 @@ impl P2PNode {
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
             salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
+            inventory_page_backlog: std::sync::Mutex::new(std::collections::VecDeque::new()),
             sealing_keys: None,
             agent_info_inbound_tx: None,
             transport_manifest_sink: None,
@@ -3603,6 +3610,10 @@ impl P2PNode {
         provide_reconcile_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition dispatch: drain the acquisition queue every 5 seconds.
         let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
+        // Paces inventory refresh pages into the publishers (see
+        // `drain_inventory_backlog`); fires every second, does nothing when empty.
+        let mut inventory_pacer_interval = tokio::time::interval(Duration::from_secs(1));
+        inventory_pacer_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         acquisition_dispatch_interval
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // The FIRST drain waits (bounded, `acquisition::FIRST_DRAIN_HOLD`) for
@@ -3884,6 +3895,10 @@ impl P2PNode {
                     }
                     drop(swarm);
                 }
+                _ = inventory_pacer_interval.tick(), if self.inventory_backlog_pending() => {
+                    drop(swarm);
+                    self.drain_inventory_backlog();
+                }
                 _ = async {
                     // T22: inventory broadcast tick. When the cadence is None
                     // (mobile archetype / disabled), `pending()` ensures this
@@ -3942,12 +3957,76 @@ impl P2PNode {
     /// evicts all of this peer's per-peer inventory entries on snapshot
     /// arrival — broadcasting empty during a transient I/O blip would
     /// corrupt every remote peer's projection of our custody.
+    /// Publish at most this many backlog pages per pacer tick. 16 leaves the
+    /// 64-slot command channel room for everything else the loop queues; a
+    /// 77-page refresh completes in ~5 ticks.
+    pub const INVENTORY_PAGES_PER_TICK: usize = 16;
+
+    /// Drain up to [`Self::INVENTORY_PAGES_PER_TICK`] pages of the inventory
+    /// backlog through the dual publisher. A backpressure error puts the page
+    /// back at the front and ends the tick (`deferred`); the next tick retries.
+    fn drain_inventory_backlog(&self) {
+        let mut sent = 0usize;
+        for _ in 0..Self::INVENTORY_PAGES_PER_TICK {
+            let page = {
+                let mut backlog = self
+                    .inventory_page_backlog
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner());
+                backlog.pop_front()
+            };
+            let Some(bytes) = page else { break };
+            match self
+                .gossip_publisher
+                .publish(crate::p2p::inventory_gossip::INVENTORY_TOPIC, bytes.clone())
+            {
+                Ok(()) => {
+                    sent += 1;
+                    crate::metrics::inc_inventory_page_published("sent");
+                }
+                Err(e) => {
+                    crate::metrics::inc_inventory_page_published("deferred");
+                    self.inventory_page_backlog
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .push_front(bytes);
+                    debug!(
+                        target: "elohim_storage::inventory",
+                        error = %e, sent,
+                        "inventory pacer: publisher backpressure — page deferred to the next tick"
+                    );
+                    break;
+                }
+            }
+        }
+        if sent > 0 {
+            let remaining = self
+                .inventory_page_backlog
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .len();
+            debug!(
+                target: "elohim_storage::inventory",
+                sent, remaining,
+                "inventory pacer: pages published"
+            );
+        }
+    }
+
+    /// True when paced inventory pages are still waiting.
+    fn inventory_backlog_pending(&self) -> bool {
+        !self
+            .inventory_page_backlog
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .is_empty()
+    }
+
     async fn broadcast_inventory_snapshot(&self) {
         use crate::p2p::inventory_broadcaster::{
             build_bounded_inventory_publications, gather_hints, LocalInventory as _,
             StaticInventory, INVENTORY_GOSSIP_PAYLOAD_BUDGET,
         };
-        use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
 
         // Fetch hashes directly so I/O failure can skip the tick. Must happen
         // before constructing StaticInventory + entering build_snapshot.
@@ -4038,10 +4117,18 @@ impl P2PNode {
 
         // Plan 4: every bounded page routes through the same dual publisher, so
         // libp2p and iroh receive byte-identical snapshot+delta sequences.
+        // Serialize the whole refresh first, then PACE it: the libp2p leg is a
+        // try_send into the 64-slot command channel this very loop drains, so a
+        // tight 77-page loop lost its tail on every refresh (measured 2026-08-29).
+        // A refresh still in the backlog when the next one is built is
+        // superseded — its snapshot page would only be replaced anyway.
+        let mut pages: std::collections::VecDeque<Vec<u8>> =
+            std::collections::VecDeque::with_capacity(page_count);
         for (page_index, publication) in publications.into_iter().enumerate() {
-            let bytes = match publication.to_bytes() {
-                Ok(bytes) => bytes,
+            match publication.to_bytes() {
+                Ok(bytes) => pages.push_back(bytes),
                 Err(e) => {
+                    crate::metrics::inc_inventory_page_published("serialize_failed");
                     warn!(
                         target: "elohim_storage::inventory",
                         error = %e,
@@ -4050,18 +4137,19 @@ impl P2PNode {
                     );
                     return;
                 }
-            };
-            if let Err(e) = self.gossip_publisher.publish(INVENTORY_TOPIC, bytes) {
-                warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    page_index,
-                    page_count,
-                    "T22: bounded inventory dual-publish failed"
-                );
-                return;
             }
         }
+        {
+            let mut backlog = self
+                .inventory_page_backlog
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            for _ in 0..backlog.len() {
+                crate::metrics::inc_inventory_page_published("superseded");
+            }
+            *backlog = pages;
+        }
+        self.drain_inventory_backlog();
 
         // T22 review fix #3: delegate the parity-record write to the
         // shared method so poisoned-lock handling stays consistent

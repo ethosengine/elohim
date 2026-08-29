@@ -155,3 +155,36 @@ peer, all survivors carry the same blob_hash form; probe: `select id from conten
 = ∅) / current state: 1 row divergent on this mesh, pre-existing, not touched by this cut. Next: decide whether P1
 should accept "agrees with ANY survivor holding the bytes" or the divergence should be healed set→set (the amber
 rule already permits amber→amber replacement; matthew's row is green with a hash it has no bytes for).
+
+## 2026-08-29 station 1's open node closed: bus-less content writers now announce their touches
+
+`rea_projection` (the DHT-signal projector: "Projecting Content from DHT", "Declaring Content HEAD from DHT")
+writes content rows with no `EventBus` in reach — it is composed before the services exist — so the docs of every
+row it touched stayed missing the field until a cold-start back-fill (1270 then 137 docs on one peer). Cure:
+`install_content_touch_sink` (mirrors the state-link sink); `handle_rea_signal` pushes the touched id after the
+write commits, and a forwarder in `main.rs` turns it into `StorageEvent::ContentUpdated` so the producer re-projects
+the doc. `elohim_content_touches_total{sent|dropped|no_sink}`; `backfill_content_docs` logs `filled=<key=n,...>` so
+the next cold start names any remaining writer class by the field it left absent. Cold mesh: touches sent 27 / 76 /
+31 within minutes of the seed.
+
+## 2026-08-29 fleet reading (item 1 validated without a deploy): the fleet is a different shape
+
+- `doorway-alpha.elohim.host/p2p/manifests` → **404**: the board is gated off on the fleet by design
+  (`DOORWAY_MANIFEST_BOARD_ENABLED`, 2026-08-24, Sybil-flood; dual mode). Shape 3's boot seed reads `{boot,empty}`
+  ×5 there and the pull leg sits on the 10 s floor — designed-inert, not broken. Storage carries no credential toward
+  the doorway, so opening the board means a doorway-side write gate (steward-peer roster + signature) first.
+- In steady state every alpha peer reads `elohim_iroh_peers_known = 6`; the boot window is the only gap.
+- **alpha's pull leg has fetched nothing in 24 h**: `elohim_acquisition_outcomes_total` = fetch_error 907 lifetime
+  (3223/24 h), transport_failure 5, no `fetched` series — and the fleet build (#1389, 71f310ce6) DOES carry the
+  `fetched` outcome. Active pins: matthew 2, others 0; dispatch iroh 792 / libp2p 120 lifetime. Filed as
+  `alpha-pull-leg-fetch-error-storm`; the error text needs Loki (502 all afternoon) or the next deploy's
+  `route_total`/`first_drain_total` series.
+
+## 2026-08-29 the drift report named the class: `headActionHash`, and the HTTP declare handlers
+
+First cold start with the report: `filled=blobHash=3,headActionHash=318` (matthew), `=4,=327` (jessica),
+`=1,=558` (james) — the docs were missing the DECLARED HEAD, not the blob hash. Writers: `rea_projection` (now
+announcing) and the two HTTP declare handlers in `http.rs` (`stamp_declared_head` with no event). Both now call
+`rea_projection::notify_content_touched`. Next cold start (13 min later, before the HTTP fix was live):
+`headActionHash=54 / 22 / 86`. Measure again after the next restart: the number should be the declare activity
+since boot that predates the forwarder's install (a handful), never hundreds.

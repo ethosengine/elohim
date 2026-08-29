@@ -1223,7 +1223,9 @@ try:
     items = json.load(sys.stdin).get("items", [])
 except Exception:
     items = []
-print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
+# An anchor is an ACTION hash (uhCkk…); a2o fixture rows carry blob hashes there
+# (sha256-…) and would make the zome probe read as a shape mismatch (2026-08-29).
+print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswith("uhCkk")), ""))
 ' 2>/dev/null)"
       if [ -z "$probe_id" ]; then
         echo "serving, but no ANCHORED content to probe the zome path with (inconclusive)"
@@ -1501,7 +1503,9 @@ try:
     items = json.load(sys.stdin).get("items", [])
 except Exception:
     items = []
-print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
+# An anchor is an ACTION hash (uhCkk…); a2o fixture rows carry blob hashes there
+# (sha256-…) and would make the zome probe read as a shape mismatch (2026-08-29).
+print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswith("uhCkk")), ""))
 ' 2>/dev/null)"
       if [ -z "$probe_id" ]; then
         echo "serving, but no ANCHORED content to probe the zome path with (inconclusive)"
