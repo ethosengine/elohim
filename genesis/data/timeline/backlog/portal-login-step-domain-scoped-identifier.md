@@ -66,3 +66,11 @@ pending — the pending is `human "Susan" is logged in`, a household-formation p
 predates this work. Portal browser lane 2/2 Act I passed (Act II twins correctly held). a2o
 `tsc --noEmit` and `eslint` clean on every touched file. Fleet read arrives with the next
 genesis run; that is the CONFIRM, not the discovery.
+
+**Re-measured on a harder mesh (same day).** A sibling session then restarted all three storage
+peers onto a rebuilt `p2p-iroh` slot and seeded 3433 content rows / 8920 relationships. `@auth`
+re-run on that state: **37 passed / 0 failed / 9 held / 1 pending — identical.** Its own dataplane
+run (warm recovery jessica PASS 439 s) reported nothing identifier-shaped red either, which closes
+the one sweep this row's first measurement had not done: gateway-scoping by default does not
+disturb the dataplane lane.
+
