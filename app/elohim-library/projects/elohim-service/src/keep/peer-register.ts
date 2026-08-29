@@ -92,13 +92,27 @@ export interface FederationDoorwaysResponseShape {
 }
 
 /**
- * How much a row's own claim about itself is worth.
+ * WHERE a row came from — provenance, not verification.
  *
- * `dht-notarized` requires the whole quartet, not just a signature: a signature
- * with no key to check it against, or with no serial to order it, is not a
- * weaker proof — it is not a proof.
+ * `dht-sourced` means the row arrived carrying the full quartet (signature, key,
+ * serial) that a DHT read path populates and that the gossip merge path leaves
+ * as None (`doorway-service/src/routes/federation.rs:112-131`). That difference
+ * is real and worth reading.
+ *
+ * It is NOT a verification result, and the name must not imply one. Nothing in
+ * doorway-service verifies `record_signature`: it is constructed or serialized
+ * in five places and checked in zero — one of those five
+ * (`projection/epr_router.rs:971`) fills it with `vec![1; 64]`. This label is
+ * read off an unverified HTTP body, so ANY origin answering
+ * `/api/v1/federation/doorways` can mint a `dht-sourced` row by filling three
+ * fields with arbitrary bytes.
+ *
+ * Consequently nothing may be GATED on this value — no admit-list, no content
+ * candidate selection, no authority. It is a hint for display and for ordering
+ * a fallback, and that is all. The honest fix lives on the server: a
+ * `provenance` field on DoorwaySummary, set where the read path is known.
  */
-export type PeerTrust = 'dht-notarized' | 'unsigned-gossip';
+export type PeerTrust = 'dht-sourced' | 'unsigned-gossip';
 
 /** A doorway as the register knows it. */
 export interface KeepPeer {
@@ -130,7 +144,7 @@ export function trustOf(row: FederationDoorwayRow): PeerTrust {
     !!row.signing_key &&
     row.record_serial !== null &&
     row.record_serial !== undefined;
-  return signed ? 'dht-notarized' : 'unsigned-gossip';
+  return signed ? 'dht-sourced' : 'unsigned-gossip';
 }
 
 /** `identity_root ?? signing_key ?? id`, matching how the rows key themselves. */
@@ -172,7 +186,7 @@ export function resolutionOf(row: FederationDoorwayRow): DoorwayResolution {
     // 'registration' is the seam's reserved word for a signed record. An
     // unsigned row is NOT 'config' — nobody configured it — so it is named for
     // what it is.
-    source: trustOf(row) === 'dht-notarized' ? 'registration' : 'federation-gossip',
+    source: trustOf(row) === 'dht-sourced' ? 'registration' : 'federation-gossip',
     endpoints: endpointsOf(row),
   };
 }

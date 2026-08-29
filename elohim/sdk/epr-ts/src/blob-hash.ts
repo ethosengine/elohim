@@ -1,3 +1,22 @@
+/**
+ * Content-address VERIFICATION for a receiver.
+ *
+ * The compose-gate's `interface-first-reuse-ts` rule is right that TypeScript
+ * receives computed identity and never mints it, so it is worth saying which
+ * of the two this is. Minting is computing an address to NAME new content —
+ * that stays in Rust (`eprfs-core::BlobCid`, `elohim/epr`'s `compute_cid`), and
+ * nothing here does it. This module only ever answers "do these bytes I was
+ * handed match the address I was told to expect?", which is the receiver half
+ * of the substrate trust contract's verify-locally-then-serve invariant. A
+ * browser has no conductor to delegate that to; if it cannot hash, it cannot
+ * check, and it is reduced to trusting whoever answered.
+ *
+ * It also belongs HERE rather than in a consumer: this is @elohim/epr's own
+ * TypeScript half, beside `computeCid`/`verifyCid` in `./cid`, which is the
+ * canonical home the rule names. The address grammar is a port of
+ * `content_address_hex` (elohim-storage/src/p2p/blob_fetch.rs:77-96) and the
+ * two are pinned to one shared fixture set so they cannot drift apart quietly.
+ */
 import { CID } from 'multiformats/cid';
 import { sha256 } from '@noble/hashes/sha2';
 import { bytesToHex } from '@noble/hashes/utils';

@@ -82,7 +82,7 @@ function build(rows: readonly FederationDoorwayRow[], fetchImpl?: typeof fetch) 
 
 describe('trust labelling', () => {
   it('requires the whole quartet, not just a signature', () => {
-    expect(trustOf(signedRow())).toBe('dht-notarized');
+    expect(trustOf(signedRow())).toBe('dht-sourced');
     expect(trustOf(gossipRow())).toBe('unsigned-gossip');
     // A signature with no key to check it against is not a weaker proof.
     expect(trustOf(signedRow({ signing_key: null }))).toBe('unsigned-gossip');
@@ -90,6 +90,20 @@ describe('trust labelling', () => {
     expect(trustOf(signedRow({ record_serial: null }))).toBe('unsigned-gossip');
     // ...nor an empty signature that is merely PRESENT.
     expect(trustOf(signedRow({ record_signature: [] }))).toBe('unsigned-gossip');
+  });
+
+  it('is provenance, not proof — arbitrary bytes earn the label', () => {
+    // This test exists to REFUSE a future reading of `dht-sourced` as verified.
+    // Nothing in doorway-service verifies record_signature (5 construct/serialize
+    // sites, 0 verify sites), so a row filled with obviously-fake bytes is
+    // labelled exactly like a real one. If someone later gates an admit-list on
+    // this value, this assertion is what tells them the gate is empty.
+    const forged = signedRow({
+      record_signature: Array.from({ length: 64 }, () => 1),
+      signing_key: 'not-a-real-key',
+      record_serial: 1,
+    });
+    expect(trustOf(forged)).toBe('dht-sourced');
   });
 
   it('never claims a peer accepts our session', () => {
@@ -185,7 +199,7 @@ describe('FederationPeerResolver — the alias problem', () => {
 
     const beta = resolver.peers().find(p => p.id === 'beta-elohim-host');
     expect(beta?.trust).toBe('unsigned-gossip');
-    expect(resolver.peers().find(p => p.id === 'alpha-elohim-host')?.trust).toBe('dht-notarized');
+    expect(resolver.peers().find(p => p.id === 'alpha-elohim-host')?.trust).toBe('dht-sourced');
   });
 
   it('does not let a later gossip row displace a signed row on a shared alias', async () => {
