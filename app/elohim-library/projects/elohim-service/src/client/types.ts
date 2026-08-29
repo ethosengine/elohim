@@ -197,6 +197,16 @@ export interface ElohimClientConfig {
   mode: ClientMode;
   /** Pluggable identity → ordered address resolver. Config-backed by default. */
   doorwayResolver?: import('./doorway-address-resolver').DoorwayAddressResolver;
+  /**
+   * Ask the serving doorway which other doorways it knows (the DHT-known set),
+   * and use that to resolve identities the static config has never heard of.
+   *
+   * Strictly additive: the config-backed resolver stays underneath as the
+   * fallback, so an unreachable or empty register resolves exactly as it does
+   * today. Ignored when `doorwayResolver` is supplied explicitly -- an explicit
+   * resolver is a deliberate override and nothing should wrap it uninvited.
+   */
+  federatedResolution?: boolean;
   /** Write buffer configuration (optional, uses defaults) */
   writeBuffer?: Partial<WriteBufferConfig>;
   /** Agent's reach level for access control */

@@ -104,6 +104,12 @@ export const appConfig: ApplicationConfig = {
         nodeUrls: environment.client?.nodeUrls,
         storageUrl: environment.client?.storageUrl,
       }),
+      // Resolve identities the static config has never heard of by asking the
+      // serving doorway which doorways it knows. Additive by construction: the
+      // config-backed resolver stays underneath, so an unreachable or empty
+      // register behaves exactly as before. Skipped in tauri mode, which has no
+      // serving doorway to ask.
+      federatedResolution: true,
       // Holochain connection for agent-centric data (attestations, identity, points)
       holochain: environment.client?.holochainHAppId
         ? {

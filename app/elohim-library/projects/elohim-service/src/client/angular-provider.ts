@@ -7,6 +7,8 @@
 
 import { InjectionToken, Provider, FactoryProvider } from '@angular/core';
 
+import { FederationPeerResolver } from '../keep/peer-register';
+
 import { ConfiguredDoorwayResolver } from './doorway-address-resolver';
 
 import { ElohimClient, ReachLevel } from './index';
@@ -64,7 +66,7 @@ export function elohimClientFactory(config: ElohimClientConfig): ElohimClient {
  */
 export function provideElohimClient(config: ElohimClientConfig): Provider[] {
   const doorway = config.mode.doorway;
-  const resolver =
+  const configured =
     config.doorwayResolver ??
     (doorway
       ? new ConfiguredDoorwayResolver([
@@ -75,6 +77,22 @@ export function provideElohimClient(config: ElohimClientConfig): Provider[] {
           },
         ])
       : new ConfiguredDoorwayResolver([]));
+
+  // When federated resolution is asked for, put the peer register in front of the
+  // configured resolver rather than in place of it: the register answers for
+  // doorways this build was never told about, and hands everything else -- and
+  // every failure -- straight back down. An explicit `doorwayResolver` is a
+  // deliberate override, so it is never wrapped.
+  const federated =
+    config.federatedResolution && !config.doorwayResolver && doorway
+      ? new FederationPeerResolver({ seedUrl: doorway.url, fallback: configured })
+      : null;
+  if (federated) {
+    // Load in the background. Nothing waits on it: until it lands, and after any
+    // failure, resolution is exactly what it was before this line existed.
+    void federated.warm();
+  }
+  const resolver: DoorwayAddressResolver = federated ?? configured;
   const resolvedConfig = { ...config, doorwayResolver: resolver };
 
   return [
