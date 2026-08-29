@@ -71,3 +71,11 @@ the shell that issued it — bracket a char (`cucumber-j[s]`). Mesh pacing: `ACQ
 - **Recovery evidence is NOT durable:** `$MESH_DIR/recovery-timeline*.jsonl` lives in /tmp and died with
   the 2026-08-25 container restart (the 13-row live series is gone; only the 8-row a2o fixture survives
   in-repo). Same defect the a2o reports were moved under `genesis/a2o/reports/` for — move the JSONL too.
+- **2026-08-29 traps:** `just mesh recovery warm <peer>` WIPES the peer's content db + DocStore + blobs (only
+  identity survives) — "warm" is a content-cold restart, so run it only against CONVERGED survivors or the
+  recovering peer re-acquires half records. `just mesh storage-restart a b` from a cwd inside
+  `elohim/elohim-storage` fails with "justfile does not contain recipe `mesh`" and a multi-peer form printed
+  nothing once — restart peers one at a time from `/projects/elohim` and confirm via `P2P node started` stamps.
+  Background tool tasks running cargo were killed twice mid-chain today; build in the foreground (≤10 min) when
+  a chain keeps dying. The recovery script overruns the 10-min tool ceiling — launch it `setsid nohup … &` from a
+  foreground call and wait on its log with a background `until grep` loop.
