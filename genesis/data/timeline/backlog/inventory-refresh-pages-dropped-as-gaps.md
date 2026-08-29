@@ -101,3 +101,12 @@ Live publisher-restart run (19:22:53, receivers' cursor 1092 vs sequences from 1
 matthew's second refresh, jessica at its third (the first refresh's deltas arrived before its snapshot re-based
 the cursor and read as replay — bounded to one refresh). Recovery ≤ 3 refreshes; before this cut it was
 cursor/78 refreshes.
+
+## 2026-08-29 sync-state contract, station 1 (`f4d819a30`; spec `2026-08-29-sync-state-contract-design.md`)
+
+The publisher's inventory sequence now carries its boot epoch in the high 32 bits (`p2p::sync_state`), so a
+restart is strictly AHEAD of the old run on the wire — receivers apply the new epoch's snapshot as a forward jump
+and never need `PUBLISHER_RESTART_GAP` (kept as the fallback for pre-epoch publishers on the fleet). No wire
+field added. Unit-tested (`an_epoch_carrying_restart_needs_no_gap_heuristic`); live: the mesh logs
+`epoch`/`counter` on every snapshot apply. Stations 2–5 (per-publisher `SyncStreamState` on `/p2p/status`,
+`docsBehind`, `pull.epoch`, a real `SnapshotRequest`) are in the spec.
