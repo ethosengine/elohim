@@ -167,8 +167,17 @@ export class LoginComponent implements OnInit, AfterViewInit {
     // was selected before we advance to the login card.
     const parsed = parseFederatedIdentifier(detail.identifier);
     if (parsed) {
+      // `resolveGatewayToDoorwayUrl` is a LOOKUP now and returns null for a host
+      // no doorway has declared — there is nothing to select in that case, and
+      // inventing one is the defect this whole path was fixed for.
       const doorwayUrl = detail.doorwayUrl || resolveGatewayToDoorwayUrl(parsed.gatewayDomain);
-      this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
+      if (doorwayUrl) {
+        // `selectProbedDoorwayUrl`, not `selectDoorwayByUrl`: the synchronous
+        // setter only accepts a doorway the app already trusts, so a host the
+        // resolver element legitimately probed would be refused by it. This
+        // path adopts a new doorway only after it answers for itself.
+        void this.doorwayRegistry.selectProbedDoorwayUrl(doorwayUrl, true);
+      }
     }
 
     this.step = 'login';

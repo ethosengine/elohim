@@ -40,6 +40,7 @@ describe('LoginComponent (Lit wrapper)', () => {
   let mockIdentityService: { waitForAuthenticatedState: ReturnType<typeof vi.fn> };
   let mockDoorwayRegistry: {
     selectDoorwayByUrl: ReturnType<typeof vi.fn>;
+    selectProbedDoorwayUrl: ReturnType<typeof vi.fn>;
     selected: ReturnType<typeof signal<null>>;
     selectedUrl: ReturnType<typeof signal<null>>;
     hasSelection: ReturnType<typeof signal<boolean>>;
@@ -69,6 +70,7 @@ describe('LoginComponent (Lit wrapper)', () => {
 
     mockDoorwayRegistry = {
       selectDoorwayByUrl: vi.fn(),
+      selectProbedDoorwayUrl: vi.fn().mockResolvedValue(true),
       selected: signal(null),
       selectedUrl: signal(null),
       hasSelection: signal(false),
@@ -165,7 +167,7 @@ describe('LoginComponent (Lit wrapper)', () => {
     expect(component.identifier).toBe('matthew@alpha.elohim.host');
   });
 
-  it('calls selectDoorwayByUrl with the resolved doorway URL', () => {
+  it('adopts the resolved doorway through the PROBED path, not the trusted-only setter', () => {
     component.onResolved(
       new CustomEvent('resolved', {
         detail: {
@@ -175,9 +177,26 @@ describe('LoginComponent (Lit wrapper)', () => {
       })
     );
 
-    expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalledWith(
-      'https://alpha.elohim.host'
+    // `selectDoorwayByUrl` accepts only a doorway the app ALREADY trusts, so a
+    // host the resolver element legitimately probed would be silently refused
+    // by it. The probed path is the one that can adopt a new doorway.
+    expect(mockDoorwayRegistry.selectProbedDoorwayUrl).toHaveBeenCalledWith(
+      'https://alpha.elohim.host',
+      true
     );
+    expect(mockDoorwayRegistry.selectDoorwayByUrl).not.toHaveBeenCalled();
+  });
+
+  it('selects nothing when no doorway declares the typed gateway', () => {
+    component.onResolved(
+      new CustomEvent('resolved', {
+        detail: { identifier: 'someone@x.evil.tld', doorwayUrl: '' },
+      })
+    );
+
+    // The lookup returns null for an undeclared host, and null is the answer.
+    expect(mockDoorwayRegistry.selectProbedDoorwayUrl).not.toHaveBeenCalled();
+    expect(mockDoorwayRegistry.selectDoorwayByUrl).not.toHaveBeenCalled();
   });
 
   it('clears errorMessage on a successful resolved event', () => {

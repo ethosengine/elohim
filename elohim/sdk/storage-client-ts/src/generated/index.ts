@@ -304,3 +304,18 @@ export * from "./HubKind.js";
 // discovery ("tag"/...) edges; `depth` marks transitive reach.
 export * from "./ContentGraphView.js";
 export * from "./ContentGraphNodeView.js";
+
+// Delivery/replication wire shapes. DeliveryPeer is what the app's service
+// worker and the library's content resolver each used to hand-copy — the copies
+// had drifted (one declared a `network: 'relay'` variant Rust never writes).
+//
+// TWO TRAPS, both empirically reproduced — do not "complete" this list:
+//   1. FreshnessState is deliberately ABSENT. Exporting it raises TS2308
+//      (duplicate export) and breaks the build for every consumer.
+//   2. Do NOT regenerate this file with scripts/generate-types.sh. It emits 457
+//      exports and reintroduces DeviceArchetype, which breaks the same way.
+// This barrel is hand-maintained on purpose.
+export * from "./DeliveryPeer.js";
+export * from "./DistributionDetails.js";
+export * from "./ReplicaPeer.js";
+export * from "./PeerTopologyView.js";

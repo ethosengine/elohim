@@ -4,6 +4,8 @@ declare const self: ServiceWorkerGlobalScope;
 
 import JSZip from 'jszip';
 
+import type { DeliveryPeer } from '@elohim/storage-client/generated';
+
 // Bumped v1→v2 (2026-05-30): the prior cache held a stale index.html keyed to an
 // old bundle hash (zip-non-determinism rotated the blobHash), which referenced new
 // chunk filenames that 404'd → white screen. A new cache name forces fresh fetches
@@ -50,14 +52,10 @@ interface ScoredPeer {
   warm: boolean;
 }
 
-interface DeliveryPeerResponse {
-  peerId: string;
-  multiaddrs: string[];
-  network: string;
-  capabilities: string[];
-  lastSeen: number;
-  httpPort: number;
-}
+// Wire shape comes from the Rust struct via ts-rs; this file used to hand-copy
+// it, and the copy in @elohim/service drifted (it invented a `network: 'relay'`
+// variant the Rust side never writes).
+type DeliveryPeerResponse = DeliveryPeer;
 
 function extractIpFromMultiaddrSw(addr: string): string {
   const match = addr.match(/\/ip4\/([^/]+)/);

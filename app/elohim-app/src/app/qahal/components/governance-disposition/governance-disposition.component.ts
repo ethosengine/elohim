@@ -10,6 +10,7 @@
 import { Component, inject, input, OnInit, signal, computed } from '@angular/core';
 
 import { IdentityService } from '@app/imagodei/services/identity.service';
+
 import { GovernanceApiService } from '@elohim/service';
 
 import type {

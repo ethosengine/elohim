@@ -32,11 +32,23 @@
 // Delivery Peer Scoring
 // ============================================================================
 
-/** Peer information from storage's /api/v1/peers/delivery */
+/**
+ * Peer information from storage's /api/v1/peers/delivery.
+ *
+ * The canonical shape is the ts-rs-generated `DeliveryPeer` in
+ * `@elohim/storage-client/generated`, emitted from `p2p/mod.rs`. This package
+ * deliberately carries no dependency edge on storage-client (see
+ * `cache/types.ts`), so the shape is restated here and must be kept in step
+ * with the generated type — which is exactly how it drifted: this declared a
+ * `network: 'relay'` variant that Rust never writes, narrowing a wire string
+ * into a union with a member that cannot occur.
+ */
 export interface DeliveryPeer {
   peerId: string;
   multiaddrs: string[];
-  network: 'lan' | 'wan' | 'relay';
+  /** Rust writes "lan" (mDNS) or "wan". Widened to string because it IS a
+   *  string on the wire — narrowing an unvalidated wire value is a claim. */
+  network: string;
   capabilities: string[];
   lastSeen: number;
   httpPort: number;

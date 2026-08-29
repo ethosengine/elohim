@@ -703,7 +703,7 @@ export class DoorwayRegistryService {
   private async reverifyRestoredSelection(url: string): Promise<void> {
     const origin = await probeDoorway(url);
     const current = this.selectedSignal();
-    if (!current || current.doorway.url !== url) return;
+    if (current?.doorway.url !== url) return;
 
     if (origin === null) {
       this.clearSelection();
