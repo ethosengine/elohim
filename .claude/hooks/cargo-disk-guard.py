@@ -18,6 +18,29 @@ Two deterministic rules (policy: genesis/agentic/pool-policy.json):
    20.7GB of non-pooled in-tree targets). DNA/WASM workspaces are exempt
    (hc dna pack canonicalizes ./target — they MUST stay plain cargo).
 
+3. I/O PRESSURE — when the HOST's /proc/pressure/io (readable in-container,
+   mirrors the node) shows `full avg10` >= io.psi_full_avg10_deny_pct or
+   `some avg60` >= io.psi_some_avg60_deny_pct, DENY new heavy work. Evidence
+   2026-08-29: the control-plane host hard-reset twice with psi_io some=77%,
+   45 procs in D-state, md2 queue depth 218-277 at 155ms write latency —
+   two worn QLC NVMes (past rated TBW) that cannot absorb concurrent builds.
+   Starting another build into that is the proximate trigger.
+
+4. ONE BUILD AT A TIME — a heavy cargo (or `just gate`) while another cargo
+   build/test/check (or its rustc/rust-lld children) is already running in
+   this container is DENIED, naming the pid to wait for. Two gates at once
+   on a box whose storage is the bottleneck is what the operator asked us to
+   stop doing; the deny replaces "remember not to".
+
+5. JOBS CAP — heavy cargo with no `-j/--jobs` and no CARGO_BUILD_JOBS (in the
+   command or the environment) is DENIED with the exact prefix to use
+   (io.default_jobs). The devfile sets CARGO_BUILD_JOBS for new workspaces;
+   this rule covers sessions born before that env existed, and retires
+   itself the moment the env is present.
+
+`just gate …` segments count as heavy for rules 1, 3, 4, 5 (gate-runner sets
+its own CARGO_TARGET_DIR, so rule 2 does not apply to them).
+
 Soft watermark (volume_soft_pct) emits an advisory additionalContext only.
 
 PARSING MODEL (adversarial-review hardened): commands are split into shell
@@ -83,6 +106,92 @@ def read_policy():
         return int(p.get("volume_hard_pct", 85)), int(p.get("volume_soft_pct", 75))
     except Exception:
         return 85, 75
+
+
+IO_DEFAULTS = {
+    "psi_full_avg10_deny_pct": 20.0,
+    "psi_some_avg60_deny_pct": 50.0,
+    "max_concurrent_heavy": 1,
+    "default_jobs": 4,
+}
+
+
+def read_io_policy():
+    try:
+        with open(POLICY_FILE) as f:
+            io_pol = json.load(f).get("io") or {}
+    except Exception:
+        io_pol = {}
+    out = dict(IO_DEFAULTS)
+    for k in IO_DEFAULTS:
+        if k in io_pol:
+            out[k] = io_pol[k]
+    return out
+
+
+PSI_FILE = os.environ.get("CARGO_GUARD_PSI_FILE", "/proc/pressure/io")
+PROC_DIR = os.environ.get("CARGO_GUARD_PROC_DIR", "/proc")
+
+
+def host_psi_io():
+    """{'some_avg10','some_avg60','full_avg10','full_avg60'} floats, or None.
+    /proc/pressure/io inside the pod reports the HOST's global PSI (verified
+    2026-08-29 against the operator's sar on the same node)."""
+    try:
+        out = {}
+        with open(PSI_FILE) as f:
+            for line in f:
+                parts = line.split()
+                if not parts or parts[0] not in ("some", "full"):
+                    continue
+                for kv in parts[1:]:
+                    k, _, v = kv.partition("=")
+                    if k in ("avg10", "avg60"):
+                        out[f"{parts[0]}_{k}"] = float(v)
+        return out or None
+    except Exception:
+        return None
+
+
+def running_heavy():
+    """Live cargo drivers (heavy verb) and compiler/linker children in this
+    container, excluding this hook's own process tree. [(pid, short cmd)]."""
+    me = {os.getpid(), os.getppid()}
+    found = []
+    try:
+        for name in os.listdir(PROC_DIR):
+            if not name.isdigit() or int(name) in me:
+                continue
+            try:
+                with open(os.path.join(PROC_DIR, name, "cmdline"), "rb") as f:
+                    argv = f.read().split(b"\0")
+            except Exception:
+                continue
+            argv = [a.decode("utf-8", "replace") for a in argv if a]
+            if not argv:
+                continue
+            head = os.path.basename(argv[0])
+            if head == "cargo":
+                verb = next((a for a in argv[1:] if not a.startswith("+")), None)
+                if verb in HEAVY_VERBS:
+                    found.append((int(name), " ".join(argv[:4])))
+            elif head in ("rustc", "rust-lld", "ld.lld", "cc1", "gate-runner.mjs"):
+                found.append((int(name), head))
+    except Exception:
+        return []
+    return found
+
+
+def has_jobs_cap(command: str, heavy: list) -> bool:
+    if os.environ.get("CARGO_BUILD_JOBS", "").strip():
+        return True
+    if re.search(r"(^|[\s;&|])CARGO_BUILD_JOBS=\S+", command):
+        return True
+    for seg in heavy:
+        toks = seg.split()
+        if any(t == "-j" or t.startswith("-j") and t[2:].isdigit() or t == "--jobs" or t.startswith("--jobs=") for t in toks):
+            return True
+    return False
 
 
 def disk_pct():
@@ -160,6 +269,8 @@ def heavy_cargo_segments(command: str):
     for toks in token_segments(command):
         head, verb = segment_head_and_verb(toks)
         if head == "cargo" and verb in HEAVY_VERBS:
+            out.append(" ".join(toks))
+        elif head == "just" and verb == "gate":
             out.append(" ".join(toks))
     return out
 
@@ -266,7 +377,7 @@ def main():
     if data.get("tool_name") != "Bash":
         return
     command = (data.get("tool_input") or {}).get("command", "")
-    if "cargo" not in command:
+    if "cargo" not in command and "just" not in command:
         return
 
     heavy = heavy_cargo_segments(command)
@@ -294,7 +405,8 @@ def main():
         )
 
     # Rule 2 — pool discipline: native builds must target a pool slot.
-    ws = native_ws_for(" ; ".join(heavy), command, cwd)
+    cargo_heavy = [h for h in heavy if not h.startswith("just ")]
+    ws = native_ws_for(" ; ".join(cargo_heavy), command, cwd) if cargo_heavy else None
     if ws and "CARGO_TARGET_DIR" not in command:
         release = bool(re.search(r"\s--release\b", command))
         slot = slot_for(ws, cwd, release)
@@ -309,6 +421,45 @@ def main():
             f"inline, e.g.:\n  {hint}{command}\n"
             f"(Slot map: SessionStart 'ELOHIM CARGO TARGET POOL' block. "
             f"DNA/WASM workspaces are exempt and must keep plain cargo.)"
+        )
+
+    io_pol = read_io_policy()
+
+    # Rule 3 — host I/O pressure: don't start a build into a stalled disk.
+    psi = host_psi_io()
+    if psi:
+        full10, some60 = psi.get("full_avg10", 0.0), psi.get("some_avg60", 0.0)
+        if full10 >= float(io_pol["psi_full_avg10_deny_pct"]) or some60 >= float(io_pol["psi_some_avg60_deny_pct"]):
+            deny(
+                f"HOST I/O PRESSURE: /proc/pressure/io full avg10={full10:.0f}% some avg60={some60:.0f}% "
+                f"(deny at full10>={io_pol['psi_full_avg10_deny_pct']} / some60>={io_pol['psi_some_avg60_deny_pct']}, "
+                f"genesis/agentic/pool-policy.json `io`). The control-plane host's NVMe mirror is "
+                f"saturated — starting another build now is the pattern that preceded the 2026-08-29 "
+                f"hard resets. Wait and re-check with `cat /proc/pressure/io`; light commands are never gated."
+            )
+
+    # Rule 4 — one build at a time in this container.
+    live = running_heavy()
+    if live and len({p for p, _ in live}) >= int(io_pol["max_concurrent_heavy"]):
+        drivers = [c for _, c in live if c.startswith("cargo") or c == "gate-runner.mjs"] or [live[0][1]]
+        pids = ", ".join(str(p) for p, c in live if c.startswith("cargo") or c == "gate-runner.mjs") or str(live[0][0])
+        deny(
+            f"ONE BUILD AT A TIME: a build is already running in this workspace — pid {pids}: "
+            f"{drivers[0]} ({len(live)} compiler/linker processes). Two concurrent builds saturate "
+            f"the host's worn NVMe mirror (2026-08-29 resets). Wait for it: "
+            f"`while pgrep -x rustc >/dev/null || pgrep -f 'cargo (build|test|check|clippy)' >/dev/null; do sleep 15; done` "
+            f"— never kill another session's build."
+        )
+
+    # Rule 5 — jobs cap.
+    if not has_jobs_cap(command, heavy):
+        n = int(io_pol["default_jobs"])
+        deny(
+            f"JOBS CAP: heavy cargo with no `-j`/`--jobs` and no CARGO_BUILD_JOBS in the environment. "
+            f"This box's storage, not its {os.cpu_count() or 24} cores, is the build bottleneck "
+            f"(pool-policy `io.default_jobs`). Re-run with the cap inline:\n"
+            f"  CARGO_BUILD_JOBS={n} {command}\n"
+            f"(New workspaces get CARGO_BUILD_JOBS from devfile.yaml; this rule retires itself once the env is present.)"
         )
 
     # Soft watermark — advisory only.

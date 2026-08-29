@@ -36,27 +36,18 @@ attributes:
         # the volume root only and skips the walk when its group already
         # matches (it does — the tree is 1234-owned). Operator-requested.
         fsGroupChangePolicy: OnRootMismatch
-      # ── Cargo target pool on its OWN volume — HELD until the operator
-      # provisions the claim. An unresolvable PVC leaves the pod Pending
-      # (workspace-killing), so this stays commented until step 1 is done.
-      # Why: ~126G / 341K inodes of constantly rewritten build artifacts is
-      # what inflates and fragments the ext4 extent tree on the control-plane
-      # host (same kswapd trace). Che consolidates devfile `volume` components
-      # into the single workspace PVC, so a separate filesystem needs a
-      # pre-provisioned claim mounted through overrides. Handshake:
-      #   1. operator creates PVC `cargo-target-pool` (≥150Gi, its own
-      #      filesystem) in this workspace's namespace;
-      #   2. uncomment `volumes:` here AND the `volumeMounts` override on the
-      #      `tools` component below, then restart — the pool root path is
-      #      unchanged, so nothing else moves;
-      #   3. after the first warm build, `rm -rf` the old
-      #      /projects/.cargo-target-pool contents from a shell that sees the
-      #      unmounted PV (or let the operator reclaim it) — the mount shadows
-      #      it, it does not free it.
-      # volumes:
-      #   - name: cargo-target-pool
-      #     persistentVolumeClaim:
-      #       claimName: cargo-target-pool
+      # A separate PVC for the cargo target pool was drafted here on
+      # 2026-08-28 and RETIRED on 2026-08-29 before provisioning: this
+      # cluster's openebs-hostpath provisions a DIRECTORY under
+      # /var/snap/microk8s/common/var/openebs/local — the same /dev/md2p1,
+      # the same ext4 extent tree, the same two worn NVMes — and both NVMes
+      # are fully partitioned, so no separate filesystem exists to carve.
+      # It would have isolated neither the I/O (the 2026-08-29 resets) nor
+      # the extent tree (the 2026-08-28 kswapd lockup). Taking the pool off
+      # the root fs needs a physical disk added to the node, not a claim.
+      # What bounds the pool instead: pool-policy.json keep-warm caps that
+      # apply to the ACTIVE family, CARGO_BUILD_JOBS below, and the guard's
+      # one-build-at-a-time + host-I/O-pressure rules.
 
 projects:
   - name: elohim
@@ -86,13 +77,6 @@ projects:
 
 components:
   - name: tools
-    # Pairs with the held `cargo-target-pool` volume in pod-overrides above.
-    # Uncomment together with it, never alone.
-    # attributes:
-    #   controller.devfile.io/container-overrides: |
-    #     volumeMounts:
-    #       - name: cargo-target-pool
-    #         mountPath: /projects/.cargo-target-pool
     container:
       # Image build source: https://github.com/ethosengine/che-devworkspaces
       #   containers/udi-plus/Dockerfile   — base: claude-code, SonarQube MCP jar,
@@ -185,6 +169,13 @@ components:
         # `value: sccache`. CI keeps its own independent sccache config.
         - name: RUSTC_WRAPPER
           value: ''
+        # Build parallelism is capped by STORAGE, not cores (2026-08-29): the
+        # node's NVMe mirror is past rated write endurance and two concurrent
+        # 24-job builds saturated it into two hard resets in one day. 4 jobs
+        # keeps a build's write burst absorbable; the cargo-disk-guard hook
+        # refuses heavy cargo without this env or an explicit -j.
+        - name: CARGO_BUILD_JOBS
+          value: '4'
         # Cargo target pool — family-shared target dirs to keep parallel
         # worktree builds from each materializing their own ~18GB target/.
         # Hooks at SessionStart/Stop run worktree stewardship; agents read
