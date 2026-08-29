@@ -123,6 +123,23 @@ still needing that shape gets `FAIL(reshape)` rows instead of another
 regenerate attempt, and `DOORWAY_B_PORT` (default 8889) is honored alongside
 `DOORWAY_PORT` throughout.
 
+**Fleet identity fidelity (`MESH_DOORWAY_GATEWAY_SCOPING`, default `1`).** A doorway
+GATEWAY-SCOPES identifiers when it has a `DOORWAY_URL`: register AND login re-qualify the
+local part with its own domain (`auth_routes.rs` `gateway_domain` + `normalize_identifier`),
+so `GET /auth/me` answers `matthew.dowell@alpha.elohim.host`, not the string that was typed.
+Every deployed doorway runs that way. Both mesh doorways launched WITHOUT the variable until
+2026-08-29, so they stored identifiers verbatim and the household mesh was structurally
+incapable of reproducing the fleet's naming — which is how genesis #1519, not a local run,
+discovered a portal scenario asserting a bare name. `mesh start` now passes
+`DOORWAY_URL=http://localhost:$DOORWAY_PORT` (doorway A) and `:$DOORWAY_B_PORT` (doorway B),
+so a mesh human is `susan@localhost`. Set `MESH_DOORWAY_GATEWAY_SCOPING=0` to run the
+verbatim shape; the variable is then OMITTED rather than set empty, because an empty
+`DOORWAY_URL` still reads as *present* to clap and would leak `"doorwayUrl": ""` into auth
+responses. **Scenarios must never derive the scoped name** — read it from the auth response
+(`AuthResponse.identifier`) or use `genesis/a2o/src/framework/doorway-identity.ts`; a
+TypeScript re-implementation of `gateway_domain` is a second home for one rule and is wrong
+wherever a test reaches a doorway at an address other than its configured one.
+
 **The sign-in portal (`MESH_PORTAL`, `THRESHOLD_PORT`).** The doorway forwards
 `/threshold/*` to `THRESHOLD_URL` with the path INTACT, and its binary default is
 `http://localhost:8081`; on the fleet that is the `doorway-app` nginx sidecar. `mesh start`
