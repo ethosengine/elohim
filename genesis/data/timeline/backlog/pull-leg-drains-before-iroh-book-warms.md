@@ -139,3 +139,19 @@ amber rule kept the EXISTING blob_hash on a green (anchored) row even when it wa
 hash; guarding it is empty-wins. Cure landed: the guard applies only when the green hash is present
 (`amber_write_fills_a_null_blob_hash_on_a_green_row`), and `reverse_project_content_doc` now returns healed iff the
 row carries the converged hash after the write, so the counter cannot re-count an unchanged row.
+
+## 2026-08-29 final run on the full cut (boot seed + half-row sweep + amber fill): 3375/3376, one survivor disagreement
+
+Before the run every peer read full 3414 / half 1 / green-half 0 and both stuck sets 0 (matthew's 72 green half
+rows filled on the first two sweeps after the amber fix; the cursor advances — scanned 177 → 172). Warm recovery
+jessica (labels cut=shape3-halfrow-heal-amber, survivor rows=3376 vs 1637 this morning — the survivors were
+converged this time): P0/P2/P3/P4 green, **P1-bad=1** for the whole run → NOT-RECOVERED at 916 s by the probe's
+letter. The one row is `evolution-of-trust` (html5-app): matthew holds `blobHash = bafkrei…` (its declared CID —
+and NO bytes: `shard_manifest_backfill: blob bytes absent locally`), james holds `sha256-ee53…` with the anchor,
+jessica pulled the record from james and agrees with james. P1 compares against survivor A (matthew) only, so a
+cross-survivor disagreement reads as the recovering peer's failure. chain / between survivor-A-row → survivor-B-row
+/ missing node: *uploaded-bundle blob_hash agreement across survivors* (assertion: for every row with bytes on any
+peer, all survivors carry the same blob_hash form; probe: `select id from content` diff of blob_hash across peers
+= ∅) / current state: 1 row divergent on this mesh, pre-existing, not touched by this cut. Next: decide whether P1
+should accept "agrees with ANY survivor holding the bytes" or the divergence should be healed set→set (the amber
+rule already permits amber→amber replacement; matthew's row is green with a hash it has no bytes for).
