@@ -44,3 +44,15 @@ be honest on matthew while it lasts.
   route to the doorway registry).
 - Loki, when it answers: `{namespace="elohim-alpha"} |= "iroh acquisition"` — the `response`/`error` field names
   the class in one line.
+
+## Measured on bdd5f9ef (edge #1390, deployed 2026-08-29 ~23:05 UTC; read 23:12–23:25 UTC)
+
+- `elohim_acquisition_outcomes_total`: **no series** this boot — no `fetch_error`, no `fetched`. `elohim_acquisition_dispatch_total` = 0
+  on every pod/transport; `elohim_transport_route_total` = 0 on every reason. Reconcile ran (`initialized=1`, `completed` 12–13 per pod at
+  the 60 s cadence). `active_pins`: matthew 2, others 0; `pins_retired`: matthew 135, adam 24.
+- matthew `/p2p/status`: `pull.total=2 fetched=2 pending=0 failed=0 caughtUp=true`. Dispatch = `reconcile_desired(wants) − local`
+  (`acquisition.rs:324-329`), retry budget in-memory → 0 dispatches from 2 pins means every wanted id is already local (`7afa03337`).
+- `first_drain_total`: expired on 5/7 pods (10 s hold), book_warm on susan + gertrude; `iroh_peers_known` = 6 everywhere within minutes.
+- **Reading:** the burn is gone by absence — nothing is asked, so `pull.caughtUp` is honest on matthew. The "no peer holds it" vs
+  "responder rejects the shape" split is still unobserved (no dispatch to classify). Loki queries still 502. Keep open only if a
+  future boot dispatches and errors again; otherwise this row closes as "pins retired / wants local".
