@@ -76,6 +76,36 @@ MESH_TRANSPORT_BACKEND=dual just mesh prologue
 MESH_TRANSPORT_BACKEND=dual just test mesh features/dataplane/content-sync.feature
 ```
 
+## The browser lane: `just test mesh-browser`
+
+`just test mesh` runs the `mesh` cucumber profile, which is tagged
+`@e2e and not @wip and not @browser and not @browser-only` — it EXCLUDES every
+browser scenario. Until the `mesh-browser` profile existed, the only browser
+profile pointed at `env: 'alpha'` (the deployed fleet), so the sign-in portal
+was never exercised against a mesh this run owns, even though `MESH_PORTAL=1`
+serves it and the doorway proxies it at `<doorway>/threshold`.
+
+```bash
+just mesh start && just mesh prologue    # portal served, cast seeded
+just test mesh-browser '@auth'           # the same act, through a real browser
+```
+
+It sets `E2E_DEVICE_MODE=playwright` and points `E2E_APP_URL` at the doorway.
+That matters: on the mesh the DOORWAY serves the app itself, so app and portal
+share one origin and a portal `returnUrl` is an ordinary same-origin redirect.
+The `doorwayToAppUrl` default (`localhost:8888` -> `localhost:4200`) is the
+split-origin local-dev shape — `ng serve` beside a doorway — and stays the
+default for that workflow.
+
+Two things this lane needs that are easy to get wrong. The cast must be seeded
+(`just mesh prologue`): without it every fixture login fails
+`INVALID_CREDENTIALS`, which reads like an auth regression and is an empty
+substrate. And the portal runs `ng serve --live-reload false`, because the
+doorway proxies `/threshold/*` and a hot-reload WebSocket cannot traverse that
+proxy — it fails its handshake against the proxied 200 and emits console errors
+on every page, which a lane asserting a clean console after login cannot tell
+apart from product errors.
+
 `dual` and `iroh` require the selected `STORAGE_BIN` to be built with
 `--features "p2p p2p-iroh"`; `start` refuses a default-feature binary and prints
 the exact cargo-pool build command. `mesh status` prints `transport=<mode>` per
@@ -122,6 +152,23 @@ false red. Reshape retries per shape are bounded by
 still needing that shape gets `FAIL(reshape)` rows instead of another
 regenerate attempt, and `DOORWAY_B_PORT` (default 8889) is honored alongside
 `DOORWAY_PORT` throughout.
+
+**Fleet identity fidelity (`MESH_DOORWAY_GATEWAY_SCOPING`, default `1`).** A doorway
+GATEWAY-SCOPES identifiers when it has a `DOORWAY_URL`: register AND login re-qualify the
+local part with its own domain (`auth_routes.rs` `gateway_domain` + `normalize_identifier`),
+so `GET /auth/me` answers `matthew.dowell@alpha.elohim.host`, not the string that was typed.
+Every deployed doorway runs that way. Both mesh doorways launched WITHOUT the variable until
+2026-08-29, so they stored identifiers verbatim and the household mesh was structurally
+incapable of reproducing the fleet's naming — which is how genesis #1519, not a local run,
+discovered a portal scenario asserting a bare name. `mesh start` now passes
+`DOORWAY_URL=http://localhost:$DOORWAY_PORT` (doorway A) and `:$DOORWAY_B_PORT` (doorway B),
+so a mesh human is `susan@localhost`. Set `MESH_DOORWAY_GATEWAY_SCOPING=0` to run the
+verbatim shape; the variable is then OMITTED rather than set empty, because an empty
+`DOORWAY_URL` still reads as *present* to clap and would leak `"doorwayUrl": ""` into auth
+responses. **Scenarios must never derive the scoped name** — read it from the auth response
+(`AuthResponse.identifier`) or use `genesis/a2o/src/framework/doorway-identity.ts`; a
+TypeScript re-implementation of `gateway_domain` is a second home for one rule and is wrong
+wherever a test reaches a doorway at an address other than its configured one.
 
 **The sign-in portal (`MESH_PORTAL`, `THRESHOLD_PORT`).** The doorway forwards
 `/threshold/*` to `THRESHOLD_URL` with the path INTACT, and its binary default is

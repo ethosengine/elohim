@@ -76,6 +76,36 @@ MESH_TRANSPORT_BACKEND=dual just mesh prologue
 MESH_TRANSPORT_BACKEND=dual just test mesh features/dataplane/content-sync.feature
 ```
 
+## The browser lane: `just test mesh-browser`
+
+`just test mesh` runs the `mesh` cucumber profile, which is tagged
+`@e2e and not @wip and not @browser and not @browser-only` — it EXCLUDES every
+browser scenario. Until the `mesh-browser` profile existed, the only browser
+profile pointed at `env: 'alpha'` (the deployed fleet), so the sign-in portal
+was never exercised against a mesh this run owns, even though `MESH_PORTAL=1`
+serves it and the doorway proxies it at `<doorway>/threshold`.
+
+```bash
+just mesh start && just mesh prologue    # portal served, cast seeded
+just test mesh-browser '@auth'           # the same act, through a real browser
+```
+
+It sets `E2E_DEVICE_MODE=playwright` and points `E2E_APP_URL` at the doorway.
+That matters: on the mesh the DOORWAY serves the app itself, so app and portal
+share one origin and a portal `returnUrl` is an ordinary same-origin redirect.
+The `doorwayToAppUrl` default (`localhost:8888` -> `localhost:4200`) is the
+split-origin local-dev shape — `ng serve` beside a doorway — and stays the
+default for that workflow.
+
+Two things this lane needs that are easy to get wrong. The cast must be seeded
+(`just mesh prologue`): without it every fixture login fails
+`INVALID_CREDENTIALS`, which reads like an auth regression and is an empty
+substrate. And the portal runs `ng serve --live-reload false`, because the
+doorway proxies `/threshold/*` and a hot-reload WebSocket cannot traverse that
+proxy — it fails its handshake against the proxied 200 and emits console errors
+on every page, which a lane asserting a clean console after login cannot tell
+apart from product errors.
+
 `dual` and `iroh` require the selected `STORAGE_BIN` to be built with
 `--features "p2p p2p-iroh"`; `start` refuses a default-feature binary and prints
 the exact cargo-pool build command. `mesh status` prints `transport=<mode>` per
