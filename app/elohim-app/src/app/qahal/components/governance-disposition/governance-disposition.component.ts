@@ -9,6 +9,7 @@
 
 import { Component, inject, input, OnInit, signal, computed } from '@angular/core';
 
+import { IdentityService } from '@app/imagodei/services/identity.service';
 import { GovernanceApiService } from '@elohim/service';
 
 import type {
@@ -341,9 +342,21 @@ import type {
   `,
 })
 export class GovernanceDispositionComponent implements OnInit {
-  readonly humanId = input.required<string>();
+  /**
+   * Optional host override. The route (community.routes.ts) does not bind it and
+   * provideRouter has no withComponentInputBinding, so this MUST NOT be
+   * `input.required` — reading an unbound required input throws NG0950 before
+   * any fallback can run, which is the defect this component shipped with.
+   */
+  readonly humanId = input<string | undefined>(undefined);
 
   private readonly governanceApi = inject(GovernanceApiService);
+  private readonly identity = inject(IdentityService);
+
+  /** Whose profile this is: the bound input when a host supplies one, else the signed-in human. */
+  private readonly targetHumanId = computed<string | null>(
+    () => this.humanId() ?? this.identity.humanId()
+  );
 
   /** The loaded disposition. */
   readonly disposition = signal<GovernanceDispositionView | null>(null);
@@ -379,12 +392,24 @@ export class GovernanceDispositionComponent implements OnInit {
 
   private async initialize(): Promise<void> {
     this.loading.set(true);
+    const humanId = this.targetHumanId();
+    if (!humanId) {
+      // No bound input and nobody signed in — the empty-state branch is the answer.
+      this.loading.set(false);
+      return;
+    }
+
     try {
-      const result = await this.governanceApi.getDisposition(this.humanId());
+      const result = await this.governanceApi.getDisposition(humanId);
       this.disposition.set(result);
       if (result) {
         this.syncEditValues(result);
       }
+    } catch {
+      // The template's @else branch is the answer for "no disposition". Without
+      // this the rejection escaped ngOnInit entirely, because Angular never
+      // awaits it.
+      this.disposition.set(null);
     } finally {
       this.loading.set(false);
     }
@@ -407,6 +432,9 @@ export class GovernanceDispositionComponent implements OnInit {
   }
 
   async save(): Promise<void> {
+    const humanId = this.targetHumanId();
+    if (!humanId) return;
+
     this.saving.set(true);
     try {
       const overrides: UpdateDispositionInputView = {
@@ -415,20 +443,27 @@ export class GovernanceDispositionComponent implements OnInit {
         consensusPreference: this.editConsensusPreference(),
         priorityValues: null,
       };
-      const updated = await this.governanceApi.updateDisposition(this.humanId(), overrides);
+      const updated = await this.governanceApi.updateDisposition(humanId, overrides);
       this.disposition.set(updated);
       this.editing.set(false);
+    } catch {
+      // Stay in edit mode so the human keeps their unsaved adjustments
     } finally {
       this.saving.set(false);
     }
   }
 
   async recompute(): Promise<void> {
+    const humanId = this.targetHumanId();
+    if (!humanId) return;
+
     this.recomputing.set(true);
     try {
-      const result = await this.governanceApi.computeDisposition(this.humanId());
+      const result = await this.governanceApi.computeDisposition(humanId);
       this.disposition.set(result);
       this.syncEditValues(result);
+    } catch {
+      // The previously loaded profile stays on screen
     } finally {
       this.recomputing.set(false);
     }

@@ -156,8 +156,15 @@ export class FeedbackAggregateComponent implements OnInit {
   }
 
   private async initialize(): Promise<void> {
-    const result = await this.governanceApi.getSignalAggregate(this.entityType(), this.entityId());
-    this.aggregate.set(result);
+    try {
+      const result = await this.governanceApi.getSignalAggregate(
+        this.entityType(),
+        this.entityId()
+      );
+      this.aggregate.set(result);
+    } catch {
+      // null aggregate keeps the panel hidden
+    }
   }
 
   toNumber(value: bigint): number {
