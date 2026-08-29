@@ -146,8 +146,8 @@ decisionPoints:
           Race capped at the eligible set (≤2 planes); ring fixed at RING=16 per key; keys
           bounded by the peer book with a MAX_KEYS backstop; pure predicate, no retries.
       - id: C7
-        status: gap
-        gapNote: >
+        status: partial
+        justification: >
           Advertise/serve symmetry — an advertised plane that fails to serve is recorded
           Degraded (surfaces the drift) but the drift itself is not cured here.
       - id: C8
@@ -2419,3 +2419,90 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/session_proof.rs
         testName: a_small_order_public_key_is_refused
         kind: unit
+  - name: SyncStreamState::caught_up
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/sync_state.rs
+      modulePath: p2p::sync_state::SyncStreamState::caught_up
+      line: 60
+    summary: >
+      The sync-state contract's one predicate: is this receiver caught up in this
+      publisher's stream? `position >= declared` within the publisher's epoch, and
+      `None` (never `true`) while the declared end is unknown. Born from four
+      2026-08-29 convergence defects that were one defect — streams with an implicit
+      position, no epoch, and a guessed "caught up". Station 1 also puts the
+      publisher's boot epoch in the inventory sequence's high 32 bits so a restart is
+      strictly ahead on the wire (no heuristic).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Replication plane only: the state is per (receiver, publisher, stream);
+          reach and content-head stay their own planes.
+      - id: C1
+        status: n-a
+        justification: No election; a receiver describes its own position.
+      - id: C2
+        status: answered
+        justification: >
+          Epoch before position, position monotone per epoch; an older epoch is a
+          replay by construction (`PositionClass::OlderEpoch`).
+      - id: C3
+        status: partial
+        justification: >
+          Liveness of the stream itself (a publisher that stops) is not judged here;
+          the freshness clock on the cursor row is the existing signal.
+      - id: C4
+        status: answered
+        justification: >
+          Unknown declared end → `caught_up() == None`; a rollup must publish null.
+      - id: C5
+        status: n-a
+        justification: A position is evidence of what was applied, never authority.
+      - id: C6a
+        status: answered
+        justification: O(1) comparison; the reorder window it serves is bounded per peer.
+      - id: C6b
+        status: answered
+        justification: Pure; re-evaluating a state is idempotent.
+      - id: C7
+        status: n-a
+        justification: Not a serving surface.
+      - id: C8
+        status: partial
+        justification: >
+          Epoch/counter are logged on snapshot apply; the per-publisher gauge rollup
+          on /p2p/status is station 2 of the spec.
+      - id: C9
+        status: answered
+        justification: >
+          Keyed by the publisher's transport peer id as carried in the page; no
+          cross-namespace join.
+      - id: C10
+        status: answered
+        justification: >
+          No wire field added: the epoch rides the existing u64 `sequence`, so a
+          receiver one build behind sees a monotone jump and still applies.
+      - id: C11
+        status: n-a
+        justification: No external backpressure source.
+      - id: C12
+        status: n-a
+        justification: No authorization decision.
+      - id: C13
+        status: n-a
+        justification: No authority graduation.
+      - id: C14
+        status: n-a
+        justification: No residual left unwitnessed; the state is fully local.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/sync_state.rs
+        testName: caught_up_is_a_comparison_and_unknown_is_not_true
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/sync_state.rs
+        testName: positions_classify_by_epoch_before_counter
+        kind: unit
+      - path: elohim/elohim-storage/src/db/peer_blob_inventory.rs
+        testName: an_epoch_carrying_restart_needs_no_gap_heuristic
+        kind: unit
+
