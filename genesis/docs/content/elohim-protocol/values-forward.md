@@ -5,7 +5,7 @@ class: governance
 artifact_kind: manifesto
 cites:
   - "elohim-protocol-manifesto | The vision this document classifies — the crisis diagnosis and the love-centered alternative, stated as conviction. Values Forward turns that vision's implicit choices into declared, defensible stances. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "constitution | The law these stances are the reasons for — the layered, graduated-immutability governance. The constitution binds; this document explains what it binds us to and why. | sha256:8aaf7899ad64a813 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "constitution | The law these stances are the reasons for — the layered, graduated-immutability governance. The constitution binds; this document explains what it binds us to and why. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "elohim-protocol-values-in-the-machine | The architecture companion whose POSIWID argument this document generalizes from a critique of the old web into a positive classifier of our own conclusions. | sha256:defdddc9f2b9a19e | path: genesis/docs/content/elohim-protocol/values-in-the-machine.md"
   - "justice-manifesto | The home of the floor/ceiling architecture and the El Roi sight-as-virtue theology that Stances II.2–II.4 canonicalize. | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
   - "governance-layers-architecture | The graduated-immutability layers, friction-gradient limitarianism (the deterministic floor), and the commons co-steward that Stances II.1–II.4 draw on. | sha256:0332959e9fbec792 | path: genesis/docs/content/elohim-protocol/governance-layers-architecture.md"

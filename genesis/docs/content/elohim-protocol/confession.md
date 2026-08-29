@@ -3,7 +3,7 @@ id: confession
 cites:
   - "theology | The companion disputation that forged this same theology article by article; its 'this stands' replies ARE this doc's 'What the Protocol Cannot Resolve' edges. | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
   - "elohim-protocol-manifesto | The vision underwriting this theology: the crisis of formation outrunning belief and the love-centered alternative, which this confession renders as plain settled doctrine. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "constitution | The law enacting this theology in code: covenant, the universal gate, and layer precedence, sealed by the Matthew 6:21 warrant that anchors this doc's 'The constitution is covenant.' | sha256:8aaf7899ad64a813 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "constitution | The law enacting this theology in code: covenant, the universal gate, and layer precedence, sealed by the Matthew 6:21 warrant that anchors this doc's 'The constitution is covenant.' | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
 ---
 # The Confession: The Theology of the Elohim Protocol, Stated Plainly
 ### What It Is For, What It Holds, and What Cannot Yet Be Resolved

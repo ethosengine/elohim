@@ -1,7 +1,7 @@
 ---
 id: elohim-protocol-manifesto
 cites:
-  - "constitution | The law that operationalizes this vision: the constitution-as-system-prompt, layer precedence (more-immutable wins), and the Matthew 6:21 gate that binds even the lawgiver. | sha256:8aaf7899ad64a813 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "constitution | The law that operationalizes this vision: the constitution-as-system-prompt, layer precedence (more-immutable wins), and the Matthew 6:21 gate that binds even the lawgiver. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "confession | The theology beneath this vision said plainly — what the protocol is FOR (the upstream soil it tends), what it holds, and the honest edges it cannot resolve. | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "theology | The same theology forged as a disputation: each commitment pressed by its strongest objection across thirteen Articles, several answered 'this stands.' | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
   - "succession | The argument that clears the ground for this vision — the mutualist lineage read for what it could not afford, and the mechanism by which a substrate carries public function without conquering anything. Written to be read BEFORE this document by anyone arriving with a formed politics. | sha256:0afb1cbdaf452ee1 | path: genesis/docs/content/elohim-protocol/succession.md"

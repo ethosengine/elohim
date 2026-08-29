@@ -116,7 +116,7 @@ When communities invest the effort to negotiate, ratify, and anchor their consti
 - The process itself builds commitment
 - The permanence demands seriousness
 - The transparency creates accountability
-- The difficulty of changing it raises the cost of backsliding
+- The challenge of changing it scales with what the change would touch — a person revises their own commitments in an afternoon, while a commitment the whole world stands on has to be witnessed by the whole world to move. That gradient is what raises the cost of backsliding, and it is the same one that lets trusted things move fast: friction here is a measure of reach and of trust already earned, never an obstacle for its own sake.
 
 This is what it means to put your treasure where your heart is. The constitution isn't just documentation—it's a **permanent investment in who we've decided to be**.
 

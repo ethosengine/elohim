@@ -2,7 +2,7 @@
 id: theology
 cites:
   - "elohim-protocol-manifesto | The vision under examination: Article 3 tests the manifesto's claim that the problem is architecture not human nature, judging it Pelagian as systematics and sound as occasional Ephesians-6 theology. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "constitution | The law under examination: Articles 5, 8, and 12 press the constitution's universal gate, layer precedence (dignity floor over community), and the binding-as-covenant sealed by Matthew 6:21. | sha256:8aaf7899ad64a813 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "constitution | The law under examination: Articles 5, 8, and 12 press the constitution's universal gate, layer precedence (dignity floor over community), and the binding-as-covenant sealed by Matthew 6:21. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "confession | Its companion settled statement: the named where-it-landed positive form, whose section What the Protocol Cannot Resolve gathers exactly the objections this disputation answers with 'this stands.' | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
 ---
 # The Theology: A Disputation on the Elohim Protocol
