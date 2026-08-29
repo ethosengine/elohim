@@ -870,6 +870,9 @@ export class ContentResolverService implements OnDestroy {
    * Check if resolution result is an error.
    */
   isError(result: ResolutionResult | ResolutionError): result is ResolutionError {
+    // Both arms of the declared union are object types, so `in` cannot receive
+    // a primitive here.
+    // eslint-disable-next-line sonarjs/in-operator-type-error -- see above
     return 'error' in result;
   }
 

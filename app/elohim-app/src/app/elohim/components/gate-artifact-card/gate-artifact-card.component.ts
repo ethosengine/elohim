@@ -383,18 +383,8 @@ export class GateArtifactCardComponent {
     this.interaction.affirm();
   }
 
+  /** Resubmission is the same act as submission; kept as a named entry point. */
   protected onResubmit(): void {
-    const text = this.localText().trim();
-    if (!text) return;
-    if (this.gateApiCall) {
-      this.interaction.submitWithApi(
-        text,
-        this.mutationType,
-        this.contextMetadata,
-        this.gateApiCall
-      );
-    } else {
-      this.interaction.submit(text, this.mutationType, this.contextMetadata);
-    }
+    this.onSubmit();
   }
 }

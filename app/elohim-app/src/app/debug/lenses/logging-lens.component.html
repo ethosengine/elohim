@@ -27,7 +27,7 @@
     id="log-level-filter"
     data-testid="log-level-filter"
     aria-label="Filter log level"
-    (change)="setFilter($any($event.target).value)"
+    (change)="onFilterChange($event)"
   >
     <option value="all">all</option>
     <option *ngFor="let lvl of angularLevels" [value]="lvl">{{ lvl }}</option>

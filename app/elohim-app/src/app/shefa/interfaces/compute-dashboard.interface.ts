@@ -27,6 +27,8 @@
 
 import { InjectionToken, inject } from '@angular/core';
 
+import { Observable } from 'rxjs';
+
 import { ComputeDashboardApiService } from '../services/compute-dashboard-api.service';
 
 // Re-export dashboard types from the model for consumer convenience.
@@ -71,8 +73,6 @@ import type {
   StorageContentDistribution,
   BidirectionalCustodianView,
 } from '../models/shefa-dashboard.model';
-
-import { Observable } from 'rxjs';
 
 // =============================================================================
 // INTERFACE

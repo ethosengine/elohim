@@ -18,6 +18,11 @@ import {
 } from '@app/elohim/models/human-consent.model';
 
 import { SessionHumanService } from '@elohim/identity';
+// LocalSourceChainService is deprecated with a staged retirement: read paths move to
+// HolochainSourceChainService, write paths migrate in M-REA-1 / M-AGGR-1. This service
+// uses both -- getEntriesByType/getAgentId AND createEntry -- so it cannot move ahead of
+// the write-path wave. Tracked there, not here.
+// eslint-disable-next-line sonarjs/deprecation -- blocked on the write-path migration wave
 import { LocalSourceChainService } from '@elohim/service';
 import { HumanConsentContent } from '@elohim/storage-client';
 
@@ -47,6 +52,7 @@ export class HumanConsentService {
   private readonly consentsSubject = new BehaviorSubject<HumanConsent[]>([]);
   public consents$ = this.consentsSubject.asObservable();
 
+  // eslint-disable-next-line sonarjs/deprecation -- see the import note: blocked on the write-path migration wave
   private readonly sourceChain = inject(LocalSourceChainService);
   private readonly sessionHuman = inject(SessionHumanService);
 

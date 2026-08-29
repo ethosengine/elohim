@@ -168,21 +168,6 @@ interface RawContentData {
   distribution?: import('@app/lamad/models/content-node.model').DistributionSummary;
 }
 
-/** Raw path step from storage/API */
-interface RawStepData {
-  id?: string;
-  pathId?: string;
-  chapterId?: string;
-  title?: string;
-  description?: string;
-  stepType?: string;
-  resourceId?: string;
-  resourceType?: string;
-  orderIndex?: number;
-  estimatedDuration?: string;
-  metadata?: Record<string, unknown>;
-}
-
 /** Raw relationship from storage/API */
 interface RawRelationshipData {
   id?: string;

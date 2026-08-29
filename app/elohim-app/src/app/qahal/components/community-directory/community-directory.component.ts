@@ -310,9 +310,9 @@ export class CommunityDirectoryComponent implements OnInit {
     this.loadDirectory();
   }
 
-  onHumanSelected(humanId: string): void {
-    // Future: navigate to human profile
-    console.log('Selected human:', humanId);
+  onHumanSelected(_humanId: string): void {
+    // TODO: navigate to the selected human's profile once the route exists.
+    // Deliberately inert until then -- a debug log here was reaching production.
   }
 
   navigateToCollective(id: string): void {

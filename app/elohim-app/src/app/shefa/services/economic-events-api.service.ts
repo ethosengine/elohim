@@ -20,18 +20,19 @@ import type {
 import type { EconomicEvent } from '@app/elohim/models';
 import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
 
+/** Doorway economic-events endpoint. A typo here is a silent 404. */
+const EVENTS_URL = '/api/v1/economic-events';
+
 @Injectable({ providedIn: 'root' })
 export class EconomicEventsApiService implements IEconomicEventFactory {
   private readonly http = inject(HttpClient);
 
   async createFromStaged(staged: StagedTransaction): Promise<EconomicEvent> {
-    return firstValueFrom(this.http.post<EconomicEvent>('/api/v1/economic-events', { staged }));
+    return firstValueFrom(this.http.post<EconomicEvent>(EVENTS_URL, { staged }));
   }
 
   async createMultipleFromStaged(stagedList: StagedTransaction[]): Promise<EconomicEvent[]> {
-    return firstValueFrom(
-      this.http.post<EconomicEvent[]>('/api/v1/economic-events/bulk', { stagedList })
-    );
+    return firstValueFrom(this.http.post<EconomicEvent[]>(`${EVENTS_URL}/bulk`, { stagedList }));
   }
 
   async createCorrectionEvent(
@@ -48,7 +49,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
     reason: string
   ): Promise<EconomicEvent> {
     return firstValueFrom(
-      this.http.post<EconomicEvent>('/api/v1/economic-events', {
+      this.http.post<EconomicEvent>(EVENTS_URL, {
         type: 'correction',
         originalEventId,
         correction,
@@ -63,26 +64,22 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
 
   async getEventsByProvider(agentId: string): Promise<EconomicEvent[]> {
     return firstValueFrom(
-      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { provider: agentId } })
+      this.http.get<EconomicEvent[]>(EVENTS_URL, { params: { provider: agentId } })
     );
   }
 
   async getEventsByReceiver(agentId: string): Promise<EconomicEvent[]> {
     return firstValueFrom(
-      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { receiver: agentId } })
+      this.http.get<EconomicEvent[]>(EVENTS_URL, { params: { receiver: agentId } })
     );
   }
 
   async getEventsByAction(action: string): Promise<EconomicEvent[]> {
-    return firstValueFrom(
-      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { action } })
-    );
+    return firstValueFrom(this.http.get<EconomicEvent[]>(EVENTS_URL, { params: { action } }));
   }
 
   async getEventsByLamadType(lamadType: string): Promise<EconomicEvent[]> {
-    return firstValueFrom(
-      this.http.get<EconomicEvent[]>('/api/v1/economic-events', { params: { lamadType } })
-    );
+    return firstValueFrom(this.http.get<EconomicEvent[]>(EVENTS_URL, { params: { lamadType } }));
   }
 
   async createEconomicEvent(payload: CreateEconomicEventInput): Promise<EconomicEvent> {
@@ -94,7 +91,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
     // 503 (write-through OFF), so every content view on alpha hit it.
     const { providerId, receiverId, ...rest } = payload;
     return firstValueFrom(
-      this.http.post<EconomicEvent>('/api/v1/economic-events', {
+      this.http.post<EconomicEvent>(EVENTS_URL, {
         ...rest,
         provider: providerId,
         receiver: receiverId,
@@ -108,7 +105,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
 
   async getAppreciationsFor(appreciatedId: string): Promise<AppreciationDisplay[]> {
     return firstValueFrom(
-      this.http.get<AppreciationDisplay[]>('/api/v1/economic-events/appreciations', {
+      this.http.get<AppreciationDisplay[]>(`${EVENTS_URL}/appreciations`, {
         params: { for: appreciatedId },
       })
     );
@@ -116,7 +113,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
 
   async getAppreciationsBy(appreciatorId: string): Promise<AppreciationDisplay[]> {
     return firstValueFrom(
-      this.http.get<AppreciationDisplay[]>('/api/v1/economic-events/appreciations', {
+      this.http.get<AppreciationDisplay[]>(`${EVENTS_URL}/appreciations`, {
         params: { by: appreciatorId },
       })
     );
@@ -124,7 +121,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
 
   async createAppreciation(payload: CreateAppreciationInput): Promise<AppreciationDisplay> {
     return firstValueFrom(
-      this.http.post<AppreciationDisplay>('/api/v1/economic-events/appreciations', payload)
+      this.http.post<AppreciationDisplay>(`${EVENTS_URL}/appreciations`, payload)
     );
   }
 }

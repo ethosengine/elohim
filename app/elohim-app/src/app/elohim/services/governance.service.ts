@@ -19,6 +19,8 @@ import {
 import { SessionHumanService } from '@elohim/identity';
 import { GovernanceApiService } from '@elohim/service';
 
+import { generateId } from '../utils/id-generator';
+
 import type {
   CreateProposalInputView,
   CastVoteInputView,
@@ -308,7 +310,7 @@ export class GovernanceService {
     const presenceId = this.sessionUser.getSessionId() ?? 'anonymous';
 
     const input: CreateProposalInputView = {
-      id: `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: generateId('proposal'),
       contentId: submission.relatedEntityId ?? '',
       proposerPresenceId: presenceId,
       proposalType: submission.proposalType,
@@ -445,7 +447,7 @@ export class GovernanceService {
    */
   postMessage(message: DiscussionMessage): Observable<boolean> {
     const input: PostMessageInputView = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: generateId('msg'),
       authorPresenceId: this.sessionUser.getSessionId() ?? 'anonymous',
       body: message.content,
     };

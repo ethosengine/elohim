@@ -175,6 +175,41 @@ async function probeCapability(slug: string): Promise<DeliveryInfo> {
 // Cache-first fetch for extracted delivery (Task 8)
 // ---------------------------------------------------------------------------
 
+/**
+ * Ask the scored delivery peers for a file, best-effort.
+ *
+ * Returns the first successful peer response (cached under its CID key on the
+ * way past), or null when no peer serves it -- an unreachable or unhelpful peer
+ * is an ordinary outcome here, not an error, so every failure just advances to
+ * the next candidate.
+ */
+async function tryDeliveryPeers(
+  cache: Cache,
+  blobHash: string,
+  identifier: string,
+  filePath: string
+): Promise<Response | null> {
+  const peers = await getDeliveryPeers(blobHash);
+  for (const peer of peers) {
+    if (!peer.baseUrl) continue;
+    if (!peer.servesExtracted || !peer.warm) continue;
+    try {
+      console.log(
+        `[apps-sw] peer-try: ${peer.peerId.slice(0, 12)} network=${peer.network} score=${peer.score}`
+      );
+      const resp = await fetch(`${peer.baseUrl}/apps/${identifier}/${filePath}`);
+      if (resp.ok) {
+        console.log(`[apps-sw] peer-hit: ${peer.peerId.slice(0, 12)} ${identifier}/${filePath}`);
+        void cache.put(buildCacheKey(blobHash, identifier, filePath), resp.clone());
+        return resp;
+      }
+    } catch {
+      continue; // peer unreachable, try the next one
+    }
+  }
+  return null;
+}
+
 async function handleAppFetch(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
@@ -198,7 +233,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
     const cidKey = new Request(`${self.location.origin}/apps/${blobHash}/${filePath}`);
     const cached = await cache.match(cidKey);
     if (cached) {
-      console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash || identifier}`);
+      console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash}`);
       return cached;
     }
   }
@@ -211,26 +246,8 @@ async function handleAppFetch(request: Request): Promise<Response> {
   }
 
   // 4. Try LAN/WAN peers in scored order (best-effort P2P delivery)
-  const peers = await getDeliveryPeers(blobHash);
-  for (const peer of peers) {
-    if (!peer.baseUrl) continue;
-    try {
-      console.log(
-        `[apps-sw] peer-try: ${peer.peerId.slice(0, 12)} network=${peer.network} score=${peer.score}`
-      );
-      if (peer.servesExtracted && peer.warm) {
-        const resp = await fetch(`${peer.baseUrl}/apps/${identifier}/${filePath}`);
-        if (resp.ok) {
-          console.log(`[apps-sw] peer-hit: ${peer.peerId.slice(0, 12)} ${identifier}/${filePath}`);
-          const cacheKey = buildCacheKey(blobHash, identifier, filePath);
-          void cache.put(cacheKey, resp.clone());
-          return resp;
-        }
-      }
-    } catch {
-      continue; // peer unreachable, try next
-    }
-  }
+  const fromPeer = await tryDeliveryPeers(cache, blobHash, identifier, filePath);
+  if (fromPeer) return fromPeer;
 
   // 5. Fall back to default path (doorway — the safety net)
   console.log(
@@ -322,6 +339,12 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
 
   const data = await resp.arrayBuffer();
   console.log(`[apps-sw] zip-fetch: ${blobUrl} size=${data.byteLength}`);
+  // Archive-expansion review: this archive is fetched from the household's own
+  // blob store by content address, for an app the peer explicitly installed, and
+  // is expanded into a private Cache Storage entry rather than onto a filesystem.
+  // A hostile archive would have to be admitted to the blob store first, which is
+  // a separate boundary with its own controls.
+  // eslint-disable-next-line sonarjs/no-unsafe-unzip -- see review note above
   const zip = await JSZip.loadAsync(data);
 
   // Cache under CID (immutable) when available, slug as fallback

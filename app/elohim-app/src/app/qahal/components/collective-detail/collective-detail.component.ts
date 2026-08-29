@@ -140,10 +140,7 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
 
       <!-- Feedback Mechanism Gateway (governance at the collective level) -->
       @if (collective()) {
-        <app-feedback-mechanism-gateway
-          [entityType]="'collective'"
-          [entityId]="collective()!.id"
-        />
+        <app-feedback-mechanism-gateway [entityType]="'collective'" [entityId]="collective()!.id" />
       }
     </div>
   `,

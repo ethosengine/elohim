@@ -16,6 +16,9 @@ import {
 import { AvodahApiService } from '../../services/avodah-api.service';
 import { StoryCardComponent } from '../story-card/story-card.component';
 
+/** CSS class marking the column currently under a drag. */
+const DROP_TARGET_CLASS = 'drop-target';
+
 @Component({
   selector: 'app-project-board',
   standalone: true,
@@ -258,16 +261,16 @@ export class ProjectBoardComponent implements OnInit {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
-    (event.currentTarget as HTMLElement).classList.add('drop-target');
+    (event.currentTarget as HTMLElement).classList.add(DROP_TARGET_CLASS);
   }
 
   onDragLeave(event: DragEvent): void {
-    (event.currentTarget as HTMLElement).classList.remove('drop-target');
+    (event.currentTarget as HTMLElement).classList.remove(DROP_TARGET_CLASS);
   }
 
   onDrop(event: DragEvent, column: BoardColumn): void {
     event.preventDefault();
-    (event.currentTarget as HTMLElement).classList.remove('drop-target');
+    (event.currentTarget as HTMLElement).classList.remove(DROP_TARGET_CLASS);
     const storyId = this.draggedStoryId;
     this.draggedStoryId = null;
     if (!storyId) return;

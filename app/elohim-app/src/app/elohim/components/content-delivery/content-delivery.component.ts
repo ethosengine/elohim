@@ -86,10 +86,10 @@ export class ContentDeliveryComponent implements OnInit, OnDestroy, AfterViewChe
 
   ngOnInit(): void {
     // Derive delivery source from current hostname
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard (globalThis.window property access is undefined, not a throw, in the SSR runtime)
-    if (globalThis.window !== undefined) {
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by the globalThis.window existence check above
-      this.deliverySource = `doorway ${globalThis.location.hostname}`;
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: the typeof guard is the check
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by the typeof check above
+      this.deliverySource = `doorway ${window.location.hostname}`;
     }
 
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {

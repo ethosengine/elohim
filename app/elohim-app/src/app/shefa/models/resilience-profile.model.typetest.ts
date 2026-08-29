@@ -21,6 +21,10 @@ import type {
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
 import type { LocalityLevel } from '@elohim/storage-client';
 
+// Shared fixture values, named so the type-level examples read as one scenario.
+const MEDICAL_CONTENT_ID = 'epr:medical-001';
+const RECORDED_AT = '2026-02-15T08:00:00Z';
+
 // =============================================================================
 // 1. ProtectionStatus exhaustiveness
 // =============================================================================
@@ -123,7 +127,7 @@ const _assessment: ElohimResilienceAssessment = {
     {
       severity: 'concerning',
       description: 'Medical records down to single peer',
-      affectedContentIds: ['epr:medical-001'],
+      affectedContentIds: [MEDICAL_CONTENT_ID],
       suggestedAction: 'Connect with institutional steward',
     } satisfies ResilienceConcern,
   ],
@@ -201,21 +205,21 @@ const _profileMinimal: ResilienceProfile = {
 
 const _activeMemory: ResilienceMemory = {
   id: 'mem-001',
-  recordedAt: '2026-02-15T08:00:00Z',
-  updatedAt: '2026-02-15T08:00:00Z',
+  recordedAt: RECORDED_AT,
+  updatedAt: RECORDED_AT,
   content: 'Two household peers went offline after a power outage. Medical records at risk.',
   relevance: 'active',
-  relatedContentIds: ['epr:medical-001', 'epr:medical-002'],
+  relatedContentIds: [MEDICAL_CONTENT_ID, 'epr:medical-002'],
   relatedHumanIds: ['human-peer-1', 'human-peer-2'],
 };
 
 const _resolvedMemory: ResilienceMemory = {
   id: 'mem-001',
-  recordedAt: '2026-02-15T08:00:00Z',
+  recordedAt: RECORDED_AT,
   updatedAt: '2026-03-01T14:00:00Z',
   content: 'Two household peers went offline after a power outage. Medical records at risk.',
   relevance: 'resolved',
-  relatedContentIds: ['epr:medical-001', 'epr:medical-002'],
+  relatedContentIds: [MEDICAL_CONTENT_ID, 'epr:medical-002'],
   relatedHumanIds: ['human-peer-1', 'human-peer-2'],
   supersededBy: 'mem-002',
 };

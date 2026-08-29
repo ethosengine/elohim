@@ -335,7 +335,10 @@ export class FeedbackMechanismGatewayComponent {
    */
   onChallengeDialogClick(event: MouseEvent): void {
     const ref = this.challengeDialog();
-    if (event.target === ref?.nativeElement) {
+    // Compare through EventTarget: `event.target` is typed EventTarget | null and
+    // the dialog as HTMLDialogElement, which the analyser reads as disjoint even
+    // though HTMLDialogElement extends EventTarget.
+    if (ref && event.target === (ref.nativeElement as EventTarget)) {
       this.closeChallengeForm();
     }
   }

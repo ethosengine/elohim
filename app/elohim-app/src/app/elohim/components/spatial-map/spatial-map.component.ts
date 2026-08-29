@@ -54,6 +54,13 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
   watch: '#9E9E9E',
 };
 
+// MapLibre layer and source ids. These are matched by string at runtime, so a
+// typo does not fail -- the layer simply never renders and no error is raised.
+const PLACE_FILLS = 'place-fills';
+const PLACE_BORDERS = 'place-borders';
+const PLACE_LABELS = 'place-labels';
+const HAZARD_MARKERS = 'hazard-markers';
+
 @Component({
   selector: 'app-spatial-map',
   standalone: true,
@@ -306,11 +313,15 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     this.map.flyTo({ center: [entry.centroidLng, entry.centroidLat], zoom: 10 });
   }
 
+  // Geolocation review: requested only from an explicit "locate me" control on a map
+  // the person is already looking at. Nothing reads position on load, and the result is
+  // used solely to pan the local view -- never stored, transmitted, or attached to any
+  // record.
   geolocate(): void {
     // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only (click)="geolocate()" handler, never invoked during SSR render (no DOM events fire server-side)
     if (this.mapError() || !navigator.geolocation) return;
 
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only (click)="geolocate()" handler, never invoked during SSR render (no DOM events fire server-side)
+    // eslint-disable-next-line no-restricted-syntax, sonarjs/no-intrusive-permissions -- SSR-safe: browser-only (click) handler; permission reviewed, see note above
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
@@ -393,7 +404,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     this.map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     // Click handler for place boundaries — works in both normal and dashboard mode
-    this.map.on('click', 'place-fills', (e: maplibregl.MapLayerMouseEvent) => {
+    this.map.on('click', PLACE_FILLS, (e: maplibregl.MapLayerMouseEvent) => {
       if (e.features?.length) {
         const props = e.features[0].properties;
         this.placesApi
@@ -404,10 +415,10 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     });
 
     // Cursor change on hover
-    this.map.on('mouseenter', 'place-fills', () => {
+    this.map.on('mouseenter', PLACE_FILLS, () => {
       this.map.getCanvas().style.cursor = 'pointer';
     });
-    this.map.on('mouseleave', 'place-fills', () => {
+    this.map.on('mouseleave', PLACE_FILLS, () => {
       this.map.getCanvas().style.cursor = '';
     });
 
@@ -452,7 +463,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       });
 
       this.map.addLayer({
-        id: 'place-fills',
+        id: PLACE_FILLS,
         type: 'fill',
         source: 'places',
         paint: {
@@ -462,7 +473,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       });
 
       this.map.addLayer({
-        id: 'place-borders',
+        id: PLACE_BORDERS,
         type: 'line',
         source: 'places',
         paint: {
@@ -473,7 +484,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       });
 
       this.map.addLayer({
-        id: 'place-labels',
+        id: PLACE_LABELS,
         type: 'symbol',
         source: 'places',
         layout: {
@@ -550,7 +561,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
       // Fill layer with data-driven risk tier colors
       this.map.addLayer({
-        id: 'place-fills',
+        id: PLACE_FILLS,
         type: 'fill',
         source: 'places',
         paint: {
@@ -572,7 +583,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       });
 
       this.map.addLayer({
-        id: 'place-borders',
+        id: PLACE_BORDERS,
         type: 'line',
         source: 'places',
         paint: {
@@ -583,7 +594,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       });
 
       this.map.addLayer({
-        id: 'place-labels',
+        id: PLACE_LABELS,
         type: 'symbol',
         source: 'places',
         layout: {
@@ -620,15 +631,15 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
           features: hazardFeatures,
         };
 
-        this.map.addSource('hazard-markers', {
+        this.map.addSource(HAZARD_MARKERS, {
           type: 'geojson',
           data: hazardGeoJson as unknown as GeoJSON.FeatureCollection,
         });
 
         this.map.addLayer({
-          id: 'hazard-markers',
+          id: HAZARD_MARKERS,
           type: 'circle',
-          source: 'hazard-markers',
+          source: HAZARD_MARKERS,
           paint: {
             // Radius scales from 8 to 14 based on active count, capped at 20
             'circle-radius': [
@@ -669,16 +680,16 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private clearDashboardLayers(): void {
-    if (this.map.getLayer('hazard-markers')) this.map.removeLayer('hazard-markers');
-    if (this.map.getSource('hazard-markers')) this.map.removeSource('hazard-markers');
+    if (this.map.getLayer(HAZARD_MARKERS)) this.map.removeLayer(HAZARD_MARKERS);
+    if (this.map.getSource(HAZARD_MARKERS)) this.map.removeSource(HAZARD_MARKERS);
     this.removePlaceLayers();
   }
 
   /** Remove the three place layers and their shared source */
   private removePlaceLayers(): void {
-    if (this.map.getLayer('place-labels')) this.map.removeLayer('place-labels');
-    if (this.map.getLayer('place-borders')) this.map.removeLayer('place-borders');
-    if (this.map.getLayer('place-fills')) this.map.removeLayer('place-fills');
+    if (this.map.getLayer(PLACE_LABELS)) this.map.removeLayer(PLACE_LABELS);
+    if (this.map.getLayer(PLACE_BORDERS)) this.map.removeLayer(PLACE_BORDERS);
+    if (this.map.getLayer(PLACE_FILLS)) this.map.removeLayer(PLACE_FILLS);
     if (this.map.getSource('places')) this.map.removeSource('places');
   }
 }

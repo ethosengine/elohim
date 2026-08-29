@@ -224,7 +224,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
     }
   }
 
-  async onOAuthStart(e: Event): Promise<void> {
+  onOAuthStart(e: Event): void {
     // The login-card emits the doorwayUrl it resolved during the resolve step.
     // Fall back to the registry's current selection when not present.
     const detail = (e as CustomEvent<{ providerId: string; doorwayUrl?: string }>).detail;
@@ -260,6 +260,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
     if (!this.resolverRef) return;
 
     const el = this.resolverRef.nativeElement as unknown as Record<string, unknown>;
+    // The Lit element awaits this imperative callback, so the promise IS the
+    // contract; today's implementation happens to resolve synchronously.
+    // eslint-disable-next-line @typescript-eslint/require-await -- see above
     el['resolveIdentifier'] = async (id: string) => {
       try {
         const parsed = parseFederatedIdentifier(id);

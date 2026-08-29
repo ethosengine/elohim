@@ -193,6 +193,11 @@ export class FaceCardComponent implements OnChanges {
     if (!name) return FaceCardComponent.COLORS[0];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
+      // codePointAt is not a drop-in here: this loop steps by UTF-16 unit, and at a
+      // surrogate lead codePointAt returns the whole astral code point, so that
+      // character would be folded into the hash twice. charCodeAt is correct for
+      // unit-wise hashing.
+      // eslint-disable-next-line unicorn/prefer-code-point -- see above
       hash = (hash << 5) - hash + name.charCodeAt(i);
       hash |= 0; // Convert to 32-bit integer
     }

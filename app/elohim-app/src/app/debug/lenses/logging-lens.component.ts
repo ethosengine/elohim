@@ -55,6 +55,13 @@ export class LoggingLensComponent implements OnInit {
   setFilter(f: LogLevel | 'all'): void {
     this.levelFilter.set(f);
   }
+  /**
+   * Read the level from a <select> change event. The cast lives here rather than
+   * as `$any(...)` in the template, so the compiler actually checks it.
+   */
+  onFilterChange(event: Event): void {
+    this.setFilter((event.target as HTMLSelectElement).value as LogLevel | 'all');
+  }
   clear(): void {
     this.logger.clearRecentLogs();
   }
