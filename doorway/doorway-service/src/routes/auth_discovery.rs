@@ -270,13 +270,19 @@ mod tests {
     fn a_matching_validator_is_recognised_in_every_legal_header_shape() {
         let tag = "\"abc123\"";
         assert!(etag_matches(tag, tag), "the simple case must match");
-        assert!(etag_matches("*", tag), "`*` matches any current representation");
+        assert!(
+            etag_matches("*", tag),
+            "`*` matches any current representation"
+        );
         assert!(
             etag_matches("\"other\", \"abc123\"", tag),
             "If-None-Match is a LIST — a naive equality check answers 200 to a well-formed \
              conditional request and the validator never fires"
         );
-        assert!(!etag_matches("\"stale\"", tag), "a stale validator must NOT match");
+        assert!(
+            !etag_matches("\"stale\"", tag),
+            "a stale validator must NOT match"
+        );
         assert!(!etag_matches("", tag), "an empty header must not match");
     }
 

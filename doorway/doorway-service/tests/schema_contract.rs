@@ -12,11 +12,11 @@
 //! The harness inlines `$ref` before compiling because the jsonschema
 //! crate doesn't resolve file-based references automatically.
 
+use doorway::routes::auth_discovery::{AuthDiscovery, AuthEndpoints};
 use doorway::routes::auth_routes::{
     AccountResponse, AuthResponse, AuthorityRef, ExchangeSessionResponse, HumanProfileResponse,
     MeResponse, SessionTokenResponse,
 };
-use doorway::routes::auth_discovery::{AuthDiscovery, AuthEndpoints};
 use doorway::routes::health::P2PHealth;
 use doorway::routes::self_healing::{
     AdmissionView, ConductorView, PeerView, ProjectorView, RenderView, SelfHealingView,
@@ -661,7 +661,10 @@ fn auth_discovery_without_doorway_id_matches_schema() {
     };
 
     let json = serde_json::to_value(&doc).unwrap();
-    assert!(json.get("doorwayId").is_none(), "absent id must be omitted, not null");
+    assert!(
+        json.get("doorwayId").is_none(),
+        "absent id must be omitted, not null"
+    );
     validate_against_schema("views/auth-discovery.schema.json", &json);
 }
 

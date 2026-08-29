@@ -849,7 +849,11 @@ pub async fn ensure_peer_key_cached(
             // with a different key — serve the incumbent, never the
             // challenger, and never fall through to `mark_negative` (which
             // would let a challenger evict a live anchor).
-            found = if accepted { Some(pubkey) } else { cache.get(kid) };
+            found = if accepted {
+                Some(pubkey)
+            } else {
+                cache.get(kid)
+            };
         }
     }
     if found.is_none() {
