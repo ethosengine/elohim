@@ -51,6 +51,7 @@ embodies the wrong human cannot be re-keyed: this mesh must be regenerated to re
 | `CONTENT_BLOB_HASH`/`CONTENT_BLOB_SIZE_BYTES` = the server bundle | before `seed-commitments` | CI exports these from its upload stage; the chain never did |
 | household fixture manifest (`E2E_HOUSEHOLD_FIXTURE_PATH`, `processControl: true`, `E2E_STORAGE_<PEER>`, `E2E_DOORWAY_POOL_STORAGE_URLS`, `E2E_DOORWAY_B` + `_BETA`) | a2o run env | 7 env-reds (peer-loss-failover, doorway-pool-degrade) |
 | `seed-operator-bindings` → `seed-projections` explicitly | seed chain | `--ids` seeding skips both; router empty → `/` sheds |
+| per-peer cgroup sub-tree `<pod>/mesh/<peer>` with `memory.max` from a `compute_envelope` (default unbounded) and `oom.group=1` inside the guest | mesh peer launch | 2026-08-29: the pod's own `oom.group=1` turned one hot rustc into a whole-workspace restart; a guest that dies alone is the cheap rung of [compute-envelope-virtual-peer-contract](epr:compute-envelope-virtual-peer-contract) — `ram-guard` then sheds guests by peer id, not process name |
 
 Scoping trap for every re-measure: `cucumber-js -p local <files>` runs the whole suite (profile paths merge);
 use `--config <empty .mjs, path relative to the REPO ROOT>` or `-p local --name '^…$'`.

@@ -12,6 +12,7 @@ informs:
   - genesis/data/rakia/compute-capacity.json
   - genesis/data/devices/archetype-resource-budgets.json
   - genesis/orchestrator/data/deployments.json
+  - genesis/data/timeline/backlog/2026-08-29-compute-envelope-virtual-peer-contract.md
 ---
 
 # Alpha Test-Bench Compute Envelope
@@ -47,3 +48,15 @@ acknowledgement is a governance action, not a claim that the hard constraint dis
 The future protocol form remains the existing bounded compute `Commitment` plus linked
 `FeedbackSignal`; this repository gate introduces no new DHT entry type, HTTP route, or database
 authority.
+
+## The same envelope, one level down (2026-08-29)
+
+The cluster envelope above bounds what the test bench can *host*. The same shape recurs inside a
+host: a virtual peer (a test-fixture persona, a dispatched rakia build step) runs on a consenting
+host's machine under an envelope the host lends it — memory, CPU, disk, wall-clock — with the
+host's own conductor, storage and sessions declared as protected, and the guest's shed order
+declared by the guest. That is a `delegates-compute` commitment with the six fields the
+devworkspace RAM guard already enforces mechanically (bound · committed-not-gross measure ·
+protected set · shed order · graded soft/high/hard · reciprocity ledger). Genesis, field mapping,
+P2P-gate answers and rungs: `genesis/data/timeline/backlog/2026-08-29-compute-envelope-virtual-peer-contract.md`;
+the rakia side (claim/dispatch/result each carrying one half) is in the rakia Stage 2 plan.
