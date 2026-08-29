@@ -9,7 +9,8 @@
     "triggerDescription": "Use when a recent sprint was marked complete but the feature isn't actually visible or usable in the app — CI green doesn't match human-visible delivery, components built but not wired, scenarios passing but the user can't see what was promised",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/deliver/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/deliver"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/deliver/SKILL.md",
+      "frontmatter": {
+        "name": "deliver",
+        "description": "Use when a recent sprint was marked complete but the feature isn't actually visible or usable in the app — CI green doesn't match human-visible delivery, components built but not wired, scenarios passing but the user can't see what was promised",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/deliver.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/deliver"

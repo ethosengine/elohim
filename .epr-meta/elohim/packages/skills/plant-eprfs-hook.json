@@ -9,7 +9,8 @@
     "triggerDescription": "Plant ONE runtime-authored hook in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the hook's executable code AND its settings.json registration; the .claude/hooks file stays byte-identical and the wiring is recorded, never rewritten). The hook member of the plant-eprfs family; verbatim-passthrough fidelity, registration reconciled read-only. Use when \"plant hook X\", rooting a .claude/hooks executable (PreToolUse / PostToolUse gate) in its package, or recording a hook's settings.json registration under package authority. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agent (subagents), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-command (slash commands).",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "elohim-agent",
     "assetRefs": [],
@@ -52,6 +53,21 @@
         "metadata": {
           "runtime": "codex",
           "sourceRuntime": "elohim-agent",
+          "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-hook.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/plant-eprfs-hook"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/plant-eprfs-hook/SKILL.md",
+      "frontmatter": {
+        "name": "plant-eprfs-hook",
+        "description": "Plant ONE runtime-authored hook in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the hook's executable code AND its settings.json registration; the .claude/hooks file stays byte-identical and the wiring is recorded, never rewritten). The hook member of the plant-eprfs family; verbatim-passthrough fidelity, registration reconciled read-only. Use when \"plant hook X\", rooting a .claude/hooks executable (PreToolUse / PostToolUse gate) in its package, or recording a hook's settings.json registration under package authority. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agent (subagents), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-command (slash commands).",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "elohim-agent",
+          "master": "package",
           "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-hook.json",
           "packageKind": "SkillPackage"
         },

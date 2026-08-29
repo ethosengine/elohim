@@ -9,7 +9,8 @@
     "triggerDescription": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/orchestrate/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/orchestrate"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/orchestrate/SKILL.md",
+      "frontmatter": {
+        "name": "orchestrate",
+        "description": "Establishes senior-decision-maker (chief-agent) discipline for an expensive top-tier model (Fable 5 / Opus). Keep premium reasoning for intent, architecture, decomposition, tradeoffs, risk, disagreement-resolution, and final review; delegate discovery, implementation, tests, logs, and verification to cheaper tiers. Use when you are the top-tier model driving multi-step work, when told to \"orchestrate\" / \"delegate this\" / \"run this as chief agent\", or any time you're about to spend premium reasoning on labor whose result is checkable from evidence.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/orchestrate.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/orchestrate"

@@ -9,7 +9,8 @@
     "triggerDescription": "Use when starting a planning or brainstorm pass on a feature or subsystem (or grounding external prior-art) and you need current ground-truth across the architecture's relevant seams before designing — \"we're exploring X, ground my understanding\", \"map the seams for X\", or as the grounding step before /brainstorm, /shift, or app-port.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,14 +53,15 @@
         "governance": "epr:elohim-agent/skills/atlas-grounding"
       }
     },
-    "codexProject": {
+    "antigravity": {
       "path": ".agents/skills/atlas-grounding/SKILL.md",
       "frontmatter": {
         "name": "atlas-grounding",
         "description": "Use when starting a planning or brainstorm pass on a feature or subsystem (or grounding external prior-art) and you need current ground-truth across the architecture's relevant seams before designing — \"we're exploring X, ground my understanding\", \"map the seams for X\", or as the grounding step before /brainstorm, /shift, or app-port.",
         "metadata": {
-          "runtime": "codex",
+          "runtime": "antigravity",
           "sourceRuntime": "claude",
+          "master": "package",
           "sourcePath": ".epr-meta/elohim/packages/skills/atlas-grounding.json",
           "packageKind": "SkillPackage"
         },

@@ -9,10 +9,13 @@
     "triggerDescription": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
-    "assetRefs": [],
+    "assetRefs": [
+      "references/document-lifecycle.md"
+    ],
     "author": "elohim-protocol",
     "governance": {
       "eprRef": "epr:elohim-agent/skills/automerge-sync",
@@ -56,6 +59,27 @@
         },
         "governance": "epr:elohim-agent/skills/automerge-sync"
       }
+    },
+    "antigravity": {
+      "path": ".agents/skills/automerge-sync/SKILL.md",
+      "frontmatter": {
+        "name": "automerge-sync",
+        "description": "Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks \"how does sync work\", \"handle merge conflicts\", \"manage stream positions\", \"offline-first content\", or implements CRDT document flows.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/automerge-sync.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/automerge-sync"
+      }
     }
-  }
+  },
+  "assets": [
+    {
+      "path": "references/document-lifecycle.md",
+      "contentBase64": "IyBEb2N1bWVudCBMaWZlY3ljbGUgJiBTdG9yYWdlIEJhY2tlbmRzCgojIyBDcmVhdGluZyBDb250ZW50CgpgYGBydXN0Ci8vIDEuIENyZWF0ZSBBdXRvbWVyZ2UgZG9jdW1lbnQKbGV0IG11dCBkb2MgPSBBdXRvbWVyZ2VEb2M6Om5ldygpOwpkb2MucHV0X29iamVjdChST09ULCAiaWQiLCBjb250ZW50X2lkKT87CmRvYy5wdXRfb2JqZWN0KFJPT1QsICJ0aXRsZSIsIHRpdGxlKT87CmRvYy5wdXRfb2JqZWN0KFJPT1QsICJjb250ZW50IiwgY29udGVudCk/OwoKLy8gMi4gU3RvcmUgbG9jYWxseQpkb2Nfc3RvcmUuc2F2ZShjb250ZW50X2lkLCAmZG9jKT87CgovLyAzLiBBZGQgdG8gZXZlbnQgbG9nCnN0cmVhbS5wdXNoKFN5bmNFdmVudCB7CiAgICBwb3NpdGlvbjogc3RyZWFtLm5leHRfcG9zaXRpb24oKSwKICAgIGRvY19pZDogY29udGVudF9pZC5jbG9uZSgpLAogICAgY2hhbmdlX2hhc2g6IGRvYy5nZXRfaGVhZHMoKVswXS5jbG9uZSgpLAogICAga2luZDogRXZlbnRLaW5kOjpMb2NhbCwKICAgIHRpbWVzdGFtcDogbm93KCksCn0pOwoKLy8gNC4gQW5ub3VuY2UgdG8gcGVlcnMKdHJhbnNwb3J0LmJyb2FkY2FzdChTeW5jTWVzc2FnZTo6QW5ub3VuY2UgeyBldmVudCB9KT87CmBgYAoKIyMgUmVjZWl2aW5nIENvbnRlbnQKCmBgYHJ1c3QKLy8gMS4gUmVjZWl2ZSBhbm5vdW5jZW1lbnQKbGV0IGV2ZW50ID0gcmVjZWl2ZV9hbm5vdW5jZSgpOwoKLy8gMi4gQ2hlY2sgaWYgd2UgaGF2ZSB0aGlzIGRvY3VtZW50CmlmICFkb2Nfc3RvcmUuaGFzKCZldmVudC5kb2NfaWQpIHsKICAgIC8vIEZ1bGwgZG9jdW1lbnQgcmVxdWVzdCAoZW1wdHkgaGVhZHMgPSBnaXZlIG1lIGV2ZXJ5dGhpbmcpCiAgICBsZXQgY2hhbmdlcyA9IHJlcXVlc3RfZG9jKCZldmVudC5kb2NfaWQsIHZlYyFbXSk/OwogICAgbGV0IGRvYyA9IEF1dG9tZXJnZURvYzo6bG9hZCgmY2hhbmdlcyk/OwogICAgZG9jX3N0b3JlLnNhdmUoJmV2ZW50LmRvY19pZCwgJmRvYyk/Owp9IGVsc2UgewogICAgLy8gSW5jcmVtZW50YWwgc3luYyAoc2VuZCBvdXIgaGVhZHMsIGdldCBvbmx5IG1pc3NpbmcgY2hhbmdlcykKICAgIGxldCBjdXJyZW50ID0gZG9jX3N0b3JlLmdldCgmZXZlbnQuZG9jX2lkKT87CiAgICBsZXQgaGVhZHMgPSBjdXJyZW50LmdldF9oZWFkcygpOwogICAgbGV0IGNoYW5nZXMgPSByZXF1ZXN0X2RvYygmZXZlbnQuZG9jX2lkLCBoZWFkcyk/OwogICAgY3VycmVudC5tZXJnZSgmY2hhbmdlcyk/OwogICAgZG9jX3N0b3JlLnNhdmUoJmV2ZW50LmRvY19pZCwgJmN1cnJlbnQpPzsKfQoKLy8gMy4gQWRkIHRvIGV2ZW50IGxvZwpzdHJlYW0ucHVzaChTeW5jRXZlbnQgewogICAga2luZDogRXZlbnRLaW5kOjpOZXcsCiAgICAuLgp9KTsKYGBgCgotLS0KCiMjIFN0b3JhZ2UgQmFja2VuZDogTmF0aXZlIChTUUxpdGUpCgpgYGBzcWwKQ1JFQVRFIFRBQkxFIGRvY3VtZW50cyAoCiAgICBpZCBURVhUIFBSSU1BUlkgS0VZLAogICAgYXV0b21lcmdlX2RhdGEgQkxPQiBOT1QgTlVMTCwKICAgIHVwZGF0ZWRfYXQgSU5URUdFUiBOT1QgTlVMTAopOwoKQ1JFQVRFIFRBQkxFIGV2ZW50cyAoCiAgICBwb3NpdGlvbiBJTlRFR0VSIFBSSU1BUlkgS0VZLAogICAgZG9jX2lkIFRFWFQgTk9UIE5VTEwsCiAgICBjaGFuZ2VfaGFzaCBURVhUIE5PVCBOVUxMLAogICAga2luZCBURVhUIE5PVCBOVUxMLAogICAgdGltZXN0YW1wIElOVEVHRVIgTk9UIE5VTEwKKTsKCkNSRUFURSBJTkRFWCBpZHhfZXZlbnRzX2RvYyBPTiBldmVudHMoZG9jX2lkKTsKYGBgCgojIyBTdG9yYWdlIEJhY2tlbmQ6IEJyb3dzZXIgKEluZGV4ZWREQikKCmBgYHR5cGVzY3JpcHQKaW50ZXJmYWNlIERvY1N0b3JlIHsKICBkb2N1bWVudHM6IHsKICAgIGlkOiBzdHJpbmc7CiAgICBhdXRvbWVyZ2VEYXRhOiBVaW50OEFycmF5OwogICAgdXBkYXRlZEF0OiBudW1iZXI7CiAgfTsKICBldmVudHM6IHsKICAgIHBvc2l0aW9uOiBudW1iZXI7CiAgICBkb2NJZDogc3RyaW5nOwogICAgY2hhbmdlSGFzaDogc3RyaW5nOwogICAga2luZDogRXZlbnRLaW5kOwogICAgdGltZXN0YW1wOiBudW1iZXI7CiAgfTsKfQpgYGAKCi0tLQoKIyMgQnJvd3Nlci1TaWRlIEludGVncmF0aW9uCgojIyMgT2ZmbGluZU9wZXJhdGlvblF1ZXVlU2VydmljZQoKUXVldWVzIG9wZXJhdGlvbnMgd2hpbGUgb2ZmbGluZSwgcmVwbGF5cyB3aGVuIGNvbm5lY3RlZDoKCmBgYHR5cGVzY3JpcHQKLy8gUXVldWUgd3JpdGUgd2hpbGUgb2ZmbGluZQpvZmZsaW5lUXVldWUuZW5xdWV1ZSh7CiAgdHlwZTogJ3VwZGF0ZS1tYXN0ZXJ5JywKICBkb2NJZDogJ21hc3Rlcnk6dXNlcjEyMy9jb25jZXB0LXgnLAogIGNoYW5nZXM6IGF1dG9tZXJnZUNoYW5nZXMsCn0pOwoKLy8gT24gcmVjb25uZWN0OiByZXBsYXkgcXVldWUKb2ZmbGluZVF1ZXVlLmZsdXNoKGFzeW5jIChvcCkgPT4gewogIGF3YWl0IGNsaWVudC5hcHBseUNoYW5nZXMob3AuZG9jSWQsIG9wLmNoYW5nZXMpOwp9KTsKYGBgCgojIyMgSW5kZXhlZERCIGZvciBQZXJzaXN0ZW5jZQoKQnJvd3NlciBzdG9yZXMgQXV0b21lcmdlIGRvY3MgaW4gSW5kZXhlZERCIGZvciBvZmZsaW5lIGFjY2VzczoKCmBgYHR5cGVzY3JpcHQKLy8gU2F2ZSBkb2MgbG9jYWxseQphd2FpdCBpZGIucHV0KCdkb2N1bWVudHMnLCB7IGlkOiBkb2NJZCwgZGF0YTogZG9jLnNhdmUoKSwgdXBkYXRlZEF0OiBEYXRlLm5vdygpIH0pOwoKLy8gTG9hZCBkb2Mgb24gc3RhcnR1cApjb25zdCBzdG9yZWQgPSBhd2FpdCBpZGIuZ2V0KCdkb2N1bWVudHMnLCBkb2NJZCk7CmNvbnN0IGRvYyA9IEF1dG9tZXJnZS5sb2FkKHN0b3JlZC5kYXRhKTsKYGBgCg=="
+    }
+  ]
 }

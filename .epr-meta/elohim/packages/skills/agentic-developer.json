@@ -9,7 +9,8 @@
     "triggerDescription": "First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Stability-gated \"done\", path-scoped authority, palette-based command permission, deterministic ci-harvest ledger with floor/ceiling rails; produces a single sprint-result markdown artifact. Invoked by the /shift slash command. Use when \"kick off shift X\", \"run /shift\", \"start an agentic developer on Y\", \"drain the CI findings ledger\", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/agentic-developer/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/agentic-developer"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/agentic-developer/SKILL.md",
+      "frontmatter": {
+        "name": "agentic-developer",
+        "description": "First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion. Stability-gated \"done\", path-scoped authority, palette-based command permission, deterministic ci-harvest ledger with floor/ceiling rails; produces a single sprint-result markdown artifact. Invoked by the /shift slash command. Use when \"kick off shift X\", \"run /shift\", \"start an agentic developer on Y\", \"drain the CI findings ledger\", or supervising a long-running implementation against CI. NOT for one-shot tasks (use direct implementation) or surface CI triage (use ci-triage).",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/agentic-developer.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/agentic-developer"

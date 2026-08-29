@@ -9,7 +9,8 @@
     "triggerDescription": "Coordinate team-based quality campaigns across the three-tier pipeline — escalate from quality-sweep (Haiku, mechanical) to quality-deep (Sonnet, complex tests/refactor) to quality-architect (Opus, systemic gaps). Use when \"run a quality campaign\", \"coverage push on X module\", \"orchestrate quality work across multiple agents\", or planning multi-tier quality effort over a sprint.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/quality-orchestrator/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/quality-orchestrator"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/quality-orchestrator/SKILL.md",
+      "frontmatter": {
+        "name": "quality-orchestrator",
+        "description": "Coordinate team-based quality campaigns across the three-tier pipeline — escalate from quality-sweep (Haiku, mechanical) to quality-deep (Sonnet, complex tests/refactor) to quality-architect (Opus, systemic gaps). Use when \"run a quality campaign\", \"coverage push on X module\", \"orchestrate quality work across multiple agents\", or planning multi-tier quality effort over a sprint.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/quality-orchestrator.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/quality-orchestrator"

@@ -9,7 +9,8 @@
     "triggerDescription": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,6 +53,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/libp2p-transport/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-transport"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/libp2p-transport/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-transport",
+        "description": "Reference for libp2p swarm setup, transport configuration, and behaviour composition in steward/node and elohim-storage (both resolve libp2p 0.54.1). Use when someone asks \"configure the swarm\", \"add a new behaviour\", \"set up transport\", or debugs P2P connection issues.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/libp2p-transport.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/libp2p-transport"

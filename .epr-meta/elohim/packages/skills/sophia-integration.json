@@ -9,7 +9,8 @@
     "triggerDescription": "REFERENCE for integrating the Sophia assessment engine into Angular FRONTEND — the sophia-question web component API, Recognition callbacks, three assessment modes (mastery / discovery / reflection). Use when \"render a quiz\", \"add an assessment to a learning path\", \"handle Recognition callbacks\", \"implement mastery scoring\", or working with psychometric instruments + session management in the UI. For backend storage of mastery records, use holochain-storage-api.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,6 +53,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/sophia-integration/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/sophia-integration"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/sophia-integration/SKILL.md",
+      "frontmatter": {
+        "name": "sophia-integration",
+        "description": "REFERENCE for integrating the Sophia assessment engine into Angular FRONTEND — the sophia-question web component API, Recognition callbacks, three assessment modes (mastery / discovery / reflection). Use when \"render a quiz\", \"add an assessment to a learning path\", \"handle Recognition callbacks\", \"implement mastery scoring\", or working with psychometric instruments + session management in the UI. For backend storage of mastery records, use holochain-storage-api.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/sophia-integration.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/sophia-integration"

@@ -28,10 +28,16 @@
         "triggerDescription": { "type": "string", "minLength": 1 },
         "runtimeTargets": {
           "type": "array",
-          "minItems": 1,
-          "items": { "enum": ["claude", "codex"] }
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["claude", "codex", "antigravity"] },
+          "allOf": [
+            { "contains": { "const": "claude" } },
+            { "contains": { "const": "codex" } },
+            { "contains": { "const": "antigravity" } }
+          ]
         },
-        "sourceRuntime": { "enum": ["claude", "codex", "elohim-agent"] },
+        "sourceRuntime": { "enum": ["claude", "codex", "antigravity", "elohim-agent"] },
         "assetRefs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
@@ -48,13 +54,29 @@
       },
       "additionalProperties": false
     },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "contentBase64"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!SKILL\\.md$).+$"
+          },
+          "contentBase64": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
     "projections": {
       "type": "object",
-      "required": ["claude", "codex"],
+      "required": ["claude", "codex", "antigravity"],
       "properties": {
         "claude": { "$ref": "#/$defs/projection" },
         "codex": { "$ref": "#/$defs/projection" },
-        "codexProject": { "$ref": "#/$defs/projection" }
+        "antigravity": { "$ref": "#/$defs/projection" }
       },
       "additionalProperties": false
     }

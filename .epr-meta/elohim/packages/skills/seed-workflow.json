@@ -9,7 +9,8 @@
     "triggerDescription": "Validate, seed, and verify Elohim content through the safe root just workflow; includes the no-dry-run safety boundary, statistics, diagnosis, and snapshot cautions.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/seed-workflow/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/seed-workflow"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/seed-workflow/SKILL.md",
+      "frontmatter": {
+        "name": "seed-workflow",
+        "description": "Validate, seed, and verify Elohim content through the safe root just workflow; includes the no-dry-run safety boundary, statistics, diagnosis, and snapshot cautions.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/seed-workflow.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/seed-workflow"

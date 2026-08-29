@@ -8,7 +8,7 @@
 //! Content addressing is single-sourced through [`eprfs_core::BlobCid::compute`]
 //! (CIDv1 / dag-cbor / sha2-256) — this crate never re-implements a CID.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use eprfs_core::{
     BlobCid, CompositionGraph, CompositionNode, DerivationEdge, EntryKind, EprRef, EprfsError,
@@ -88,8 +88,9 @@ struct ComposeKind {
 }
 
 /// The compose table — the single place the producer learns about artifact
-/// kinds. Skills/agents each project into Claude + Codex (2 edges); hooks and
-/// agentdocs project a single file (1 edge). The exact number of runtimes is NOT
+/// kinds. Skills currently project into Claude + Codex + Antigravity; agents
+/// project into the runtimes whose executable-agent ABI is actually supported;
+/// hooks and agentdocs may project a single file. The exact number of runtimes is NOT
 /// hardcoded here: it's read from each package's declared `projections` map, so a
 /// kind that grows a new runtime target needs no code change.
 const COMPOSE_KINDS: &[ComposeKind] = &[
@@ -321,6 +322,46 @@ fn collect_compose_kind(
                 composed_by,
                 json!({ "runtime": runtime }),
             ));
+
+            for (asset_path, _) in declared_assets(&package) {
+                let Some(parent) = mirror.parent() else {
+                    continue;
+                };
+                let asset_mirror = safe_descendant(parent, &asset_path)?;
+                if !asset_mirror.exists() {
+                    continue;
+                }
+                let asset_bytes = read_bytes(&asset_mirror)?;
+                let asset_cid = BlobCid::compute(&asset_bytes);
+                let declared_asset_path = Path::new(&declared)
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .join(&asset_path);
+
+                graph.add_node(CompositionNode::new(
+                    asset_cid.clone(),
+                    ProjectionSource::new(
+                        NAMESPACE,
+                        ProjectionSourceKind::Content,
+                        format!("{id}@{runtime}:{asset_path}"),
+                    ),
+                    json!({
+                        "role": "projection-asset",
+                        "kind": kind,
+                        "id": id,
+                        "runtime": runtime,
+                        "path": asset_mirror.to_string_lossy(),
+                        "declaredPath": declared_asset_path.to_string_lossy(),
+                        "assetPath": asset_path,
+                    }),
+                ));
+                graph.add_edge(DerivationEdge::projection(
+                    package_cid.clone(),
+                    asset_cid,
+                    composed_by,
+                    json!({ "runtime": runtime, "assetPath": asset_path }),
+                ));
+            }
         }
     }
 
@@ -358,6 +399,33 @@ fn declared_projection_path(package: &Value, runtime: &str) -> Option<String> {
         .and_then(|entry| entry.get("path"))
         .and_then(Value::as_str)
         .map(str::to_string)
+}
+
+fn declared_assets(package: &Value) -> Vec<(String, String)> {
+    package
+        .get("assets")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|asset| {
+            Some((
+                asset.get("path")?.as_str()?.to_string(),
+                asset.get("contentBase64")?.as_str()?.to_string(),
+            ))
+        })
+        .collect()
+}
+
+fn safe_descendant(root: &Path, relative: &str) -> Result<PathBuf> {
+    let path = Path::new(relative);
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        return Err(EprfsError::InvalidProjectionPath(relative.to_string()));
+    }
+    Ok(root.join(path))
 }
 
 /// Build the projections-root MIRROR path for one projected artifact. The leaf
@@ -609,13 +677,24 @@ mod tests {
             fs::write(&p, bytes).unwrap();
         };
 
-        // A skill: claude + codex projections (nested-by-id, SKILL.md leaf).
+        // A skill: Claude + Codex + Antigravity projections, with one packaged
+        // reference asset copied beside every runtime's SKILL.md.
         write(
             "skills/alpha.json",
-            br#"{"kind":"SkillPackage","metadata":{"id":"alpha","master":"package","sourceRuntime":"claude","composedBy":"claude-opus-4-8"},"projections":{"claude":{"path":".claude/skills/alpha/SKILL.md"},"codex":{"path":".codex/skills/alpha/SKILL.md"}}}"#,
+            br#"{"kind":"SkillPackage","metadata":{"id":"alpha","master":"package","sourceRuntime":"claude","composedBy":"claude-opus-4-8"},"assets":[{"path":"references/example.md","contentBase64":"IyBleGFtcGxlCg=="}],"projections":{"claude":{"path":".claude/skills/alpha/SKILL.md"},"codex":{"path":".codex/skills/alpha/SKILL.md"},"antigravity":{"path":".agents/skills/alpha/SKILL.md"}}}"#,
         );
         write_proj("claude/skills/alpha/SKILL.md", b"# alpha claude\n");
         write_proj("codex/skills/alpha/SKILL.md", b"# alpha codex\n");
+        write_proj(
+            "antigravity/skills/alpha/SKILL.md",
+            b"# alpha antigravity\n",
+        );
+        for runtime in ["claude", "codex", "antigravity"] {
+            write_proj(
+                &format!("{runtime}/skills/alpha/references/example.md"),
+                b"# example\n",
+            );
+        }
 
         // A hook: single claude projection (flat, .py leaf).
         write(
@@ -672,17 +751,24 @@ mod tests {
 
         assert!(graph.validate().is_ok(), "graph must satisfy invariants");
 
-        // 6 package nodes + 10 projection nodes (2 skill + 1 hook + 1 agentdoc
-        // + 2 command + 2 MCP server + 2 MCP profile).
-        assert_eq!(graph.nodes.len(), 16, "6 packages + 10 projections");
-        assert_eq!(graph.edges.len(), 10, "one edge per existing projection");
+        // 6 package nodes + 14 projection nodes (3 skill entrypoints + 3 skill
+        // assets + 1 hook + 1 agentdoc + 2 command + 2 MCP server + 2 profile).
+        assert_eq!(graph.nodes.len(), 20, "6 packages + 14 projections");
+        assert_eq!(
+            graph.edges.len(),
+            14,
+            "one edge per existing projection or asset"
+        );
 
         // Every edge's source is a package node cid, derived a projection cid,
         // and the package's cid is the canonical CID of its bytes.
         let alpha_bytes = fs::read(pkg_root.join("skills/alpha.json")).unwrap();
         let alpha_cid = BlobCid::compute(&alpha_bytes);
         let alpha_edges = graph.edges.iter().filter(|e| e.source == alpha_cid).count();
-        assert_eq!(alpha_edges, 2, "alpha skill has claude + codex edges");
+        assert_eq!(
+            alpha_edges, 6,
+            "alpha skill has three runtime entrypoints plus three asset edges"
+        );
 
         // The package node carries master/composedBy in metadata.
         let alpha_node = graph

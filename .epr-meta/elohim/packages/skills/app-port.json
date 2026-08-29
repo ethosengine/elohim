@@ -9,7 +9,8 @@
     "triggerDescription": "Use when bringing an external app or prior-art onto the Elohim Protocol — \"how would Hylo / this repo work native here\", \"port my app to elohim\", \"decompose this product onto the protocol\", onboarding an external developer's codebase or product vision. For an INTERNAL feature exploration (not external prior-art), use atlas-grounding instead.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/app-port/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/app-port"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/app-port/SKILL.md",
+      "frontmatter": {
+        "name": "app-port",
+        "description": "Use when bringing an external app or prior-art onto the Elohim Protocol — \"how would Hylo / this repo work native here\", \"port my app to elohim\", \"decompose this product onto the protocol\", onboarding an external developer's codebase or product vision. For an INTERNAL feature exploration (not external prior-art), use atlas-grounding instead.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/app-port.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/app-port"

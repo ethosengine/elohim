@@ -9,7 +9,8 @@
     "triggerDescription": "Drives the whole development cycle to stasis against the developer docs in one loop — the operator-as-conveyor role, formalized. Each round reads the class-aware delivery scoreboard (per-job CI verdicts, env-red≠code-red, ledgers), dispatches the equipped station for the highest-leverage pressure (/converge, /deliver, /close-loop, scope-reconcile, triage, memory loops; pre-authors /shift Objectives), re-measures until only ceiling items remain — then presents the ceiling menu (the 2-5 decisions only the operator can make). Under explicit launch-time BUILD authorization (overnight /loop), each cycle adds a build leg: fires the top vision-ranked OPEN Objective as an agentic-developer arc under an evidence-gated push lease. Use when \"drive the dev cycle to stasis\", \"delivery stasis pass\", \"run the conveyor\", at session boundaries, or looped overnight with build mode granted. NOT for a single station's work (invoke it directly) or memory-only hygiene (use /memory-stasis-loop).",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/delivery-stasis/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/delivery-stasis"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/delivery-stasis/SKILL.md",
+      "frontmatter": {
+        "name": "delivery-stasis",
+        "description": "Drives the whole development cycle to stasis against the developer docs in one loop — the operator-as-conveyor role, formalized. Each round reads the class-aware delivery scoreboard (per-job CI verdicts, env-red≠code-red, ledgers), dispatches the equipped station for the highest-leverage pressure (/converge, /deliver, /close-loop, scope-reconcile, triage, memory loops; pre-authors /shift Objectives), re-measures until only ceiling items remain — then presents the ceiling menu (the 2-5 decisions only the operator can make). Under explicit launch-time BUILD authorization (overnight /loop), each cycle adds a build leg: fires the top vision-ranked OPEN Objective as an agentic-developer arc under an evidence-gated push lease. Use when \"drive the dev cycle to stasis\", \"delivery stasis pass\", \"run the conveyor\", at session boundaries, or looped overnight with build mode granted. NOT for a single station's work (invoke it directly) or memory-only hygiene (use /memory-stasis-loop).",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/delivery-stasis.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/delivery-stasis"

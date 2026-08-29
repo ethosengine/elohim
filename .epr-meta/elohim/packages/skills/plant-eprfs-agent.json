@@ -9,7 +9,8 @@
     "triggerDescription": "Plant ONE runtime-authored subagent in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the agent's system prompt AND execution contract — tools/model/color; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The agent member of the plant-eprfs family; contract + MCP-wiring round-trip-guaranteed lossless. Use when \"plant agent X\", \"root this subagent in its package\", or flipping a .claude/agents/<X>.md to package authority — the artifact is a subagent persona whose tools/model/color/mcpServers contract must round-trip. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-command (slash commands), plant-eprfs-hook (executable hooks).",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "elohim-agent",
     "assetRefs": [],
@@ -52,6 +53,21 @@
         "metadata": {
           "runtime": "codex",
           "sourceRuntime": "elohim-agent",
+          "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-agent.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/plant-eprfs-agent"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/plant-eprfs-agent/SKILL.md",
+      "frontmatter": {
+        "name": "plant-eprfs-agent",
+        "description": "Plant ONE runtime-authored subagent in its elohim-native package on the eprfs layer (the package becomes the authoritative source-of-truth for the agent's system prompt AND execution contract — tools/model/color; .claude/.codex become generated, content-addressed, provenance-recorded projections that grow from and trace back to it). The agent member of the plant-eprfs family; contract + MCP-wiring round-trip-guaranteed lossless. Use when \"plant agent X\", \"root this subagent in its package\", or flipping a .claude/agents/<X>.md to package authority — the artifact is a subagent persona whose tools/model/color/mcpServers contract must round-trip. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-command (slash commands), plant-eprfs-hook (executable hooks).",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "elohim-agent",
+          "master": "package",
           "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-agent.json",
           "packageKind": "SkillPackage"
         },

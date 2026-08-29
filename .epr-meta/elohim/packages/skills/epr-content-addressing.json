@@ -9,7 +9,8 @@
     "triggerDescription": "Reference for content linking in the Elohim Protocol — how links carry knowledge, value, and governance context, how reach is earned at authoring, how links adapt to where the learner is, and how verified content addressing works. Use when authoring content links, explaining the architecture, creating content with verified fingerprints, or helping developers understand context-aware linking.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,6 +53,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/epr-content-addressing/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/epr-content-addressing"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/epr-content-addressing/SKILL.md",
+      "frontmatter": {
+        "name": "epr-content-addressing",
+        "description": "Reference for content linking in the Elohim Protocol — how links carry knowledge, value, and governance context, how reach is earned at authoring, how links adapt to where the learner is, and how verified content addressing works. Use when authoring content links, explaining the architecture, creating content with verified fingerprints, or helping developers understand context-aware linking.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/epr-content-addressing.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/epr-content-addressing"

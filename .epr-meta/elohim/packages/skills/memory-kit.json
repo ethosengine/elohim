@@ -9,7 +9,8 @@
     "triggerDescription": "Librarian-solo hygiene-sweep toolkit and cadence: deterministic hygiene/audit tools (cleanup, path-update, dedupe, memory-review, claude-md/agent/skill audits, memory-coherence) plus a stasis/coverage tier (placement-audit ledger, substrate-currency, story-coverage, decompose, retention, scope reconcilers) and an edit-time layer of PreToolUse/PostToolUse hooks keeping new agentic-agent text born-governed at emission (prevention), complementing the after-the-fact sweep (remediation): byte-budget enforcement, archive-ratio tracking, dead-citation hygiene, in-flight memory-to-code coherence. Read-only by default; mutations are operator-gated. Sibling to /memory-ceremony (the four-lens substrate-currency rewrite this kit never attempts) and to the memory-stasis-loop workflow. Read `placement-audit.py --ledger` first so the sweep drains a measured budget. Use for byte-budget enforcement, an audit-numbers pass, or chaining hygiene tools ad-hoc — not for the rewrite ceremony or the unified memory+dev stasis loop.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/memory-kit/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/memory-kit"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/memory-kit/SKILL.md",
+      "frontmatter": {
+        "name": "memory-kit",
+        "description": "Librarian-solo hygiene-sweep toolkit and cadence: deterministic hygiene/audit tools (cleanup, path-update, dedupe, memory-review, claude-md/agent/skill audits, memory-coherence) plus a stasis/coverage tier (placement-audit ledger, substrate-currency, story-coverage, decompose, retention, scope reconcilers) and an edit-time layer of PreToolUse/PostToolUse hooks keeping new agentic-agent text born-governed at emission (prevention), complementing the after-the-fact sweep (remediation): byte-budget enforcement, archive-ratio tracking, dead-citation hygiene, in-flight memory-to-code coherence. Read-only by default; mutations are operator-gated. Sibling to /memory-ceremony (the four-lens substrate-currency rewrite this kit never attempts) and to the memory-stasis-loop workflow. Read `placement-audit.py --ledger` first so the sweep drains a measured budget. Use for byte-budget enforcement, an audit-numbers pass, or chaining hygiene tools ad-hoc — not for the rewrite ceremony or the unified memory+dev stasis loop.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/memory-kit.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/memory-kit"

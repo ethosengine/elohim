@@ -9,7 +9,8 @@
     "triggerDescription": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Any written .feature story must then enter the context-isolated blind-reader revision loop required by genesis/a2o/.epr-meta. Also invocable manually with /story-harvest.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/story-harvest/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/story-harvest"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/story-harvest/SKILL.md",
+      "frontmatter": {
+        "name": "story-harvest",
+        "description": "Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Any written .feature story must then enter the context-isolated blind-reader revision loop required by genesis/a2o/.epr-meta. Also invocable manually with /story-harvest.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/story-harvest.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/story-harvest"

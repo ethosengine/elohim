@@ -9,7 +9,8 @@
     "triggerDescription": "Surface-level CI/CD failure diagnosis from build logs — under 5 minutes per build. Use when \"why did the build fail?\", \"is this red?\", or quick health check on a pipeline. For multi-build flake pattern analysis or deeper investigation, escalate to ci-investigator.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/ci-triage/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/ci-triage"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/ci-triage/SKILL.md",
+      "frontmatter": {
+        "name": "ci-triage",
+        "description": "Surface-level CI/CD failure diagnosis from build logs — under 5 minutes per build. Use when \"why did the build fail?\", \"is this red?\", or quick health check on a pipeline. For multi-build flake pattern analysis or deeper investigation, escalate to ci-investigator.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/ci-triage.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/ci-triage"

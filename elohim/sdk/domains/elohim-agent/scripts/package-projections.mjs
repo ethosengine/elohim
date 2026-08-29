@@ -59,6 +59,7 @@ const COMMAND_SOURCE_DIR = resolve(REPO_ROOT, '.claude/commands');
 // reconciled against, NEVER auto-written (a bad settings.json write can wedge
 // the whole PreToolUse gating toolchain).
 const SETTINGS_PATH = resolve(REPO_ROOT, '.claude/settings.json');
+const ANTIGRAVITY_RUNTIME = 'antigravity';
 
 const args = process.argv.slice(2);
 const command = args.find((arg) => !arg.startsWith('-')) ?? 'verify';
@@ -157,6 +158,13 @@ async function writeText(path, value) {
   await writeFile(path, value, 'utf8');
 }
 
+async function writeBytes(path, value) {
+  const current = await readBytesIfExists(path);
+  if (current?.equals(value)) return;
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, value);
+}
+
 async function writeJson(path, value) {
   await writeText(path, `${JSON.stringify(value, null, 2)}\n`);
 }
@@ -164,6 +172,15 @@ async function writeJson(path, value) {
 async function readIfExists(path) {
   try {
     return await readFile(path, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function readBytesIfExists(path) {
+  try {
+    return await readFile(path);
   } catch (error) {
     if (error?.code === 'ENOENT') return null;
     throw error;
@@ -379,6 +396,49 @@ function governanceFor(kind, id) {
   };
 }
 
+async function discoverSkillAssets(skillDir) {
+  const assets = [];
+
+  async function walk(dir) {
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const path = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (entry.isFile() && path !== resolve(skillDir, 'SKILL.md')) {
+        assets.push({
+          path: relative(skillDir, path).split('\\').join('/'),
+          contentBase64: (await readFile(path)).toString('base64'),
+        });
+      }
+    }
+  }
+
+  await walk(skillDir);
+  return assets;
+}
+
+function assetBytes(asset) {
+  return Buffer.from(asset.contentBase64, 'base64');
+}
+
+function validateSkillAssetPath(path) {
+  return (
+    typeof path === 'string' &&
+    path.length > 0 &&
+    !path.startsWith('/') &&
+    !path.split('/').includes('..') &&
+    path !== 'SKILL.md'
+  );
+}
+
 // ── Lodging: dedup-guarded append to the governance-findings ledger ──
 
 function governanceFingerprint(kind, id, assertionClass) {
@@ -440,7 +500,7 @@ async function lodgeGovernanceFinding({ fingerprint, kind, id, detail }) {
   return { lodged: true, fingerprint };
 }
 
-function skillPackageFromClaude(path, parsed) {
+function skillPackageFromClaude(path, parsed, assets = []) {
   const name = parsed.frontmatter.name;
   const version = parsed.frontmatter.metadata?.version ?? '1.0.0';
   const description = parsed.frontmatter.description;
@@ -455,9 +515,9 @@ function skillPackageFromClaude(path, parsed) {
       version,
       description,
       triggerDescription: description,
-      runtimeTargets: ['claude', 'codex'],
+      runtimeTargets: ['claude', 'codex', ANTIGRAVITY_RUNTIME],
       sourceRuntime: 'claude',
-      assetRefs: [],
+      assetRefs: assets.map((asset) => asset.path),
       author: parsed.frontmatter.metadata?.author,
       governance,
     },
@@ -465,6 +525,7 @@ function skillPackageFromClaude(path, parsed) {
       format: 'markdown',
       body: parsed.body,
     },
+    ...(assets.length ? { assets } : {}),
     projections: {
       claude: {
         path: relative(REPO_ROOT, path),
@@ -482,9 +543,10 @@ function skillPackageFromClaude(path, parsed) {
           governance,
         }),
       },
-      codexProject: {
+      antigravity: {
         path: `.agents/skills/${name}/SKILL.md`,
         frontmatter: codexFrontmatter({
+          runtime: ANTIGRAVITY_RUNTIME,
           name,
           description,
           packageKind: 'SkillPackage',
@@ -558,6 +620,7 @@ function agentPackageFromClaude(path, parsed) {
 }
 
 function codexFrontmatter({
+  runtime = 'codex',
   name,
   description,
   packageKind,
@@ -568,7 +631,7 @@ function codexFrontmatter({
   governance,
 }) {
   const metadata = {
-    runtime: 'codex',
+    runtime,
     sourceRuntime,
     sourcePath,
     packageKind,
@@ -631,11 +694,11 @@ function claudeFrontmatterFromPackage(pkg) {
 // re-roots provenance: `sourcePath` points at the PACKAGE (the authoritative
 // root), NOT the stale `.claude` source it was born from. Identity (name) never
 // forks per runtime.
-function codexFrontmatterFromPackage(pkg) {
+function codexFrontmatterFromPackage(pkg, runtime = 'codex') {
   const { name, description, sourceRuntime, master, governance } = pkg.metadata;
   const dir = pkg.kind === 'SkillPackage' ? 'skills' : 'agents';
   const metadata = {
-    runtime: 'codex',
+    runtime,
     sourceRuntime,
     master,
     sourcePath: `.epr-meta/elohim/packages/${dir}/${pkg.metadata.id}.json`,
@@ -670,8 +733,8 @@ function projectMarkdownSurface(pkg, runtime) {
   let frontmatter;
   if (runtime === 'claude' && pkg.metadata.master === 'package') {
     frontmatter = stringifyYaml(claudeFrontmatterFromPackage(pkg));
-  } else if (runtime === 'codex' && pkg.metadata.master === 'package') {
-    frontmatter = stringifyYaml(codexFrontmatterFromPackage(pkg));
+  } else if (runtime !== 'claude' && pkg.metadata.master === 'package') {
+    frontmatter = stringifyYaml(codexFrontmatterFromPackage(pkg, runtime));
   } else if (projection.frontmatterRaw) {
     frontmatter = `${projection.frontmatterRaw}\n`;
   } else {
@@ -740,7 +803,8 @@ async function loadSourcePackages({ skillDir = SKILL_SOURCE_DIR, agentDir = AGEN
     if (raw) {
       const parsed = parseMarkdownSurface(path, raw);
       if (!isPackageAuthoritative(parsed.frontmatter)) {
-        sourcePackages.push(skillPackageFromClaude(path, parsed));
+        const assets = await discoverSkillAssets(dirname(path));
+        sourcePackages.push(skillPackageFromClaude(path, parsed, assets));
       }
     }
   }
@@ -995,6 +1059,92 @@ function runtimePathsFor(pkg) {
   };
 }
 
+function skillMainPathFor(pkg, runtime, { fixture }) {
+  if (pkg.kind !== 'SkillPackage') return null;
+  return fixture
+    ? projectionFixturePathsFor(pkg)[runtime]
+    : runtimePathsFor(pkg)[runtime];
+}
+
+function skillAssetPathsFor(pkg, runtime, { fixture }) {
+  const mainPath = skillMainPathFor(pkg, runtime, { fixture });
+  if (!mainPath) return [];
+  return (pkg.assets ?? []).map((asset) => ({
+    asset,
+    path: resolve(dirname(mainPath), asset.path),
+  }));
+}
+
+async function listProjectedSkillAssetPaths(mainPath) {
+  const root = dirname(mainPath);
+  const paths = [];
+
+  async function walk(dir) {
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const path = resolve(dir, entry.name);
+      if (entry.isDirectory()) await walk(path);
+      else if (entry.isFile() && path !== mainPath) {
+        paths.push(relative(root, path).split('\\').join('/'));
+      }
+    }
+  }
+
+  await walk(root);
+  return paths;
+}
+
+function runtimeSkillAssetsAreGenerated(pkg, runtime, { fixture }) {
+  return (
+    fixture ||
+    pkg.metadata.master === 'package' ||
+    pkg.metadata.sourceRuntime === 'elohim-agent' ||
+    runtime !== pkg.metadata.sourceRuntime
+  );
+}
+
+async function writeSkillAssets(pkg, runtime, { fixture }) {
+  const mainPath = skillMainPathFor(pkg, runtime, { fixture });
+  if (!mainPath) return;
+  const expectedPaths = new Set((pkg.assets ?? []).map((asset) => asset.path));
+  if (runtimeSkillAssetsAreGenerated(pkg, runtime, { fixture })) {
+    for (const actualPath of await listProjectedSkillAssetPaths(mainPath)) {
+      if (!expectedPaths.has(actualPath)) {
+        await rm(resolve(dirname(mainPath), actualPath), { force: true });
+      }
+    }
+  }
+  for (const { asset, path } of skillAssetPathsFor(pkg, runtime, { fixture })) {
+    await writeBytes(path, assetBytes(asset));
+  }
+}
+
+async function verifySkillAssets(pkg, runtime, { fixture }) {
+  const mainPath = skillMainPathFor(pkg, runtime, { fixture });
+  if (!mainPath) return;
+  const expectedPaths = (pkg.assets ?? []).map((asset) => asset.path).sort();
+  const actualPaths = (await listProjectedSkillAssetPaths(mainPath)).sort();
+  assert(
+    JSON.stringify(actualPaths) === JSON.stringify(expectedPaths),
+    `${fixture ? 'projection fixture' : 'runtime projection'} asset set is exact: ${relative(REPO_ROOT, dirname(mainPath))}`,
+  );
+  for (const { asset, path } of skillAssetPathsFor(pkg, runtime, { fixture })) {
+    const actual = await readBytesIfExists(path);
+    const expected = assetBytes(asset);
+    assert(
+      actual?.equals(expected),
+      `${fixture ? 'projection fixture' : 'runtime projection'} asset is fresh: ${relative(REPO_ROOT, path)}`,
+    );
+  }
+}
+
 function projectedTextFor(pkg, runtime, packages = []) {
   // Hooks project VERBATIM (byte-for-byte passthrough) and are runtime-agnostic.
   if (pkg.kind === HOOK_KIND) return projectHook(pkg);
@@ -1008,7 +1158,7 @@ function projectedTextFor(pkg, runtime, packages = []) {
   if (pkg.kind === COMMAND_KIND) return projectCommand(pkg);
   if (pkg.kind === MCP_SERVER_KIND) return projectMcpServer(pkg, runtime);
   if (pkg.kind === MCP_PROFILE_KIND) return projectMcpProfile(pkg, packages, runtime);
-  return runtime === 'claude' ? projectClaude(pkg) : projectCodex(pkg);
+  return projectMarkdownSurface(pkg, runtime);
 }
 
 async function writePackages(packages) {
@@ -1022,6 +1172,7 @@ async function writeProjectionFixtures(packages, packageCatalog = packages) {
     const paths = projectionFixturePathsFor(pkg);
     for (const runtime of Object.keys(paths)) {
       await writeText(paths[runtime], projectedTextFor(pkg, runtime, packageCatalog));
+      await writeSkillAssets(pkg, runtime, { fixture: true });
     }
   }
 }
@@ -1031,6 +1182,7 @@ async function writeRuntimeProjections(packages, packageCatalog = packages) {
     const paths = runtimePathsFor(pkg);
     for (const runtime of Object.keys(paths)) {
       await writeText(paths[runtime], projectedTextFor(pkg, runtime, packageCatalog));
+      await writeSkillAssets(pkg, runtime, { fixture: false });
     }
   }
 }
@@ -1225,6 +1377,28 @@ async function verifyPackage(pkg, validators, settings, packageCatalog) {
     pkg.projections.codex.frontmatter.description === pkg.metadata.description,
     `${pkg.metadata.id} Codex projection description matches package metadata`,
   );
+  if (pkg.kind === 'SkillPackage') {
+    assert(
+      pkg.projections.antigravity.frontmatter.description === pkg.metadata.description,
+      `${pkg.metadata.id} Antigravity projection description matches package metadata`,
+    );
+    const assets = pkg.assets ?? [];
+    const assetPaths = assets.map((asset) => asset.path);
+    assert(
+      assetPaths.every(validateSkillAssetPath) && new Set(assetPaths).size === assetPaths.length,
+      `${pkg.metadata.id} skill asset paths are unique, relative, and remain below the skill root`,
+    );
+    assert(
+      JSON.stringify(pkg.metadata.assetRefs) === JSON.stringify(assetPaths),
+      `${pkg.metadata.id} skill assetRefs match canonical packaged assets`,
+    );
+    assert(
+      assets.every(
+        (asset) => assetBytes(asset).toString('base64') === asset.contentBase64,
+      ),
+      `${pkg.metadata.id} skill assets use canonical base64`,
+    );
+  }
 
   if (pkg.kind === 'AgentPackage' && pkg.metadata.sourceRuntime === 'claude') {
     const claudeTools = toolRefsFrom(pkg.projections.claude.frontmatter);
@@ -1302,9 +1476,12 @@ async function verifyPackage(pkg, validators, settings, packageCatalog) {
   await verifyRuntimeProjectionIfPresent(pkg, 'codex');
   if (pkg.kind === 'SkillPackage') {
     for (const runtime of Object.keys(pkg.projections)) {
-      if (runtime === 'claude' || runtime === 'codex') continue;
-      await verifyProjectionFixture(pkg, runtime);
-      await verifyRuntimeProjectionIfPresent(pkg, runtime);
+      if (runtime !== 'claude' && runtime !== 'codex') {
+        await verifyProjectionFixture(pkg, runtime);
+        await verifyRuntimeProjectionIfPresent(pkg, runtime);
+      }
+      await verifySkillAssets(pkg, runtime, { fixture: true });
+      await verifySkillAssets(pkg, runtime, { fixture: false });
     }
   }
   await verifyGovernanceBackref(pkg);
@@ -1566,13 +1743,19 @@ async function runSelfTest() {
         version: '1.0.0',
         description,
         triggerDescription: description,
-        runtimeTargets: ['claude', 'codex'],
+        runtimeTargets: ['claude', 'codex', ANTIGRAVITY_RUNTIME],
         sourceRuntime: 'claude', // origin preserved — born from Claude
         master: 'package', // authority flipped to package-first
-        assetRefs: [],
+        assetRefs: ['references/example.md'],
         governance: governanceFor('skills', 'synthetic-flip'),
       },
       instructions: { format: 'markdown', body },
+      assets: [
+        {
+          path: 'references/example.md',
+          contentBase64: Buffer.from('# Example\n').toString('base64'),
+        },
+      ],
       projections: {
         claude: {
           path: '.claude/skills/synthetic-flip/SKILL.md',
@@ -1592,9 +1775,10 @@ async function runSelfTest() {
             governance: governanceFor('skills', 'synthetic-flip'),
           }),
         },
-        codexProject: {
+        antigravity: {
           path: '.agents/skills/synthetic-flip/SKILL.md',
           frontmatter: codexFrontmatter({
+            runtime: ANTIGRAVITY_RUNTIME,
             name: 'synthetic-flip',
             description,
             packageKind: 'SkillPackage',
@@ -1627,13 +1811,33 @@ async function runSelfTest() {
       'selftest(b): flipped .claude IGNORES stale frontmatterRaw (generated, not passthrough)',
     );
     assert(
-      projectedTextFor(flippedPkg, 'codexProject') === projectCodex(flippedPkg),
-      'selftest(b): stock Codex project skill uses the Codex backend without forking identity',
+      projectedTextFor(flippedPkg, ANTIGRAVITY_RUNTIME).includes('runtime: antigravity'),
+      'selftest(b): Antigravity skill uses the shared markdown backend with localized runtime provenance',
     );
     assert(
-      runtimePathsFor(flippedPkg).codexProject ===
+      runtimePathsFor(flippedPkg).antigravity ===
         resolve(REPO_ROOT, '.agents/skills/synthetic-flip/SKILL.md'),
-      'selftest(b): stock Codex project skill targets .agents/skills/<id>/SKILL.md',
+      'selftest(b): Antigravity skill targets .agents/skills/<id>/SKILL.md',
+    );
+    assert(
+      skillAssetPathsFor(flippedPkg, ANTIGRAVITY_RUNTIME, { fixture: false })[0].path ===
+        resolve(REPO_ROOT, '.agents/skills/synthetic-flip/references/example.md'),
+      'selftest(b): Antigravity skill assets preserve paths relative to SKILL.md',
+    );
+    const isolatedPkg = structuredClone(flippedPkg);
+    isolatedPkg.projections.antigravity.path = resolve(
+      sandbox,
+      '.agents/skills/synthetic-flip/SKILL.md',
+    );
+    const isolatedMain = runtimePathsFor(isolatedPkg).antigravity;
+    await mkdir(resolve(dirname(isolatedMain), 'references'), { recursive: true });
+    await writeFile(isolatedMain, '# synthetic\n');
+    await writeFile(resolve(dirname(isolatedMain), 'references/stale.md'), '# stale\n');
+    await writeSkillAssets(isolatedPkg, ANTIGRAVITY_RUNTIME, { fixture: false });
+    assert(
+      JSON.stringify(await listProjectedSkillAssetPaths(isolatedMain)) ===
+        JSON.stringify(['references/example.md']),
+      'selftest(b): generated skill asset sets prune stale files when package assets are removed',
     );
 
     const normalBody = '# Normal\n\nnormal body\n';
@@ -2029,6 +2233,43 @@ async function runAdoptDoc(docPath, { id, dryRun }) {
   pass(`adopt-doc: scaffolded AgentDocPackage ${docId} → ${relative(REPO_ROOT, pkgPath)}`);
 }
 
+async function runMigrateAntigravity({ dryRun }) {
+  const packages = (await loadPackageFixtures()).filter((pkg) => pkg.kind === 'SkillPackage');
+  for (const pkg of packages) {
+    const sourcePath = `.epr-meta/elohim/packages/skills/${pkg.metadata.id}.json`;
+    const frontmatter =
+      pkg.metadata.master === 'package' || pkg.metadata.sourceRuntime === 'elohim-agent'
+        ? codexFrontmatterFromPackage(pkg, ANTIGRAVITY_RUNTIME)
+        : codexFrontmatter({
+            runtime: ANTIGRAVITY_RUNTIME,
+            name: pkg.metadata.name,
+            description: pkg.metadata.description,
+            packageKind: pkg.kind,
+            sourcePath: pkg.projections.claude.path,
+            sourceRuntime: pkg.metadata.sourceRuntime,
+            governance: pkg.metadata.governance,
+          });
+
+    pkg.metadata.runtimeTargets = ['claude', 'codex', ANTIGRAVITY_RUNTIME];
+    const assets = await discoverSkillAssets(
+      resolve(REPO_ROOT, dirname(pkg.projections.claude.path)),
+    );
+    pkg.metadata.assetRefs = assets.map((asset) => asset.path);
+    if (assets.length) pkg.assets = assets;
+    else delete pkg.assets;
+    delete pkg.projections.codexProject;
+    pkg.projections.antigravity = {
+      path: `.agents/skills/${pkg.metadata.id}/SKILL.md`,
+      frontmatter,
+    };
+
+    if (!dryRun) await writeJson(resolve(REPO_ROOT, sourcePath), pkg);
+  }
+  pass(
+    `${dryRun ? 'would migrate' : 'migrated'} ${packages.length} SkillPackages to the Antigravity .agents skill ABI with packaged assets`,
+  );
+}
+
 async function main() {
   const positionals = positionalArgs(args);
   switch (command) {
@@ -2047,6 +2288,9 @@ async function main() {
     case 'adopt-doc':
       await runAdoptDoc(positionals[1], { id: flagValue(args, '--id'), dryRun: DRY_RUN });
       break;
+    case 'migrate-antigravity':
+      await runMigrateAntigravity({ dryRun: DRY_RUN });
+      break;
     case 'project':
       await runProject({ writeFixtures: WRITE_FIXTURES, writeRuntime: WRITE_RUNTIME, only: ONLY });
       break;
@@ -2059,7 +2303,7 @@ async function main() {
       break;
     default:
       fail(
-        `unknown command: ${command} (expected init, import, import-hook, adopt-doc, project, verify, selftest)`,
+        `unknown command: ${command} (expected init, import, import-hook, adopt-doc, migrate-antigravity, project, verify, selftest)`,
       );
   }
 

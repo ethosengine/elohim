@@ -9,7 +9,8 @@
     "triggerDescription": "Use when an Elohim question is framed in conventional-computing terms — a Linux service/syscall, an OS or hardware primitive, a network protocol, a cloud/hyperscaler service, a k8s primitive — and you need the elohim-native analog AND where the concern is placed. Triggers include \"what's the elohim equivalent of X\", \"where does X live here\", \"I know Linux/hardware — map my mental model\".",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/concept-mapping/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/concept-mapping"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/concept-mapping/SKILL.md",
+      "frontmatter": {
+        "name": "concept-mapping",
+        "description": "Use when an Elohim question is framed in conventional-computing terms — a Linux service/syscall, an OS or hardware primitive, a network protocol, a cloud/hyperscaler service, a k8s primitive — and you need the elohim-native analog AND where the concern is placed. Triggers include \"what's the elohim equivalent of X\", \"where does X live here\", \"I know Linux/hardware — map my mental model\".",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/concept-mapping.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/concept-mapping"

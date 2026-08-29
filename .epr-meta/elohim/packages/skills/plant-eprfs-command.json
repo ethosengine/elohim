@@ -9,7 +9,8 @@
     "triggerDescription": "Plant ONE runtime-authored slash command in its elohim-native CommandPackage on the eprfs layer. The package becomes authoritative while the Claude and Codex command files remain byte-identical verbatim projections. The command member of the plant-eprfs family; fidelity-gate-guaranteed lossless. Use when \"plant command X\", planting a .claude/commands slash command into its CommandPackage, moving a command to package authority, or finishing command projection coverage in the plant-eprfs suite. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agent (subagents), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-hook (executable hooks).",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "elohim-agent",
     "assetRefs": [],
@@ -52,6 +53,21 @@
         "metadata": {
           "runtime": "codex",
           "sourceRuntime": "elohim-agent",
+          "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-command.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/plant-eprfs-command"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/plant-eprfs-command/SKILL.md",
+      "frontmatter": {
+        "name": "plant-eprfs-command",
+        "description": "Plant ONE runtime-authored slash command in its elohim-native CommandPackage on the eprfs layer. The package becomes authoritative while the Claude and Codex command files remain byte-identical verbatim projections. The command member of the plant-eprfs family; fidelity-gate-guaranteed lossless. Use when \"plant command X\", planting a .claude/commands slash command into its CommandPackage, moving a command to package authority, or finishing command projection coverage in the plant-eprfs suite. Siblings for other artifact types: plant-eprfs-skill (SKILL.md), plant-eprfs-agent (subagents), plant-eprfs-agentdoc (CLAUDE.md / AGENTS.md), plant-eprfs-hook (executable hooks).",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "elohim-agent",
+          "master": "package",
           "sourcePath": ".epr-meta/elohim/packages/skills/plant-eprfs-command.json",
           "packageKind": "SkillPackage"
         },

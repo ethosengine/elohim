@@ -9,7 +9,8 @@
     "triggerDescription": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,6 +53,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/libp2p-discovery/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-discovery"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/libp2p-discovery/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-discovery",
+        "description": "Reference for P2P peer discovery (mDNS, Kademlia), NAT traversal (relay, DCUTR), peer tracking, and network topology. Use when someone asks \"peers not connecting\", \"add bootstrap nodes\", \"mDNS not finding peers\", \"configure Kademlia\", or works on NAT traversal and peer discovery.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/libp2p-discovery.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/libp2p-discovery"

@@ -9,7 +9,8 @@
     "triggerDescription": "Audit Angular component legibility — data-testid coverage for tests/agents, accessible labeling for people. Scans templates, reports gaps, suggests fixes, escalates components that need redesign. Use when \"add testids to this component\", \"page object audit\", \"a11y scan on Angular templates\", \"are these tests legible to agents?\", or instrumenting Angular for E2E + page-object selectors.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -47,6 +48,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/page-model/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/page-model"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/page-model/SKILL.md",
+      "frontmatter": {
+        "name": "page-model",
+        "description": "Audit Angular component legibility — data-testid coverage for tests/agents, accessible labeling for people. Scans templates, reports gaps, suggests fixes, escalates components that need redesign. Use when \"add testids to this component\", \"page object audit\", \"a11y scan on Angular templates\", \"are these tests legible to agents?\", or instrumenting Angular for E2E + page-object selectors.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/page-model.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/page-model"

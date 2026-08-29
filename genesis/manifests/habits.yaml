@@ -2332,6 +2332,9 @@ habits:
       and the live compose graph records 123 skill entrypoints plus 9 asset edges across Claude,
       Codex, and Antigravity; 41 Antigravity skills and all 3 packaged assets are present, and the
       context-blind a2o review returned READY.
+
+      DELTA 2026-08-29: landing commit re-ran the checks on the integrated tree — projector selftest 43/43,
+      package verify 1697/1697, adapter cargo test 6/6 (EXIT=0); status stays green. a2o story remains @wip.
     guard: >
       A SKILL.md-only green is false when its relative references or scripts are absent. A shared
       .agents path is also not evidence that Antigravity supports Codex agent, command, hook, or MCP

@@ -9,7 +9,8 @@
     "triggerDescription": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
     "runtimeTargets": [
       "claude",
-      "codex"
+      "codex",
+      "antigravity"
     ],
     "sourceRuntime": "claude",
     "assetRefs": [],
@@ -52,6 +53,21 @@
           "runtime": "codex",
           "sourceRuntime": "claude",
           "sourcePath": ".claude/skills/libp2p-protocols/SKILL.md",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/libp2p-protocols"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/libp2p-protocols/SKILL.md",
+      "frontmatter": {
+        "name": "libp2p-protocols",
+        "description": "Reference for Elohim custom libp2p protocols, request-response codecs, message serialization (MessagePack), and wire format specification. Use when someone asks \"add a new protocol\", \"implement a codec\", \"debug message serialization\", \"wire format\", or works with sync/shard protocol handlers.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "claude",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/libp2p-protocols.json",
           "packageKind": "SkillPackage"
         },
         "governance": "epr:elohim-agent/skills/libp2p-protocols"
