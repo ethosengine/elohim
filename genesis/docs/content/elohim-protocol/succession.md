@@ -2,10 +2,10 @@
 id: succession
 sovereignty-frame: adversary
 cites:
-  - "elohim-protocol-manifesto | The vision this document clears the ground for — the crisis it answers and the love-centered alternative it proposes, which a reader arriving with a formed politics will not see until the older argument is settled. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | The thirteen Stances this document treats as settled law — most of all I.1 (the commons owned by no one), I.2 (not a blockchain and not a token), I.4 (the common inheritance), II.4 (stewardship over sovereignty), and IV.2 (enforcement by participation, never coercion). | sha256:5f4acd177219031f | path: genesis/docs/content/elohim-protocol/values-forward.md"
-  - "constitution | The law that operationalizes the vision — the layer precedence and the universal gate this document's refusals inherit. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
-  - "confession | The theology beneath the vision, and the discipline this document's most present-tense claim answers to: leaven, not the Kingdom. | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "elohim-protocol-manifesto | The vision this document clears the ground for — the crisis it answers and the love-centered alternative it proposes, which a reader arriving with a formed politics will not see until the older argument is settled. | sha256:c8df6ddb283624fa | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "values-forward | The thirteen Stances this document treats as settled law — most of all I.1 (the commons owned by no one), I.2 (not a blockchain and not a token), I.4 (the common inheritance), II.4 (stewardship over sovereignty), and IV.2 (enforcement by participation, never coercion). | sha256:b85b8effd37fbc0a | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "constitution | The law that operationalizes the vision — the layer precedence and the universal gate this document's refusals inherit. | sha256:44658e1ade471cdd | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "confession | The theology beneath the vision, and the discipline this document's most present-tense claim answers to: leaven, not the Kingdom. | sha256:8dfc6b65b9c89c48 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "justice-manifesto | Where justice is defined as restored capability rather than punishment, and where humility is named as the one virtue a confident system structurally cannot perform. | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
   - "stewardship-over-sovereignty | The foundational canon behind this document's refusal of the illegibility position — no self-sovereign apex, trust made load-bearing rather than eliminated. | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "glossary | Plain definitions of the recurring terms (elohim, reach, standing, substrate, REA) that this document's orientation section restates for a reader arriving from outside. | sha256:faeef215b3a16143 | path: genesis/docs/content/elohim-protocol/glossary.md"
@@ -120,7 +120,7 @@ The manifesto has a theory of how the protocol spreads, and it is an unusually d
 
 Emission explains **diffusion**. It does not explain **succession**. It says how a healthier practice travels; it does not say how a public function — maintaining a water basin, resolving a dispute, caring for an elder, clearing a local trade — *moves* from the institution that currently carries it to a substrate that could carry it better.
 
-The corpus reaches for that move at least three times and stops each time. *"The old system doesn't need to be defeated. It simply becomes less attractive than the alternative"* is an outcome, not a mechanism. Elsewhere the project has written that *"subsumption is the peaceful attractor path — not overthrown, outgrown,"* which names the intuition and leaves it unmechanised. And in one place the manifesto proposes something worse than a gap, which §9.1 takes up: that those who decline will face *"rising extraction costs, reputational erosion, and social isolation."* That is a mechanism, and it is coercion.
+The corpus reaches for that move at least three times and stops each time. *"The old system doesn't need to be defeated. It simply becomes less attractive than the alternative"* is an outcome, not a mechanism. Elsewhere the project has written that *"subsumption is the peaceful attractor path — not overthrown, outgrown,"* which names the intuition and leaves it unmechanised. And in one place the manifesto proposed something worse than a gap — that those who declined would face *"rising extraction costs, reputational erosion, and social isolation"* — which is a mechanism, and is coercion. That passage has since been rewritten to the standard §6.5 sets; §9.1 keeps the record of it.
 
 A project without a succession theory does not stay neutral about succession. It improvises one under pressure, and the improvisation is almost always either confrontation — which invites exactly the response the whole design exists to avoid — or enclosure, which trades the commons for defensibility. Naming the mechanism in advance is how the refusals in §6.5 become architecture instead of good intentions.
 
@@ -502,7 +502,7 @@ And it collides with settled canon. Stance II.4 refuses an absolute lockout and 
 
 ### 7.1 The replacement: distributed legal legibility
 
-> **The network is uncapturable because it is thousands of ordinary, boring, compliant legal persons — not because nobody is home.**
+> **Capture costs more than it returns because the network is thousands of ordinary, boring, compliant legal persons — not because nobody is home.**
 
 Capture requires a chokepoint: an entity whose seizure yields control. A protocol with a treasury has one. A protocol with a foundation holding the trademark has one. A protocol with a token has one — which is Stance I.1's reasoning exactly: *a claim is an ownership surface; an ownership surface is a capture surface.* A protocol whose participants are ten thousand households, co-ops, community land trusts, credit unions, and small businesses — each individually legible, taxed, and regulated, each individually replaceable, none load-bearing — has **no chokepoint at all**, and does not need to hide.
 
@@ -550,21 +550,21 @@ The invariant that follows, offered as a community's policy rather than a rule t
 
 ## 9. Where this argument convicts us
 
-A document that argues for legibility owes the reader its own books. Three findings, in descending order of how much they should cost us.
+A document that argues for legibility owes the reader its own books. Four findings. The first two were charges against the manifesto and have since been answered; they are kept here, rather than quietly deleted, because a corpus that erases its own corrections is doing the sanitising this argument exists to refuse.
 
-### 9.1 The manifesto contradicts itself on coercion
+### 9.1 The manifesto contradicted itself on coercion — repaired
 
-The manifesto commits, in one part, that *"non-participation is not a tax, and departure must be gentle and costless."* In another it says that those who resist will face *"rising extraction costs, reputational erosion, and social isolation as the new economy proves more attractive."*
+The manifesto committed, in one part, that *"non-participation is not a tax, and departure must be gentle and costless."* In another it said that those who resisted would face *"rising extraction costs, reputational erosion, and social isolation as the new economy proves more attractive."*
 
-These cannot both hold. The second describes exactly the network-effect coercion the first refuses, aimed at wealth-holders. **A mechanism is coercive or it is not, independent of whom it is pointed at** — and a project that will use social isolation against a disfavoured class has told everyone else what it is capable of. §6.5's third refusal takes the first passage's side, and the second should be rewritten to its standard.
+These could not both hold. The second described exactly the network-effect coercion the first refuses, aimed at wealth-holders. **A mechanism is coercive or it is not, independent of whom it is pointed at** — and a project that will use social isolation against a disfavoured class has told everyone else what it is capable of. §6.5's third refusal took the first passage's side, and the second has been rewritten to its standard: those who decline now *"keep what is theirs and forgo only what participation itself offers,"* under a non-coercion held as a property of the mechanism rather than a courtesy extended to particular people.
 
-### 9.2 The manifesto assumes an allocative power this argument forbids
+### 9.2 The manifesto assumed an allocative power this argument forbids — repaired
 
-The same part of the manifesto is half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.5's negotiated equilibrium, reached before the mechanism was articulated. It deserves credit for that.
+That part of the manifesto was half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.5's negotiated equilibrium, reached before the mechanism was articulated. It deserved credit for that.
 
-Then it has agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crosses §5.4's line, and it silently undoes the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.**
+Then it had agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crossed §5.4's line, and it silently undid the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.** It was the same defect §3.7 finds in George and Gesell, reproduced inside our own canon: a high-context judgment quietly backstopped by a blunt universal instrument.
 
-It is the same defect §3.7 finds in George and Gesell, reproduced inside our own canon: a high-context judgment quietly backstopped by a blunt universal instrument. Keep the negotiation; delete the table.
+The prescription was *keep the negotiation; delete the table*, and that is what was done. The manifesto now names the infrastructure categories without proportions, and says plainly that the proportions belong to the communities doing the negotiating.
 
 ### 9.3 The substrate is built; the currency is a setting nobody has turned; the proof is missing
 
