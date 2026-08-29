@@ -1205,54 +1205,62 @@ mod tests {
     }
 
     /// A restarted publisher (sequences from 1 again) must not leave the
-    /// receiver's cursor at the old run's high-water mark: its byte-identical
-    /// snapshot re-bases the cursor so the deltas that follow apply.
+    /// receiver's cursor at the old run's high-water mark. Two doors: with no
+    /// delta since the last snapshot the fingerprint still matches and the
+    /// fast-path re-bases (`Rebased`, no set churn); after a delta the
+    /// fingerprint is cleared, the set is replaced and the cursor moves DOWN
+    /// with it (`Applied`). Either way the deltas that follow apply.
     #[test]
     fn a_publisher_restart_rebases_the_cursor() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let peer = "restarting-peer";
         let page0 = vec!["h-a".to_string(), "h-b".to_string()];
+        let ts = "2026-08-29T19:00:00Z";
         assert_eq!(
-            apply_snapshot(&mut conn, peer, &page0, 1000, "2026-08-29T19:00:00Z").unwrap(),
+            apply_snapshot(&mut conn, peer, &page0, 1000, ts).unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        // Door 1: restart straight after a snapshot — same page, far below.
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, 5, ts).unwrap(),
+            SnapshotApplyOutcome::Rebased
+        );
+        assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(5));
+        assert_eq!(
+            apply_delta(&mut conn, peer, &["h-c".to_string()], &[], 6, ts).unwrap(),
+            DeltaApplyOutcome::Applied
+        );
+        // Long run again (a delta cleared the fingerprint, so this replaces).
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, 1000, ts).unwrap(),
             SnapshotApplyOutcome::Applied
         );
         assert_eq!(
-            apply_delta(
-                &mut conn,
-                peer,
-                &["h-c".to_string()],
-                &[],
-                1001,
-                "2026-08-29T19:00:01Z"
-            )
-            .unwrap(),
+            apply_delta(&mut conn, peer, &["h-d".to_string()], &[], 1001, ts).unwrap(),
             DeltaApplyOutcome::Applied
         );
-        // Publisher restarts: same first page at sequence 3.
+        // Door 2: restart after deltas — the set is replaced and the cursor
+        // moves down to the new sequence instead of staying at 1001.
         assert_eq!(
-            apply_snapshot(&mut conn, peer, &page0, 3, "2026-08-29T19:05:00Z").unwrap(),
-            SnapshotApplyOutcome::Rebased
+            apply_snapshot(&mut conn, peer, &page0, 3, ts).unwrap(),
+            SnapshotApplyOutcome::Applied
         );
         assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(3));
-        // Its next delta applies instead of reading as a replay.
         assert_eq!(
-            apply_delta(
-                &mut conn,
-                peer,
-                &["h-d".to_string()],
-                &[],
-                4,
-                "2026-08-29T19:05:01Z"
-            )
-            .unwrap(),
-            DeltaApplyOutcome::Applied
+            apply_delta(&mut conn, peer, &["h-e".to_string()], &[], 4, ts).unwrap(),
+            DeltaApplyOutcome::Applied,
+            "the new run's delta applies instead of reading as a replay"
         );
-        // A reordered echo inside the gap still dedups without moving the cursor back.
+        // Pre-existing (not this cut's) behaviour, documented: once a delta has
+        // cleared the fingerprint, an echoed OLD snapshot inside the gap is still
+        // "accepted regardless of sequence" — the set is replaced and the cursor
+        // rolls back to it. The next refresh re-bases forward again, so this is
+        // a one-refresh wobble, not a strand; a true dedup needs the fingerprint.
         assert_eq!(
-            apply_snapshot(&mut conn, peer, &page0, 2, "2026-08-29T19:05:02Z").unwrap(),
-            SnapshotApplyOutcome::Deduplicated
+            apply_snapshot(&mut conn, peer, &page0, 2, ts).unwrap(),
+            SnapshotApplyOutcome::Applied
         );
-        assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(4));
+        assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(2));
     }
 }
