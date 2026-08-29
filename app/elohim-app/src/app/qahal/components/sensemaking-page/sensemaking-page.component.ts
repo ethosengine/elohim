@@ -261,7 +261,7 @@ export class SensemakingPageComponent implements OnInit {
       this.entityId.set(id);
 
       if (type && id) {
-        this.loadClusters(type, id);
+        void this.loadClusters(type, id);
       }
     });
   }

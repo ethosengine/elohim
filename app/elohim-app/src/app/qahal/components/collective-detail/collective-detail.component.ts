@@ -345,7 +345,7 @@ export class CollectiveDetailComponent implements OnInit {
   }
 
   navigateBack(): void {
-    this.router.navigate(['/community', 'directory']);
+    void this.router.navigate(['/community', 'directory']);
   }
 
   private loadCollective(id: string): void {

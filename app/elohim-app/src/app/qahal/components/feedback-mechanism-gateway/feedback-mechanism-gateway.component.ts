@@ -309,7 +309,7 @@ export class FeedbackMechanismGatewayComponent {
     effect(() => {
       const type = this.entityType();
       const id = this.entityId();
-      this.loadGovernanceData(type, id);
+      void this.loadGovernanceData(type, id);
     });
 
     // When the challenge dialog mounts, open it modally so it renders in
@@ -363,7 +363,7 @@ export class FeedbackMechanismGatewayComponent {
 
   /** Navigate to the sensemaking page with entity context as query params. */
   navigateToSensemaking(): void {
-    this.router.navigate(['/community/governance/sensemaking'], {
+    void this.router.navigate(['/community/governance/sensemaking'], {
       queryParams: {
         entityType: this.entityType(),
         entityId: this.entityId(),
@@ -374,7 +374,7 @@ export class FeedbackMechanismGatewayComponent {
   /** Handle successful challenge filing — close form and reload governance state. */
   onChallengeFiled(_challenge: ChallengeView): void {
     this.showChallengeForm.set(false);
-    this.loadGovernanceData(this.entityType(), this.entityId());
+    void this.loadGovernanceData(this.entityType(), this.entityId());
   }
 
   /**
@@ -383,7 +383,7 @@ export class FeedbackMechanismGatewayComponent {
    */
   onBallotSubmitted(_event: unknown): void {
     // Reload governance data after a ballot is submitted
-    this.loadGovernanceData(this.entityType(), this.entityId());
+    void this.loadGovernanceData(this.entityType(), this.entityId());
   }
 
   private async loadGovernanceData(entityType: string, entityId: string): Promise<void> {

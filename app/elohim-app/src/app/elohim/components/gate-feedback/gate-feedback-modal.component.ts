@@ -198,7 +198,7 @@ export class GateFeedbackModalComponent implements AfterViewInit {
   constructor() {
     effect(() => {
       if (this.feedbackType() === 'report') {
-        this.diagnosticCollector.collect().then(bundle => {
+        void this.diagnosticCollector.collect().then(bundle => {
           this.diagnosticBundle = bundle;
         });
       }

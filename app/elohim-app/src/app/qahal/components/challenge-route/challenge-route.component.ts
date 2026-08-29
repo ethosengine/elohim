@@ -79,7 +79,7 @@ export class ChallengeRouteComponent {
   readonly entityId = computed(() => this.queryParams()?.get('entityId') ?? '');
 
   onChallengeFiled(challenge: ChallengeView): void {
-    this.router.navigate(['..', challenge.id], {
+    void this.router.navigate(['..', challenge.id], {
       relativeTo: this.route,
     });
   }

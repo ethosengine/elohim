@@ -241,6 +241,37 @@ module.exports = tseslint.config(
       "sonarjs/no-ignored-exceptions": "error",                 // S2486 - Ignored exceptions
       "sonarjs/no-unused-vars": "error",                        // S1481 - Unused variables
 
+      // ---- sonarjs/recommended rules downgraded, with the reason at the site ----
+
+      // OFF: S3735 directly contradicts @typescript-eslint/no-floating-promises,
+      // which is enabled as an error above. That rule's documented remedy for an
+      // intentionally-unawaited promise is to mark it `void promise` -- exactly
+      // what this rule forbids. A developer cannot satisfy both, which is why
+      // this app carried 13 unfixed floating promises alongside 29 void-use
+      // errors: whichever you chose, a rule failed you. no-floating-promises is
+      // a correctness rule and wins; this is a style rule and goes. The other
+      // 20 sites are `void assertExhaustive;` in a .typetest.ts whose entire
+      // purpose is to be compiled and not run.
+      "sonarjs/void-use": "off",
+
+      // WARN: S3800 fires on TypeScript union return types -- `LogLevel | null`
+      // from a try/catch read, `string | null` from a parse-or-null helper,
+      // `boolean | UrlTree` because that IS Angular's guard signature. Those are
+      // declared, compiler-checked contracts, not the untyped polymorphic
+      // returns the rule was written for. Every in-repo suppression of it says
+      // some version of "intentional"; 90 more would say the same. Kept visible
+      // as a warning rather than deleted, so a genuinely messy return still
+      // shows up.
+      "sonarjs/function-return-type": "warn",
+
+      // WARN: S1135 makes every TODO an error. The 68 here are accurate
+      // architectural breadcrumbs, most of them in services that declare
+      // themselves Phase 1 stubs at the top of the file -- "TODO: Persist to
+      // Holochain DHT" is true and worth reading. An error-level TODO rule does
+      // not get the work done; it teaches people to delete the marker. Tracked
+      // work belongs in genesis/data/timeline; the inline note stays a warning.
+      "sonarjs/todo-tag": "warn",
+
       // Keep this off - arrow functions in RxJS pipes are idiomatic
       "sonarjs/no-nested-functions": "off",
 

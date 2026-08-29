@@ -308,7 +308,7 @@ export class ContributeStatementComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadStatements();
+    void this.loadStatements();
   }
 
   async loadStatements(): Promise<void> {

@@ -243,7 +243,7 @@ export class PsephosBallotWrapperComponent {
     // Load options whenever the proposal input changes
     effect(() => {
       const prop = this.proposal();
-      this.loadOptions(prop.id);
+      void this.loadOptions(prop.id);
     });
   }
 

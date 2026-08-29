@@ -316,7 +316,7 @@ export class CommunityDirectoryComponent implements OnInit {
   }
 
   navigateToCollective(id: string): void {
-    this.router.navigate(['/community', 'collective', id]);
+    void this.router.navigate(['/community', 'collective', id]);
   }
 
   private loadDirectory(): void {

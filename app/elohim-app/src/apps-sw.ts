@@ -16,7 +16,7 @@ const CACHE_NAME = 'apps-v2';
 
 self.addEventListener('install', () => {
   // Activate immediately — don't wait for old SW to release
-  self.skipWaiting();
+  void self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -223,7 +223,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
         if (resp.ok) {
           console.log(`[apps-sw] peer-hit: ${peer.peerId.slice(0, 12)} ${identifier}/${filePath}`);
           const cacheKey = buildCacheKey(blobHash, identifier, filePath);
-          cache.put(cacheKey, resp.clone());
+          void cache.put(cacheKey, resp.clone());
           return resp;
         }
       }
