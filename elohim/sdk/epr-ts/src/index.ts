@@ -2,6 +2,12 @@
 export { encodeCanonical, decodeCanonical } from './cbor';
 export { computeCid, verifyCid } from './cid';
 export { verifyEd25519 } from './proof';
+export {
+  contentAddressHex,
+  sha256BlobHash,
+  verifyBlobHash,
+  type BlobHashVerdict,
+} from './blob-hash';
 export { canonicalEnvelopeBytes } from './envelope';
 export { verifyEpr, type Epr, type VerifyError } from './epr';
 

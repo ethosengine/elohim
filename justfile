@@ -385,8 +385,11 @@ _gate-elohim-compute:
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea --all-targets
 
+# `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
+# import fails at module resolution rather than at type-check. Testing a package
+# that cannot be imported proves the tests, not the package.
 _gate-epr-ts:
-    cd elohim/sdk/epr-ts && pnpm test
+    cd elohim/sdk/epr-ts && pnpm build && pnpm test
 
 # elohim/eprfs is its own native workspace with no per-project justfile; the
 # recipe lives here so the manifest's typed contract has a real target.
