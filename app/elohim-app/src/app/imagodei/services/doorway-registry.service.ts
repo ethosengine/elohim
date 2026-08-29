@@ -29,6 +29,7 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 
 import { isWorkspaceRuntime, workspaceDoorwayUrl } from '@workspace/runtime';
 
+import { environment } from '../../../environments/environment';
 import {
   type DoorwayInfo,
   type DoorwayStatus,
@@ -38,6 +39,7 @@ import {
   DOORWAY_URL_KEY,
   DOORWAY_CACHE_KEY,
   BOOTSTRAP_DOORWAYS,
+  probeDoorway,
   sortDoorwaysByRelevance,
 } from '../models/doorway.model';
 
@@ -120,8 +122,21 @@ export class DoorwayRegistryService {
   /** Currently selected doorway */
   readonly selected = this.selectedSignal.asReadonly();
 
-  /** Selected doorway URL (for auth operations) */
-  readonly selectedUrl = computed(() => this.selectedSignal()?.doorway.url ?? null);
+  /**
+   * Selected doorway URL — null until the selection carries PROOF.
+   *
+   * This is the accessor auth uses, so it is deliberately the strict one: a
+   * selection whose `verified` flag is false reads as "no doorway selected"
+   * and callers fall back to their configured origin. Use
+   * `selectedUrlUnverified` for display/diagnostics, never as a request base.
+   */
+  readonly selectedUrl = computed(() => {
+    const selection = this.selectedSignal();
+    return selection?.verified ? selection.doorway.url : null;
+  });
+
+  /** Selected doorway URL regardless of proof — display/diagnostics only. */
+  readonly selectedUrlUnverified = computed(() => this.selectedSignal()?.doorway.url ?? null);
 
   /** Whether doorways are loading */
   readonly isLoading = this.loadingSignal.asReadonly();
@@ -241,43 +256,57 @@ export class DoorwayRegistryService {
   // ===========================================================================
 
   /**
-   * Select a doorway for use.
+   * Select a doorway the caller already holds — a registry entry, a bootstrap
+   * entry, or one `validateDoorway()` just answered for. Such a doorway came
+   * from somewhere trusted, so the selection is verified.
    */
   selectDoorway(doorway: DoorwayInfo, isExplicit = true): void {
-    const selection: DoorwaySelection = {
-      doorway,
-      selectedAt: new Date().toISOString(),
-      isExplicit,
-    };
-
-    this.selectedSignal.set(selection);
-    this.persistSelection(selection);
+    this.applySelection(doorway, isExplicit, true);
   }
 
   /**
-   * Select a doorway by URL (for auto-selection in hosted contexts).
-   * Finds the doorway in known list or creates a minimal entry.
+   * Select a doorway by URL — REFUSING any URL we cannot vouch for.
+   *
+   * A URL reaches here from a resolved federated identifier, from
+   * `environment.client.doorwayUrl`, or from a profile action, so it may carry
+   * whatever a human typed. We select it only when its host is one we already
+   * trust (a known/bootstrap doorway, a configured origin, this workspace's
+   * doorway). An unrecognised host is a NO-OP: the current selection stands
+   * and nothing is written to localStorage — because the next thing that
+   * happens to a selected doorway is a plaintext password POSTed at it.
+   *
+   * To adopt a genuinely new doorway, prove it first with
+   * {@link selectProbedDoorwayUrl}.
    */
   selectDoorwayByUrl(url: string): void {
     if (this.selectedUrl() === url) return;
 
-    const known = this.doorwaysSignal().find(d => d.url === url);
-    if (known) {
-      this.selectDoorway(known, false);
-    } else {
-      const doorway: DoorwayInfo = {
-        id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/g, '-'),
-        name: new URL(url).hostname,
-        url,
-        description: '',
-        region: 'global',
-        operator: '',
-        features: [],
-        status: 'unknown',
-        registrationOpen: true,
-      };
-      this.selectDoorway(doorway, false);
+    const known = this.findTrustedDoorway(url);
+    if (!known) return;
+
+    this.applySelection(known, false, true);
+  }
+
+  /**
+   * Adopt a doorway the app has never seen, by asking that host to prove it is
+   * one (`GET /.well-known/elohim-auth`). The probed origin is the host's OWN
+   * origin — never a derivative of it — so what gets selected is exactly what
+   * answered.
+   *
+   * @returns true when the host proved itself and is now selected.
+   */
+  async selectProbedDoorwayUrl(url: string, isExplicit = false): Promise<boolean> {
+    const trusted = this.findTrustedDoorway(url);
+    if (trusted) {
+      this.applySelection(trusted, isExplicit, true);
+      return true;
     }
+
+    const origin = await probeDoorway(url);
+    if (!origin) return false;
+
+    this.applySelection(this.minimalDoorway(origin), isExplicit, true);
+    return true;
   }
 
   /**
@@ -506,6 +535,8 @@ export class DoorwayRegistryService {
         doorway: createWorkspaceDoorway(),
         selectedAt: new Date().toISOString(),
         isExplicit: false,
+        // Resolved by the vendor fence from build-time config, not from input.
+        verified: true,
       });
       return;
     }
@@ -516,7 +547,17 @@ export class DoorwayRegistryService {
       if (!raw) return;
 
       const selection = JSON.parse(raw) as DoorwaySelection;
-      this.selectedSignal.set(selection);
+
+      // localStorage is attacker-writable and predates this rule, so a stored
+      // `verified: true` proves nothing. Recompute it: a trusted host is
+      // verified now, anything else is restored UNVERIFIED (so it can never be
+      // an auth base) and re-proved in the background, or discarded.
+      const trusted = this.findTrustedDoorway(selection.doorway.url) !== null;
+      this.selectedSignal.set({ ...selection, verified: trusted });
+
+      if (!trusted) {
+        void this.reverifyRestoredSelection(selection.doorway.url);
+      }
     } catch {
       // Invalid stored data, clear it
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by typeof localStorage check at top of restoreSelection()
@@ -578,6 +619,98 @@ export class DoorwayRegistryService {
     } catch {
       return [];
     }
+  }
+
+  // ===========================================================================
+  // Private Methods - Trust
+  // ===========================================================================
+
+  /**
+   * Origins this app trusts WITHOUT a probe, because they were not typed by a
+   * human: build-time environment config and this workspace's own doorway.
+   */
+  private configuredOrigins(): string[] {
+    return [
+      environment.client?.doorwayUrl,
+      environment.holochain?.authUrl,
+      workspaceDoorwayUrl(),
+    ].filter((url): url is string => !!url);
+  }
+
+  /**
+   * Find a doorway we can vouch for at `url`'s host — a loaded registry entry,
+   * a bootstrap entry, or a configured origin. Host EQUALITY, never substring:
+   * `alpha.elohim.host.evil.tld` contains `alpha.elohim.host` and is not it.
+   *
+   * @returns the doorway to select, or null when the host is unvouched.
+   */
+  private findTrustedDoorway(url: string): DoorwayInfo | null {
+    const host = this.hostOf(url);
+    if (!host) return null;
+
+    const known = [...this.doorwaysSignal(), ...BOOTSTRAP_DOORWAYS].find(
+      d => this.hostOf(d.url) === host
+    );
+    if (known) return known;
+
+    const configured = this.configuredOrigins().find(origin => this.hostOf(origin) === host);
+    return configured ? this.minimalDoorway(configured) : null;
+  }
+
+  /** Lowercased host (with port) of a URL, or null when it does not parse. */
+  private hostOf(url: string): string | null {
+    try {
+      return new URL(this.normalizeUrl(url)).host.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  /** A placeholder registry entry for a doorway known only by its URL. */
+  private minimalDoorway(url: string): DoorwayInfo {
+    return {
+      id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/g, '-'),
+      name: new URL(url).hostname,
+      url,
+      description: '',
+      region: 'global',
+      operator: '',
+      features: [],
+      status: 'unknown',
+      registrationOpen: true,
+    };
+  }
+
+  /** Set + persist a selection, recording whether it carries proof. */
+  private applySelection(doorway: DoorwayInfo, isExplicit: boolean, verified: boolean): void {
+    const selection: DoorwaySelection = {
+      doorway,
+      selectedAt: new Date().toISOString(),
+      isExplicit,
+      verified,
+    };
+
+    this.selectedSignal.set(selection);
+    this.persistSelection(selection);
+  }
+
+  /**
+   * Re-prove a selection restored from localStorage. The host either answers
+   * its own auth-discovery document — in which case the restored selection is
+   * promoted to verified — or the selection is DISCARDED, storage included, so
+   * a value poisoned before this rule existed cannot outlive one boot.
+   */
+  private async reverifyRestoredSelection(url: string): Promise<void> {
+    const origin = await probeDoorway(url);
+    const current = this.selectedSignal();
+    if (!current || current.doorway.url !== url) return;
+
+    if (origin === null) {
+      this.clearSelection();
+      return;
+    }
+
+    this.applySelection(current.doorway, current.isExplicit, true);
   }
 
   // ===========================================================================

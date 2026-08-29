@@ -29,7 +29,13 @@ describe('PasswordAuthProvider', () => {
   };
 
   beforeEach(() => {
-    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue(null) };
+    // `selectedUrl()` is null unless the registry holds PROOF for the doorway;
+    // `selected()` is the full selection, consulted to refuse an identifier the
+    // selected doorway does not serve.
+    mockDoorwayRegistry = {
+      selectedUrl: vi.fn().mockReturnValue(null),
+      selected: vi.fn().mockReturnValue(null),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -46,6 +52,95 @@ describe('PasswordAuthProvider', () => {
 
   afterEach(() => {
     httpMock.verify();
+  });
+
+  // ==========================================================================
+  // Where the password goes — the two rules that decide the POST origin
+  // ==========================================================================
+  describe('auth base URL is earned, not typed', () => {
+    it('ignores an UNVERIFIED selection and falls back to the configured authUrl', async () => {
+      // The registry returns null from selectedUrl() for an unverified
+      // selection, which is the whole mechanism: an unproven doorway is
+      // indistinguishable from no doorway at the point where it would matter.
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(null);
+      (mockDoorwayRegistry.selected as Mock).mockReturnValue({
+        doorway: { id: 'x', url: 'https://doorway-x.evil.tld' },
+        selectedAt: new Date().toISOString(),
+        isExplicit: true,
+        verified: false,
+      });
+
+      const promise = provider.login({
+        type: 'password',
+        identifier: 'someone',
+        password: 'pw',
+      } as PasswordCredentials);
+
+      const req = httpMock.expectOne(r => r.url.endsWith('/auth/login'));
+      expect(req.request.url.startsWith('https://doorway-x.evil.tld')).toBe(false);
+      req.flush(mockAuthResponse);
+      await promise;
+    });
+
+    it('refuses a foreign identifier without issuing a request at all', async () => {
+      // doorway-service's handle_login re-qualifies the local part with its OWN
+      // gateway domain, so POSTing alice@other.host at the alpha doorway would
+      // authenticate alpha's OWN alice on a password collision — as the wrong
+      // human, silently. The wire cannot express the distinction, so the refusal
+      // has to happen before the request exists.
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(
+        'https://doorway-alpha.elohim.host'
+      );
+      (mockDoorwayRegistry.selected as Mock).mockReturnValue({
+        doorway: {
+          id: 'alpha',
+          url: 'https://doorway-alpha.elohim.host',
+          gatewayDomain: 'alpha.elohim.host',
+        },
+        selectedAt: new Date().toISOString(),
+        isExplicit: true,
+        verified: true,
+      });
+
+      const result = await provider.login({
+        type: 'password',
+        identifier: 'alice@other.host',
+        password: 'pw',
+      } as PasswordCredentials);
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe('VALIDATION_ERROR');
+      // The assertion that matters: nothing was sent. httpMock.verify() in
+      // afterEach would also catch a stray request.
+      httpMock.expectNone(() => true);
+    });
+
+    it('allows an identifier the selected doorway DOES serve', async () => {
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(
+        'https://doorway-alpha.elohim.host'
+      );
+      (mockDoorwayRegistry.selected as Mock).mockReturnValue({
+        doorway: {
+          id: 'alpha',
+          url: 'https://doorway-alpha.elohim.host',
+          gatewayDomain: 'alpha.elohim.host',
+        },
+        selectedAt: new Date().toISOString(),
+        isExplicit: true,
+        verified: true,
+      });
+
+      const promise = provider.login({
+        type: 'password',
+        identifier: 'alice@alpha.elohim.host',
+        password: 'pw',
+      } as PasswordCredentials);
+
+      const req = httpMock.expectOne('https://doorway-alpha.elohim.host/auth/login');
+      req.flush(mockAuthResponse);
+      const result = await promise;
+      expect(result.success).toBe(true);
+    });
   });
 
   // ==========================================================================

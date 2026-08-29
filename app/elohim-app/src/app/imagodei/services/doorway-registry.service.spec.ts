@@ -209,13 +209,41 @@ describe('DoorwayRegistryService', () => {
       expect(service.selected()?.isExplicit).toBe(false);
     });
 
-    it('should create minimal entry for unknown URL', () => {
+    // This test previously asserted that ANY url became a selection ("create a
+    // minimal entry for unknown URL"). That is the hole: `selectDoorwayByUrl` is
+    // reachable from a typed identifier, and a selection becomes the origin a
+    // plaintext password is POSTed to. Adopting an unknown host now requires a
+    // probe, so the synchronous path refuses.
+    it('refuses an unknown URL, and writes nothing', () => {
+      const before = localStorage.getItem('elohim-doorway-url');
+
       service.selectDoorwayByUrl('https://unknown-doorway.example.com');
 
-      expect(service.hasSelection()).toBe(true);
-      expect(service.selectedUrl()).toBe('https://unknown-doorway.example.com');
-      expect(service.selected()?.doorway.name).toBe('unknown-doorway.example.com');
-      expect(service.selected()?.isExplicit).toBe(false);
+      expect(service.hasSelection()).toBe(false);
+      expect(service.selectedUrl()).toBeNull();
+      expect(localStorage.getItem('elohim-doorway-url')).toBe(before);
+    });
+
+    it('refuses an attacker host that merely contains a known one', () => {
+      service.selectDoorwayByUrl('https://doorway.example.com.evil.tld');
+
+      expect(service.hasSelection()).toBe(false);
+      expect(service.selectedUrl()).toBeNull();
+    });
+
+    it('leaves an existing verified selection intact when an unknown URL is offered', async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true, data: [mockDoorway] })
+      );
+      await service.loadDoorways();
+      service.selectDoorwayByUrl('https://doorway.example.com');
+      expect(service.selectedUrl()).toBe('https://doorway.example.com');
+
+      service.selectDoorwayByUrl('https://unknown-doorway.example.com');
+
+      // Not merely "no new selection" — the good one must survive.
+      expect(service.selectedUrl()).toBe('https://doorway.example.com');
     });
 
     it('should not re-select if already selected', () => {

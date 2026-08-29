@@ -515,12 +515,15 @@ export class AuthService {
    * Doorway base URL for session walking. The service owns this derivation —
    * the client receives a plain origin (no strategy logic in the client).
    * Mirrors PasswordAuthProvider.getAuthBaseUrl() priority:
-   * selected doorway > this workspace's doorway > environment authUrl > adminUrl.
+   * PROVEN doorway selection > this workspace's doorway > environment authUrl
+   * > adminUrl. Bearer tokens ride this URL, so the environment is the default
+   * and a selection only overrides it with proof.
    *
    * @returns Base URL, or null when no configuration is available
    */
   private deriveAuthBaseUrl(): string | null {
-    // Selected doorway first (fediverse-style gateway)
+    // A doorway selection overrides the environment ONLY when it carries proof:
+    // `selectedUrl()` is null until DoorwayRegistryService has verified it.
     const doorwayUrl = this.doorwayRegistry.selectedUrl();
     if (doorwayUrl) {
       return doorwayUrl;

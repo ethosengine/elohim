@@ -4,9 +4,11 @@
  * Framework-agnostic; consumed by both Angular services (via doorway.model.ts
  * re-export) and the standalone imagodei-portal bundle's StandaloneResolver.
  *
- * Pure TS — no Lit, no Angular, no DOM dependencies (fetch is available in
- * browser and Tauri webview contexts but this module does not call it; all
- * resolution is currently convention-based and synchronous).
+ * Pure TS — no Lit, no Angular, no DOM dependencies. Resolution is LOOKUP
+ * (synchronous, against doorways the caller already trusts) or PROOF
+ * (`probeDoorway`, one fetch against the typed host itself). It is never
+ * synthesis: a host a human typed must never become the origin a password is
+ * POSTed to just because a template said so.
  */
 
 // =============================================================================
@@ -93,47 +95,120 @@ export interface DoorwayDescriptor {
   url: string;
   /** Optional doorway-id slug (kebab-case). */
   id?: string;
+  /**
+   * Gateway host whose identifiers this doorway serves — e.g. the doorway at
+   * `https://doorway-alpha.elohim.host` DECLARES that it answers for
+   * `alpha.elohim.host`. Declared by the doorway entry, never derived by
+   * string surgery on whatever a human typed.
+   */
+  gatewayDomain?: string;
 }
 
 export type ResolveOutcome =
   | { ok: true; doorway: DoorwayDescriptor }
-  | { ok: false; reason: string };
+  | { ok: false; reason: 'empty-gateway' | 'unknown-gateway' };
+
+/** Lowercased host (with port) of a URL, or null when it does not parse. */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Normalize a typed gateway host: trim, lowercase, drop any scheme/path. */
+function normalizeHost(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+    .replace(/\/.*$/, '');
+}
 
 /**
- * Resolve a gateway host to a doorway URL using a convention-first strategy.
+ * Resolve a gateway host to a doorway URL by LOOKUP — never by synthesis.
  *
- * Resolution order:
- * 1. Check `knownDoorways` for an entry whose URL contains the gateway domain
- *    or whose URL contains `doorway-{first-subdomain}`.
- * 2. Convention: `sub.host.tld` (≥ 3 parts, not already prefixed) →
- *    `https://doorway-sub.host.tld`.
- * 3. Fallback: `https://{gatewayDomain}` (the domain IS the doorway).
+ * A doorway is returned only when a `knownDoorways` entry vouches for the
+ * host: its own URL host EQUALS the typed host, or it declares that host in
+ * `gatewayDomain`. Anything else is `{ ok: false, reason: 'unknown-gateway' }`,
+ * and the caller must prove the host with {@link probeDoorway} before sending
+ * anything to it.
  *
- * This is synchronous and network-free. Deeper discovery (`.well-known`,
- * federation registry) belongs in a coordinator layer that calls this first.
+ * There is deliberately no `https://doorway-{host}` convention and no
+ * substring match. Both let a typed identifier NAME the origin a password is
+ * POSTed to: `me@x.evil.tld` synthesized `https://doorway-x.evil.tld`, and a
+ * `.includes()` match made `alpha.elohim.host.evil.tld` read as the known
+ * alpha doorway.
  *
  * @param gatewayDomain  Hostname extracted from the federated identifier.
- * @param knownDoorways  Optional list of pre-resolved doorways; defaults to [].
+ * @param knownDoorways  Doorways already trusted by the caller; defaults to [].
  */
 export function resolveGatewayToDoorwayUrl(
   gatewayDomain: string,
   knownDoorways: ReadonlyArray<DoorwayDescriptor> = []
 ): ResolveOutcome {
-  // 1. Match against known doorways (by URL content or doorway-prefix convention)
-  const parts = gatewayDomain.split('.');
-  const firstSubdomain = parts[0] ?? '';
+  const wanted = normalizeHost(gatewayDomain);
+  if (wanted.length === 0) {
+    return { ok: false, reason: 'empty-gateway' };
+  }
+
   const known = knownDoorways.find(
-    d => d.url.includes(gatewayDomain) || d.url.includes(`doorway-${firstSubdomain}`)
+    d =>
+      hostOf(d.url) === wanted ||
+      (d.gatewayDomain !== undefined && normalizeHost(d.gatewayDomain) === wanted)
   );
   if (known) {
     return { ok: true, doorway: { url: known.url, id: known.id } };
   }
 
-  // 2. Convention: alpha.elohim.host → https://doorway-alpha.elohim.host
-  if (parts.length >= 3 && !firstSubdomain.startsWith('doorway-')) {
-    return { ok: true, doorway: { url: `https://doorway-${gatewayDomain}` } };
+  return { ok: false, reason: 'unknown-gateway' };
+}
+
+/**
+ * Ask a host whether it is a doorway, by fetching its own auth-discovery
+ * document (`GET /.well-known/elohim-auth`, served by
+ * `doorway-service/src/routes/auth_discovery.rs` — unauthenticated by design).
+ *
+ * The proof is the TYPED host answering for itself. On success this returns
+ * that host's origin and nothing else: never a `doorway-`-prefixed derivative,
+ * never a host read out of the response body. An unreachable host, a non-2xx,
+ * or a malformed host all return null — the caller then has no doorway, which
+ * is the safe outcome.
+ *
+ * @param gatewayHost  Host from the identifier (scheme/path tolerated, ignored).
+ * @param fetchImpl    Injectable fetch, for tests; defaults to `globalThis.fetch`.
+ */
+export async function probeDoorway(
+  gatewayHost: string,
+  fetchImpl?: typeof fetch
+): Promise<string | null> {
+  const host = normalizeHost(gatewayHost);
+  if (host.length === 0) {
+    return null;
   }
 
-  // 3. Fallback: domain may be the doorway itself
-  return { ok: true, doorway: { url: `https://${gatewayDomain}` } };
+  const origin = `https://${host}`;
+  let probeUrl: URL;
+  try {
+    probeUrl = new URL('/.well-known/elohim-auth', origin);
+  } catch {
+    return null;
+  }
+  // A host that does not survive URL parsing unchanged is not the host we
+  // were asked about (userinfo/`@` smuggling), so refuse rather than probe.
+  if (probeUrl.host !== host) {
+    return null;
+  }
+
+  const doFetch =
+    fetchImpl ??
+    ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init));
+
+  try {
+    const resp = await doFetch(probeUrl.toString(), { credentials: 'omit' });
+    return resp.ok ? origin : null;
+  } catch {
+    return null;
+  }
 }

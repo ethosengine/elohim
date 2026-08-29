@@ -34,6 +34,7 @@ import {
   type RegisterAuthRequest,
   type LoginRequest,
 } from '../../models/auth.model';
+import { parseFederatedIdentifier } from '../../models/doorway.model';
 import { DoorwayRegistryService } from '../doorway-registry.service';
 
 // =============================================================================
@@ -50,19 +51,28 @@ export class PasswordAuthProvider implements AuthProvider {
   /**
    * Get the base URL for auth endpoints.
    *
-   * Priority:
-   * 1. Selected doorway URL (user's chosen identity provider)
-   * 2. Development workspace: this workspace's own doorway endpoint
-   * 3. Explicit authUrl from environment
-   * 4. Derive from adminUrl by converting WS to HTTP
+   * The environment is the DEFAULT and a doorway selection is an override that
+   * must earn its place: `selectedUrl()` is null unless the registry holds
+   * proof for that doorway (a configured origin, a registry entry, or a host
+   * that answered its own `/.well-known/elohim-auth`). That inversion is the
+   * whole point — this URL is where a plaintext password is POSTed, and it used
+   * to be derivable from whatever host a human typed after the `@`.
    */
   private getAuthBaseUrl(): string {
-    // Check for selected doorway first (fediverse-style gateway)
-    const doorwayUrl = this.doorwayRegistry.selectedUrl();
-    if (doorwayUrl) {
-      return doorwayUrl;
+    // A doorway selection overrides the environment ONLY when it carries proof.
+    const verifiedDoorwayUrl = this.doorwayRegistry.selectedUrl();
+    if (verifiedDoorwayUrl) {
+      return verifiedDoorwayUrl;
     }
 
+    return this.environmentAuthBaseUrl();
+  }
+
+  /**
+   * The auth base URL this build was configured with — never derived from user
+   * input, so it is the safe floor when no doorway has proved itself.
+   */
+  private environmentAuthBaseUrl(): string {
     // A development workspace serves the doorway at a sibling origin. This is
     // the workspace developer's OWN doorway — the identity provider they
     // register and log in against, and the one whose chaperone provisions
@@ -100,6 +110,40 @@ export class PasswordAuthProvider implements AuthProvider {
   }
 
   /**
+   * Refuse to hand a doorway an identifier it does not serve.
+   *
+   * `handle_login` in doorway-service (`routes/auth_routes.rs`) re-qualifies the
+   * submitted identifier's local-part with the doorway's OWN gateway domain, so
+   * a foreign `alice@other.host` POSTed here authenticates THIS doorway's
+   * `alice` on a password collision — silently, as the wrong human. The wire
+   * cannot express "I meant the other alice", so the check has to happen before
+   * the request exists.
+   *
+   * @returns the domain the selected doorway serves when it disagrees with the
+   *   identifier's, or null when there is nothing to disagree about (a bare
+   *   local-part, which the doorway qualifies by design, or no proven selection).
+   */
+  private foreignIdentifierDomain(identifier: string): string | null {
+    const parsed = parseFederatedIdentifier(identifier);
+    if (!parsed) return null;
+
+    const selection = this.doorwayRegistry.selected();
+    if (!selection?.verified) return null;
+
+    const { doorway } = selection;
+    let served = doorway.gatewayDomain;
+    if (!served) {
+      try {
+        served = new URL(doorway.url).host;
+      } catch {
+        return null;
+      }
+    }
+
+    return served.toLowerCase() === parsed.gatewayDomain.toLowerCase() ? null : served;
+  }
+
+  /**
    * Get headers for auth requests.
    */
   private getHeaders(): Record<string, string> {
@@ -121,6 +165,16 @@ export class PasswordAuthProvider implements AuthProvider {
     }
 
     const passwordCreds = credentials;
+
+    const servedDomain = this.foreignIdentifierDomain(passwordCreds.identifier);
+    if (servedDomain !== null) {
+      return {
+        success: false,
+        error: `The selected doorway signs in ${servedDomain} identities. Resolve your identifier first to reach its own doorway.`,
+        code: 'VALIDATION_ERROR',
+      };
+    }
+
     const url = `${this.getAuthBaseUrl()}/auth/login`;
 
     const body: LoginRequest = {

@@ -72,24 +72,29 @@ describe('resolveGatewayToDoorwayUrl', () => {
     expect(result).toBe('https://doorway-alpha.elohim.host');
   });
 
-  it('should use convention for unknown 3+ part domains', () => {
-    const result = resolveGatewayToDoorwayUrl('staging.elohim.host', []);
-    expect(result).toBe('https://doorway-staging.elohim.host');
+  // The four tests below previously asserted the SYNTHESIS behaviour — that an
+  // unknown gateway host becomes `https://doorway-{host}` or `https://{host}`.
+  // That convention is what let a typed identifier name the origin a plaintext
+  // password was POSTed to. They now assert the refusal, and they are the
+  // regression guard: if any of them goes back to returning a URL, the
+  // credential-exfiltration path is open again.
+
+  it('refuses to invent a doorway for an unknown 3+ part host', () => {
+    expect(resolveGatewayToDoorwayUrl('staging.elohim.host', [])).toBeNull();
   });
 
-  it('should use domain directly for 2-part domains', () => {
-    const result = resolveGatewayToDoorwayUrl('elohim.host', []);
-    expect(result).toBe('https://elohim.host');
+  it('refuses to invent a doorway for an unknown 2-part host', () => {
+    expect(resolveGatewayToDoorwayUrl('elohim.host', [])).toBeNull();
   });
 
-  it('should not double-prefix doorway domains', () => {
-    const result = resolveGatewayToDoorwayUrl('doorway-alpha.elohim.host', []);
-    // Already starts with doorway- so should not re-prefix
-    expect(result).not.toContain('doorway-doorway-');
+  it('does not resolve a host merely because it looks like a doorway', () => {
+    // Starting with `doorway-` is not evidence of anything; only a declaration
+    // or a probe is.
+    expect(resolveGatewayToDoorwayUrl('doorway-alpha.elohim.host', [])).toBeNull();
   });
 
-  it('should match known doorways by URL content', () => {
-    const knownDoorways: DoorwayInfo[] = [
+  it('matches a known doorway only by DECLARED gatewayDomain, not by URL substring', () => {
+    const undeclared: DoorwayInfo[] = [
       {
         id: 'custom',
         name: 'Custom',
@@ -102,7 +107,37 @@ describe('resolveGatewayToDoorwayUrl', () => {
         registrationOpen: true,
       },
     ];
-    const result = resolveGatewayToDoorwayUrl('custom.example.com', knownDoorways);
-    expect(result).toBe('https://doorway-custom.example.com');
+    // The URL contains 'custom.example.com', but the doorway never said it
+    // vouches for that gateway. Inferring it from the URL is string surgery.
+    expect(resolveGatewayToDoorwayUrl('custom.example.com', undeclared)).toBeNull();
+
+    // With the declaration present, it resolves.
+    const declared: DoorwayInfo[] = [{ ...undeclared[0], gatewayDomain: 'custom.example.com' }];
+    expect(resolveGatewayToDoorwayUrl('custom.example.com', declared)).toBe(
+      'https://doorway-custom.example.com'
+    );
+  });
+
+  describe('hostile input', () => {
+    // Each of these returned a usable https:// origin before the fix, and each
+    // is a live credential-exfiltration vector: whatever comes back here is
+    // where PasswordAuthProvider POSTs {identifier, password}.
+    it('refuses a bare attacker domain', () => {
+      expect(resolveGatewayToDoorwayUrl('evil.tld')).toBeNull();
+    });
+
+    it('refuses an attacker subdomain', () => {
+      expect(resolveGatewayToDoorwayUrl('x.evil.tld')).toBeNull();
+    });
+
+    it('refuses a known host used as a PREFIX of an attacker domain', () => {
+      // The old matcher used `.includes`, so this resolved to the real alpha
+      // doorway's URL — the substring accident. Host equality closes it.
+      expect(resolveGatewayToDoorwayUrl('alpha.elohim.host.evil.tld')).toBeNull();
+    });
+
+    it('refuses an attacker domain that merely CONTAINS a known host', () => {
+      expect(resolveGatewayToDoorwayUrl('evil.tld/alpha.elohim.host')).toBeNull();
+    });
   });
 });

@@ -93,6 +93,14 @@ export interface DoorwayInfo {
 
   /** Number of vouches from other doorways/users */
   vouchCount?: number;
+
+  /**
+   * Gateway host whose federated identifiers this doorway serves — e.g. the
+   * alpha doorway declares `alpha.elohim.host`, so `matthew@alpha.elohim.host`
+   * resolves to it by DECLARATION rather than by string surgery on the typed
+   * host. Absent means "this doorway vouches for nothing but its own host".
+   */
+  gatewayDomain?: string;
 }
 
 /**
@@ -183,6 +191,9 @@ export const BOOTSTRAP_DOORWAYS: DoorwayInfo[] = [
     id: 'doorway-alpha-elohim-host',
     name: 'Alpha Gateway',
     url: 'https://doorway-alpha.elohim.host',
+    // This doorway answers for `user@alpha.elohim.host`. Declared here because
+    // the resolver no longer derives `doorway-{host}` from what was typed.
+    gatewayDomain: 'alpha.elohim.host',
     description:
       'Development doorway operated by Matthew Dowell @ Ethos Engine. For alpha/dev testing.',
     region: 'north-america',
@@ -210,6 +221,18 @@ export interface DoorwaySelection {
 
   /** Whether this was auto-selected or user choice */
   isExplicit: boolean;
+
+  /**
+   * Whether this doorway carries PROOF that it is a doorway — it is a
+   * build-time configured origin, an entry from the doorway registry, or a
+   * host that answered its own `/.well-known/elohim-auth`.
+   *
+   * Only a verified selection may become an auth base URL. The flag is never
+   * trusted off the wire: `DoorwayRegistryService.restoreSelection()` recomputes
+   * it, because localStorage is attacker-writable and a selection persisted
+   * before this rule existed would otherwise survive it.
+   */
+  verified: boolean;
 }
 
 // =============================================================================
@@ -254,10 +277,20 @@ export interface DoorwayHealthResponse {
 import {
   parseFederatedIdentifier as _parseFedId,
   resolveGatewayToDoorwayUrl as _resolveGateway,
+  probeDoorway as _probeDoorway,
 } from 'elohim-imagodei/federated-identifier';
 
 export const parseFederatedIdentifierOutcome: typeof _parseFedId = _parseFedId;
 export const resolveGatewayToDoorwayUrlOutcome: typeof _resolveGateway = _resolveGateway;
+
+/**
+ * Ask a typed host to prove it is a doorway (`GET /.well-known/elohim-auth`).
+ *
+ * Returns that host's origin, or null. This is the ONLY way an origin the user
+ * typed becomes a doorway the app will talk to — `resolveGatewayToDoorwayUrl`
+ * below is lookup-only and never invents one.
+ */
+export const probeDoorway: typeof _probeDoorway = _probeDoorway;
 
 // =============================================================================
 // Helpers
@@ -330,19 +363,20 @@ export function parseFederatedIdentifier(identifier: string): {
 }
 
 /**
- * Resolve a gateway domain to a doorway URL.
+ * Look up the doorway that vouches for a gateway host — or null.
  *
- * Thin wrapper over the framework-agnostic helper in elohim-imagodei that
- * preserves the original string-returning signature for existing Angular call
- * sites.  New code should prefer `resolveGatewayToDoorwayUrlOutcome` from
- * this module for the discriminated-union shape.
+ * Null is the ANSWER, not a gap to paper over: an unknown host has no doorway
+ * until it proves itself via `probeDoorway`. The former fallbacks
+ * (`https://doorway-{host}`, then `https://{host}`) made a typed identifier
+ * name the origin a plaintext password was POSTed to, so both are gone and the
+ * signature is nullable. Callers must branch.
  */
 export function resolveGatewayToDoorwayUrl(
   gatewayDomain: string,
   knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS
-): string {
+): string | null {
   const outcome = _resolveGateway(gatewayDomain, knownDoorways);
-  return outcome.ok ? outcome.doorway.url : `https://${gatewayDomain}`;
+  return outcome.ok ? outcome.doorway.url : null;
 }
 
 /**
