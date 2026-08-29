@@ -20,7 +20,7 @@ import { Component, ElementRef, effect, inject, input, signal, viewChild } from 
 import { Router } from '@angular/router';
 
 import { GovernanceApiService } from '@elohim/service';
-import type { AccumulationStatusView, MechanismSelectionView } from '@elohim/storage-client';
+
 import {
   ContextMenuOnlyComponent,
   type ContextMenuAction,
@@ -31,7 +31,12 @@ import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feed
 import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
 import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
 
-import type { ChallengeView, ProposalView } from '@elohim/storage-client';
+import type {
+  AccumulationStatusView,
+  MechanismSelectionView,
+  ChallengeView,
+  ProposalView,
+} from '@elohim/storage-client';
 
 @Component({
   selector: 'qahal-feedback-mechanism-gateway',
@@ -330,7 +335,7 @@ export class FeedbackMechanismGatewayComponent {
    */
   onChallengeDialogClick(event: MouseEvent): void {
     const ref = this.challengeDialog();
-    if (ref && event.target === ref.nativeElement) {
+    if (event.target === ref?.nativeElement) {
       this.closeChallengeForm();
     }
   }

@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 
-import type { PlacementGapView } from '@app/generated/placement-gap-view';
 import { ResilienceService } from '@elohim/service/public-api';
+
+import type { PlacementGapView } from '@app/generated/placement-gap-view';
 
 @Component({
   selector: 'app-signals-card',

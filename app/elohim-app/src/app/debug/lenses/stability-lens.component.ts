@@ -1,16 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
-import type { StabilityStatusView } from '../../generated/stability-status-view';
+
 import { DoorwayAdminService } from '../../doorway/services/doorway-admin.service';
 import { DebugContextService } from '../../elohim/services/debug-context.service';
 import { BlockState } from '../debug.types';
 
+import type { StabilityStatusView } from '../../generated/stability-status-view';
+
 /** Minimal read-subset of storage's ProjectorStatusView / P2PStatusInfo (canonical
  *  types: ts-rs ProjectorStatusView + P2PStatusInfo in @elohim/storage-client). */
 interface ProjectorStatusReadModel {
-  lag: Array<{ lagSeconds: number | null }>;
+  lag: { lagSeconds: number | null }[];
 }
 interface P2pStatusReadModel {
   projectionReconcile?: { caughtUp: boolean; divergentAnchor: number } | null;
@@ -94,9 +97,9 @@ export class StabilityLensComponent implements OnInit {
         v.admission == null
           ? { state: 'pending', note: PENDING }
           : { state: 'real', value: v.admission },
-      upstreams: !v.upstreams?.length
-        ? { state: 'pending', note: PENDING }
-        : { state: 'real', value: v.upstreams },
+      upstreams: v.upstreams?.length
+        ? { state: 'real', value: v.upstreams }
+        : { state: 'pending', note: PENDING },
       projector: { state: 'real', value: v.projector },
       peers: { state: 'real', value: v.peers },
       render: { state: 'real', value: v.render },

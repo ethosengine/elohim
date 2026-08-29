@@ -48,7 +48,6 @@ import {
   withEstablishingContentIdsArray,
 } from '@app/elohim/adapters/storage-types.adapter';
 import { EventQuery } from '@app/elohim/models/economic-event.model';
-import { extractGateFromResponse } from '@elohim/service';
 import { handleGateError } from '@app/elohim/services/gate-error.handler';
 import { GateService } from '@app/elohim/services/gate.service';
 import {
@@ -64,6 +63,8 @@ import {
   ResolveDisputeInput,
   BulkAllocationResult,
 } from '@app/lamad/models/stewardship-allocation.model';
+
+import { extractGateFromResponse } from '@elohim/service';
 
 import { environment } from '../../../environments/environment';
 import {

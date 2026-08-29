@@ -29,16 +29,17 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import type { AuthorityResolution } from 'elohim-imagodei';
 
 import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
-import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from '../../models/doorway.model';
 import { type PasswordCredentials } from '../../models/auth.model';
+import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from '../../models/doorway.model';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+
+import type { AuthorityResolution } from 'elohim-imagodei';
 
 type Step = 'resolve' | 'login';
 
@@ -113,21 +114,19 @@ export class LoginComponent implements OnInit, AfterViewInit {
     // fetch cannot resolve relative URLs and jsdom's default `about:blank`
     // origin is `'null'` — both surface as ERR_INVALID_URL.
     if (
-      typeof window === 'undefined' ||
+      globalThis.window === undefined ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      !window.location ||
+      !globalThis.location?.origin ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      !window.location.origin ||
+      globalThis.location.origin === 'null' ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      window.location.origin === 'null' ||
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      !window.location.protocol.startsWith('http')
+      !globalThis.location.protocol.startsWith('http')
     ) {
       return;
     }
     try {
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (early return above when window is undefined)
-      const resp = await fetch(`${window.location.origin}/auth/me`, { credentials: 'include' });
+      const resp = await fetch(`${globalThis.location.origin}/auth/me`, { credentials: 'include' });
       if (!resp.ok) return;
       const data = (await resp.json()) as Record<string, unknown>;
       const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};

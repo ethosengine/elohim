@@ -36,15 +36,15 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 
+import { ContentNode } from '@app/lamad/models/content-node.model';
+import { PathView } from '@app/lamad/models/learning-path.model';
+
 import {
   SourceTier,
   createContentResolver,
   isWasmResolverAvailable,
   TsContentResolver,
 } from '@elohim/service/cache/content-resolver';
-
-import { ContentNode } from '@app/lamad/models/content-node.model';
-import { PathView } from '@app/lamad/models/learning-path.model';
 
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';

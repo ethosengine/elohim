@@ -8,7 +8,6 @@ import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { Observable, Subject, catchError, of, retry, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import type { StabilityStatusView } from '../../generated/stability-status-view';
 import {
   NodesResponse,
   NodeDetails,
@@ -20,6 +19,8 @@ import {
   NodeSnapshot,
   ClusterSnapshot,
 } from '../models/doorway.model';
+
+import type { StabilityStatusView } from '../../generated/stability-status-view';
 
 /**
  * Connection state for WebSocket

@@ -40,15 +40,17 @@ import {
   UpstreamProposal,
   ExtensionStats,
 } from '@app/lamad/models/path-extension.model';
+
 import { GOVERNANCE } from '@elohim/service';
 import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/models/agent.model';
+
+import { environment } from '../../../environments/environment';
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentBackendService } from './content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
-import { environment } from '../../../environments/environment';
 
 import type { IGovernance } from '@elohim/service';
 import type {

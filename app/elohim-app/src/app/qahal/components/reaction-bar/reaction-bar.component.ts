@@ -3,7 +3,6 @@ import { Component, OnDestroy, OnInit, inject, input } from '@angular/core';
 
 import { Subject, takeUntil } from 'rxjs';
 
-import { GovernanceApiService } from '@elohim/service';
 import {
   GovernanceSignalService,
   ReactionCounts,
@@ -17,6 +16,8 @@ import {
   MediatedReaction,
   DEFAULT_REACTION_CONSTRAINTS,
 } from '@app/lamad/models/feedback-profile.model';
+
+import { GovernanceApiService } from '@elohim/service';
 // GovernanceRecognitionService retired by M-REA-3: participation now POSTs to
 // POST /api/v1/mishpat/recognition/participation via GovernanceApiService.postParticipation().
 // The substrate reads recognition_weight_by_level from the standing-policy Manifest.

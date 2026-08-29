@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 
 import { Subject, takeUntil } from 'rxjs';
 
-import { GovernanceApiService } from '@elohim/service';
 import {
   GovernanceSignalService,
   GraduatedFeedbackInput,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
+
+import { GovernanceApiService } from '@elohim/service';
 // GovernanceRecognitionService retired by M-REA-3: participation now POSTs to
 // POST /api/v1/mishpat/recognition/participation via GovernanceApiService.postParticipation().
 

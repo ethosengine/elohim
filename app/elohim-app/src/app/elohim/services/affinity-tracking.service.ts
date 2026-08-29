@@ -6,7 +6,6 @@ import { takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
-import { SessionHumanService } from '@elohim/identity';
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import {
   HumanAffinity,
@@ -15,6 +14,8 @@ import {
   CategoryAffinityStats,
   TypeAffinityStats,
 } from '@app/qahal/models/human-affinity.model';
+
+import { SessionHumanService } from '@elohim/identity';
 
 /**
  * Service for tracking human affinity (relationship strength) to content nodes.

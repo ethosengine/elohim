@@ -17,6 +17,7 @@
  * thin bridge.
  */
 
+import { CommonModule } from '@angular/common';
 import {
   AfterViewInit,
   Component,
@@ -27,13 +28,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import 'elohim-imagodei/register';
 
+import { type AuthResult } from '../../models/auth.model';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
-import { type AuthResult } from '../../models/auth.model';
 
 @Component({
   selector: 'app-auth-callback',
@@ -106,7 +106,7 @@ export class AuthCallbackComponent implements OnInit, AfterViewInit {
 
   onError(e: Event): void {
     const detail = (e as CustomEvent<{ reason: string; recoverable: boolean }>).detail;
-    // eslint-disable-next-line no-console
+
     console.error('OAuth callback error:', detail.reason);
   }
 }

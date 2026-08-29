@@ -23,9 +23,9 @@ import {
   PathsOverview,
   ProfileSummaryCompact,
 } from '@app/imagodei/models/profile.model';
-import { SessionPathProgress } from '@elohim/identity';
-import { SessionHumanService } from '@elohim/identity';
 import { PathService } from '@app/lamad/services/path.service';
+
+import { SessionPathProgress, SessionHumanService } from '@elohim/identity';
 
 import { AffinityTrackingService } from './affinity-tracking.service';
 

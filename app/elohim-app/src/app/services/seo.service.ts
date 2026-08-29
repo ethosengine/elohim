@@ -7,9 +7,7 @@ import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 
 import { filter, map, mergeMap } from 'rxjs/operators';
 
-import { JsonLdMetadata } from '@elohim/service';
-import { OpenGraphMetadata } from '@elohim/service';
-import { eprToUniversalHref } from '@elohim/service';
+import { JsonLdMetadata, OpenGraphMetadata, eprToUniversalHref } from '@elohim/service';
 
 /**
  * SEO configuration for a page

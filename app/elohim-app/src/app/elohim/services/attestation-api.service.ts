@@ -18,6 +18,7 @@
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+
 import { catchError, firstValueFrom, of } from 'rxjs';
 
 import type { AttestationView } from '@app/generated/attestation-view';

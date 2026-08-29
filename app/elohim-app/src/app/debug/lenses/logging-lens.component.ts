@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { LoggerService, LogLevel } from '../../elohim/services/logger.service';
+
 import { DebugContextService } from '../../elohim/services/debug-context.service';
+import { LoggerService, LogLevel } from '../../elohim/services/logger.service';
 
 const LEVEL_KEY = 'elohim-log-level';
 const ANGULAR_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];

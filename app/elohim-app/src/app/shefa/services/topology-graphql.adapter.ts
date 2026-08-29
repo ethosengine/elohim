@@ -103,9 +103,9 @@ function adaptComputeTriptych(
   gql: ComputeTriptychGql
 ): MyClusterView['devices'][number]['compute'] {
   return {
-    free: gql.free !== null ? Number(gql.free) : null,
-    used: gql.used !== null ? Number(gql.used) : null,
-    stewarded: gql.stewarded !== null ? Number(gql.stewarded) : null,
+    free: gql.free === null ? null : Number(gql.free),
+    used: gql.used === null ? null : Number(gql.used),
+    stewarded: gql.stewarded === null ? null : Number(gql.stewarded),
   };
 }
 

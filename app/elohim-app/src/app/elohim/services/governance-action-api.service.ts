@@ -15,11 +15,12 @@
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+
 import { catchError, firstValueFrom, of } from 'rxjs';
 
-import type { GovernanceActionView } from '@app/generated/governance-action-view';
-import type { GovernanceActionTallyView } from '@app/generated/governance-action-tally-view';
 import type { AttestationView } from '@app/generated/attestation-view';
+import type { GovernanceActionTallyView } from '@app/generated/governance-action-tally-view';
+import type { GovernanceActionView } from '@app/generated/governance-action-view';
 
 export interface ProposeGovernanceActionInput {
   /** Discriminator, e.g. 'governance-action:key-revocation', 'governance-action:content-succession'. */

@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
+
 import { DebugModeService } from '../services/debug-mode.service';
+
 import { DebugLens } from './debug.types';
 import { ConnectionLensComponent } from './lenses/connection-lens.component';
-import { StabilityLensComponent } from './lenses/stability-lens.component';
-import { LoggingLensComponent } from './lenses/logging-lens.component';
-import { HealthLensComponent } from './lenses/health-lens.component';
 import { FlagsLensComponent } from './lenses/flags-lens.component';
+import { HealthLensComponent } from './lenses/health-lens.component';
+import { LoggingLensComponent } from './lenses/logging-lens.component';
+import { StabilityLensComponent } from './lenses/stability-lens.component';
 
 /** Hidden-but-accessible /debug surface (chrome://flags model). Always resolves
  *  by URL; the nav entry is gated separately (DebugModeService). Read-only +

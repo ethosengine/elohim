@@ -1,8 +1,8 @@
 // AUTO-GENERATED from imagodei manifest + companion schemas.
 // DO NOT EDIT — regenerate with: pnpm run imagodei:codegen
 
-import type { ContentView } from '../../generated/content-view';
 import type { HumanMetadata, PresenceMetadata } from './metadata-types';
+import type { ContentView } from '../../generated/content-view';
 
 export type TypedIdentityNode =
   | (ContentView & { contentType: 'human'; metadata: HumanMetadata })

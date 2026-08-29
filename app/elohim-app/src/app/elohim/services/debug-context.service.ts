@@ -1,5 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
+
 import { detectConnectionMode } from '@elohim/service/connection';
+
 import { environment } from '../../../environments/environment';
 
 /** Active deployment-context descriptor for the debug surface. The single place

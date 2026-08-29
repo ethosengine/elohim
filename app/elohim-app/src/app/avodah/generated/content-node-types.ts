@@ -1,8 +1,8 @@
 // AUTO-GENERATED from avodah manifest + companion schemas.
 // DO NOT EDIT — regenerate with: pnpm run avodah:codegen
 
-import type { ContentView } from '../../generated/content-view';
 import type { WorkStoryMeta, WorkProjectMeta } from './metadata-types';
+import type { ContentView } from '../../generated/content-view';
 
 export type AvodahTypedContentNode =
   | (ContentView & { contentType: 'work-story'; metadata: WorkStoryMeta })

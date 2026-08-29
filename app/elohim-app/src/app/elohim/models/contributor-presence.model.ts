@@ -37,7 +37,6 @@
  * - Accumulated value tracked as EconomicResource
  */
 
-import { OpenGraphMetadata } from '@elohim/service';
 import {
   REAAgent,
   ExternalIdentifier,
@@ -45,6 +44,8 @@ import {
   Commitment,
   Measure,
 } from '@app/elohim/models/rea-bridge.model';
+
+import { OpenGraphMetadata } from '@elohim/service';
 
 // ============================================================================
 // Presence State

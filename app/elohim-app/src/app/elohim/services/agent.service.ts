@@ -6,7 +6,6 @@ import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
 
-import { SessionHumanService } from '../../imagodei/services/session-human.service';
 import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '@elohim/identity';
 import {
   Agent,
@@ -15,6 +14,8 @@ import {
   MasteryLevel,
   MASTERY_LEVEL_VALUES,
 } from '@elohim/service/angular/models/agent.model';
+
+import { SessionHumanService } from '../../imagodei/services/session-human.service';
 
 import { DataLoaderService } from './data-loader.service';
 

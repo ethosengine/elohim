@@ -5,8 +5,7 @@ import { Observable, catchError, of } from 'rxjs';
 
 // Wire types are generated from Rust via ts-rs. Do not redeclare inline.
 // Regenerate with: cd elohim/elohim-views && cargo test export_bindings
-import type { EprNavContextView, EprNavRef } from '@elohim/storage-client/generated';
-export type { EprNavContextView, EprNavRef };
+import type { EprNavContextView } from '@elohim/storage-client/generated';
 
 /**
  * Thin HTTP client for the EPR nav-context projection endpoint.
@@ -30,3 +29,5 @@ export class EprNavContextService {
       .pipe(catchError(() => of(null)));
   }
 }
+
+export { type EprNavRef, type EprNavContextView } from '@elohim/storage-client/generated';

@@ -20,6 +20,7 @@ import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
 import { PathView, PathStep, parsePathView } from '@app/lamad/models/learning-path.model';
+
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 

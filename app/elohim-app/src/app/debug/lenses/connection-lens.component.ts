@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { DebugContextService } from '../../elohim/services/debug-context.service';
+
 import { environment } from '../../../environments/environment';
+import { DebugContextService } from '../../elohim/services/debug-context.service';
 
 /** Answers "what context am I in?" — the cheapest, always-available lens. */
 @Component({

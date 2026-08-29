@@ -1,8 +1,8 @@
 // Re-export WorkProjectMeta from generated types (schema is source of truth)
 export type { WorkProjectMeta } from '../generated/metadata-types';
 
-import type { ContentMetadata } from '@app/lamad/models/content-node.model';
 import type { WorkProjectMeta } from '../generated/metadata-types';
+import type { ContentMetadata } from '@app/lamad/models/content-node.model';
 
 export interface BoardColumn {
   id: string;

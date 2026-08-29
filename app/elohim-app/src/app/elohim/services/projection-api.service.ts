@@ -17,9 +17,10 @@ import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
 
-import { environment } from '../../../environments/environment';
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
 import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
+
+import { environment } from '../../../environments/environment';
 
 import { ContentBackendService } from './content.service';
 import { StorageClientService } from './storage-client.service';

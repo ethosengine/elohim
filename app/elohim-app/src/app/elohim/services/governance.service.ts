@@ -15,8 +15,9 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
-import { GovernanceApiService } from '@elohim/service';
+
 import { SessionHumanService } from '@elohim/identity';
+import { GovernanceApiService } from '@elohim/service';
 
 import type {
   CreateProposalInputView,
@@ -327,14 +328,14 @@ export class GovernanceService {
         (view): ProposalRecord => ({
           id: view.id,
           title: view.title,
-          proposalType: view.proposalType as ProposalRecord['proposalType'],
+          proposalType: view.proposalType,
           description: view.body,
           proposer: {
             agentId: view.proposerPresenceId,
             displayName: view.proposerPresenceId,
           },
-          status: view.status as ProposalRecord['status'],
-          phase: view.status as ProposalRecord['phase'],
+          status: view.status,
+          phase: view.status,
           createdAt: view.createdAt,
         })
       ),

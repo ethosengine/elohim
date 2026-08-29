@@ -4,24 +4,6 @@ import { provideRouter } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { environment } from '../environments/environment';
-
-import { routes } from './app.routes';
-import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
-import { GOVERNANCE } from '@elohim/service';
-import { ELOHIM_ENV } from '@elohim/service';
-import {
-  provideElohimClient,
-  detectClientMode,
-  ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
-} from './elohim/providers/elohim-client.provider';
-import {
-  provideEprResolution,
-  EPR_RESOLUTION_PROVIDER,
-} from './elohim/providers/epr-resolution.provider';
-import { ELOHIM_CLIENT } from '@elohim/service';
-import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
-import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { GovernanceApiService } from '@elohim/service';
 import { BLOB_FETCHER } from '@elohim/service';
@@ -44,15 +26,34 @@ import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/s
 import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
 import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
+import { ELOHIM_CLIENT } from '@elohim/service';
+import { ELOHIM_ENV } from '@elohim/service';
+import { GOVERNANCE } from '@elohim/service';
 import {
   BUNDLE_ROUTE_CONTEXT,
   claimsFromDeclaration,
   type BundleRouteContext,
 } from '@elohim/service';
 import { CONTENT_SYNC_STORAGE_BASE_URL } from '@elohim/service';
+
+import { environment } from '../environments/environment';
+
+import { routes } from './app.routes';
+import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
+import {
+  provideElohimClient,
+  detectClientMode,
+  ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
+} from './elohim/providers/elohim-client.provider';
+import {
+  provideEprResolution,
+  EPR_RESOLUTION_PROVIDER,
+} from './elohim/providers/epr-resolution.provider';
 import { AffinityTrackingService } from './elohim/services/affinity-tracking.service';
 import { AgentService } from './elohim/services/agent.service';
 import { ContextAssemblyService } from './elohim/services/context-assembly.service';
+import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
+import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { EprNavService } from './elohim/services/epr-nav.service';
 import { EprResolverService } from './elohim/services/epr-resolver.service';
 import { GovernanceSignalService } from './elohim/services/governance-signal.service';
@@ -78,9 +79,9 @@ import { EconomicEventsApiService } from './shefa/services/economic-events-api.s
  */
 function resolveDoorwayUrl(configured: string | undefined): string {
   // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+  if (globalThis.window !== undefined && globalThis.location.hostname !== 'localhost') {
     // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-    return window.location.origin;
+    return globalThis.location.origin;
   }
   return configured ?? 'http://localhost:8888';
 }

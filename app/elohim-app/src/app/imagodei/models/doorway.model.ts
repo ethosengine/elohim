@@ -254,13 +254,8 @@ export interface DoorwayHealthResponse {
 import {
   parseFederatedIdentifier as _parseFedId,
   resolveGatewayToDoorwayUrl as _resolveGateway,
-  type FederatedIdentifier,
-  type DoorwayDescriptor,
-  type ParseOutcome,
-  type ResolveOutcome,
 } from 'elohim-imagodei/federated-identifier';
 
-export type { FederatedIdentifier, DoorwayDescriptor, ParseOutcome, ResolveOutcome };
 export const parseFederatedIdentifierOutcome: typeof _parseFedId = _parseFedId;
 export const resolveGatewayToDoorwayUrlOutcome: typeof _resolveGateway = _resolveGateway;
 
@@ -379,3 +374,10 @@ export function sortDoorwaysByRelevance(doorways: DoorwayInfo[]): DoorwayInfo[] 
     return a.name.localeCompare(b.name);
   });
 }
+
+export {
+  type FederatedIdentifier,
+  type ParseOutcome,
+  type DoorwayDescriptor,
+  type ResolveOutcome,
+} from 'elohim-imagodei/federated-identifier';

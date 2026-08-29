@@ -6,13 +6,14 @@ import { map, shareReplay, take, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
 
-import { SessionHumanService } from '@elohim/identity';
 import {
   EmotionalReaction,
   EmotionalReactionType,
   MediationLog,
   REACTION_CATEGORIES,
 } from '@app/lamad/models/feedback-profile.model';
+
+import { SessionHumanService } from '@elohim/identity';
 
 import { LoggerService } from './logger.service';
 

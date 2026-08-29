@@ -12,7 +12,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
-import { EprNavService } from '../../services/epr-nav.service';
 
 // @coverage: 44.6% (2026-02-24)
 
@@ -21,20 +20,20 @@ import { filter, map, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 
 import { RunningContextService } from '@app/doorway/services/running-context.service';
-import { DebugModeService } from '../../../services/debug-mode.service';
-import { environment } from '../../../../environments/environment';
 import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AgencyBadgeComponent } from '@app/imagodei/components/agency-badge/agency-badge.component';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
 import { UpgradeModalComponent } from '@app/imagodei/components/upgrade-modal/upgrade-modal.component';
-import { SessionHuman } from '@elohim/identity';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { UpgradeBannerProvider } from '@app/imagodei/services/providers/upgrade-banner.provider';
-import { SessionHumanService } from '@elohim/identity';
 
+import { SessionHuman, SessionHumanService } from '@elohim/identity';
+
+import { environment } from '../../../../environments/environment';
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
+import { DebugModeService } from '../../../services/debug-mode.service';
 import {
   AlertBannerComponent,
   AlertData,
@@ -42,6 +41,7 @@ import {
 } from '../../../shared/components/alert-banner';
 import { BannerNotice, bannerNoticeToAlertData } from '../../models/banner-notice.model';
 import { BannerService } from '../../services/banner.service';
+import { EprNavService } from '../../services/epr-nav.service';
 
 /**
  * Context app identifiers for the Elohim Protocol

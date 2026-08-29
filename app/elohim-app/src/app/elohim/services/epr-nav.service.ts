@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Route } from '@angular/router';
 
 import { ProtocolRouteContextService } from './protocol-route-context.service';
 import { SessionNavStackService } from './session-nav-stack.service';
+
+import type { Route } from '@angular/router';
 
 /**
  * EPR-aware navigation: same-bundle paths go through the Angular router;

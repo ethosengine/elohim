@@ -29,7 +29,7 @@ export class SessionNavStackService {
    */
   readonly previous = (): NavStackEntry | null => {
     const s = this._stack();
-    return s.length >= 2 ? (s[s.length - 2] ?? null) : null;
+    return s.length >= 2 ? (s.at(-2) ?? null) : null;
   };
 
   constructor() {

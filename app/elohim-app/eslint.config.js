@@ -116,7 +116,17 @@ module.exports = tseslint.config(
       // Promise handling - matches S6544
       "@typescript-eslint/no-misused-promises": "error",        // S6544 - Promise in void context
       "@typescript-eslint/no-floating-promises": "error",       // Unhandled promises must be awaited
-      "@typescript-eslint/promise-function-async": "warn",      // Functions returning promises should be async
+      // DISABLED, deliberately: this rule is autofixable, and its fix changes
+      // runtime semantics for zero correctness gain. Adding `async` to a
+      // function that already returns a promise wraps the result in one extra
+      // microtask tick and converts a synchronous throw into a rejection.
+      // Running `lint:fix` applied it to exactly two sites and broke both:
+      // StabilityLensComponent.fromStorage (the extra tick lands after
+      // `fixture.whenStable()` resolves, so the spec reads 'loading' instead of
+      // 'real') and main.server.ts's SSR bootstrap (the entry that
+      // lint-ssr-entry.mjs exists to protect). A style warning must not be able
+      // to retime the SSR entry point behind a reviewer's back.
+      "@typescript-eslint/promise-function-async": "off",
       "@typescript-eslint/require-await": "error",              // S2486/S4123 - async functions need await
 
       // Type assertion hygiene
@@ -387,7 +397,18 @@ module.exports = tseslint.config(
   // Scoped to directive reporting only: every rule stays on, because a
   // generator can still emit something genuinely wrong.
   {
-    files: ["src/app/generated/**/*.ts"],
+    files: ["src/app/generated/**/*.ts", "src/app/**/generated/**/*.ts"],
     linterOptions: { reportUnusedDisableDirectives: "off" },
+    rules: {
+      // Style rules a generator's output trips. They cannot be satisfied
+      // without hand-editing a file the next codegen run overwrites, so they
+      // are not findings -- they are unfixable errors that red the gate for
+      // everyone. Correctness rules stay on: a generator CAN emit something
+      // genuinely wrong, and that is worth hearing about.
+      "@typescript-eslint/array-type": "off",
+      "sonarjs/no-duplicate-string": "off",
+      "sonarjs/redundant-type-aliases": "off",
+      "import/order": "off",
+    },
   }
 );

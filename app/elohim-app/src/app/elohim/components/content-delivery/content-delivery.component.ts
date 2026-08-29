@@ -16,11 +16,11 @@ import { takeUntil } from 'rxjs/operators';
 import { Subject, Subscription } from 'rxjs';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
+import { RendererInitializerService } from '@app/lamad/renderers/renderer-initializer.service';
 import {
   ContentRenderer,
   RendererRegistryService,
 } from '@app/lamad/renderers/renderer-registry.service';
-import { RendererInitializerService } from '@app/lamad/renderers/renderer-initializer.service';
 import { ContentService } from '@app/lamad/services/content.service';
 
 import { SeoService } from '../../../services/seo.service';

@@ -12,10 +12,11 @@
  */
 
 // Models from lamad pillar
-import { MasteryLevel } from '@elohim/service/angular/models/agent.model';
-import { JsonLdMetadata } from '@elohim/service';
-import { OpenGraphMetadata } from '@elohim/service';
 import { ContentType } from '@app/lamad/models/content-node.model';
+
+import { JsonLdMetadata, OpenGraphMetadata } from '@elohim/service';
+import { MasteryLevel } from '@elohim/service/angular/models/agent.model';
+
 // Models from elohim pillar (canonical location for shared types)
 
 /**

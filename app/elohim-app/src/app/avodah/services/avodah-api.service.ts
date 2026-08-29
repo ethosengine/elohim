@@ -2,9 +2,10 @@ import { inject, Injectable } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
+import { ContentNode, ContentRelationshipType } from '@app/lamad/models/content-node.model';
+
 import { UpdateContentPatch } from '../../elohim/interfaces';
 import { StorageApiService } from '../../elohim/services/storage-api.service';
-import { ContentNode, ContentRelationshipType } from '@app/lamad/models/content-node.model';
 import { WorkStoryStatus } from '../models/work-story.model';
 
 import type { ContentWithTagsView } from '@elohim/storage-client/generated';
