@@ -437,12 +437,16 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                     ) {
                         Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Applied) => {
                             crate::metrics::inc_inventory_page("snapshot", "applied");
+                            let (epoch, counter) =
+                                crate::p2p::sync_state::split_sequence(snapshot.sequence);
                             info!(
                                 target: "elohim_storage::inventory",
                                 from = %source,
                                 peer_id = %snapshot.peer_id,
                                 count = snapshot.hashes.len(),
                                 sequence = snapshot.sequence,
+                                epoch,
+                                counter,
                                 "Inventory snapshot applied"
                             );
                             if let Some(fetch) = ctx.inventory_fetch {

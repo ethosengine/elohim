@@ -1263,4 +1263,70 @@ mod tests {
         );
         assert_eq!(read_cursor_sequence(&mut conn, peer).unwrap(), Some(2));
     }
+
+    /// Station 1 of the sync-state contract: a publisher that restarts with a
+    /// NEWER epoch in its sequence's high bits is strictly ahead on the wire,
+    /// so the receiver follows it with no restart heuristic at all.
+    #[test]
+    fn an_epoch_carrying_restart_needs_no_gap_heuristic() {
+        use crate::p2p::sync_state::{epoch_base, split_sequence};
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let peer = "epoch-peer";
+        let page0 = vec!["h-a".to_string()];
+        let ts = "2026-08-29T19:00:00Z";
+        let run1 = epoch_base(100);
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, run1 as i64 + 1, ts).unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        assert_eq!(
+            apply_delta(
+                &mut conn,
+                peer,
+                &["h-b".to_string()],
+                &[],
+                run1 as i64 + 2,
+                ts
+            )
+            .unwrap(),
+            DeltaApplyOutcome::Applied
+        );
+        // Restart: epoch 101, counters from 1 again — a forward jump on the wire.
+        let run2 = epoch_base(101);
+        assert_eq!(
+            apply_snapshot(&mut conn, peer, &page0, run2 as i64 + 1, ts).unwrap(),
+            SnapshotApplyOutcome::Applied
+        );
+        assert_eq!(
+            read_cursor_sequence(&mut conn, peer).unwrap(),
+            Some(run2 as i64 + 1)
+        );
+        assert_eq!(split_sequence(run2 + 1), (101, 1));
+        assert_eq!(
+            apply_delta(
+                &mut conn,
+                peer,
+                &["h-c".to_string()],
+                &[],
+                run2 as i64 + 2,
+                ts
+            )
+            .unwrap(),
+            DeltaApplyOutcome::Applied
+        );
+        // The old run's straggler is a replay, not a gap.
+        assert_eq!(
+            apply_delta(
+                &mut conn,
+                peer,
+                &["h-z".to_string()],
+                &[],
+                run1 as i64 + 3,
+                ts
+            )
+            .unwrap(),
+            DeltaApplyOutcome::Replay
+        );
+    }
 }

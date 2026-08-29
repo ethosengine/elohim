@@ -74,6 +74,7 @@ pub mod shard_protocol;
 pub mod sync_gate;
 pub mod sync_protocol;
 pub mod sync_round;
+pub mod sync_state; // the sync-state contract: epoch before position, caught-up is a comparison
 pub mod topics;
 pub mod transport_manifest_gossip;
 pub mod transport_paths; // PathObservation + select_path — transport self-awareness (spec 2026-08-24 §3.1)
@@ -3045,7 +3046,17 @@ impl P2PNode {
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
-            inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
+            // Station 1 of the sync-state contract: sequences carry this
+            // process's boot epoch in their high 32 bits, so a restart is
+            // strictly ahead of the old run on the wire (see `p2p::sync_state`).
+            inventory_seq: inventory_broadcaster::SequenceAllocator::new(
+                crate::p2p::sync_state::epoch_base(crate::p2p::sync_state::boot_epoch(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                )),
+            ),
             salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
             inventory_page_backlog: std::sync::Mutex::new(std::collections::VecDeque::new()),
