@@ -26,3 +26,26 @@ of crate elohim_cache_core` because the feature-different build rewrote rlibs be
 rustdoc. Unit/integration suites had already passed. Re-run the gate alone on a quiet slot (it went green
 first try). Also: the gate's `cargo test` re-links `debug/elohim-storage` with DEFAULT features, so
 always re-run the feature-full build AFTER the gate before `just mesh start` (start refuses otherwise).
+
+**2026-08-28 — the pool is a CLUSTER-STABILITY control, not just disk hygiene.** The workspace PV
+(`storage-workspace836e1cb3b3d7457c`) lives on the root fs of ethosengine, the host running the only k8s
+control plane. Netconsole trace (23:00Z): `kswapd0` soft-locked in `ext4_es_scan → __es_shrink →
+es_reclaim_extents` (extent-status shrinker; cost ∝ inode count + fragmentation), 14 CPUs followed, API
+down for hours — 17th freeze, all 17 in 19:00–05:00 UTC (= devworkspace working hours). The pool was
+341K of the PV's ~1.02M inodes (126G), ≈47% of ALL root-fs inodes came from this one PV.
+Two enforcement gaps let it grow: hash-gc (step 2) and the keep-warm cap (step 4) both skipped the
+*protected* (active) family — `dev` sat at 96G under a 60G cap for weeks. Fixed in `pool-lib.sh`: both
+now apply slot-granularly to the active family with guards `slot_in_use` (flock OR a live process
+exec'ing from the slot — the mesh runs out of its slots), `slot_pinned` (`touch <slot>/.pin`; the fork
+conductor slot is pinned), linked slots, and freshest-per-crate within `keep_warm_slot_days` (7).
+Operator asks, in the devfile: `attributes.pod-overrides.spec.securityContext.fsGroupChangePolicy:
+OnRootMismatch` (default Always chowns 1.02M files every start); a HELD, commented separate-PVC block
+(`cargo-target-pool`) waits on the operator provisioning the claim. Success criteria they watch:
+48h freeze-free, `ext4_inode_cache` < ~1M objects (readable in-container: `grep ext4_inode_cache
+/proc/slabinfo`), no kswapd lockup on `intel-nuc:/var/log/netconsole-ethosengine.log`.
+sccache: dead Aug 23–28 (Garage bucket+keys wiped), restored 2026-08-28 — probe showed 0 errors, 0.10 s
+write, 6 ms hit; dev-profile *incremental* crates are non-cacheable by design (that's the old 25% hit
+rate), deps cache fine. `RUSTC_WRAPPER` stays '' per the 2026-07-03 decision; flip is one line.
+A concurrent session's `cargo test` correctly makes the family `busy` — wait, never override.
+Measured on the first apply (2026-08-28 23:57Z): pool 125G→87G, pool inodes 341,508→202,513,
+host `ext4_inode_cache` 1,137,138→991,724. Enforce reported "freed 0B" for keep-warm trims — fixed.
