@@ -454,6 +454,21 @@
       "supersededBy": null
     },
     {
+      "id": "habit-declaration-at-birth",
+      "version": 1,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2",
+      "sha256Computed": "sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2",
+      "pinState": "verified",
+      "cid": "bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi",
+      "bodyBytes": 1767,
+      "supersedes": [],
+      "supersededBy": null
+    },
+    {
       "id": "memory-frontmatter-at-birth",
       "version": 1,
       "registry": "policies.yaml",

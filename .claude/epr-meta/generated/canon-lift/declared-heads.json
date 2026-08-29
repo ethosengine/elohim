@@ -491,6 +491,28 @@
       ]
     },
     {
+      "id": "habit-declaration-at-birth",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi",
+        "sha256Pin": "sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "memory-frontmatter-at-birth",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",

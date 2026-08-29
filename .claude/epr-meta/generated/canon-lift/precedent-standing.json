@@ -531,6 +531,27 @@
       }
     },
     {
+      "citesContentCid": "bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi",
+      "citesContentSha256": "sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "habit-declaration-at-birth@1",
+        "title": "A habit is born observable and born retirable",
+        "summary": "A habit is born observable and born retirable",
+        "full_reasoning": "You are declaring a HABIT — what this system reliably does — in the .epr-meta governance package of the directory whose behaviour it describes. Five fields are required at birth, and each one is load-bearing: `epr-habit-version: 1`; an `id` that MATCHES the filename (the filename is the address the cascade resolves, and the id is the join across register, CI and Gherkin — concern ids stay globally unique even though declaration is local); an `invariant` (a habit with no stated invariant is a mood); a `status` of green | red | unwired (`unwired` = committed to, with no runnable check yet — declared and counted on purpose, and the state a headcount cap makes unaffordable); and a `retire-when` exit CONDITION, never a date — `never: <why this is a floor>` is a legitimate answer and the whole point of admitting it is that it becomes countable rather than silent. `checks:` is not required here because an `unwired` habit legitimately has none; the census (`.claude/scripts/_lib/epr_habits.py`) enforces the conditional — checks required unless unwired, and refused when unwired — along with the two roll-ups no single manifest can make: globally-unique concern ownership, and `max 2 active` (the WIP fence bounds ATTENTION, and attention does not compose). Run `.claude/scripts/habits-project.py --check` after; the flat register at genesis/manifests/habits.yaml is a GENERATED projection of these atoms.",
+        "binding": "constitutional",
+        "scope_json": "{\"scope\":{\"new\":true,\"write\":\"*.habit.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "operator-2026-08-27",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y",
       "citesContentSha256": "sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee",
       "registry": "policies.yaml",

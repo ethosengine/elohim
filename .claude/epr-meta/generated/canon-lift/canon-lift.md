@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**33 rows across both registry homes -> 33 CIDv1(dag-cbor, sha2-256) atoms** (33 pin-verified, 26 declared heads).
+**34 rows across both registry homes -> 34 CIDv1(dag-cbor, sha2-256) atoms** (34 pin-verified, 27 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -33,6 +33,7 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `capability-governance` | `policies.yaml@1` | `sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32` | `bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi` |
 | `eprfs-meta-domain-neutrality` | `policies.yaml@2` | `sha256:307b4f47ccc93aeb4bf58cfcdf0e4756d18cb768fc6e279f4638370ff09b09da` | `bafyreibqpnhuptgjhlvux5mm7tpq4r2w2gglo2h4nytz6rryg4h7bgyj3i` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
+| `habit-declaration-at-birth` | `policies.yaml@1` | `sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2` | `bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi` |
 | `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |
 | `ownership-ontology-guard` | `policies.yaml@3` | `sha256:4778db5e19f8b4867cca5241237d3fb10a875990da1665f18e4f28fa0e0a5b59` | `bafyreichpdnv4gpywsdhzsssierx2p5rbkdvteg2czs7ddspfd5a4cs3le` |
 | `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52` | `bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki` |
