@@ -297,6 +297,16 @@ pub struct DoorwayBootstrapInputs {
     pub self_node_id: String,
 }
 
+/// Boot-seed retry cadence while the board reads empty. Sized with
+/// [`BOOT_SEED_ATTEMPTS`] to finish inside `acquisition::FIRST_DRAIN_HOLD`
+/// (10 s): 5 reads at 0/2/4/6/8 s, so the last one still releases the drain
+/// on its 10 s tick. Bounded: at most `BOOT_SEED_ATTEMPTS` GETs per boot, and
+/// only while the book is empty.
+pub const BOOT_SEED_RETRY: Duration = Duration::from_secs(2);
+
+/// See [`BOOT_SEED_RETRY`].
+pub const BOOT_SEED_ATTEMPTS: u32 = 5;
+
 /// Spawn the bootstrap joiner: one **boot seed** if the book is empty right
 /// now, then — after `grace` — whenever the book is EMPTY, read the doorway's
 /// board and seed it.
@@ -335,8 +345,19 @@ pub fn spawn_doorway_bootstrap(
         // T0 boot seed: the one read that runs BEFORE gossip's first refusal,
         // because the first acquisition drain is waiting on it (see the doc
         // above). A warm book (never at a real boot; tests) issues nothing.
-        if inputs.book.is_empty() {
+        // Bounded retry: on a cold SIMULTANEOUS start the first peer up reads
+        // an empty board (nobody has announced yet — measured 2026-08-29:
+        // james `{boot,empty}`, then `expired` at 10 s while its neighbours
+        // posted at +2 s). Re-reading every BOOT_SEED_RETRY for at most
+        // BOOT_SEED_ATTEMPTS keeps the seed inside the drain's 10 s hold; a
+        // warm restart seeds on the first read and never sleeps here.
+        let mut attempts = 0;
+        while inputs.book.is_empty() && attempts < BOOT_SEED_ATTEMPTS {
             read_board(&client, &inputs, BootstrapPhase::Boot).await;
+            attempts += 1;
+            if inputs.book.is_empty() && attempts < BOOT_SEED_ATTEMPTS {
+                tokio::time::sleep(BOOT_SEED_RETRY).await;
+            }
         }
         // The grace period is what makes the WATCH a fallback: gossip gets
         // first refusal on keeping the book filled.
@@ -640,6 +661,48 @@ mod tests {
             server.received_requests().await.unwrap().len(),
             1,
             "exactly one GET at boot; the watch leg is still inside its grace"
+        );
+    }
+
+    /// The cold-simultaneous-start shape: the board is empty on the first read
+    /// (nobody has announced yet) and fills a moment later. The boot seed must
+    /// re-read inside the hold rather than sleep through the grace.
+    #[tokio::test]
+    async fn an_empty_board_at_boot_is_re_read_inside_the_hold() {
+        let server = wiremock::MockServer::start().await;
+        // First read: empty board. Mounted first, expires after one match.
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(MANIFESTS_PATH))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        let ann = signed(&[25u8; 32], 4700, 100);
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(MANIFESTS_PATH))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(board_with(&ann)))
+            .mount(&server)
+            .await;
+        let book = IrohPeerBook::new();
+        let handle = spawn_doorway_bootstrap(
+            DoorwayBootstrapInputs {
+                base_url: server.uri(),
+                book: book.clone(),
+                self_node_id: "self".into(),
+            },
+            Duration::from_secs(60),
+            Duration::from_secs(60),
+        );
+        let deadline = tokio::time::Instant::now() + BOOT_SEED_RETRY * 3;
+        while book.is_empty() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        handle.abort();
+        assert_eq!(book.len(), 1, "the second read must seed the book");
+        assert_eq!(
+            server.received_requests().await.unwrap().len(),
+            2,
+            "empty, then seeded — and no further reads once the book is warm"
         );
     }
 

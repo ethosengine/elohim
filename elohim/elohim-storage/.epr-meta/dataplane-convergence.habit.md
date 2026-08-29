@@ -454,3 +454,4 @@ MEASURED 2026-08-29 (household mesh, dual, full corpus): warm recovery jessica P
 (space-ids reachable by id on the recovered peer; absent set drained to 0); route vocabulary at 0 on boot then
 best_rtt iroh 27:3 on the pull leg; first-drain hold expired at 10 s while the book warmed at +28 s (30 s
 manifest cadence) — shape 3 is the next cut. Record: reports/recovery/recovery-timeline.jsonl.
+- 2026-08-29 (shape 3, household mesh dual, `d4fc29f5b`+retry): the doorway bootstrap seeds the iroh book at T0 — simultaneous warm restart of all three peers reads `{boot,seeded} 1` → first drain `book_warm` at 139/343/6 ms (this morning: `held 2 → expired 1` on all three, gossip +28 s); warm recovery jessica pull-leg dispatch iroh 274 / libp2p 29 (was 225 / 73). Cold-start first-booter `{boot,empty}` closed by a 2 s × 5 bounded retry inside the 10 s hold.

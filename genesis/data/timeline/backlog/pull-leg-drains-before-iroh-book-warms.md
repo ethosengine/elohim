@@ -82,3 +82,19 @@ doorways with no board (the pull leg is back on the floor, visibly). Two wiremoc
 is seeded well inside a 60 s grace with exactly one GET; a warm book issues none. To measure: warm recovery on the
 dual mesh — expect `first_drain_total{outcome="book_warm"} 1`, `held ≤ 1`, and `iroh peer learned from the doorway
 bulletin board` before the first `... from transport manifest` line.
+
+## 2026-08-29 MEASURED: shape 3 turns the release into an event — `book_warm` at 1–343 ms on every boot
+
+Cold simultaneous `just mesh start` (dual, three peers, shape-3 binary): matthew and jessica read the board at T0
+(`{boot,seeded}` 1 and 2 peers) and released `book_warm` at 1 ms / 3 ms; the first gossip manifest landed +26 s later.
+james — first up, nobody had announced yet — read `{boot,empty}` and fell to the floor (`held 2 → expired 1`, watch leg
+seeded it at +30 s). That cold-start ordering got a bounded retry the same day: `BOOT_SEED_RETRY` 2 s ×
+`BOOT_SEED_ATTEMPTS` 5 (0/2/4/6/8 s, inside the 10 s hold, only while the book is empty; wiremock test
+`an_empty_board_at_boot_is_re_read_inside_the_hold`). Simultaneous warm `storage-restart matthew jessica james`
+on that binary — the shape that read `held 2 → expired 1` on all three this morning — now reads on ALL three:
+`{boot,seeded}` 1 (accepted 2, own 1) → `first acquisition drain released reason=book_warm` at **139 / 343 / 6 ms**,
+`held 0`, `expired 0`; gossip's first manifest still +28 s out. Warm recovery jessica<-matthew on the same binary:
+boot seed → `book_warm` at 1 ms; pull-leg dispatch iroh 274 / libp2p 29 (this morning, with the first drain
+single-plane: 225 / 73 — libp2p's share fell 24.5 % → 9.6 %), route `best_rtt` iroh 27 : libp2p 3, `prior_iroh` 2.
+Fleet read: `first_drain_total{outcome="book_warm"}` should be 1 per boot on every dual peer with a doorway; a
+`{boot,empty}` column that stays non-zero names a doorway whose board is not being posted to.
