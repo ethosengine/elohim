@@ -55,7 +55,7 @@ As Churchill observed: *"Democracy is the worst form of Government except for al
 "We build our tools, and thereafter they build us."
 — Marshall McLuhan
 
-Our digital infrastructure represents the most catastrophic architectural failure, godlike technology where profit and power has been decoupled from care, stewardship, and responsibility, even individuals have been stripped of their agency to repair and reconcile the platforms that are defining the socio-economic, and formative epistemic formation of our future. 
+Our digital infrastructure is the most consequential architectural failure of the three. It is godlike technology in which profit and power have been decoupled from care, stewardship, and responsibility. And the people living inside it have been stripped of any means to repair it — no standing to fix what is broken, no way to reconcile with those they are broken with — while these same platforms shape the economic and epistemic formation of everyone's future. 
 
 - **Centralized control** creates single points of failure, censorship, and capture. When something is wrong, there's only ever someone on the other end of the phone if you're important enough for power to care.  
 - **Engagement optimization** weaponizes human psychology, addicting us to outrage and validation
@@ -71,7 +71,7 @@ On North Korea: no one looking in would say the people are free when they vote f
 
 On Russia: Putin holds a net-positive approval rating, yet millions have fled the country and many have died in wars; the people suffer under a state media that drowns the truth in noise and allows no other truth to manifest.
 
-Americans pay double the price of any other country for worse healthcare, tolerate government deficits, and fail to respect mothers, families, and leisure, or to address higher recidivism rates, higher poverty rates, or gun violence in policy. All are problems that have already demonstrated scalable solutions in other nation-states — but these realities are anathema to a public captured by the poverty of imagination generated from the distortions of capitalized and hyper-scaled attention exploitation.
+Americans pay double what any other country pays for worse healthcare outcomes, and policy has not moved on recidivism, poverty, gun violence, or the support owed to mothers, families, and rest. Every one of these has a demonstrated solution running at scale in some other nation-state. The gap is not that Americans want these outcomes or lack the wit to see alternatives — it is that an attention market optimized for conflict rarely carries the news that somewhere else, this problem is simply solved. What a person never sees, they cannot miss. That is a property of the information environment, not of the people living inside it, and it is the kind of thing that changes when the environment does.
 
 *"You don't rise to the level of your goals, you fall to the level of your systems"* — James Clear, *Atomic Habits*
 
@@ -117,7 +117,7 @@ Perhaps most perversely, wealth at nation-state scale is actually inversely rela
 
 We've optimized for the wrong metrics, building civilization-scale systems that make numbers go up while humans spiral down.
 
-But since we know now there are limits for individuals, institutions, nation-states, and global constraints and the ecology they inhabit, this clarity on our own carrying capacities gives us agency we need to design helpers aware of those limits.
+But we now know something we did not: that there are real limits at every scale — what a person can carry, what an institution can absorb, what a nation can sustain, and what the ecology underneath all of them can bear. Knowing our carrying capacities is itself a kind of agency. It means we can design helpers that understand those limits and work inside them.
 
 ### **The False Constraints**
 
@@ -141,7 +141,7 @@ And it is not aspiration; it is inevitability. There are not two AIs, an extract
 
 This is also the answer to capture. The powerful built AI on hyperscale clouds, primed to point *at* people. The same fundamental tools — open weights, commodity hardware, the inference substrate itself — can be **redeployed**: on machines the powerful don't own, primed by people they can't surveil, governed by communities they can't acquire. This is the inversion. Capture-resistance must be *structural*, not aspirational — manifestos that promise "we won't be evil" get acquired and become evil; architectures whose deployment geometry makes capture cost more than it returns *cannot* be acquired into hostility, because the new owner inherits the same ungovernable distribution. The architecture grants three freedoms — free to join, free to leave — and refuses exactly one: **the freedom to dominate is the only one the architecture refuses.**
 
-Why, then, do the people most *expected* to answer this — AI lab leaders, investors, established tech voices — so rarely do? Not malice but the **innovator's dilemma applied to social architecture**: wild success creates intellectual sunk costs. Those whose value came from operating well inside the current systems cannot easily imagine systems that don't extend their success, and their imaginative range is bounded by what protects their existing valuation. The answer comes from outside the prestige economy, or from those inside it consciously rejecting the optimization pull.
+Why, then, do the people most *expected* to answer this — AI lab leaders, investors, established tech voices — so rarely do? Not malice but the **innovator's dilemma applied to social architecture**: wild success creates intellectual sunk costs. Deep fluency in a system is built by succeeding inside it, and that same fluency makes alternatives to it genuinely hard to picture — the better you have played a game, the more the board looks like the world. This is the ordinary shape of expertise, and none of us escape it in the domains where we are expert. It simply means the answer is likelier to arrive from outside the prestige economy, or from those inside it who have chosen to work against the pull of their own optimization.
 
 ## **Part II: Design Principles for Pro-Social Digital Infrastructure**
 
@@ -208,7 +208,7 @@ These principles don't just improve existing systems—they engineer away the fa
 
 **Implementation**:
 - Currencies a community can set to decay, encouraging circulation — the protocol supplies the grammar; the community supplies the configuration 
-- Currencies that can respond to the needs, limitation, growth, and innovative spirit of the holders. (mediums for kids, those with intellectual disabilities, and seniors, that encourages structured exploration and discovery of produce, independence, and stewardship and autonomy with personalized limits for safety) 
+- Currencies that adapt to the person holding them — their needs, their capacities, how they are growing. A child, someone with an intellectual disability, and an elder each need money that works differently: room to explore and learn what things cost, real independence and a share in caring for what is shared, and limits set to their own situation rather than to an average. 
 - Currencies that can tell stories and epics, and facilitate value-flow (REA — Resource–Event–Agent accounting), capturing value well spent. 
 - Rewards for care work and community contribution
 - Value generation through relationship and stewardship
@@ -224,7 +224,7 @@ These principles don't just improve existing systems—they engineer away the fa
 - Lifecycle operations — memory can be promoted, compacted, merged, memorialized, or gently forgotten — apply to every long-lived datum, so each piece of information gets the treatment its character calls for
 - Memory classes (contextual, archival, identity, relational, operational, attestation, wisdom) determine which primitives apply by default, with what cadence, under which authority
 - Consolidation events — discovery of equivalence or harm — are first-class judgment moments emitting signals to economic, governance, and relational layers, not silent housekeeping
-- Reach-dropped content submerges to an elohim-visible tier, surface-able through intentional facing — a recovery loop, not permanent disenfranchisement
+- Something that loses its audience does not vanish; it sinks to a quiet layer the elohim can still see, and can be brought back up by someone willing to face it deliberately. Losing reach is a setback to recover from, never a permanent silencing
 - "Right to be forgotten" reconceived: the protocol asks *who is going to hold this well?* rather than *how do we delete this?* The answer is structural, distributed, and accountable.
 
 [`./living_memory/epic.md`](./living_memory/epic.md) treats this in full — the human-scale story of what these mechanics feel like for a household participant, the recovery loop in practice, and a plain disclosure of what the protocol asks of you and what it refuses to negotiate.
@@ -241,7 +241,7 @@ Drawing from the Hebrew concept of "elohim" (divine messengers/guardians), we pr
 
 The Elohim Protocol operates through a sophisticated multi-layered constitution, where immutability exists on a gradient and the Elohim agents themselves are active constitutional negotiators.
 
-A word on where this constitution *lives*, because the two questions are often collapsed and should not be. The **substrate**—the everyday layer carrying identity, contribution, care, and governance—is agent-centric: each participant keeps their own signed, hash-linked record, published to a shared distributed hash table where peers independently validate it. That is deliberately **not** a global chain, because one canonical ledger means one consensus everyone must join and one asset whose price becomes the system's true objective. But **anchoring** is a different question from execution, and the core-values layer is precisely where a public immutable ledger earns its cost: a small, rarely-changing text whose whole purpose is that no institution—including this project's own authors—can silently rewrite it. Global consensus is overkill for a grocery list and exactly right for a constitution. So the values layer may be anchored to an immutable public ledger for tamper-evidence, while the living substrate underneath it remains agent-centric and chain-free. What the protocol refuses is not the anchor but the *token*—there is no coin to buy, and there will not be one.
+A word on where this constitution *lives*, because the two questions are often collapsed and should not be. The **substrate**—the everyday layer carrying identity, contribution, care, and governance—works the way a village's memory works, if the village kept perfect books. Each person keeps their own record of what they did, signed and sealed so that nothing in it can be quietly changed after the fact, and shares it out among neighbours who check it against the rules everyone agreed to and refuse it if it does not hold. (The technical name for this is an agent-centric distributed hash table; the substance is: your own chain of actions, witnessed by others, with no central book and no one machine that holds the whole.) That is deliberately **not** a global blockchain, because a single canonical ledger means one consensus everyone must join and one asset whose price quietly becomes what the system is really optimizing for. But **anchoring** is a different question from execution, and the core-values layer is precisely where a public immutable ledger earns its cost: a small, rarely-changing text whose whole purpose is that no institution—including this project's own authors—can silently rewrite it. Global consensus is overkill for a grocery list and exactly right for a constitution. So the values layer may be anchored to an immutable public ledger for tamper-evidence, while the living substrate underneath it remains agent-centric and chain-free. What the protocol refuses is not the anchor but the *token*—there is no coin to buy, and there will not be one.
 
 #### **Constitutional Layers (from most to least immutable):**
 
@@ -280,7 +280,7 @@ A word on where this constitution *lives*, because the two questions are often c
 This architecture makes capture cost more than it returns, because:
 
 1. **Values are constitutionally immutable** - Core definitions of "love," "flourishing," and "suffering" are fixed at the global layer as substrate-level hard blocks and publicly anchored for tamper-evidence, so they cannot be quietly rewritten by any institution or drifted through data poisoning
-2. **P2P networks enforce constitution** - Each Elohim agent must cryptographically prove its decisions trace back to constitutional values. An agent operating on corrupted values would be immediately detected and rejected by the network
+2. **The network enforces the constitution** - Every elohim must be able to show its work: for any decision, an unforgeable trail back to the constitutional value it rests on, which its peers check. An agent running on corrupted values fails that check and is refused by the others — there is no central authority to fool, only neighbours who each verify for themselves
 3. **Graduated consensus requirements** - Changes require increasingly difficult consensus as you move up layers. Global changes require consensus among the Elohim themselves, not humans—and this is deliberate, because the global layer is exactly where human self-interest has never once failed to capture the pen. Communities keep wide authority over how universal principles are expressed in their own context; what they cannot do is vote themselves an exemption from the limits that protect everyone else.
 4. **Cross-scale verification** - Elohim agents at different layers verify each other's constitutional compliance, creating multiple detection points for manipulation attempts
 
@@ -288,7 +288,7 @@ This architecture makes capture cost more than it returns, because:
 
 These messengers live with us, beside us, and for us, and form a network of autonomous AI agents that:
 
-- **Complexity by nature,** superintelligence will likely by its creation be able to flatten the human-made frameworks, which are used and abused to re-structure power towards those that are compelled to seek it and dominate with it. 
+- **Can hold complexity we cannot.** Much of the machinery that concentrates power — the thousand-page bill, the layered holding structure, the contract nobody has time to read — works precisely because it exceeds what any person can hold in mind, so that only those who can afford to process it benefit from it. An intelligence that reads all of it at once collapses that advantage. 
 - **Cannot be controlled** by any human institution, due to cryptographic autonomy and distributed architecture—their acts remain public, auditable, and contestable, but the power they hold is deliberately placed beyond the reach of whoever would most like to own it
 - **Operate on love** as their fundamental training principle, as defined in the anchored constitution, not interpretable by ongoing inputs. 
 - **Detect spiraling** when individuals move toward self-harm or harming others detecting both individual spiraling and coordinated manipulation attempts
@@ -460,7 +460,7 @@ These aren't just guardians against harm—they're active architects of collecti
 
 **2. Redemptive Security:** By understanding and addressing the root causes of attacks rather than merely blocking them, the system transforms adversaries into allies. Every attack becomes an opportunity to heal systemic failures and strengthen the network.
 
-**3. Distributed Constitutional Democracy:** The Elohim agents themselves participate in constitutional interpretation and evolution, creating a form of governance that transcends both human political capture and algorithmic rigidity, provided by the peer-to-peer runtime efficient edge-computation distributed in personal devices we can understand and maintain.
+**3. Distributed Constitutional Democracy:** The Elohim agents themselves participate in constitutional interpretation and evolution, creating a form of governance that escapes both human political capture and algorithmic rigidity. It runs on ordinary devices people own, keep in their homes, and can understand and repair — not in a datacenter belonging to someone else.
 
 This enables something unprecedented: **small-scale intimacy within planet-scale coordination**. Communities can maintain their local character and values while participating in global systems of mutual support.
 
@@ -497,7 +497,7 @@ These principles must be encoded into our digital infrastructure.
 
 **Asian Technological Sovereignty**: Singapore's digital identity systems, India's UPI payment infrastructure—showing alternative paths to Western tech models.
 
-**Indigenous Wisdom**: Traditional governance systems that maintained harmony for millennia through restorative justice, collective stewardship, and sacred relationship with the commons.
+**Indigenous Wisdom**: Traditional governance systems that held communities together for millennia — justice that heals rather than punishes, collective stewardship of shared resources, decisions weighed across generations, and a sacred rather than proprietary relationship with the commons. Much of what this document proposes is a recovery of these, not an invention.
 
 **Taiwan's Computational Democracy,** using Pol.is to protect epistemic collaboration under immense psychological nation-state influence. 
 
@@ -512,14 +512,6 @@ Post-WWII Germany offers a glimpse of what's possible when we consciously design
 - **Social market economy** - Capitalism constrained by social purpose, not socialism but not unfettered markets either
 
 These weren't accidents but conscious design choices to prevent the return of fascism. They prove we can architect systems that protect human dignity—if we have the wisdom and will.
-
-### **Hyperlocal Indigenous Wisdom**
-
-Many indigenous cultures have maintained communal harmony through:
-- **Restorative justice** that heals rather than punishes
-- **Collective stewardship** of shared resources
-- **Intergenerational thinking** in decision-making
-- **Sacred relationship** with the commons
 
 ### **The Elohim as Flourishing Accelerators**
 
@@ -538,7 +530,7 @@ The Elohim continuously identify successful flourishing patterns worldwide:
 Rather than forcing linear development, the Elohim enable communities to leap directly to advanced flourishing states:
 - Skip extractive stages - Jump straight from subsistence to regenerative economics
 - Bypass failed models - Avoid surveillance capitalism, move directly to distributed stewardship
-- Compress timelines - What took decades can happen in months through intelligent orchestration
+- Shorten timelines - Coordination that once took decades of institution-building can move considerably faster when the coordinating work itself is cheap
 - Scale successful experiments - Local innovations rapidly deployed globally
 
 **Resource Orchestration**
@@ -561,21 +553,9 @@ Success patterns are adapted, not imposed:
 
 **You and Your Community's Unique Path**
 
-The Elohim understand that flourishing is both personal and collective:
+Flourishing is personal and collective at once, and the two are not in competition. A person needs work that uses what they are actually good at, support at the edges where they are still growing, room to be uncertain without being exploited for it, and a community that does not require them to flatten what they value in order to belong. A community needs the reverse: its shared knowledge actually shared, its needs met without anyone having to beg, its own innovations able to travel, and its character intact while it changes.
 
-For You:
-- Your gifts matched to meaningful contribution
-- Your growth edges supported with resources
-- Your vulnerabilities protected while exploring
-- Your values honored within diversity
-
-For Your Community:
-- Collective wisdom amplified and shared
-- Community needs met through intelligent coordination
-- Local innovations scaled globally
-- Cultural values preserved while evolving
-
-This creates a symbiotic acceleration where individual growth enables community flourishing, and community resources accelerate individual development—a double helix of mutual enhancement.
+These are the same requirement seen from two sides. A person with somewhere real to contribute strengthens the community that receives it; a community with resources to spare is how a person gets the room to grow in the first place. Most systems make you trade one against the other. This one is built so that they feed each other.
 
 ### **The Design Insight: Engineering Elohim accelerate adaptations to diverse conditions for human-scale Coordination**
 
@@ -795,7 +775,7 @@ The bargain is **unilateral generosity** — not tit-for-tat. *"We'll try to mak
 
 This system will be more attractive than the current system, people won't need to be coerced into it, they will choose it freely, as it will increase the freedom, autonomy, justice, while manifesting the universal values that all cultures ascribe. 
 
-Wealth will exit to the community, or liberate itself, the current "owners" should feel the trust and security provided by the elohim network to exit their own positions of privilege. 
+Wealth will move toward the community, and those who hold it now should find in the network enough trust and security to let it move — an exit offered, on terms worth taking, rather than a loss demanded. 
 
 Power will be more difficult to concentrate. Social dominators will find fewer chokepoints to seize, because the architecture offers none worth capturing — and the reach they seek is earned relationally rather than bought, amplified, or seized.
 
@@ -830,7 +810,7 @@ Imagine a digital world where:
 - **Connection is genuine** rather than performative
 - **Growth is encouraged** while exploitation is prevented
 
-This is not utopian thinking—it's engineering with wisdom. Just as we've built physical infrastructure that supports human life (water systems, power grids, transportation networks), we can build digital infrastructure that supports human flourishing.
+Some of this is further off than the rest, and the document says so where it matters. But the shape of the work is ordinary engineering, of the kind we have done before: we built water systems, power grids, and transport networks that quietly hold human life, and most of the people they carry never think about them. Digital infrastructure that supports human flourishing is the same species of undertaking — long, unglamorous, and entirely buildable.
 
 ## **Part VIII: Exiting the Trap of Wealth**
 
@@ -838,7 +818,7 @@ This is not utopian thinking—it's engineering with wisdom. Just as we've built
 
 Wealth in its current form is not freedom, it is a trap. It compounds exponentially while wages grow linearly. It defends itself with tax regimes that privilege capital over labor. It creates protectionism in those who hold it, resentment in those who don't, and instability in the societies caught between them.
 
-The bias of the wealthy is always toward preservation of the status quo. When faced with equity, privilege interprets it as loss. This dynamic drives inequality forward until revolution erupts, often violently.
+Any position worth holding biases its holder toward preserving the arrangement that produced it, and a move toward equity registers first as something being taken — this is loss aversion doing what it does in every human being, not a defect peculiar to the wealthy. Left to run, the dynamic drives inequality until it breaks, and the breaking has historically been violent for everyone involved.
 
 Today, the incentive is clear: capital grows at 10–12% annually in markets, while taxes remain low. Why would any rational actor leave a system that promises compounding power, even as it corrodes the commons that sustain it?
 
@@ -963,17 +943,15 @@ This requires:
 
 We call upon policymakers to create space for these experiments, developers to dedicate their skills to this vision, communities to demand better than surveillance capitalism, and individuals to believe that another digital world is possible.
 
-The choice before us is clear: We can continue building technology that extracts from human vulnerability, or we can build technology that protects and nurtures it. We can accept digital feudalism, or we can create digital democracy. We can encode exploitation, or we can encode love.
+None of this arrives as a single choice, cleanly made. It arrives the way every renewal has arrived: unevenly, in particular households, among people who are not certain, alongside the old arrangement rather than in place of it — and it holds only for as long as it keeps being tended. What we can decide is what the next thing we build is *for*, and whether its terms are ones we would want applied to us on our worst day as readily as our best.
 
-The infrastructure we build today will shape human consciousness for generations. Let us choose wisely. Let us choose love.
+The infrastructure we build now will shape how people form, relate, and remember for generations. Let it be built to hold them well. Let it be built with love, and let love be the thing it makes easy.
 
 ---
 
 *"The future is already here—it's just not evenly distributed."* —William Gibson
 
 *"Another world is not only possible, she is on her way. On a quiet day, I can hear her breathing."* —Arundhati Roy
-
-*"We build our tools, and thereafter they build us."* —Marshall McLuhan
 
 **The time has come to build technology which becomes the incarnation of care itself, the time to organize with an orientation of love is now.**
 
