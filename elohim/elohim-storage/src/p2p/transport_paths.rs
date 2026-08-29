@@ -172,6 +172,30 @@ pub enum Route {
     None,
 }
 
+/// The closed vocabulary of route reasons — every `&'static str` that
+/// [`select_path`], [`PathObservations::route`] and
+/// [`PathObservations::note_fallback`] can emit. Metrics registration
+/// pre-touches `elohim_transport_route_total` over this list at zero so a
+/// converged fleet reads `route_total{…} 0` ("nothing routed") rather than an
+/// absent series ("nothing observable") — the C4 trap at the metrics layer,
+/// measured on 7/7 alpha pods 2026-08-29. A reason added below without being
+/// added here is caught by `every_emitted_reason_is_in_the_closed_vocabulary`.
+pub const ROUTE_REASONS: &[&str] = &[
+    "race_small",
+    "race_unknown",
+    "only_plane",
+    "best_rtt",
+    "explore",
+    "explore_unknown",
+    "explore_degraded",
+    "prior_iroh",
+    "unknown_over_degraded",
+    "all_degraded",
+    "selection_off",
+    "fallback",
+    "no_plane",
+];
+
 /// `select_path(eligible, op_class, pick) -> (Route, reason)` — the pure
 /// decision predicate (registered in `seam-registry.yaml`). `eligible` is the
 /// set canon's `select_transport` rules 1/3 derive (planes BOTH peers support
@@ -457,6 +481,54 @@ mod tests {
             transport: t,
             state: s,
             rtt_ewma_ms: rtt,
+        }
+    }
+
+    /// The vocabulary is CLOSED: walk every (state × state × class × pick)
+    /// shape the selector can see and assert the reason it emits is listed in
+    /// [`ROUTE_REASONS`] — the list the metrics layer pre-touches at zero.
+    #[test]
+    fn every_emitted_reason_is_in_the_closed_vocabulary() {
+        let states = [
+            (PathState::Unknown, None),
+            (PathState::Sampled, Some(20.0)),
+            (PathState::Sampled, Some(900.0)),
+            (PathState::Degraded, Some(50.0)),
+            (PathState::Degraded, None),
+        ];
+        let mut seen = std::collections::BTreeSet::new();
+        for class in [OpClass::Small, OpClass::Bulk] {
+            assert_eq!(select_path(&[], class, 1).1, "no_plane");
+            for (sa, ra) in states {
+                let one = [p(Transport::Libp2p, sa, ra)];
+                seen.insert(select_path(&one, class, 1).1);
+                for (sb, rb) in states {
+                    let two = [p(Transport::Libp2p, sa, ra), p(Transport::Iroh, sb, rb)];
+                    for pick in 1..=(2 * EXPLORE_EVERY + 1) {
+                        let reason = select_path(&two, class, pick).1;
+                        assert!(
+                            ROUTE_REASONS.contains(&reason),
+                            "select_path emitted {reason:?}, not in ROUTE_REASONS"
+                        );
+                        seen.insert(reason);
+                    }
+                }
+            }
+        }
+        // The two reasons emitted outside `select_path` are listed too.
+        for r in ["selection_off", "fallback", "no_plane"] {
+            assert!(ROUTE_REASONS.contains(&r));
+        }
+        // And the walk actually reached the vocabulary — a matrix that only
+        // ever hit `only_plane` would prove nothing.
+        for r in [
+            "race_small",
+            "race_unknown",
+            "only_plane",
+            "best_rtt",
+            "prior_iroh",
+        ] {
+            assert!(seen.contains(r), "walk never produced {r:?}: {seen:?}");
         }
     }
 

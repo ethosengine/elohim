@@ -112,7 +112,7 @@ print(len(s.get("rows", [])), s.get("docs", 0), s.get("content", 0))
 recovery_predicate() { # <snapshot-file> <recovering-http-port> -> "P0=.. P1=.. P2=.. P3=.. P4=.."; rc 0 iff all 1
   local snap="$1" port="$2"
   python3 - "$snap" "$port" "$RECOVERY_DOORWAY_A" "$RECOVERY_DOORWAY_B" "$RECOVERY_LANDING_PATH" <<'PY'
-import json, sys, urllib.request, urllib.error
+import json, sys, urllib.request, urllib.error, urllib.parse
 snap, port, dwa, dwb, landing = sys.argv[1:6]
 s = json.load(open(snap))
 def code(url):
@@ -131,7 +131,11 @@ p0 = int(bool(docs) and docs.get("total") == s["docs"])
 p1 = 1; p2 = 1
 p1_bad = []; p2_bad = []
 for row in s["rows"]:
-    j = getj(f"/db/content/{row['id']}")
+    # Quote the id: 2,306 seeded slugs carry spaces, and an unquoted space is an
+    # InvalidURL that this leg used to read as "absent" (2026-08-29) — a URL
+    # grammar failure counted as a replication failure. safe='' so a '/' in an
+    # id cannot re-route either.
+    j = getj(f"/db/content/{urllib.parse.quote(row['id'], safe='')}")
     if not j or j.get("blobHash") != row["blobHash"]:
         p1 = 0
         p1_bad.append(f"{row['id']}={'absent' if not j else (j.get('blobHash') or 'null')[:16]}")

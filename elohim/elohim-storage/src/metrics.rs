@@ -1478,6 +1478,21 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The first-drain gate (`acquisition::first_drain`): `held` per tick the
+    /// first drain waited for the iroh book, then exactly one release reason
+    /// per boot (`book_warm` · `no_iroh_leg` · `expired`). Read beside
+    /// [`TRANSPORT_ROUTE`]: a boot that released `expired` routed its first
+    /// pulls with single-plane peers, so a flat `route_total` there is the
+    /// book, not the selector.
+    pub static ref ACQUISITION_FIRST_DRAIN: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_first_drain_total",
+            "First acquisition drain after boot: ticks held for the iroh peer book, and the release reason.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Acquisition reconcile tick outcomes. This is deliberately separate from
     /// [`ACQUISITION_OUTCOMES`]: fetch outcomes answer whether requested bytes
     /// arrived, while this counter answers whether the local desired-set pass
@@ -2374,8 +2389,45 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_FETCH_WINDOW_REQUEUED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_DISPATCH.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_FIRST_DRAIN.clone()));
+        ACQUISITION_FIRST_DRAIN
+            .with_label_values(&["held"])
+            .inc_by(0);
+        for reason in crate::p2p::acquisition::FirstDrainRelease::ALL {
+            ACQUISITION_FIRST_DRAIN
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(TRANSPORT_ROUTE.clone()));
         let _ = REGISTRY.register(Box::new(TRANSPORT_PATH_RTT_MS.clone()));
+        // Pre-touch the closed route vocabulary at zero (the
+        // ACQUISITION_RECONCILE_OUTCOMES pattern below). An `IntCounterVec`
+        // materialises a series only on first `with_label_values`, and a
+        // converged fleet routes nothing — so on 7/7 alpha pods (2026-08-29)
+        // "no decision yet" and "metric absent" were one reading. `none` is
+        // only ever paired with `no_plane`; every other reason names a plane.
+        // (`TRANSPORT_PATH_RTT_MS` carries a peer label and is NOT pre-touched:
+        // its absence honestly means "no verified sample from that peer".)
+        {
+            use crate::p2p::transport_paths::ROUTE_REASONS;
+            for transport in ["libp2p", "iroh"] {
+                ACQUISITION_DISPATCH
+                    .with_label_values(&[transport])
+                    .inc_by(0);
+                for op_class in ["small", "bulk"] {
+                    for reason in ROUTE_REASONS.iter().filter(|r| **r != "no_plane") {
+                        TRANSPORT_ROUTE
+                            .with_label_values(&[transport, op_class, reason])
+                            .inc_by(0);
+                    }
+                }
+            }
+            for op_class in ["small", "bulk"] {
+                TRANSPORT_ROUTE
+                    .with_label_values(&["none", op_class, "no_plane"])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
         {
             use seam_contracts::ReasonLabel as _;
@@ -3115,6 +3167,11 @@ pub fn inc_acquisition_outcome(outcome: &str) {
 /// Count one acquisition dispatch on `transport` (`libp2p` | `iroh`).
 pub fn inc_acquisition_dispatch(transport: &str) {
     ACQUISITION_DISPATCH.with_label_values(&[transport]).inc();
+}
+
+/// One first-drain gate outcome (`held` per tick, else a release reason).
+pub fn inc_acquisition_first_drain(outcome: &str) {
+    ACQUISITION_FIRST_DRAIN.with_label_values(&[outcome]).inc();
 }
 
 /// One transport route decision (C8 observability-per-decision).
@@ -4771,6 +4828,45 @@ mod tests {
     }
 
     // ── Ghost-witness sweep failure legibility (saga-06-heads-converge stations) ──
+
+    /// Transport self-awareness (C8): the route vocabulary must be readable
+    /// from a scrape BEFORE any decision has been made — a converged fleet
+    /// makes none, and "nothing routed" must not scrape as "metric absent".
+    #[test]
+    fn transport_route_vocabulary_is_pretouched_at_boot() {
+        register_all();
+        let text = gather_text();
+        for transport in ["libp2p", "iroh"] {
+            assert!(
+                text.contains(&format!(
+                    "elohim_acquisition_dispatch_total{{transport=\"{transport}\"}}"
+                )),
+                "dispatch plane {transport} not pre-touched:\n{text}"
+            );
+            for op_class in ["small", "bulk"] {
+                for reason in crate::p2p::transport_paths::ROUTE_REASONS
+                    .iter()
+                    .filter(|r| **r != "no_plane")
+                {
+                    let series = format!(
+                        "elohim_transport_route_total{{op_class=\"{op_class}\",reason=\"{reason}\",transport=\"{transport}\"}}"
+                    );
+                    assert!(text.contains(&series), "{series} not pre-touched");
+                }
+            }
+        }
+        assert!(text.contains(
+            "elohim_transport_route_total{op_class=\"bulk\",reason=\"no_plane\",transport=\"none\"}"
+        ));
+        for outcome in ["held", "book_warm", "no_iroh_leg", "expired"] {
+            assert!(
+                text.contains(&format!(
+                    "elohim_acquisition_first_drain_total{{outcome=\"{outcome}\"}}"
+                )),
+                "first-drain outcome {outcome} not pre-touched"
+            );
+        }
+    }
 
     #[test]
     fn content_witness_reauthor_failed_classes_are_pretouched_at_boot() {

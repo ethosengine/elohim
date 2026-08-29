@@ -7,7 +7,7 @@ title: "2,306 of 3,015 seeded blob-bearing rows have SPACES in their ids; storag
 slug: "content-id-with-spaces-unreachable-by-id"
 written: "2026-08-29"
 author: "M4 quiesce delta"
-status: "open"
+status: "wip"
 priority: "high"
 jobs: [elohim-edge, elohim-genesis]
 cluster: "arch-dataplane-refactor-backlog"
@@ -23,3 +23,16 @@ three (jessica holds all 3,454). Three defects in one shape:
    number on the seeded corpus is NOT comparable across arms (the "absent" floor is the space-id count of that
    run's snapshot: 1,287 vs 2,188).
 3. **seed**: content ids are slugs; a slug with spaces should be refused or normalised at seed time.
+
+## 2026-08-29 defects 1 + 2 cured (local evidence); defect 3 deliberately NOT taken
+
+1. **storage**: `decode_path_id` percent-decodes at the LEAF of every id-bearing arm (`/db/content/{id}`, its
+   `/schedule` · `/head` · `/head-record` · `/canonical-head` suffixes, `/db/allocations/content/{id}`) — after the
+   suffix match, so an encoded `/` cannot re-route; lossy-UTF-8, never a refusal. 4 unit tests incl. the measured
+   value-scanner shape.
+2. **harness**: `hc-mesh-recovery.sh` P1 now `urllib.parse.quote(id, safe='')` — the leg measures replication, not
+   URL grammar. The next cold-recovery run on the full corpus is the first comparable number.
+3. **seed**: measured 2,671 of 3,460 ids in `genesis/data/lamad/content/**` carry spaces (the value-scanner
+   generator mints `scenario-value-scanner-<…>-<title with spaces>`). Content ids are identity — relationships and
+   paths reference them — so normalising is a content MIGRATION (re-mint + rewrite every referrer + reseed the fleet),
+   not a bug fix. Left open on purpose; the storage cure makes the rows reachable as they are.

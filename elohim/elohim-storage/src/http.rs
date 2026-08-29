@@ -200,6 +200,57 @@ pub(crate) fn admission_exempt_path(path: &str) -> bool {
     )
 }
 
+/// Percent-decode one path segment that names a row by id (`/db/content/{id}`,
+/// `/db/allocations/content/{id}`, and the entity-nested `{id}/schedule` ·
+/// `/head` · `/head-record` · `/canonical-head` arms). Content ids are slugs,
+/// and 2,306 of the 3,015 seeded blob-bearing rows carry SPACES — which every
+/// client sends as `%20`. Matching the RAW segment made those rows unreachable
+/// by id on every peer (author included) while `/db/content?limit=…` listed
+/// them; measured 2026-08-29 on the household mesh, where the recovery
+/// harness's P1 leg then read them as "absent" and masked the transport number.
+///
+/// Decoding happens at the LEAF, after the suffix arms have matched on the raw
+/// segment, so an encoded `/` inside an id can never re-route a request.
+/// Invalid UTF-8 is replaced, never refused: a lookup on a mangled id is a 404,
+/// which is the truthful answer. Idempotent on an already-plain id.
+fn decode_path_id(segment: &str) -> std::borrow::Cow<'_, str> {
+    percent_encoding::percent_decode_str(segment).decode_utf8_lossy()
+}
+
+#[cfg(test)]
+mod decode_path_id_tests {
+    use super::decode_path_id;
+
+    #[test]
+    fn plain_id_is_untouched_and_borrowed() {
+        let d = decode_path_id("elohim-host-landing");
+        assert!(matches!(d, std::borrow::Cow::Borrowed(_)));
+        assert_eq!(d, "elohim-host-landing");
+    }
+
+    #[test]
+    fn encoded_spaces_decode_to_the_seeded_slug() {
+        // The measured shape: a value-scanner scenario id with spaces.
+        assert_eq!(
+            decode_path_id(
+                "scenario-value-scanner-worker-scenarios-household-recognizing%20household%20labor"
+            ),
+            "scenario-value-scanner-worker-scenarios-household-recognizing household labor"
+        );
+    }
+
+    #[test]
+    fn apostrophe_and_utf8_survive() {
+        assert_eq!(decode_path_id("child%27s%20care"), "child's care");
+        assert_eq!(decode_path_id("caf%C3%A9"), "café");
+    }
+
+    #[test]
+    fn invalid_utf8_is_replaced_not_refused() {
+        assert_eq!(decode_path_id("bad%FF"), "bad\u{FFFD}");
+    }
+}
+
 #[cfg(test)]
 mod head_declare_write_admission_carveout_tests {
     use super::*;
@@ -5771,8 +5822,9 @@ impl HttpServer {
         // Entity-nested schedule routes: /db/content/{cid}/schedule
         if let Some(rest) = resource_path.strip_prefix("content/") {
             if let Some(cid) = rest.strip_suffix("/schedule") {
+                let cid = decode_path_id(cid);
                 return self
-                    .handle_content_schedule(req, method, cid, &app_ctx)
+                    .handle_content_schedule(req, method, &cid, &app_ctx)
                     .await;
             }
             // Entity-nested notary-HEAD authority: /db/content/{cid}/head
@@ -5785,10 +5837,14 @@ impl HttpServer {
             // more specific suffix first makes the ordering intent explicit and
             // survives a future "/head*" widening.
             if let Some(cid) = rest.strip_suffix("/head-record") {
-                return self.handle_content_head_record(method, cid, &app_ctx).await;
+                let cid = decode_path_id(cid);
+                return self
+                    .handle_content_head_record(method, &cid, &app_ctx)
+                    .await;
             }
             if let Some(cid) = rest.strip_suffix("/head") {
-                return self.handle_content_head(req, method, cid, &app_ctx).await;
+                let cid = decode_path_id(cid);
+                return self.handle_content_head(req, method, &cid, &app_ctx).await;
             }
             // Entity-nested CROSS-ROOT canonical-head declaration (notary-
             // authority convergence, Model B / Tier-1 STAGING tier). Distinct
@@ -5796,14 +5852,18 @@ impl HttpServer {
             // edge auth (auth_required) is the route's protection. Must
             // precede the generic content/{id} catch-all below.
             if let Some(cid) = rest.strip_suffix("/canonical-head") {
+                let cid = decode_path_id(cid);
                 return self
-                    .handle_content_canonical_head(req, method, cid, &app_ctx)
+                    .handle_content_canonical_head(req, method, &cid, &app_ctx)
                     .await;
             }
         }
 
         if let Some(content_id) = resource_path.strip_prefix("content/") {
-            return self.handle_db_content_by_id(req, method, content_id).await;
+            // Decoded at the leaf — see `decode_path_id`: ids with spaces were
+            // a 404 on every peer until 2026-08-29.
+            let content_id = decode_path_id(content_id);
+            return self.handle_db_content_by_id(req, method, &content_id).await;
         }
 
         // Relationships routes
@@ -5980,8 +6040,9 @@ impl HttpServer {
         if let Some(alloc_path) = resource_path.strip_prefix("allocations/") {
             // Support /allocations/content/{content_id} and /allocations/steward/{steward_id}
             if let Some(content_id) = alloc_path.strip_prefix("content/") {
+                let content_id = decode_path_id(content_id);
                 return self
-                    .handle_allocations_for_content(req, method, content_id, &app_ctx)
+                    .handle_allocations_for_content(req, method, &content_id, &app_ctx)
                     .await;
             }
             if let Some(steward_id) = alloc_path.strip_prefix("steward/") {

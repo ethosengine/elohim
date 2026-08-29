@@ -7,7 +7,7 @@ title: "A warm-restarted peer drains its whole pull queue in the first seconds a
 slug: "pull-leg-drains-before-iroh-book-warms"
 written: "2026-08-29"
 author: "M4 transport self-awareness cut"
-status: "open"
+status: "wip"
 priority: "medium"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -36,3 +36,12 @@ tags: [dataplane, iroh, peer-book, boot-ordering, transport-selection, ratchet-l
 
 Fleet relevance: a long-running peer's book is warm and its pull leg runs continuously, so the fleet
 reading of `route_total{reason}` is where the selector's Bulk behaviour actually shows.
+
+## 2026-08-29 cure shape 2 landed (local evidence; mesh measurement pending)
+
+`acquisition::first_drain` (pure, 5 tests) gates the FIRST dispatch tick: hold while the iroh book is empty and
+`< FIRST_DRAIN_HOLD` (10 s) has elapsed; release on `book_warm` (the moment the book learns a peer), `no_iroh_leg`
+(nothing to wait for) or `expired` (bounded, never indefinite). Counted in
+`elohim_acquisition_first_drain_total{outcome}` (pre-touched). Read beside `route_total`: a boot released `expired`
+routed with single-plane peers, so a flat route series there is the book, not the selector. To measure: warm
+recovery on the dual mesh — expect `route_total{op_class="bulk"}` rows to appear on the recovering peer's first drain.

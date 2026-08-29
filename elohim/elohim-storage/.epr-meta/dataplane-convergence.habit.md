@@ -446,3 +446,7 @@ Vec<&Change> to Vec<Change>, and our sole call site is `.len()`.
 HELD 2026-08-10: /account/import no longer writes viewer-relative package
 assignments into peer-global content.reach; red-first handler regression
 and the full elohim-storage unit/integration inventory are green.
+2026-08-29 ratchet slice (local evidence): ids with spaces reachable by id (leaf percent-decode) +
+recovery harness quotes ids (P1 measures replication, not URL grammar); route vocabulary pre-touched
+at zero (absence ≠ 'nothing routed'); first acquisition drain holds ≤10 s for the iroh book
+(`first_drain_total{outcome}`). Lib tests green on default + p2p-iroh; fleet/mesh reads pending.

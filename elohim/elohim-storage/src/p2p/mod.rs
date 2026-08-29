@@ -3601,6 +3601,12 @@ impl P2PNode {
         let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
         acquisition_dispatch_interval
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // The FIRST drain waits (bounded, `acquisition::FIRST_DRAIN_HOLD`) for
+        // the iroh peer book to learn a peer, so the transport selector has a
+        // dual-plane peer to decide on. Measured 2026-08-29: the t=0 drain
+        // emptied the whole queue over libp2p ~8 s before the book warmed.
+        let loop_started = tokio::time::Instant::now();
+        let mut first_drain_released = false;
         // Delay first tick by the full retry interval so it doesn't race with the
         // initial dials queued by start(). start() owns t=0 dialing; this loop owns
         // subsequent attempts.
@@ -3759,6 +3765,39 @@ impl P2PNode {
                 }
                 _ = acquisition_dispatch_interval.tick() => {
                     drop(swarm);
+                    if !first_drain_released {
+                        #[cfg(feature = "p2p-iroh")]
+                        let iroh_book_empty = crate::p2p_iroh::iroh_fetch_leg()
+                            .map(|leg| leg.book().is_empty());
+                        #[cfg(not(feature = "p2p-iroh"))]
+                        let iroh_book_empty: Option<bool> = None;
+                        let since_boot = loop_started.elapsed();
+                        match acquisition::first_drain(
+                            iroh_book_empty,
+                            since_boot,
+                            acquisition::FIRST_DRAIN_HOLD,
+                        ) {
+                            acquisition::FirstDrain::Hold => {
+                                crate::metrics::inc_acquisition_first_drain("held");
+                                debug!(
+                                    target: "elohim_storage::acquisition",
+                                    since_boot_ms = since_boot.as_millis() as u64,
+                                    "first acquisition drain held: iroh peer book is empty"
+                                );
+                                continue;
+                            }
+                            acquisition::FirstDrain::Release(reason) => {
+                                first_drain_released = true;
+                                crate::metrics::inc_acquisition_first_drain(reason.label());
+                                info!(
+                                    target: "elohim_storage::acquisition",
+                                    reason = reason.label(),
+                                    since_boot_ms = since_boot.as_millis() as u64,
+                                    "first acquisition drain released"
+                                );
+                            }
+                        }
+                    }
                     if !self.sync_gate.suppressed() {
                         self.drain_acquisition_queue().await;
                     }

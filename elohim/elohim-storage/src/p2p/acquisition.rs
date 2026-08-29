@@ -55,6 +55,119 @@ pub fn retry_budget_for_peers(connected_peers: usize) -> u32 {
 /// node-level stream).
 pub const MAX_ACQUISITION_INFLIGHT: usize = 25;
 
+/// Longest the FIRST acquisition drain after boot waits for the iroh peer
+/// book to learn a peer. Measured 2026-08-29 (dual household mesh, warm
+/// recovery jessica<-matthew): the 5 s dispatch cadence drained all 11 pulls
+/// in the first seconds while the book learned its first peer at +8..10 s —
+/// so the transport selector only ever saw single-plane peers and libp2p
+/// carried every pull with no decision to make (backlog
+/// `pull-leg-drains-before-iroh-book-warms`). Bounded, never indefinite: a
+/// node whose book never warms drains on this deadline and pays it once.
+pub const FIRST_DRAIN_HOLD: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Why the first drain was released — one per boot, counted in
+/// `elohim_acquisition_first_drain_total{outcome}` (C8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FirstDrainRelease {
+    /// The iroh book holds at least one peer: dual-plane decisions are possible.
+    BookWarm,
+    /// No iroh leg is running — there is no second plane to wait for.
+    NoIrohLeg,
+    /// [`FIRST_DRAIN_HOLD`] elapsed with the book still empty.
+    Expired,
+}
+
+impl FirstDrainRelease {
+    pub const ALL: [FirstDrainRelease; 3] = [
+        FirstDrainRelease::BookWarm,
+        FirstDrainRelease::NoIrohLeg,
+        FirstDrainRelease::Expired,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            FirstDrainRelease::BookWarm => "book_warm",
+            FirstDrainRelease::NoIrohLeg => "no_iroh_leg",
+            FirstDrainRelease::Expired => "expired",
+        }
+    }
+}
+
+/// The first-drain gate's answer for one dispatch tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FirstDrain {
+    /// Keep the queue for the next tick: the iroh book is still empty and the
+    /// hold has time left. Counted as `outcome="held"` per tick.
+    Hold,
+    /// Drain now, and never consult this gate again this process.
+    Release(FirstDrainRelease),
+}
+
+/// Decide whether the first acquisition drain may run. `iroh_book_empty` is
+/// `None` when no iroh leg exists (release at once), `Some(true)` while the
+/// book has learned nobody. Pure: the loop supplies `since_boot` and `hold`.
+pub fn first_drain(
+    iroh_book_empty: Option<bool>,
+    since_boot: std::time::Duration,
+    hold: std::time::Duration,
+) -> FirstDrain {
+    match iroh_book_empty {
+        None => FirstDrain::Release(FirstDrainRelease::NoIrohLeg),
+        Some(false) => FirstDrain::Release(FirstDrainRelease::BookWarm),
+        Some(true) if since_boot >= hold => FirstDrain::Release(FirstDrainRelease::Expired),
+        Some(true) => FirstDrain::Hold,
+    }
+}
+
+#[cfg(test)]
+mod first_drain_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn holds_while_the_book_is_empty_and_time_remains() {
+        assert_eq!(
+            first_drain(Some(true), Duration::from_secs(0), FIRST_DRAIN_HOLD),
+            FirstDrain::Hold
+        );
+        assert_eq!(
+            first_drain(Some(true), Duration::from_secs(9), FIRST_DRAIN_HOLD),
+            FirstDrain::Hold
+        );
+    }
+
+    #[test]
+    fn releases_the_moment_the_book_warms() {
+        assert_eq!(
+            first_drain(Some(false), Duration::from_secs(1), FIRST_DRAIN_HOLD),
+            FirstDrain::Release(FirstDrainRelease::BookWarm)
+        );
+    }
+
+    #[test]
+    fn releases_on_the_deadline_never_indefinitely() {
+        assert_eq!(
+            first_drain(Some(true), FIRST_DRAIN_HOLD, FIRST_DRAIN_HOLD),
+            FirstDrain::Release(FirstDrainRelease::Expired)
+        );
+    }
+
+    #[test]
+    fn releases_at_once_without_an_iroh_leg() {
+        assert_eq!(
+            first_drain(None, Duration::ZERO, FIRST_DRAIN_HOLD),
+            FirstDrain::Release(FirstDrainRelease::NoIrohLeg)
+        );
+    }
+
+    #[test]
+    fn every_release_reason_has_a_distinct_label() {
+        let labels: std::collections::BTreeSet<_> =
+            FirstDrainRelease::ALL.iter().map(|r| r.label()).collect();
+        assert_eq!(labels.len(), FirstDrainRelease::ALL.len());
+    }
+}
+
 /// Pin status for a pin whose every wanted item exhausted its retry budget
 /// against every connected provider.
 ///

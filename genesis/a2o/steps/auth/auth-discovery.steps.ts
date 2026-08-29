@@ -215,7 +215,9 @@ Then(
     // path as its <base href>. The app shell's is "/". Deriving the expected
     // value from the ADVERTISED path also means this cannot drift apart from the
     // document it is checking.
-    const baseHref = `${portalPath.replace(/[^/]*$/, '')}`;
+    // Everything up to and including the last '/' — a string op, not a regex:
+    // sonarjs/slow-regex refuses `/[^/]*$/` (backtracking on a long path).
+    const baseHref = portalPath.slice(0, portalPath.lastIndexOf('/') + 1);
     const declared = /<base\s+href="([^"]*)"/i.exec(html)?.[1];
     assert.equal(
       declared,
