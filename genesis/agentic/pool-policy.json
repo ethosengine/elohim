@@ -1,5 +1,5 @@
 {
-  "_comment": "Pool eviction policy — the operator's standing decisions, codified once so enforcement is deterministic (ccache semantics: bounded cache, automatic eviction). Consumed by pool-lib.sh enforce_pool / cargo-pool enforce, the SessionStart/Stop hooks, the cargo-disk-guard PreToolUse hook, and .husky/pre-push pressure strategy. Decided 2026-06-04 (operator-confirmed: merge-aware dispositions, 150G/75/85 budget, full gate enforcement). Evidence basis: genesis/docs — 71% of the pool was stale ~1GB DWARF test binaries; see memory project_rust_build_footprint_anatomy.",
+  "_comment": "Pool eviction policy \u2014 the operator's standing decisions, codified once so enforcement is deterministic (ccache semantics: bounded cache, automatic eviction). Consumed by pool-lib.sh enforce_pool / cargo-pool enforce, the SessionStart/Stop hooks, the cargo-disk-guard PreToolUse hook, and .husky/pre-push pressure strategy. Decided 2026-06-04 (operator-confirmed: merge-aware dispositions, 150G/75/85 budget, full gate enforcement). Evidence basis: genesis/docs \u2014 71% of the pool was stale ~1GB DWARF test binaries; see memory project_rust_build_footprint_anatomy.",
   "pool_max_gb": 150,
   "volume_soft_pct": 88,
   "volume_hard_pct": 92,
@@ -8,21 +8,53 @@
   "artifact_min_mb": 64,
   "artifact_min_age_hours": 6,
   "keep_warm_slot_days": 7,
-  "_keep_warm_slot_days": "keep-warm trim survivors: the freshest slot per crate (workspace key) built within this many days is always kept; colder keys become candidates oldest-first. Per-slot operator pin: `touch <slot>/.pin` (e.g. the fork conductor — ~3G, ~45 min rebuild).",
-  "_evidence_2026_08_28": "The pool is a cluster-stability control, not only disk hygiene: the workspace PV lives on the root fs of the host that runs the only k8s control plane; a netconsole trace (2026-08-28 23:00Z) showed kswapd soft-locked in ext4_es_scan/__es_shrink (extent-status shrinker, cost ∝ inode count + fragmentation) — 14 CPUs followed, cluster API down for hours, 17th freeze. The pool held 341K of the PV's ~1.02M inodes (126G) and its churn fragments the extent tree. Two enforcement gaps let it grow: hash-gc and the keep-warm cap both skipped the ACTIVE family (dev sat at 96G under a 60G cap). Both now apply slot-granularly with in-use/pin guards.",
+  "_keep_warm_slot_days": "keep-warm trim survivors: the freshest slot per crate (workspace key) built within this many days is always kept; colder keys become candidates oldest-first. Per-slot operator pin: `touch <slot>/.pin` (e.g. the fork conductor \u2014 ~3G, ~45 min rebuild).",
+  "_evidence_2026_08_28": "The pool is a cluster-stability control, not only disk hygiene: the workspace PV lives on the root fs of the host that runs the only k8s control plane; a netconsole trace (2026-08-28 23:00Z) showed kswapd soft-locked in ext4_es_scan/__es_shrink (extent-status shrinker, cost \u221d inode count + fragmentation) \u2014 14 CPUs followed, cluster API down for hours, 17th freeze. The pool held 341K of the PV's ~1.02M inodes (126G) and its churn fragments the extent tree. Two enforcement gaps let it grow: hash-gc and the keep-warm cap both skipped the ACTIVE family (dev sat at 96G under a 60G cap). Both now apply slot-granularly with in-use/pin guards.",
   "families": {
-    "shift": { "disposition": "evict-on-merge" },
-    "sprint": { "disposition": "evict-on-merge" },
-    "dev": { "disposition": "keep-warm", "max_gb": 60 },
-    "e2e": { "disposition": "ttl", "ttl_days": 14 },
-    "design": { "disposition": "ttl", "ttl_days": 14 },
-    "elohim": { "disposition": "ttl", "ttl_days": 14 },
-    "*": { "disposition": "ttl", "ttl_days": 7 }
+    "shift": {
+      "disposition": "evict-on-merge"
+    },
+    "sprint": {
+      "disposition": "evict-on-merge"
+    },
+    "dev": {
+      "disposition": "keep-warm",
+      "max_gb": 60
+    },
+    "e2e": {
+      "disposition": "ttl",
+      "ttl_days": 14
+    },
+    "design": {
+      "disposition": "ttl",
+      "ttl_days": 14
+    },
+    "elohim": {
+      "disposition": "ttl",
+      "ttl_days": 14
+    },
+    "*": {
+      "disposition": "ttl",
+      "ttl_days": 7
+    }
   },
   "_dispositions": {
     "evict-on-merge": "auto-evicted when EVERY local+remote branch under <family>/* is merged into dev AND no live worktree/PIDs reference the family. Active session's family is always protected regardless.",
-    "keep-warm": "never evicted as a family — and trimmed to max_gb EVEN WHILE ACTIVE (the active family is the one that grows; a cap that pauses during work never binds). Survivors: freshest slot per crate built within keep_warm_slot_days, pinned (<slot>/.pin), linked, and in-use slots (cargo lock held or a live process executing from the slot). Candidates go release-profile-first, then oldest-first. Unmeetable caps are reported, never forced.",
+    "keep-warm": "never evicted as a family \u2014 and trimmed to max_gb EVEN WHILE ACTIVE (the active family is the one that grows; a cap that pauses during work never binds). Survivors: freshest slot per crate built within keep_warm_slot_days, pinned (<slot>/.pin), linked, and in-use slots (cargo lock held or a live process executing from the slot). Candidates go release-profile-first, then oldest-first. Unmeetable caps are reported, never forced.",
     "ttl": "evicted after ttl_days with no filesystem activity anywhere in the family tree.",
     "pin": "never touched by enforce (operator-manual only)."
+  },
+  "ram": {
+    "_comment": "RAM guard policy (genesis/agentic/bin/ram-guard + .claude/hooks/ram-guard.py). Percentages are of the container cgroup memory.max (devfile memoryLimit) measured on COMMITTED memory (anon+kernel+shmem+unevictable \u2014 page cache is reclaimable and not counted). Evidence 2026-08-29 17:12Z: the pod had memory.oom.group=1 so one OOM event killed all 35 processes + PID 1; trigger = rustc 4.3G + 7 rust-lld on top of 3 conductors (~1.2G RSS each). soft = advisory; high = shed newest compile tree + deny new heavy builds; hard = tier1 (compile) \u2192 tier2 (JS builders/test runners) \u2192 tier3 (dev servers, sonarqube-mcp, SonarLint, headless chrome). Critical and unclassified processes are never shed. kernel_steering writes memory.oom.group=0, memory.high=memory_high_pct of max, and oom_score_adj (builds 1000, critical 0) so the kernel's own last resort also picks a build, never a conductor or an agent.",
+    "soft_pct": 70,
+    "high_pct": 80,
+    "hard_pct": 88,
+    "memory_high_pct": 94,
+    "poll_seconds": 2.0,
+    "grace_seconds": 3.0,
+    "max_kills_per_tick": 3,
+    "kernel_steering": true,
+    "fallback_max_gb": 30,
+    "events_keep": 500
   }
 }

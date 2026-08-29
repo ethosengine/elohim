@@ -29,6 +29,12 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event session",
+            "timeout": 10,
+            "statusMessage": "RAM guard (workspace memory limit)..."
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/ci-harvest.py\" --hook",
             "timeout": 90,
             "statusMessage": "Harvesting CI results since cursor...",
@@ -79,6 +85,11 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-projection.py\" --event prompt",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event prompt",
             "timeout": 5
           }
         ]
@@ -131,6 +142,11 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/cargo-disk-guard.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event pretool",
             "timeout": 5
           },
           {
@@ -263,6 +279,11 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/deprecation-sentinel.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event posttool",
             "timeout": 5
           }
         ]

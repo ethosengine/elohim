@@ -1,0 +1,755 @@
+#!/usr/bin/env python3
+"""
+RAM Guard — keep the devworkspace under its container memory limit by shedding
+non-critical processes BEFORE the kernel OOM-kills the whole workspace.
+
+Evidence (2026-08-29 17:12Z): the workspace pod hit memory.max (31 GiB); the
+container cgroup carried memory.oom.group=1 (kubelet's cgroup-v2 default), so
+ONE OOM event killed all 35 processes and PID 1 — the whole workspace
+restarted, the mesh and every agent session with it. The trigger was a
+rustc (4.3 GB) + seven rust-lld linkers on top of three conductors.
+
+Three layers, kernel first (policy: genesis/agentic/pool-policy.json `ram`):
+
+1. KERNEL STEERING (re-asserted every tick, all writable from inside the pod —
+   probed 2026-08-29: full caps, cgroupfs rw):
+     memory.oom.group = 0        an OOM kills ONE process, never the workspace
+     memory.high      = N% max   the kernel throttles + reclaims in the band
+                                 below the hard limit instead of killing
+     oom_score_adj    builds → 1000, critical set → 0 (k8s burstable default
+                                 is 869) so even the kernel's own last-resort
+                                 choice is a rustc, not a conductor or claude.
+2. USER-SPACE SHEDDER — a 2 s poll on the pod cgroup's COMMITTED memory
+   (anon + kernel + shmem + unevictable — page cache is reclaimable and must
+   not count) versus memory.max:
+     soft   advisory only (state.json; the hook banners it)
+     high   shed tier1  — compile trees: cargo/rustc/rust-lld/cc/ld/clang
+     hard   shed tier1 → tier2 (JS builders/test runners) → tier3 (dev
+            servers, sonarqube-mcp, SonarLint, headless chrome)
+   Newest tree first inside a tier (least sunk cost, most likely culprit);
+   SIGTERM root-first, SIGKILL after a grace; re-measure between kills.
+   CRITICAL and UNKNOWN processes are never shed — a guard that kills what it
+   cannot name is the OOM killer with extra steps.
+3. AGENT NOTIFICATION — every shed lands in <store>/events.jsonl and the
+   current level in <store>/state.json; .claude/hooks/ram-guard.py reads
+   those (SessionStart ensures the daemon; UserPromptSubmit/PostToolUse
+   banner unseen sheds per session; PreToolUse denies new heavy builds at
+   high/hard).
+
+Store: $RAM_GUARD_DIR | $CLAUDE_CONFIG_DIR/ram-guard | /projects/.claude-config/ram-guard
+  state.json · events.jsonl · guard.log · guard.pid (flock)
+
+Commands:
+  ram-guard start            spawn the daemon (idempotent, detached via setsid)
+  ram-guard stop
+  ram-guard status [--brief] level, pressure, kernel steering, last sheds
+  ram-guard plan             what WOULD be shed at hard right now (dry)
+  ram-guard run              foreground loop (what `start` detaches)
+  ram-guard once [--dry-run] a single tick
+
+Fail-safe by design: every internal error is logged and the loop continues;
+a guard bug must never be the thing that kills the workspace.
+"""
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the devworkspace platform itself sets memory.oom.group=0 and a memory.high throttle "
+    "band on the container (kubelet singleProcessOOMKill / devfile), AND one full quarter passes "
+    "with zero shed events in events.jsonl — the guard exists because the pod's cgroup defaults "
+    "turn one hot rustc into a workspace restart, so it retires when the platform stops doing that."
+)
+
+import fcntl
+import json
+import os
+import re
+import signal
+import sys
+import time
+from dataclasses import dataclass, field, asdict
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json")
+if not os.path.exists(POLICY_FILE):
+    POLICY_FILE = os.path.join(HERE, "..", "pool-policy.json")
+
+DEFAULTS = {
+    "soft_pct": 70,
+    "high_pct": 80,
+    "hard_pct": 88,
+    "memory_high_pct": 94,
+    "poll_seconds": 2.0,
+    "grace_seconds": 3.0,
+    "kernel_steering": True,
+    "max_kills_per_tick": 3,
+    "fallback_max_gb": 30,
+    "events_keep": 500,
+}
+
+TIER_LADDER = ["tier1", "tier2", "tier3"]
+
+
+# ----------------------------------------------------------------- policy
+
+def load_policy(path=POLICY_FILE):
+    p = dict(DEFAULTS)
+    try:
+        with open(path) as f:
+            ram = (json.load(f) or {}).get("ram") or {}
+        for k, v in ram.items():
+            if k in DEFAULTS and not k.startswith("_"):
+                p[k] = v
+    except Exception:
+        pass
+    return p
+
+
+def level_for(pct, policy):
+    if pct >= policy["hard_pct"]:
+        return "hard"
+    if pct >= policy["high_pct"]:
+        return "high"
+    if pct >= policy["soft_pct"]:
+        return "soft"
+    return "ok"
+
+
+def tiers_for_level(level):
+    if level == "high":
+        return ["tier1"]
+    if level == "hard":
+        return list(TIER_LADDER)
+    return []
+
+
+def memory_high_target(max_bytes, policy):
+    """Page-aligned (the kernel rounds memory.high down to a page; an unaligned target would
+    read back different and be re-written every tick)."""
+    page = os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") else 4096
+    return (int(max_bytes * policy["memory_high_pct"] / 100) // page) * page
+
+
+# ----------------------------------------------------------------- sensor
+
+@dataclass
+class Reading:
+    current: int
+    max_bytes: int
+    anon: int
+    kernel: int
+    shmem: int
+    unevictable: int
+    committed: int
+    pct: float
+    psi_some10: float
+    oom_group: int
+    high: str
+
+
+def detect_cgroup_dir():
+    """The pod container's own cgroup-v2 dir (memory.max there is the devfile limit)."""
+    try:
+        with open("/proc/self/cgroup") as f:
+            rel = f.read().strip().split(":", 2)[-1]
+    except Exception:
+        rel = ""
+    for d in (f"/sys/fs/cgroup{rel}", "/sys/fs/cgroup"):
+        if os.path.exists(os.path.join(d, "memory.max")):
+            return d
+    return None
+
+
+class CgroupSensor:
+    def __init__(self, cgroup_dir, fallback_max=None):
+        self.dir = cgroup_dir
+        self.fallback_max = fallback_max or DEFAULTS["fallback_max_gb"] * 2**30
+
+    def _read(self, name):
+        with open(os.path.join(self.dir, name)) as f:
+            return f.read().strip()
+
+    def _int(self, name, default=0):
+        try:
+            v = self._read(name)
+            return int(v) if v != "max" else None
+        except Exception:
+            return default
+
+    def read(self):
+        max_bytes = self._int("memory.max", None) or self.fallback_max
+        current = self._int("memory.current", 0) or 0
+        stat = {}
+        try:
+            for line in self._read("memory.stat").splitlines():
+                k, _, v = line.partition(" ")
+                if v.strip().isdigit():
+                    stat[k] = int(v)
+        except Exception:
+            pass
+        anon = stat.get("anon", 0)
+        kernel = stat.get("kernel", 0)
+        shmem = stat.get("shmem", 0)
+        unevictable = stat.get("unevictable", 0)
+        committed = anon + kernel + shmem + unevictable
+        if committed == 0:  # no memory.stat — fall back to the gross number
+            committed = current
+        pct = round(committed * 100 / max_bytes, 1) if max_bytes else 0.0
+        psi = 0.0
+        try:
+            m = re.search(r"some avg10=([\d.]+)", self._read("memory.pressure"))
+            psi = float(m.group(1)) if m else 0.0
+        except Exception:
+            pass
+        oom_group = self._int("memory.oom.group", 0)
+        try:
+            high = self._read("memory.high")
+        except Exception:
+            high = "?"
+        return Reading(current, max_bytes, anon, kernel, shmem, unevictable, committed, pct, psi, oom_group or 0, high)
+
+    def write(self, name, value):
+        with open(os.path.join(self.dir, name), "w") as f:
+            f.write(str(value))
+
+
+# ----------------------------------------------------------------- processes
+
+@dataclass
+class Proc:
+    pid: int
+    ppid: int
+    comm: str
+    args: str
+    rss_kb: int
+    etimes: float  # seconds since the process started
+
+
+CRITICAL_COMM = {
+    "entrypoint-volu", "machine-exec", "claude", "claude.exe", "holochain", "hc", "lair-keystore",
+    "elohim-storage", "doorway", "mongod", "mempalace-mcp", "ram-guard", "hc-mesh.sh",
+    "bash", "sh", "zsh", "dash", "just", "sshd", "systemd", "init", "tini", "dumb-init",
+}
+CRITICAL_ARGS = re.compile(
+    r"/checode/|code-server|@anthropic-ai/claude-code|\bram-guard\b|hc-mesh|entrypoint-volume|"
+    r"conductor-config\.yaml|/lair-keystore\b|codex(\.js)?\b"
+)
+TIER1_COMM = {
+    "rustc", "rust-lld", "ld", "ld.lld", "lld", "ld.gold", "ld.bfd", "gold", "cc1", "cc1plus", "clang",
+    "clang++", "gcc", "g++", "cc", "c++", "as", "collect2", "wasm-opt", "wasm-bindgen", "cargo-clippy",
+    "clippy-driver", "rustdoc", "sccache-dist", "cmake", "make", "ninja",
+}
+CARGO_HEAVY = {"build", "b", "test", "t", "check", "c", "clippy", "run", "r", "nextest", "bench", "doc", "install", "rustc"}
+TIER3_ARGS = re.compile(
+    r"\bng serve\b|storybook(\.js)?\s+dev\b|\bstorybook\b(?!.*\bbuild\b)|sonarqube-mcp|SonarLint|"
+    r"chrome-headless-shell|headless_shell|/chrome\b|chromium|\bhttp-server\b|reports:serve|"
+    r"(?<![\w./-])vite(\.js)?(\s+(dev|serve|preview)\b|\s*$)|webpack-dev-server|\bnodemon\b"
+)
+TIER2_ARGS = re.compile(
+    r"\bng (build|test|lint|e2e|extract-i18n)\b|\bvitest\b|\bjest\b|\btsc\b|\besbuild\b|storybook.*\bbuild\b|"
+    r"\bplaywright\b|\bcucumber(-js)?\b|\beslint\b|\bkarma\b|\bwebpack\b|\bvite\b.*\bbuild\b|\bng-packagr\b|"
+    r"\brollup\b|\btsx\b.*\btest|\bnode\b.*\.spec\.[jt]s|\bprettier\b|\bsonar-scanner\b|\bstylelint\b|"
+    r"\bswc\b|\bbabel\b|\bwasm-pack\b|\bhc dna pack\b|\bhc app pack\b"
+)
+
+
+def _head_verb(args):
+    toks = args.split()
+    i = 0
+    while i < len(toks) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", toks[i]):
+        i += 1
+    if i >= len(toks):
+        return None, None
+    head = os.path.basename(toks[i])
+    j = i + 1
+    while j < len(toks) and toks[j].startswith("+"):
+        j += 1
+    return head, (toks[j] if j < len(toks) else None)
+
+
+def classify(proc):
+    """critical | tier1 | tier2 | tier3 | unknown. Critical first, always; unknown is never shed."""
+    comm = proc.comm
+    args = proc.args or ""
+    if comm in CRITICAL_COMM or CRITICAL_ARGS.search(args):
+        return "critical"
+    head, verb = _head_verb(args)
+    if comm in TIER1_COMM or head in TIER1_COMM:
+        return "tier1"
+    if comm == "cargo" or head == "cargo":
+        return "tier1" if verb in CARGO_HEAVY else "unknown"
+    if comm.startswith("build-script-") or (head or "").startswith("build-script-"):
+        return "tier1"
+    if TIER3_ARGS.search(args):
+        return "tier3"
+    if TIER2_ARGS.search(args):
+        return "tier2"
+    return "unknown"
+
+
+def oom_adj_for(kind):
+    if kind in TIER_LADDER:
+        return 1000
+    if kind == "critical":
+        return 0
+    return None
+
+
+def snapshot_procs(proc_root="/proc"):
+    try:
+        with open(os.path.join(proc_root, "uptime")) as f:
+            uptime = float(f.read().split()[0])
+    except Exception:
+        uptime = 0.0
+    hz = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+    page_kb = (os.sysconf("SC_PAGE_SIZE") // 1024) if hasattr(os, "sysconf") else 4
+    procs = []
+    for name in os.listdir(proc_root):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        try:
+            with open(os.path.join(proc_root, name, "stat")) as f:
+                st = f.read()
+            rp = st.rindex(")")
+            comm = st[st.index("(") + 1:rp]
+            fields = st[rp + 2:].split()
+            ppid = int(fields[1])
+            starttime = int(fields[19]) / hz
+            rss_kb = int(fields[21]) * page_kb
+            with open(os.path.join(proc_root, name, "cmdline"), "rb") as f:
+                args = f.read().replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+            procs.append(Proc(pid, ppid, comm, args or f"[{comm}]", rss_kb, max(0.0, uptime - starttime)))
+        except Exception:
+            continue
+    return procs
+
+
+@dataclass
+class Tree:
+    root: int
+    tier: str
+    pids: list
+    rss_kb: int
+    etimes: float
+    comm: str
+    cmd: str
+
+
+class ProcTable:
+    def __init__(self, procs):
+        self.by_pid = {p.pid: p for p in procs}
+        self.children = {}
+        for p in procs:
+            self.children.setdefault(p.ppid, []).append(p.pid)
+        self._kind = {}
+
+    def kind(self, pid):
+        if pid not in self._kind:
+            p = self.by_pid.get(pid)
+            self._kind[pid] = classify(p) if p else "unknown"
+        return self._kind[pid]
+
+    def tree_root(self, pid):
+        """Walk up while the parent is a sheddable (tier-classified) process; stop below
+        critical/unknown/shell ancestors so a tree never widens into something we cannot name."""
+        cur = pid
+        seen = {cur}
+        while True:
+            p = self.by_pid.get(cur)
+            if not p:
+                return cur
+            parent = self.by_pid.get(p.ppid)
+            if not parent or parent.pid in seen or self.kind(parent.pid) not in TIER_LADDER:
+                return cur
+            cur = parent.pid
+            seen.add(cur)
+
+    def descendants(self, pid):
+        out, stack = [], list(self.children.get(pid, []))
+        while stack:
+            c = stack.pop()
+            out.append(c)
+            stack.extend(self.children.get(c, []))
+        return out
+
+
+def shed_plan(tbl, tiers, self_pid):
+    """Trees to shed, ordered by tier ladder then newest root first."""
+    roots = {}
+    for pid in tbl.by_pid:
+        if pid == self_pid or tbl.kind(pid) not in TIER_LADDER:
+            continue
+        root = tbl.tree_root(pid)
+        if root == self_pid:
+            continue
+        rk = tbl.kind(root)
+        if rk not in tiers:
+            continue
+        if root not in roots:
+            rp = tbl.by_pid[root]
+            pids = [root] + tbl.descendants(root)
+            rss = sum(tbl.by_pid[x].rss_kb for x in pids if x in tbl.by_pid)
+            roots[root] = Tree(root, rk, pids, rss, rp.etimes, rp.comm, rp.args[:200])
+    order = {t: i for i, t in enumerate(tiers)}
+    return sorted(roots.values(), key=lambda t: (order[t.tier], t.etimes, -t.rss_kb))
+
+
+# ----------------------------------------------------------------- store
+
+def store_dir():
+    return (os.environ.get("RAM_GUARD_DIR")
+            or os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config"), "ram-guard"))
+
+
+class StateStore:
+    def __init__(self, d):
+        self.dir = d
+        os.makedirs(d, exist_ok=True)
+        self.state_path = os.path.join(d, "state.json")
+        self.events_path = os.path.join(d, "events.jsonl")
+        self.log_path = os.path.join(d, "guard.log")
+        self.pid_path = os.path.join(d, "guard.pid")
+
+    def write_state(self, r, level, policy, extra=None):
+        s = {
+            "ts": time.time(), "level": level, "pct": r.pct,
+            "committed_bytes": r.committed, "current_bytes": r.current, "max_bytes": r.max_bytes,
+            "anon_bytes": r.anon, "psi_some10": r.psi_some10, "oom_group": r.oom_group, "memory_high": r.high,
+            "soft_pct": policy["soft_pct"], "high_pct": policy["high_pct"], "hard_pct": policy["hard_pct"],
+            "pid": os.getpid(),
+        }
+        if extra:
+            s.update(extra)
+        tmp = self.state_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(s, f)
+        os.replace(tmp, self.state_path)
+
+    def read_state(self):
+        try:
+            with open(self.state_path) as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def append_event(self, ev, keep=DEFAULTS["events_keep"]):
+        with open(self.events_path, "a") as f:
+            f.write(json.dumps(ev) + "\n")
+        try:
+            if os.path.getsize(self.events_path) > 512 * 1024:
+                with open(self.events_path) as f:
+                    lines = f.readlines()[-keep:]
+                tmp = self.events_path + ".tmp"
+                with open(tmp, "w") as f:
+                    f.writelines(lines)
+                os.replace(tmp, self.events_path)
+        except Exception:
+            pass
+
+    def events(self, n=20):
+        try:
+            with open(self.events_path) as f:
+                lines = f.readlines()[-n:]
+            return [json.loads(l) for l in lines if l.strip()]
+        except Exception:
+            return []
+
+    def log(self, msg):
+        line = f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {msg}\n"
+        try:
+            with open(self.log_path, "a") as f:
+                f.write(line)
+        except Exception:
+            pass
+        return line
+
+
+# ----------------------------------------------------------------- shedding
+
+def kill_tree(pids, sig, grace=3.0):
+    """SIGTERM root first (so a driver cannot respawn children), then the rest; SIGKILL survivors after grace."""
+    for pid in pids:
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
+        except Exception:
+            pass
+    if sig == signal.SIGKILL or grace <= 0:
+        return
+    deadline = time.time() + grace
+    while time.time() < deadline:
+        alive = [p for p in pids if os.path.exists(f"/proc/{p}")]
+        if not alive:
+            return
+        time.sleep(0.2)
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+
+def shed(tbl, reading, policy, store, tiers, self_pid, killer, remeasure, max_kills):
+    """Walk the plan, killing one tree at a time and re-measuring; stop as soon as pressure
+    drops below high or max_kills is reached. Returns the number of trees shed."""
+    level = level_for(reading.pct, policy)
+    kills = 0
+    r = reading
+    for tree in shed_plan(tbl, tiers, self_pid):
+        if kills >= max_kills:
+            break
+        killer(tree.pids, signal.SIGTERM)
+        kills += 1
+        store.append_event({
+            "ts": time.time(), "level": level, "pct": r.pct, "committed_bytes": r.committed, "max_bytes": r.max_bytes,
+            "tier": tree.tier, "root": tree.root, "comm": tree.comm, "cmd": tree.cmd, "rss_kb": tree.rss_kb,
+            "age_s": round(tree.etimes), "pids": tree.pids, "signal": "SIGTERM",
+        }, keep=policy.get("events_keep", DEFAULTS["events_keep"]))
+        store.log(f"SHED {tree.tier} root={tree.root} {tree.comm} rss={tree.rss_kb // 1024}MB age={tree.etimes:.0f}s "
+                  f"at {r.pct}% ({level}) — {tree.cmd[:120]}")
+        r = remeasure()
+        if level_for(r.pct, policy) in ("ok", "soft"):
+            break
+    return kills
+
+
+# ----------------------------------------------------------------- daemon
+
+class Daemon:
+    def __init__(self, policy=None, store=None, sensor=None, dry_run=False):
+        self.policy = policy or load_policy()
+        self.store = store or StateStore(store_dir())
+        cg = detect_cgroup_dir()
+        self.sensor = sensor or (CgroupSensor(cg, self.policy["fallback_max_gb"] * 2**30) if cg else None)
+        self.dry_run = dry_run
+        self._adj_set = {}
+        self._steer_warned = False
+        self.ticks = 0
+
+    def steer_cgroup(self, r):
+        if not self.policy.get("kernel_steering", True) or self.dry_run or not self.sensor:
+            return
+        try:
+            if r.oom_group != 0:
+                self.sensor.write("memory.oom.group", "0")
+                self.store.log("STEER memory.oom.group 1 → 0 (one OOM kills one process, not the workspace)")
+            target = memory_high_target(r.max_bytes, self.policy)
+            if r.high != str(target):
+                self.sensor.write("memory.high", str(target))
+                self.store.log(f"STEER memory.high {r.high} → {target} ({self.policy['memory_high_pct']}% of max)")
+        except Exception as e:
+            if not self._steer_warned:
+                self.store.log(f"STEER unavailable ({e}); running as user-space shedder only")
+                self._steer_warned = True
+
+    def steer_oom_scores(self, tbl):
+        if not self.policy.get("kernel_steering", True) or self.dry_run:
+            return
+        for pid in list(tbl.by_pid):
+            adj = oom_adj_for(tbl.kind(pid))
+            if adj is None or self._adj_set.get(pid) == adj:
+                continue
+            path = f"/proc/{pid}/oom_score_adj"
+            try:
+                with open(path) as f:
+                    cur = int(f.read().strip() or 0)
+                if cur != adj:
+                    with open(path, "w") as f:
+                        f.write(str(adj))
+                self._adj_set[pid] = adj
+            except Exception:
+                continue
+        # forget dead pids so a recycled pid is re-evaluated
+        for pid in [p for p in self._adj_set if p not in tbl.by_pid]:
+            self._adj_set.pop(pid, None)
+
+    def tick(self):
+        if not self.sensor:
+            self.store.log("no cgroup memory files found — cannot measure")
+            return None
+        r = self.sensor.read()
+        level = level_for(r.pct, self.policy)
+        self.steer_cgroup(r)
+        tbl = ProcTable(snapshot_procs())
+        # every tick: rustc/lld live for seconds, and a pid the guard has already set is skipped
+        # via _adj_set, so the per-tick cost is one small read per NEW pid only
+        self.steer_oom_scores(tbl)
+        shed_n = 0
+        tiers = tiers_for_level(level)
+        if tiers:
+            grace = self.policy["grace_seconds"]
+            killer = (lambda pids, sig: self.store.log(f"DRY-RUN would kill {pids}")) if self.dry_run \
+                else (lambda pids, sig: kill_tree(pids, sig, grace))
+
+            def remeasure():
+                time.sleep(0.5)
+                return self.sensor.read()
+            shed_n = shed(tbl, r, self.policy, self.store, tiers, os.getpid(), killer, remeasure,
+                          self.policy["max_kills_per_tick"])
+            r = self.sensor.read()
+            level = level_for(r.pct, self.policy)
+        self.store.write_state(r, level, self.policy, {"last_shed_n": shed_n, "tick": self.ticks})
+        self.ticks += 1
+        return r, level, shed_n
+
+    def run(self):
+        lock = open(self.store.pid_path, "a+")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("ram-guard: already running", file=sys.stderr)
+            return 1
+        lock.seek(0); lock.truncate(); lock.write(str(os.getpid())); lock.flush()
+        stop = {"v": False}
+
+        def _stop(*_):
+            stop["v"] = True
+        signal.signal(signal.SIGTERM, _stop)
+        signal.signal(signal.SIGINT, _stop)
+        self.store.log(f"START pid={os.getpid()} policy soft/high/hard={self.policy['soft_pct']}/{self.policy['high_pct']}/"
+                       f"{self.policy['hard_pct']}% memory_high={self.policy['memory_high_pct']}% cgroup={getattr(self.sensor, 'dir', None)}")
+        last_level = None
+        while not stop["v"]:
+            try:
+                res = self.tick()
+                if res:
+                    r, level, _ = res
+                    if level != last_level:
+                        self.store.log(f"LEVEL {last_level} → {level} at {r.pct}% committed={r.committed // 2**20}MB of {r.max_bytes // 2**20}MB")
+                        last_level = level
+            except Exception as e:  # fail-safe: never let the guard die of its own bug
+                self.store.log(f"tick error: {e!r}")
+            time.sleep(self.policy["poll_seconds"])
+        self.store.log("STOP")
+        return 0
+
+
+# ----------------------------------------------------------------- cli
+
+def _running_pid(store):
+    try:
+        with open(store.pid_path) as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(f, fcntl.LOCK_UN)
+            return None  # lock free → not running
+    except FileNotFoundError:
+        return None
+    except OSError:
+        try:
+            with open(store.pid_path) as f:
+                return int(f.read().strip() or 0) or None
+        except Exception:
+            return -1
+
+
+def cmd_start(store):
+    pid = _running_pid(store)
+    if pid:
+        print(f"ram-guard: running (pid {pid})")
+        return 0
+    # double-fork + setsid: survives the spawning hook/tool/session exiting
+    if os.fork() != 0:
+        time.sleep(0.3)
+        pid = _running_pid(store)
+        print(f"ram-guard: started (pid {pid})" if pid else "ram-guard: start failed — see guard.log")
+        return 0 if pid else 1
+    os.setsid()
+    if os.fork() != 0:
+        os._exit(0)
+    devnull = os.open(os.devnull, os.O_RDWR)
+    for fd in (0, 1, 2):
+        os.dup2(devnull, fd)
+    os.chdir("/")
+    os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), "run"])
+
+
+def cmd_stop(store):
+    pid = _running_pid(store)
+    if not pid or pid < 0:
+        print("ram-guard: not running")
+        return 0
+    os.kill(pid, signal.SIGTERM)
+    print(f"ram-guard: stopped (pid {pid})")
+    return 0
+
+
+def _fmt_gb(b):
+    return f"{b / 2**30:.1f}G"
+
+
+def cmd_status(store, brief=False):
+    s = store.read_state()
+    pid = _running_pid(store)
+    if not s:
+        print("RAM-GUARD  not running (no state) — genesis/agentic/bin/ram-guard start")
+        return 1
+    age = time.time() - s.get("ts", 0)
+    alive = pid and age < 30
+    head = (f"RAM-GUARD  {s['level'].upper():4}  committed {_fmt_gb(s['committed_bytes'])} / {_fmt_gb(s['max_bytes'])} "
+            f"({s['pct']}%)  soft/high/hard {s['soft_pct']}/{s['high_pct']}/{s['hard_pct']}%  "
+            + (f"daemon pid {pid}" if alive else f"DAEMON STALE ({age:.0f}s) — ram-guard start"))
+    print(head)
+    if brief:
+        return 0 if alive else 1
+    print(f"  cgroup current {_fmt_gb(s['current_bytes'])} (page cache is reclaimable and not counted) · anon {_fmt_gb(s['anon_bytes'])} · "
+          f"psi some10 {s.get('psi_some10', 0)}")
+    print(f"  kernel steering: memory.oom.group={s.get('oom_group')} (0 = one OOM kills one process) · memory.high={s.get('memory_high')}")
+    ev = store.events(8)
+    if ev:
+        print("  recent sheds:")
+        for e in ev:
+            print(f"    {time.strftime('%m-%d %H:%M:%S', time.localtime(e['ts']))} {e['tier']} {e['comm']:<14} "
+                  f"{e['rss_kb'] // 1024:>5}MB at {e['pct']}%  {e['cmd'][:90]}")
+    else:
+        print("  recent sheds: none")
+    print(f"  store: {store.dir}")
+    return 0 if alive else 1
+
+
+def cmd_plan(store, policy):
+    tbl = ProcTable(snapshot_procs())
+    plan = shed_plan(tbl, TIER_LADDER, os.getpid())
+    print(f"shed order at HARD ({policy['hard_pct']}%) — tier ladder, newest tree first (dry, nothing killed):")
+    for t in plan:
+        print(f"  {t.tier} root={t.root:<7} {t.comm:<16} {t.rss_kb // 1024:>6}MB  {len(t.pids):>3} pids  age {t.etimes:>6.0f}s  {t.cmd[:90]}")
+    if not plan:
+        print("  (nothing sheddable is running)")
+    crit = sum(1 for p in tbl.by_pid if tbl.kind(p) == "critical")
+    unk = [tbl.by_pid[p] for p in tbl.by_pid if tbl.kind(p) == "unknown"]
+    unk.sort(key=lambda p: -p.rss_kb)
+    print(f"protected: {crit} critical · {len(unk)} unknown (never shed). Largest unknown:")
+    for p in unk[:6]:
+        print(f"    {p.pid:<7} {p.comm:<16} {p.rss_kb // 1024:>6}MB  {p.args[:90]}")
+    return 0
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    store = StateStore(store_dir())
+    policy = load_policy()
+    if cmd == "start":
+        return cmd_start(store)
+    if cmd == "stop":
+        return cmd_stop(store)
+    if cmd == "status":
+        return cmd_status(store, brief="--brief" in argv)
+    if cmd == "plan":
+        return cmd_plan(store, policy)
+    if cmd == "run":
+        return Daemon(policy, store).run()
+    if cmd == "once":
+        d = Daemon(policy, store, dry_run="--dry-run" in argv)
+        res = d.tick()
+        if res:
+            r, level, n = res
+            print(f"{level} {r.pct}% committed={_fmt_gb(r.committed)} max={_fmt_gb(r.max_bytes)} shed={n}")
+        return 0
+    print(__doc__.split("Commands:")[1].split("Fail-safe")[0])
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -309,7 +309,7 @@ look kind="page" target="":
       *) echo "look kind must be page|graphos" >&2; exit 2 ;;
     esac
 
-# Show the runtime, habits, saga, CI preview, or seed state.
+# Show the runtime, habits, saga, CI preview, seed, or RAM-guard state.
 status view="all":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -326,8 +326,9 @@ status view="all":
       saga) python3 "{{ root }}/.claude/scripts/saga-status.py" ;;
       ci) node "{{ root }}/genesis/orchestrator/preview.mjs" origin/dev ;;
       seed) cd "{{ seeder_dir }}"; exec pnpm exec tsx src/stats.ts ;;
-      all) runtime; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
-      *) echo "status view must be all|runtime|habits|saga|ci|seed" >&2; exit 2 ;;
+      ram) exec python3 "{{ root }}/genesis/agentic/bin/ram-guard" status ;;
+      all) runtime; python3 "{{ root }}/genesis/agentic/bin/ram-guard" status --brief || true; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
+      *) echo "status view must be all|runtime|habits|saga|ci|seed|ram" >&2; exit 2 ;;
     esac
 
 # Generate or verify derived interfaces. Safe default: verify.

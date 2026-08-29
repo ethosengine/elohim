@@ -161,6 +161,53 @@ cargo-pool orphans           # deduped merged-dirty history + live dirty-no-proc
   subagent process. The live scan surfaces crash-recovery candidates without
   storing them.
 
+## RAM guard (`ram-guard`)
+
+The disk pool's sibling for memory. Evidence 2026-08-29 17:12Z: the workspace
+pod hit `memory.max` (31 GiB) and, because the container cgroup carries
+`memory.oom.group=1` (kubelet's cgroup-v2 default), ONE OOM event killed all
+35 processes and PID 1 — the whole workspace restarted (mesh, agents,
+terminals). The trigger was a `rustc` (4.3 GB) + seven `rust-lld` linkers on
+top of three conductors (~1.2 GB RSS each).
+
+Policy: `pool-policy.json` `ram` block. Store (PVC, outside the repo):
+`$CLAUDE_CONFIG_DIR/ram-guard/{state.json,events.jsonl,guard.log,guard.pid}`.
+
+Three layers, kernel first:
+
+1. **Kernel steering** (re-asserted every tick): `memory.oom.group=0` (an OOM
+   kills one process, never the workspace); `memory.high = memory_high_pct`
+   of `memory.max` (the kernel throttles + reclaims in that band instead of
+   killing); `oom_score_adj` builds → 1000, critical set → 0 (k8s default
+   869), so even the kernel's own last resort picks a `rustc`, not a
+   conductor or a `claude`.
+2. **User-space shedder** — 2 s poll on the pod cgroup's COMMITTED memory
+   (`anon+kernel+shmem+unevictable`; page cache is reclaimable and is not
+   counted) vs `memory.max`: `soft` advisory · `high` shed tier1 (compile
+   trees: cargo/rustc/rust-lld/cc/ld) newest first · `hard` tier1 → tier2
+   (ng build/test, vitest, jest, tsc, esbuild, playwright, cucumber, eslint)
+   → tier3 (ng serve, storybook, sonarqube-mcp, SonarLint, headless chrome).
+   SIGTERM root-first, SIGKILL after `grace_seconds`, re-measure between
+   kills. **Critical and unclassified processes are never shed** (checode/IDE,
+   claude, holochain, hc, elohim-storage, doorway, mongod, shells, the guard).
+3. **Agent notification** — `.claude/hooks/ram-guard.py`: SessionStart
+   ensures the daemon (idempotent `start`) and prints one status line;
+   UserPromptSubmit / PostToolUse banner sheds a session has not yet seen
+   (per-session cursor under `seen/`) plus the pressure line at soft+;
+   PreToolUse Bash denies NEW heavy work (heavy cargo, `just gate|test`, JS
+   builders/test runners) at high/hard, advisory at soft, never on stale state.
+
+```bash
+genesis/agentic/bin/ram-guard start|stop      # detached daemon (setsid, flock pidfile)
+genesis/agentic/bin/ram-guard status [--brief]  # = just status ram
+genesis/agentic/bin/ram-guard plan            # what WOULD be shed at hard, right now (dry)
+genesis/agentic/bin/ram-guard once --dry-run  # one tick, logs instead of signalling
+```
+
+Tests: `python3 .claude/hooks/tests/test_ram_guard.py`. Cheapest lever while
+a build runs hot: `CARGO_BUILD_JOBS=4` (seven concurrent linkers was the
+spike), one feature-set clippy at a time while conductors are up.
+
 ## Env vars
 
 | Variable | Default | Purpose |
