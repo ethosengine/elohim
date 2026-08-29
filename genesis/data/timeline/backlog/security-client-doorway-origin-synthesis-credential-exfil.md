@@ -7,7 +7,7 @@ title: "The login client SYNTHESIZES a doorway origin from user-typed text, pers
 slug: "security-client-doorway-origin-synthesis-credential-exfil"
 written: "2026-08-28"
 author: "opus (red-team lens of the auth-client-module design pass; chain re-verified on disk)"
-status: "backlog"
+status: "resolved"
 priority: "critical"
 area: "app/imagodei"
 domain: "protocol"
@@ -94,3 +94,49 @@ must be attested in that human's own record rather than advertised publicly.
 at `/.well-known/doorway-keys` (`routes/federation.rs:173`), so signing the body and having the
 client verify against that JWKS is the remaining work, and it is what closes a MITM or
 stale-DNS answer rewriting the document.
+
+
+---
+
+## RESOLVED 2026-08-29
+
+Landed in `e73869bd6`. 1199 imagodei tests pass; `just gate elohim-app` green
+end to end (0 lint errors, AOT build, 220 files / 4612 tests).
+
+Four changes, each removing a way for typed text to become a request origin:
+
+1. A doorway DECLARES the gateway it serves (`gatewayDomain` on `DoorwayInfo`).
+   `resolveGatewayToDoorwayUrl` is a lookup against declarations and returns
+   `string | null`; both synthesis fallbacks are deleted. The old matcher also
+   used `.includes`, so `alpha.elohim.host.evil.tld` matched the real alpha
+   doorway — host equality closes that.
+2. Adopting an unknown host requires `probeDoorway`, which GETs
+   `/.well-known/elohim-auth` on the typed host's OWN origin and selects exactly
+   what answered, never a `doorway-`-prefixed derivative.
+3. `DoorwaySelection.verified` gates use, and is RECOMPUTED on restore rather
+   than read back from storage. This was the subtle half: fixing the write path
+   while trusting the restore path fixes nothing for anyone already poisoned,
+   because localStorage is attacker-writable and a selection persisted before
+   the rule existed would otherwise survive it.
+4. Precedence inverted — the environment is the default; a selection is an
+   override that must carry proof.
+
+**One thing this investigation found that the row did not name.**
+`handle_login` re-qualifies a submitted identifier's local part with the
+doorway's OWN gateway domain, so POSTing `alice@other.host` at a doorway serving
+`alpha.elohim.host` authenticates ALPHA's alice on a password collision —
+silently, as the wrong human. The wire cannot express the distinction, so login
+refuses a foreign identifier before the request exists.
+
+**The tests are the deliverable as much as the fix.** Four in
+`doorway.model.spec.ts` previously asserted the SYNTHESIS behaviour — they
+encoded this vulnerability — and now assert the refusal, alongside four
+hostile-input vectors. The registry spec's "should create minimal entry for
+unknown URL" likewise asserted the permissive path.
+
+**Caught late, worth recording:** lint and 4611 tests passed on a version where
+`login.component` still called the trusted-only setter with the probed URL,
+which would have silently refused every legitimately-probed doorway and broken
+federated sign-in. Only the AOT build surfaced it (`TS2345`), via the nullable
+return type. The security fix and the regression it nearly caused were separated
+by one `ng build`.

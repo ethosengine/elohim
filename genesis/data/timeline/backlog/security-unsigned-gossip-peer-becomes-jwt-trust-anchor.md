@@ -7,7 +7,7 @@ title: "A doorway learned only from UNSIGNED HTTP gossip is fetched for JWKS on 
 slug: "security-unsigned-gossip-peer-becomes-jwt-trust-anchor"
 written: "2026-08-29"
 author: "opus (red-team lens of the client control-surface design pass; every line re-verified on disk)"
-status: "backlog"
+status: "resolved"
 priority: "critical"
 area: "doorway/doorway-service"
 domain: "protocol"
@@ -81,3 +81,42 @@ Surfaced by the peer-plurality grounding leg of the client control-surface desig
 output is otherwise about a TypeScript client. It is filed here rather than absorbed into that
 design because it is a server-side trust-set defect that no client change can mitigate: the
 client cannot see which peers the doorway has already decided to trust as token issuers.
+
+
+---
+
+## RESOLVED 2026-08-29
+
+Both halves landed. `cargo test federation` green: 36 tests, three of them new.
+
+**(a) The entry guard.** `PeerJwksCache::insert_positive` returns bool and refuses
+to replace a live kid with a DIFFERENT pubkey; the same key for the same kid is a
+legitimate refresh and still succeeds. Two tests pin both directions
+(`insert_positive_refuses_conflicting_pubkey_for_same_kid`,
+`insert_positive_accepts_identical_pubkey_as_refresh`) so a guard that simply
+refused everything would not pass.
+
+**(b) The source.** `spawn_peer_jwks_refresh_task` no longer reads `PeerCache` at
+all. It takes the ZomeCaller + FederationConfig, asks the DHT doorway registry,
+and fetches JWKS only for doorways carrying a non-empty `signing_key` — asserted
+by `jwks_refresh_never_reaches_a_doorway_without_a_signing_key`.
+
+**This row's own step 1 was NOT implemented, because it is unimplementable as
+written.** "Filter the peer cache by provenance" cannot be done: `PeerDoorway`
+carries no signature material, `PeerCache` is 100% gossip by construction, and
+`record_signature` is verified nowhere in this service. A literal implementation
+would either no-op or empty the trust set. Changing the SOURCE was the available
+fix, not filtering the existing one. The `record_signature` half is filed
+separately as `security-federation-record-signature-serialized-never-verified`.
+
+**Where it landed:** commit `4230637f4`. That commit's message describes
+dataplane inventory work and does not mention this fix — a concurrent session
+committed across the shared worktree while these changes were staged. The code is
+correct and tested; the trail is recorded here because the commit message will
+not lead anyone to it.
+
+**Carry forward:** half (b) is fail-closed. A doorway with no `zome_caller` ends
+with an empty JWKS trust set and cross-doorway verification stops. That is nearly
+free today — HS256 is the mint default and the foreign-kid path hard-refuses
+non-EdDSA — but it becomes load-bearing the moment `DOORWAY_JWT_SIGN_ALG` is
+flipped to eddsa. Re-check it BEFORE that flip, not after.
