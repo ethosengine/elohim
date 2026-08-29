@@ -162,8 +162,8 @@ describe('readAuthDiscovery — states that must not be confused', () => {
     expect(answer.state).toBe('present');
     if (answer.state !== 'present') return;
     expect(portalUrl(answer.value, ORIGIN)).toBe(`${ORIGIN}/threshold/login`);
-    expect(portalUrl(answer.value, `${ORIGIN}/`, '/lamad')).toBe(
-      `${ORIGIN}/threshold/login?returnUrl=%2Flamad`
+    expect(portalUrl(answer.value, `${ORIGIN}/`, '/learning')).toBe(
+      `${ORIGIN}/threshold/login?returnUrl=%2Flearning`
     );
   });
 });
