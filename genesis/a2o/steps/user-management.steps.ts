@@ -10,6 +10,12 @@ import { strict as assert } from 'node:assert';
 import { When, Then } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
+import {
+  identifierCandidates,
+  localPart,
+  namesHuman,
+  expectedIdentifiersFor,
+} from '../src/framework/doorway-identity.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 import type {
@@ -22,51 +28,6 @@ import type { Human } from '../src/framework/human.js';
 // ---------------------------------------------------------------------------
 // Finding a human in the users list
 // ---------------------------------------------------------------------------
-
-/**
- * Every identifier the doorway could be storing this human under.
- *
- * TWO things make a naive `u.identifier === human.credentials.identifier`
- * match fail, and both are real product behaviour rather than test drift:
- *
- * 1. **The doorway gateway-scopes identifiers on register AND login**
- *    (`auth_routes.rs normalize_identifier`): the local-part is re-qualified
- *    with the doorway's own configured domain, so `susan@test.elohim.host`
- *    is STORED and returned as `susan@alpha.elohim.host`, and an ephemeral
- *    `e2e-troublemaker-<id>@test.elohim.host` becomes
- *    `e2e-troublemaker-<id>@alpha.elohim.host`. Verified live:
- *      POST /auth/login {"identifier":"susan@test.elohim.host"}
- *        -> 200 {"identifier":"susan@alpha.elohim.host", ...}
- *    The credentials the test TYPED are therefore not the credentials the
- *    doorway KEEPS.
- *
- * 2. Legacy rows from before that normalization landed still carry the old
- *    domain (alpha holds both `susan@alpha.elohim.host` and
- *    `susan@test.elohim.host`), so the requested form can also be a real —
- *    but stale — row.
- *
- * The auth response's `identifier` is the authoritative answer: it is exactly
- * what the doorway resolved this session to. Prefer it, and keep the requested
- * identifier as a fallback for deployments with no configured gateway domain
- * (local dev), where the doorway leaves the identifier untouched.
- */
-function identifierCandidates(human: Human): string[] {
-  const candidates: string[] = [];
-  const device = human.devices[0];
-  if (device instanceof BrowserDevice) {
-    const sessionIdentifier = device.client.session?.identifier;
-    if (sessionIdentifier) candidates.push(sessionIdentifier);
-  }
-  if (!candidates.includes(human.credentials.identifier)) {
-    candidates.push(human.credentials.identifier);
-  }
-  return candidates;
-}
-
-/** The part before the `@` — stable across gateway re-qualification. */
-function localPart(identifier: string): string {
-  return identifier.split('@')[0];
-}
 
 /**
  * Find a human's row in the WHOLE admin users collection.
@@ -307,7 +268,14 @@ Then(
   function (this: E2EWorld, humanName: string) {
     assert.ok(lastUserDetails, 'No user details available');
     const human = this.getHuman(humanName);
-    assert.strictEqual(lastUserDetails.identifier, human.credentials.identifier);
+    // The details row carries the identifier the DOORWAY stores, which on any
+    // gateway-scoping doorway is not the one the credentials name — the same
+    // reason findUserEntry above matches on candidates rather than on equality.
+    assert.ok(
+      namesHuman(lastUserDetails.identifier, human),
+      `the details row is "${lastUserDetails.identifier}", which is not ${humanName} on ` +
+        `this doorway (expected ${expectedIdentifiersFor(human)})`
+    );
   }
 );
 

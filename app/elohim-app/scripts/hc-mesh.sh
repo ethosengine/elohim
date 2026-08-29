@@ -210,6 +210,19 @@ if [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
+
+# MESH_DOORWAY_GATEWAY_SCOPING — does a mesh doorway name its humans the way a
+# FLEET doorway does? Every deployed doorway runs with DOORWAY_URL set, and
+# doorway-service then re-qualifies an identifier's local part to
+# `<local>@<gateway domain>` on register AND login (auth_routes.rs
+# `gateway_domain` + `normalize_identifier`), so `/auth/me` answers
+# `matthew.dowell@alpha.elohim.host`. With no DOORWAY_URL it stores identifiers
+# verbatim -- which is what this mesh did until 2026-08-29, and why the fleet,
+# not the mesh, was the thing that discovered a portal scenario asserting the
+# bare name (genesis #1519; backlog portal-login-step-domain-scoped-identifier).
+# A mesh that cannot express the fleet's identity convention cannot pre-empt a
+# fleet red about it, so the default is ON. Set to 0 to run the verbatim shape.
+MESH_DOORWAY_GATEWAY_SCOPING="${MESH_DOORWAY_GATEWAY_SCOPING:-1}"
 # mongod backs the doorways' Mongo-side projection archive (app_file_cache /
 # warm-shell ShellArchive / DoorwayResolver store). Without it every doorway
 # constructs an INERT WarmShellStore and a memory-only projection — which is
@@ -1621,6 +1634,9 @@ EOF
     # nohup command never sees. 2026-08-22 (123cea498) that severed DOORWAY_ID and
     # DOORWAY_HEALTH_PORT — doorway A booted with a random doorway_id, matched ZERO
     # project-epr rows, and served / as 503 and /lamad as 404 for a whole lane.
+    local gw_a=()
+    [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_a=("DOORWAY_URL=http://localhost:$DOORWAY_PORT")
+    env "${gw_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
@@ -1653,6 +1669,9 @@ EOF
   # island DHT). Gives the saga's cross-doorway legs a LOCAL target instead of
   # bleeding to the live production doorway (E2E_DOORWAY_B).
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
+    local gw_b=()
+    [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_b=("DOORWAY_URL=http://localhost:$DOORWAY_B_PORT")
+    env "${gw_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \

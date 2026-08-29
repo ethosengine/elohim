@@ -12,6 +12,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { DoorwayClient } from '../src/framework/api/doorway-client.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
+import { namesHuman, expectedIdentifiersFor } from '../src/framework/doorway-identity.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -114,7 +115,11 @@ Then(
     const freshClient = new DoorwayClient(device.client.url);
     freshClient.setToken(jwt);
     const me = await freshClient.me();
-    assert.strictEqual(me.identifier, human.credentials.identifier);
+    assert.ok(
+      namesHuman(me.identifier, human),
+      `the exchanged session names "${me.identifier}", which is not ${humanName} on this ` +
+        `doorway (expected ${expectedIdentifiersFor(human)})`
+    );
   }
 );
 
@@ -213,16 +218,41 @@ Then(
     const account = await appClient.account();
 
     assert.ok(account, 'Account endpoint returned nothing');
-    assert.strictEqual(account.identifier, human.credentials.identifier);
+    assert.ok(
+      namesHuman(account.identifier, human),
+      `the doorway-app account is "${account.identifier}", which is not ${humanName} on this ` +
+        `doorway (expected ${expectedIdentifiersFor(human)})`
+    );
     this.contentIds.set('doorwayAppAccountIdentifier', account.identifier);
   }
 );
 
+/**
+ * The handoff must not RENAME the human.
+ *
+ * This step used to read `the account identifier should be
+ * "matthew.dowell@alpha.elohim.host"` — a fleet hostname hardcoded into a
+ * scenario that also runs against the household mesh, where the same human is
+ * `matthew.dowell@localhost`. It could therefore only ever be green in one
+ * deployment, and what it was really reaching for is deployment-independent:
+ * the account the doorway-app sees is named EXACTLY as the doorway named it when
+ * it issued the session, so nothing in the exchange re-qualifies or downgrades
+ * the identifier. That is a strictly stronger claim than the previous step's
+ * (which only asks that it be one of the names for this human) and it needs no
+ * knowledge of the doorway's domain convention.
+ */
 Then(
-  'the account identifier should be {string}',
-  function (this: E2EWorld, expectedIdentifier: string) {
+  'the account identifier is exactly the one the doorway issued at sign-in',
+  function (this: E2EWorld) {
     const identifier = this.contentIds.get('doorwayAppAccountIdentifier');
-    assert.strictEqual(identifier, expectedIdentifier);
+    const issued = this.contentIds.get('doorwayAppIdentifier');
+    assert.ok(issued, 'no identifier was recorded when the doorway issued the session');
+    assert.strictEqual(
+      identifier,
+      issued,
+      `the handoff renamed the human: the doorway issued "${issued}" but the doorway-app ` +
+        `account is "${identifier}"`
+    );
   }
 );
 
@@ -231,10 +261,10 @@ Then(
   function (this: E2EWorld, humanName: string) {
     const human = this.getHuman(humanName);
     const doorwayIdentifier = this.contentIds.get('doorwayAppIdentifier');
-    assert.strictEqual(
-      doorwayIdentifier,
-      human.credentials.identifier,
-      'Identifiers do not match across elohim-app and doorway-app'
+    assert.ok(
+      namesHuman(doorwayIdentifier, human),
+      `doorway-app names the handed-off human "${doorwayIdentifier}", which is not ` +
+        `${humanName} on this doorway (expected ${expectedIdentifiersFor(human)})`
     );
   }
 );

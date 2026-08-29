@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { When, Then } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
+import { namesHuman, expectedIdentifiersFor } from '../src/framework/doorway-identity.js';
 import { getFixture } from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -203,7 +204,13 @@ Then(
     assert.strictEqual(this.contentIds.get('lastMeSuccess'), 'true', '/auth/me failed');
     const me = JSON.parse(this.contentIds.get('lastMeResponse')!) as Record<string, unknown>;
     const human = this.getHuman(humanName);
-    assert.strictEqual(me.identifier, human.credentials.identifier);
+    // The doorway gateway-scopes identifiers, so what it ANSWERS is not always
+    // what the scenario typed — see src/framework/doorway-identity.ts.
+    assert.ok(
+      namesHuman(me.identifier as string | undefined, human),
+      `/auth/me named "${String(me.identifier)}", which is not ${humanName} on this ` +
+        `doorway (expected ${expectedIdentifiersFor(human)})`
+    );
   }
 );
 

@@ -36,6 +36,7 @@ import type { E2EWorld } from '../../src/framework/world.js';
 /** Per-scenario OAuth state. The cucumber World is constructed per scenario, so
  *  hanging this off it keeps parallel workers from sharing a code. */
 interface OAuthState {
+  /** What the DOORWAY calls this human, read back from its own login answer. */
   identifier: string;
   humanId: string;
   token: string;
@@ -146,11 +147,26 @@ Given(
     const loginBody = await login.body.text();
     assert.ok(login.statusCode < 300, `login failed: ${login.statusCode} ${loginBody}`);
 
-    const parsed = JSON.parse(loginBody) as { token?: string; humanId?: string };
+    const parsed = JSON.parse(loginBody) as {
+      token?: string;
+      humanId?: string;
+      identifier?: string;
+    };
     assert.ok(parsed.token, `login returned no token: ${loginBody}`);
+    // The doorway names the human it resolved this session to, and on a
+    // gateway-scoping doorway that is NOT the string typed above: the local part
+    // is re-qualified with the doorway's own domain
+    // (auth_routes.rs normalize_identifier), so `x@local.mesh` is kept as
+    // `x@localhost` on the mesh and `x@alpha.elohim.host` on the fleet. Carrying
+    // the requested spelling forward is how a scenario ends up asserting a name
+    // no deployment actually uses -- see src/framework/doorway-identity.ts.
+    assert.ok(
+      parsed.identifier,
+      `login named no human, so nothing downstream can check whose token this is: ${loginBody}`
+    );
 
     (this as unknown as { __oauth: OAuthState }).__oauth = {
-      identifier,
+      identifier: parsed.identifier,
       humanId: parsed.humanId ?? '',
       token: parsed.token,
       state: `a2o-${randomUUID().slice(0, 8)}`,

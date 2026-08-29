@@ -7,7 +7,7 @@ title: "The deployed doorway names a signed-in hosted human with its gateway dom
 slug: "portal-login-step-domain-scoped-identifier"
 written: "2026-08-29"
 author: "m4-fleet-confirm shift (close)"
-status: "wip"
+status: "triaged"
 priority: "medium"
 jobs: [elohim-genesis]
 cluster: "arch-frontend-bundle-seams-backlog"
@@ -35,3 +35,34 @@ scope identifiers the way the fleet does. Nothing is derived, so nothing can dri
 variant (`gatewayDomainOf` mirroring `auth_routes.rs`) was written and superseded the same hour. Landing commit and
 fleet read: that session's delta below. Separately, the a2o gate's one standing error (`auth-discovery.steps.ts`
 slow-regex) is cleared in the dataplane ratchet commit so this push is not refused on lint.
+
+## 2026-08-29 landed — measured on the household mesh
+
+Seven sites, one class. The instance the fleet caught is the portal step; the same naive
+`assert.strictEqual(<what the doorway answered>, <what the scenario typed>)` sat at six more:
+`auth-lifecycle.steps.ts` (`/auth/me`), `session-handoff.steps.ts` x3, `user-management.steps.ts`
+(admin details for a THIRD-PARTY human, where the doorway's answer arrives via the admin row
+rather than a session), and `oauth-code-flow.steps.ts`, which had registered under a synthetic
+`@local.mesh`. `session-handoff.feature` additionally hardcoded `matthew.dowell@alpha.elohim.host`
+— a fleet hostname pinned into a scenario that also runs on the mesh, so it could only ever be
+green in one deployment. Replaced by the property it was reaching for: the handoff must not
+RENAME the human, so the doorway-app account must be EXACTLY the identifier the doorway issued at
+sign-in (strictly stronger, and deployment-independent).
+
+**Why the fleet found this and the mesh could not.** Every deployed doorway runs with
+`DOORWAY_URL` set; `hc-mesh.sh` launched both mesh doorways WITHOUT it, so `gateway_domain`
+returned `None` and identifiers were stored verbatim. The household mesh was structurally
+incapable of expressing the convention it was being asked to assert.
+`MESH_DOORWAY_GATEWAY_SCOPING` (default **1**) closes that. Measured after the change: register
+bare `probe-<uuid>` -> stored `probe-<uuid>@localhost`; login bare -> 200 naming
+`probe-<uuid>@localhost`.
+
+**Detector control.** Flipping the portal assertion back to the bare name fails on the
+now-scoped mesh with genesis #1519's exact shape (`"...@localhost"` vs `"..."`). Reverted; green
+after. The mesh can now pre-empt this class instead of the fleet discovering it.
+
+**Evidence (household mesh, scoping on):** `@auth` lane **37 passed / 0 failed** / 9 held / 1
+pending — the pending is `human "Susan" is logged in`, a household-formation precondition that
+predates this work. Portal browser lane 2/2 Act I passed (Act II twins correctly held). a2o
+`tsc --noEmit` and `eslint` clean on every touched file. Fleet read arrives with the next
+genesis run; that is the CONFIRM, not the discovery.

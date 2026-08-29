@@ -43,10 +43,14 @@ const AUTH_TOKEN_KEY = 'doorway_auth_token';
 const PORTAL_PATH = '/threshold/login';
 
 interface PortalState {
-  /** The full identifier the human is registered under: `<local>@<gatewayDomain>`. */
-  identifier: string;
-  /** Only the local part — the portal appends the domain itself. */
+  /** What the human types into the portal, and the whole identifier on the wire. */
   localPart: string;
+  /**
+   * What the DOORWAY says it stored for that human, read back from the register
+   * response. Bare on a doorway with no configured URL, `<local>@<gatewayDomain>`
+   * on a fleet doorway — either way it is this deployment's own answer, not ours.
+   */
+  canonicalIdentifier: string;
   password: string;
   device: PlaywrightDevice;
   doorwayUrl: string;
@@ -76,24 +80,43 @@ function doorwayBase(world: E2EWorld, id: string): string {
 }
 
 /*
- * WHY THERE IS NO DOMAIN COMPOSITION HERE.
+ * WHY THIS ASKS THE DOORWAY WHAT IT CALLS THE HUMAN, INSTEAD OF WORKING IT OUT.
  *
  * The portal RENDERS a domain suffix beside the identifier field
  * (`threshold-domain-suffix`, from `gatewayDomain()` =
  * `window.location.hostname` minus a `doorway-` prefix), so a human reads
  * "you are signing in as name@<doorway>". It does NOT send that domain: the
  * submitted body is `{"identifier":"<exactly what was typed>"}`, measured on the
- * local mesh 2026-08-28.
+ * local mesh 2026-08-28. So these steps type the bare local part — exactly the
+ * string the portal will submit.
  *
- * And the doorway stores identifiers VERBATIM — it does no domain resolution.
- * Measured, same day: register `bare` then login `bare` -> 200; login
- * `bare@localhost` -> 401 INVALID_CREDENTIALS.
+ * What the doorway STORES is a different question, and it depends on how that
+ * doorway is deployed (`doorway-service/src/routes/auth_routes.rs`,
+ * `gateway_domain` + `normalize_identifier`): with `--doorway-url` configured it
+ * re-qualifies the local part to `<local>@<gateway domain>` on register AND on
+ * login, so `GET /auth/me` names the human `portal-a2o-<uuid>@alpha.elohim.host`
+ * (genesis #1519, 2026-08-29); with no URL configured it stores the identifier
+ * verbatim. Asserting the bare name is what failed that build — on an identifier
+ * convention, not on sign-in. The session was real.
  *
- * So the rendered suffix is cosmetic and contradicts the wire. These steps
- * therefore register the human under exactly the string the portal will submit.
- * Filed as backlog `security-doorway-portal-domain-suffix-not-submitted`; when
- * that is resolved one way or the other, this comment and the registration below
- * are what must change.
+ * The cure is NOT to re-derive the convention here. Re-implementing
+ * `gateway_domain` in TypeScript would make a second hand-maintained home for a
+ * rule that already has one, guarded by nothing but a comment asking the two to
+ * agree — and it would still be wrong wherever a test reaches a doorway at an
+ * address other than the one that doorway was configured with.
+ *
+ * Instead: registration ASKS. `POST /auth/register` answers with the canonical
+ * identifier it stored (`AuthResponse.identifier`, auth_routes.rs:168), so the
+ * doorway states its own convention once, in the deployment under test, and the
+ * scenario holds it to that answer afterwards. The anchor that keeps this from
+ * being circular is the uuid: the local part of what the doorway returns must be
+ * the local part this scenario minted, so a doorway cannot satisfy it by naming
+ * some other human. Then the portal's token must name that canonical identifier
+ * EXACTLY — not one of several tolerated spellings.
+ *
+ * The rendered-but-not-submitted suffix is filed as backlog
+ * `security-doorway-portal-domain-suffix-not-submitted`; this identifier
+ * convention as `portal-login-step-domain-scoped-identifier`.
  */
 
 Given(
@@ -105,13 +128,14 @@ Given(
     // depending on that doorway having been seeded with the household personas.
     // Registered under exactly what the portal submits — see the note above.
     const localPart = `portal-a2o-${randomUUID()}`;
-    const identifier = localPart;
     const password = `portal-a2o-${randomUUID()}`;
 
     const res = await request(`${base}/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ identifier, password, displayName: 'Portal A2O' }),
+      // The bare local part — see the note above: it is the whole identifier the
+      // portal will submit, so it is what this human is registered under.
+      body: JSON.stringify({ identifier: localPart, password, displayName: 'Portal A2O' }),
     });
     const body = await res.body.text();
     assert.ok(
@@ -119,9 +143,28 @@ Given(
       `could not register a hosted human on "${doorwayId}": ${res.statusCode} ${body}`
     );
 
+    // The doorway names the human it just stored. Which spelling that is depends
+    // on how THIS doorway is deployed, so it is read rather than derived.
+    const registered = JSON.parse(body) as { identifier?: string };
+    const canonicalIdentifier = registered.identifier;
+    assert.ok(
+      typeof canonicalIdentifier === 'string' && canonicalIdentifier.length > 0,
+      `the doorway registered a human without naming it, so nothing downstream can check ` +
+        `whose session the portal mints: ${body}`
+    );
+    // The anchor that stops this being circular: whatever domain the doorway may
+    // qualify with, the LOCAL PART has to be the one-off name minted here. A
+    // doorway cannot satisfy the scenario by answering for a different human.
+    assert.equal(
+      canonicalIdentifier.split('@')[0],
+      localPart,
+      `registration asked for "${localPart}" and the doorway stored ` +
+        `"${canonicalIdentifier}" — that is a different human, not a domain convention`
+    );
+
     const s = stash(this);
-    s.identifier = identifier;
     s.localPart = localPart;
+    s.canonicalIdentifier = canonicalIdentifier;
     s.password = password;
     s.doorwayUrl = base;
   }
@@ -220,11 +263,13 @@ Then('the doorway confirms a session for that human', async function (this: E2EW
     `the doorway refused the token the portal minted: ${res.statusCode} ${body}`
   );
   const me = JSON.parse(body) as { identifier?: string };
+  // Exact: the token the PORTAL minted must resolve to the same account
+  // REGISTRATION created, under the very name this doorway said it stored.
   assert.equal(
     me.identifier,
-    s.identifier,
-    `the doorway named "${me.identifier}" for the portal's token, not the human who ` +
-      `signed in ("${s.identifier}")`
+    s.canonicalIdentifier,
+    `the doorway named "${me.identifier}" for the portal's token, but registration ` +
+      `stored "${s.canonicalIdentifier}" — the portal signed somebody else in`
   );
 });
 

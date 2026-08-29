@@ -44,4 +44,4 @@ Feature: Cross-App Session Handoff
     When Matthew requests a session transfer token
     And Matthew opens the doorway-app with the transfer token
     Then the doorway-app account endpoint should return Matthew's account
-    And the account identifier should be "matthew.dowell@alpha.elohim.host"
+    And the account identifier is exactly the one the doorway issued at sign-in
