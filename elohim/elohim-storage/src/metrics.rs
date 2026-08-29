@@ -1443,6 +1443,32 @@ lazy_static! {
     /// [`ACQUISITION_OUTCOMES`] and `elohim_iroh_blob_fetches_total`: a dual mesh
     /// where `{transport="iroh"}` stays flat has iroh wired but idle on the pull
     /// leg (the 2026-08-28 fleet shape); labels are the two planes, never a peer.
+    /// Transport self-awareness (spec 2026-08-24 §3.1, C8): every `Route`
+    /// decision, by plane × op_class × reason (`race_small` · `race_unknown` ·
+    /// `only_plane` · `best_rtt` · `explore` · `explore_unknown` ·
+    /// `explore_degraded` · `prior_iroh` · `unknown_over_degraded` ·
+    /// `all_degraded` · `selection_off` · `fallback` · `no_plane`).
+    pub static ref TRANSPORT_ROUTE: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_transport_route_total",
+            "Transport route decisions by plane, op_class and reason.",
+        ),
+        &["transport", "op_class", "reason"],
+    )
+    .unwrap();
+
+    /// Verified-success RTT samples per (peer, plane, op_class) — the races
+    /// are the probe. Peer cardinality is bounded by the peer book.
+    pub static ref TRANSPORT_PATH_RTT_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_transport_path_rtt_ms",
+            "Verified-success RTT per peer, transport plane and op_class (ms).",
+        )
+        .buckets(vec![5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 30000.0]),
+        &["peer", "transport", "op_class"],
+    )
+    .unwrap();
+
     pub static ref ACQUISITION_DISPATCH: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_acquisition_dispatch_total",
@@ -2348,6 +2374,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_FETCH_WINDOW_REQUEUED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_DISPATCH.clone()));
+        let _ = REGISTRY.register(Box::new(TRANSPORT_ROUTE.clone()));
+        let _ = REGISTRY.register(Box::new(TRANSPORT_PATH_RTT_MS.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
         {
             use seam_contracts::ReasonLabel as _;
@@ -3087,6 +3115,20 @@ pub fn inc_acquisition_outcome(outcome: &str) {
 /// Count one acquisition dispatch on `transport` (`libp2p` | `iroh`).
 pub fn inc_acquisition_dispatch(transport: &str) {
     ACQUISITION_DISPATCH.with_label_values(&[transport]).inc();
+}
+
+/// One transport route decision (C8 observability-per-decision).
+pub fn inc_transport_route(transport: &str, op_class: &str, reason: &str) {
+    TRANSPORT_ROUTE
+        .with_label_values(&[transport, op_class, reason])
+        .inc();
+}
+
+/// One verified-success RTT sample on a transport path.
+pub fn observe_transport_path_rtt(peer: &str, transport: &str, op_class: &str, ms: f64) {
+    TRANSPORT_PATH_RTT_MS
+        .with_label_values(&[peer, transport, op_class])
+        .observe(ms);
 }
 
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.

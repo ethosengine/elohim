@@ -247,6 +247,7 @@ pub async fn race_fetch(
             let hash = blob_hash.to_string();
             let timeout = per_peer_timeout;
             let peer_label = peer_id_str.clone();
+            let started = std::time::Instant::now();
             in_flight.push(tokio::spawn(async move {
                 let (reply_tx, reply_rx) = oneshot::channel();
                 if cmd_tx
@@ -258,13 +259,13 @@ pub async fn race_fetch(
                     .await
                     .is_err()
                 {
-                    return (peer_label, Err("swarm channel closed".to_string()));
+                    return (peer_label, started, Err("swarm channel closed".to_string()));
                 }
                 match tokio::time::timeout(timeout, reply_rx).await {
-                    Ok(Ok(Ok(reply))) => (peer_label, Ok(reply)),
-                    Ok(Ok(Err(e))) => (peer_label, Err(e)),
-                    Ok(Err(_)) => (peer_label, Err("oneshot dropped".to_string())),
-                    Err(_) => (peer_label, Err("timeout".to_string())),
+                    Ok(Ok(Ok(reply))) => (peer_label, started, Ok(reply)),
+                    Ok(Ok(Err(e))) => (peer_label, started, Err(e)),
+                    Ok(Err(_)) => (peer_label, started, Err("oneshot dropped".to_string())),
+                    Err(_) => (peer_label, started, Err("timeout".to_string())),
                 }
             }));
         }
@@ -273,9 +274,32 @@ pub async fn race_fetch(
         // hash-verified manifest, Q3) wins. Mismatches and errors are
         // skipped — keep polling the remaining futures.
         while let Some(joined) = in_flight.next().await {
-            let Ok((peer, Ok(reply))) = joined else {
+            let Ok((peer, started, reply)) = joined else {
                 continue;
             };
+            let reply = match reply {
+                Ok(reply) => reply,
+                Err(_) => {
+                    // The races are the probe: a failed leg is a libp2p Small sample too.
+                    crate::p2p::transport_paths::global().record(
+                        &peer,
+                        crate::p2p::transport_paths::Transport::Libp2p,
+                        crate::p2p::transport_paths::OpClass::Small,
+                        None,
+                        false,
+                        false,
+                    );
+                    continue;
+                }
+            };
+            crate::p2p::transport_paths::global().record(
+                &peer,
+                crate::p2p::transport_paths::Transport::Libp2p,
+                crate::p2p::transport_paths::OpClass::Small,
+                Some(started.elapsed()),
+                true,
+                false,
+            );
             match reply {
                 BlobFetchReply::Bytes(bytes) => {
                     if verify_blob_hash(&bytes, blob_hash) {

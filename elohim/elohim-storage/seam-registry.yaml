@@ -102,6 +102,76 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: ghost_decay_blocked_leg_agrees_with_the_predicate
         kind: unit
+  - name: select_path
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/transport_paths.rs
+      modulePath: p2p::transport_paths::select_path
+      line: 183
+    summary: >
+      Transport self-awareness (spec 2026-08-24 §3.1). Refines canon's
+      peer_map::select_transport eligible set (planes BOTH peers support; Track3/NoShared
+      never reach here) into a Route: Small ops RACE every eligible plane (the races are
+      the probe — each yields an RTT sample per plane); Bulk ops SELECT the lowest-EWMA
+      Sampled plane, with a deterministic exploration floor (1 in EXPLORE_EVERY picks) so
+      the non-preferred live plane keeps earning samples; Unknown is its own state — in the
+      race on Small, the IMMEDIATE Bulk pick until it earns one sample, preferred over
+      Degraded, never last;
+      Degraded is explored only every 2×EXPLORE_EVERY picks (never twice in a row for a
+      large transfer). ELOHIM_TRANSPORT_SELECTION=off restores the static prior
+      (labelled selection_off). Consumers: acquisition_dispatch::plan_acquisition_targets_selected
+      (pull leg), P2PNode::push_shard_routed (write-time custody push, iroh leg + one fallback).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          T2 substrate, both swarms co-resident (TransportBackend::Dual); a route choice is a
+          local, reversible, un-witnessed act.
+      - id: C3
+        status: answered
+        justification: >
+          Exploration floor keeps a non-preferred live plane sampled; a Degraded plane that
+          starts succeeding returns to Sampled through the ring rate and the hint clearing
+          on a clean success — no operator action. Test
+          c3_degraded_plane_recovers_to_sampled_on_its_own.
+      - id: C4
+        status: answered
+        justification: >
+          Unknown never coerces to slow: it races on Small and is the Bulk exploration pick
+          within EXPLORE_EVERY picks; with nothing Sampled it beats Degraded. Test
+          c4_unknown_races_on_small_and_is_explored_on_bulk_within_n_picks.
+      - id: C6a
+        status: answered
+        justification: >
+          Race capped at the eligible set (≤2 planes); ring fixed at RING=16 per key; keys
+          bounded by the peer book with a MAX_KEYS backstop; pure predicate, no retries.
+      - id: C7
+        status: gap
+        gapNote: >
+          Advertise/serve symmetry — an advertised plane that fails to serve is recorded
+          Degraded (surfaces the drift) but the drift itself is not cured here.
+      - id: C8
+        status: answered
+        justification: >
+          Every Route increments elohim_transport_route_total{transport,op_class,reason}
+          (closed vocabulary incl. fallback and selection_off); every verified success
+          observes elohim_transport_path_rtt_ms{peer,transport,op_class};
+          /p2p/status.transportPaths projects the ring.
+      - id: C11
+        status: answered
+        justification: >
+          saturation_hint lowers weight (Degraded) and never triggers a retry; the only
+          retry is the single push fallback to the OTHER plane, counted as fallback.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/transport_paths.rs
+        testName: c4_unknown_races_on_small_and_is_explored_on_bulk_within_n_picks
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/transport_paths.rs
+        testName: c3_degraded_plane_recovers_to_sampled_on_its_own
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/transport_paths.rs
+        testName: degraded_is_avoided_and_never_explored_twice_in_a_row
+        kind: unit
   - name: decide_head_action
     kind: pure-decision-predicate
     sourceLocation:

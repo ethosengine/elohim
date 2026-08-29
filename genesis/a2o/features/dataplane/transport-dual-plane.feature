@@ -30,3 +30,18 @@ Feature: Matthew's household actually exchanges data on its iroh plane
     # transport-manifest gossip is how peers learn each other's iroh addresses —
     # receiving one proves another peer's announcement crossed the iroh plane
     And labeled metric "elohim_iroh_gossip_received_total" with label "topic" "elohim/transport/manifest" on peer "matthew" >= 1
+
+  # Transport self-awareness: Matthew's peer measures each plane by the work
+  # it already does (a read-miss heal races libp2p and iroh and times both),
+  # then sends bulk work down the plane the measurements favour. Every route
+  # decision is counted by plane, class and reason — `race_small` /
+  # `race_unknown` are the measuring races, `best_rtt` / `explore_*` the
+  # evidence-based picks, `only_plane` a peer reachable one way. Seeing a
+  # route on EACH plane on the same peer proves neither plane went unused —
+  # the liveness the design promises: a plane that is never tried can never
+  # be measured, and a plane never measured can never win.
+  @concern:transport-diversity
+  Scenario: Matthew's peer has routed work over both planes
+    Then labeled metric "elohim_transport_route_total" with label "transport" "iroh" on peer "matthew" >= 1
+    And labeled metric "elohim_transport_route_total" with label "transport" "libp2p" on peer "matthew" >= 1
+

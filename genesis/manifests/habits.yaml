@@ -105,6 +105,19 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-29b (M4 transport self-awareness; NO status flip). Landed
+      spec 2026-08-24 §3.1: p2p::transport_paths (PathObservation ring keyed by
+      the cross-plane peer label; select_path pure predicate, registry row, C3/C4
+      contract tests), elohim_transport_route_total{transport,op_class,reason} +
+      elohim_transport_path_rtt_ms, /p2p/status.transportPaths. Small ops race
+      both planes and sample them; Bulk selects on evidence — pull leg
+      (plan_acquisition_targets_selected) and the write-time custody push
+      (push_shard_routed, new iroh leg + one fallback). Measured, dual household
+      mesh: jessica->matthew Small iroh 15 ms vs libp2p 816 ms (degraded); probe
+      content's shards pushed transport=iroh to both holders. Warm recovery
+      on 62/59/61 s, off 61/60/58 s, on-v2 61/57/60 s: inside noise on a LAN
+      (spec-predicted); ELOHIM_TRANSPORT_SELECTION=off is the rollback. Gap
+      filed: a warm-restarted peer drains its pulls before its iroh book warms.
       DELTA 2026-08-29a (transport-parity check; NO status flip). Pure-iroh
       PARITY measured: homo-iroh warm jessica<-matthew 61 / 60 / 72 s and cold
       113 s, all PASS P0-P4 (cut reconcile-peers-1, durable rows 01:16-01:21Z);

@@ -702,6 +702,14 @@ async fn race_both_planes(
                 match tokio::time::timeout(iroh_timeout, leg.fetch(addr.clone(), &wire)).await {
                     Err(_) => {
                         crate::metrics::inc_iroh_blob_fetch("timeout");
+                        crate::p2p::transport_paths::global().record(
+                            &peer_id,
+                            crate::p2p::transport_paths::Transport::Iroh,
+                            crate::p2p::transport_paths::OpClass::Small,
+                            Some(started.elapsed()),
+                            false,
+                            false,
+                        );
                         tracing::warn!(
                             target: "elohim_storage::blob_fetch",
                             blob_hash = %wire,
@@ -714,6 +722,14 @@ async fn race_both_planes(
                     }
                     Ok(Err(crate::p2p_iroh::IrohBlobFetchError::NotFound(_))) => {
                         crate::metrics::inc_iroh_blob_fetch("not_found");
+                        crate::p2p::transport_paths::global().record(
+                            &peer_id,
+                            crate::p2p::transport_paths::Transport::Iroh,
+                            crate::p2p::transport_paths::OpClass::Small,
+                            Some(started.elapsed()),
+                            true,
+                            false,
+                        );
                         // Composite pivot (parity with the libp2p leg): an honest
                         // whole-bytes miss may still be a peer holding the blob as
                         // RS shards — ask for the manifest over the same ALPN.
@@ -745,6 +761,14 @@ async fn race_both_planes(
                     }
                     Ok(Err(e)) => {
                         crate::metrics::inc_iroh_blob_fetch(e.metric_result());
+                        crate::p2p::transport_paths::global().record(
+                            &peer_id,
+                            crate::p2p::transport_paths::Transport::Iroh,
+                            crate::p2p::transport_paths::OpClass::Small,
+                            Some(started.elapsed()),
+                            false,
+                            false,
+                        );
                         tracing::warn!(
                             target: "elohim_storage::blob_fetch",
                             blob_hash = %wire,
@@ -763,6 +787,14 @@ async fn race_both_planes(
                         // discarded here and never reach persistence.
                         if crate::p2p::blob_fetch::verify_blob_hash(&bytes, &wire) {
                             crate::metrics::inc_iroh_blob_fetch("ok");
+                            crate::p2p::transport_paths::global().record(
+                                &peer_id,
+                                crate::p2p::transport_paths::Transport::Iroh,
+                                crate::p2p::transport_paths::OpClass::Small,
+                                Some(started.elapsed()),
+                                true,
+                                false,
+                            );
                             tracing::debug!(
                                 target: "recovery::transport",
                                 blob_hash = %wire,
@@ -784,6 +816,14 @@ async fn race_both_planes(
                                 "iroh blob fetch: bytes do not hash to the requested address"
                             );
                             crate::metrics::inc_iroh_blob_fetch("verify_failed");
+                            crate::p2p::transport_paths::global().record(
+                                &peer_id,
+                                crate::p2p::transport_paths::Transport::Iroh,
+                                crate::p2p::transport_paths::OpClass::Small,
+                                Some(started.elapsed()),
+                                false,
+                                false,
+                            );
                             warn!(
                                 target: "elohim_storage::blob_swarm",
                                 blob_hash = %wire,

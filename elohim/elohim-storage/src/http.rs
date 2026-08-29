@@ -4336,9 +4336,18 @@ impl HttpServer {
             status.sync_mode = gate.mode().as_str().to_string();
             status.network_class = gate.network().as_str().to_string();
             status.sync_reasons = verdict.reason_strings();
-            let json = serde_json::to_string(&status).map_err(|e| {
+            let mut value = serde_json::to_value(&status).map_err(|e| {
                 StorageError::Internal(format!("Failed to serialize P2P status: {}", e))
             })?;
+            // Transport self-awareness surface (spec 2026-08-24 §3.1): the
+            // peer's-eye view of every (peer, plane, class) it has sampled.
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert(
+                    "transportPaths".to_string(),
+                    serde_json::json!(crate::p2p::transport_paths::global().view()),
+                );
+            }
+            let json = value.to_string();
             return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -4370,6 +4379,12 @@ impl HttpServer {
                         }
                     }
                 }
+            }
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert(
+                    "transportPaths".to_string(),
+                    serde_json::json!(crate::p2p::transport_paths::global().view()),
+                );
             }
             return Ok(Response::builder()
                 .status(StatusCode::OK)

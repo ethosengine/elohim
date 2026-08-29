@@ -64,11 +64,51 @@ pub fn prefer_iroh_from_env() -> bool {
 /// `iroh_entries` is the book snapshot EXCLUDING self. When `prefer_iroh` is false the
 /// iroh plane is used only for peers that have no libp2p connection at all — iroh-only
 /// peers are never left unreachable, whatever the preference.
+/// Static planner — `prefer_iroh` decides every dual peer the same way.
 #[cfg(feature = "p2p-iroh")]
 pub fn plan_acquisition_targets(
     libp2p_peers: &[PeerId],
     iroh_entries: &[crate::p2p_iroh::IrohPeerEntry],
     prefer_iroh: bool,
+) -> Vec<AcquisitionTarget> {
+    plan_acquisition_targets_routed(libp2p_peers, iroh_entries, prefer_iroh, &|_| None)
+}
+
+/// Evidence-routed planner (spec 2026-08-24 §3.1, Bulk class): a dual peer's
+/// plane comes from `transport_paths::select_path` over its observed RTT /
+/// success per plane — best plane by evidence, exploration floor so the other
+/// plane keeps earning samples. Falls back to the static `prefer_iroh` prior
+/// when selection is off (`ELOHIM_TRANSPORT_SELECTION=off`) or iroh is
+/// disabled for the pull leg (`ELOHIM_ACQUISITION_IROH=off`).
+#[cfg(feature = "p2p-iroh")]
+pub fn plan_acquisition_targets_selected(
+    libp2p_peers: &[PeerId],
+    iroh_entries: &[crate::p2p_iroh::IrohPeerEntry],
+    prefer_iroh: bool,
+) -> Vec<AcquisitionTarget> {
+    use crate::p2p::transport_paths::{global, OpClass, Route, Transport};
+    if !prefer_iroh {
+        return plan_acquisition_targets(libp2p_peers, iroh_entries, false);
+    }
+    let choose = |label: &str| -> Option<Transport> {
+        match global().route(label, &[Transport::Libp2p, Transport::Iroh], OpClass::Bulk) {
+            Route::Single(t) => Some(t),
+            Route::Race(ts) => ts.first().copied(),
+            Route::None => None,
+        }
+    };
+    plan_acquisition_targets_routed(libp2p_peers, iroh_entries, prefer_iroh, &choose)
+}
+
+/// The planner proper. `choose(label)` answers the plane for a peer known on
+/// BOTH planes (`None` → the static `prefer_iroh` prior); single-plane peers
+/// are never consulted — there is nothing to select.
+#[cfg(feature = "p2p-iroh")]
+pub fn plan_acquisition_targets_routed(
+    libp2p_peers: &[PeerId],
+    iroh_entries: &[crate::p2p_iroh::IrohPeerEntry],
+    prefer_iroh: bool,
+    choose: &dyn Fn(&str) -> Option<crate::p2p::transport_paths::Transport>,
 ) -> Vec<AcquisitionTarget> {
     let mut targets: Vec<AcquisitionTarget> =
         Vec::with_capacity(libp2p_peers.len() + iroh_entries.len());
@@ -79,16 +119,21 @@ pub fn plan_acquisition_targets(
             .iter()
             .position(|e| e.libp2p_peer_id.as_deref() == Some(peer_str.as_str()));
         match joined {
-            Some(idx) if prefer_iroh => {
-                claimed.push(idx);
-                targets.push(AcquisitionTarget::Iroh {
-                    label: peer_str,
-                    addr: iroh_entries[idx].addr.clone(),
-                });
-            }
             Some(idx) => {
                 claimed.push(idx);
-                targets.push(AcquisitionTarget::Libp2p(*peer));
+                let use_iroh = match choose(&peer_str) {
+                    Some(crate::p2p::transport_paths::Transport::Iroh) => true,
+                    Some(crate::p2p::transport_paths::Transport::Libp2p) => false,
+                    None => prefer_iroh,
+                };
+                if use_iroh {
+                    targets.push(AcquisitionTarget::Iroh {
+                        label: peer_str,
+                        addr: iroh_entries[idx].addr.clone(),
+                    });
+                } else {
+                    targets.push(AcquisitionTarget::Libp2p(*peer));
+                }
             }
             None => targets.push(AcquisitionTarget::Libp2p(*peer)),
         }

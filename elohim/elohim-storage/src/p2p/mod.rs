@@ -75,6 +75,7 @@ pub mod sync_protocol;
 pub mod sync_round;
 pub mod topics;
 pub mod transport_manifest_gossip;
+pub mod transport_paths; // PathObservation + select_path — transport self-awareness (spec 2026-08-24 §3.1)
 pub mod trust_cache;
 pub mod trust_protocol;
 pub mod view_federation;
@@ -804,6 +805,17 @@ pub struct P2PNode {
     /// Maps in-flight replication GetContent request IDs to content IDs.
     /// Used to clean up replication state when requests fail.
     pending_replication_fetches: PendingReplicationFetchMap,
+    /// GetContent dispatch start times by request id — the libp2p Bulk RTT
+    /// sample for transport self-awareness (`p2p::transport_paths`), settled
+    /// by `settle_fetch_sample` on the Content / ContentNotFound / failure arms.
+    pending_fetch_started: Arc<
+        tokio::sync::Mutex<
+            std::collections::HashMap<
+                request_response::OutboundRequestId,
+                (String, std::time::Instant),
+            >,
+        >,
+    >,
     /// Ordered queue of content IDs awaiting replication dispatch.
     /// drain_gap_queue() consumes from this at a rate bounded by
     /// MAX_REPLICATION_INFLIGHT, decoupling discovery from dispatch.
@@ -1911,6 +1923,71 @@ impl P2PHandle {
 
     /// Push a shard to a specific peer for replication.
     /// Returns Ok(()) on acknowledgment, Err on timeout/failure.
+    /// Push one shard over the plane the evidence selects (Bulk class), falling
+    /// back ONCE to the other eligible plane on failure; every attempt is a
+    /// sample. Returns the transport that carried the bytes.
+    async fn push_shard_routed(
+        &self,
+        label: &str,
+        libp2p_id: Option<&str>,
+        iroh_addr: Option<IrohPushAddr>,
+        hash: &str,
+        data: Vec<u8>,
+    ) -> Result<&'static str, String> {
+        use crate::p2p::transport_paths::{global, OpClass, Route, Transport};
+        let mut eligible: Vec<Transport> = Vec::with_capacity(2);
+        if libp2p_id.is_some() {
+            eligible.push(Transport::Libp2p);
+        }
+        if iroh_addr.is_some() {
+            eligible.push(Transport::Iroh);
+        }
+        let first = match global().route(label, &eligible, OpClass::Bulk) {
+            Route::Single(t) => t,
+            Route::Race(ts) => ts[0],
+            Route::None => return Err("no transport binding for peer".to_string()),
+        };
+        let order: Vec<Transport> = std::iter::once(first)
+            .chain(eligible.iter().copied().filter(|t| *t != first))
+            .collect();
+        let mut last_err = String::new();
+        for (n, t) in order.iter().enumerate() {
+            if n > 0 {
+                global().note_fallback(*t, OpClass::Bulk);
+            }
+            let started = std::time::Instant::now();
+            let res: Result<(), String> = match t {
+                Transport::Libp2p => match libp2p_id {
+                    Some(id) => self.push_shard(id, hash, data.clone()).await,
+                    None => Err("no libp2p binding".to_string()),
+                },
+                Transport::Iroh => {
+                    #[cfg(feature = "p2p-iroh")]
+                    {
+                        match iroh_addr.clone() {
+                            Some(addr) => push_shard_over_iroh(addr, hash, data.clone()).await,
+                            None => Err("no iroh binding".to_string()),
+                        }
+                    }
+                    #[cfg(not(feature = "p2p-iroh"))]
+                    {
+                        Err("iroh plane not compiled".to_string())
+                    }
+                }
+            };
+            let ok = res.is_ok();
+            global().record(label, *t, OpClass::Bulk, Some(started.elapsed()), ok, false);
+            match res {
+                Ok(()) => return Ok(t.as_str()),
+                Err(e) => {
+                    debug!(peer = %label, transport = t.as_str(), error = %e, "shard push attempt failed on this plane");
+                    last_err = e;
+                }
+            }
+        }
+        Err(last_err)
+    }
+
     pub async fn push_shard(&self, peer_id: &str, hash: &str, data: Vec<u8>) -> Result<(), String> {
         let peer_id: PeerId = peer_id
             .parse()
@@ -2257,25 +2334,40 @@ impl P2PHandle {
             // Resolve the dial target. An unresolvable peer (no transport binding
             // yet) is skipped with a log + metric — the shard stays unplaced this
             // pass, exactly as a push failure does today (no hard error).
-            let Some(dial_id) = dial_ids.get(&peer.peer_id) else {
+            let dial_id: Option<&String> = dial_ids.get(&peer.peer_id);
+            let iroh_addr = iroh_push_addr_for(&peer.peer_id, dial_id.map(String::as_str));
+            if dial_id.is_none() && iroh_addr.is_none() {
                 crate::metrics::inc_shard_push_peer_unresolved();
                 tracing::warn!(
                     content_id,
                     shard_index = i,
                     peer = %peer.peer_id,
-                    "Shard push skipped: agent_cid has no known libp2p transport binding \
-                     (peer_transport_manifest + peer_identity_bindings both miss)"
+                    "Shard push skipped: agent_cid has no known libp2p or iroh transport binding \
+                     (peer_transport_manifest + peer_identity_bindings + iroh peer book all miss)"
                 );
                 continue;
-            };
+            }
+            // Cross-plane label: the libp2p PeerId when dual, else the agent CID —
+            // the same key the pull leg and the reconcile arms observe under.
+            let dial_label: String = dial_id.cloned().unwrap_or_else(|| peer.peer_id.clone());
 
-            match self.push_shard(dial_id, hash, shard_data.clone()).await {
-                Ok(()) => {
+            match self
+                .push_shard_routed(
+                    &dial_label,
+                    dial_id.map(String::as_str),
+                    iroh_addr,
+                    hash,
+                    shard_data.clone(),
+                )
+                .await
+            {
+                Ok(transport) => {
                     tracing::info!(
                         content_id,
                         shard_index = i,
                         peer = %peer.peer_id,
-                        dial = %dial_id,
+                        dial = %dial_label,
+                        transport,
                         household = ?peer.household_id,
                         "Shard distributed"
                     );
@@ -2301,7 +2393,7 @@ impl P2PHandle {
                         content_id,
                         shard_index = i,
                         peer = %peer.peer_id,
-                        dial = %dial_id,
+                        dial = %dial_label,
                         error = %e,
                         "Shard push failed"
                     );
@@ -2734,6 +2826,25 @@ pub const DRAIN_INTERVAL_SECS: u64 = 15;
 pub const DRAIN_INTERVAL_STARTUP_DELAY_SECS: u64 = 5;
 
 impl P2PNode {
+    /// Settle the libp2p Bulk RTT sample for a GetContent request (no-op for
+    /// any other request kind — only GetContent dispatches are timed).
+    async fn settle_fetch_sample(
+        &self,
+        request_id: &request_response::OutboundRequestId,
+        ok: bool,
+    ) {
+        if let Some((peer, started)) = self.pending_fetch_started.lock().await.remove(request_id) {
+            crate::p2p::transport_paths::global().record(
+                &peer,
+                crate::p2p::transport_paths::Transport::Libp2p,
+                crate::p2p::transport_paths::OpClass::Bulk,
+                Some(started.elapsed()),
+                ok,
+                false,
+            );
+        }
+    }
+
     /// Create a new P2P node
     pub async fn new(
         identity: NodeIdentity,
@@ -2881,6 +2992,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            pending_fetch_started: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
@@ -5561,6 +5675,7 @@ impl P2PNode {
                                     }
                                     ShardResponse::Content(record) => {
                                         let content_id = record.id.clone();
+                                        self.settle_fetch_sample(&request_id, true).await;
                                         debug!(id = %content_id, "Received content record from peer");
                                         self.pending_replication_fetches
                                             .lock()
@@ -5607,6 +5722,7 @@ impl P2PNode {
                                         self.replication_state.update_caught_up().await;
                                     }
                                     ShardResponse::ContentNotFound => {
+                                        self.settle_fetch_sample(&request_id, true).await;
                                         // Remove from acquisition tracking first (if it was an acquisition fetch)
                                         if let Some(acq_id) = self
                                             .pending_acquisition_fetches
@@ -5692,6 +5808,7 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound shard request failed");
+                self.settle_fetch_sample(&request_id, false).await;
                 // Settle a failed ListContent discovery chain: drop its page
                 // cursor and back the peer off (interval doubles up to the cap).
                 // This is the arm that breaks the timeout storm — a Timeout here
@@ -9022,6 +9139,10 @@ impl P2PNode {
                 .lock()
                 .await
                 .insert(request_id, id.clone());
+            self.pending_fetch_started
+                .lock()
+                .await
+                .insert(request_id, (peer.to_string(), std::time::Instant::now()));
         }
     }
 
@@ -9431,8 +9552,15 @@ impl P2PNode {
     /// exhausts its retry budget having probed 1/6 of the fabric. The rotation
     /// offset advances once per drain so successive retries walk distinct peers.
     async fn drain_acquisition_queue(&self) {
-        use acquisition_dispatch::{plan_acquisition_targets, AcquisitionTarget};
+        use acquisition_dispatch::AcquisitionTarget;
         let budget = reconcile_rails::DispatchBudget::new(acquisition::MAX_ACQUISITION_INFLIGHT);
+        // Nothing queued ⇒ no plan: the routed planner counts a transport
+        // decision per dual peer it plans for (C8), and a decision with no
+        // dispatch behind it would inflate `elohim_transport_route_total`
+        // (measured 73 `prior_iroh` decisions for 0 dispatches, 2026-08-29).
+        if self.acquisition_queue.lock().await.is_empty() {
+            return;
+        }
         let peers: Vec<PeerId> = {
             let swarm = self.swarm.read().await;
             swarm.connected_peers().cloned().collect()
@@ -9445,11 +9573,15 @@ impl P2PNode {
             let entries = crate::p2p_iroh::iroh_fetch_leg()
                 .map(|leg| leg.book().snapshot(Some(&leg.endpoint().node_id())))
                 .unwrap_or_default();
-            plan_acquisition_targets(&peers, &entries, *acquisition_prefer_iroh())
+            acquisition_dispatch::plan_acquisition_targets_selected(
+                &peers,
+                &entries,
+                *acquisition_prefer_iroh(),
+            )
         };
         #[cfg(not(feature = "p2p-iroh"))]
         let targets: Vec<AcquisitionTarget> =
-            plan_acquisition_targets(&peers, *acquisition_prefer_iroh());
+            acquisition_dispatch::plan_acquisition_targets(&peers, *acquisition_prefer_iroh());
         if targets.is_empty() {
             return; // peer-gated (R-E) — on either plane
         }
@@ -9496,6 +9628,10 @@ impl P2PNode {
                         .lock()
                         .await
                         .insert(request_id, id.clone());
+                    self.pending_fetch_started
+                        .lock()
+                        .await
+                        .insert(request_id, (peer.to_string(), std::time::Instant::now()));
                 }
                 #[cfg(feature = "p2p-iroh")]
                 AcquisitionTarget::Iroh { label, addr } => {
@@ -10276,6 +10412,64 @@ pub(crate) enum PullKind {
     Pin,
 }
 
+#[cfg(feature = "p2p-iroh")]
+type IrohPushAddr = iroh::NodeAddr;
+#[cfg(not(feature = "p2p-iroh"))]
+type IrohPushAddr = ();
+
+/// The iroh dial target for a shard holder, from the transport-manifest peer
+/// book: by the holder's agent CID, else by its libp2p PeerId (dual peers
+/// announce both). `None` when the book has no entry or no iroh leg exists.
+#[cfg(feature = "p2p-iroh")]
+fn iroh_push_addr_for(agent_cid: &str, libp2p_id: Option<&str>) -> Option<IrohPushAddr> {
+    let leg = crate::p2p_iroh::iroh_fetch_leg()?;
+    leg.book()
+        .snapshot(None)
+        .into_iter()
+        .find(|e| {
+            e.agent_cid.as_deref() == Some(agent_cid)
+                || (libp2p_id.is_some() && e.libp2p_peer_id.as_deref() == libp2p_id)
+        })
+        .map(|e| e.addr)
+}
+#[cfg(not(feature = "p2p-iroh"))]
+fn iroh_push_addr_for(_agent_cid: &str, _libp2p_id: Option<&str>) -> Option<IrohPushAddr> {
+    None
+}
+
+/// Write-time custody push over the iroh shard ALPN — the same
+/// `ShardRequest::Push` the libp2p leg sends, answered by the shared
+/// `ShardService` responder (`PushAck`).
+#[cfg(feature = "p2p-iroh")]
+async fn push_shard_over_iroh(
+    addr: iroh::NodeAddr,
+    hash: &str,
+    data: Vec<u8>,
+) -> Result<(), String> {
+    use crate::p2p_iroh::IrohShardClient;
+    let leg = crate::p2p_iroh::iroh_fetch_leg().ok_or_else(|| "iroh leg not ready".to_string())?;
+    let client = IrohShardClient::new(leg.endpoint());
+    let request = ShardRequest::Push {
+        hash: hash.to_string(),
+        data,
+    };
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        client.request(addr, &request),
+    )
+    .await
+    {
+        Ok(Ok(ShardResponse::PushAck)) => Ok(()),
+        Ok(Ok(ShardResponse::Error(e))) => Err(e),
+        Ok(Ok(other)) => Err(format!(
+            "unexpected push response: {:?}",
+            std::mem::discriminant(&other)
+        )),
+        Ok(Err(e)) => Err(e.to_string()),
+        Err(_) => Err("iroh push timed out after 30s".to_string()),
+    }
+}
+
 /// The iroh pull leg for one queued content id: `GetContent` over the shard
 /// ALPN, then — for a blob-backed row we do not hold — the quilt-draw blob
 /// pull over the SAME peer, landing through `finalize_quilt_draw` (verify-first,
@@ -10303,35 +10497,76 @@ pub(crate) async fn acquire_over_iroh(
     let request = ShardRequest::GetContent {
         id: content_id.clone(),
     };
+    let started = std::time::Instant::now();
     let response =
         tokio::time::timeout(CONTENT_TIMEOUT, client.request(addr.clone(), &request)).await;
     let record = match response {
         Ok(Ok(ShardResponse::Content(record))) => record,
         Ok(Ok(ShardResponse::ContentNotFound)) => {
+            crate::p2p::transport_paths::global().record(
+                &label,
+                crate::p2p::transport_paths::Transport::Iroh,
+                crate::p2p::transport_paths::OpClass::Bulk,
+                Some(started.elapsed()),
+                true,
+                false,
+            );
             crate::metrics::inc_acquisition_outcome("fetch_error");
             settle_pull_failure(&ctx, &content_id, kind).await;
             ctx.replication_state.update_caught_up().await;
             return;
         }
         Ok(Ok(other)) => {
+            crate::p2p::transport_paths::global().record(
+                &label,
+                crate::p2p::transport_paths::Transport::Iroh,
+                crate::p2p::transport_paths::OpClass::Bulk,
+                Some(started.elapsed()),
+                false,
+                false,
+            );
             debug!(id = %content_id, peer = %label, response = ?std::mem::discriminant(&other), "iroh acquisition: unexpected response");
             crate::metrics::inc_acquisition_outcome("fetch_error");
             settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
         Ok(Err(e)) => {
+            crate::p2p::transport_paths::global().record(
+                &label,
+                crate::p2p::transport_paths::Transport::Iroh,
+                crate::p2p::transport_paths::OpClass::Bulk,
+                Some(started.elapsed()),
+                false,
+                false,
+            );
             debug!(id = %content_id, peer = %label, error = %e, "iroh acquisition: request failed");
             crate::metrics::inc_acquisition_outcome("fetch_error");
             settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
         Err(_) => {
+            crate::p2p::transport_paths::global().record(
+                &label,
+                crate::p2p::transport_paths::Transport::Iroh,
+                crate::p2p::transport_paths::OpClass::Bulk,
+                Some(started.elapsed()),
+                false,
+                false,
+            );
             debug!(id = %content_id, peer = %label, "iroh acquisition: request timed out");
             crate::metrics::inc_acquisition_outcome("fetch_error");
             settle_pull_failure(&ctx, &content_id, kind).await;
             return;
         }
     };
+    crate::p2p::transport_paths::global().record(
+        &label,
+        crate::p2p::transport_paths::Transport::Iroh,
+        crate::p2p::transport_paths::OpClass::Bulk,
+        Some(started.elapsed()),
+        true,
+        false,
+    );
     debug!(id = %content_id, peer = %label, transport = "iroh", "Received content record from peer");
     if let StoredRecord::Stored { blob_hash, .. } = store_acquired_record(&ctx, *record).await {
         if let Some(hash) = blob_hash.filter(|h| !h.is_empty()) {
