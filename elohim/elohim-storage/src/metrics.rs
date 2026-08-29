@@ -1340,6 +1340,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Doorway bulletin-board reads by the iroh bootstrap joiner. labels:
+    /// phase = "boot" (the T0 seed that releases the first acquisition drain)
+    /// | "watch" (the empty-book fallback after the grace); result = "seeded"
+    /// (≥1 accepted) | "none_accepted" (entries, none taken) | "empty" (no
+    /// entries, or the doorway was unreachable). Pre-touched at zero.
+    pub static ref IROH_DOORWAY_BOOTSTRAP_READS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_doorway_bootstrap_reads_total",
+            "Doorway /p2p/manifests board reads by the iroh bootstrap joiner, by phase and result.",
+        ),
+        &["phase", "result"],
+    )
+    .unwrap();
+
     /// iroh-gossip membership transitions on inbound topics. label:
     /// direction = "up" | "down". `up` staying at zero = the plane has no
     /// neighbors and every iroh publish is a shout into a void.
@@ -2390,6 +2404,14 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_DISPATCH.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_FIRST_DRAIN.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_DOORWAY_BOOTSTRAP_READS.clone()));
+        for phase in IROH_DOORWAY_BOOTSTRAP_PHASES {
+            for result in IROH_DOORWAY_BOOTSTRAP_READ_RESULTS {
+                IROH_DOORWAY_BOOTSTRAP_READS
+                    .with_label_values(&[phase, result])
+                    .reset();
+            }
+        }
         ACQUISITION_FIRST_DRAIN
             .with_label_values(&["held"])
             .inc_by(0);
@@ -3170,6 +3192,23 @@ pub fn inc_acquisition_dispatch(transport: &str) {
 }
 
 /// One first-drain gate outcome (`held` per tick, else a release reason).
+/// `phase` vocabulary of `IROH_DOORWAY_BOOTSTRAP_READS`. Lives here, not in
+/// `p2p_iroh` (feature-gated), so the pre-touch at boot is unconditional and
+/// the emitter's `BootstrapPhase::label()` is pinned to it by test.
+pub const IROH_DOORWAY_BOOTSTRAP_PHASES: &[&str] = &["boot", "watch"];
+
+/// `result` vocabulary of `IROH_DOORWAY_BOOTSTRAP_READS` — pre-touched at
+/// zero so a boot that never seeded is a visible 0, not a missing series.
+pub const IROH_DOORWAY_BOOTSTRAP_READ_RESULTS: &[&str] = &["seeded", "none_accepted", "empty"];
+
+/// One doorway board read by the iroh bootstrap joiner (see
+/// `IROH_DOORWAY_BOOTSTRAP_READS` for the label vocabulary).
+pub fn inc_iroh_doorway_bootstrap_read(phase: &str, result: &str) {
+    IROH_DOORWAY_BOOTSTRAP_READS
+        .with_label_values(&[phase, result])
+        .inc();
+}
+
 pub fn inc_acquisition_first_drain(outcome: &str) {
     ACQUISITION_FIRST_DRAIN.with_label_values(&[outcome]).inc();
 }

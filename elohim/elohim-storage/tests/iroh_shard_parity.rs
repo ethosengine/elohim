@@ -26,6 +26,8 @@ impl ShardBackend for FixedShardBackend {
             ShardRequest::Get { hash: _ } => ShardResponse::Data(b"shard-bytes-phase7".to_vec()),
             ShardRequest::Have { hash: _ } => ShardResponse::Have(true),
             ShardRequest::Push { hash: _, data: _ } => ShardResponse::PushAck,
+            // A fixed whole-bytes backend holds no composite: the manifest pivot misses.
+            ShardRequest::GetManifest { hash: _ } => ShardResponse::NotFound,
             ShardRequest::ListContent { .. } => ShardResponse::ContentList {
                 items: vec![],
                 total: 0,

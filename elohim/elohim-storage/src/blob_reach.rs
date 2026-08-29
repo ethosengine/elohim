@@ -150,6 +150,55 @@ pub fn blob_serve_verdict(refs: &[BlobReference], identity_resolved: bool) -> Bl
     }
 }
 
+// ---------------------------------------------------------------------------
+// Storage projection lookup
+// ---------------------------------------------------------------------------
+
+/// Every content row that references any of `hash_candidates`.
+///
+/// The byte route receives a blob address in whichever form the caller had —
+/// `sha256-<hex>`, `blake3-<hex>`, or a `bafkrei…` CID — and the content row may
+/// record it in any of three columns (`blob_hash`, `blob_cid`,
+/// `server_blob_hash`), so the caller passes every form it has resolved and this
+/// matches across all three. A caller that resolved fewer forms gets a smaller
+/// reference set, which can only ever make the verdict MORE permissive — so the
+/// caller must pass the aliases it already looked up for backend selection.
+///
+/// bounded-work: one indexed SELECT over `content`, capped at
+/// [`MAX_REFERENCES`] rows. A blob referenced by more rows than that is
+/// answered from the capped set; the cap is above the largest fan-out measured
+/// in the corpus (12) by two orders of magnitude.
+pub fn lookup_references(
+    conn: &mut diesel::SqliteConnection,
+    hash_candidates: &[String],
+) -> diesel::QueryResult<Vec<BlobReference>> {
+    use crate::db::diesel_schema::content::dsl as c;
+    use diesel::prelude::*;
+
+    if hash_candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let rows: Vec<(String, String)> = c::content
+        .filter(
+            c::blob_hash
+                .eq_any(hash_candidates)
+                .or(c::blob_cid.eq_any(hash_candidates))
+                .or(c::server_blob_hash.eq_any(hash_candidates)),
+        )
+        .select((c::id, c::reach))
+        .limit(MAX_REFERENCES)
+        .load(conn)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(content_id, reach)| BlobReference { content_id, reach })
+        .collect())
+}
+
+/// Cap on referencing rows read for one blob decision. See `lookup_references`.
+pub const MAX_REFERENCES: i64 = 1000;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,52 +328,3 @@ mod tests {
         assert!(requires_authorization("intimate"));
     }
 }
-
-// ---------------------------------------------------------------------------
-// Storage projection lookup
-// ---------------------------------------------------------------------------
-
-/// Every content row that references any of `hash_candidates`.
-///
-/// The byte route receives a blob address in whichever form the caller had —
-/// `sha256-<hex>`, `blake3-<hex>`, or a `bafkrei…` CID — and the content row may
-/// record it in any of three columns (`blob_hash`, `blob_cid`,
-/// `server_blob_hash`), so the caller passes every form it has resolved and this
-/// matches across all three. A caller that resolved fewer forms gets a smaller
-/// reference set, which can only ever make the verdict MORE permissive — so the
-/// caller must pass the aliases it already looked up for backend selection.
-///
-/// bounded-work: one indexed SELECT over `content`, capped at
-/// [`MAX_REFERENCES`] rows. A blob referenced by more rows than that is
-/// answered from the capped set; the cap is above the largest fan-out measured
-/// in the corpus (12) by two orders of magnitude.
-pub fn lookup_references(
-    conn: &mut diesel::SqliteConnection,
-    hash_candidates: &[String],
-) -> diesel::QueryResult<Vec<BlobReference>> {
-    use crate::db::diesel_schema::content::dsl as c;
-    use diesel::prelude::*;
-
-    if hash_candidates.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let rows: Vec<(String, String)> = c::content
-        .filter(
-            c::blob_hash
-                .eq_any(hash_candidates)
-                .or(c::blob_cid.eq_any(hash_candidates))
-                .or(c::server_blob_hash.eq_any(hash_candidates)),
-        )
-        .select((c::id, c::reach))
-        .limit(MAX_REFERENCES)
-        .load(conn)?;
-
-    Ok(rows
-        .into_iter()
-        .map(|(content_id, reach)| BlobReference { content_id, reach })
-        .collect())
-}
-
-/// Cap on referencing rows read for one blob decision. See `lookup_references`.
-pub const MAX_REFERENCES: i64 = 1000;

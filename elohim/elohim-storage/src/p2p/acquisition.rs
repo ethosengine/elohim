@@ -69,10 +69,12 @@ pub const MAX_ACQUISITION_INFLIGHT: usize = 25;
 /// fills from the transport-manifest gossip round, which lands every 30 s. A
 /// wall-clock hold waits on a cadence-delivered event: any value under one
 /// round expires before the round can land, and any value over it is "wait
-/// for a round" with extra steps and a 30 s tax on every boot. The cure that
-/// removes the dependency is to seed the book from the doorway's
-/// `/p2p/manifests` before the first drain (the row's shape 3); this constant
-/// stays the bounded floor underneath that, not the lever.
+/// for a round" with extra steps and a 30 s tax on every boot. The release is
+/// therefore an EVENT, not this deadline: the doorway bootstrap's boot seed
+/// (`p2p_iroh::doorway_bootstrap`, one GET of `/p2p/manifests` at T0) fills
+/// the book from the survivors' signed manifests before the first tick can
+/// expire. This constant is the bounded floor underneath that — the boot with
+/// no doorway, or an unreachable one — never the lever.
 pub const FIRST_DRAIN_HOLD: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Why the first drain was released — one per boot, counted in

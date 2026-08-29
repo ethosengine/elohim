@@ -68,3 +68,17 @@ Do not spend a cut widening it. Shape 3 removes the dependency (doorway-seeded b
 floor stays as the bound). Pinned on the constant's doc comment in `acquisition.rs` so the cheap fix is refused at
 the site where it would be typed.
 
+
+## 2026-08-29 cure shape 3 landed (local evidence; mesh measurement below when it lands)
+
+`p2p_iroh::doorway_bootstrap::spawn_doorway_bootstrap` now issues ONE **boot seed** — a bounded GET of the doorway's
+`/p2p/manifests` at T0, verify-then-upsert as before — whenever the book is empty at spawn, BEFORE the 30 s grace it
+used to sleep through. The watch leg (empty-book fallback after the grace) is unchanged. So the first-drain release
+is an event (`book_warm`, within the first 5 s tick) instead of the `expired` deadline; `FIRST_DRAIN_HOLD` stays the
+floor for a node with no doorway or an unreachable one. Counted in `elohim_iroh_doorway_bootstrap_reads_total{phase,
+result}` (pre-touched; `boot`/`watch` × `seeded`/`none_accepted`/`empty`) — read beside `first_drain_total`: a boot
+that reads `{boot,seeded} 1` should release `book_warm`, and a fleet whose `boot` column only ever reads `empty` has
+doorways with no board (the pull leg is back on the floor, visibly). Two wiremock tests pin the shape: an empty book
+is seeded well inside a 60 s grace with exactly one GET; a warm book issues none. To measure: warm recovery on the
+dual mesh — expect `first_drain_total{outcome="book_warm"} 1`, `held ≤ 1`, and `iroh peer learned from the doorway
+bulletin board` before the first `... from transport manifest` line.

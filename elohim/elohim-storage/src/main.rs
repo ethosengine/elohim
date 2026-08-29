@@ -3552,10 +3552,12 @@ async fn async_main(
         // manifest that signed for its own NodeId" invariant survives the web2
         // concession — a lying doorway costs availability, never redirection.
         //
-        // Spawned whenever a doorway is configured, with no mode flag: the
-        // joiner acts only while the book is EMPTY, so a dual-mode node (whose
-        // libp2p gossip fills the book in seconds) never issues a request, and
-        // a pure-iroh node — or one a partition emptied — re-bootstraps on its
+        // Spawned whenever a doorway is configured, with no mode flag: ONE
+        // boot seed while the book is empty (this is what releases the pull
+        // leg's first drain — `acquisition::first_drain` — before the 30 s
+        // manifest round can), then the joiner acts only while the book is
+        // EMPTY, so a dual-mode node pays exactly one GET per boot and a
+        // pure-iroh node — or one a partition emptied — re-bootstraps on its
         // own. Inert entirely when no doorway URL resolves.
         match doorway_base_url.clone() {
             Some(base_url) => {

@@ -297,10 +297,20 @@ pub struct DoorwayBootstrapInputs {
     pub self_node_id: String,
 }
 
-/// Spawn the bootstrap joiner: after `grace`, whenever the book is EMPTY, read
-/// the doorway's board and seed it.
+/// Spawn the bootstrap joiner: one **boot seed** if the book is empty right
+/// now, then — after `grace` — whenever the book is EMPTY, read the doorway's
+/// board and seed it.
 ///
-/// Empty-only by design. Gossip is the primary channel and fills the book
+/// The boot seed is the pull leg's release. `acquisition::first_drain` holds
+/// the first acquisition drain on this book for at most `FIRST_DRAIN_HOLD`
+/// (10 s); the book otherwise fills from the transport-manifest gossip round,
+/// which lands every 30 s (measured 2026-08-29, `pull-leg-drains-before-iroh-
+/// book-warms`) — so without this read the hold always expired first and the
+/// selector saw single-plane peers. One bounded GET at T0 turns the release
+/// from a deadline into an event: the board holds every survivor's signed
+/// manifest (24 h TTL), verified here before the book sees it.
+///
+/// Empty-only after that, by design. Gossip is the primary channel and fills the book
 /// within seconds on any node that can reach a peer; the doorway leg exists for
 /// the node that cannot. Gating on emptiness means a dual-mode node pays one
 /// cheap check per tick and never a request, while a pure-iroh node — or one
@@ -322,8 +332,14 @@ pub fn spawn_doorway_bootstrap(
             warn!("doorway bootstrap: could not build an HTTP client — leg inert");
             return;
         };
-        // The grace period is what makes this a FALLBACK: gossip gets first
-        // refusal on filling the book.
+        // T0 boot seed: the one read that runs BEFORE gossip's first refusal,
+        // because the first acquisition drain is waiting on it (see the doc
+        // above). A warm book (never at a real boot; tests) issues nothing.
+        if inputs.book.is_empty() {
+            read_board(&client, &inputs, BootstrapPhase::Boot).await;
+        }
+        // The grace period is what makes the WATCH a fallback: gossip gets
+        // first refusal on keeping the book filled.
         tokio::time::sleep(grace).await;
         info!(
             doorway = %inputs.base_url,
@@ -336,21 +352,62 @@ pub fn spawn_doorway_bootstrap(
             if !inputs.book.is_empty() {
                 continue;
             }
-            let entries = fetch_manifests(&client, &inputs.base_url).await;
-            if entries.is_empty() {
-                debug!(doorway = %inputs.base_url, "doorway bootstrap: board is empty");
-                continue;
-            }
-            let outcome = verify_and_upsert(&inputs.book, Some(&inputs.self_node_id), entries);
-            info!(
-                doorway = %inputs.base_url,
-                accepted = outcome.accepted, stale = outcome.stale,
-                rejected = outcome.rejected, own = outcome.own,
-                "doorway bootstrap: board read"
-            );
-            crate::metrics::set_iroh_peers_known(inputs.book.len());
+            read_board(&client, &inputs, BootstrapPhase::Watch).await;
         }
     })
+}
+
+/// Which leg of the joiner issued a board read — the `phase` label on
+/// `elohim_iroh_doorway_bootstrap_reads_total`. A boot with
+/// `{phase="boot",result="seeded"}` = 1 is the shape-3 path firing; a fleet
+/// where `boot` only ever reads `empty`/`unreachable` has doorways with no
+/// board, and the pull leg is back on the 10 s floor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BootstrapPhase {
+    Boot,
+    Watch,
+}
+
+impl BootstrapPhase {
+    pub const ALL: &'static [BootstrapPhase] = &[BootstrapPhase::Boot, BootstrapPhase::Watch];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            BootstrapPhase::Boot => "boot",
+            BootstrapPhase::Watch => "watch",
+        }
+    }
+}
+
+/// One board read: fetch → verify → upsert, counted by phase and result.
+/// `empty` covers an unreachable doorway too — `fetch_manifests` folds every
+/// failure into an empty list, and the leg treats both as "nothing to seed".
+async fn read_board(
+    client: &reqwest::Client,
+    inputs: &DoorwayBootstrapInputs,
+    phase: BootstrapPhase,
+) -> BootstrapOutcome {
+    let entries = fetch_manifests(client, &inputs.base_url).await;
+    if entries.is_empty() {
+        debug!(doorway = %inputs.base_url, phase = phase.label(), "doorway bootstrap: board is empty");
+        crate::metrics::inc_iroh_doorway_bootstrap_read(phase.label(), "empty");
+        return BootstrapOutcome::default();
+    }
+    let outcome = verify_and_upsert(&inputs.book, Some(&inputs.self_node_id), entries);
+    let result = if outcome.accepted > 0 {
+        "seeded"
+    } else {
+        "none_accepted"
+    };
+    crate::metrics::inc_iroh_doorway_bootstrap_read(phase.label(), result);
+    info!(
+        doorway = %inputs.base_url, phase = phase.label(),
+        accepted = outcome.accepted, stale = outcome.stale,
+        rejected = outcome.rejected, own = outcome.own,
+        "doorway bootstrap: board read"
+    );
+    crate::metrics::set_iroh_peers_known(inputs.book.len());
+    outcome
 }
 
 #[cfg(test)]
@@ -519,5 +576,98 @@ mod tests {
             Some("http://localhost:8080")
         );
         assert_eq!(origin_of("not a url"), None);
+    }
+
+    /// The emitter's labels are the pre-touched vocabulary — a rename here
+    /// without one in `metrics.rs` would read as a series appearing from
+    /// nowhere on the fleet.
+    #[test]
+    fn bootstrap_phase_labels_are_the_pretouched_vocabulary() {
+        for phase in BootstrapPhase::ALL {
+            assert!(
+                crate::metrics::IROH_DOORWAY_BOOTSTRAP_PHASES.contains(&phase.label()),
+                "{phase:?} is not pre-touched"
+            );
+        }
+        for result in ["seeded", "none_accepted", "empty"] {
+            assert!(crate::metrics::IROH_DOORWAY_BOOTSTRAP_READ_RESULTS.contains(&result));
+        }
+    }
+
+    fn board_with(ann: &TransportManifestAnnouncement) -> serde_json::Value {
+        serde_json::json!({ "manifests": [as_json(ann)] })
+    }
+
+    /// Shape 3 of `pull-leg-drains-before-iroh-book-warms`: an empty book at
+    /// boot is seeded from the board IMMEDIATELY, not after the grace period.
+    /// The grace here is 60 s and the test bounds the seed at 5 s, so a seed
+    /// that waited for the grace would fail, and so would one that never ran.
+    #[tokio::test]
+    async fn the_boot_seed_fills_an_empty_book_before_the_grace_elapses() {
+        let server = wiremock::MockServer::start().await;
+        let ann = signed(&[21u8; 32], 4500, 100);
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(MANIFESTS_PATH))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(board_with(&ann)))
+            .mount(&server)
+            .await;
+        let book = IrohPeerBook::new();
+        let handle = spawn_doorway_bootstrap(
+            DoorwayBootstrapInputs {
+                base_url: server.uri(),
+                book: book.clone(),
+                self_node_id: "not-the-announcer".into(),
+            },
+            Duration::from_secs(60),
+            Duration::from_secs(60),
+        );
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while book.is_empty() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        handle.abort();
+        assert_eq!(
+            book.len(),
+            1,
+            "the boot seed must fill the book well inside the 60 s grace"
+        );
+        let node_id: iroh::NodeId = ann.iroh_node_id.parse().unwrap();
+        assert!(
+            book.get(&node_id).is_some(),
+            "the seeded peer is the board's announcer"
+        );
+        assert_eq!(
+            server.received_requests().await.unwrap().len(),
+            1,
+            "exactly one GET at boot; the watch leg is still inside its grace"
+        );
+    }
+
+    /// The boot seed is one GET at most, and none when the book is already
+    /// warm — a node never pays a doorway round-trip it has no use for.
+    #[tokio::test]
+    async fn a_warm_book_issues_no_boot_read() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&server)
+            .await;
+        let book = IrohPeerBook::new();
+        assert!(book.accept(&signed(&[23u8; 32], 4600, 100)));
+        let handle = spawn_doorway_bootstrap(
+            DoorwayBootstrapInputs {
+                base_url: server.uri(),
+                book: book.clone(),
+                self_node_id: "self".into(),
+            },
+            Duration::from_secs(60),
+            Duration::from_secs(60),
+        );
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        handle.abort();
+        assert!(
+            server.received_requests().await.unwrap().is_empty(),
+            "a warm book must not issue a boot read"
+        );
     }
 }
