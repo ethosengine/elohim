@@ -42,6 +42,22 @@ export class E2EWorld extends World {
   /** Slug of the current scenario's feature file, set by the Before hook (e.g. "lamad-learning-journey") */
   featureSlug?: string;
 
+  /**
+   * Browser console errors this scenario DELIBERATELY provokes.
+   *
+   * The After hook fails any passing browser scenario that logged a console
+   * error. That contract is right for nearly everything and wrong for a
+   * scenario whose subject IS the failure path: a wrong-password test that
+   * produced no 401 would be the broken one. A step registers what it expects
+   * with `expectBrowserError`; nothing else is forgiven.
+   */
+  expectedBrowserErrors: RegExp[] = [];
+
+  /** Declare a console error this scenario is supposed to cause. */
+  expectBrowserError(pattern: RegExp): void {
+    this.expectedBrowserErrors.push(pattern);
+  }
+
   /** Slug of the current scenario's name, set by the Before hook (e.g. "starting-a-journey") */
   scenarioSlug?: string;
 

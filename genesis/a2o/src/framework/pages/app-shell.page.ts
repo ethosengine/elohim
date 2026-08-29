@@ -9,9 +9,17 @@ import { BasePage } from './base.page.js';
 import { SHELL } from './selectors.js';
 
 export class AppShellPage extends BasePage {
-  /** Wait for app-root to be visible. */
+  /**
+   * Wait for the authenticated shell to be visible.
+   *
+   * Accepts EITHER bundle root. `lamad` was extracted into its own EPR-app
+   * bundle (app/CLAUDE.md §Bundle seams are not domain seams), so the doorway
+   * serves `<lamad-root>` at /lamad and `<app-root>` at the shell routes. Both
+   * are "the authenticated shell" to the human; waiting only for `app-root`
+   * asserted a pre-extraction shape and timed out on every lamad route.
+   */
   async waitForReady(): Promise<void> {
-    await this.locate(SHELL.APP_ROOT).waitFor({ state: 'visible', timeout: 10_000 });
+    await this.locate(SHELL.APP_ROOT).first().waitFor({ state: 'visible', timeout: 10_000 });
   }
 
   /** Open the profile tray and click "Log Out". */

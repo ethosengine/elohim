@@ -679,7 +679,14 @@ function collectBrowserErrors(world: E2EWorld, scenarioName: string): string[] {
     }
   }
 
-  return errorReport;
+  // A scenario whose SUBJECT is a failure path deliberately provokes a browser
+  // error — a wrong-password test that produced no 401 would be the broken one.
+  // Such a step registers the error it expects via `world.expectBrowserError`,
+  // and only exactly that is forgiven; every other console error still fails the
+  // scenario, so the clean-console contract stays intact everywhere else.
+  const expected = world.expectedBrowserErrors ?? [];
+  if (!expected.length) return errorReport;
+  return errorReport.filter(line => !expected.some(rx => rx.test(line)));
 }
 
 /**

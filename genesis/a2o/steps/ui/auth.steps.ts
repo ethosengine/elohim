@@ -23,6 +23,7 @@ import {
 import { getFixture } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { ThresholdLoginPage, AppShellPage } from '../../src/framework/pages/index.js';
+import { TOOLBAR } from '../../src/framework/pages/selectors.js';
 import {
   isSpaRoutingNoise,
   isExpectedNetworkFailure,
@@ -147,6 +148,10 @@ When(
     const human = this.getHuman(humanName);
 
     // Same surface as the happy path — the doorway's portal owns the password.
+    // The rejection IS the subject here, so the 401 it provokes is expected: a
+    // run of this scenario that logged no 401 would mean the wrong password was
+    // accepted.
+    this.expectBrowserError(/status of 401/);
     await device.navigate(`${THRESHOLD_PATH}?returnUrl=${encodeURIComponent('/')}`);
 
     // Fill with correct identifier but wrong password via page object
@@ -181,8 +186,19 @@ When(
  */
 When('{word} logs out through the browser UI', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywrightDevice(this, humanName);
-  const shell = new AppShellPage(device.page);
-  await shell.logout();
+
+  // A hosted human's session belongs to their DOORWAY, so signing out happens on
+  // the doorway's own toolbar — the same surface that signed them in. The app
+  // shell's profile bubble is for a session the app itself owns, which a hosted
+  // human does not have until the doorway hands one over.
+  const bubble = device.page.getByTestId(TOOLBAR.PROFILE_BUBBLE);
+  await bubble.waitFor({ state: 'visible', timeout: 15_000 });
+  await bubble.click();
+
+  const logout = device.page.getByTestId(TOOLBAR.LOGOUT);
+  await logout.waitFor({ state: 'visible', timeout: 10_000 });
+  await logout.click();
+  await device.page.waitForLoadState('networkidle');
 });
 
 // ---------------------------------------------------------------------------

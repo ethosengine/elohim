@@ -141,7 +141,12 @@ export const SHELL = {
   PROFILE_BUBBLE: 'profile-bubble',
   PROFILE_TRAY: 'profile-tray',
   LOGOUT: 'logout-button',
-  APP_ROOT: 'app-root', // tag selector — used via locate(), not testId()
+  // Tag selector — used via locate(), not testId(). Two roots because `lamad`
+  // was extracted into its own EPR-app bundle: the doorway serves <app-root> at
+  // the shell's routes and <lamad-root> under /lamad, and both ARE "the
+  // authenticated shell" to the person looking at them. Asserting only app-root
+  // reads a served, working lamad page as a missing shell.
+  APP_ROOT: 'app-root, lamad-root',
   APP_LOGO: 'nav-app-logo',
   CONTEXT_TOGGLE: 'nav-context-toggle',
   PROTOCOL_LINK: 'nav-protocol-link',

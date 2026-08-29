@@ -131,8 +131,9 @@ test target="changed" scope="":
             '// feature tree. Regenerated every run; never commit it.' \
             "import profiles from 'file://{{ a2o_dir }}/cucumber.mjs';" \
             'export default function () {' \
-            '  const { paths: _paths, ...mesh } = profiles().mesh;' \
-            '  return { mesh };' \
+            '  const name = process.env.A2O_PROFILE || "mesh";' \
+            '  const { paths: _paths, ...profile } = profiles()[name];' \
+            '  return { [name]: profile };' \
             '}' > "$cfg"
           cfg_rel="$(realpath --relative-to="{{ a2o_dir }}" "$cfg")"
           case "{{ scope }}" in

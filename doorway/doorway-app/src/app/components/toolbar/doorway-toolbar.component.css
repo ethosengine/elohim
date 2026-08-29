@@ -246,7 +246,14 @@
 .dropdown-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 250;
+  /* BELOW .dw-toolbar's 200, not above it. `.dw-toolbar` is
+     `position: sticky; z-index: 200`, which makes it a STACKING CONTEXT — so
+     `.profile-dropdown`'s z-index:300 is resolved INSIDE that context and cannot
+     rise above 200 in the root one. At 250 this backdrop therefore painted over
+     the open menu and swallowed the click on "Sign Out": the button was visible,
+     enabled and completely unusable, for a person and for a test alike. It only
+     has to cover what is OUTSIDE the toolbar, so 150 does the job. */
+  z-index: 150;
   background: transparent;
   border: none;
   padding: 0;
