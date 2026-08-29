@@ -7,7 +7,7 @@ title: "elohim_transport_route_total / _path_rtt_ms / acquisition_dispatch_total
 slug: "transport-route-metrics-pretouch-zero"
 written: "2026-08-29"
 author: "m4-fleet-confirm shift"
-status: "wip"
+status: "triaged"
 priority: "low"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -28,3 +28,11 @@ registration, `inc_by(0)` every (transport × op_class × reason) of the closed 
 and `elohim_acquisition_dispatch_total` for both planes. Pinned by `every_emitted_reason_is_in_the_closed_vocabulary`
 (walks the selector's full state × pick matrix) and `transport_route_vocabulary_is_pretouched_at_boot` (scrape text).
 Next fleet deploy makes "nothing routed" read as `0`, not absence.
+
+## 2026-08-29 MEASURED on the household mesh
+
+After `storage-restart` onto the rebuilt binary all three peers scrape the full vocabulary at boot —
+`elohim_transport_route_total{op_class="bulk",reason="best_rtt",transport="iroh|libp2p"} 0`,
+`elohim_acquisition_dispatch_total{transport="iroh|libp2p"} 0` — before any decision exists; after the warm recovery
+jessica's rows populated (`best_rtt` iroh 27 / libp2p 3, `explore` 2, `explore_unknown` 2). Absence and "not yet
+decided" are now two readings. Fleet read on the next edge deploy is the confirm.

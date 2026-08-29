@@ -45,3 +45,17 @@ reading of `route_total{reason}` is where the selector's Bulk behaviour actually
 `elohim_acquisition_first_drain_total{outcome}` (pre-touched). Read beside `route_total`: a boot released `expired`
 routed with single-plane peers, so a flat route series there is the book, not the selector. To measure: warm
 recovery on the dual mesh — expect `route_total{op_class="bulk"}` rows to appear on the recovering peer's first drain.
+
+## 2026-08-29 MEASURED: the hold is honest but too short on this mesh — next cut is shape 3
+
+Warm recovery jessica (dual, survivors' books warm): `P2P node started` 11:22:36.49 → `first acquisition drain
+released reason=expired since_boot_ms=10004` → first `iroh peer learned from transport manifest` at **+28 s**
+(11:23:04.81); manifest rounds then land every 30 s (:04/:07/:34/:37). All three peers on the simultaneous
+`storage-restart` read the same `held 2 → expired 1`. So `FIRST_DRAIN_HOLD` = 10 s covers the row's +8..10 s
+measurement but not this mesh's ~30 s announcer cadence; a hold sized to the cadence would tax every boot by 30 s.
+The pull leg nevertheless ROUTED this run — the reconcile keeps re-enqueueing across a 3.4k-row recovery, so the
+selector saw dual peers from the second minute on: 34 bulk decisions, `best_rtt` iroh 27 : libp2p 3 (EWMA 18 ms
+vs 367 ms), dispatch iroh 225 / libp2p 73. The one-shot small-queue shape (11 pulls, gone before the book warms)
+is what shape 3 cures: seed the book from the doorway's `/p2p/manifests` BEFORE the first drain (today the T0'
+bootstrap waits its 30 s grace and then only watches for an EMPTY book). Keep the 10 s hold as the bounded floor;
+make the doorway seed the release, not the deadline.
