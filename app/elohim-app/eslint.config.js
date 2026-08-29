@@ -247,7 +247,20 @@ module.exports = tseslint.config(
       "unicorn/prefer-array-index-of": "error",                 // S7753 - indexOf over findIndex
       "unicorn/no-typeof-undefined": "error",                   // S7741 - === undefined over typeof
       "unicorn/prefer-export-from": "error",                    // S7763 - Re-export directly
-      "unicorn/prefer-global-this": "error",                     // S7764 - globalThis over window
+      // DISABLED, deliberately (S7764). Like promise-function-async above, this
+      // rule is autofixable and its fix rewrites SSR-critical code. It cannot
+      // tell a plain `window.foo` reference from the `typeof window ===
+      // 'undefined'` guard idiom, and it rewrites the guard into
+      // `globalThis.window === undefined` -- which TypeScript types as
+      // statically always-false (sonarjs/different-types-comparison then fires
+      // on the result, which is how this was caught). Running `lint:fix`
+      // rewrote both of this app's SSR guards: app.config.ts's doorway-origin
+      // resolver, and login.component.ts's five-clause browser check, where it
+      // also folded away a defensive clause and left the surrounding comments
+      // referring to a "preceding typeof check" that no longer existed.
+      // This whole rule block exists because of the 2026-07-05 empty-landing
+      // incident; a style autofix must not be able to rewrite its guards.
+      "unicorn/prefer-global-this": "off",
       "unicorn/no-negated-condition": "error",                   // S7735 - Swap branches to remove negation
       "unicorn/no-array-push-push": "error",                     // S7778 - Single push call
       "unicorn/prefer-string-raw": "error",                      // S7780 - String.raw for backslashes

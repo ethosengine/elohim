@@ -34,7 +34,7 @@ export interface SignalKindDeclaration {
   description: string;
   target_kinds: string[];
   evidence_required?: boolean;
-  standing_impact_allowed?: ('advisory' | 'consequential' | 'binding')[];
+  standing_impact_allowed?: Array<'advisory' | 'consequential' | 'binding'>;
 }
 
 export const AVODAH_OBSERVATION_KINDS: ObservationKindDeclaration[] = [];

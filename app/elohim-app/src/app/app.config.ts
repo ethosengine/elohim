@@ -4,13 +4,8 @@ import { provideRouter } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
-import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
-import { GovernanceApiService } from '@elohim/service';
-import { BLOB_FETCHER } from '@elohim/service';
-import { HeliaFetchService } from './elohim/services/helia-fetch.service';
-import { HolochainClientService } from './elohim/services/holochain-client.service';
-import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ContentIOModuleWithPlugins } from '@app/lamad/content-io/content-io.module';
+import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
 import {
   LAMAD_HOLOCHAIN_CLIENT,
   LAMAD_AFFINITY_TRACKING,
@@ -21,20 +16,22 @@ import {
   LAMAD_CONTEXT_ASSEMBLY,
   LAMAD_EPR_RESOLUTION_PROVIDER,
 } from '@app/lamad/interfaces/cross-pillar.interface';
-import { LAMAD_AGENT } from '@app/lamad/interfaces/agent.interface';
-import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
 import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface';
+import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
 import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
+
 import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
-import { ELOHIM_CLIENT } from '@elohim/service';
-import { ELOHIM_ENV } from '@elohim/service';
-import { GOVERNANCE } from '@elohim/service';
 import {
+  BLOB_FETCHER,
   BUNDLE_ROUTE_CONTEXT,
+  CONTENT_SYNC_STORAGE_BASE_URL,
+  ELOHIM_CLIENT,
+  ELOHIM_ENV,
+  GOVERNANCE,
+  GovernanceApiService,
   claimsFromDeclaration,
   type BundleRouteContext,
 } from '@elohim/service';
-import { CONTENT_SYNC_STORAGE_BASE_URL } from '@elohim/service';
 
 import { environment } from '../environments/environment';
 
@@ -54,10 +51,14 @@ import { AgentService } from './elohim/services/agent.service';
 import { ContextAssemblyService } from './elohim/services/context-assembly.service';
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
+import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { EprNavService } from './elohim/services/epr-nav.service';
 import { EprResolverService } from './elohim/services/epr-resolver.service';
 import { GovernanceSignalService } from './elohim/services/governance-signal.service';
 import { GovernanceService } from './elohim/services/governance.service';
+import { HeliaFetchService } from './elohim/services/helia-fetch.service';
+import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
 import { StorageClientService } from './elohim/services/storage-client.service';
 import { ELOHIM_OWNS_UNIVERSAL_ROUTE, ELOHIM_ROUTE_CLAIMS } from './generated/route-claims';
@@ -79,9 +80,9 @@ import { EconomicEventsApiService } from './shefa/services/economic-events-api.s
  */
 function resolveDoorwayUrl(configured: string | undefined): string {
   // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-  if (globalThis.window !== undefined && globalThis.location.hostname !== 'localhost') {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
     // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-    return globalThis.location.origin;
+    return window.location.origin;
   }
   return configured ?? 'http://localhost:8888';
 }

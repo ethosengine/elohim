@@ -114,19 +114,21 @@ export class LoginComponent implements OnInit, AfterViewInit {
     // fetch cannot resolve relative URLs and jsdom's default `about:blank`
     // origin is `'null'` — both surface as ERR_INVALID_URL.
     if (
-      globalThis.window === undefined ||
+      typeof window === 'undefined' ||
+      // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/prefer-optional-chain -- SSR-safe: short-circuited by the preceding typeof check; and each clause is a separate defensive check, so collapsing them to `?.` drops one
+      !window.location ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      !globalThis.location?.origin ||
+      !window.location.origin ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      globalThis.location.origin === 'null' ||
+      window.location.origin === 'null' ||
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (short-circuited by the preceding typeof check)
-      !globalThis.location.protocol.startsWith('http')
+      !window.location.protocol.startsWith('http')
     ) {
       return;
     }
     try {
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (early return above when window is undefined)
-      const resp = await fetch(`${globalThis.location.origin}/auth/me`, { credentials: 'include' });
+      const resp = await fetch(`${window.location.origin}/auth/me`, { credentials: 'include' });
       if (!resp.ok) return;
       const data = (await resp.json()) as Record<string, unknown>;
       const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};

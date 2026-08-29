@@ -1,13 +1,13 @@
 // AUTO-GENERATED from qahal manifest + companion schemas.
 // DO NOT EDIT — regenerate with: pnpm run qahal:codegen
 
+import type { ContentView } from '../../generated/content-view';
 import type {
   CollectiveMetadata,
   ProposalMetadata,
   ChallengeMetadata,
   StatementMetadata,
 } from './metadata-types';
-import type { ContentView } from '../../generated/content-view';
 
 export type QahalTypedContentNode =
   | (ContentView & { contentType: 'collective'; metadata: CollectiveMetadata })

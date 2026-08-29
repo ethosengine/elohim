@@ -988,11 +988,6 @@ export class DataLoaderService {
    * Load the knowledge map index from content service.
    */
   getKnowledgeMapIndex(): Observable<KnowledgeMapIndex> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-    }
-
     return this.contentService.queryKnowledgeMaps({}).pipe(
       map(results => ({
         lastUpdated: new Date().toISOString(),
@@ -1009,11 +1004,6 @@ export class DataLoaderService {
    * Load a specific knowledge map from content service.
    */
   getKnowledgeMap(mapId: string): Observable<KnowledgeMap | null> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of(null);
-    }
-
     return this.contentService.getKnowledgeMap(mapId).pipe(
       catchError(_err => {
         return of(null);
@@ -1152,11 +1142,6 @@ export class DataLoaderService {
    * Load a specific path extension from content service.
    */
   getPathExtension(extensionId: string): Observable<PathExtension | null> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of(null);
-    }
-
     return this.contentService.getPathExtension(extensionId).pipe(
       catchError(_err => {
         return of(null);
@@ -1313,18 +1298,14 @@ export class DataLoaderService {
    */
   getGraph(): Observable<ContentGraph> {
     if (!this.graphCache$) {
-      if (true) {
-        // Content graph served from projection tier
-        // Build graph from Holochain relationships
-        this.graphCache$ = this.buildGraphFromHolochain().pipe(
-          shareReplay(1),
-          catchError(_err => {
-            return of(this.createEmptyGraph());
-          })
-        );
-      } else {
-        this.graphCache$ = of(this.createEmptyGraph());
-      }
+      // Content graph is served from the projection tier: build it from the
+      // Holochain relationships, falling back to an empty graph only on error.
+      this.graphCache$ = this.buildGraphFromHolochain().pipe(
+        shareReplay(1),
+        catchError(_err => {
+          return of(this.createEmptyGraph());
+        })
+      );
     }
     return this.graphCache$;
   }
@@ -1376,11 +1357,6 @@ export class DataLoaderService {
     contentId: string,
     direction: 'outgoing' | 'incoming' | 'both'
   ): Observable<ContentRelationship[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return this.contentService
       .getRelationships(contentId, direction)
       .pipe(map(results => (results ?? []).map(r => this.transformToContentRelationship(r))));
@@ -1580,11 +1556,6 @@ export class DataLoaderService {
    * Builds from Content entries with assessment contentType.
    */
   getAssessmentIndex(): Observable<AssessmentIndex> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-    }
-
     return this.contentService.queryContent({ contentType: 'assessment', limit: 500 }).pipe(
       map(contentNodes => {
         const assessments: AssessmentIndexEntry[] = contentNodes.map(node => {
@@ -1636,17 +1607,6 @@ export class DataLoaderService {
    * Aggregates counts from all governance entity types.
    */
   getGovernanceIndex(): Observable<GovernanceIndex> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of({
-        lastUpdated: new Date().toISOString(),
-        challengeCount: 0,
-        proposalCount: 0,
-        precedentCount: 0,
-        discussionCount: 0,
-      });
-    }
-
     // Query all governance types in parallel via thin API
     // Note: thin API queryChallenges/etc require a contentId — use empty string for "all"
     return defer(async () =>
@@ -1680,11 +1640,6 @@ export class DataLoaderService {
    * Load all challenges from Holochain.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('challenge'))).pipe(
       map(results => results.map(r => this.transformGovernanceStateToChallenge(r))),
       catchError(_err => {
@@ -1697,11 +1652,6 @@ export class DataLoaderService {
    * Get challenges for a specific entity.
    */
   getChallengesForEntity(entityType: string, entityId: string): Observable<ChallengeRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryChallenges(entityId))).pipe(
       map(results => results.map(r => this.transformChallengeView(r))),
       catchError(_err => {
@@ -1746,11 +1696,6 @@ export class DataLoaderService {
    * Load all proposals from Holochain.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('proposal'))).pipe(
       map(results => results.map(r => this.transformGovernanceStateToProposal(r))),
       catchError(_err => {
@@ -1763,11 +1708,6 @@ export class DataLoaderService {
    * Get proposals by status (voting, discussion, decided).
    */
   getProposalsByStatus(status: string): Observable<ProposalRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('proposal'))).pipe(
       map(results =>
         results
@@ -1800,11 +1740,6 @@ export class DataLoaderService {
    * Load all precedents from Holochain.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('precedent'))).pipe(
       map(results => results.map(r => this.transformGovernanceStateToPrecedent(r))),
       catchError(_err => {
@@ -1817,11 +1752,6 @@ export class DataLoaderService {
    * Get precedents by binding level (constitutional, binding-network, binding-local, persuasive).
    */
   getPrecedentsByBinding(binding: string): Observable<PrecedentRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('precedent'))).pipe(
       map(results =>
         results
@@ -1854,11 +1784,6 @@ export class DataLoaderService {
    * Load all discussion threads from Holochain.
    */
   getDiscussions(): Observable<DiscussionRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryGovernanceStates('discussion'))).pipe(
       map(results => results.map(r => this.transformGovernanceStateToDiscussion(r))),
       catchError(_err => {
@@ -1871,11 +1796,6 @@ export class DataLoaderService {
    * Get discussions for a specific entity.
    */
   getDiscussionsForEntity(entityType: string, entityId: string): Observable<DiscussionRecord[]> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of([]);
-    }
-
     return defer(() => from(this.governance.queryDiscussions(entityId))).pipe(
       map(results => results.map(r => this.transformDiscussionView(r))),
       catchError(_err => {
@@ -1931,11 +1851,6 @@ export class DataLoaderService {
     entityType: string,
     entityId: string
   ): Observable<GovernanceStateRecord | null> {
-    if (false) {
-      // TODO: Remove dead availability guards after migration verified
-      return of(null);
-    }
-
     return defer(() => from(this.governance.getGovernanceState(entityType, entityId))).pipe(
       map(result => (result ? this.transformGovernanceStateView(result) : null)),
       catchError(_err => {
