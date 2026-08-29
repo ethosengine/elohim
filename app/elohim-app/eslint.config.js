@@ -52,11 +52,21 @@ module.exports = tseslint.config(
           project: "./tsconfig.json"
         }
       },
-      // `@workspace/runtime` (app/workspace-runtime — the dev-workspace vendor fence)
-      // resolves OUTSIDE this package, so without this it is classified as an
-      // external dep of the root package and flagged as extraneous. It is dev
-      // tooling composed into the app, not a dependency.
-      "import/internal-regex": "^@workspace/"
+      // Path aliases that resolve OUTSIDE this package are not npm dependencies.
+      // Without this they are classified as external deps of the root package and
+      // flagged extraneous (`import/no-extraneous-dependencies`):
+      //   `@workspace/runtime` → app/workspace-runtime, the dev-workspace vendor
+      //     fence: dev tooling composed into the app, not a dependency.
+      //   `@app/lamad/*`       → app/lamad/src/app, a separate EPR-app bundle
+      //     reached by tsconfig path alias. Declaring `lamad` an npm dependency
+      //     would DEEPEN the bundle-seam violation the workspace-imports rail
+      //     refuses (see app/CLAUDE.md §Bundle seams are not domain seams, and
+      //     the open placement decision in arch-frontend-bundle-seams-backlog).
+      //     The lint fix is to state what the alias is, not to invent a dep.
+      // The in-workspace `@app/*` pillars are internal by construction, and
+      // `import/order` above already declares `@app/**` group "internal" — this
+      // makes the resolver agree with the ordering rule instead of contradicting it.
+      "import/internal-regex": "^@(workspace|app)/"
     },
     rules: {
       // ============================================================
@@ -362,5 +372,22 @@ module.exports = tseslint.config(
         ],
       }],
     },
+  },
+
+  // ============================================================
+  // GENERATED CODE (src/app/generated)
+  // ============================================================
+  // Emitted from the protocol view schemas by `pnpm run schema:codegen:ts`,
+  // carrying codegen's own `/* eslint-disable @typescript-eslint/consistent-
+  // indexed-object-style */` banner. That banner is written for the schemas'
+  // canonical consumer config; a consumer that does not enable the rule must
+  // not then report the banner as dead code. Without this, 99 generated files
+  // each raise an unused-directive warning, and `eslint --fix` STRIPS the
+  // banner the next codegen run writes back — an oscillation, not a fix.
+  // Scoped to directive reporting only: every rule stays on, because a
+  // generator can still emit something genuinely wrong.
+  {
+    files: ["src/app/generated/**/*.ts"],
+    linterOptions: { reportUnusedDisableDirectives: "off" },
   }
 );
