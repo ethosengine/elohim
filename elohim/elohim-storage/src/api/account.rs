@@ -5,8 +5,12 @@
 //!         `/api/v1/account/recovery/:id/vote`, `/api/v1/account/portal-hosts`
 //!
 //! ## Auth pattern
-//! All routes resolve the calling agent via `X-Agent-Id` header (doorway JWT injection)
-//! with active local session as Tauri fallback — same pattern as `api/identity.rs`.
+//! GET routes resolve the calling agent from the REQUEST ALONE via
+//! [`resolve_account_caller`] (`X-Agent-Id`, then `X-Agent-Cid`) and answer 401
+//! when neither header is present — there is no ambient-session fallback on a
+//! read (see [`extract_agent_key_explicit`]). The zome-write routes still use
+//! [`extract_agent_key`]'s cascade (`X-Agent-Id` with active local session as
+//! Tauri fallback), the same pattern as `api/identity.rs`.
 //!
 //! ## Truth layer
 //! GET handlers read from SQLite projections (Category A — rebuildable from DHT signals).
@@ -115,14 +119,9 @@ async fn get_account(
     let mut conn = get_conn(pool)?;
 
     // 1. Resolve calling agent
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-    let agent_key = match agent_key {
+    let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => {
-            return Ok(response::bad_request(
-                "Cannot resolve account: no X-Agent-Id header and no active session",
-            ))
-        }
+        None => return Ok(unauthorized_no_caller()),
     };
 
     // 2. Resolve Human from agent key
@@ -296,14 +295,9 @@ async fn get_account_keys(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-    let agent_key = match agent_key {
+    let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => {
-            return Ok(response::bad_request(
-                "Cannot resolve account: no X-Agent-Id header and no active session",
-            ))
-        }
+        None => return Ok(unauthorized_no_caller()),
     };
 
     use crate::db::diesel_schema::key_rotations::dsl;
@@ -345,14 +339,9 @@ async fn get_account_revocations(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-    let agent_key = match agent_key {
+    let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => {
-            return Ok(response::bad_request(
-                "Cannot resolve account: no X-Agent-Id header and no active session",
-            ))
-        }
+        None => return Ok(unauthorized_no_caller()),
     };
 
     // Resolve human_id from agent_key
@@ -394,14 +383,9 @@ async fn get_pending_recovery(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-    let agent_key = match agent_key {
+    let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => {
-            return Ok(response::bad_request(
-                "Cannot resolve account: no X-Agent-Id header and no active session",
-            ))
-        }
+        None => return Ok(unauthorized_no_caller()),
     };
 
     let human = match get_human_by_agent_key(&mut conn, &agent_key)? {
@@ -465,14 +449,9 @@ async fn get_portal_hosts(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-    let agent_key = match agent_key {
+    let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => {
-            return Ok(response::bad_request(
-                "Cannot resolve account: no X-Agent-Id header and no active session",
-            ))
-        }
+        None => return Ok(unauthorized_no_caller()),
     };
 
     let human = match get_human_by_agent_key(&mut conn, &agent_key)? {
@@ -1039,6 +1018,72 @@ pub(crate) fn extract_agent_cid_explicit<B>(req: &Request<B>) -> Option<String> 
         .map(|s| s.to_string())
 }
 
+/// Read the caller's agent public key from the EXPLICIT `X-Agent-Id` header
+/// ONLY — step 1 of [`extract_agent_key`]'s cascade, without step 2's ambient
+/// session fallback.
+///
+/// `X-Agent-Id` is set by doorway's bespoke portal-host handlers after JWT
+/// validation (`doorway/doorway-service/src/routes/auth_routes.rs`), never by
+/// generic middleware.
+pub(crate) fn extract_agent_key_explicit<B>(req: &Request<B>) -> Option<String> {
+    req.headers()
+        .get("X-Agent-Id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+/// Resolve the agent public key of whoever sent THIS request — the read-path
+/// resolver for every `/api/v1/account` GET.
+///
+/// Resolution order:
+/// 1. `X-Agent-Id` — already an agent pubkey (bespoke portal-host handlers)
+/// 2. `X-Agent-Cid` — injected by the general `/api/v1` proxy from the JWT's
+///    `claims.human_id`, so it carries EITHER a `uhCA…` agent key (Tauri-direct
+///    callers set it themselves) OR a human slug. A slug is resolved through
+///    `humans.agent_pub_key` before it is returned: agent key and slug are
+///    distinct identity namespaces and a raw cross-namespace value silently
+///    empties every downstream join (crate CLAUDE.md, "Identity &
+///    Transport-Identity Coherence"). Same discrimination as the head-declare
+///    gate in `http.rs`.
+/// 3. `None` — the caller asserted no identity; the handler answers 401.
+///
+/// **There is deliberately no `local_sessions` fallback.** [`extract_agent_key`]
+/// has one, and on a hosted pod `services::genesis_self_heal` mints an ACTIVE
+/// session for the node's OWN human at boot, while the doorway forwards neither
+/// header for an unverified caller. Composed, those two facts mean an ANONYMOUS
+/// `GET /api/v1/account` resolved as the node's own human and was served that
+/// human's account — the identity-door twin of the reach exposure cured in
+/// [`extract_agent_cid_explicit`]. A caller that asserts no identity gets no
+/// identity: deny-by-default.
+pub(crate) fn resolve_account_caller<B>(
+    req: &Request<B>,
+    conn: &mut diesel::SqliteConnection,
+) -> Result<Option<String>, StorageError> {
+    if let Some(key) = extract_agent_key_explicit(req) {
+        return Ok(Some(key));
+    }
+
+    match extract_agent_cid_explicit(req) {
+        Some(cid) if cid.starts_with("uhCA") => Ok(Some(cid)),
+        Some(slug) => Ok(get_human_by_id(conn, &slug)?.and_then(|h| h.agent_pub_key)),
+        None => Ok(None),
+    }
+}
+
+/// 401 for a read whose caller cannot be resolved from the request itself.
+///
+/// This was a 400 while the ambient session made "no identity" unreachable;
+/// with the fallback gone the condition is missing authentication, not a
+/// malformed request.
+fn unauthorized_no_caller() -> Response<Full<Bytes>> {
+    response::json_response(
+        hyper::StatusCode::UNAUTHORIZED,
+        &serde_json::json!({
+            "error": "authentication required: no X-Agent-Id or X-Agent-Cid on the request"
+        }),
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
@@ -1119,6 +1164,127 @@ mod tests {
             extract_agent_cid_explicit(&bearer_only),
             None,
             "an unvalidated bearer header must not resolve an identity"
+        );
+    }
+
+    /// A `/api/v1/account` READ resolves its caller from the request alone.
+    ///
+    /// Regression companion to `explicit_agent_cid_ignores_everything_but_the_header`,
+    /// reached through the account door instead of the reach door: the GET
+    /// handlers used `extract_agent_key`, whose step 2 falls back to the active
+    /// `local_sessions` row. A hosted pod always has one — `genesis_self_heal`
+    /// mints it for the node's OWN human — and the doorway forwards no identity
+    /// header for an unverified caller, so an ANONYMOUS `GET /api/v1/account`
+    /// resolved as the node's human and was served that human's account.
+    ///
+    /// The fixture is that exact production shape: a node human with an active
+    /// ambient session, plus an unrelated visitor.
+    #[test]
+    fn account_caller_resolves_from_the_request_not_the_ambient_session() {
+        use crate::db::humans::{create_human, CreateHumanInput};
+        use crate::db::run_migrations;
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::sqlite::SqliteConnection;
+
+        fn insert_human(conn: &mut SqliteConnection, id: &str, key: Option<&str>) {
+            create_human(
+                conn,
+                CreateHumanInput {
+                    id: id.to_string(),
+                    agent_pub_key: key.map(|k| k.to_string()),
+                    display_name: id.to_string(),
+                    bio: None,
+                    affinities: "[]".to_string(),
+                    profile_reach: "commons".to_string(),
+                    location: None,
+                    profile_photo_url: None,
+                    h_app_id: "imagodei".to_string(),
+                    household_id: None,
+                },
+            )
+            .expect("insert human");
+        }
+
+        // Shared-cache in-memory pool with the real migrations — gives us both
+        // `humans` and `local_sessions`.
+        let url = format!(
+            "file:account_caller_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool: crate::db::DbPool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        let mut conn = pool.get().expect("conn");
+
+        insert_human(&mut conn, "human-node", None);
+        insert_human(&mut conn, "human-visitor", Some("uhCAkVISITOR"));
+
+        // The ambient session the hosted pod mints for its OWN human at boot.
+        crate::services::genesis_self_heal::genesis_self_heal_identity(
+            &mut conn,
+            "human-node",
+            "uhCAkNODE",
+            None,
+        )
+        .expect("self-heal");
+        assert_eq!(
+            crate::db::local_sessions::get_active_session(&mut conn)
+                .unwrap()
+                .expect("ambient session present")
+                .agent_pub_key,
+            "uhCAkNODE",
+            "fixture must reproduce the hosted-pod ambient session"
+        );
+
+        // (a) A doorway-forwarded slug resolves to THAT human's agent key —
+        // never to the node's.
+        let visitor = Request::builder()
+            .uri("/api/v1/account")
+            .header("X-Agent-Cid", "human-visitor")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            resolve_account_caller(&visitor, &mut conn)
+                .unwrap()
+                .as_deref(),
+            Some("uhCAkVISITOR")
+        );
+
+        // (b) The anonymous case: no identity asserted, no identity resolved.
+        let anonymous = Request::builder().uri("/api/v1/account").body(()).unwrap();
+        assert_eq!(
+            resolve_account_caller(&anonymous, &mut conn).unwrap(),
+            None,
+            "an anonymous read must not resolve the node's own human through \
+             the ambient local session"
+        );
+
+        // (c) A bearer token is not an identity — storage never validates it.
+        let bearer_only = Request::builder()
+            .uri("/api/v1/account")
+            .header("Authorization", "Bearer bogus")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            resolve_account_caller(&bearer_only, &mut conn).unwrap(),
+            None,
+            "an unvalidated bearer header must not resolve an identity"
+        );
+
+        // (d) `X-Agent-Id` still resolves — doorway's bespoke portal-host
+        // handlers inject it after JWT validation (`auth_routes.rs`).
+        let portal_host = Request::builder()
+            .uri("/api/v1/account/portal-hosts")
+            .header("X-Agent-Id", "uhCAkVISITOR")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            resolve_account_caller(&portal_host, &mut conn)
+                .unwrap()
+                .as_deref(),
+            Some("uhCAkVISITOR")
         );
     }
 

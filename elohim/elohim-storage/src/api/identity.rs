@@ -10,8 +10,9 @@
 //!
 //! The "me" endpoints resolve the current human via the `X-Agent-Id` header,
 //! which doorway injects after JWT validation. In Tauri/direct mode the app
-//! sends the same header. If the header is absent, the active local session's
-//! agent_pub_key is used as a fallback.
+//! sends the same header. The READ (`GET /me`) resolves from the request alone
+//! and answers 401 when it carries no identity; only the write (`PUT /me`)
+//! still falls back to the active local session's agent_pub_key.
 //!
 //! The {agentId} endpoints serve per-agent projections. The agentId is the
 //! agent's pubkey (same format as X-Agent-Id). The caller must supply their
@@ -164,18 +165,20 @@ async fn heal_human(
 /// GET /api/v1/identity/me
 ///
 /// Fetch the human record for the currently authenticated agent.
-/// Resolution order:
-/// 1. `X-Agent-Id` header (set by doorway JWT middleware)
-/// 2. Active local session's `agent_pub_key` (Tauri fallback)
+///
+/// Identity comes from the REQUEST ALONE — `X-Agent-Id`, then `X-Agent-Cid`
+/// (slug-resolved) — via `account::resolve_account_caller`. The ambient
+/// `local_sessions` fallback that [`extract_agent_key`] carries is NOT used
+/// here: on a hosted pod `genesis_self_heal` mints an active session for the
+/// node's own human, so an anonymous `GET /me` answered with the NODE's human
+/// record. No header → 401.
 async fn get_me(
     req: Request<Incoming>,
     pool: &DbPool,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
-    let agent_key = extract_agent_key(&req, &mut conn)?;
-
-    match agent_key {
+    match crate::api::account::resolve_account_caller(&req, &mut conn)? {
         Some(key) => {
             let result = humans::get_human_by_agent_key(&mut conn, &key)?;
             Ok(response::from_option(
@@ -183,8 +186,11 @@ async fn get_me(
                 "No human record found for current agent",
             ))
         }
-        None => Ok(response::bad_request(
-            "Cannot resolve current identity: no X-Agent-Id header and no active session",
+        None => Ok(response::json_response(
+            hyper::StatusCode::UNAUTHORIZED,
+            &serde_json::json!({
+                "error": "authentication required: no X-Agent-Id or X-Agent-Cid on the request"
+            }),
         )),
     }
 }
@@ -335,7 +341,13 @@ async fn get_profile_lens(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Resolve the current agent public key from the request.
+/// Resolve the current agent public key from the request, with the Tauri
+/// ambient-session fallback.
+///
+/// **Writes only.** The fallback resolves the NODE's own human on a hosted pod
+/// (`services::genesis_self_heal` mints an active session at boot), so it must
+/// never decide what a read is allowed to see — reads go through
+/// `account::resolve_account_caller`, which has no fallback.
 ///
 /// Returns `Ok(Some(key))` when resolved, `Ok(None)` when no identity
 /// signal is present (caller decides whether that is an error).
