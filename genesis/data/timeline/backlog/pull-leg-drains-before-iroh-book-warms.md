@@ -59,3 +59,12 @@ vs 367 ms), dispatch iroh 225 / libp2p 73. The one-shot small-queue shape (11 pu
 is what shape 3 cures: seed the book from the doorway's `/p2p/manifests` BEFORE the first drain (today the T0'
 bootstrap waits its 30 s grace and then only watches for an EMPTY book). Keep the 10 s hold as the bounded floor;
 make the doorway seed the release, not the deadline.
+
+### Sharpening (2026-08-29, sibling review): the hold is in the wrong UNIT, not the wrong size
+
+The hold is wall-clock; the book fills from a 30 s manifest cadence. So `FIRST_DRAIN_HOLD` is not a tunable:
+under one round it always expires first, over one round it is "wait for a round" plus a 30 s tax on every boot.
+Do not spend a cut widening it. Shape 3 removes the dependency (doorway-seeded book gates the release, the 10 s
+floor stays as the bound). Pinned on the constant's doc comment in `acquisition.rs` so the cheap fix is refused at
+the site where it would be typed.
+
