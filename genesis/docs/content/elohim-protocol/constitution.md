@@ -20,9 +20,11 @@ Robert Robinson wrote that hymn knowing his own heart's tendency to wander—and
 
 ## Executive Summary
 
-The Elohim Protocol solves AI alignment not through training values into model weights, but through **constitutional reflection**—structured system prompts that any sufficiently capable, reasonably aligned base model can faithfully execute.
+Most attempts to make AI behave well try to build the values *into the machine* — baked in during training, where nobody outside the lab can read them, argue with them, or change them. This protocol does something different: it writes the values down, in plain language, as a document the machine reads and is bound by. The values live in the text, not in the machine. That means you can read them, your community can negotiate them, and they can change without rebuilding anything.
 
-This document defines the first-draft constitutional architecture: what it is, why it works, and what it looks like at each governance layer from individual to global.
+The consequence is a separation worth stating plainly: **building a capable machine and deciding whose values it serves become two different jobs, done by different people.** Labs build the capability. Communities write the values. Neither gets to do the other's work.
+
+This document is the first draft of that architecture — what it is, why it works, and what it looks like at each layer of governance from a single person up to the whole of humanity.
 
 ---
 
@@ -30,14 +32,11 @@ This document defines the first-draft constitutional architecture: what it is, w
 
 ### The Problem with Trained Alignment
 
-Traditional AI alignment attempts to bake values directly into model weights:
-- Train on curated data → hope values generalize
-- RLHF on human preferences → hope preferences are wise
-- Constitutional AI training → hope the constitution is complete
+The usual approach bakes the values into the machine itself, during training, in three familiar ways. Feed it carefully chosen material and hope the right values generalize from the examples. Have people rate its answers and train it toward the ones they preferred — and hope those preferences were wise. Or train it against a written set of principles and hope the principles were complete.
 
-Each approach struggles with the same fundamental issue: **whose values?** And: **what happens when values need to evolve?**
+Each runs into the same two questions, and neither has a good answer inside the machine: **whose values?** And **what happens when the values need to change?**
 
-A model trained on 2024 values cannot easily update for 2034 understanding. Values frozen in weights become technical debt, then liability, then harm.
+Values fixed during training are fixed in a way nobody can easily see or revise. A model trained on what we understood in 2024 does not readily update to what we understand in 2034, and values that cannot be revised become first a maintenance problem, then a liability, then a harm.
 
 ### The Constitutional Alternative
 
@@ -58,7 +57,7 @@ The base model provides **capability**. The constitution provides **values**. Th
 - Evolvable (amendments through consensus)
 - Verifiable (blockchain-anchored, auditable)
 
-This separates the hard problem (building capable AI) from the legitimacy problem (whose values it serves). Labs build capability. Communities negotiate values. Neither controls the other.
+This is what splits the hard problem (building a capable machine) from the legitimacy problem (whose values it serves), and it is why the split holds: the values are in a document, so the people who wrote the machine do not own them.
 
 ---
 
@@ -89,11 +88,13 @@ Blockchain Constitution:
 ```
 
 When a community encodes "we do not permit exploitation of children" in their constitutional layer:
-- This isn't a policy that can be quietly revised
-- This isn't a guideline that can be "interpreted" away
-- This is treasure placed permanently in the shared ledger
-- Every Elohim agent can verify it hasn't been tampered with
-- Every community member can audit compliance
+- It cannot be revised quietly — a change is a change everyone can see
+- Interpreting it away leaves a trace, because the text it departs from is fixed and public
+- It is treasure placed where the community's heart can be read from it
+- Any Elohim agent can check the text it is running against the one that was ratified
+- Any community member can audit compliance
+
+None of this makes the commitment incorruptible. A community can still ratify something it should not, drift in how it reads its own words, or lose the will to hold what it wrote. What anchoring buys is narrower and still worth having: the change cannot happen in the dark.
 
 ### The Graduated Immutability Model
 
@@ -115,7 +116,7 @@ When communities invest the effort to negotiate, ratify, and anchor their consti
 - The process itself builds commitment
 - The permanence demands seriousness
 - The transparency creates accountability
-- The immutability protects against backsliding
+- The difficulty of changing it raises the cost of backsliding
 
 This is what it means to put your treasure where your heart is. The constitution isn't just documentation—it's a **permanent investment in who we've decided to be**.
 
@@ -675,9 +676,9 @@ function resolveConflict(action, constitutionalStack):
     return Permitted(reasoning)
 ```
 
-### Blockchain Anchoring
+### Anchoring and Verification
 
-Each constitutional version is anchored via:
+Anchoring applies to the shared upper layers — global first, and the national and community texts a wide public must be able to check. Household and personal constitutions are never anchored publicly; they live in their own tamper-evident records, verified among the people they concern. A version at an anchored layer records:
 
 ```
 ConstitutionalAnchor:
@@ -692,10 +693,12 @@ ConstitutionalAnchor:
 ```
 
 Agents verify by:
-1. Fetching anchor from blockchain
-2. Hashing local constitution copy
+1. Fetching the anchor — from the public ledger for an anchored layer, or from the signed records of the people concerned for a household or personal one
+2. Hashing the local constitution copy
 3. Comparing hashes
-4. Refusing to operate on unverified constitutions
+4. Refusing to operate on a constitution that fails its check
+
+The check is the same at every layer; only where the reference lives differs. A family should never need a world ledger to be online in order to run its own agent.
 
 ### Edge Device Operation
 
@@ -724,7 +727,7 @@ Constitutional prompts are designed for edge deployment:
 └─────────────────────────────────────────────┘
 ```
 
-No central server required. Constitution verified against blockchain and peer consensus. Agent operates locally with community-validated values.
+No central server required. The constitution is verified against its anchor and against peers, and the agent then runs locally on community-validated values — including offline, since verification is a check the device can hold rather than a service it must reach.
 
 ---
 

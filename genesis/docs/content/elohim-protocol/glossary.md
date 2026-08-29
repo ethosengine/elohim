@@ -1,9 +1,9 @@
 ---
 id: glossary
 cites:
-  - "elohim-protocol-manifesto | manifesto | sha256:c8df6ddb283624fa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "constitution | constitution | sha256:44658e1ade471cdd | path: genesis/docs/content/elohim-protocol/constitution.md"
-  - "values-forward | the stances that canonize the common inheritance, self-sealing, and the floor/ceiling | sha256:b85b8effd37fbc0a | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "elohim-protocol-manifesto | manifesto | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "constitution | constitution | sha256:8aaf7899ad64a813 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "values-forward | the stances that canonize the common inheritance, self-sealing, and the floor/ceiling | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
 ---
 # Glossary — Reading the Elohim Protocol
 
