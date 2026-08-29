@@ -346,6 +346,67 @@ fn handle_revocation_message(
 /// Inventory snapshot/delta projection into `peer_blob_inventory`. The
 /// commitment-driven active fetch + delta-gap snapshot-request run only when
 /// `ctx.inventory_fetch` is `Some` (both active receive planes; see module docs).
+/// Apply every held page that is now contiguous with the cursor, in order.
+/// bounded-work: at most the per-peer window (`MAX_PENDING_PER_PEER`) applies
+/// per call, each one indexed replace/delete work already bounded by page size.
+fn flush_held_pages(
+    ctx: &GossipDispatchCtx<'_>,
+    conn: &mut diesel::SqliteConnection,
+    peer_id: &str,
+    mut next_seq: i64,
+) {
+    use crate::p2p::inventory_reorder::with_reorder;
+    let mut flushed = 0usize;
+    while let Some(held) = with_reorder(|r| r.take_next(peer_id, next_seq)) {
+        let added_str: Vec<String> = held.added.iter().map(|a| a.to_string()).collect();
+        let removed_str: Vec<String> = held.removed.iter().map(|a| a.to_string()).collect();
+        let when = chrono::DateTime::from_timestamp_micros(held.emitted_at)
+            .unwrap_or_else(chrono::Utc::now)
+            .to_rfc3339();
+        match crate::db::peer_blob_inventory::apply_delta(
+            conn,
+            peer_id,
+            &added_str,
+            &removed_str,
+            held.sequence as i64,
+            &when,
+        ) {
+            Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
+                flushed += 1;
+                crate::metrics::inc_inventory_page("delta", "flushed");
+                if !held.added.is_empty() {
+                    if let Some(fetch) = ctx.inventory_fetch {
+                        fetch.score_and_enqueue(conn, peer_id, &held.hints, &added_str);
+                    }
+                }
+                next_seq = held.sequence as i64 + 1;
+            }
+            Ok(other) => {
+                // Replay/Gap on a page we chose by exact sequence: the cursor
+                // moved under us (other plane). Stop; the next apply re-drains.
+                debug!(
+                    target: "elohim_storage::inventory",
+                    peer_id = %peer_id, sequence = held.sequence, outcome = ?other,
+                    "held inventory page no longer contiguous — left for the next apply"
+                );
+                break;
+            }
+            Err(e) => {
+                crate::metrics::inc_inventory_page("delta", "failed");
+                warn!(target: "elohim_storage::inventory", error = %e, "apply_delta (held page) failed");
+                break;
+            }
+        }
+    }
+    if flushed > 0 {
+        debug!(
+            target: "elohim_storage::inventory",
+            peer_id = %peer_id, flushed,
+            "held inventory pages applied in order"
+        );
+    }
+}
+
 fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
     use crate::p2p::inventory_gossip::{BlobInventoryDelta, BlobInventorySnapshot};
 
@@ -375,6 +436,7 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                         &when,
                     ) {
                         Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Applied) => {
+                            crate::metrics::inc_inventory_page("snapshot", "applied");
                             info!(
                                 target: "elohim_storage::inventory",
                                 from = %source,
@@ -391,8 +453,23 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                                     &hashes_str,
                                 );
                             }
+                            flush_held_pages(
+                                ctx,
+                                &mut conn,
+                                &snapshot.peer_id,
+                                snapshot.sequence as i64 + 1,
+                            );
                         }
                         Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Deduplicated) => {
+                            crate::metrics::inc_inventory_page("snapshot", "deduplicated");
+                            // The cursor advanced to this sequence even though the
+                            // set did not change — pages held past it apply now.
+                            flush_held_pages(
+                                ctx,
+                                &mut conn,
+                                &snapshot.peer_id,
+                                snapshot.sequence as i64 + 1,
+                            );
                             debug!(
                                 target: "elohim_storage::inventory",
                                 from = %source,
@@ -446,6 +523,7 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                         &when,
                     ) {
                         Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
+                            crate::metrics::inc_inventory_page("delta", "applied");
                             debug!(
                                 target: "elohim_storage::inventory",
                                 peer_id = %delta.peer_id,
@@ -464,8 +542,15 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                                     );
                                 }
                             }
+                            flush_held_pages(
+                                ctx,
+                                &mut conn,
+                                &delta.peer_id,
+                                delta.sequence as i64 + 1,
+                            );
                         }
                         Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
+                            crate::metrics::inc_inventory_page("delta", "replay");
                             debug!(
                                 target: "elohim_storage::inventory",
                                 peer_id = %delta.peer_id,
@@ -477,15 +562,36 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSou
                             expected,
                             received,
                         }) => {
-                            warn!(
-                                target: "elohim_storage::inventory",
-                                peer_id = %delta.peer_id,
-                                expected,
-                                received,
-                                "Inventory delta gap — requesting snapshot"
-                            );
-                            if let Some(fetch) = ctx.inventory_fetch {
-                                fetch.request_snapshot_for_gap(&delta.peer_id);
+                            // An early page is HELD, not dropped: the cursor
+                            // reaches it when its predecessor lands (often the
+                            // other plane's copy). Only a page beyond the window
+                            // is a real loss worth a snapshot request.
+                            use crate::p2p::inventory_reorder::{with_reorder, StashOutcome};
+                            let peer = delta.peer_id.clone();
+                            let outcome = with_reorder(|r| r.stash(delta));
+                            match outcome {
+                                StashOutcome::Buffered => {
+                                    crate::metrics::inc_inventory_page("delta", "buffered");
+                                    debug!(
+                                        target: "elohim_storage::inventory",
+                                        peer_id = %peer, expected, received,
+                                        "Inventory delta ahead of the cursor — held for in-order apply"
+                                    );
+                                }
+                                StashOutcome::Duplicate => {
+                                    crate::metrics::inc_inventory_page("delta", "duplicate");
+                                }
+                                StashOutcome::Overflow => {
+                                    crate::metrics::inc_inventory_page("delta", "overflow");
+                                    warn!(
+                                        target: "elohim_storage::inventory",
+                                        peer_id = %peer, expected, received,
+                                        "Inventory delta gap beyond the reorder window — requesting snapshot"
+                                    );
+                                    if let Some(fetch) = ctx.inventory_fetch {
+                                        fetch.request_snapshot_for_gap(&peer);
+                                    }
+                                }
                             }
                         }
                         Err(e) => warn!(

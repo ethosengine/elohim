@@ -1370,6 +1370,35 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Paged inventory refresh pages received, by kind and what the receiver
+    /// did. labels: kind = "snapshot" | "delta"; outcome = "applied" |
+    /// "deduplicated" | "replay" | "buffered" (ahead of the cursor, held) |
+    /// "flushed" (held page applied in order) | "duplicate" | "overflow" (beyond
+    /// the reorder window — a real loss) | "failed". Pre-touched. Fleet read:
+    /// `overflow` > 0 per hour = pages genuinely lost; a `buffered` that never
+    /// turns into `flushed` = the cursor never catches up.
+    pub static ref INVENTORY_PAGES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_inventory_pages_total",
+            "Inventory refresh pages received, by kind and receiver outcome.",
+        ),
+        &["kind", "outcome"],
+    )
+    .unwrap();
+
+    /// Content-row touches announced by writers that have no EventBus in
+    /// reach (`rea_projection`). label: outcome = "sent" | "dropped" (channel
+    /// full) | "no_sink" (before the forwarder is installed; the cold-start
+    /// back-fill covers these). Pre-touched.
+    pub static ref CONTENT_TOUCHES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_touches_total",
+            "Content-row touches forwarded to ContentUpdated from bus-less writers, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// iroh-gossip membership transitions on inbound topics. label:
     /// direction = "up" | "down". `up` staying at zero = the plane has no
     /// neighbors and every iroh publish is a shout into a void.
@@ -2422,6 +2451,16 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_FIRST_DRAIN.clone()));
         let _ = REGISTRY.register(Box::new(IROH_DOORWAY_BOOTSTRAP_READS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_HALF_ROW_HEAL.clone()));
+        let _ = REGISTRY.register(Box::new(INVENTORY_PAGES.clone()));
+        for kind in ["snapshot", "delta"] {
+            for outcome in INVENTORY_PAGE_OUTCOMES {
+                INVENTORY_PAGES.with_label_values(&[kind, outcome]).reset();
+            }
+        }
+        let _ = REGISTRY.register(Box::new(CONTENT_TOUCHES.clone()));
+        for outcome in ["sent", "dropped", "no_sink"] {
+            CONTENT_TOUCHES.with_label_values(&[outcome]).reset();
+        }
         for outcome in SYNC_HALF_ROW_HEAL_OUTCOMES {
             SYNC_HALF_ROW_HEAL.with_label_values(&[outcome]).reset();
         }
@@ -3220,6 +3259,28 @@ pub const IROH_DOORWAY_BOOTSTRAP_PHASES: &[&str] = &["boot", "watch"];
 /// `result` vocabulary of `IROH_DOORWAY_BOOTSTRAP_READS` — pre-touched at
 /// zero so a boot that never seeded is a visible 0, not a missing series.
 pub const IROH_DOORWAY_BOOTSTRAP_READ_RESULTS: &[&str] = &["seeded", "none_accepted", "empty"];
+
+/// `outcome` vocabulary of `INVENTORY_PAGES`, pre-touched at zero.
+pub const INVENTORY_PAGE_OUTCOMES: &[&str] = &[
+    "applied",
+    "deduplicated",
+    "replay",
+    "buffered",
+    "flushed",
+    "duplicate",
+    "overflow",
+    "failed",
+];
+
+/// One inventory refresh page, by kind and receiver outcome.
+pub fn inc_inventory_page(kind: &str, outcome: &str) {
+    INVENTORY_PAGES.with_label_values(&[kind, outcome]).inc();
+}
+
+/// One content-row touch from a bus-less writer.
+pub fn inc_content_touch(outcome: &str) {
+    CONTENT_TOUCHES.with_label_values(&[outcome]).inc();
+}
 
 /// `outcome` vocabulary of `SYNC_HALF_ROW_HEAL`, pre-touched at zero.
 pub const SYNC_HALF_ROW_HEAL_OUTCOMES: &[&str] = &["scanned", "healed", "no_doc_hash", "failed"];

@@ -3923,6 +3923,25 @@ async fn async_main(
                     }
                 });
 
+                // DHT-signal content writes (`rea_projection`) have no bus in
+                // reach; they push touched ids here and this forwarder turns them
+                // into ContentUpdated so the producer re-projects the doc.
+                {
+                    let (touch_tx, mut touch_rx) = tokio::sync::mpsc::channel::<String>(
+                        elohim_storage::rea_projection::CONTENT_TOUCH_CAPACITY,
+                    );
+                    if elohim_storage::rea_projection::install_content_touch_sink(touch_tx) {
+                        let touch_events = services.events.clone();
+                        tokio::spawn(async move {
+                            while let Some(id) = touch_rx.recv().await {
+                                touch_events.emit(
+                                    elohim_storage::services::events::StorageEvent::ContentUpdated { id },
+                                );
+                            }
+                        });
+                        info!("content-touch forwarder spawned — DHT-signal row writes now re-project their sync docs");
+                    }
+                }
                 elohim_storage::sync::projector::spawn_content_projection_listener(
                     services.events.clone(),
                     node.sync_manager().clone(),
@@ -4055,6 +4074,25 @@ async fn async_main(
                             None
                         }
                     };
+                    // DHT-signal content writes (`rea_projection`) have no bus in
+                    // reach; they push touched ids here and this forwarder turns them
+                    // into ContentUpdated so the producer re-projects the doc.
+                    {
+                        let (touch_tx, mut touch_rx) = tokio::sync::mpsc::channel::<String>(
+                            elohim_storage::rea_projection::CONTENT_TOUCH_CAPACITY,
+                        );
+                        if elohim_storage::rea_projection::install_content_touch_sink(touch_tx) {
+                            let touch_events = services.events.clone();
+                            tokio::spawn(async move {
+                                while let Some(id) = touch_rx.recv().await {
+                                    touch_events.emit(
+                                    elohim_storage::services::events::StorageEvent::ContentUpdated { id },
+                                );
+                                }
+                            });
+                            info!("content-touch forwarder spawned — DHT-signal row writes now re-project their sync docs");
+                        }
+                    }
                     elohim_storage::sync::projector::spawn_content_projection_listener(
                         services.events.clone(),
                         iroh_sync.clone(),

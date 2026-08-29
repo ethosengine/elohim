@@ -324,8 +324,21 @@ pub async fn project_content_doc_reconcile(
     sync: &SyncManager,
     content: &Content,
 ) -> Result<bool, StorageError> {
+    Ok(!project_content_doc_reconcile_keys(sync, content)
+        .await?
+        .is_empty())
+}
+
+/// [`project_content_doc_reconcile`] that names WHICH doc fields it filled —
+/// the back-fill's drift report reads these so a fleet operator can tell
+/// "docs were missing `blobHash`" from "docs were missing `declaredHead`"
+/// without a debugger. Empty = nothing to fill (or reach not distributable).
+pub async fn project_content_doc_reconcile_keys(
+    sync: &SyncManager,
+    content: &Content,
+) -> Result<Vec<&'static str>, StorageError> {
     if !reach_is_distribution_safe(&content.reach) {
-        return Ok(false);
+        return Ok(Vec::new());
     }
     let doc_id = content_doc_id(&content.id);
     let mut doc = sync
@@ -351,7 +364,7 @@ pub async fn project_content_doc_reconcile(
         })
         .collect();
     if fields.is_empty() {
-        return Ok(false);
+        return Ok(Vec::new());
     }
     doc.transact::<_, _, automerge::AutomergeError>(|tx| {
         for (key, val) in &fields {
@@ -365,7 +378,7 @@ pub async fn project_content_doc_reconcile(
     .map_err(|e| StorageError::Sync(format!("projector reconcile transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
-    Ok(true)
+    Ok(fields.into_iter().map(|(key, _)| key).collect())
 }
 
 /// One sweep batch of the half-row heal.
@@ -517,6 +530,10 @@ pub async fn backfill_content_docs(
 ) -> Result<BackfillStats, StorageError> {
     let batch = batch.max(1);
     let mut stats = BackfillStats::default();
+    // Drift report: which doc fields were absent and got filled, by key.
+    // A fleet operator reads this line to name the writer class that skipped
+    // the event path (measured 2026-08-29: 1270 then 137 docs on one peer).
+    let mut filled: std::collections::BTreeMap<&'static str, u64> = Default::default();
     let mut offset: i64 = 0;
     loop {
         let rows = {
@@ -533,9 +550,14 @@ pub async fn backfill_content_docs(
             stats.scanned += 1;
             // Reconcile mode, NOT event mode: a back-fill replays possibly-
             // stale rows and must offer-not-fight (see the reconcile fn).
-            match project_content_doc_reconcile(sync, content).await {
-                Ok(true) => stats.projected += 1,
-                Ok(false) => stats.skipped += 1,
+            match project_content_doc_reconcile_keys(sync, content).await {
+                Ok(keys) if keys.is_empty() => stats.skipped += 1,
+                Ok(keys) => {
+                    stats.projected += 1;
+                    for key in keys {
+                        *filled.entry(key).or_insert(0) += 1;
+                    }
+                }
                 Err(e) => {
                     stats.failed += 1;
                     tracing::error!(id = %content.id, error = %e, "backfill: projection failed");
@@ -549,11 +571,17 @@ pub async fn backfill_content_docs(
             break;
         }
     }
+    let filled_report = filled
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join(",");
     tracing::info!(
         scanned = stats.scanned,
         projected = stats.projected,
         skipped = stats.skipped,
         failed = stats.failed,
+        filled = %filled_report,
         "backfill: corpus projection pass complete"
     );
     Ok(stats)

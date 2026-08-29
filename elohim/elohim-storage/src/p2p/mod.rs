@@ -53,6 +53,7 @@ pub mod identity_handshake;
 pub mod identity_map;
 pub mod inventory_broadcaster;
 pub mod inventory_gossip;
+pub mod inventory_reorder; // receive-side reorder window for paged inventory refreshes
 pub mod kad_store;
 pub mod observation_gossip;
 pub mod participations_reconcile; // cross-peer membership arm of the projection reconcile
@@ -421,8 +422,9 @@ pub(crate) fn micros_to_iso(micros: i64) -> Option<String> {
 
 /// A peer discovered on the network with its delivery capabilities.
 /// Populated from mDNS discovery + identify protocol info.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct DeliveryPeer {
     /// libp2p PeerId (base58)
     pub peer_id: String,
@@ -455,6 +457,7 @@ pub struct DeliveryPeer {
     #[serde(default = "DeliveryPeer::default_cache_tier")]
     pub cache_tier: String,
     /// When this peer was last seen (unix ms)
+    #[ts(type = "number")]
     pub last_seen: u64,
     /// HTTP port for direct file serving (default 8090)
     pub http_port: u16,
@@ -2796,6 +2799,7 @@ mod http_port_advertisement_tests {
         let peer = sample_peer(parsed);
         let json = serde_json::to_value(&peer).expect("DeliveryPeer serializes");
         assert_eq!(json["httpPort"], serde_json::json!(8091));
+        assert!(json["lastSeen"].is_u64());
     }
 
     /// A peer record missing the http_port suffix (un-upgraded peer, or no

@@ -68,6 +68,37 @@ pub fn install_state_link_sink(tx: tokio::sync::mpsc::UnboundedSender<PendingSta
 /// Record a pending state-link transition. No-op when no sink is installed
 /// (e.g. unit tests / conductor-less mode) — the SQL cache flip already stands;
 /// the link is the durable upgrade the subscriber path performs once wired.
+/// Content rows this file writes WITHOUT an `EventBus` in reach (the REA
+/// signal subscriber is composed before the services exist). The producer that
+/// projects rows into their sync docs listens for `StorageEvent::ContentUpdated`;
+/// a row touched here and never announced leaves its doc stale until the next
+/// cold-start back-fill. Measured 2026-08-29 (household mesh): two consecutive
+/// cold starts of the same peer re-projected 1270 then 137 docs — the anchor
+/// writes of `Projecting Content from DHT` were the class. Bounded channel:
+/// a full sink drops the touch (counted), the back-fill remains the floor.
+static CONTENT_TOUCH_TX: std::sync::OnceLock<tokio::sync::mpsc::Sender<String>> =
+    std::sync::OnceLock::new();
+
+/// Install the sink once; returns `false` if one is already installed (the
+/// caller must not spawn a second forwarder for a channel nobody feeds).
+pub fn install_content_touch_sink(tx: tokio::sync::mpsc::Sender<String>) -> bool {
+    CONTENT_TOUCH_TX.set(tx).is_ok()
+}
+
+/// Capacity of the touch channel: a seed-sized burst (~3.4k) fits twice over.
+pub const CONTENT_TOUCH_CAPACITY: usize = 8192;
+
+fn notify_content_touched(id: &str) {
+    if let Some(tx) = CONTENT_TOUCH_TX.get() {
+        match tx.try_send(id.to_string()) {
+            Ok(()) => crate::metrics::inc_content_touch("sent"),
+            Err(_) => crate::metrics::inc_content_touch("dropped"),
+        }
+    } else {
+        crate::metrics::inc_content_touch("no_sink");
+    }
+}
+
 fn record_pending_state_link(commitment_cid: &str, state: &str, event_hash: &str, signed_at: &str) {
     if let Some(tx) = STATE_LINK_TX.get() {
         let _ = tx.send(PendingStateLink {
@@ -516,6 +547,14 @@ pub fn handle_rea_signal(
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+    // Content rows written below change fields the sync doc projects
+    // (anchor, declared head, value patch) — announce them once the write
+    // has committed, at the end of this fn.
+    let touched_content_id: Option<String> = match &signal {
+        ReaProjectionSignal::ContentCommitted { content, .. } => Some(content.id.clone()),
+        ReaProjectionSignal::ContentHeadDeclared { content_id, .. } => Some(content_id.clone()),
+        _ => None,
+    };
 
     match signal {
         ReaProjectionSignal::AgreementCommitted {
@@ -760,6 +799,10 @@ pub fn handle_rea_signal(
                 );
             }
         }
+    }
+
+    if let Some(id) = touched_content_id {
+        notify_content_touched(&id);
     }
 
     Ok(())

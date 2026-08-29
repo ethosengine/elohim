@@ -681,7 +681,27 @@ impl PeerJwksCache {
         }
     }
 
-    fn insert_positive(&self, kid: String, pubkey: [u8; 32]) {
+    /// Anchor `kid` to `pubkey`. Returns `false` when the insert was
+    /// REFUSED: a live positive entry already anchors this `kid` to a
+    /// DIFFERENT key, and a JWKS document that disagrees with a live anchor
+    /// is a takeover attempt, not a refresh. Re-asserting the SAME pubkey is
+    /// a legitimate refresh and succeeds (sliding the TTL); once the anchor
+    /// has aged past `PEER_JWKS_TTL` it is no longer live and a rotated key
+    /// may take its place.
+    fn insert_positive(&self, kid: String, pubkey: [u8; 32]) -> bool {
+        if let Some(JwksCacheEntry::Positive {
+            pubkey: anchored,
+            fetched_at,
+        }) = self.0.get(&kid).map(|entry| entry.clone())
+        {
+            if anchored != pubkey && fetched_at.elapsed() < PEER_JWKS_TTL {
+                warn!(
+                    kid = %kid,
+                    "Refusing to replace a live peer JWKS trust anchor with a different pubkey"
+                );
+                return false;
+            }
+        }
         self.0.insert(
             kid,
             JwksCacheEntry::Positive {
@@ -689,6 +709,7 @@ impl PeerJwksCache {
                 fetched_at: Instant::now(),
             },
         );
+        true
     }
 
     fn mark_negative(&self, kid: &str) {
@@ -821,10 +842,15 @@ pub async fn ensure_peer_key_cached(
     let keys = fetch_peer_jwks(client, peer_url).await;
     let mut found = None;
     for (fetched_kid, pubkey) in keys {
-        if fetched_kid == kid {
-            found = Some(pubkey);
+        let is_target = fetched_kid == kid;
+        let accepted = cache.insert_positive(fetched_kid, pubkey);
+        if is_target {
+            // A REFUSED insert means a live anchor already holds this `kid`
+            // with a different key — serve the incumbent, never the
+            // challenger, and never fall through to `mark_negative` (which
+            // would let a challenger evict a live anchor).
+            found = if accepted { Some(pubkey) } else { cache.get(kid) };
         }
-        cache.insert_positive(fetched_kid, pubkey);
     }
     if found.is_none() {
         cache.mark_negative(kid);
@@ -832,13 +858,41 @@ pub async fn ensure_peer_key_cached(
     found
 }
 
+/// The doorways a JWKS refresh may take a trust anchor from: a registration
+/// the infrastructure zome holds AND that carries a `signing_key`.
+///
+/// A registration with an empty `signing_key` has not yet bound an identity,
+/// so whatever answers its URL could claim any `kid` it likes. It is filtered
+/// out here rather than at insert time so `refresh_peer_jwks_cache` is never
+/// handed one at all — no request, no chance to answer.
+fn jwks_trust_anchors(registrations: &[DoorwayRegistration]) -> Vec<PeerDoorway> {
+    registrations
+        .iter()
+        .filter(|reg| !reg.signing_key.trim().is_empty() && !reg.url.trim().is_empty())
+        .map(|reg| PeerDoorway {
+            id: reg.id.clone(),
+            url: reg.url.clone(),
+            region: reg.region.clone(),
+            capabilities: Vec::new(),
+            source_peer: "dht-registration".to_string(),
+        })
+        .collect()
+}
+
 /// Spawns a background task that periodically refreshes the peer JWKS cache
-/// from the `PeerCache` the existing discovery task already maintains — this
-/// piggybacks that machinery's OUTPUT (the known-peer list) rather than
-/// duplicating peer discovery. `initial_delay`/`interval` mirror
+/// from the DHT doorway registry — NOT from `PeerCache`.
+///
+/// `PeerCache` is populated entirely by what peers report over HTTP
+/// (`fetch_single_peer`), carries no signature material, and is never
+/// verified against anything; sourcing trust anchors from it let ANY doorway
+/// that appears in gossip publish a `kid` and overwrite a sibling's JWT
+/// verification key. `get_all_doorways` reads the registrations the
+/// infrastructure zome admitted to the DHT instead, and only those carrying a
+/// `signing_key` are fetched. `initial_delay`/`interval` mirror
 /// `spawn_peer_discovery_task`'s cadence.
 pub fn spawn_peer_jwks_refresh_task(
-    peer_cache: PeerCache,
+    zome_caller: Arc<ZomeCaller>,
+    config: FederationConfig,
     jwks_cache: PeerJwksCache,
     initial_delay: Duration,
     interval: Duration,
@@ -852,9 +906,24 @@ pub fn spawn_peer_jwks_refresh_task(
             .unwrap_or_default();
 
         loop {
-            let peers = get_cached_peers(&peer_cache).await;
-            if !peers.is_empty() {
-                refresh_peer_jwks_cache(&peers, &client, &jwks_cache).await;
+            match get_all_doorways(&zome_caller, &config).await {
+                Ok(registrations) => {
+                    let anchors = jwks_trust_anchors(&registrations);
+                    if anchors.is_empty() {
+                        debug!(
+                            registration_count = registrations.len(),
+                            "Peer JWKS refresh: no registered doorway carries a signing key"
+                        );
+                    } else {
+                        refresh_peer_jwks_cache(&anchors, &client, &jwks_cache).await;
+                    }
+                }
+                Err(e) => {
+                    debug!(
+                        error = %e,
+                        "Peer JWKS refresh: doorway registry unavailable this tick"
+                    );
+                }
             }
             tokio::time::sleep(interval).await;
         }
@@ -1500,8 +1569,8 @@ mod tests {
     // ── Peer JWKS cache: fetch, refresh, TTL/cooldown (Task 2.1) ──────────
     mod peer_jwks {
         use super::super::{
-            ensure_peer_key_cached, fetch_peer_jwks, new_peer_jwks_cache, refresh_peer_jwks_cache,
-            PeerDoorway,
+            ensure_peer_key_cached, fetch_peer_jwks, jwks_trust_anchors, new_peer_jwks_cache,
+            refresh_peer_jwks_cache, DoorwayRegistration, PeerDoorway,
         };
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
         use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
@@ -1609,6 +1678,94 @@ mod tests {
             // panics on drop if a second request landed.
             let second = ensure_peer_key_cached(&cache, "ghost", &server.uri(), &client).await;
             assert_eq!(second, None);
+        }
+
+        #[test]
+        fn insert_positive_refuses_conflicting_pubkey_for_same_kid() {
+            let cache = new_peer_jwks_cache();
+            let incumbent = [1u8; 32];
+            let challenger = [2u8; 32];
+
+            assert!(cache.insert_positive("sibling".to_string(), incumbent));
+            assert!(
+                !cache.insert_positive("sibling".to_string(), challenger),
+                "a live kid must never be re-anchored to a different pubkey"
+            );
+            assert_eq!(
+                cache.get("sibling"),
+                Some(incumbent),
+                "the incumbent anchor survives the takeover attempt"
+            );
+        }
+
+        #[test]
+        fn insert_positive_accepts_identical_pubkey_as_refresh() {
+            let cache = new_peer_jwks_cache();
+            let pubkey = [5u8; 32];
+
+            assert!(cache.insert_positive("sibling".to_string(), pubkey));
+            assert!(
+                cache.insert_positive("sibling".to_string(), pubkey),
+                "re-asserting the SAME key is a legitimate refresh, not a takeover"
+            );
+            assert_eq!(cache.get("sibling"), Some(pubkey));
+        }
+
+        fn registration(id: &str, url: &str, signing_key: &str) -> DoorwayRegistration {
+            DoorwayRegistration {
+                id: id.to_string(),
+                url: url.to_string(),
+                identity_root: format!("{id}-identity-root"),
+                signing_key: signing_key.to_string(),
+                endpoints: vec![],
+                record_serial: 1,
+                record_signature: vec![1; 64],
+                operator_agent: format!("{id}-operator"),
+                operator_human: None,
+                capabilities_json: r#"["gateway"]"#.to_string(),
+                reach: "public".to_string(),
+                region: None,
+                bandwidth_mbps: None,
+                version: "test".to_string(),
+                tier: "Emerging".to_string(),
+                registered_at: "test".to_string(),
+                updated_at: "test".to_string(),
+            }
+        }
+
+        #[tokio::test]
+        async fn jwks_refresh_never_reaches_a_doorway_without_a_signing_key() {
+            let anchored = MockServer::start().await;
+            let pubkey = [11u8; 32];
+            mount_jwks(&anchored, "anchored", &pubkey).await;
+
+            // A registration with no signing key must never be contacted —
+            // if it were, this body would claim the sibling's `kid`.
+            let keyless = MockServer::start().await;
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/.well-known/doorway-keys"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_json(jwks_body("anchored", &[99u8; 32])),
+                )
+                .expect(0)
+                .mount(&keyless)
+                .await;
+
+            let registrations = vec![
+                registration("anchored", &anchored.uri(), "anchored-signing-key"),
+                registration("keyless", &keyless.uri(), ""),
+            ];
+
+            let anchors = jwks_trust_anchors(&registrations);
+            assert_eq!(anchors.len(), 1);
+            assert_eq!(anchors[0].id, "anchored");
+
+            let cache = new_peer_jwks_cache();
+            refresh_peer_jwks_cache(&anchors, &reqwest::Client::new(), &cache).await;
+
+            assert_eq!(cache.get("anchored"), Some(pubkey));
+            // wiremock's `.expect(0)` panics on drop if the keyless doorway
+            // was contacted at all.
         }
     }
 }

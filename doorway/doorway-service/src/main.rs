@@ -1511,18 +1511,6 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             "Federation peer discovery started: {} peer(s) configured",
             peer_count
         );
-
-        // T2.2 live wiring: refresh the peer JWKS cache off the peer list the
-        // discovery task above already maintains. Same cadence, one tick later
-        // so the first refresh sees a populated peer list. This is the ONLY
-        // place peer keys are fetched — `verify_token` is network-free.
-        services::federation::spawn_peer_jwks_refresh_task(
-            state.peer_cache.clone(),
-            state.peer_jwks_cache.clone(),
-            std::time::Duration::from_secs(15),
-            std::time::Duration::from_secs(60),
-        );
-        info!("Peer JWKS refresh task started (cross-doorway JWT verification)");
     }
 
     // Federation: register in DHT + start heartbeat task
@@ -1555,6 +1543,20 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                     warn!("Federation registration failed (non-fatal): {}", e);
                 }
             });
+
+            // T2.2 live wiring: refresh the peer JWKS cache off the DHT
+            // doorway registry — NOT the gossip-populated `PeerCache`, which
+            // would let any peer that appears in gossip overwrite a sibling's
+            // JWT verification key. This is the ONLY place peer keys are
+            // fetched in bulk — `verify_token` is network-free.
+            let _peer_jwks = services::federation::spawn_peer_jwks_refresh_task(
+                Arc::clone(&zome_caller),
+                fed_config.clone(),
+                state.peer_jwks_cache.clone(),
+                std::time::Duration::from_secs(15),
+                std::time::Duration::from_secs(60),
+            );
+            info!("Peer JWKS refresh task started (cross-doorway JWT verification)");
 
             // Spawn heartbeat task
             let _heartbeat = services::federation::spawn_heartbeat_task(
