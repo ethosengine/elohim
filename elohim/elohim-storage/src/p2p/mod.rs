@@ -59,6 +59,7 @@ pub mod participations_reconcile; // cross-peer membership arm of the projection
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
+pub mod reconcile_peers; // transport-neutral peer source for the reconcile arms (libp2p | iroh)
 pub mod reconcile_rails;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
@@ -836,6 +837,8 @@ pub struct P2PNode {
     /// GetContent fetches in flight on the iroh plane (the libp2p ones are the
     /// `pending_acquisition_fetches` map); both count against the dispatch budget.
     acquisition_iroh_in_flight: Arc<std::sync::atomic::AtomicUsize>,
+    /// See `AcquisitionIngestCtx::write_gate`.
+    acquisition_write_gate: Arc<tokio::sync::Mutex<()>>,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// T7 (head-plane trust-gradient program): process-lifetime
@@ -2891,6 +2894,7 @@ impl P2PNode {
             acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition_rotation: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             acquisition_iroh_in_flight: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            acquisition_write_gate: Arc::new(tokio::sync::Mutex::new(())),
             extraction_cache: None,
             memo_store: None,
             #[cfg(feature = "graph-native")]
@@ -9529,6 +9533,7 @@ impl P2PNode {
             acquisition: self.acquisition.clone(),
             blob_store: self.blob_store.clone(),
             self_cid: self.config.self_cid.clone().unwrap_or_default(),
+            write_gate: self.acquisition_write_gate.clone(),
         }
     }
 
@@ -10134,12 +10139,21 @@ fn acquisition_prefer_iroh() -> &'static bool {
 /// The deps a content-record ingest needs, independent of the plane the record
 /// arrived on. `Clone` + `Send` so the iroh pull task can own one.
 #[derive(Clone)]
+// `blob_store` / `self_cid` feed the iroh quilt-draw leg (`acquire_over_iroh`);
+// without that feature the libp2p leg reads them from `P2PNode` directly.
+#[cfg_attr(not(feature = "p2p-iroh"), allow(dead_code))]
 pub(crate) struct AcquisitionIngestCtx {
     pub(crate) db_pool: Option<DbPool>,
     pub(crate) replication_state: replication::ReplicationState,
     pub(crate) acquisition: acquisition::AcquisitionState,
     pub(crate) blob_store: Arc<BlobStore>,
     pub(crate) self_cid: String,
+    /// Serialises the SQLite writes of concurrent iroh pulls. The libp2p arm
+    /// ingests on its single event loop; iroh pulls run as independent tasks
+    /// (up to MAX_REPLICATION_INFLIGHT + MAX_ACQUISITION_INFLIGHT at once) and
+    /// without this gate they exceeded even a 30 s busy_timeout — measured
+    /// 2026-08-29: `database is locked` on 4 of 31 rows, dropped silently.
+    pub(crate) write_gate: Arc<tokio::sync::Mutex<()>>,
 }
 
 pub(crate) enum StoredRecord {
@@ -10195,6 +10209,7 @@ pub(crate) async fn store_acquired_record(
         dht_anchor_hash: None,
     };
     let app_ctx = crate::db::AppContext::default_lamad();
+    let _write = ctx.write_gate.lock().await;
     match crate::db::content_diesel::bulk_create_content(&mut conn, &app_ctx, vec![input]) {
         Ok(result) => {
             if result.inserted > 0 || result.skipped > 0 {
@@ -10206,8 +10221,22 @@ pub(crate) async fn store_acquired_record(
                     blob_hash: blob_hash_opt,
                 }
             } else {
+                // Neither inserted nor skipped: the insert itself failed and
+                // `bulk_create_content` reports it in `errors`, not as an Err.
+                // Until 2026-08-28 this was labelled `blob_unavailable` and the
+                // message was dropped — three rows the adopt-before-author arm
+                // had just declared vanished silently on a recovering peer.
+                warn!(
+                    id = %content_id,
+                    errors = ?result.errors,
+                    "Acquired content record failed to store"
+                );
                 ctx.replication_state.mark_failed(&content_id).await;
-                crate::metrics::inc_acquisition_outcome("blob_unavailable");
+                crate::metrics::inc_acquisition_outcome(if result.errors.is_empty() {
+                    "blob_unavailable"
+                } else {
+                    "store_error"
+                });
                 ctx.acquisition.mark_failed(&content_id).await;
                 StoredRecord::Failed
             }
@@ -10317,6 +10346,7 @@ pub(crate) async fn acquire_over_iroh(
                 let pull = ShardRequest::Get { hash: hash.clone() };
                 match tokio::time::timeout(BLOB_TIMEOUT, client.request(addr, &pull)).await {
                     Ok(Ok(ShardResponse::Data(data))) => {
+                        let _write = ctx.write_gate.lock().await;
                         let landed = match ctx.db_pool.as_ref().map(|p| p.get()) {
                             Some(Ok(mut conn)) => {
                                 crate::p2p::blob_fetch::finalize_quilt_draw(

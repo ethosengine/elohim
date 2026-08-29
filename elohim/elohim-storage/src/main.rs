@@ -3372,8 +3372,8 @@ async fn async_main(
     // fetch. Created whenever an iroh node exists; handed to the libp2p node
     // as the manifest sink so gossipsub-delivered manifests land in it too.
     #[cfg(feature = "p2p-iroh")]
-    #[cfg(feature = "p2p-iroh")]
     let mut iroh_pull_core: Option<Arc<elohim_storage::p2p_iroh::IrohPullCore>> = None;
+    #[cfg(feature = "p2p-iroh")]
     let iroh_peer_book: Option<elohim_storage::p2p_iroh::IrohPeerBook> = _iroh_node
         .as_ref()
         .map(|_| elohim_storage::p2p_iroh::IrohPeerBook::new());
@@ -4877,7 +4877,45 @@ async fn async_main(
                 app_id: args.app_id.clone(),
             }
         });
-        match (reconcile_secs, p2p_handle, db_pool.clone()) {
+        // The reconcile arms ask peers through `ReconcilePeers`; a libp2p handle
+        // is one source, the iroh peer book + view-federation ALPN is the other.
+        // With neither there is no discovery and no heal — declared below.
+        let reconcile_peers: Option<Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>> =
+            match p2p_handle {
+                Some(handle) => Some(Arc::new(handle)),
+                None => {
+                    #[cfg(feature = "p2p-iroh")]
+                    {
+                        if elohim_storage::p2p_iroh::iroh_fetch_leg().is_some() {
+                            info!(
+                                "projection-reconcile: no libp2p node — discovery + heal ride the iroh plane"
+                            );
+                            // Same preference as the libp2p identity: operator
+                            // override → the REAL conductor cell key → empty.
+                            let iroh_agent_cid = args
+                                .agent_pubkey
+                                .clone()
+                                .or_else(|| {
+                                    hc_registry_for_http
+                                        .as_ref()
+                                        .and_then(|r| r.lamad_client())
+                                        .map(|hc| hc.agent_key_uhcak())
+                                })
+                                .unwrap_or_default();
+                            Some(Arc::new(elohim_storage::p2p_iroh::IrohReconcilePeers::new(
+                                iroh_agent_cid,
+                            )))
+                        } else {
+                            None
+                        }
+                    }
+                    #[cfg(not(feature = "p2p-iroh"))]
+                    {
+                        None
+                    }
+                }
+            };
+        match (reconcile_secs, reconcile_peers, db_pool.clone()) {
             (0, _, _) => {
                 info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");
                 // Close the operator-verb kick channel so
@@ -5012,7 +5050,7 @@ async fn async_main(
                             // Discovery is conductor-free and bounded (peer
                             // asks capped by PEER_TIMEOUT) — runs EVERY wake.
                             let plan = run_discovery(
-                                &handle,
+                                handle.as_ref(),
                                 &pool,
                                 &mut inventory_window,
                                 &mut miss_ledger,
@@ -5088,7 +5126,7 @@ async fn async_main(
                                                 &heal_pool,
                                                 &heal_state,
                                                 &heal_provide,
-                                                &heal_p2p,
+                                                heal_p2p.as_ref(),
                                                 &trust,
                                             )
                                             .await;

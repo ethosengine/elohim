@@ -49,9 +49,9 @@ use crate::p2p::projection_reconcile::{
     call_with_retry, is_transient_conductor_error, Admission, HealCircuit, HealOutcomeKind,
     HealPacing, InventoryWindow, MissLedger, MAX_INVENTORY_WINDOW_TOTAL, MAX_RETRIES, PEER_TIMEOUT,
 };
+use crate::p2p::reconcile_peers::ReconcilePeers;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::PROJECTION_INVENTORY_TABLE_PARTICIPATIONS;
-use crate::p2p::P2PHandle;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
 
 /// Discovery-side output for the participations arm. Mirrors
@@ -137,7 +137,7 @@ pub(crate) fn classify_participation_gap(
 /// round-trip every sweep forever (the same ruling the collectives arm makes on
 /// an undecodable cid).
 pub async fn discover_participations(
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     pool: &DbPool,
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
@@ -154,10 +154,6 @@ pub async fn discover_participations(
         std::collections::HashMap::new();
 
     for peer in &peers {
-        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
                 table: PROJECTION_INVENTORY_TABLE_PARTICIPATIONS.to_string(),
@@ -170,7 +166,9 @@ pub async fn discover_participations(
         // Q11 atomic timing budget: the inventory-page RPC itself, per peer per
         // table — timed regardless of outcome (a timeout is a real cost).
         let inventory_page_started = std::time::Instant::now();
-        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        let call_result = p2p
+            .view_federate(&peer.peer_id, request, PEER_TIMEOUT)
+            .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::InventoryPage,
             inventory_page_started.elapsed(),

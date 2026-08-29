@@ -56,7 +56,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 use seam_contracts::Answer;
 
-use super::P2PHandle;
+use super::reconcile_peers::ReconcilePeers;
 use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher, RecordAbsentReason};
 use crate::views::{ContentHeadRecordPayload, ViewFederationRequest, ViewKind};
 
@@ -69,34 +69,21 @@ use crate::views::{ContentHeadRecordPayload, ViewFederationRequest, ViewKind};
 /// cannot tell apart from an offline peer.
 pub const HEAD_RECORD_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Fetches a peer's head `Record` over the libp2p view-federation plane.
-pub struct PeerHeadRecordFetcher {
-    p2p: P2PHandle,
+/// Fetches a peer's head `Record` over whichever view-federation plane the
+/// [`ReconcilePeers`] source rides (libp2p or iroh).
+pub struct PeerHeadRecordFetcher<'a> {
+    p2p: &'a dyn ReconcilePeers,
 }
 
-impl PeerHeadRecordFetcher {
-    pub fn new(p2p: P2PHandle) -> Self {
+impl<'a> PeerHeadRecordFetcher<'a> {
+    pub fn new(p2p: &'a dyn ReconcilePeers) -> Self {
         Self { p2p }
     }
 }
 
 #[async_trait::async_trait]
-impl HeadRecordFetcher for PeerHeadRecordFetcher {
+impl HeadRecordFetcher for PeerHeadRecordFetcher<'_> {
     async fn fetch(&self, peer_id: &str, content_id: &str) -> Answer<CarriedHeadRecord> {
-        let peer = match peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(e) => {
-                // Unreachable, not Absent: we never asked anyone anything.
-                tracing::warn!(
-                    peer = %peer_id, error = %e,
-                    "head-record fetch: unparseable peer id; skipping"
-                );
-                let answer = Answer::Unreachable;
-                crate::metrics::inc_head_record_fetch(answer.state());
-                return answer;
-            }
-        };
-
         let request = ViewFederationRequest {
             view_kind: ViewKind::ContentHeadRecord {
                 content_id: content_id.to_string(),
@@ -112,7 +99,7 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
         let head_record_verify_started = std::time::Instant::now();
         let call_result = self
             .p2p
-            .view_federate(peer, request, HEAD_RECORD_TIMEOUT)
+            .view_federate(peer_id, request, HEAD_RECORD_TIMEOUT)
             .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::HeadRecordVerify,

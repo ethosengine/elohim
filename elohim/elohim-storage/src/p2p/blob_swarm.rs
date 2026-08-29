@@ -692,11 +692,24 @@ async fn race_both_planes(
         let wire = wire_addr.clone();
         in_flight.push(
             async move {
-                match tokio::time::timeout(per_peer_timeout, leg.fetch(addr.clone(), &wire)).await {
+                // The iroh leg may ride a relay locally (no direct address in the
+                // book entry) — a 1.8 MB landing bundle timed out at the 5 s
+                // per-peer budget 171× on 2026-08-29 while the responder served it
+                // 456×. Bytes in flight get a size-tolerant bound; the HTTP request
+                // budget still returns `syncing` and the heal lands in the background.
+                let iroh_timeout = per_peer_timeout.max(Duration::from_secs(60));
+                let started = std::time::Instant::now();
+                match tokio::time::timeout(iroh_timeout, leg.fetch(addr.clone(), &wire)).await {
                     Err(_) => {
-                        // A timeout cannot distinguish a stalled dial from a
-                        // stalled transfer; "error" is the honest label.
-                        crate::metrics::inc_iroh_blob_fetch("error");
+                        crate::metrics::inc_iroh_blob_fetch("timeout");
+                        tracing::warn!(
+                            target: "elohim_storage::blob_fetch",
+                            blob_hash = %wire,
+                            source_peer = %peer_id,
+                            transport = "iroh",
+                            after_s = started.elapsed().as_secs(),
+                            "iroh blob fetch timed out"
+                        );
                         FetchOutcome::Miss
                     }
                     Ok(Err(crate::p2p_iroh::IrohBlobFetchError::NotFound(_))) => {
@@ -732,6 +745,15 @@ async fn race_both_planes(
                     }
                     Ok(Err(e)) => {
                         crate::metrics::inc_iroh_blob_fetch(e.metric_result());
+                        tracing::warn!(
+                            target: "elohim_storage::blob_fetch",
+                            blob_hash = %wire,
+                            source_peer = %peer_id,
+                            transport = "iroh",
+                            after_ms = started.elapsed().as_millis() as u64,
+                            error = %e,
+                            "iroh blob fetch failed"
+                        );
                         FetchOutcome::Miss
                     }
                     Ok(Ok(bytes)) => {
@@ -753,6 +775,14 @@ async fn race_both_planes(
                                 source_peer: peer_id,
                             }
                         } else {
+                            tracing::warn!(
+                                target: "elohim_storage::blob_fetch",
+                                blob_hash = %wire,
+                                source_peer = %peer_id,
+                                transport = "iroh",
+                                bytes = bytes.len(),
+                                "iroh blob fetch: bytes do not hash to the requested address"
+                            );
                             crate::metrics::inc_iroh_blob_fetch("verify_failed");
                             warn!(
                                 target: "elohim_storage::blob_swarm",
@@ -769,13 +799,27 @@ async fn race_both_planes(
         );
     }
 
+    // Bytes beat a manifest. A peer that only holds the manifest answers in one
+    // round trip while another peer is still streaming the whole blob; returning
+    // the manifest at once sent the heal down the shard path — which fails when
+    // the blob exists only as an aliased whole object (measured 2026-08-28,
+    // re-staged landing: `manifest persisted but swarm shard-fetch incomplete`).
+    // Hold the manifest as the fallback until every leg has spoken.
+    let mut manifest_fallback: Option<FetchOutcome> = None;
     while let Some(outcome) = in_flight.next().await {
         match outcome {
             hit @ FetchOutcome::Hit { .. } => return hit,
-            manifest @ FetchOutcome::Manifest { .. } => return manifest,
+            manifest @ FetchOutcome::Manifest { .. } => {
+                if manifest_fallback.is_none() {
+                    manifest_fallback = Some(manifest);
+                }
+            }
             // A leg that gave up is just a leg that gave up; keep polling.
             FetchOutcome::Miss | FetchOutcome::NoCandidates | FetchOutcome::InvalidAddress => {}
         }
+    }
+    if let Some(manifest) = manifest_fallback {
+        return manifest;
     }
 
     // At least one iroh dial was attempted (legs != Libp2pOnly), so "no

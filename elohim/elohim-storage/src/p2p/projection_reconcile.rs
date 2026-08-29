@@ -143,13 +143,13 @@ use ts_rs::TS;
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
 use crate::p2p::head_record_client::PeerHeadRecordFetcher;
+use crate::p2p::reconcile_peers::ReconcilePeers;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_COLLECTIVES,
     PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_PARTICIPATIONS,
     PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
-use crate::p2p::P2PHandle;
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
 
@@ -1860,7 +1860,7 @@ mod inventory_window_tests {
 /// by the caller's discovery loop), so successive sweeps window across a corpus
 /// larger than the responder's page cap rather than re-diffing only the hot set.
 pub async fn run_discovery(
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     pool: &DbPool,
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
@@ -1951,7 +1951,7 @@ pub async fn run_heal(
     pool: &DbPool,
     state: &ProjectionReconcileState,
     provide_state: &ProvideLoopState,
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     trust: &crate::trust::TrustGradient<'_>,
 ) {
     let SweepPlan {
@@ -2141,7 +2141,7 @@ pub async fn run_heal(
     // two paths that MINT roots, so they are the two that must first ask whether
     // a canonical head already exists. The fetcher rides the same view-federation
     // plane the inventory hints came from.
-    let head_record_fetcher = PeerHeadRecordFetcher::new(p2p.clone());
+    let head_record_fetcher = PeerHeadRecordFetcher::new(p2p);
     let adopt = crate::services::head_adoption::AdoptContext {
         hints: &peer_head_hints,
         fetcher: Some(&head_record_fetcher),
@@ -2784,7 +2784,7 @@ fn ghost_probe_ids(ghosts: &[(String, String, String)], max_per_tick: i64) -> Ve
 /// [`GapTracker`] (an id missing locally, OR present with a different anchor, is a
 /// gap). No conductor call happens here — [`heal_rea`] owns that.
 async fn discover_rea(
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     pool: &DbPool,
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
@@ -2841,10 +2841,6 @@ async fn discover_rea(
         std::collections::HashMap::new();
 
     for peer in &peers {
-        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
                 table: PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS.to_string(),
@@ -2861,7 +2857,9 @@ async fn discover_rea(
         // Q11 atomic timing budget: the inventory-page RPC itself, per peer
         // per table — timed regardless of outcome (a timeout is a real cost).
         let inventory_page_started = std::time::Instant::now();
-        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        let call_result = p2p
+            .view_federate(&peer.peer_id, request, PEER_TIMEOUT)
+            .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::InventoryPage,
             inventory_page_started.elapsed(),
@@ -3435,7 +3433,7 @@ fn classify_content_gap(
 /// re-enqueued afresh. `MAX_RETRIES` only bounds within-sweep churn (and the heal
 /// leg attempts each gap once per sweep, so it is effectively a floor).
 async fn discover_content(
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     pool: &DbPool,
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
@@ -3551,10 +3549,6 @@ async fn discover_content(
     let mut peer_head_hints = crate::services::head_adoption::PeerHeadHints::new();
 
     for peer in &peers {
-        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
                 table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
@@ -3568,7 +3562,9 @@ async fn discover_content(
         // Q11 atomic timing budget: the inventory-page RPC itself, per peer
         // per table — timed regardless of outcome (a timeout is a real cost).
         let inventory_page_started = std::time::Instant::now();
-        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        let call_result = p2p
+            .view_federate(&peer.peer_id, request, PEER_TIMEOUT)
+            .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::InventoryPage,
             inventory_page_started.elapsed(),
@@ -5632,7 +5628,7 @@ pub(crate) fn classify_collective_gap(
 /// resolve, so enqueuing it would burn a conductor round-trip every sweep
 /// forever.
 async fn discover_collectives(
-    p2p: &P2PHandle,
+    p2p: &dyn ReconcilePeers,
     pool: &DbPool,
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
@@ -5678,10 +5674,6 @@ async fn discover_collectives(
         std::collections::HashMap::new();
 
     for peer in &peers {
-        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
                 table: PROJECTION_INVENTORY_TABLE_COLLECTIVES.to_string(),
@@ -5694,7 +5686,9 @@ async fn discover_collectives(
         // Q11 atomic timing budget: the inventory-page RPC itself, per peer
         // per table — timed regardless of outcome (a timeout is a real cost).
         let inventory_page_started = std::time::Instant::now();
-        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        let call_result = p2p
+            .view_federate(&peer.peer_id, request, PEER_TIMEOUT)
+            .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::InventoryPage,
             inventory_page_started.elapsed(),
@@ -6226,7 +6220,7 @@ mod collectives_gap_tests {
 /// serves `table = "shard_locations"` with a `CustodyInventoryPayload` (see the
 /// slice report for the exact responder + `run_discovery` insertions). Kept
 /// `pub` so it compiles clean (no dead-code) as landed-but-dormant.
-pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool) {
+pub async fn reconcile_shard_locations_from_peers(p2p: &dyn ReconcilePeers, pool: &DbPool) {
     use crate::p2p::custody_announce::{
         CustodyInventoryPayload, PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS,
     };
@@ -6244,10 +6238,6 @@ pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool
     let mut peers_asked = 0usize;
 
     for peer in &peers {
-        let peer_id = match peer.peer_id.parse::<libp2p::PeerId>() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
                 table: PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS.to_string(),
@@ -6262,7 +6252,9 @@ pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool
         // `reconcile_shard_locations_from_peers` — but the RPC shape and cost
         // are identical, so it feeds the same series).
         let inventory_page_started = std::time::Instant::now();
-        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        let call_result = p2p
+            .view_federate(&peer.peer_id, request, PEER_TIMEOUT)
+            .await;
         crate::metrics::observe_atom_duration(
             crate::metrics::ConvergenceAtom::InventoryPage,
             inventory_page_started.elapsed(),

@@ -106,6 +106,7 @@ impl IrohPullCore {
                 acquisition,
                 blob_store,
                 self_cid,
+                write_gate: Arc::new(Mutex::new(())),
             },
             gap_queue: Mutex::new(VecDeque::new()),
             acquisition_queue: Mutex::new(VecDeque::new()),

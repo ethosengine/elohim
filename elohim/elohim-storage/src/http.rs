@@ -4357,6 +4357,8 @@ impl HttpServer {
         {
             // Pure-iroh mode: the pull leg's status rides here so `pull.caughtUp` /
             // `replication` read the same on iroh as on libp2p (parity, 2026-08-28).
+            // `mut` is consumed only by the iroh-book enrichment below.
+            #[cfg_attr(not(feature = "p2p-iroh"), allow(unused_mut))]
             let mut body = serde_json::json!({ "peerId": peer_id, "irohNodeId": peer_id });
             #[cfg(feature = "p2p-iroh")]
             if let Some(core) = self.iroh_pull.as_ref() {

@@ -49,7 +49,6 @@ pub const VALID_RELATIONSHIP_TYPES: &[&str] = &[
     "DEFINITION_OF",
 ];
 
-
 /// Relationship service for content graph operations
 pub struct RelationshipService {
     pool: DbPool,
@@ -497,7 +496,8 @@ mod relationship_vocabulary_tests {
     #[test]
     fn manifest_relationship_vocabulary_is_accepted() {
         let manifest = include_str!("../../../sdk/domains/lamad/manifest/relationships.json");
-        let parsed: serde_json::Value = serde_json::from_str(manifest).expect("relationships.json parses");
+        let parsed: serde_json::Value =
+            serde_json::from_str(manifest).expect("relationships.json parses");
         let ids: Vec<&str> = parsed
             .as_object()
             .expect("relationships.json is an object keyed by relationship id")
@@ -505,7 +505,13 @@ mod relationship_vocabulary_tests {
             .map(String::as_str)
             .collect();
         assert!(ids.len() >= 11, "manifest lost relationship ids: {ids:?}");
-        let missing: Vec<&&str> = ids.iter().filter(|id| !VALID_RELATIONSHIP_TYPES.contains(id)).collect();
-        assert!(missing.is_empty(), "manifest relationship ids not accepted by relationship_service: {missing:?}");
+        let missing: Vec<&&str> = ids
+            .iter()
+            .filter(|id| !VALID_RELATIONSHIP_TYPES.contains(id))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "manifest relationship ids not accepted by relationship_service: {missing:?}"
+        );
     }
 }

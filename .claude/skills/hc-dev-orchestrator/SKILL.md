@@ -101,7 +101,10 @@ with `MESH_RECOVERY_QUIESCE=1`. It composes the per-peer transport interface
 (`MESH_PEER_TRANSPORTS` in `hc-mesh.sh`) with the single-peer recovery
 primitive (`hc-mesh-recovery.sh`). Drive one scenario/run directly with
 `just mesh recovery <warm|cold> <peer> [--label k=v]` before reaching for the
-full matrix. The matrix seeds its notion of the current shape from the LIVE
+full matrix — pass `--label scenario=homo-iroh` (or `homo-libp2p`/`homo-dual`) so
+`recovery-timeline.py --table` groups the row instead of filing it `<unlabeled>`; a red
+poll prints `recovery-detail: P1-bad=N [id=absent|<hash>…] P2-bad=…` on stderr naming
+the failing ids, so a plateau is never a bare bit. The matrix seeds its notion of the current shape from the LIVE
 mesh (`matrix: live shape <peers>/<doorways>`) so it only reshapes
 (stop/start/prologue) when a scenario genuinely needs a different shape —
 override with `MESH_RECOVERY_LIVE_SHAPE="<peers-csv>/<0|1>"`, and point the

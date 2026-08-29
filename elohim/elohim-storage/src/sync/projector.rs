@@ -495,6 +495,27 @@ pub async fn reverse_project_content_doc(
         .get()
         .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
     let ctx = AppContext::default_lamad();
+    // Idempotent: a row already naming the converged value is left untouched
+    // (no `updated_at` churn per sync round), and a row that DIFFERS is named
+    // at INFO before the amber write — the 2026-08-29 `bafkrei…`→`sha256-…`
+    // drift on a recovering iroh peer had no log line naming its writer.
+    let existing =
+        content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)?;
+    let Some(existing) = existing else {
+        return Ok(false); // absent row → the shard/replication plane's job
+    };
+    if existing.blob_hash.as_deref() == Some(blob_hash.as_str()) {
+        return Ok(false);
+    }
+    tracing::info!(
+        target: "elohim_storage::sync_heal",
+        content_id = %id,
+        doc_id = %doc_id,
+        from = ?existing.blob_hash,
+        to = %blob_hash,
+        green = existing.dht_anchor_hash.is_some(),
+        "reverse projection: converged blobHash differs from the local row (amber heal; a green row keeps its own)"
+    );
     let input = content_diesel::UpdateContentInput {
         id: id.to_string(),
         blob_hash: Some(blob_hash),

@@ -21,7 +21,7 @@ use tracing::info;
 
 use super::{
     blob_store::IrohBlobStore,
-    codec::{read_frame_default, write_frame},
+    codec::{read_frame, write_frame, HARD_MAX_FRAME_SIZE},
     config::IrohConfig,
     endpoint::BuildEndpointError,
     gossip::IrohGossip,
@@ -262,7 +262,12 @@ pub async fn fetch_blob_over_iroh(
     send.finish()
         .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
 
-    let res: ShardResponse = read_frame_default(&mut recv)
+    // Blob bodies are the one reply that legitimately exceeds the 16 MiB
+    // default frame: the landing bundle is 27.7 MB and every Data leg for it
+    // died with `frame too large: 27705546 > 16777216` (2026-08-29) while the
+    // libp2p blob plane served it. Read up to the codec's hard cap; anything
+    // larger needs streaming, not a bigger frame.
+    let res: ShardResponse = read_frame(&mut recv, HARD_MAX_FRAME_SIZE)
         .await
         .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
 

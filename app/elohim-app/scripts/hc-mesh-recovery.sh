@@ -129,10 +129,19 @@ def getj(p):
 docs = getj("/sync/v1/elohim/docs?limit=1")
 p0 = int(bool(docs) and docs.get("total") == s["docs"])
 p1 = 1; p2 = 1
+p1_bad = []; p2_bad = []
 for row in s["rows"]:
     j = getj(f"/db/content/{row['id']}")
-    if not j or j.get("blobHash") != row["blobHash"]: p1 = 0
-    if code(f"http://localhost:{port}/blob/{row['blobHash']}")[0] != 200: p2 = 0
+    if not j or j.get("blobHash") != row["blobHash"]:
+        p1 = 0
+        p1_bad.append(f"{row['id']}={'absent' if not j else (j.get('blobHash') or 'null')[:16]}")
+    if code(f"http://localhost:{port}/blob/{row['blobHash']}")[0] != 200:
+        p2 = 0
+        p2_bad.append(f"{row['id']}:{row['blobHash'][:16]}")
+# Name the failing legs' ids (to stderr so the caller's `legs=$(...)` stays one line):
+# a red bit with no id behind it is a plateau nobody can act on.
+if p1_bad or p2_bad:
+    print(f"recovery-detail: P1-bad={len(p1_bad)} [{' '.join(p1_bad[:6])}] P2-bad={len(p2_bad)} [{' '.join(p2_bad[:6])}]", file=sys.stderr)
 st = getj("/p2p/status") or {}
 pull = st.get("pull") or {}
 p3 = int(pull.get("caughtUp") is True and pull.get("failed", 1) == 0)

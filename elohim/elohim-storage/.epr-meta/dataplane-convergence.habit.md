@@ -70,6 +70,18 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-29a (transport-parity check; NO status flip). Pure-iroh
+PARITY measured: homo-iroh warm jessica<-matthew 61 / 60 / 72 s and cold
+113 s, all PASS P0-P4 (cut reconcile-peers-1, durable rows 01:16-01:21Z);
+homo-libp2p warm 58 s the same hour. Cause of the last red: the
+projection-reconcile discovery arm + anchor heal from the own conductor
+were P2PHandle-gated, so pure iroh had no heal leg at all (P1 red 469 s on
+a row libp2p healed in 58 s; the 2026-08-28g 258 s pass stood on P1 luck).
+Cure: p2p::reconcile_peers::ReconcilePeers (libp2p + IrohReconcilePeers
+over the peer book + view-fed ALPN); every arm takes &dyn ReconcilePeers.
+Reverse heal is idempotent and names from/to (elohim_storage::sync_heal).
+Residual filed: content-doc-blobhash-representation-drift (plane-neutral).
+Focused tests 65/0, clippy green; full gate in flight at write time.
 DELTA 2026-08-28g (transport-parity check; NO status flip). Pure-iroh
 parity landed (b9c9ad477): pull core, heal-on-read without a libp2p
 handle, shard responder alias fallback, composite manifest pivot. homo-iroh
