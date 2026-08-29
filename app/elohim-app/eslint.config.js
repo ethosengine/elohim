@@ -185,7 +185,18 @@ module.exports = tseslint.config(
       "import/no-duplicates": "error",                          // S1128 - Duplicate imports
       "import/no-useless-path-segments": "error",
       "import/no-extraneous-dependencies": ["error", {          // Catch pnpm hoist phantom deps
-        devDependencies: ["**/*.spec.ts", "**/*.test.ts", "**/vite.config.ts"],
+        // Test-only entry points belong on this list for the same reason specs
+        // do: test-setup.ts is the vitest bootstrap, and src/app/testing/** is
+        // the shared mock/harness tree only specs import. Both legitimately
+        // reach for devDependencies (vitest, @analogjs/vitest-angular,
+        // fake-indexeddb); neither ships in the app bundle.
+        devDependencies: [
+          "**/*.spec.ts",
+          "**/*.test.ts",
+          "**/vite.config.ts",
+          "**/test-setup.ts",
+          "src/app/testing/**",
+        ],
         peerDependencies: true,
       }],
 

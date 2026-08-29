@@ -17,13 +17,13 @@ import { FileChallengeComponent } from '../file-challenge/file-challenge.compone
 import type { ChallengeView } from '@elohim/storage-client/generated';
 
 @Component({
-  selector: 'qahal-challenge-route',
+  selector: 'app-challenge-route',
   standalone: true,
   imports: [FileChallengeComponent],
   template: `
     @if (entityType() && entityId()) {
       <div class="challenge-route-container">
-        <qahal-file-challenge
+        <app-file-challenge
           [entityType]="entityType()!"
           [entityId]="entityId()!"
           (challengeFiled)="onChallengeFiled($event)"

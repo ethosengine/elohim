@@ -18,7 +18,7 @@ import type {
 } from '@elohim/storage-client/generated';
 
 @Component({
-  selector: 'qahal-governance-disposition',
+  selector: 'app-governance-disposition',
   standalone: true,
   template: `
     @if (disposition()) {
@@ -371,7 +371,13 @@ export class GovernanceDispositionComponent implements OnInit {
     return parseVotingPattern(d.votingPatternSummary);
   });
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    // Angular never awaits ngOnInit, so returning a promise from it silently
+    // discards the result. Delegate and mark the hand-off explicitly.
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     this.loading.set(true);
     try {
       const result = await this.governanceApi.getDisposition(this.humanId());

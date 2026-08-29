@@ -183,16 +183,6 @@ interface RawStepData {
   metadata?: Record<string, unknown>;
 }
 
-/** Raw chapter from storage/API */
-interface RawChapterData {
-  id?: string;
-  title?: string;
-  description?: string;
-  orderIndex?: number;
-  estimatedDuration?: string;
-  steps?: RawStepData[];
-}
-
 /** Raw relationship from storage/API */
 interface RawRelationshipData {
   id?: string;

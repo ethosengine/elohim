@@ -39,7 +39,7 @@ import type {
 } from '@elohim/storage-client';
 
 @Component({
-  selector: 'qahal-feedback-mechanism-gateway',
+  selector: 'app-feedback-mechanism-gateway',
   standalone: true,
   imports: [
     ContextMenuOnlyComponent,
@@ -69,7 +69,7 @@ import type {
           >
             &times;
           </button>
-          <qahal-file-challenge
+          <app-file-challenge
             [entityType]="entityType()"
             [entityId]="entityId()"
             (challengeFiled)="onChallengeFiled($event)"
@@ -82,7 +82,7 @@ import type {
       @if (sel.renderTarget === 'angular') {
         @switch (sel.level) {
           @case (0) {
-            <qahal-context-menu-only
+            <app-context-menu-only
               [entityType]="entityType()"
               [entityId]="entityId()"
               (challenge)="onChallengeAction($event)"
@@ -100,7 +100,7 @@ import type {
       }
 
       @if (sel.renderTarget === 'psephos' && activeProposal()) {
-        <qahal-psephos-ballot-wrapper
+        <app-psephos-ballot-wrapper
           [proposal]="activeProposal()!"
           [mechanism]="sel.mechanism"
           (ballotSubmitted)="onBallotSubmitted($event)"

@@ -13,7 +13,7 @@ import { Component, input, output } from '@angular/core';
  * No backend wiring in this component — pure presentation + event emission.
  */
 @Component({
-  selector: 'qahal-context-menu-only',
+  selector: 'app-context-menu-only',
   standalone: true,
   template: `
     <div class="context-menu-wrapper">

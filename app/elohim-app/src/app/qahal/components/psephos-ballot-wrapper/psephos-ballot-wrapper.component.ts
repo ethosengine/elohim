@@ -70,7 +70,7 @@ interface BallotRecognition {
 }
 
 @Component({
-  selector: 'qahal-psephos-ballot-wrapper',
+  selector: 'app-psephos-ballot-wrapper',
   standalone: true,
   imports: [DecimalPipe, TitleCasePipe],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],

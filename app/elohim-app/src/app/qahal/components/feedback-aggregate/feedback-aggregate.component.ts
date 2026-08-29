@@ -149,7 +149,13 @@ export class FeedbackAggregateComponent implements OnInit {
 
   private readonly governanceApi = inject(GovernanceApiService);
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    // Angular never awaits ngOnInit, so returning a promise from it silently
+    // discards the result. Delegate and mark the hand-off explicitly.
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     const result = await this.governanceApi.getSignalAggregate(this.entityType(), this.entityId());
     this.aggregate.set(result);
   }

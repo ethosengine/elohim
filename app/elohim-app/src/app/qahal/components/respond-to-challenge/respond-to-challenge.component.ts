@@ -21,7 +21,7 @@ const OUTCOME_OPTIONS = [
 ] as const;
 
 @Component({
-  selector: 'qahal-respond-to-challenge',
+  selector: 'app-respond-to-challenge',
   standalone: true,
   imports: [FormsModule],
   template: `

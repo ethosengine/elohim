@@ -23,7 +23,7 @@ interface ProxyVoteEntry {
 }
 
 @Component({
-  selector: 'qahal-proxy-vote-list',
+  selector: 'app-proxy-vote-list',
   standalone: true,
   imports: [ProxyVoteNotificationComponent],
   template: `
@@ -37,7 +37,7 @@ interface ProxyVoteEntry {
       } @else {
         <div class="vote-cards">
           @for (entry of entries(); track entry.vote.id) {
-            <qahal-proxy-vote-notification
+            <app-proxy-vote-notification
               [proxyVote]="entry.vote"
               [proposalTitle]="entry.proposalTitle"
               (confirmed)="dismiss(entry.vote.id)"
@@ -80,7 +80,13 @@ export class ProxyVoteListComponent implements OnInit {
   readonly loading = signal(true);
   readonly entries = signal<ProxyVoteEntry[]>([]);
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    // Angular never awaits ngOnInit, so returning a promise from it silently
+    // discards the result. Delegate and mark the hand-off explicitly.
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     this.loading.set(true);
     try {
       // Load proxy votes for the current user.

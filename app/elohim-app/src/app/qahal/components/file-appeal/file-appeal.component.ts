@@ -21,7 +21,7 @@ const APPEAL_GROUNDS_OPTIONS = [
 ] as const;
 
 @Component({
-  selector: 'qahal-file-appeal',
+  selector: 'app-file-appeal',
   standalone: true,
   imports: [FormsModule],
   template: `

@@ -1296,16 +1296,14 @@ export class DataLoaderService {
    * loading the entire graph.
    */
   getGraph(): Observable<ContentGraph> {
-    if (!this.graphCache$) {
-      // Content graph is served from the projection tier: build it from the
-      // Holochain relationships, falling back to an empty graph only on error.
-      this.graphCache$ = this.buildGraphFromHolochain().pipe(
-        shareReplay(1),
-        catchError(_err => {
-          return of(this.createEmptyGraph());
-        })
-      );
-    }
+    // Content graph is served from the projection tier: build it from the
+    // Holochain relationships, falling back to an empty graph only on error.
+    this.graphCache$ ??= this.buildGraphFromHolochain().pipe(
+      shareReplay(1),
+      catchError(_err => {
+        return of(this.createEmptyGraph());
+      })
+    );
     return this.graphCache$;
   }
 

@@ -23,7 +23,7 @@ import { OpinionClusterComponent } from '../opinion-cluster/opinion-cluster.comp
 import type { SensemakingResultView, StatementView } from '@elohim/storage-client/generated';
 
 @Component({
-  selector: 'qahal-sensemaking-page',
+  selector: 'app-sensemaking-page',
   standalone: true,
   imports: [ContributeStatementComponent, OpinionClusterComponent, RouterLink],
   template: `

@@ -12,7 +12,7 @@ import { Component, input, output } from '@angular/core';
 import type { RankedVoteView } from '@elohim/storage-client/generated';
 
 @Component({
-  selector: 'qahal-proxy-vote-notification',
+  selector: 'app-proxy-vote-notification',
   standalone: true,
   template: `
     <div class="proxy-notification-card">

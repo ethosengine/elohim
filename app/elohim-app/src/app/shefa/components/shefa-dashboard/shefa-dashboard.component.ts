@@ -22,8 +22,7 @@ import { takeUntil, tap } from 'rxjs/operators';
 
 import { Observable, Subject } from 'rxjs';
 
-import { COMPUTE_DASHBOARD, COMPUTE_EVENT } from '../../interfaces';
-import { DATA_PROTECTION } from '../../interfaces';
+import { COMPUTE_DASHBOARD, COMPUTE_EVENT, DATA_PROTECTION } from '../../interfaces';
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
 
 /**

@@ -144,7 +144,7 @@ export class ContentDeliveryComponent implements OnInit, OnDestroy, AfterViewChe
   private populateOmnibar(node: ContentNode): void {
     this.contentAddress = node.id;
     this.reach = (node.reach as string) || 'commons';
-    this.omnibarStewards = (node.stewardedBy || []).map(s => ({
+    this.omnibarStewards = (node.stewardedBy ?? []).map(s => ({
       humanId: s.humanId,
       displayName: s.humanId,
       ratio: s.affinity ?? 0,

@@ -13,7 +13,7 @@ import { GovernanceApiService } from '@elohim/service';
 import type { ChallengeView } from '@elohim/storage-client/generated';
 
 @Component({
-  selector: 'qahal-challenge-detail',
+  selector: 'app-challenge-detail',
   standalone: true,
   imports: [RouterLink],
   template: `
@@ -137,7 +137,13 @@ export class ChallengeDetailComponent implements OnInit {
   readonly challenge = signal<ChallengeView | null>(null);
   readonly loading = signal(true);
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    // Angular never awaits ngOnInit, so returning a promise from it silently
+    // discards the result. Delegate and mark the hand-off explicitly.
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.loading.set(false);

@@ -27,7 +27,6 @@ import { GovernanceApiService } from '@elohim/service';
 
 import type {
   StatementView,
-  StatementVoteView,
   OpinionClusterView,
   ParticipantPositionView,
   SensemakingResultView,

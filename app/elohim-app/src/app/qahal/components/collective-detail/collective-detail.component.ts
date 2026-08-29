@@ -140,7 +140,7 @@ export type DetailTab = 'members' | 'proposals' | 'discussions';
 
       <!-- Feedback Mechanism Gateway (governance at the collective level) -->
       @if (collective()) {
-        <qahal-feedback-mechanism-gateway
+        <app-feedback-mechanism-gateway
           [entityType]="'collective'"
           [entityId]="collective()!.id"
         />

@@ -42,7 +42,7 @@ const OUTCOME_OPTIONS = [
 ] as const;
 
 @Component({
-  selector: 'qahal-file-challenge',
+  selector: 'app-file-challenge',
   standalone: true,
   imports: [FormsModule],
   template: `

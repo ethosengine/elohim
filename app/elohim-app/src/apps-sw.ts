@@ -153,9 +153,9 @@ async function probeCapability(slug: string): Promise<DeliveryInfo> {
   try {
     const resp = await fetch(`/apps/${slug}/_capability`, { method: 'HEAD' });
     const info: DeliveryInfo = {
-      deliveryMode: resp.headers.get('X-Delivery-Mode') || 'compressed',
-      blobHash: resp.headers.get('X-Blob-Hash') || '',
-      cacheTier: resp.headers.get('X-Cache-Tier') || 'unknown',
+      deliveryMode: resp.headers.get('X-Delivery-Mode') ?? 'compressed',
+      blobHash: resp.headers.get('X-Blob-Hash') ?? '',
+      cacheTier: resp.headers.get('X-Cache-Tier') ?? 'unknown',
       ready:
         resp.headers.get('X-Ready') === 'true' || resp.headers.get('X-Projection-Ready') === 'true',
     };
@@ -262,7 +262,7 @@ async function fetchAndCacheByCid(
     const response = await fetch(request);
     if (response.ok) {
       // Read content address from response header (doorway sets this)
-      const contentAddress = response.headers.get('X-Content-Address') || blobHash;
+      const contentAddress = response.headers.get('X-Content-Address') ?? blobHash;
       const responseToCache = response.clone();
 
       // Cache under CID key (immutable) if we have a content address
@@ -340,7 +340,7 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
 }
 
 function guessContentType(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const types: Record<string, string> = {
     html: 'text/html; charset=utf-8',
     js: 'application/javascript; charset=utf-8',
