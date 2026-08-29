@@ -122,3 +122,20 @@ Counted in `elohim_sync_half_row_heal_total{outcome}` (pre-touched). Test pins h
 Also found on the way, filed separately: `inventory-refresh-pages-dropped-as-gaps` (a dual-mode peer's view of a
 neighbour's blob inventory sits at ~9 % — 77-page refresh, out-of-order pages dropped as gaps, snapshot request is
 a placeholder).
+
+## 2026-08-29 second recovery on the heal-sweep binary: 96 P1-bad — two more stations in the same chain
+
+Run 2 (labels cut=shape3-halfrow-heal): the sweep healed 54 during the run but 96 half rows read `no_doc_hash`:
+jessica held matthew's CURRENT doc (changes applied 15:35) and it had no `blobHash`. **matthew's own docs were stale**
+against its rows: a warm restart of matthew ran the cold-start back-fill and re-projected **1270** docs
+(`scanned 3442 projected 1270`), after which jessica's stuck set fell 262 → 27 within three sweep ticks. Whatever
+wrote those rows' `blob_hash` did not ride the `ContentUpdated` producer path, so the doc only caught up at the next
+cold start — chain / between row-write→doc / missing node: *every blob_hash writer re-projects the doc* (open;
+candidates: the seed's blob-attach, blob-heal "persisted and recorded"). The back-fill's `doc_matches` is the
+level-triggered version of that node and it already exists — it just only runs at boot.
+
+Station 2: matthew's sweep reported the identical `healed 72 / no_doc_hash 128` every tick. `update_content`'s
+amber rule kept the EXISTING blob_hash on a green (anchored) row even when it was NULL — a NULL is not a notarized
+hash; guarding it is empty-wins. Cure landed: the guard applies only when the green hash is present
+(`amber_write_fills_a_null_blob_hash_on_a_green_row`), and `reverse_project_content_doc` now returns healed iff the
+row carries the converged hash after the write, so the counter cannot re-count an unchanged row.

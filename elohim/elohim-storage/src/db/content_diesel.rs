@@ -789,7 +789,14 @@ pub fn update_content(
     // MAJOR-1, stale-restarter case.)
     let existing_is_green = existing.content.dht_anchor_hash.is_some();
     let is_amber_write = input.crdt_converged_at.is_some();
-    let new_blob_hash = if is_amber_write && existing_is_green {
+    // A NULL is not a notarized hash: a green row whose blob_hash is absent (a
+    // half row — declared blob_cid, bytes never derived here) is FILLED by an
+    // amber heal, never guarded. Measured 2026-08-29 (household mesh): 72 green
+    // half rows on matthew re-"healed" every sync round without changing because
+    // this guard kept the NULL; jessica's warm recovery plateaued on the same
+    // shape. Guarding an absent value is empty-wins, the inverse of the rule.
+    let green_hash_present = existing_is_green && existing.content.blob_hash.is_some();
+    let new_blob_hash = if is_amber_write && green_hash_present {
         // Amber must not clobber a notarized (green) blob_hash.
         existing.content.blob_hash.as_deref()
     } else {
@@ -4079,6 +4086,40 @@ mod tests {
             row.dht_anchor_hash.as_deref(),
             Some("bafy-notarized-anchor"),
             "existing notarized anchor preserved"
+        );
+    }
+
+    /// The inverse guard: a GREEN row with NO blob_hash (a half row) is filled
+    /// by an amber heal — a NULL is not a notarized hash, and keeping it is
+    /// how 72 green half rows on a peer re-"healed" every round for nothing.
+    #[test]
+    fn amber_write_fills_a_null_blob_hash_on_a_green_row() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let id = "epr:green-half";
+
+        let mut green_half = mk_bundle(id);
+        green_half.blob_hash = None;
+        green_half.blob_cid = Some("bafkrei-declared".to_string());
+        green_half.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
+        create_content(&mut conn, &ctx, green_half).unwrap();
+
+        let amber = UpdateContentInput {
+            id: id.to_string(),
+            blob_hash: Some("bafkrei-declared".to_string()),
+            crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        let updated = update_content(&mut conn, &ctx, amber).unwrap();
+        assert_eq!(
+            updated.content.blob_hash.as_deref(),
+            Some("bafkrei-declared"),
+            "an amber heal FILLS an absent blob_hash on a green row"
+        );
+        assert_eq!(
+            updated.content.dht_anchor_hash.as_deref(),
+            Some("bafy-notarized-anchor"),
+            "the anchor is untouched"
         );
     }
 
