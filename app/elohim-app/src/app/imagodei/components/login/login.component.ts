@@ -39,6 +39,15 @@ import { IdentityService } from '../../services/identity.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 
+// SIDE-EFFECT import: registers <elohim-imagodei-federated-resolver> and
+// <elohim-imagodei-login-card>. Without it this page renders the custom
+// elements' fallback text and NO identifier input, so login is impossible on a
+// direct navigation to /identity/login. The registration used to arrive only
+// via auth-callback.component.ts, which a first-time visitor never passes
+// through, and the type-only import below is erased at compile time so it
+// pulls in nothing.
+import 'elohim-imagodei/register';
+
 import type { AuthorityResolution } from 'elohim-imagodei';
 
 type Step = 'resolve' | 'login';
