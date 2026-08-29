@@ -40,3 +40,7 @@ shows). Traps: (1) Unknown must be the IMMEDIATE Bulk pick (a tick-only floor ne
 (2) one blip ≠ Degraded — MIN_SAMPLES_FOR_DEGRADED=3; (3) count route decisions only when there is work to
 dispatch (73 phantom `prior_iroh`); (4) a warm-restarted peer drains pulls before its iroh book warms (backlog
 `pull-leg-drains-before-iroh-book-warms`); (5) `cut` at the end of a Monitor pipeline block-buffers — no events.
+**`storage-restart` env capture keeps the last overlay** (2026-08-29): the restart re-applies the CAPTURED daemon
+environment, so after a `MESH_RESTART_ENV_OVERLAY="ELOHIM_TRANSPORT_SELECTION=off"` restart, a later restart with the
+overlay UNSET still runs off. Flip back with an explicit `MESH_RESTART_ENV_OVERLAY="ELOHIM_TRANSPORT_SELECTION=on"`, and
+read `elohim_transport_route_total{reason}` on the peer to confirm which arm you are actually measuring.

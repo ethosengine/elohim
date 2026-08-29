@@ -1,18 +1,18 @@
 {
  "jobs": {
-  "elohim": 1677,
-  "elohim-edge": 1388,
-  "elohim-genesis": 1517,
-  "elohim-holochain": 1405,
-  "elohim-orchestrator": 1741,
+  "elohim": 1678,
+  "elohim-edge": 1389,
+  "elohim-genesis": 1519,
+  "elohim-holochain": 1406,
+  "elohim-orchestrator": 1743,
   "elohim-sophia": 146,
   "elohim-steward": 1,
-  "elohim-storybook": 293
+  "elohim-storybook": 294
  },
  "green": {
-  "elohim-holochain": 1402,
+  "elohim-holochain": 1406,
   "elohim-sophia": 146,
-  "elohim-storybook": 293,
+  "elohim-storybook": 294,
   "elohim": 1608,
   "elohim-edge": 1386,
   "elohim-orchestrator": 1469
@@ -20,15 +20,14 @@
  "green_streak": {
   "elohim": 0,
   "elohim-edge": 0,
-  "elohim-storybook": 6,
+  "elohim-storybook": 7,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
-  "elohim-holochain": 0,
+  "elohim-holochain": 1,
   "elohim-sophia": 1
  },
  "recent": {
   "elohim": [
-   "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
@@ -42,6 +41,7 @@
    "UNSTABLE",
    "UNSTABLE",
    "ABORTED",
+   "UNSTABLE",
    "UNSTABLE"
   ],
   "elohim-edge": [
@@ -52,13 +52,13 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS",
    "ABORTED",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
    "ABORTED",
+   "UNSTABLE",
    "UNSTABLE"
   ],
   "elohim-storybook": [
@@ -69,8 +69,8 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS",
    "ABORTED",
+   "SUCCESS",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
@@ -79,8 +79,6 @@
    "SUCCESS"
   ],
   "elohim-orchestrator": [
-   "NOT_BUILT",
-   "NOT_BUILT",
    "UNSTABLE",
    "UNSTABLE",
    "FAILURE",
@@ -93,6 +91,8 @@
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
+   "UNSTABLE",
+   "FAILURE",
    "UNSTABLE"
   ],
   "elohim-genesis": [
@@ -102,14 +102,14 @@
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
    "ABORTED",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
+   "UNSTABLE",
+   "FAILURE",
    "UNSTABLE"
   ],
   "elohim-holochain": [
@@ -119,7 +119,6 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS",
    "FAILURE",
    "SUCCESS",
    "FAILURE",
@@ -127,7 +126,8 @@
    "SUCCESS",
    "FAILURE",
    "FAILURE",
-   "ABORTED"
+   "ABORTED",
+   "SUCCESS"
   ],
   "elohim-sophia": [
    "FAILURE",

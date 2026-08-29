@@ -21,3 +21,8 @@ Folds the git push/branch/worktree discipline cluster — the rules governing wh
 - [[feedback_partition_compile_and_stale_dist]] — Two integration anti-patterns from 2026-07-24 overnight — commit partitions must respect COMPILE deps, and local dist/ presence proves nothing about CI stage coverage
 - [[project_sprint_branch_not_orchestrator_indexed]] — Orchestrator indexes only {PR-*, dev}: sprint/* and claude/* pushes never trigger CI ([build:*] inert, NOT_BUILT); auto-deploy only via dev-merge.
 - **Never reset by relative ref in a shared worktree (2026-08-27 near-miss).** `git reset --soft HEAD~1` meant to drop MY commit removed the sibling session's newest commit instead — three of theirs had landed on top of mine in the minutes between. Recovered from the reflog within a minute, but the rule is: name the commit (`git reset --soft <sha>` / `git revert <sha>`), re-read `git log -5` immediately before any history op, and prefer a forward correction commit over rewriting when another session is live. Corollary: an inert `[build:*]` tag buried in history is harmless — the orchestrator reads `git log -1` only — so leave it and add a commit above it rather than rebase.
+
+**2026-08-29 — two agents committing in ONE shared worktree collide on the index.** Sweep B's `git reset`
+emptied sweep A's staged index mid-flight, and B's `git add` of its own file landed inside A's commit (A had to
+amend it out). One index per worktree: serialize commits (one committer at a time) or give each integrating
+agent `isolation: worktree`; never run two path-limited committers concurrently in the same checkout.
