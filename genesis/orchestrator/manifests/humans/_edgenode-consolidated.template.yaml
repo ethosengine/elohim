@@ -535,6 +535,15 @@ spec:
             # Boot sentinel: "Dual: DualGossipPublisher wired into P2PNode". Rollback: "libp2p".
             - name: ELOHIM_TRANSPORT_BACKEND
               value: "dual"
+            # Storage-side iroh relay — distinct from the conductor's network.relay_url
+            # above; read by p2p_iroh/config.rs and, until now, set by nothing (the
+            # dead-config note in scripts/ci/dead-config-lint.sh). Without it the iroh
+            # half of "dual" is direct-only: pod IPs, unreachable from any peer outside
+            # the namespace (measured 2026-08-30 — a workspace peer's iroh 0.92 attached
+            # to this relay in 3 s; the fleet could not dial back). One relay per premises,
+            # the same value the conductor gets.
+            - name: ELOHIM_IROH_RELAY_URL
+              value: "RELAY_URL_PLACEHOLDER"
             # CPU profiling exposition — arms GET /debug/pprof/profile?seconds=N
             # on the storage-http port for the Alloy/Pyroscope scraper (see the
             # profiles.grafana.com/cpu.* annotations on this pod template).
