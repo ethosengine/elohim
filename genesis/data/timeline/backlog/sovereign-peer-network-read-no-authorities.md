@@ -66,3 +66,14 @@ so the null is what a fresh kitsune2 arc looks like on the board, not a fleet-on
 grows is still unanswered — and the fleet's conductor was found NOT to be the pinned fork
 (backlog/conductor-pin-ships-base-binary.md), so every prior "on the fork" fleet read of this item needs
 re-doing once 9d2842a63 deploys. sovereign-peer-join scenario 1 PASSED on the pair.
+
+## 2026-08-30 — T3 workspace peers cannot receive coordinator hot-swaps
+
+A storage attached to an EXTERNAL conductor (`HOLOCHAIN_ADMIN_URL`, the T3 rung's shape) never runs
+`happ_manager::ensure_happ_installed`/`sync_coordinators` — that path lives inside the embedded
+ProcessManager boot loop only. So when a coordinator-only change ships (e.g. the head-delegation
+batch), the fleet hot-swaps via its embedded storages but a workspace conductor keeps the old
+coordinators; the only workspace path today is a fresh `hc sandbox generate` (which re-keys the
+device agent). Cure candidate: an `--sync-coordinators-once` storage flag (or a small admin script)
+that drives `update_coordinators` against an external conductor from `--happ-path`, preserving the
+device key. Until then a T3 re-key after each coordinator wave is the documented cost.
