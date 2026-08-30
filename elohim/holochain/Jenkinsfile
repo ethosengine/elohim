@@ -817,6 +817,102 @@ def nonProdTrueGate(String env) {
 }
 
 /**
+ * Build the sed argument list (one -e expression per placeholder, shell-quoted)
+ * for rendering a human manifest. Extracted from deployHumanManifest to keep
+ * that method under the per-def CPS method-size ceiling — same pattern as
+ * nonProdTrueGate above. All inputs are explicit parameters (no closure
+ * capture); the placeholder set and substitution values are byte-identical
+ * to the pre-extraction inline version.
+ */
+def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String happDigest, String storageImage, String nonProdGate, Map primaryDoorway, String relayUrl, String hostAliases, String p2pNodes, String nodeTypeValues, String deviceArchetype, String householdId, String nodeRole, String region) {
+    // Doorway ORIGIN (scheme + host, no path) for the storage-side iroh bootstrap:
+    // elohim-storage's transport-manifest announcer POSTs to, and its joiner reads,
+    // `${ELOHIM_DOORWAY_URL}/p2p/manifests`. Without this env every fleet storage has
+    // doorway_base_url() == None and never announces — measured 2026-08-30: with the
+    // board open, its only entry was an outside workspace peer's. Derived from the
+    // bootstrap URL so the two can never name different doorways (inlined below in
+    // the sed list: `bootstrapUrl - '/bootstrap'`).
+
+    // Digest-pinned doorway ref — see deployEdgeWithManifest note.
+    def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
+    return [
+        // Image tag placeholders
+        "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
+        "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
+        "s|STORAGE_IMAGE_PLACEHOLDER|${storageImage}|g",
+        "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
+        "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
+        "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
+        // Resolved hApp content digest — stamped into the pod-template annotation
+        // so a floating-tag move (new DNA bytes, no edge commit) changes the STS
+        // spec and the genesis-peer restart-skip stays correct. Digest contains
+        // no `|`, so it's safe with the sed `|` delimiter.
+        "s|HAPP_DIGEST_PLACEHOLDER|${happDigest}|g",
+        "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
+        "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
+        // Topology placeholders
+        "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
+        "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
+        "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_DELEGATES_COMPUTE_PLACEHOLDER|${nonProdGate}|g",
+        "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${nonProdGate}|g",
+        "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
+        "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
+        "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
+        "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
+        "s|RELAY_URL_PLACEHOLDER|${relayUrl}|g",
+        "s|DOORWAY_ORIGIN_PLACEHOLDER|${primaryDoorway.bootstrapUrl - '/bootstrap'}|g",
+        "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
+        "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
+        // Node-local storage class — P2P dataplane owns replication, not k8s.
+        "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
+        // Per-human placeholders (no-ops on the consolidated manifest, which
+        // has these values hand-coded for Adam).
+        "s|HUMAN_LABEL_PLACEHOLDER|${humanConfig.humanLabel}|g",
+        "s|HUMAN_ID_PLACEHOLDER|${humanConfig.humanId}|g",
+        "s|NODE_TYPE_VALUES_PLACEHOLDER|${nodeTypeValues}|g",
+        "s|AFFINITY_COMMENT_PLACEHOLDER|${humanConfig.affinityComment ?: ''}|g",
+        "s|EDGENODE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.edgenodeMemoryRequest ?: ''}|g",
+        "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
+        "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
+        "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
+        // SQLite pool size (consolidated template only). Defaults to '10' (the
+        // code default) so an unset node never leaves an unresolved placeholder.
+        "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
+        // k2Gossip round-timeout / accepted-rounds (consolidated template only).
+        // Defaults 60000/4 preserve the household slow-WAN profile baked into
+        // the template for every human that doesn't override — an unset node
+        // renders byte-identically to before this placeholder existed. Per
+        // adam-firstman.yaml's ARC-CONVERGENCE comment, that profile is wrong
+        // for multi-tenant shem conductors; deployments.json overrides
+        // gertrude/susan/eve to adam's proven 15000/10 (2026-08-09: zero
+        // storage-arc-to-full events in 24h at 60000/4 vs 23-24 on household
+        // pods).
+        "s|K2_ROUND_TIMEOUT_PLACEHOLDER|${humanConfig.k2GossipRoundTimeoutMs ?: '60000'}|g",
+        "s|K2_MAX_ACCEPTED_ROUNDS_PLACEHOLDER|${humanConfig.k2GossipMaxAcceptedRounds ?: '4'}|g",
+        // Authority arc factor (consolidated template only). Default '1' (full arc =
+        // kitsune2 default) so an unset node never leaves an unresolved placeholder;
+        // '0' = leecher (deploy-time arc-shrink for a non-anchor OOMing on the full arc).
+        "s|TARGET_ARC_FACTOR_PLACEHOLDER|${humanConfig.edgenodeArcFactor ?: '1'}|g",
+        // Consolidated-template env-var placeholders (no-ops on the legacy
+        // template and on Adam's hand-rendered manifest, which either omit
+        // these tokens entirely or pre-bake their values).
+        "s|DEVICE_ARCHETYPE_PLACEHOLDER|${deviceArchetype}|g",
+        "s|HOUSEHOLD_ID_PLACEHOLDER|${householdId}|g",
+        "s|NODE_ROLE_PLACEHOLDER|${nodeRole}|g",
+        "s|REGION_PLACEHOLDER|${region}|g",
+    ].collect {
+        // Each sed expression is wrapped in single quotes for the shell, so any
+        // apostrophe inside the expression (e.g. "Matthew's role" in an affinity
+        // comment) closes the shell string prematurely. Escape `'` → `'\''`
+        // (close, escape, reopen) to embed it safely inside single quotes.
+        "-e '${it.replace("'", "'\\''")}'"
+    }.join(' ')
+}
+
+/**
  * Deploy a human manifest with topology-aware placeholder substitution.
  * Uses | as sed delimiter because URLs contain /.
  */
@@ -924,92 +1020,11 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // resolveRelayUrl's doc comment for the fail-loud rationale.
     def relayUrl = resolveRelayUrl(primaryDoorway.signalUrl, humanConfig.name, humanConfig.env)
 
-    // Doorway ORIGIN (scheme + host, no path) for the storage-side iroh bootstrap:
-    // elohim-storage's transport-manifest announcer POSTs to, and its joiner reads,
-    // `${ELOHIM_DOORWAY_URL}/p2p/manifests`. Without this env every fleet storage has
-    // doorway_base_url() == None and never announces — measured 2026-08-30: with the
-    // board open, its only entry was an outside workspace peer's. Derived from the
-    // bootstrap URL so the two can never name different doorways (inlined below in
-    // the sed list: `bootstrapUrl - '/bootstrap'` — this method sits at the CPS
-    // size ceiling, so no extra def).
-
-    // Digest-pinned doorway ref — see deployEdgeWithManifest note.
-    def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
-    def sedArgs = [
-        // Image tag placeholders
-        "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
-        "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
-        "s|STORAGE_IMAGE_PLACEHOLDER|${storageImage}|g",
-        "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
-        "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
-        "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
-        // Resolved hApp content digest — stamped into the pod-template annotation
-        // so a floating-tag move (new DNA bytes, no edge commit) changes the STS
-        // spec and the genesis-peer restart-skip stays correct. Digest contains
-        // no `|`, so it's safe with the sed `|` delimiter.
-        "s|HAPP_DIGEST_PLACEHOLDER|${happDigest}|g",
-        "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
-        "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
-        // Topology placeholders
-        "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
-        "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
-        "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${nonProdGate}|g",
-        "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${nonProdGate}|g",
-        "s|ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER|${nonProdGate}|g",
-        "s|ALLOW_SEED_DELEGATES_COMPUTE_PLACEHOLDER|${nonProdGate}|g",
-        "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${nonProdGate}|g",
-        "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
-        "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
-        "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
-        "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
-        "s|RELAY_URL_PLACEHOLDER|${relayUrl}|g",
-        "s|DOORWAY_ORIGIN_PLACEHOLDER|${primaryDoorway.bootstrapUrl - '/bootstrap'}|g",
-        "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
-        "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
-        // Node-local storage class — P2P dataplane owns replication, not k8s.
-        "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
-        // Per-human placeholders (no-ops on the consolidated manifest, which
-        // has these values hand-coded for Adam).
-        "s|HUMAN_LABEL_PLACEHOLDER|${humanConfig.humanLabel}|g",
-        "s|HUMAN_ID_PLACEHOLDER|${humanConfig.humanId}|g",
-        "s|NODE_TYPE_VALUES_PLACEHOLDER|${nodeTypeValues}|g",
-        "s|AFFINITY_COMMENT_PLACEHOLDER|${humanConfig.affinityComment ?: ''}|g",
-        "s|EDGENODE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.edgenodeMemoryRequest ?: ''}|g",
-        "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
-        "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
-        "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
-        // SQLite pool size (consolidated template only). Defaults to '10' (the
-        // code default) so an unset node never leaves an unresolved placeholder.
-        "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
-        // k2Gossip round-timeout / accepted-rounds (consolidated template only).
-        // Defaults 60000/4 preserve the household slow-WAN profile baked into
-        // the template for every human that doesn't override — an unset node
-        // renders byte-identically to before this placeholder existed. Per
-        // adam-firstman.yaml's ARC-CONVERGENCE comment, that profile is wrong
-        // for multi-tenant shem conductors; deployments.json overrides
-        // gertrude/susan/eve to adam's proven 15000/10 (2026-08-09: zero
-        // storage-arc-to-full events in 24h at 60000/4 vs 23-24 on household
-        // pods).
-        "s|K2_ROUND_TIMEOUT_PLACEHOLDER|${humanConfig.k2GossipRoundTimeoutMs ?: '60000'}|g",
-        "s|K2_MAX_ACCEPTED_ROUNDS_PLACEHOLDER|${humanConfig.k2GossipMaxAcceptedRounds ?: '4'}|g",
-        // Authority arc factor (consolidated template only). Default '1' (full arc =
-        // kitsune2 default) so an unset node never leaves an unresolved placeholder;
-        // '0' = leecher (deploy-time arc-shrink for a non-anchor OOMing on the full arc).
-        "s|TARGET_ARC_FACTOR_PLACEHOLDER|${humanConfig.edgenodeArcFactor ?: '1'}|g",
-        // Consolidated-template env-var placeholders (no-ops on the legacy
-        // template and on Adam's hand-rendered manifest, which either omit
-        // these tokens entirely or pre-bake their values).
-        "s|DEVICE_ARCHETYPE_PLACEHOLDER|${deviceArchetype}|g",
-        "s|HOUSEHOLD_ID_PLACEHOLDER|${householdId}|g",
-        "s|NODE_ROLE_PLACEHOLDER|${nodeRole}|g",
-        "s|REGION_PLACEHOLDER|${region}|g",
-    ].collect {
-        // Each sed expression is wrapped in single quotes for the shell, so any
-        // apostrophe inside the expression (e.g. "Matthew's role" in an affinity
-        // comment) closes the shell string prematurely. Escape `'` → `'\''`
-        // (close, escape, reopen) to embed it safely inside single quotes.
-        "-e '${it.replace("'", "'\\''")}'"
-    }.join(' ')
+    // Sed argument list (one -e expression per placeholder, shell-quoted) —
+    // built in humanManifestSedArgs to keep this method under the per-def
+    // CPS method-size ceiling. See that def's doc comment for the doorway
+    // origin derivation and the doorwayRef digest-pin note.
+    def sedArgs = humanManifestSedArgs(humanConfig, versions, deployVersion, happDigest, storageImage, nonProdGate, primaryDoorway, relayUrl, hostAliases, p2pNodes, nodeTypeValues, deviceArchetype, householdId, nodeRole, region)
 
     // Output path uses resourcePrefix so multiple humans sharing a template
     // don't collide on a single rendered file.
