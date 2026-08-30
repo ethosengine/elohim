@@ -734,7 +734,9 @@ impl HeadDelegationJson {
             .map_err(|e| StorageError::InvalidInput(format!("delegation.delegate: {e:?}")))?;
         let sig_bytes = base64::engine::general_purpose::STANDARD
             .decode(self.signature.as_bytes())
-            .or_else(|_| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(self.signature.as_bytes()))
+            .or_else(|_| {
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(self.signature.as_bytes())
+            })
             .map_err(|e| StorageError::InvalidInput(format!("delegation.signature: {e}")))?;
         let sig: [u8; 64] = sig_bytes.as_slice().try_into().map_err(|_| {
             StorageError::InvalidInput(format!(

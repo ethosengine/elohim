@@ -724,9 +724,7 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     // unique_id: a nextest retry shares the process-global mem-bootstrap DHT,
     // so a fixed id would self-poison the retry (dna #1357).
     let id = unique_id("device-1");
-    let _created: ContentOutput = c1
-        .call(&zome1, "create_content", test_content(&id))
-        .await;
+    let _created: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
     let valid_until = Timestamp::from_micros(Timestamp::now().as_micros() + 3_600_000_000);
     let delegation: HeadDelegationMirror = c1
         .call(
@@ -745,9 +743,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     // B must see the content before acting on it.
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        let seen: Option<ContentHeadOutput> = c2
-            .call(&zome2, "resolve_content_head", id.clone())
-            .await;
+        let seen: Option<ContentHeadOutput> =
+            c2.call(&zome2, "resolve_content_head", id.clone()).await;
         if seen.is_some() {
             break;
         }
@@ -787,9 +784,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     for (c, zome, who) in [(&c1, &zome1, "author"), (&c2, &zome2, "delegate")] {
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
-            let h: Option<ContentHeadOutput> = c
-                .call(zome, "resolve_content_head", id.clone())
-                .await;
+            let h: Option<ContentHeadOutput> =
+                c.call(zome, "resolve_content_head", id.clone()).await;
             if let Some(h) = h {
                 if h.head_action_hash == b_action {
                     break;
@@ -814,7 +810,10 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             },
         )
         .await;
-    let err = format!("{:?}", bare.expect_err("undelegated earned declare must be refused"));
+    let err = format!(
+        "{:?}",
+        bare.expect_err("undelegated earned declare must be refused")
+    );
     assert!(
         err.contains("restricted to the"),
         "refusal must name the authority rule; got: {err}"
@@ -842,8 +841,14 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             },
         )
         .await;
-    let err = format!("{:?}", scoped.expect_err("out-of-scope delegation must be refused"));
-    assert!(err.contains("scope"), "refusal must name the scope; got: {err}");
+    let err = format!(
+        "{:?}",
+        scoped.expect_err("out-of-scope delegation must be refused")
+    );
+    assert!(
+        err.contains("scope"),
+        "refusal must name the scope; got: {err}"
+    );
 
     Ok(())
 }

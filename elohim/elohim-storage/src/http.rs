@@ -7027,8 +7027,7 @@ impl HttpServer {
             /// chain's root author — this layer only checks the caller matches
             /// the delegate before spending a conductor round-trip.
             #[serde(default)]
-            delegation:
-                Option<crate::services::conductor_writes::HeadDelegationJson>,
+            delegation: Option<crate::services::conductor_writes::HeadDelegationJson>,
         }
 
         let pool = self
