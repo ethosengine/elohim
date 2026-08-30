@@ -50,8 +50,13 @@ async function connect(adminUrl: string, origin: string) {
 }
 
 async function grant() {
-  // Fleet conductor via the doorway admin proxy (admin + app share the socket path there).
-  const adminUrl = process.env.FLEET_ADMIN_URL ?? 'wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024';
+  // Grantor = matthew's conductor. Reach it directly (a `kubectl port-forward`
+  // of matthew's pod's admin+app ports to localhost is the reliable path —
+  // FLEET_ADMIN_URL=ws://127.0.0.1:4444, FLEET_APP_PORT=4445, no api-key needed
+  // on a loopback admin socket). The doorway admin proxy is permission-gated and
+  // does not route app-interface zome calls, so the port-forward is preferred.
+  const adminUrl = process.env.FLEET_ADMIN_URL ?? 'ws://127.0.0.1:4444';
+  const appPort = Number(process.env.FLEET_APP_PORT ?? 4445);
   const admin = await AdminWebsocket.connect({ url: new URL(adminUrl), wsClientOptions: { origin: APP_ID } });
   const apps = await admin.listApps({});
   const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
@@ -68,9 +73,18 @@ async function grant() {
   const matthewKey = encodeHashToBase64(lamad[1]);
   console.log(`fleet agent (grantor / matthew's conductor key): ${matthewKey}`);
 
+  // Signing credentials for the lamad cell — the missing step my earlier draft
+  // skipped (the app zome call is refused without it).
+  await admin.authorizeSigningCredentials(lamad);
+  // Ensure an app interface exists on the expected port, then connect to it.
+  const ifaces = await admin.listAppInterfaces();
+  if (!ifaces.some((i: any) => (i.port ?? i) === appPort)) {
+    await admin.attachAppInterface({ port: appPort, allowed_origins: APP_ID });
+  }
   const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
+  const appHost = new URL(adminUrl).hostname;
   const appWs = await AppWebsocket.connect({
-    url: new URL(adminUrl),
+    url: new URL(`ws://${appHost}:${appPort}`),
     token: token.token,
     wsClientOptions: { origin: APP_ID },
   });
