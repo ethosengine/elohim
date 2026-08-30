@@ -7,7 +7,7 @@ title: "Author stewarded-device-sync.feature to resolve canonical story's dangli
 slug: "stewarded-device-sync-feature-authoring"
 written: "2026-05-14"
 author: "cartographer"
-status: "refined"
+status: "wip"
 priority: "high"
 relatedNodeIds:
   - "story:james-son--as-stewardee--stewarded-device-sync"
@@ -133,3 +133,14 @@ those principles propagate to executable substrate.
 **Readiness 9/10** — story canonical, beats written, dependencies stable, measurement
 deterministic (audit), no blocking decisions outstanding. The only friction is finding an
 authoring slot.
+
+## 2026-08-30 — feature authored (stations 3-4 of the workspace-as-device ladder)
+
+`genesis/a2o/features/auth/stewarded-device-sync.feature` now exists at the declared path with 8
+scenarios: matthew's workspace as the adult instance (device agent W joins the controller set via
+`binds-identity`, signed AgentPeerBinding, known-agent reach gate, declare-head under adam's grant,
+served-head-matches-declared-head on both doorways with no seed and no pipeline, no-grant flagged/
+refused, revocation) and James's second device as the stewardee instance (the story's beat). All
+RED-marked / @wip until `bind_identity` (mishpat), the signed AgentPeerBinding (imagodei) and the fleet
+pull leg for network-authored ids land. Design: `2026-08-30-workspace-stewarded-device-peer-design.md`.
+Remaining for done: (b) story-coverage-audit zero dangling refs — verify; (c) `/deliver` first verdict.
