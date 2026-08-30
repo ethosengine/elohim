@@ -77,3 +77,11 @@ coordinators; the only workspace path today is a fresh `hc sandbox generate` (wh
 device agent). Cure candidate: an `--sync-coordinators-once` storage flag (or a small admin script)
 that drives `update_coordinators` against an external conductor from `--happ-path`, preserving the
 device key. Until then a T3 re-key after each coordinator wave is the documented cost.
+
+## 2026-08-30 22:5xZ — confirmed by live test
+`scripts/delegation-live-check.ts` (W grants to a fresh device key D, D declares the gate-reading
+head) failed at the grant with `Zome content_store Fn grant_head_delegation doesn't exist` — the
+workspace conductor (started 20:52Z from Jenkins lastSuccessfulBuild, pre-a0784c306) carries the OLD
+coordinators. The fleet's 7 pods hot-swapped the new ones at 22:48Z; the workspace did not, exactly
+because the external-conductor path skips `sync_coordinators`. Cure remains the `--sync-coordinators-once`
+storage lever (reuse `happ_manager::sync_coordinators` against `HOLOCHAIN_ADMIN_URL`, key-preserving).
