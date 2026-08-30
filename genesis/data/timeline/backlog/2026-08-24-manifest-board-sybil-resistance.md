@@ -33,3 +33,13 @@ not newly-public — fix alongside the flag flip):
   correct the doc comment.
 - spawn_announce_pull (sync_backend.rs:195) has no per-(peer,doc) debounce/dedup/concurrency cap —
   a flood of bogus-hash announces spawns unbounded dial-back tasks. Coalesce per (peer,doc).
+
+## 2026-08-30 — gated board reads as "empty" to a joiner (C4 honest-absence)
+
+A workspace storage joiner (iroh, relay.alpha attached) bootstrapping against doorway-alpha with the
+board OFF counted `elohim_iroh_doorway_bootstrap_reads_total{phase="boot",result="empty"}` ×5 and
+`{phase="watch",result="empty"}` — the doorway's 404 (`DOORWAY_MANIFEST_BOARD_ENABLED` unset) is
+indistinguishable from a board with no peers. A joiner that will never seed should say so: add a
+`result="gated"` (HTTP 404/403) outcome so the boot sentinel does not print a green "empty board".
+Measured while staging the alpha enablers (storage-side `ELOHIM_IROH_RELAY_URL` + board ON for
+doorway-alpha); see stewarded-device-sync.feature station 3.
