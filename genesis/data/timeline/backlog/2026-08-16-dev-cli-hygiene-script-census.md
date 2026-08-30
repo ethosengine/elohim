@@ -151,3 +151,25 @@ CLAUDE.md Build & Test block. NOT yet synced: `.claude/skills/hc-dev-orchestrato
 package projection (`.epr-meta/elohim/packages/skills/hc-dev-orchestrator.json`) mid-edit in a sibling
 session on 2026-08-28; fold the knobs (`CONDUCTOR_ARC_FACTOR`, `CONDUCTOR_APP_PORT`, `MESH_HAPP_PATH`,
 `RECOVERY_REPORTS_DIR`, `T2_RECEIPT`) into the package, then project, once that WIP lands.
+
+## 2026-08-30 — +1 seeder script, gate-internal (CI triage, museum trap #17)
+
+`genesis/seeder/package.json` gained `sync:cid-artifacts:check` (322 → 323). It is **not** a new
+developer verb and no root verb should absorb it: it is a named handle for a flag the existing
+`sync:cid-artifacts` tool already had (`--check`), minted so the new pre-push
+`cid-artifact-freshness` leg can call it by name instead of by argv. Same shape as the
+`validate:*` family — a gate calls it; a human runs `just gate`.
+
+No coupled-context sync owed: not in root CLAUDE.md's Build & Test block (gate-internal), not in
+the hc-dev-orchestrator lifecycle (no stack involvement), no root justfile recipe. The pre-push
+leg list in `.husky/pre-push.bash` — the surface that *does* document it — was updated in the
+same commit.
+
+Residual for the next census pass: `pnpm --filter genesis-seeder …` was repo-wide-wrong (the
+package is `holochain-seeder`) and **`pnpm --filter <unknown>` exits 0**, so nine remediation
+hints were copy-pasteable no-ops that read as success. Fixed in `genesis/seeder/src/**` and
+`.husky/pre-push.bash`; two remain in
+`genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md`,
+a managed surface that wants a cite-tooling pass. A hint naming a filter that matches nothing is
+exactly the "out-of-date instructions are cognitive load" this census exists to burn down —
+worth a grep sweep for other `--filter` names that no longer resolve.
