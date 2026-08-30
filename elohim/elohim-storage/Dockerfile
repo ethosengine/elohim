@@ -435,8 +435,20 @@ RUN mkdir -p /var/local/lib/holochain && chown storage:storage /var/local/lib/ho
 COPY --from=builder /app/target/release/elohim-storage /usr/local/bin/elohim-storage
 
 # Holochain conductor binary — for embedded conductor mode.
-# Extracted from the same edgenode image we've been running in production.
-COPY --from=conductor-source /usr/bin/holochain /usr/local/bin/holochain
+# Extracted from the pinned edgenode image. Take /bin/holochain — the path the
+# edgenode Dockerfile (che-devworkspaces/containers/elohim-edgenode) writes its
+# freshly built fork binary to and the path its entrypoint launches — NOT
+# /usr/bin/holochain. The holo-host base ships a stock `usr/bin/holochain` with
+# `bin -> usr/bin` as a symlink; a COPY to /bin/holochain over that base can
+# leave the base's stock binary at /usr/bin/holochain untouched, and copying
+# /usr/bin/holochain from here then ships the STOCK conductor under the fork's
+# pin tag. Measured 2026-08-30 (edge #1391, pin conductor-c9a6c4439293…): every
+# fleet pod logged the pre-fix `access.rs:192` saturation line and the
+# sys-validation spin the pinned commits remove — three source-line
+# fingerprints of a 0.6.3-lineage binary without the fork's commits. When
+# /bin is a plain symlink this line is byte-identical to the old one; when it
+# is shadowed, this is the only line that reaches the built binary.
+COPY --from=conductor-source /bin/holochain /usr/local/bin/holochain
 
 # Set ownership
 RUN chown -R storage:storage /app
