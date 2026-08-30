@@ -71,6 +71,9 @@ Feature: A second device becomes one of a human's own — and its writes are the
     wired RED scenario is a measurement, not a placeholder. The capabilities waited on:
     the identity-head `bind_identity` coordinator (mishpat), a signed AgentPeerBinding
     (imagodei), and the fleet pull leg fetching network-authored ids.
+    Today every scenario is @wip: no step is wired yet, so nothing here measures until
+    the steps land (the first wiring reuses saga-06's served-head-matches-declared-head
+    step and sovereign-peer-join's Background verbatim).
 
   Design: genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md
   Run locally (household mesh): just test mesh '@concern:stewarded-device-sync and not @wip'
@@ -95,6 +98,7 @@ Feature: A second device becomes one of a human's own — and its writes are the
     Then within 3 minutes at least one fleet peer holds an identity binding row for "W" whose anchor is on the network
     And that peer resolves the workspace's iroh node id to "W" without comparing raw identity strings
 
+  @wip
   Scenario: a write signed by a recognised device is accepted at community reach; an unrecognised one is refused (RED — the gap)
     Given a fleet peer that holds an identity binding for "W"
     When "W" authors a content node at reach "community"
@@ -111,6 +115,7 @@ Feature: A second device becomes one of a human's own — and its writes are the
     Then alpha-A's declared head for the manifesto is the version "W" authored within 3 minutes
     And the act's attribution resolves to matthew's identity root, not to "W"'s raw key
 
+  @wip
   Scenario: the device-declared head becomes the served head on both doorways with no seed and no pipeline (RED — the gap)
     Given "adam" holds an active declare-head grant to "matthew" over the elohim-protocol corpus
     And "W" is a controller of matthew's identity head with a transport binding the fleet resolves
