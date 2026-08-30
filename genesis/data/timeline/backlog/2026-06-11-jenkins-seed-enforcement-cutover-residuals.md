@@ -44,3 +44,15 @@ dev-mode, neither blocks the dev push that landed this):
 **Verification when the cutover happens:** flip `DEV_MODE=false` on alpha (repo manifest), confirm
 `jwt_secret` is set, re-run the end-to-end auth review, and assert an authenticated seed run writes
 content (no 401) while an unauthenticated/absent-creds run 401s loudly (FAILURE, not UNSTABLE).
+
+## 2026-08-30 06:50Z — genesis #1523: row seeded, bytes refused (401), on BOTH doorways
+
+First genesis run after the manifesto CID-twin fix (a36fb36e1): Validate Constants SUCCESS, Seed Database SUCCESS
+(row `manifesto` with the new blobHash sha256-2454b8… declared), but `Upload Blob-Backed Content` UNSTABLE:
+"doorway-seed-ensure failed (admin key present but register/login rejected …) — upload runs unauthenticated"
+→ `upload.content HTTP 401 Authentication required to seed content`. The new head is DECLARED with no bytes
+behind it on the fleet — declared-but-unservable, minted by the pipeline itself. `/db/content/manifesto` is
+reach `community` (403 anonymous) so the public read can't even show the gap. This is the third instance
+tonight of the same seam (workspace probe: declared, fleet can't pull; fleet pull-leg: 42/42 ContentNotFound;
+now the pipeline seed). The native path (stewarded-device-sync.feature) is the cure that removes the seed
+credential from the content path altogether.
