@@ -52,6 +52,7 @@ set -o pipefail
 #   sweettest-check          → Sweettest compile-check (any zome source or sweettest source change)
 #   genesis/a2o/             → E2E lint + typecheck
 #   gherkin-prepush-lint     → Parse every executable A2O feature before E2E can abort blank
+#   cid-artifact-freshness   → generated CID twin matches its source .md (genesis/docs/content/elohim-protocol/ or genesis/data/lamad/content/ change)
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
 # There is no project-name shell switch or grep fallback: adding a local gate is
@@ -340,10 +341,28 @@ if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; th
 
   if ! git diff --quiet -- genesis/data/humans/humans.json genesis/data/presences/presences.json 2>/dev/null; then
     echo "[pre-push] ERROR: humans.json or presences.json is stale relative to markdown sources."
-    echo "  Re-run 'pnpm --filter genesis-seeder run build:data' and stage the changes before pushing."
+    echo "  Re-run '(cd genesis/seeder && pnpm run build:data)' and stage the changes before pushing."
     exit 1
   fi
   echo "[pre-push] humans/presences validation ✓"
+fi
+
+# ── CID-addressed artifact freshness (source .md ↔ generated CID twin) ──
+#
+# The seeder's cid-artifact-integrity guard lives in genesis/seeder, but the edit that
+# BREAKS it is a source .md under genesis/docs/content/elohim-protocol — which selects the
+# elohim-storybook gate project, never `genesis`. So the deterministic-floor guard existed
+# and CI (elohim-genesis #1522) was the first observer: manifesto.json's blobHash/blobCid
+# dangled while seven manifesto.md commits shipped. Key the freshness check to the SOURCE
+# side, not the generator's directory. Pure node+tsx (~0.6s) → PVC-EXEMPT BY OMISSION.
+if echo "$CHANGED" | grep -qE "^genesis/docs/content/elohim-protocol/|^genesis/data/lamad/content/"; then
+  echo "[pre-push] Verifying CID-addressed artifacts are fresh relative to their source .md..."
+  if ! (cd genesis/seeder && pnpm run sync:cid-artifacts:check); then
+    echo "[pre-push] ERROR: a CID-addressed artifact drifted from its source .md — /blob/<hash> would 404."
+    echo "  Run: (cd genesis/seeder && pnpm run sync:cid-artifacts) and stage the regenerated JSON."
+    exit 1
+  fi
+  echo "[pre-push] CID-artifact freshness ✓"
 fi
 
 # ── Device Archetype Validation ──────────────────────────────────

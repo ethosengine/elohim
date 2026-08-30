@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "description": "Generated from genesis/data/humans/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data",
+  "description": "Generated from genesis/data/humans/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter holochain-seeder run build:data",
   "humans": [
     {
       "id": "human-adam-firstman",

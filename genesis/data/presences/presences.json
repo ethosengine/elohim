@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "Generated from genesis/data/presences/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data",
+  "description": "Generated from genesis/data/presences/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter holochain-seeder run build:data",
   "presences": [
     {
       "id": "presence-2000-watt-society-and-2000-watt-site",

@@ -96,7 +96,7 @@ export async function buildHumansJson(dir: string): Promise<HumansJson> {
   return {
     version: '2.0.0',
     description:
-      'Generated from genesis/data/humans/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data',
+      'Generated from genesis/data/humans/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter holochain-seeder run build:data',
     humans,
     relationships,
   };
@@ -118,7 +118,7 @@ export async function buildPresencesJson(dir: string): Promise<PresencesJson> {
   return {
     version: '1.0.0',
     description:
-      'Generated from genesis/data/presences/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data',
+      'Generated from genesis/data/presences/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter holochain-seeder run build:data',
     presences,
   };
 }

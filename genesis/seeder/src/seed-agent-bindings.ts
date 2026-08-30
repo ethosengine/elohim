@@ -449,7 +449,7 @@ export async function main(): Promise<void> {
   if (!existsSync(jsonPath)) {
     console.error(`ERROR: ${jsonPath} not found`);
     console.error('  humans.json is generated from markdown. Run:');
-    console.error('  pnpm --filter genesis-seeder run build:data');
+    console.error('  pnpm --filter holochain-seeder run build:data');
     process.exit(1);
   }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));

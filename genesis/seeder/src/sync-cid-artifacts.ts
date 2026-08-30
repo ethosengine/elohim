@@ -10,8 +10,8 @@
 // field literals are replaced, with an abort-guard if any literal is not found
 // exactly once, so all curated metadata and JSON formatting stay byte-identical.
 //
-//   pnpm --filter genesis-seeder run sync:cid-artifacts          # fix in place
-//   pnpm --filter genesis-seeder run sync:cid-artifacts --check  # report only (CI-style)
+//   pnpm --filter holochain-seeder run sync:cid-artifacts        # fix in place
+//   pnpm --filter holochain-seeder run sync:cid-artifacts:check  # report only (pre-push leg)
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';

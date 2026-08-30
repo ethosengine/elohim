@@ -3,7 +3,7 @@
  *
  * The canonical source is genesis/data/humans/*.md (YAML frontmatter per human).
  * humans.json is a generated artifact. If missing, regenerate with:
- *   pnpm --filter genesis-seeder run build:data
+ *   pnpm --filter holochain-seeder run build:data
  *
  * Credential derivation (MUST match genesis/a2o/src/framework/fixtures/humans.ts):
  *   Matthew (human-matthew-manager): matthew.dowell@alpha.elohim.host / TestAdmin2026!

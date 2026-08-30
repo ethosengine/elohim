@@ -14,7 +14,7 @@
  *   blobCid  === CIDv1-raw-sha256(source .md bytes)
  *
  * Re-earn the reach after editing a source .md:
- *   pnpm --filter genesis-seeder run sync:cid-artifacts
+ *   pnpm --filter holochain-seeder run sync:cid-artifacts
  */
 import { resolve } from 'node:path';
 
@@ -27,7 +27,7 @@ const CONTENT_DIR = resolve(process.cwd(), '../data/lamad/content');
 const DOCS_ROOT = resolve(process.cwd(), '../docs/content/elohim-protocol');
 
 const artifacts = scanCidArtifacts(CONTENT_DIR, DOCS_ROOT);
-const resync = 'pnpm --filter genesis-seeder run sync:cid-artifacts';
+const resync = 'pnpm --filter holochain-seeder run sync:cid-artifacts';
 
 describe('CID-addressed artifact integrity', () => {
   it('the guard is wired (finds the known CID-addressed artifacts)', () => {
