@@ -57,3 +57,12 @@ it is also the mechanism behind cross-conductor `dht-fetch` misses and I3 root-a
 3. Story: `sovereign-peer-join.feature` sc5's "within 3 minutes" is a gossip/authority bound, not the
    storage sync-round bound its glossary borrowed; keep it RED until 1–2 resolve, then re-measure
    time-to-hold under arc 1 and network-read latency under arc 0 (`CONDUCTOR_ARC_FACTOR`).
+
+## 2026-08-30 — re-measured on fork c9a6c4439 (workspace pair), fleet still on the base conductor
+
+W (workspace, `target_arc_factor=1`) announced 03:41:14Z; doorway-alpha's conductor-diagnostics listed all
+40 agent-infos (8 agents incl. W) with `storageArc: null` — W's OWN full-arc conductor advertises null too,
+so the null is what a fresh kitsune2 arc looks like on the board, not a fleet-only defect. Whether it ever
+grows is still unanswered — and the fleet's conductor was found NOT to be the pinned fork
+(backlog/conductor-pin-ships-base-binary.md), so every prior "on the fork" fleet read of this item needs
+re-doing once 9d2842a63 deploys. sovereign-peer-join scenario 1 PASSED on the pair.
