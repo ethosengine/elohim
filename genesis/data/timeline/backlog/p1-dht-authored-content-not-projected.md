@@ -67,3 +67,17 @@ connections within a minute (one direct), peer store 30 entries, gossip rounds i
 green on the fork. Scenario 3 (this gap) is still RED and should be re-run on the fork before the
 cure decision — the read-miss fallback (candidate 2) only helps if the fleet conductors can fetch
 the workspace's entry, which now they can.
+
+## Re-measured 2026-08-30 on the CORRECT fork pair (c9a6c4439, the conductor alpha runs)
+
+Workspace conductor joined alpha (sovereign-peer-join scenario 1 PASSED; W announced 03:41:14Z,
+live on doorway-alpha diagnostics). A workspace elohim-storage (iroh, relay.alpha attached) bulk-created
+`ws-native-sync-probe-20260830T040450Z`, PATCHed it → `create_content` on W's conductor → `dht_anchor_hash uhCkkFPFhiyRPOWxXOtJp2…`
+(04:05:51Z), then DECLARED its head as W (04:10:55Z, `trust: notarized`). Both fleet doorways answered
+404 for `/db/content/ws-native-sync-probe-20260830T040450Z` on every 30 s poll for the following 25 min. The gap is real and no
+longer over-determined: the conductor was connected (fork pair, relay), the entry is on the DHT,
+the head is declared — and no fleet storage learned the id, because (a) storages discover ids only
+from other storages' inventories and (b) no fleet storage can reach the workspace storage (pod IPs
+policy-isolated; fleet iroh relay-less; board gated — enabler manifests staged 2026-08-30). Cure (2),
+a storage read-miss fallback to its own conductor's `get_content_by_id`, is the smaller change and
+is what would have served this probe; cure (1) is what makes the fleet learn it unprompted.
