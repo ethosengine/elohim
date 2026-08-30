@@ -79,6 +79,11 @@ pub struct UpdateContentInput {
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_json: Option<String>,
+    /// Reach (audience tier) patch — re-notarizes the entry with the new reach
+    /// through the conductor (reach-floor Task 6; the storage facade's
+    /// `reach_patch_refusal` lifts in step). Absent → reach unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reach: Option<String>,
 }
 
 /// Content wire type. Mirrors the integrity zome's Content entry type.

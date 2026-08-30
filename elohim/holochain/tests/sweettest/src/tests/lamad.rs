@@ -662,6 +662,192 @@ async fn declare_head_notarizes_and_supersedes() -> Result<()> {
     Ok(())
 }
 
+/// Station 3 (stewarded-device-sync): a root author DELEGATES head authority to
+/// a second device agent, and the delegate — not the author — moves the head.
+///
+/// Proves, across two conductors on one DHT:
+///   a. A creates content; A mints a signed `HeadDelegation` for B via
+///      `grant_head_delegation` (the conductor signs with A's key).
+///   b. B (non-author) updates the content and declares the EARNED canonical
+///      head at its own update, carrying the delegation → accepted.
+///   c. Both conductors' `resolve_content_head` converge on B's update (the
+///      canonical override wins over the author-filtered per-root election).
+///   d. Without a delegation the same declare is refused ("restricted to the");
+///      with a delegation whose scope does not cover the id it is refused
+///      ("scope").
+#[tokio::test(flavor = "multi_thread")]
+async fn delegated_device_moves_the_head() -> Result<()> {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct GrantHeadDelegationInput {
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    // Opaque mirror: the zome returns { payload: {...}, signature: ... }; we
+    // round-trip it verbatim into the declare input, so the test cannot drift
+    // from the zome's serialization (serde_json::Value would mangle msgpack
+    // bytes; a typed passthrough keeps them exact).
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationPayloadMirror {
+        grantor: AgentPubKey,
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationMirror {
+        payload: HeadDelegationPayloadMirror,
+        signature: hdk::prelude::Signature,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct DeclareEarnedWithDelegationInput {
+        id: String,
+        head_action_hash: String,
+        delegation: Option<HeadDelegationMirror>,
+    }
+
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    // (a) A creates; A grants B a delegation valid for an hour.
+    // unique_id: a nextest retry shares the process-global mem-bootstrap DHT,
+    // so a fixed id would self-poison the retry (dna #1357).
+    let id = unique_id("device-1");
+    let _created: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&id))
+        .await;
+    let valid_until = Timestamp::from_micros(Timestamp::now().as_micros() + 3_600_000_000);
+    let delegation: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "grant_head_delegation",
+            GrantHeadDelegationInput {
+                delegate: a2.clone(),
+                scope: "*".to_string(),
+                valid_until,
+            },
+        )
+        .await;
+    assert_eq!(delegation.payload.grantor, a1);
+    assert_eq!(delegation.payload.delegate, a2);
+
+    // B must see the content before acting on it.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let seen: Option<ContentHeadOutput> = c2
+            .call(&zome2, "resolve_content_head", id.clone())
+            .await;
+        if seen.is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            panic!("agent 2 could not see content 'device-1' within 30s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    // (b) B updates (its own device-authored version) and declares the EARNED
+    // canonical head at it, carrying the delegation.
+    let b_update: ContentOutput = c2
+        .call(
+            &zome2,
+            "update_content",
+            UpdateContentInput {
+                id: id.clone(),
+                title: Some("Revised on the second device".to_string()),
+            },
+        )
+        .await;
+    let b_action = b_update.action_hash.clone();
+    let declared: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(b_action.clone()).to_string(),
+                delegation: Some(delegation.clone()),
+            },
+        )
+        .await;
+    assert_eq!(declared.head_action_hash, b_action);
+
+    // (c) Both conductors converge on B's update as the head.
+    for (c, zome, who) in [(&c1, &zome1, "author"), (&c2, &zome2, "delegate")] {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            let h: Option<ContentHeadOutput> = c
+                .call(zome, "resolve_content_head", id.clone())
+                .await;
+            if let Some(h) = h {
+                if h.head_action_hash == b_action {
+                    break;
+                }
+            }
+            if Instant::now() >= deadline {
+                panic!("{who} conductor did not converge on the delegate's head within 30s");
+            }
+            sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    // (d) No delegation → refused; wrong scope → refused.
+    let bare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(b_action.clone()).to_string(),
+                delegation: None,
+            },
+        )
+        .await;
+    let err = format!("{:?}", bare.expect_err("undelegated earned declare must be refused"));
+    assert!(
+        err.contains("restricted to the"),
+        "refusal must name the authority rule; got: {err}"
+    );
+
+    let wrong_scope: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "grant_head_delegation",
+            GrantHeadDelegationInput {
+                delegate: a2.clone(),
+                scope: "some-other-id".to_string(),
+                valid_until,
+            },
+        )
+        .await;
+    let scoped: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(b_action).to_string(),
+                delegation: Some(wrong_scope),
+            },
+        )
+        .await;
+    let err = format!("{:?}", scoped.expect_err("out-of-scope delegation must be refused"));
+    assert!(err.contains("scope"), "refusal must name the scope; got: {err}");
+
+    Ok(())
+}
+
 /// The projection-heal read must only inspect the conductor's local view: on a
 /// cold storage arc it returns `None` promptly, rather than waiting for the
 /// network request timeout. After the normal peer exchange and DHT convergence,

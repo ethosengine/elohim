@@ -386,15 +386,12 @@ impl ContentService {
             conductor_writes::call_create_content(hc, &bootstrap).await?
         } else {
             // Standard update: only patched fields cross the wire.
-            // LIMITATION (reach floor, G1): `reach` is NOT threaded through this standard
-            // update path — the zome's update_content (content_store) does not accept a
-            // reach patch field. It IS applied on the null-anchor and stale-anchor branches,
-            // which re-publish via create_content (carrying reach), which is why the heal of
-            // bulk-seeded (never-anchored) content works. Changing reach on a live-anchored
-            // entry needs a zome change (reach-floor-foundation-plan.md Task 6) — until then
-            // `reach_patch_refusal` (called above, before any write) REFUSES such a patch
-            // with a 400 rather than letting it reach here and answer 200 having changed
-            // nothing. So no reach-carrying patch can arrive on this arm.
+            // REACH (reach-floor Task 6, landed 2026-08-30): `reach` IS threaded through
+            // this path now — the content_store zome's `update_content` accepts a reach
+            // patch and re-notarizes the entry with it, so a reach change on a
+            // live-anchored entry is a real substrate move (the projection then stamps
+            // the committed grade). `reach_patch_refusal` (called above) only refuses
+            // when the conductor bridge cannot carry the change; on this arm it can.
             let patch = lamad_types::UpdateContentInput {
                 id: id.to_string(),
                 blob_cid: new_blob_cid.clone(),
@@ -408,6 +405,7 @@ impl ContentService {
                 title: view.title.clone(),
                 description: view.description.clone(),
                 metadata_json: merged_metadata_json.clone(),
+                reach: view.reach.clone(),
             };
             match conductor_writes::call_update_content(hc, &patch).await {
                 Ok(bytes) => bytes,
@@ -793,16 +791,15 @@ fn reach_patch_refusal(
     if requested == current_reach {
         return None;
     }
-    dht_anchor_hash?;
-    Some(StorageError::InvalidInput(format!(
-        "reach is not patchable on a DHT-anchored content entry \
-         (id={id}, notarized reach={current_reach}, requested={requested}). \
-         The content_store zome's update_content carries no reach field, so this \
-         write would report success and change nothing. Author the reach when the \
-         entry is created (POST /db/content) or re-author the entry; patching a \
-         notarized reach in place needs a zome change \
-         (reach-floor-foundation-plan.md Task 6)."
-    )))
+    // Reach-floor Task 6 (landed 2026-08-30): the content_store zome's
+    // `update_content` now carries a `reach` field, so a reach change on a
+    // DHT-anchored entry re-notarizes through the conductor — the silent-no-op
+    // class this refusal existed for is closed at the substrate. Anchored and
+    // unanchored rows both accept the patch; the conductor round-trip is the
+    // gate (a refused/failed zome call still surfaces as an error, never a 200
+    // that changed nothing).
+    let _ = (id, dht_anchor_hash);
+    None
 }
 
 /// Content statistics
@@ -849,31 +846,19 @@ mod tests {
     const ANCHOR: &str = "uhCkk87JiPmogR2U93nUTJLa9kolkN5GhYwqSKen9lMZLm3JdxGwY";
 
     #[test]
-    fn reach_change_on_anchored_row_is_refused_not_silently_dropped() {
-        let refusal = reach_patch_refusal(
+    fn reach_change_on_anchored_row_is_now_carried_not_refused() {
+        // Reach-floor Task 6 (2026-08-30): the zome's `update_content` carries
+        // `reach`, so the anchored-row refusal is retired — the patch proceeds
+        // to the conductor, which re-notarizes with the new reach. The refusal
+        // fn stays as the seam (a future substrate that cannot carry a change
+        // refuses HERE, before any write), but today it must pass this through.
+        assert!(reach_patch_refusal(
             "community-garden-club",
             Some(ANCHOR),
             "public",
             Some("community"),
         )
-        .expect("a reach change the substrate cannot carry must be refused");
-        let msg = refusal.to_string();
-        assert!(msg.contains("reach"), "message must name the field: {msg}");
-        assert!(
-            msg.contains("community-garden-club"),
-            "message must name the row: {msg}"
-        );
-        assert!(
-            matches!(refusal, StorageError::InvalidInput(_)),
-            "InvalidInput so the route answers 400, never a success"
-        );
-    }
-
-    #[test]
-    fn refused_reach_patch_maps_to_400() {
-        let refusal = reach_patch_refusal("c1", Some(ANCHOR), "public", Some("community")).unwrap();
-        let resp = crate::services::response::error_response(refusal);
-        assert_eq!(resp.status(), hyper::StatusCode::BAD_REQUEST);
+        .is_none());
     }
 
     #[test]

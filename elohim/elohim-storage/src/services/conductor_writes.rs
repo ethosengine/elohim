@@ -677,6 +677,121 @@ pub struct DeclareCanonicalHeadInput {
     /// are actually in hand, so `true` always travels WITH its evidence.
     #[serde(default)]
     pub adopt_before_author: bool,
+    /// Root-author-signed delegation letting a NON-author device declare the
+    /// EARNED head (station 3). Mirrors `content_store::HeadDelegation` field
+    /// for field — the holochain types are the SAME crate lineage the zome
+    /// serializes with, so the MessagePack bytes match without a hand-rolled
+    /// mirror. Absent → omitted from the wire (old coordinators ignore it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delegation: Option<HeadDelegationWire>,
+}
+
+/// Mirror of `content_store::HeadDelegationPayload` — the bytes the root author
+/// signed. Field ORDER matters (it is what `sign`/`verify_signature` serialize),
+/// so this must stay identical to the zome struct.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HeadDelegationPayloadWire {
+    pub grantor: holochain_types::prelude::AgentPubKey,
+    pub delegate: holochain_types::prelude::AgentPubKey,
+    pub scope: String,
+    pub valid_until: holochain_types::prelude::Timestamp,
+}
+
+/// Mirror of `content_store::HeadDelegation`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HeadDelegationWire {
+    pub payload: HeadDelegationPayloadWire,
+    pub signature: holochain_types::prelude::Signature,
+}
+
+/// The HTTP/JSON form of a delegation as a device carries it: agent keys and
+/// the signature as base64 strings (the form `grant_head_delegation` answers
+/// over the app websocket once encoded for humans), `validUntil` as
+/// microseconds. Converted to the MessagePack wire form by
+/// [`HeadDelegationJson::into_wire`] — the ONLY place the two meet.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeadDelegationJson {
+    pub grantor: String,
+    pub delegate: String,
+    #[serde(default = "HeadDelegationJson::default_scope")]
+    pub scope: String,
+    pub valid_until: i64,
+    /// Standard base64 of the 64 signature bytes.
+    pub signature: String,
+}
+
+impl HeadDelegationJson {
+    fn default_scope() -> String {
+        "*".to_string()
+    }
+
+    pub fn into_wire(self) -> Result<HeadDelegationWire, StorageError> {
+        use base64::Engine as _;
+        let grantor = holochain_types::prelude::AgentPubKey::try_from(self.grantor.as_str())
+            .map_err(|e| StorageError::InvalidInput(format!("delegation.grantor: {e:?}")))?;
+        let delegate = holochain_types::prelude::AgentPubKey::try_from(self.delegate.as_str())
+            .map_err(|e| StorageError::InvalidInput(format!("delegation.delegate: {e:?}")))?;
+        let sig_bytes = base64::engine::general_purpose::STANDARD
+            .decode(self.signature.as_bytes())
+            .or_else(|_| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(self.signature.as_bytes()))
+            .map_err(|e| StorageError::InvalidInput(format!("delegation.signature: {e}")))?;
+        let sig: [u8; 64] = sig_bytes.as_slice().try_into().map_err(|_| {
+            StorageError::InvalidInput(format!(
+                "delegation.signature: expected 64 bytes, got {}",
+                sig_bytes.len()
+            ))
+        })?;
+        Ok(HeadDelegationWire {
+            payload: HeadDelegationPayloadWire {
+                grantor,
+                delegate,
+                scope: self.scope,
+                valid_until: holochain_types::prelude::Timestamp::from_micros(self.valid_until),
+            },
+            signature: holochain_types::prelude::Signature(sig),
+        })
+    }
+}
+
+/// Declare the EARNED canonical head of `id` at `head_action_hash` from THIS
+/// conductor, as the root author OR as a device carrying the root author's
+/// signed [`HeadDelegationWire`] (station 3). Calls the coordinator's
+/// `declare_earned_canonical_head`; its Guest errors ("restricted to the root
+/// author, a device it delegated, or the bootstrap steward", "head delegation:
+/// …") surface verbatim so the HTTP layer can classify them.
+pub async fn call_declare_earned_canonical_head(
+    hc: &Arc<HcClient>,
+    id: &str,
+    head_action_hash: String,
+    delegation: Option<HeadDelegationWire>,
+) -> Result<ContentHeadWire, StorageError> {
+    let input = DeclareCanonicalHeadInput {
+        id: id.to_string(),
+        head_action_hash,
+        carried_record: None,
+        adopt_before_author: false,
+        delegation,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode DeclareCanonicalHeadInput (earned): {e}"
+        ))
+    })?;
+    let (bytes, _timing) = hc
+        .call_zome_timed(
+            ZOME_NAME,
+            "declare_earned_canonical_head",
+            payload,
+            DECLARE_DEFAULT_CLASS,
+        )
+        .await?;
+    let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (declare earned): {e}"
+        ))
+    })?;
+    Ok(out)
 }
 
 /// Caller-input wire shape for the `content_store::get_record_for_action`
@@ -1176,6 +1291,9 @@ pub async fn call_declare_canonical_content_head_classed(
         head_action_hash,
         carried_record,
         adopt_before_author,
+        // The STAGING/adopt path never carries a device delegation — that is
+        // the EARNED path's concern (`call_declare_earned_canonical_head`).
+        delegation: None,
     };
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
         StorageError::Internal(format!(

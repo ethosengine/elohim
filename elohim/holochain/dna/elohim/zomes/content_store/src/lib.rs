@@ -2528,6 +2528,13 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     if let Some(v) = input.metadata_json {
         content.metadata_json = v;
     }
+    // REACH (reach-floor Task 6): a reach change on a live-anchored entry now
+    // re-notarizes through this same update — the storage facade's
+    // `reach_patch_refusal` is lifted in step with this field. Validation of
+    // the value happens in `prepare_content_for_storage` below.
+    if let Some(v) = input.reach {
+        content.reach = v;
+    }
     content.updated_at = format!("{:?}", sys_time()?);
 
     // 4. Re-run prepare/validate against the mutated content (sets
@@ -2635,6 +2642,11 @@ pub struct ContentHeadOutput {
 pub struct DeclareContentHeadInput {
     pub id: String,
     pub head_action_hash: Option<holo_hash::ActionHashB64>,
+    /// A root-author-signed [`HeadDelegation`] letting a NON-author caller (one
+    /// of the author's own devices) pass the author gate. Absent → the classic
+    /// author-only gate, byte-for-byte (`#[serde(default)]`).
+    #[serde(default)]
+    pub delegation: Option<HeadDelegation>,
 }
 
 /// Input for [`declare_canonical_content_head`] — the CROSS-ROOT canonical-head
@@ -2717,6 +2729,12 @@ pub struct DeclareCanonicalHeadInput {
     /// world at every point in a rolling upgrade.
     #[serde(default)]
     pub adopt_before_author: bool,
+    /// A root-author-signed [`HeadDelegation`] letting a NON-author caller (one
+    /// of the author's own devices) declare the EARNED canonical head of content
+    /// that author created. Consulted by [`declare_earned_canonical_head`] only;
+    /// the STAGING scaffold path ignores it. `#[serde(default)]` → absent ⇒ `None`.
+    #[serde(default)]
+    pub delegation: Option<HeadDelegation>,
 }
 
 /// Input for [`get_record_for_action`] — the SOURCE side of
@@ -2919,7 +2937,9 @@ fn newest_canonical_link(id: &str) -> ExternResult<Option<Link>> {
 /// unmarked/empty or STAGING tag reads as NOT earned (safe default: an unmarked
 /// declaration never gains earned protection, so the scaffold stays flexible).
 fn canonical_link_is_earned(link: &Link) -> bool {
-    link.tag.0.as_slice() == CANONICAL_TAG_EARNED
+    // PREFIX match: a delegate-declared head appends `|delegation:<bytes>` to
+    // the marker (`canonical_tag_with_delegation`); the tier is the marker alone.
+    link.tag.0.as_slice().starts_with(CANONICAL_TAG_EARNED)
 }
 
 /// A canonical-head declaration reduced to the fields that decide which one WINS.
@@ -3455,6 +3475,208 @@ mod adopt_before_author_gate_tests {
 fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()> {
     // god-mode OPEN. Replace with the earned-authority grant check.
     Ok(())
+}
+
+// =============================================================================
+// Head delegation — a root author lets one of its own devices act for it
+// (stewarded-device-sync.feature station 3; spec workspace-stewarded-device-peer)
+// =============================================================================
+//
+// A human's second device holds a NEW agent key (never a copy of the first), so
+// every author gate above — `me == root_author` — refuses it. The delegation is
+// the root author's SIGNED statement "agent D may move heads I authored, within
+// this scope, until this time". It is verified in-wasm by every peer that
+// consults it (`verify_signature` against the ROOT AUTHOR's key — the key that
+// created the content, which is the only authority the chain itself names), so
+// a forged or expired proof is refused identically everywhere. Coordinator-only:
+// no entry type, no link type, no DNA-hash move. The proof also rides the
+// canonical-head link tag (`CANONICAL_TAG_EARNED` + `|delegation:` + bytes) so
+// an electing peer can see WHY a non-author's head was accepted (C5 evidence).
+//
+// What it deliberately does NOT do: it does not let a delegate mint a delegation
+// (only the root author's key signs — C1), it cannot outlive `valid_until` (C2
+// bounded), and revocation is the mishpat `revokes-commitment` on the
+// `binds-identity` record that carries the same payload — storage stops
+// presenting the proof; the in-wasm window bounds the residual.
+
+/// The bytes the root author signs. Canonical field order is the struct order;
+/// `sign`/`verify_signature` serialize it the same way on both sides.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct HeadDelegationPayload {
+    /// The ROOT AUTHOR granting the delegation (must equal the content chain's
+    /// root Create author at verify time).
+    pub grantor: AgentPubKey,
+    /// The device agent allowed to act.
+    pub delegate: AgentPubKey,
+    /// `"*"` (any content this grantor authored) or an exact content id, or an
+    /// id prefix ending in `*` (e.g. `"elohim-protocol/*"`).
+    pub scope: String,
+    /// Absolute expiry (microseconds since epoch, the DHT `Timestamp` unit).
+    pub valid_until: Timestamp,
+}
+
+/// A signed delegation: the payload plus the grantor's signature over it.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+pub struct HeadDelegation {
+    pub payload: HeadDelegationPayload,
+    pub signature: Signature,
+}
+
+/// Input to [`grant_head_delegation`]: the caller (root author) names the
+/// delegate, scope and expiry; the conductor signs with the caller's key.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantHeadDelegationInput {
+    pub delegate: AgentPubKey,
+    #[serde(default = "default_delegation_scope")]
+    pub scope: String,
+    pub valid_until: Timestamp,
+}
+
+fn default_delegation_scope() -> String {
+    "*".to_string()
+}
+
+/// Mint a signed head delegation from THIS agent (the grantor) to `delegate`.
+///
+/// The signature is produced by the conductor's keystore for
+/// `agent_info().agent_initial_pubkey` — only the key holder can call this on
+/// its own conductor, which is what makes the proof a statement BY the root
+/// author rather than about one. Nothing is committed to the source chain:
+/// the delegation is a capability the delegate carries, and the witnessed
+/// governance record of the same act is the mishpat `binds-identity`
+/// commitment the primary device creates alongside it.
+///
+/// Errors (Guest): a `valid_until` at or before now; a delegate equal to the
+/// grantor (a self-delegation is meaningless and is refused so it can never
+/// be mistaken for a grant).
+#[hdk_extern]
+pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<HeadDelegation> {
+    let grantor = agent_info()?.agent_initial_pubkey;
+    if input.delegate == grantor {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "grant_head_delegation: delegate must differ from the grantor".to_string(),
+        )));
+    }
+    let now = sys_time()?;
+    if input.valid_until <= now {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "grant_head_delegation: valid_until {:?} is not in the future (now {:?})",
+            input.valid_until, now
+        ))));
+    }
+    let payload = HeadDelegationPayload {
+        grantor: grantor.clone(),
+        delegate: input.delegate,
+        scope: input.scope,
+        valid_until: input.valid_until,
+    };
+    let signature = sign(grantor, &payload)?;
+    Ok(HeadDelegation { payload, signature })
+}
+
+/// Does `scope` cover content `id`? `"*"` covers everything; a trailing `*`
+/// is a prefix match; anything else is an exact id match.
+fn delegation_scope_covers(scope: &str, id: &str) -> bool {
+    if scope == "*" {
+        return true;
+    }
+    if let Some(prefix) = scope.strip_suffix('*') {
+        return id.starts_with(prefix);
+    }
+    scope == id
+}
+
+/// Verify a delegation licenses `me` to act as `root_author` on content `id`.
+///
+/// Every failure is a Guest error naming the reason, so the HTTP layer (and a
+/// human reading the log) sees WHICH check refused: wrong grantor, wrong
+/// delegate, scope, expiry, or signature. The signature check runs LAST — the
+/// cheap structural checks refuse first, and a valid signature over the wrong
+/// grantor is still a refusal (the chain's root author, not the payload, says
+/// who may grant).
+fn verify_head_delegation(
+    delegation: &HeadDelegation,
+    me: &AgentPubKey,
+    root_author: &AgentPubKey,
+    id: &str,
+) -> ExternResult<()> {
+    let p = &delegation.payload;
+    if &p.grantor != root_author {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "head delegation: grantor {:?} is not the root author {:?} of content '{id}'",
+            p.grantor, root_author
+        ))));
+    }
+    if &p.delegate != me {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "head delegation: delegate {:?} is not the caller {:?}",
+            p.delegate, me
+        ))));
+    }
+    if !delegation_scope_covers(&p.scope, id) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "head delegation: scope '{}' does not cover content '{id}'",
+            p.scope
+        ))));
+    }
+    let now = sys_time()?;
+    if p.valid_until <= now {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "head delegation: expired at {:?} (now {:?})",
+            p.valid_until, now
+        ))));
+    }
+    if !verify_signature(p.grantor.clone(), delegation.signature.clone(), p)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "head delegation: signature does not verify against grantor {:?}",
+            p.grantor
+        ))));
+    }
+    Ok(())
+}
+
+/// The author gate shared by every head-moving extern: the caller IS the root
+/// author, or carries a delegation the root author signed for it. Returns the
+/// verified delegation (if one was used) so the caller can record its
+/// provenance.
+fn authorize_author_or_delegate(
+    me: &AgentPubKey,
+    root_author: &AgentPubKey,
+    id: &str,
+    delegation: Option<&HeadDelegation>,
+    what: &str,
+) -> ExternResult<Option<HeadDelegation>> {
+    if me == root_author {
+        return Ok(None);
+    }
+    match delegation {
+        Some(d) => {
+            verify_head_delegation(d, me, root_author, id)?;
+            Ok(Some(d.clone()))
+        }
+        None => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{what}: agent {me:?} is not the author of content '{id}' (author {root_author:?}) \
+             and carries no head delegation"
+        )))),
+    }
+}
+
+/// Link-tag separator between the provenance marker and an attached delegation.
+const CANONICAL_TAG_DELEGATION_SEP: &[u8] = b"|delegation:";
+
+/// Provenance tag for a canonical-head link: the tier marker, plus — when a
+/// delegate declared it — the verified delegation bytes, so an electing peer
+/// can see the grant behind a non-author's head. `canonical_link_is_earned`
+/// reads the marker by PREFIX, so the suffix never changes the tier.
+fn canonical_tag_with_delegation(tier: &[u8], delegation: Option<&HeadDelegation>) -> Vec<u8> {
+    let mut tag = tier.to_vec();
+    if let Some(d) = delegation {
+        if let Ok(sb) = SerializedBytes::try_from(d.clone()) {
+            tag.extend_from_slice(CANONICAL_TAG_DELEGATION_SEP);
+            tag.extend_from_slice(sb.bytes());
+        }
+    }
+    tag
 }
 
 /// Shared substring `build_content_head_output`'s wrong-id refusal error
@@ -4712,12 +4934,21 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
             )))
         })?;
     let me = agent_info()?.agent_initial_pubkey;
-    if me != root_author {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_content_head: agent {me:?} is not the author of content '{}' (author {root_author:?})",
+    // Author OR a device the author delegated (station 3). The refusal text
+    // keeps the "not the author" substring the storage facade classifies on.
+    authorize_author_or_delegate(
+        &me,
+        &root_author,
+        &input.id,
+        input.delegation.as_ref(),
+        "declare_content_head",
+    )
+    .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "declare_content_head: agent {me:?} is not the author of content '{}' (author {root_author:?}): {e}",
             input.id
-        ))));
-    }
+        )))
+    })?;
 
     // Current head = newest author-authored record (same election as resolve).
     let current_head = records
@@ -5159,18 +5390,59 @@ pub fn declare_canonical_content_head(
 pub fn declare_earned_canonical_head(
     input: DeclareCanonicalHeadInput,
 ) -> ExternResult<ContentHeadOutput> {
-    // EARNED-AUTHORITY GATE (Tier-1 progenitor stand-in for Plan C5).
-    if !am_i_bootstrap_steward()? {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_earned_canonical_head: earned canonical declaration is restricted to the \
-             bootstrap steward (progenitor) for id '{}'",
-            input.id
-        ))));
-    }
+    // EARNED-AUTHORITY GATE (Tier-1 progenitor stand-in for Plan C5), widened
+    // for station 3: the id's ROOT AUTHOR, or a device carrying the root
+    // author's signed delegation, may also declare the earned head — the
+    // author's own content is the one thing the progenitor stand-in never had
+    // to guard against its author. `am_i_bootstrap_steward` is consulted only
+    // when the caller is neither, so a network with no progenitor configured
+    // (alpha's happ.yaml carries `progenitor_pubkey: null`) can still be moved
+    // by its authors, and the error names both refusals.
+    let me = agent_info()?.agent_initial_pubkey;
+    let root_author = gather_content_chain(&input.id, GetStrategy::Network)?.map(|(a, _)| a);
+    let delegation_used = match root_author {
+        Some(ref root) => match authorize_author_or_delegate(
+            &me,
+            root,
+            &input.id,
+            input.delegation.as_ref(),
+            "declare_earned_canonical_head",
+        ) {
+            Ok(d) => Some(d),
+            Err(author_err) => {
+                if am_i_bootstrap_steward().unwrap_or(false) {
+                    Some(None)
+                } else {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "declare_earned_canonical_head: earned canonical declaration for id '{}' is \
+                         restricted to the root author, a device it delegated, or the bootstrap \
+                         steward (progenitor): {author_err}",
+                        input.id
+                    ))));
+                }
+            }
+        },
+        // No chain retrievable here (the adopt-before-author residual): only the
+        // progenitor may declare, exactly as before.
+        None => {
+            if !am_i_bootstrap_steward()? {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "declare_earned_canonical_head: earned canonical declaration is restricted to the \
+                     bootstrap steward (progenitor) for id '{}'",
+                    input.id
+                ))));
+            }
+            Some(None)
+        }
+    };
+    let tag = canonical_tag_with_delegation(
+        CANONICAL_TAG_EARNED,
+        delegation_used.as_ref().and_then(|d| d.as_ref()),
+    );
     declare_canonical_head_inner(
         &input.id,
         input.head_action_hash,
-        CANONICAL_TAG_EARNED,
+        &tag,
         input.carried_record,
         input.adopt_before_author,
     )

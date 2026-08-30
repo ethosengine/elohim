@@ -7021,6 +7021,14 @@ impl HttpServer {
         struct DeclareHeadBody {
             #[serde(default)]
             head_action_hash: Option<String>,
+            /// Root-author-signed head delegation (station 3): lets a device
+            /// agent that is NOT the root author move the head of content its
+            /// human authored. Verified in-wasm by the coordinator against the
+            /// chain's root author — this layer only checks the caller matches
+            /// the delegate before spending a conductor round-trip.
+            #[serde(default)]
+            delegation:
+                Option<crate::services::conductor_writes::HeadDelegationJson>,
         }
 
         let pool = self
@@ -7083,12 +7091,15 @@ impl HttpServer {
             }
         };
 
-        // (b) Parse body { headActionHash?: String } — absent body → None.
-        let head_action_hash: Option<String> = if body_bytes.is_empty() {
-            None
+        // (b) Parse body { headActionHash?, delegation? } — absent body → both None.
+        let (head_action_hash, delegation): (
+            Option<String>,
+            Option<crate::services::conductor_writes::HeadDelegationJson>,
+        ) = if body_bytes.is_empty() {
+            (None, None)
         } else {
             match serde_json::from_slice::<DeclareHeadBody>(body_bytes) {
-                Ok(b) => b.head_action_hash,
+                Ok(b) => (b.head_action_hash, b.delegation),
                 Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
             }
         };
@@ -7121,11 +7132,53 @@ impl HttpServer {
                 }
             };
         let is_author = head.author.as_ref().map(|a| a.as_str()) == Some(caller_agent_key.as_str());
-        if !is_author {
-            return Ok(response::forbidden(&serde_json::json!({
-                "error": "caller is not the author of this content"
-            })));
-        }
+        // (d1) DELEGATED DEVICE (station 3): a non-author caller may proceed
+        // when it carries a root-author-signed delegation naming ITSELF as the
+        // delegate and this head's author as the grantor. Cheap structural
+        // checks here; the cryptographic verification is the coordinator's
+        // (`verify_head_delegation`, in-wasm) — this layer never trusts the
+        // proof, it only refuses obviously-mismatched ones before spending a
+        // conductor round-trip. The delegate path requires an explicit target
+        // (`headActionHash`): "advance to my latest" is an author-chain notion.
+        let delegate_wire = if is_author {
+            None
+        } else {
+            match delegation {
+                Some(d) if d.delegate == caller_agent_key => {
+                    if head.author.as_ref().map(|a| a.as_str()) != Some(d.grantor.as_str()) {
+                        return Ok(response::forbidden(&serde_json::json!({
+                            "error": format!(
+                                "delegation grantor {} is not this content's author {:?}",
+                                d.grantor, head.author
+                            )
+                        })));
+                    }
+                    if head_action_hash.is_none() {
+                        return Ok(response::bad_request(
+                            "a delegated head declare requires headActionHash (the delegate's \
+                             target version)",
+                        ));
+                    }
+                    match d.into_wire() {
+                        Ok(w) => Some(w),
+                        Err(e) => return Ok(response::bad_request(&e.to_string())),
+                    }
+                }
+                Some(d) => {
+                    return Ok(response::forbidden(&serde_json::json!({
+                        "error": format!(
+                            "delegation names delegate {}, but the caller is {}",
+                            d.delegate, caller_agent_key
+                        )
+                    })));
+                }
+                None => {
+                    return Ok(response::forbidden(&serde_json::json!({
+                        "error": "caller is not the author of this content"
+                    })));
+                }
+            }
+        };
 
         // (d2) NOW apply write-admission backpressure — reached only by a caller
         // whose authorship has already been confirmed. This route is carved out
@@ -7154,18 +7207,40 @@ impl HttpServer {
         };
 
         // (e) Declare / advance the HEAD via the conductor. Coordinator error
-        // substrings map to the right HTTP class.
-        let declared = match crate::services::conductor_writes::call_declare_content_head(
-            &hc,
-            content_id,
-            head_action_hash,
-        )
-        .await
-        {
+        // substrings map to the right HTTP class. An AUTHOR advances its own
+        // chain (`declare_content_head`); a DELEGATED DEVICE declares the
+        // EARNED canonical head for its explicit target — the coordinator
+        // re-verifies the delegation in-wasm against the chain's root author.
+        let declare_result = match delegate_wire {
+            None => {
+                crate::services::conductor_writes::call_declare_content_head(
+                    &hc,
+                    content_id,
+                    head_action_hash,
+                )
+                .await
+            }
+            Some(wire) => {
+                let target = head_action_hash
+                    .clone()
+                    .expect("checked in (d1): delegate path requires headActionHash");
+                crate::services::conductor_writes::call_declare_earned_canonical_head(
+                    &hc,
+                    content_id,
+                    target,
+                    Some(wire),
+                )
+                .await
+            }
+        };
+        let declared = match declare_result {
             Ok(h) => h,
             Err(e) => {
                 let msg = e.to_string();
-                if msg.contains("not the author") {
+                if msg.contains("not the author")
+                    || msg.contains("head delegation")
+                    || msg.contains("restricted to the")
+                {
                     return Ok(response::forbidden(&serde_json::json!({ "error": msg })));
                 } else if msg.contains("not in the version chain") {
                     return Ok(response::bad_request(&msg));
