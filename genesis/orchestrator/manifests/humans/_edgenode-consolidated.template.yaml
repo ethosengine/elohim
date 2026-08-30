@@ -544,6 +544,16 @@ spec:
             # the same value the conductor gets.
             - name: ELOHIM_IROH_RELAY_URL
               value: "RELAY_URL_PLACEHOLDER"
+            # Doorway ORIGIN for the storage-side iroh bootstrap: the transport-manifest
+            # announcer POSTs to, and the joiner reads, `${ELOHIM_DOORWAY_URL}/p2p/manifests`
+            # (p2p_iroh/doorway_bootstrap.rs). Unset, doorway_base_url() is None and the
+            # storage never announces — measured 2026-08-30 with the board open: its only
+            # entry was an outside workspace peer's. Rendered from the bootstrap URL's origin
+            # (elohim/holochain/Jenkinsfile) so bootstrap and board always name one doorway.
+            # NOT DOORWAY_CAPABILITY_URL — that env also drives the SSR render-capability
+            # fetch (main.rs) and must stay pointed at the capability document.
+            - name: ELOHIM_DOORWAY_URL
+              value: "DOORWAY_ORIGIN_PLACEHOLDER"
             # CPU profiling exposition — arms GET /debug/pprof/profile?seconds=N
             # on the storage-http port for the Alloy/Pyroscope scraper (see the
             # profiles.grafana.com/cpu.* annotations on this pod template).

@@ -924,6 +924,15 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // resolveRelayUrl's doc comment for the fail-loud rationale.
     def relayUrl = resolveRelayUrl(primaryDoorway.signalUrl, humanConfig.name, humanConfig.env)
 
+    // Doorway ORIGIN (scheme + host, no path) for the storage-side iroh bootstrap:
+    // elohim-storage's transport-manifest announcer POSTs to, and its joiner reads,
+    // `${ELOHIM_DOORWAY_URL}/p2p/manifests`. Without this env every fleet storage has
+    // doorway_base_url() == None and never announces — measured 2026-08-30: with the
+    // board open, its only entry was an outside workspace peer's. Derived from the
+    // bootstrap URL so the two can never name different doorways (inlined below in
+    // the sed list: `bootstrapUrl - '/bootstrap'` — this method sits at the CPS
+    // size ceiling, so no extra def).
+
     // Digest-pinned doorway ref — see deployEdgeWithManifest note.
     def doorwayRef = ((versions.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? "${versions.DOORWAY_TAG}@${versions.DOORWAY_DIGEST}" : versions.DOORWAY_TAG
     def sedArgs = [
@@ -954,6 +963,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
         "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
         "s|RELAY_URL_PLACEHOLDER|${relayUrl}|g",
+        "s|DOORWAY_ORIGIN_PLACEHOLDER|${primaryDoorway.bootstrapUrl - '/bootstrap'}|g",
         "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
         // Node-local storage class — P2P dataplane owns replication, not k8s.
