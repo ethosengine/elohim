@@ -31,6 +31,11 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   Today, alpha-A (the author peer) passes both; elohim.host (the alpha-b federation peer) fails
   both — blobHash is null on elohim.host so the EprRouter cannot serve the landing SPA.
 
+  Uniformity has TWO failure modes, and this feature carries both: bytes/metadata that never
+  ARRIVE on a doorway (the first three scenarios), and doorways that each hold the page but
+  serve different VERSIONS of it because the version election never reached them (the final
+  scenario — its own vocabulary block sits above it).
+
   This feature is the acceptance gate that makes the per-host Jenkinsfile stageSpaBlob stage
   un-shippable: a uniform deploy MUST mean every doorway can independently resolve the landing
   EPR, not just the peer that ran the CI blob-upload step. Fixing this requires blobHash metadata
@@ -106,3 +111,50 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # A credential-free remote caller stays refused; a green here with this line failing means
     # the fix was a bypass, not an authority.
     And staging a blob on peer "elohim.host" with NO credential is refused
+
+  # ── Second failure mode: VERSION DIVERGENCE (parallel to the deploy gap, not downstream of it) ──
+  #
+  # Everything above is about bytes and metadata ARRIVING. This scenario is about something that
+  # can go wrong even when they have: the two doorways each HOLD the page but serve two different
+  # VERSIONS of it. Vocabulary for this half, extending the block at the top:
+  #
+  #   A HEAD is the specific version of an EPR a doorway serves — a pointer to one authored
+  #   revision, distinct from blobHash (which points at bytes; the head names WHICH bytes).
+  #   A DECLARATION is a signed link that names one head as the canonical version of an EPR.
+  #   Declarations carry a tier: EARNED (authored through the protocol's authority path) or
+  #   STAGING (placed by a deploy/seed scaffold). The ELECTION is the rule every peer shares for
+  #   picking one winner from all declarations it can see: earned beats staging, then the newest
+  #   notarized declaration timestamp, with a deterministic tiebreak — so identical inputs give
+  #   identical winners on every peer. The RECONCILE SWEEP is the periodic background process on
+  #   each peer that measures disagreements and heals the ones it can prove.
+  #
+  # This failure mode EXISTS TODAY, alongside (not after) the null-blobHash gap: measured live
+  # 2026-08-31, both alpha doorways held the SAME bytes for the manifesto but served two
+  # DIFFERENT declared heads, for days — because each doorway's head only ever moved when a
+  # deploy or seed wrote to that host directly, while the declarations that should settle the
+  # election live on the conductor DHT and were not traveling (storage arcs reset to Empty on
+  # every restart, so election links never gossiped in; adam's sweep measured 2,619 divergent
+  # rows and refused 2,603 per sweep — correctly, having no election to obey).
+  @wip @concern:federation-deploy
+  Scenario: two doorways that disagree about a page converge on the elected version without anyone re-uploading it
+    # THE CURE UNDER TEST — carry the election: a peer that HOLDS the winning declaration
+    # serves the declaration link's own signed record alongside its head; the disagreeing
+    # peer's OWN conductor re-derives it in wasm — the link's bytes hash to the address they
+    # claim, the author's signature verifies, the link binds to this EPR's anchor, the tier
+    # parses — and merges it with every declaration it can already see under the shared
+    # election rule. Only a verified win moves the row, under the same never-move-backwards
+    # guard as every other head move. No doorway credential, no seed, no deploy is involved
+    # anywhere in this chain — that is the assertion, not an implementation detail.
+    #
+    # Ships DORMANT: the capability is enabled per-fleet by the operator flag
+    # ELOHIM_OBEY_CARRIED_ELECTION. Scenario green means the capability works where enabled;
+    # visitors experience convergence only once the operator turns it on.
+    Given peer "alpha-A" and peer "elohim.host" both declare a head for EPR "elohim-host-landing"
+    And their declared heads DISAGREE
+    And an EARNED canonical declaration exists for the newer head on its declaring peer
+    When the reconcile sweep runs on the peer holding the older head with carried elections enabled
+    Then that peer's conductor verifies the carried declaration link in wasm
+    And the peer's served head moves to the earned-tier elected head, earned beating staging and ties breaking on the notarized declaration timestamp
+    And both doorways serve the SAME head for EPR "elohim-host-landing"
+    # ANTI-REGRESSION: the move must be an ELECTION OBEYED, never a trust-the-peer copy.
+    And a carried declaration link whose signature or binding fails wasm verification moves nothing

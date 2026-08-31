@@ -602,6 +602,10 @@ async fn build_content_head_record_payload(
                 // explain — the requester reads this as `Answer::Absent` and
                 // never looks at the reason.
                 record_absent_reason: None,
+                election_link_record: None,
+                election_winner_target: None,
+                election_declared_at: None,
+                election_earned: None,
             })
             .unwrap_or(serde_json::Value::Null),
             state,
@@ -700,6 +704,58 @@ async fn build_content_head_record_payload(
         None => (None, None),
     };
 
+    // Carry-the-election supply (ADDITIVE): serve this peer's canonical
+    // election EVIDENCE — the winning declaration link's own signed Record —
+    // so a requester whose conductor cannot see the election (links not
+    // gossiped in) can have its own wasm re-derive it. Best-effort under the
+    // same responder budget discipline as the record call: every failure is an
+    // honest absence (fields simply stay unset), never a transport error. The
+    // zome call is Local-only (one link gather + one local get), so the bound
+    // exists for latency honesty, not for work it could cancel.
+    let election = match hc_registry.and_then(|r| r.lamad_client()) {
+        Some(hc) => match tokio::time::timeout(
+            HEAD_RECORD_CONDUCTOR_TIMEOUT,
+            crate::services::conductor_writes::call_get_canonical_election_evidence(
+                &hc, content_id,
+            ),
+        )
+        .await
+        {
+            Ok(Ok(ev)) => ev,
+            Ok(Err(e)) => {
+                tracing::debug!(
+                    target: "elohim_storage::view_federation",
+                    content_id = %content_id,
+                    error = %e,
+                    "ContentHeadRecord: conductor could not serve election evidence; \
+                     answering without it"
+                );
+                None
+            }
+            Err(_elapsed) => {
+                tracing::info!(
+                    target: "elohim_storage::view_federation",
+                    content_id = %content_id,
+                    budget_secs = HEAD_RECORD_CONDUCTOR_TIMEOUT.as_secs(),
+                    "ContentHeadRecord: election-evidence fetch exceeded the responder \
+                     budget; answering without it"
+                );
+                None
+            }
+        },
+        None => None,
+    };
+    let (election_link_record, election_winner_target, election_declared_at, election_earned) =
+        match election {
+            Some(ev) => (
+                Some(base64::engine::general_purpose::STANDARD.encode(&ev.link_record)),
+                Some(ev.election.winner_target.to_string()),
+                Some(ev.election.canonical_declared_at),
+                Some(ev.election.canonical_earned),
+            ),
+            None => (None, None, None, None),
+        };
+
     (
         serde_json::to_value(ContentHeadRecordPayload {
             content_id: content_id.to_string(),
@@ -707,6 +763,10 @@ async fn build_content_head_record_payload(
             declared_at,
             record: record_b64,
             record_absent_reason: record_absent_reason.map(|r| r.wire_str().to_string()),
+            election_link_record,
+            election_winner_target,
+            election_declared_at,
+            election_earned,
         })
         .unwrap_or(serde_json::Value::Null),
         FreshnessState::Live,

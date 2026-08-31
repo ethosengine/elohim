@@ -610,3 +610,102 @@ decisionPoints:
       or `run_admitted_batch` are separately registered as their own rows in this file — an
       honest gap this note records rather than papers over, consistent with the two rows this
       revision's registration step named.
+
+  - name: canonical_tag_tier
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::canonical_tag_tier
+    summary: >
+      The provenance TIER a canonical-head link tag declares, as a pure total function of the
+      tag bytes - Some(true) EARNED / Some(false) STAGING / None not-a-declaration (refusal,
+      never a default tier). Prefix-matched because a delegate-declared head appends
+      |delegation:<bytes> after the marker.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          An unrecognized tag answers None (observed non-declaration), never a defaulted tier -
+          canonical_tag_tier_refuses_non_declaration_tags pins the refusal arm including the
+          marker-prefix corner.
+    contractTests:
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: canonical_tag_tier_refuses_non_declaration_tags
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: canonical_tag_tier_earned_with_and_without_delegation_suffix
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: canonical_tag_tier_staging
+        kind: unit
+
+  - name: verify_carried_election
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::verify_carried_election
+    summary: >
+      Receiver side of carry-the-election - re-derives a peer-carried canonical-head
+      declaration LINK Record entirely in wasm (self-binding, author signature, anchor binding
+      to the id, IdToContent link type, declared tier) and answers the election the MERGED
+      candidate set (local + carried) yields under the one shared ordering
+      (seam_contracts::election::select_arbitrated_winner). Read-only; commits nothing.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          The extern authors nothing - it verifies a declaration ANOTHER agent signed and lets
+          the shared selector arbitrate; the receiver can never crown itself from carried
+          evidence.
+      - id: C2
+        status: answered
+        justification: >
+          Tier precedence and the notarized link timestamp order the merged set exactly as
+          resolve-time election ordering does (the selector is the same ArbitrationKey fn), so
+          a carried staging candidate can never displace a locally-visible earned one.
+      - id: C5
+        status: answered
+        justification: >
+          Authenticity parity with DHT gossip, stated in the doc: integrity validates every
+          RegisterCreateLink as Valid, so gossip enforces custody + signature - the same
+          clauses re-derived here; a transferred claim confers only what the receiver
+          re-derives.
+      - id: C12
+        status: partial
+        justification: >
+          Declarer AUTHORITY (beyond authenticity) is not replayed here, matching the existing
+          scaffold posture - tier protection lives at declare-time gates on honest coordinators
+          plus resolve-time tier precedence; the Plan C5 reach-cohort path replaces that gate
+          for both arrival paths. Named gap, not silence.
+    contractTests: null
+    gapNote: >
+      Wasm-context extern (hash_action / verify_signature / get_links) - not unit-testable
+      outside a conductor; the pure tier split is pinned by canonical_tag_tier's tests and the
+      ordering by seam_contracts election property tests. Sweettest coverage owed with the
+      first multi-conductor carry-the-election scenario.
+
+  - name: get_canonical_election_evidence
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::get_canonical_election_evidence
+    summary: >
+      Source side of carry-the-election - serve this conductor's canonical election WITH the
+      winning declaration link's own signed Record (Local gets only; the caller is a remote
+      peer that exhausted its own view). Ok(None) means not-in-THIS-conductor's-local-store,
+      never fleet-wide absence (same semantic narrowing as get_record_for_action).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          A conductor that can see the winning link but not retrieve its Record answers None -
+          honest absence the requester degrades on; no fabricated evidence arm exists.
+      - id: C6a
+        status: answered
+        justification: >
+          One Local link gather + one Local get per call, no network await, no chain walk -
+          the same bounded floor as resolve_canonical_election, stated in the doc.
+    contractTests: null
+    gapNote: >
+      Wasm-context extern; covered transitively by select_election's bounded-work registration
+      and owed sweettest coverage with the first multi-conductor carry-the-election scenario.

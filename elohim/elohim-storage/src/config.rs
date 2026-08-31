@@ -145,6 +145,30 @@ pub fn adopt_before_author_enabled() -> bool {
     *ADOPT_BEFORE_AUTHOR.get().unwrap_or(&false)
 }
 
+/// Process-wide mirror of [`Config::obey_carried_election`] — the
+/// OPERATOR-RESERVED switch for carry-the-election (the election-visibility
+/// wall's supply-side exit). Same `OnceLock` rationale as
+/// [`ADOPT_BEFORE_AUTHOR`].
+static OBEY_CARRIED_ELECTION: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the obey-carried-election switch. Idempotent (first call wins).
+pub fn set_obey_carried_election(enabled: bool) {
+    let _ = OBEY_CARRIED_ELECTION.set(enabled);
+}
+
+/// May the obey arm, when its OWN conductor sees no election for a divergent
+/// id, fetch a peer's canonical-head declaration LINK record over
+/// view-federation and hand it to its own conductor for wasm verification
+/// (`verify_carried_election`) — obeying the verified outcome under the same
+/// monotonic stamp guard as a locally-visible election?
+///
+/// **Default FALSE.** Shipped DORMANT, same discipline as
+/// [`adopt_before_author_enabled`]: off, every call site is byte-for-byte the
+/// prior behaviour (no extra fetch, no extra conductor call, no allocation).
+pub fn obey_carried_election_enabled() -> bool {
+    *OBEY_CARRIED_ELECTION.get().unwrap_or(&false)
+}
+
 /// Process-wide mirror of [`Config::ghost_declaration_decay`] — the
 /// OPERATOR-RESERVED switch that lets the witness sweeps author over a
 /// declaration whose evidence has been POSITIVELY falsified. Same `OnceLock`
@@ -809,6 +833,28 @@ pub struct Config {
     #[serde(default)]
     pub adopt_before_author: bool,
 
+    /// CARRY-THE-ELECTION (operator-reserved): may the obey arm supply a
+    /// missing election from a PEER — fetching the peer's canonical-head
+    /// declaration link `Record` over view-federation and having its OWN
+    /// conductor re-derive everything in wasm (`verify_carried_election`)
+    /// before obeying the verified outcome under the ordinary monotonic stamp
+    /// guard?
+    ///
+    /// This is the supply-side exit for the ELECTION-VISIBILITY WALL
+    /// (`elohim_content_election_obey_probe_total{outcome="no_election"}`
+    /// dominant): canonical-head links travel as ordinary link ops, and on a
+    /// fleet whose storage arcs have not reconverged since restart they do not
+    /// travel at all — measured 2026-08-31 with every fleet agent-info at
+    /// `storageArc: None` and both doorways frozen on divergent declared heads.
+    ///
+    /// ## Off is behaviour-identical
+    ///
+    /// The flag gates the extra fetch and the extra conductor call at the call
+    /// site, so `false` performs no additional work of any kind.
+    /// Loaded from env `ELOHIM_OBEY_CARRIED_ELECTION`.
+    #[serde(default)]
+    pub obey_carried_election: bool,
+
     /// GHOST-DECLARATION DECAY (operator-reserved): may the witness sweeps
     /// author a fresh head over a declaration whose evidence is POSITIVELY
     /// dead — own conductor observed empty for the id this sweep, and the
@@ -1221,6 +1267,7 @@ impl Default for Config {
             contest_two_way_declared: default_true(),
             contest_undeclared_divergence: default_true(),
             adopt_before_author: false,
+            obey_carried_election: false,
             ghost_declaration_decay: false,
             head_corpus_digest_enabled: false,
             trust_memo_reads_enabled: false,

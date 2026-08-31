@@ -490,6 +490,30 @@ async fn async_main(
     }
     elohim_storage::config::set_adopt_before_author(config.adopt_before_author);
 
+    // CARRY-THE-ELECTION (default OFF — operator-reserved). Env ENABLES it:
+    // 1/true/yes/on. The election-visibility wall's supply-side exit: with it
+    // on, a divergent row whose OWN conductor sees no election may obey a
+    // peer-carried canonical-head declaration link AFTER this node's conductor
+    // re-derives it in wasm (self-binding, author signature, anchor binding,
+    // link type + tier, merged against every locally-visible candidate under
+    // the one shared ordering). Off performs no additional work of any kind.
+    if let Ok(v) = std::env::var("ELOHIM_OBEY_CARRIED_ELECTION") {
+        config.obey_carried_election = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
+    if config.obey_carried_election {
+        tracing::warn!(
+            "OBEY-CARRIED-ELECTION is ENABLED — this node may obey a canonical-head election \
+             whose declaration link was carried from a peer, after its OWN conductor verifies \
+             the link in wasm and the monotonic stamp guard prices the move. This is the \
+             election-visibility wall's exit; unset ELOHIM_OBEY_CARRIED_ELECTION to return \
+             to the dormant default"
+        );
+    }
+    elohim_storage::config::set_obey_carried_election(config.obey_carried_election);
+
     // GHOST-DECLARATION DECAY (default OFF — operator-reserved). Env ENABLES
     // it: 1/true/yes/on. Lets the witness sweeps author a fresh head over a
     // declaration whose evidence has been POSITIVELY falsified twice over

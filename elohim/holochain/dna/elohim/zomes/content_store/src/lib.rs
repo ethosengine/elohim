@@ -3071,6 +3071,18 @@ struct CanonicalHeadAnswer {
 /// the `canonical_head` StringAnchor authority and gossip as ordinary link ops,
 /// so a conductor missing the CONTENT can still hold the ELECTION.
 fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<CanonicalCandidate>> {
+    Ok(select_canonical_winner(gather_election_candidates(
+        id, strategy,
+    )?))
+}
+
+/// The candidate-gathering half of [`select_election`], split out so
+/// [`verify_carried_election`] can merge a CARRIED candidate into the same
+/// local set before running the same selector — one ordering, two suppliers.
+fn gather_election_candidates(
+    id: &str,
+    strategy: GetStrategy,
+) -> ExternResult<Vec<CanonicalCandidate>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
@@ -3113,7 +3125,7 @@ fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<Canon
                 })
         })
         .collect();
-    Ok(select_canonical_winner(candidates))
+    Ok(candidates)
 }
 
 fn gather_canonical_head_record(
@@ -3141,6 +3153,35 @@ fn gather_canonical_head_record(
             is_earned: winner.is_earned,
         })),
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod canonical_tag_tier_tests {
+    use super::*;
+
+    #[test]
+    fn canonical_tag_tier_earned_with_and_without_delegation_suffix() {
+        assert_eq!(canonical_tag_tier(CANONICAL_TAG_EARNED), Some(true));
+        let mut with_delegation = CANONICAL_TAG_EARNED.to_vec();
+        with_delegation.extend_from_slice(CANONICAL_TAG_DELEGATION_SEP);
+        with_delegation.extend_from_slice(b"opaque-delegation-bytes");
+        assert_eq!(canonical_tag_tier(&with_delegation), Some(true));
+    }
+
+    #[test]
+    fn canonical_tag_tier_staging() {
+        assert_eq!(canonical_tag_tier(CANONICAL_TAG_STAGING), Some(false));
+    }
+
+    #[test]
+    fn canonical_tag_tier_refuses_non_declaration_tags() {
+        // An unrecognized tag is a REFUSAL, never a default tier — an ordinary
+        // IdToContent link must not read as a declaration.
+        assert_eq!(canonical_tag_tier(b""), None);
+        assert_eq!(canonical_tag_tier(b"some-ordinary-tag"), None);
+        // A PREFIX of the marker is not the marker.
+        assert_eq!(canonical_tag_tier(b"canonical-head:"), None);
     }
 }
 
@@ -5669,6 +5710,244 @@ pub struct BatchResolveElectionsOutput {
     pub stop_reason: Option<BatchStopReason>,
     /// In-wasm wall time this call spent, measured via `sys_time()`.
     pub elapsed_ms: u32,
+}
+
+/// Output of [`get_canonical_election_evidence`] — the election PLUS the
+/// evidence that proves it: the winning canonical-head declaration LINK's own
+/// signed [`Record`], serialized with `holochain_serialized_bytes` (the same
+/// encoding every carried-record boundary in this zome uses).
+///
+/// This is the SOURCE half of carry-the-election: link ops and entry ops
+/// travel independently, and on a fleet whose storage arcs have not
+/// reconverged (kitsune2 resets every agent's current arc to Empty on join)
+/// NEITHER travels — the election-visibility wall the obey arm's
+/// `no_election` probe outcome names. A peer that authored (or holds) the
+/// winning declaration can serve the link Record itself; the receiver
+/// re-derives everything in wasm ([`verify_carried_election`]) — a
+/// transferred claim confers only what the receiver re-derives.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CanonicalElectionEvidenceOutput {
+    /// The election as this conductor resolves it locally — identical shape to
+    /// [`resolve_canonical_election`]'s answer.
+    pub election: CanonicalElectionOutput,
+    /// `holochain_serialized_bytes`-encoded [`Record`] of the WINNING
+    /// canonical-head CreateLink action. `serde_bytes` keeps it a MessagePack
+    /// `bin` (compact), matching every other carried-record field.
+    #[serde(with = "serde_bytes")]
+    pub link_record: Vec<u8>,
+}
+
+/// Serve this conductor's canonical election for `id` WITH the winning
+/// declaration link's signed `Record` — the source side of
+/// carry-the-election (the election twin of [`get_record_for_action`]).
+///
+/// LOCAL gets, deliberately, both for the link set and the link Record: the
+/// caller is a remote peer that already exhausted its own view and is asking
+/// us as the supplier (same contract and same semantic narrowing as
+/// [`get_record_for_action`] — `Ok(None)` means "not in THIS conductor's
+/// local store right now", never fleet-wide absence).
+///
+/// Coordinator-only and read-only: no entries, no links, no commits — ships
+/// on the `update_coordinators` hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn get_canonical_election_evidence(
+    id: String,
+) -> ExternResult<Option<CanonicalElectionEvidenceOutput>> {
+    let winner = match select_election(&id, GetStrategy::Local)? {
+        Some(w) => w,
+        None => return Ok(None),
+    };
+    // The winning declaration LINK's own Record. A conductor that can see the
+    // link in get_links but cannot retrieve its Record answers None — honest
+    // absence, the requester degrades exactly as if no evidence were served.
+    let record = match get(winner.link_hash.clone(), GetOptions::local())? {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    let bytes = holochain_serialized_bytes::encode(&record).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "get_canonical_election_evidence: could not serialize link record for {:?}: {e}",
+            winner.link_hash
+        )))
+    })?;
+    Ok(Some(CanonicalElectionEvidenceOutput {
+        election: CanonicalElectionOutput {
+            winner_target: holo_hash::ActionHashB64::from(winner.target),
+            canonical_declared_at: winner.timestamp,
+            canonical_earned: winner.is_earned,
+        },
+        link_record: bytes,
+    }))
+}
+
+/// Input for [`verify_carried_election`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyCarriedElectionInput {
+    /// The content id the carried declaration is claimed to elect a head for.
+    pub id: String,
+    /// `holochain_serialized_bytes`-encoded [`Record`] of a canonical-head
+    /// CreateLink action, as served by a peer's
+    /// [`get_canonical_election_evidence`].
+    #[serde(with = "serde_bytes")]
+    pub link_record: Vec<u8>,
+}
+
+/// The provenance TIER a canonical-head link tag declares, as a pure, total
+/// function of the tag bytes. `Some(true)` = EARNED, `Some(false)` = STAGING,
+/// `None` = not a canonical-head declaration tag at all (an ordinary
+/// IdToContent link, or garbage) — the refusal arm, never a default tier.
+///
+/// PREFIX match on both markers because a delegate-declared head appends
+/// `|delegation:<bytes>` after the marker ([`canonical_tag_with_delegation`]);
+/// the tier is the marker alone. Pure so the three-way split is unit-pinned
+/// without a conductor (`canonical_tag_tier_*` tests).
+pub fn canonical_tag_tier(tag: &[u8]) -> Option<bool> {
+    if tag.starts_with(CANONICAL_TAG_EARNED) {
+        Some(true)
+    } else if tag.starts_with(CANONICAL_TAG_STAGING) {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Verify a CARRIED canonical-head declaration link and answer the election it
+/// yields when merged with every candidate this conductor can already see —
+/// the receiver side of carry-the-election.
+///
+/// ## What the carried bytes must prove (all re-derived in wasm)
+///
+/// 1. The bytes decode to a `Record` whose action hashes to its own claimed
+///    address (self-binding — the same clause as [`validate_carried_record`]).
+/// 2. The author's signature verifies over the action.
+/// 3. The action IS a `CreateLink` whose base is `id`'s canonical-head anchor
+///    (`StringAnchor(CANONICAL_HEAD_ANCHOR, id)`) — a link for another id, or
+///    a non-link record, is refused, never re-scoped.
+/// 4. The link type is this zome's `IdToContent` (the type every canonical
+///    declaration writes) and the tag parses to a declared tier
+///    ([`canonical_tag_tier`]); an unrecognized tag is a refusal.
+/// 5. The link target is an `ActionHash` (the declared head action).
+///
+/// This is AUTHENTICITY PARITY with DHT gossip: the integrity zome validates
+/// every `RegisterCreateLink` as `Valid` (no base/target gate exists on
+/// `IdToContent`), so a link arriving by gossip is enforced to exactly custody
+/// + signature — the same clauses verified here. Tier PROTECTION stays where
+/// it already lives: the declare-time authority gates on honest coordinators
+/// and, decisively, [`select_canonical_winner`]'s resolve-time tier
+/// precedence, which runs below over the MERGED candidate set. A carried
+/// staging declaration can therefore never displace a locally-visible earned
+/// one, and a carried earned candidate wins only what the shared ordering
+/// (tier, notarized link timestamp, link-hash tiebreak) awards it.
+///
+/// ## What this extern does NOT do
+///
+/// It commits NOTHING — no entry, no link, no re-authored declaration (C1:
+/// the receiver obeys an election another agent declared; it never crowns
+/// itself from carried evidence). The answer is advisory input to the
+/// storage projection's stamp guard, which enforces its own monotonic
+/// ordering on top.
+///
+/// Coordinator-only and read-only — ships on the `update_coordinators`
+/// hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn verify_carried_election(
+    input: VerifyCarriedElectionInput,
+) -> ExternResult<Option<CanonicalElectionOutput>> {
+    let record: Record = holochain_serialized_bytes::decode(&input.link_record).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link record for id '{}' could not be \
+             deserialized: {e}",
+            input.id
+        )))
+    })?;
+
+    // (1) Self-binding: the bytes must hash to the address they claim.
+    let computed = hash_action(record.action().clone())?;
+    if record.action_address() != &computed {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link record claims action {:?} but hashes to \
+             {computed:?}",
+            record.action_address()
+        ))));
+    }
+
+    // (2) The author's signature must verify over the action.
+    let author = record.action().author().clone();
+    let signature = record.signature().clone();
+    if !verify_signature(author.clone(), signature, record.action())? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link record {computed:?} carries an invalid \
+             author signature (author {author:?})"
+        ))));
+    }
+
+    // (3) It must BE a canonical-head declaration for THIS id.
+    let create_link = match record.action() {
+        Action::CreateLink(cl) => cl.clone(),
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "verify_carried_election: carried record {computed:?} is a {} action, not a \
+                 CreateLink",
+                other.action_type()
+            ))));
+        }
+    };
+    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, &input.id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    if create_link.base_address != AnyLinkableHash::from(anchor_hash.clone()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link {computed:?} is based on {:?}, not id '{}''s \
+             canonical-head anchor {anchor_hash:?}",
+            create_link.base_address, input.id
+        ))));
+    }
+
+    // (4) Link type + declared tier.
+    let scoped: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
+    if create_link.zome_index != scoped.zome_index || create_link.link_type != scoped.zome_type {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link {computed:?} has link type ({:?}, {:?}), not \
+             this zome's IdToContent ({:?}, {:?})",
+            create_link.zome_index, create_link.link_type, scoped.zome_index, scoped.zome_type
+        ))));
+    }
+    let is_earned = match canonical_tag_tier(create_link.tag.0.as_slice()) {
+        Some(tier) => tier,
+        None => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "verify_carried_election: carried link {computed:?} does not carry a \
+                 canonical-head provenance tag — not a declaration"
+            ))));
+        }
+    };
+
+    // (5) The declared head target must be an action.
+    let target = ActionHash::try_from(create_link.target_address.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "verify_carried_election: carried link {computed:?} targets {:?}, which is not an \
+             ActionHash",
+            create_link.target_address
+        )))
+    })?;
+
+    // Merge the proven carried candidate with every candidate this conductor
+    // already sees, and let the ONE shared ordering arbitrate. Duplicates are
+    // harmless (identical keys order identically); a locally-visible earned
+    // declaration beats a carried staging one by tier precedence.
+    let mut candidates = gather_election_candidates(&input.id, GetStrategy::Local)?;
+    candidates.push(CanonicalCandidate {
+        is_earned,
+        timestamp: record.action().timestamp(),
+        link_hash: computed,
+        target,
+    });
+    Ok(
+        select_canonical_winner(candidates).map(|w| CanonicalElectionOutput {
+            winner_target: holo_hash::ActionHashB64::from(w.target),
+            canonical_declared_at: w.timestamp,
+            canonical_earned: w.is_earned,
+        }),
+    )
 }
 
 /// Input for [`validate_carried_head_record`].

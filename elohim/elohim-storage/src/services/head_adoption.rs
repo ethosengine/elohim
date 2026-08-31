@@ -439,6 +439,14 @@ pub struct CarriedHeadRecord {
     /// one. Always `None` when bytes ARE carried; `None` also when the peer is
     /// too old to state a reason.
     pub record_absent_reason: Option<RecordAbsentReason>,
+    /// Carry-the-election (ADDITIVE, 2026-08-31): serialized `Record` of the
+    /// peer's WINNING canonical-head declaration LINK, when the peer served
+    /// one. NEVER trusted here — the obey arm hands it to the OWN conductor
+    /// (`verify_carried_election`) and obeys only what the wasm re-derives.
+    /// `None` from an old peer, a peer with no election, or a peer whose
+    /// conductor could not retrieve its link Record — all the same honest
+    /// absence.
+    pub election_link_record: Option<Vec<u8>>,
 }
 
 /// Fetches a peer's head `Record` over whichever transport the caller owns.
@@ -1446,6 +1454,29 @@ pub async fn try_adopt_canonical_head(
         {
             return outcome;
         }
+    } else if should_probe_declared_divergence_election(
+        canonical_head.is_some(),
+        local_declared.is_some(),
+        local_election,
+        hint.is_some(),
+        crate::config::obey_carried_election_enabled(),
+    ) {
+        // DECLARED-DIVERGENCE class (carry-the-election, flag-gated): the own
+        // conductor answered only a fallback, the local row is declared with
+        // no election behind it, and a peer advertises a head. One obey
+        // attempt whose election may be peer-supplied and wasm re-derived. A
+        // successful obey settles the row under the election's own ordering;
+        // ANY failure falls through to the normal decision so the contest arm
+        // still mints its DHT candidate — the durable supply for every other
+        // peer — exactly as before.
+        if let Some(outcome) =
+            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher, election_resolve)
+                .await
+        {
+            if matches!(outcome, AdoptOutcome::Adopted) {
+                return outcome;
+            }
+        }
     }
 
     // SPIN-discharge evidence: a peer advertised a DIVERGENT non-empty anchor
@@ -1809,6 +1840,112 @@ pub(crate) fn should_probe_election(head_answer_present: bool) -> bool {
     !head_answer_present
 }
 
+/// Should the obey arm ALSO probe for the DECLARED-DIVERGENCE class — a row the
+/// own conductor answered for (so [`should_probe_election`] says no) but only
+/// with a NON-canonical fallback, while the local row stands declared with no
+/// election behind it and a peer is advertising a head?
+///
+/// This is the class the 2026-08-31 fleet read froze on: both doorways declared,
+/// divergent, `decide_head_action` routing every sweep to Contest/Hold while the
+/// DHT election stayed invisible (arcs Empty ⇒ links never gossip in). With
+/// carry-the-election ON, these rows get ONE obey attempt per sweep whose
+/// election may be supplied by the advertising peer and re-derived in wasm; a
+/// failed attempt falls through to the normal decision, so contest supply is
+/// never starved.
+///
+/// Flag-gated at the PREDICATE so OFF performs no fetch, no conductor call, and
+/// no allocation — the dormant-costs-nothing discipline.
+pub(crate) fn should_probe_declared_divergence_election(
+    conductor_canonical: bool,
+    local_declared: bool,
+    local_election: bool,
+    hint_present: bool,
+    obey_carried_enabled: bool,
+) -> bool {
+    obey_carried_enabled
+        && hint_present
+        && local_declared
+        && !local_election
+        && !conductor_canonical
+}
+
+/// Supply a missing election FROM THE ADVERTISING PEER — the carry-the-election
+/// arm (operator-reserved, `ELOHIM_OBEY_CARRIED_ELECTION`, default OFF).
+///
+/// One fetch (the same `ContentHeadRecord` ask the obey arm was about to make
+/// anyway — the answer is returned for reuse so the byte step never pays a
+/// second round-trip), then ONE own-conductor wasm call
+/// (`verify_carried_election`) that re-derives everything: self-binding,
+/// author signature, anchor binding to `id`, link type + declared tier, and a
+/// merge against every locally-visible candidate under the one shared
+/// ordering. `None` for every failure mode — flag off, no courier, no evidence
+/// served, or evidence the wasm refused — and the caller then behaves exactly
+/// as the pre-flag world (counts `no_election`, returns to the normal
+/// decision).
+async fn try_carried_election_supply(
+    hc: &Arc<HcClient>,
+    id: &str,
+    hint: Option<&PeerHeadHint>,
+    fetcher: Option<&dyn HeadRecordFetcher>,
+) -> Option<(
+    conductor_writes::CanonicalElectionWire,
+    Answer<CarriedHeadRecord>,
+)> {
+    if !crate::config::obey_carried_election_enabled() {
+        return None;
+    }
+    let (hint, fetcher) = match (hint, fetcher) {
+        (Some(h), Some(f)) => (h, f),
+        _ => return None,
+    };
+    let answer = fetcher.fetch(&hint.peer_id, id).await;
+    let link_record = match &answer {
+        Answer::Present(c) => match &c.election_link_record {
+            Some(bytes) => bytes.clone(),
+            None => return None,
+        },
+        _ => return None,
+    };
+    match conductor_writes::call_verify_carried_election(hc, id, link_record).await {
+        Ok(Some(e)) => {
+            tracing::info!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                winner = %e.winner_target,
+                earned = e.canonical_earned,
+                "carried-election: own conductor VERIFIED a peer-carried canonical-head \
+                 declaration link and answered the merged election — obeying it under the \
+                 ordinary monotonic stamp guard"
+            );
+            Some((e, answer))
+        }
+        Ok(None) => {
+            tracing::debug!(
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                "carried-election: evidence verified but the merged candidate set yielded no \
+                 winner; nothing to obey"
+            );
+            None
+        }
+        Err(e) => {
+            // WARN on purpose: a peer served declaration evidence its own link
+            // bytes cannot back — forged, misbound, or bit-rotted. The peer is
+            // named; the row simply stays where it was.
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                error = %e,
+                "carried-election: own conductor REFUSED the peer-carried declaration link — \
+                 the evidence does not prove what it claims; ignoring it"
+            );
+            None
+        }
+    }
+}
+
 async fn try_obey_visible_election(
     hc: &Arc<HcClient>,
     pool: &DbPool,
@@ -1829,13 +1966,30 @@ async fn try_obey_visible_election(
     // here (`Probe`, the single-id path) or from the BATCH answer the caller
     // already paid for (`Resolved`, the arm-4 two-phase path). Same conductor,
     // same question, same three routings; only the round-trip count differs.
+    // Carry-the-election bookkeeping: when the election was supplied by the
+    // ADVERTISING PEER (own conductor saw none), the fetch that carried it is
+    // reused for the byte step below, and the obeyed series names the path.
+    let mut prefetched: Option<Answer<CarriedHeadRecord>> = None;
+    let mut obeyed_path = "carried";
     let election = match election_resolve {
         ElectionResolve::Resolved(Answer::Present(e)) => e.clone(),
         ElectionResolve::Resolved(Answer::Absent) => {
-            // Identical to the `Ok(None)` arm below: no election visible,
-            // nothing to obey, behaviour exactly unchanged for this id.
-            crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::NoElection);
-            return None;
+            // No election visible to the own conductor. Carry-the-election
+            // (flag-gated, default OFF) may supply one from the advertising
+            // peer, re-derived in wasm; otherwise behaviour exactly unchanged.
+            match try_carried_election_supply(hc, id, hint, fetcher).await {
+                Some((e, fetched)) => {
+                    prefetched = Some(fetched);
+                    obeyed_path = "peer_carried";
+                    e
+                }
+                None => {
+                    crate::metrics::inc_election_obey_probe(
+                        crate::metrics::ElectionObeyProbe::NoElection,
+                    );
+                    return None;
+                }
+            }
         }
         ElectionResolve::Resolved(Answer::Unreachable) => {
             // Identical to the `Err` arm below: the batch never answered for
@@ -1857,17 +2011,27 @@ async fn try_obey_visible_election(
         ElectionResolve::Probe => {
             match conductor_writes::call_resolve_canonical_election(hc, id).await {
                 Ok(Some(e)) => e,
-                // No election visible — nothing to obey. Behaviour is exactly unchanged
-                // for every id in this state, which is the pre-wave-4 world. Counted,
-                // though: a `no_election`-dominated series names an ELECTION-VISIBILITY
-                // wall (the canonical-head links have not gossiped in), which is a
-                // gossip/link-layer finding, not an obey-arm one.
-                Ok(None) => {
-                    crate::metrics::inc_election_obey_probe(
-                        crate::metrics::ElectionObeyProbe::NoElection,
-                    );
-                    return None;
-                }
+                // No election visible — nothing to obey, UNLESS carry-the-
+                // election (flag-gated, default OFF) can supply one from the
+                // advertising peer, re-derived in wasm. Off, behaviour is
+                // exactly unchanged for every id in this state. Counted when
+                // nothing is supplied: a `no_election`-dominated series names
+                // an ELECTION-VISIBILITY wall (the canonical-head links have
+                // not gossiped in), which is a gossip/link-layer finding —
+                // and the exact wall the carried supply exists to cross.
+                Ok(None) => match try_carried_election_supply(hc, id, hint, fetcher).await {
+                    Some((e, fetched)) => {
+                        prefetched = Some(fetched);
+                        obeyed_path = "peer_carried";
+                        e
+                    }
+                    None => {
+                        crate::metrics::inc_election_obey_probe(
+                            crate::metrics::ElectionObeyProbe::NoElection,
+                        );
+                        return None;
+                    }
+                },
                 Err(e) => {
                     // A conductor that will not answer is not evidence of anything.
                     // Fall through to the normal decision rather than holding the id.
@@ -1923,7 +2087,14 @@ async fn try_obey_visible_election(
     // retries next sweep — identical to the pre-P2.3 behaviour. The answer state
     // is logged so the two are still readable in a trace even though they route
     // the same way.
-    let answer = fetcher.fetch(&hint.peer_id, id).await;
+    let answer = match prefetched.take() {
+        // Carry-the-election already fetched this peer's answer to obtain the
+        // evidence; the byte step reuses it rather than paying a second
+        // round-trip (and rather than racing the peer's head moving between
+        // the two asks).
+        Some(a) => a,
+        None => fetcher.fetch(&hint.peer_id, id).await,
+    };
     let answer_state = answer.state().label();
     let carried = answer.into_option();
     let bytes = match &carried {
@@ -2021,7 +2192,7 @@ async fn try_obey_visible_election(
         Some(election.ordering()),
     ) {
         Ok(StampOutcome::Stamped) => {
-            crate::metrics::inc_election_obeyed("carried");
+            crate::metrics::inc_election_obeyed(obeyed_path);
             crate::metrics::inc_content_head_adopted();
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
@@ -2029,9 +2200,11 @@ async fn try_obey_visible_election(
                 head = %winner,
                 from_peer = %hint.peer_id,
                 earned = election.canonical_earned,
-                "election-obey: OBEYED the DHT-elected canonical head — this conductor could \
-                 see the election but not the content, so a peer supplied the bytes and the \
-                 zome proved them; the row now agrees with the fleet"
+                path = obeyed_path,
+                "election-obey: OBEYED the elected canonical head — the election was read \
+                 from the own conductor (path=carried) or supplied by the peer and \
+                 re-derived in wasm (path=peer_carried); a peer supplied the bytes, the \
+                 zome proved them, and the row now agrees with the fleet"
             );
             Some(AdoptOutcome::Adopted)
         }
@@ -3348,6 +3521,7 @@ mod tests {
             head_action_hash: "uhCkk-head".into(),
             record: None,
             record_absent_reason: None,
+            election_link_record: None,
         });
         // A hash-only answer is still PRESENT — the peer answered. Reading it as
         // an absence is the `carried_present` mislabel (`da8975176`).
@@ -3362,6 +3536,7 @@ mod tests {
             head_action_hash: "uhCkk-head".into(),
             record: None,
             record_absent_reason: reason,
+            election_link_record: None,
         }
     }
 
@@ -3376,6 +3551,7 @@ mod tests {
             head_action_hash: "uhCkk-head".into(),
             record: Some(vec![1, 2, 3]),
             record_absent_reason: None,
+            election_link_record: None,
         };
         assert_eq!(
             classify_evidence(Some(&carried)),
@@ -3421,6 +3597,7 @@ mod tests {
             head_action_hash: "uhCkk-head".into(),
             record: Some(vec![7]),
             record_absent_reason: Some(RecordAbsentReason::NoRecord),
+            election_link_record: None,
         };
         assert_eq!(
             classify_evidence(Some(&contradictory)),
@@ -3535,6 +3712,7 @@ mod tests {
             head_action_hash: "uhCkk-head".into(),
             record: Some(bytes.to_vec()),
             record_absent_reason: None,
+            election_link_record: None,
         })
     }
 
@@ -4625,6 +4803,42 @@ mod tests {
             "a row the conductor DID answer for is already served by the adopt/contest \
              arms; probing it spends a conductor round-trip per row per sweep for nothing"
         );
+    }
+
+    /// CARRY-THE-ELECTION scope (the declared-divergence class): probed ONLY
+    /// when every one of the five facts holds — flag on, a peer advertising,
+    /// local row declared, NO election behind it, and the own conductor
+    /// answering nothing better than a fallback. Each input alone flipping the
+    /// answer to false is the dormant-costs-nothing discipline made a truth
+    /// table.
+    #[test]
+    fn carried_election_probe_is_scoped_to_declared_divergence() {
+        // The one probing corner.
+        assert!(should_probe_declared_divergence_election(
+            false, true, false, true, true
+        ));
+        // A canonical own-conductor answer: the row is already served by
+        // AdoptLocal — never probed.
+        assert!(!should_probe_declared_divergence_election(
+            true, true, false, true, true
+        ));
+        // Undeclared local row: that is the conductor-missing/adopt class,
+        // owned by `should_probe_election` and the AdoptPeer arm.
+        assert!(!should_probe_declared_divergence_election(
+            false, false, false, true, true
+        ));
+        // A row already obeying an election is SETTLED (quiescence input).
+        assert!(!should_probe_declared_divergence_election(
+            false, true, true, true, true
+        ));
+        // No advertising peer — no courier, nothing to ask.
+        assert!(!should_probe_declared_divergence_election(
+            false, true, false, false, true
+        ));
+        // Flag off is byte-for-byte the prior behaviour.
+        assert!(!should_probe_declared_divergence_election(
+            false, true, false, true, false
+        ));
     }
 
     /// The obey path must stamp under the ELECTION's ordering in `HealCanonical`

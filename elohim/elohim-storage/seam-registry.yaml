@@ -851,6 +851,44 @@ decisionPoints:
         testName: the_election_obey_transition_is_courier_gated_and_lands_settled
         kind: unit
 
+  - name: should_probe_declared_divergence_election
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::should_probe_declared_divergence_election
+      line: 1826
+    summary: >
+      Should the obey arm ALSO probe the DECLARED-DIVERGENCE class - own conductor answered
+      only a non-canonical fallback, local row declared with NO election behind it, a peer
+      advertising, and the carry-the-election flag on? The 2026-08-31 fleet freeze class:
+      declared-vs-declared rows routed to Contest/Hold every sweep while the DHT election
+      stayed invisible (storage arcs Empty, links never gossiped in).
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          carried_election_probe_is_scoped_to_declared_divergence proves each of the five
+          inputs alone flips the probe off - flag off performs no fetch, no conductor call, no
+          allocation (dormant-costs-nothing), and settled rows (local election standing) are
+          never probed (quiescence).
+      - id: C1
+        status: answered
+        justification: >
+          The probe only ever routes into try_obey_visible_election, which OBEYS an election
+          another agent declared (peer-supplied evidence is re-derived by the OWN conductor in
+          wasm via verify_carried_election); nothing on this path authors or crowns. A failed
+          obey falls through to the unchanged decision table, so contest supply is not starved.
+      - id: C2
+        status: answered
+        justification: >
+          Any move this probe leads to lands in stamp_declared_head_mode under the election's
+          own CanonicalOrdering (tier precedence + notarized link timestamp) - the same
+          monotonic guard as every other obey; a carried election cannot move a row backwards.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: carried_election_probe_is_scoped_to_declared_divergence
+        kind: unit
+
   - name: ElectionObeyProbe
     kind: reason-outcome-enum
     sourceLocation:

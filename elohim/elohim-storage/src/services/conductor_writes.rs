@@ -584,6 +584,85 @@ pub async fn call_resolve_canonical_election(
     Ok(out)
 }
 
+/// Wire shape of `content_store::get_canonical_election_evidence`'s answer —
+/// the election PLUS the winning declaration LINK's own serialized `Record`
+/// (the evidence a requester's conductor re-derives in wasm).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CanonicalElectionEvidenceWire {
+    pub election: CanonicalElectionWire,
+    /// `holochain_serialized_bytes`-encoded `Record` of the winning
+    /// canonical-head CreateLink action — opaque to this layer.
+    #[serde(with = "serde_bytes")]
+    pub link_record: Vec<u8>,
+}
+
+/// Ask the conductor for its canonical election for `id` WITH the winning
+/// declaration link's `Record` (`content_store::get_canonical_election_evidence`)
+/// — the SOURCE side of carry-the-election. `Ok(None)` = no election in this
+/// conductor's local view, or the link's Record is not locally retrievable —
+/// never authoritative absence.
+pub async fn call_get_canonical_election_evidence(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<CanonicalElectionEvidenceWire>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode get_canonical_election_evidence id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "get_canonical_election_evidence", payload)
+        .await?;
+    let out: Option<CanonicalElectionEvidenceWire> =
+        rmp_serde::from_slice(&bytes).map_err(|e| {
+            StorageError::Serialization(format!(
+                "conductor_writes: decode CanonicalElectionEvidenceWire: {e}"
+            ))
+        })?;
+    Ok(out)
+}
+
+/// Caller-input wire shape for `content_store::verify_carried_election`.
+#[derive(Debug, serde::Serialize)]
+struct VerifyCarriedElectionInput {
+    id: String,
+    #[serde(with = "serde_bytes")]
+    link_record: Vec<u8>,
+}
+
+/// Hand a peer-carried canonical-head declaration LINK `Record` to the OWN
+/// conductor for full wasm re-derivation (`content_store::verify_carried_election`):
+/// self-binding, author signature, anchor binding to `id`, link type + tier —
+/// then a merge against every locally-visible candidate under the one shared
+/// ordering. `Ok(Some(_))` is the election the merged set yields (which may be
+/// a LOCAL candidate outranking the carried one); `Ok(None)` = no candidate
+/// survived; `Err` includes the zome's refusals (forged or misbound evidence —
+/// worth reading the text).
+pub async fn call_verify_carried_election(
+    hc: &Arc<HcClient>,
+    id: &str,
+    link_record: Vec<u8>,
+) -> Result<Option<CanonicalElectionWire>, StorageError> {
+    let input = VerifyCarriedElectionInput {
+        id: id.to_string(),
+        link_record,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode verify_carried_election: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "verify_carried_election", payload)
+        .await?;
+    let out: Option<CanonicalElectionWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode CanonicalElectionWire (verify carried): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 /// Caller-input wire shape for `content_store::validate_carried_head_record`.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ValidateCarriedHeadRecordInput {

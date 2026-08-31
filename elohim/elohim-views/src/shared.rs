@@ -261,6 +261,38 @@ pub struct ContentHeadRecordPayload {
     /// pre-field one, so a served-bytes answer is unchanged on the wire.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record_absent_reason: Option<String>,
+    /// ADDITIVE (2026-08-31, carry-the-election): standard-base64 serialized
+    /// `Record` of the responder's WINNING canonical-head declaration LINK
+    /// (`content_store::get_canonical_election_evidence`), when it has one and
+    /// its conductor holds the link's Record. An OPAQUE token to every layer in
+    /// between — the requesting side's conductor re-derives everything in wasm
+    /// (`verify_carried_election`) before any election is obeyed.
+    ///
+    /// This is the supply-side exit for the ELECTION-VISIBILITY WALL the obey
+    /// arm's `no_election` probe outcome names: canonical-head links travel as
+    /// ordinary link ops, and on a fleet whose storage arcs have not
+    /// reconverged they do not travel at all.
+    ///
+    /// Wire compatibility: identical discipline to `record_absent_reason`
+    /// (additive + optional + `skip_serializing_if`; this payload is not
+    /// `deny_unknown_fields`) — old peers ignore or omit it, and an absent key
+    /// decodes to `None`, which is yesterday's behaviour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub election_link_record: Option<String>,
+    /// ADDITIVE, HINT-only companions to `election_link_record`: the responder's
+    /// own reading of its election (winner target action, the winning LINK's
+    /// notarized DHT timestamp in i64 microseconds, and the earned marker).
+    /// Never stamped, never trusted — logging/short-circuit hints; the verified
+    /// values come from the requester's own conductor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub election_winner_target: Option<String>,
+    /// See [`Self::election_winner_target`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number | null")]
+    pub election_declared_at: Option<i64>,
+    /// See [`Self::election_winner_target`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub election_earned: Option<bool>,
 }
 
 /// One discovered projection row in a [`ProjectionInventoryPayload`]: the
@@ -675,6 +707,10 @@ mod inventory_offset_wire_compat_tests {
             declared_at: None,
             record: None,
             record_absent_reason: None,
+            election_link_record: None,
+            election_winner_target: None,
+            election_declared_at: None,
+            election_earned: None,
         };
         let bytes = rmp_serde::to_vec_named(&absent).unwrap();
         let back: ContentHeadRecordPayload = rmp_serde::from_slice(&bytes).unwrap();
@@ -686,6 +722,10 @@ mod inventory_offset_wire_compat_tests {
             declared_at: Some(1_753_000_000_000_000),
             record: Some("YmFzZTY0".into()),
             record_absent_reason: None,
+            election_link_record: Some("ZXZpZGVuY2U=".into()),
+            election_winner_target: Some("uhCkkWINNER".into()),
+            election_declared_at: Some(1_753_000_000_000_001),
+            election_earned: Some(true),
         };
         let json = serde_json::to_value(&present).unwrap();
         assert!(
@@ -733,6 +773,12 @@ mod inventory_offset_wire_compat_tests {
             declared_at: Some(1_753_000_000_000_000),
             record: None,
             record_absent_reason: Some("no_record".into()),
+            // Carry-the-election fields SET on purpose: the old peer must
+            // ignore these exactly as it ignores record_absent_reason.
+            election_link_record: Some("ZXZpZGVuY2U=".into()),
+            election_winner_target: Some("uhCkkWINNER".into()),
+            election_declared_at: Some(7),
+            election_earned: Some(true),
         };
         let msgpack = rmp_serde::to_vec_named(&new).unwrap();
         let old: OldContentHeadRecordPayload = rmp_serde::from_slice(&msgpack)
@@ -780,6 +826,10 @@ mod inventory_offset_wire_compat_tests {
             declared_at: Some(42),
             record: Some("YmFzZTY0".into()),
             record_absent_reason: None,
+            election_link_record: None,
+            election_winner_target: None,
+            election_declared_at: None,
+            election_earned: None,
         };
         let old = OldContentHeadRecordPayload {
             content_id: "elohim-host-landing".into(),

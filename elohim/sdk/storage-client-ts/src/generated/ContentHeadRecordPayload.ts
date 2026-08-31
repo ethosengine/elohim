@@ -72,4 +72,39 @@ record: string | null,
  * `skip_serializing_if` keeps the `None` encoding byte-identical to the
  * pre-field one, so a served-bytes answer is unchanged on the wire.
  */
-recordAbsentReason: string | null, };
+recordAbsentReason: string | null, 
+/**
+ * ADDITIVE (2026-08-31, carry-the-election): standard-base64 serialized
+ * `Record` of the responder's WINNING canonical-head declaration LINK
+ * (`content_store::get_canonical_election_evidence`), when it has one and
+ * its conductor holds the link's Record. An OPAQUE token to every layer in
+ * between — the requesting side's conductor re-derives everything in wasm
+ * (`verify_carried_election`) before any election is obeyed.
+ *
+ * This is the supply-side exit for the ELECTION-VISIBILITY WALL the obey
+ * arm's `no_election` probe outcome names: canonical-head links travel as
+ * ordinary link ops, and on a fleet whose storage arcs have not
+ * reconverged they do not travel at all.
+ *
+ * Wire compatibility: identical discipline to `record_absent_reason`
+ * (additive + optional + `skip_serializing_if`; this payload is not
+ * `deny_unknown_fields`) — old peers ignore or omit it, and an absent key
+ * decodes to `None`, which is yesterday's behaviour.
+ */
+electionLinkRecord: string | null, 
+/**
+ * ADDITIVE, HINT-only companions to `election_link_record`: the responder's
+ * own reading of its election (winner target action, the winning LINK's
+ * notarized DHT timestamp in i64 microseconds, and the earned marker).
+ * Never stamped, never trusted — logging/short-circuit hints; the verified
+ * values come from the requester's own conductor.
+ */
+electionWinnerTarget: string | null, 
+/**
+ * See [`Self::election_winner_target`].
+ */
+electionDeclaredAt: number | null, 
+/**
+ * See [`Self::election_winner_target`].
+ */
+electionEarned: boolean | null, };

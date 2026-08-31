@@ -218,10 +218,37 @@ fn classify_payload(
     let record_absent_reason =
         RecordAbsentReason::from_wire(payload.record_absent_reason.as_deref());
 
+    // Carry-the-election evidence (ADDITIVE; absent from an old peer). Same
+    // malformed-base64 posture as `record` above: forged-looking transport
+    // bytes are dropped loudly, and the rest of the answer stands — the
+    // evidence is optional supply, never load-bearing for the classic path.
+    let election_link_record = match payload
+        .election_link_record
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(b64) => match STANDARD.decode(b64) {
+            Ok(bytes) => Some(bytes),
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::head_adoption",
+                    peer = %peer_id,
+                    content_id = %content_id,
+                    error = %e,
+                    "head-record served malformed base64 election evidence — ignoring it"
+                );
+                None
+            }
+        },
+        None => None,
+    };
+
     Answer::Present(CarriedHeadRecord {
         head_action_hash,
         record,
         record_absent_reason,
+        election_link_record,
     })
 }
 
@@ -249,6 +276,41 @@ mod tests {
             declared_at: None,
             record: record.map(str::to_string),
             record_absent_reason: reason.map(str::to_string),
+            election_link_record: None,
+            election_winner_target: None,
+            election_declared_at: None,
+            election_earned: None,
+        }
+    }
+
+    /// Carry-the-election mapping: valid base64 evidence lands as bytes on the
+    /// answer; malformed evidence is DROPPED (loudly) while the rest of the
+    /// answer stands — the evidence is optional supply, never load-bearing.
+    #[test]
+    fn election_evidence_decodes_and_malformed_is_dropped_not_fatal() {
+        let mut p = payload(Some("uhCkkHEAD"), None);
+        p.election_link_record = Some("ZXZpZGVuY2U=".to_string()); // b"evidence"
+        match classify_payload(p, "peer-1", "c1") {
+            Answer::Present(c) => {
+                assert_eq!(c.election_link_record.as_deref(), Some(&b"evidence"[..]));
+            }
+            other => panic!("expected Present, got {other:?}"),
+        }
+
+        let mut bad = payload(Some("uhCkkHEAD"), Some("Ynl0ZXM="));
+        bad.election_link_record = Some("%%%not-base64%%%".to_string());
+        match classify_payload(bad, "peer-1", "c1") {
+            Answer::Present(c) => {
+                assert!(
+                    c.election_link_record.is_none(),
+                    "malformed evidence must be dropped"
+                );
+                assert!(
+                    c.record.is_some(),
+                    "the record must survive a malformed election field"
+                );
+            }
+            other => panic!("expected Present, got {other:?}"),
         }
     }
 
