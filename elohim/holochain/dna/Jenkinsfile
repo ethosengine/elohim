@@ -906,7 +906,21 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             options { timeout(time: 30, unit: 'MINUTES') }
             steps {
                 container('builder') {
-                    sh "bash '${env.WORKSPACE}/scripts/ci/fleet-coordswap-dispatch.sh' '${env.WORKSPACE}/elohim/holochain/dna/elohim/elohim.happ' alpha"
+                    script {
+                        // Derive the roster HERE with readJSON — the builder
+                        // container has no jq (first fleet contact, build
+                        // #1410, hit `jq: command not found` and skipped).
+                        // Mirrors the edge Jenkinsfile's suspended filter +
+                        // computeStorageUrls DNS shape.
+                        def deployments = readJSON(file: 'genesis/orchestrator/data/deployments.json')
+                        def peers = deployments.humans
+                            .findAll { !(it.suspended ?: false) }
+                            .collect { "${it.name}=http://elohim-${it.name}-alpha.elohim-alpha.svc.cluster.local:8090" }
+                            .join(',')
+                        withEnv(["COORDSWAP_PEERS=${peers}"]) {
+                            sh "bash '${env.WORKSPACE}/scripts/ci/fleet-coordswap-dispatch.sh' '${env.WORKSPACE}/elohim/holochain/dna/elohim/elohim.happ' alpha"
+                        }
+                    }
                 }
             }
         }

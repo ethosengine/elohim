@@ -56,11 +56,32 @@ fi
 # computeStorageUrls: resourcePrefix = elohim-<name>-<env>, namespace =
 # elohim-<env>, storage HTTP on :8090. Suspended humans are the roster's
 # source of truth (scope-reconcile) — never target them.
-PEERS="$(jq -r --arg env "$TARGET_ENV" '
-  .humans[]
-  | select((.suspended // false) | not)
-  | "\(.name)=http://elohim-\(.name)-\($env).elohim-\($env).svc.cluster.local:8090"
-' "$DEPLOYMENTS_JSON" | paste -sd, -)"
+#
+# Layered derivation (2026-08-31: the DNA builder container has NO jq —
+# first fleet contact hit `jq: command not found` and skipped): an explicit
+# COORDSWAP_PEERS env wins (the Jenkins stage derives the roster natively
+# with readJSON and passes it), else jq, else python3, else a loud skip.
+if [ -n "${COORDSWAP_PEERS:-}" ]; then
+  PEERS="$COORDSWAP_PEERS"
+elif command -v jq >/dev/null 2>&1; then
+  PEERS="$(jq -r --arg env "$TARGET_ENV" '
+    .humans[]
+    | select((.suspended // false) | not)
+    | "\(.name)=http://elohim-\(.name)-\($env).elohim-\($env).svc.cluster.local:8090"
+  ' "$DEPLOYMENTS_JSON" | paste -sd, -)"
+elif command -v python3 >/dev/null 2>&1; then
+  PEERS="$(python3 - "$DEPLOYMENTS_JSON" "$TARGET_ENV" <<'PYDERIVE'
+import json, sys
+data = json.load(open(sys.argv[1])); env = sys.argv[2]
+print(",".join(
+    f"{h['name']}=http://elohim-{h['name']}-{env}.elohim-{env}.svc.cluster.local:8090"
+    for h in data["humans"] if not h.get("suspended")))
+PYDERIVE
+)"
+else
+  echo "COORDSWAP: SKIP — no COORDSWAP_PEERS env and neither jq nor python3 available to derive the roster"
+  exit 0
+fi
 
 if [ -z "$PEERS" ]; then
   echo "COORDSWAP: SKIP — no active peers derived for env '$TARGET_ENV'"
