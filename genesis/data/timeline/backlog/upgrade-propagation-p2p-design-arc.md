@@ -41,6 +41,28 @@ Existing inventory (all proven live 2026-08-31, the carried-election shift):
   (HC 0.6 gates `lineage:` behind unstable-migration; we own the conductor
   fork). Read `2026-06-11-dna-upgrade-governance.md` first.
 
+## The velocity ladder (operator-harvested 2026-08-31)
+
+The change-class taxonomy, measured against the 2026-08-31 arc (three fleet
+rolls paid for changes that mostly had — or nearly had — atomic mechanisms).
+Cheap iterations everywhere possible are what buy the wall-clock to shake out
+the genuinely hard seams; each rung is a workable item on this arc, ordered by
+leverage-per-line-of-code:
+
+| # | Rung | Change class it frees | State |
+|---|------|----------------------|-------|
+| 1 | **Decouple conductor lifecycle from storage** — the conductor is storage's CHILD PROCESS in the fleet pod, so every storage binary swap kills it and resets its arcs. Let storage swap in place (exec-swap or split into separately-imaged containers) while the conductor keeps running. All three 2026-08-31 fixes were storage-side; on the mesh and on W2 storage restarted repeatedly with the conductor untouched. | native storage/doorway binaries — the class that manufactured every catch-up queue today | **pull-forward candidate: highest leverage per line** |
+| 2 | **Staggered rolls** — when a restart IS needed, never all 7 pods at once; the fleet never enters the all-arcs-Empty regime (see backlog `staggered-conductor-fleet-restarts`). | restart-shaped changes generally | existing backlog, fold in |
+| 3 | **Config as runtime surface, not boot env** — flags (e.g. ELOHIM_OBEY_CARRIED_ELECTION, read via OnceLock at boot) become watchable at runtime; protocol-native endgame: config as declared EPRs, so a flag flip is a head declaration that converges. | config flips — one boolean cost a full roll on 2026-08-31 | missing |
+| 4 | **Coordinator hot-swap gets its own delivery vehicle** — the mechanism (admin `update_coordinators`, no re-key, no churn) is atomic and proven twice on 2026-08-31, but it only ships bundled inside the pod-image roll. Separate the vehicle: coordinator bundles propagate as artifacts and apply without a roll. | coordinator zome logic | mechanism exists; vehicle missing |
+| 5 | **Binary/wasm artifacts as ELECTED CONTENT** — an update is a content-addressed artifact with an earned canonical head; peers verify locally and adopt at their own pace; mixed versions coexist via the additive-wire discipline; **revert = the election moving back to the prior head**. The carried-election machinery IS this kernel. | everything above the DNA line | kernel proven (carried-election); propagation + adoption design open |
+| 6 | **DNA lineage migration** — the irreducible network-agreement seam (hash = network identity; data rebinds across lineage). Once rungs 1-5 exist it becomes RARE and governed — a constitutional event, not a Tuesday. | integrity zomes / DNA | the hard kernel; dna-upgrade-governance is the prior art |
+
+Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
+because everything ships in ONE vehicle (the pod image). **Separate the
+delivery vehicle by change class.**
+
 Brainstorm-class: route through /brainstorm (p2p-design-gate applies —
 upgrade artifacts, lineage records, and adoption elections are data
-entities). Not to be ground as shift iterations.
+entities). Rung 1 may be pulled forward as bounded shift work ahead of the
+full design arc. Not to be ground as unplanned shift iterations.
