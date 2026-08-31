@@ -4385,6 +4385,44 @@ async fn heal_content(
                                     });
                                 }
                             }
+
+                            // DECLARED-DIVERGENCE ADMISSION (carry-the-election,
+                            // 2026-08-31, flag-gated). A DECLARED row whose own
+                            // conductor merely ECHOES it back lands here — and until
+                            // this admission it reached no candidate list at all, so
+                            // the obey arm could never even ask whether a peer
+                            // carries the election. That is the frozen fleet class
+                            // (2026-08-31: both doorways declared + divergent for
+                            // days, refused ~100% per sweep). Admission ONLY: the
+                            // decision rule is untouched, and the pre-flight's
+                            // carried-election probe
+                            // (should_probe_declared_divergence_election) gates the
+                            // actual work — a settled row (election standing) or a
+                            // vanished divergence admits nothing, which is the
+                            // quiescence input. Election-read failure must NOT admit
+                            // (conservative, same rule as the arms above).
+                            if crate::config::obey_carried_election_enabled()
+                                && !head.canonical
+                                && (divergent_actionable.contains_key(id.as_str())
+                                    || peer_head_hints.contains_key(&id))
+                            {
+                                let (declared, has_election) = pool
+                                    .get()
+                                    .ok()
+                                    .and_then(|mut c| {
+                                        crate::db::content_diesel::declared_head_with_election(
+                                            &mut c, &app_ctx, &id,
+                                        )
+                                        .ok()
+                                    })
+                                    .unwrap_or((None, true));
+                                if declared.is_some() && !has_election {
+                                    adopt_candidates.push(AdoptCandidate {
+                                        id: id.clone(),
+                                        head: Some(head.clone()),
+                                    });
+                                }
+                            }
                         }
                         Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
                             // Row already carries a DIFFERENT declared head — the heal

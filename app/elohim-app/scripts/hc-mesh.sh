@@ -456,6 +456,11 @@ ELOHIM_HEAD_CORPUS_DIGEST="${MESH_HEAD_CORPUS_DIGEST:-1}"
 # 2026-08-16 measure's 23→81 actionable plateau); the overnight converged run
 # had it live (adopt_peer canonical links). Prod default stays off.
 ELOHIM_ADOPT_BEFORE_AUTHOR="${MESH_ADOPT_BEFORE_AUTHOR:-1}"
+# Carry-the-election (2026-08-31): let the obey arm supply a missing election
+# from the advertising peer, re-derived in wasm by the OWN conductor. Mesh
+# default ON (the mesh is where the capability is proven); prod ships dormant
+# behind ELOHIM_OBEY_CARRIED_ELECTION.
+ELOHIM_OBEY_CARRIED_ELECTION="${MESH_OBEY_CARRIED_ELECTION:-1}"
 # Serialize adopt/contest declares on the mesh: concurrent declares race the
 # conductor source-chain head ("bundle head has moved", 2026-08-16 measure) and
 # every collision costs a fallback + next-sweep retry — fanout 1 lands first-try.
@@ -1138,6 +1143,7 @@ restart_env_overlay() { # <captured-environ> <peer-name>
       "ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
       "ELOHIM_HEAD_CORPUS_DIGEST=$ELOHIM_HEAD_CORPUS_DIGEST" \
       "ELOHIM_ADOPT_BEFORE_AUTHOR=$ELOHIM_ADOPT_BEFORE_AUTHOR" \
+      "ELOHIM_OBEY_CARRIED_ELECTION=$ELOHIM_OBEY_CARRIED_ELECTION" \
       "ADOPT_CONTEST_FANOUT=$ADOPT_CONTEST_FANOUT" \
       "ELOHIM_NETWORK_STAKES=$ELOHIM_NETWORK_STAKES" \
       "ALLOW_SEED_NETWORK_STAKES=1" \
@@ -1880,6 +1886,7 @@ PYEOF
       ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
       ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
       ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
+      ELOHIM_OBEY_CARRIED_ELECTION="$ELOHIM_OBEY_CARRIED_ELECTION" \
       ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
       ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
       ALLOW_SEED_NETWORK_STAKES=1 \
