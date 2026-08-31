@@ -85,3 +85,20 @@ workspace conductor (started 20:52Z from Jenkins lastSuccessfulBuild, pre-a0784c
 coordinators. The fleet's 7 pods hot-swapped the new ones at 22:48Z; the workspace did not, exactly
 because the external-conductor path skips `sync_coordinators`. Cure remains the `--sync-coordinators-once`
 storage lever (reuse `happ_manager::sync_coordinators` against `HOLOCHAIN_ADMIN_URL`, key-preserving).
+
+## 2026-08-31 — sharpest evidence: storage-plane caught-up, conductor-plane head NOT adopted
+Device peer W2 authored the manifesto, re-notarized reach=commons, declared an EARNED cross-root
+canonical head (valid + DHT-anchored on its own conductor). Measured after:
+  - W2 storage/iroh plane: irohPeersKnown=7, replication caughtUp, pull caughtUp (CONNECTED).
+  - matthew's fleet conductor (doorway-alpha resolve_content_head): canonical:false, old per-root
+    head — it NEVER received W2's canonical-head link.
+The STORAGE plane converges for a fresh joiner; the CONDUCTOR kitsune2 DHT-gossip plane does NOT
+carry a fresh joiner's authored canonical-head link (StringAnchor link op) to the fleet, so no fleet
+conductor's election sees it and the doorways keep projecting the old head. NOT a doorway-auth/admin-
+key concern, and NOT (on today's scaffold) an authority concern — head election is a conductor-plane
+property and a fresh joiner's ops aren't gossiped/fetched by the fleet (arc-null; no advertised
+authority to pull from). Forcing it by declaring on a fleet conductor hits the 60s Network-resolve
+timeout (gather_content_chain(Network) on a cold/saturated arc). Cure lives in the conductor/kitsune2
+storage-arc + gossip path (make a fresh joiner an authority whose ops the fleet fetches) = the
+dataplane-convergence habit. "Declare from the root author's conductor" masks this; the real bar is
+any validly-elected head converging across the plane with every doorway projecting it, no key.
