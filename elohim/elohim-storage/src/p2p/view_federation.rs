@@ -785,7 +785,17 @@ const INVENTORY_ENVELOPE_RESERVE: usize = 8 * 1024;
 /// Byte budget for the serialized inventory *payload* alone — [`MAX_PAYLOAD`]
 /// minus the envelope reserve. A payload trimmed to this budget guarantees the
 /// full `ViewFederationResponse` frame stays under the codec's write bound.
-const INVENTORY_PAYLOAD_BUDGET: usize = MAX_PAYLOAD - INVENTORY_ENVELOPE_RESERVE;
+/// CONSERVATIVE-SENDER clamp (2026-08-31): sized under the 256 KiB frame cap
+/// that pre-cure iroh READERS across the deployed fleet still enforce
+/// (`crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR`) — NOT under this
+/// plane's own 1 MiB [`MAX_PAYLOAD`]. A page trimmed smaller is decodable by
+/// every reader old and new (just more pages); a page trimmed to 1 MiB was
+/// refused outright by every iroh reader (`frame too large`), which starved
+/// an iroh-only peer of ALL inventory — the hint plane that feeds head
+/// adoption. Raise back toward MAX_PAYLOAD only after the whole fleet runs
+/// the liberal reader.
+const INVENTORY_PAYLOAD_BUDGET: usize =
+    crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR - INVENTORY_ENVELOPE_RESERVE;
 
 /// MessagePack-serialized byte length of an inventory payload — the same
 /// named-field encoding the codec puts on the wire (the payload rides the frame
@@ -1267,6 +1277,25 @@ mod tests {
     use super::*;
     use crate::views::{Freshness, FreshnessState, JsonVal, ViewKind, ViewSlice};
     use libp2p::request_response::Codec;
+
+    /// CONSERVATIVE-SENDER / LIBERAL-READER pin (2026-08-31 frame-cap drift):
+    /// a trimmed inventory payload plus its envelope reserve must fit under
+    /// the 256 KiB frame cap pre-cure iroh readers enforce, and the liberal
+    /// reader cap must cover everything a max-budget sender emits. Both
+    /// inequalities breaking is the "frame too large" starvation class — an
+    /// iroh-only peer refused EVERY inventory exchange.
+    #[test]
+    fn inventory_budget_fits_the_deployed_reader_floor() {
+        assert!(
+            INVENTORY_PAYLOAD_BUDGET + INVENTORY_ENVELOPE_RESERVE
+                <= crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR,
+            "a sender page must be decodable by the oldest deployed iroh reader"
+        );
+        assert!(
+            crate::p2p_iroh::view_fed::MAX_PAYLOAD >= MAX_PAYLOAD,
+            "the iroh reader cap must be at least as liberal as the libp2p plane's"
+        );
+    }
 
     #[test]
     fn protocol_id_is_canonical() {
@@ -2136,15 +2165,25 @@ mod tests {
         let serialized = inventory_payload_len(&payload);
         assert!(
             serialized > 256 * 1024,
-            "2000-entry content inventory ({serialized} B) must exceed the OLD 256 KiB bound"
+            "2000-entry content inventory ({serialized} B) must exceed the 256 KiB reader floor"
         );
         assert!(
             serialized < MAX_PAYLOAD,
-            "2000-entry content inventory ({serialized} B) must fit the new 1 MiB MAX_PAYLOAD"
+            "2000-entry content inventory ({serialized} B) must fit the 1 MiB MAX_PAYLOAD"
         );
-        // And with the envelope reserve it still fits the payload budget → no trim
-        // fires in the healthy path; the raise alone resolves the blocker.
-        assert!(serialized <= INVENTORY_PAYLOAD_BUDGET);
+        // 2026-08-31 revision (iroh frame-cap drift cure): the earlier fix
+        // raised only the libp2p read cap to 1 MiB — the iroh reader stayed at
+        // 256 KiB behind a comment CLAIMING parity, so a full-cap page like
+        // this one was refused by every iroh reader on the deployed fleet
+        // ("frame too large: 5xxxxx > 262144", inventory starvation for an
+        // iroh-only peer). Senders are now CONSERVATIVE: this page exceeds the
+        // clamped budget, so the trim/pagination path fires (proven by
+        // `over_budget_inventory_is_trimmed_to_fit_and_reports_drop`) and every
+        // emitted frame fits the oldest deployed reader.
+        assert!(
+            serialized > INVENTORY_PAYLOAD_BUDGET,
+            "a full-cap page must now take the trim/pagination path"
+        );
     }
 
     #[test]

@@ -32,9 +32,25 @@ use crate::views::{ViewFederationRequest, ViewFederationResponse};
 /// identical MessagePack payloads."
 pub const VIEW_FED_ALPN: &[u8] = b"/elohim/view-federation/2.0.0";
 
-/// 256 KiB cap on a single inbound view-federation frame, matching the
-/// libp2p side's `MAX_PAYLOAD` (`crate::p2p::view_federation::MAX_PAYLOAD`).
-pub const MAX_PAYLOAD: usize = 256 * 1024;
+/// Cap on a single inbound view-federation frame — now ACTUALLY matching the
+/// libp2p side's `MAX_PAYLOAD` (`crate::p2p::view_federation::MAX_PAYLOAD`,
+/// 1 MiB).
+///
+/// DRIFT CURED (2026-08-31, measured live): this constant was 256 KiB while
+/// its own comment claimed parity with libp2p's 1 MiB — so every responder
+/// that trimmed to the 1 MiB budget produced frames an iroh READER refused
+/// (`frame too large: 536378 > 262144`, workspace peer W2 pulling fleet
+/// inventory). Fleet-to-fleet traffic survived on the libp2p leg; an
+/// iroh-only peer failed EVERY oversized exchange. The robustness split:
+/// readers are LIBERAL (this 1 MiB cap), senders are CONSERVATIVE (the
+/// inventory trim budget stays under the 256 KiB floor deployed fleet
+/// readers still enforce — see `INVENTORY_PAYLOAD_BUDGET`).
+pub const MAX_PAYLOAD: usize = crate::p2p::view_federation::MAX_PAYLOAD;
+
+/// The frame cap OLD deployed iroh readers (pre-2026-08-31 binaries) still
+/// enforce. Senders that must be readable by a mixed fleet size their
+/// payloads under THIS, not under [`MAX_PAYLOAD`].
+pub const DEPLOYED_READER_FLOOR: usize = 256 * 1024;
 
 #[async_trait::async_trait]
 pub trait ViewFederationBackend: Send + Sync + 'static {
