@@ -49,8 +49,10 @@ pub const MAX_PAYLOAD: usize = crate::p2p::view_federation::MAX_PAYLOAD;
 
 /// The frame cap OLD deployed iroh readers (pre-2026-08-31 binaries) still
 /// enforce. Senders that must be readable by a mixed fleet size their
-/// payloads under THIS, not under [`MAX_PAYLOAD`].
-pub const DEPLOYED_READER_FLOOR: usize = 256 * 1024;
+/// payloads under THIS, not under [`MAX_PAYLOAD`]. Canonical home is the
+/// always-compiled plane (`p2p::view_federation::IROH_DEPLOYED_READER_FLOOR`);
+/// this is its alias for iroh-side readers of the contract.
+pub const DEPLOYED_READER_FLOOR: usize = crate::p2p::view_federation::IROH_DEPLOYED_READER_FLOOR;
 
 #[async_trait::async_trait]
 pub trait ViewFederationBackend: Send + Sync + 'static {

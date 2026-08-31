@@ -785,17 +785,21 @@ const INVENTORY_ENVELOPE_RESERVE: usize = 8 * 1024;
 /// Byte budget for the serialized inventory *payload* alone — [`MAX_PAYLOAD`]
 /// minus the envelope reserve. A payload trimmed to this budget guarantees the
 /// full `ViewFederationResponse` frame stays under the codec's write bound.
+/// The frame cap OLD deployed iroh readers (pre-2026-08-31 binaries) still
+/// enforce. Lives HERE (the always-compiled plane) because the sender clamp
+/// below must hold in every feature set; `p2p_iroh::view_fed::
+/// DEPLOYED_READER_FLOOR` aliases this when that gated module is compiled.
+pub const IROH_DEPLOYED_READER_FLOOR: usize = 256 * 1024;
+
 /// CONSERVATIVE-SENDER clamp (2026-08-31): sized under the 256 KiB frame cap
 /// that pre-cure iroh READERS across the deployed fleet still enforce
-/// (`crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR`) — NOT under this
-/// plane's own 1 MiB [`MAX_PAYLOAD`]. A page trimmed smaller is decodable by
-/// every reader old and new (just more pages); a page trimmed to 1 MiB was
-/// refused outright by every iroh reader (`frame too large`), which starved
-/// an iroh-only peer of ALL inventory — the hint plane that feeds head
-/// adoption. Raise back toward MAX_PAYLOAD only after the whole fleet runs
-/// the liberal reader.
-const INVENTORY_PAYLOAD_BUDGET: usize =
-    crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR - INVENTORY_ENVELOPE_RESERVE;
+/// ([`IROH_DEPLOYED_READER_FLOOR`]) — NOT under this plane's own 1 MiB
+/// [`MAX_PAYLOAD`]. A page trimmed smaller is decodable by every reader old
+/// and new (just more pages); a page trimmed to 1 MiB was refused outright by
+/// every iroh reader (`frame too large`), which starved an iroh-only peer of
+/// ALL inventory — the hint plane that feeds head adoption. Raise back toward
+/// MAX_PAYLOAD only after the whole fleet runs the liberal reader.
+const INVENTORY_PAYLOAD_BUDGET: usize = IROH_DEPLOYED_READER_FLOOR - INVENTORY_ENVELOPE_RESERVE;
 
 /// MessagePack-serialized byte length of an inventory payload — the same
 /// named-field encoding the codec puts on the wire (the payload rides the frame
@@ -1287,10 +1291,10 @@ mod tests {
     #[test]
     fn inventory_budget_fits_the_deployed_reader_floor() {
         assert!(
-            INVENTORY_PAYLOAD_BUDGET + INVENTORY_ENVELOPE_RESERVE
-                <= crate::p2p_iroh::view_fed::DEPLOYED_READER_FLOOR,
+            INVENTORY_PAYLOAD_BUDGET + INVENTORY_ENVELOPE_RESERVE <= IROH_DEPLOYED_READER_FLOOR,
             "a sender page must be decodable by the oldest deployed iroh reader"
         );
+        #[cfg(feature = "p2p-iroh")]
         assert!(
             crate::p2p_iroh::view_fed::MAX_PAYLOAD >= MAX_PAYLOAD,
             "the iroh reader cap must be at least as liberal as the libp2p plane's"
