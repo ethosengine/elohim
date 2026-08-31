@@ -4968,40 +4968,68 @@ async fn async_main(
         // The reconcile arms ask peers through `ReconcilePeers`; a libp2p handle
         // is one source, the iroh peer book + view-federation ALPN is the other.
         // With neither there is no discovery and no heal — declared below.
-        let reconcile_peers: Option<Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>> =
+        // BOTH planes feed the reconcile stream (2026-08-31 cure). The prior
+        // selection was libp2p-if-present-ELSE-iroh, so a DUAL fleet polled
+        // only its libp2p peers and an iroh-only peer was invisible to every
+        // inventory poll, hint, and head-record fetch by construction —
+        // measured live as the workspace supplier W2 that no fleet peer ever
+        // asked, across two full fleet reboots. Dual now means dual: the legs
+        // compose (union of peers, transport-shaped fallthrough) via
+        // `CompositeReconcilePeers`.
+        let libp2p_leg: Option<Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>> =
             match p2p_handle {
                 Some(handle) => Some(Arc::new(handle)),
-                None => {
-                    #[cfg(feature = "p2p-iroh")]
-                    {
-                        if elohim_storage::p2p_iroh::iroh_fetch_leg().is_some() {
-                            info!(
-                                "projection-reconcile: no libp2p node — discovery + heal ride the iroh plane"
-                            );
-                            // Same preference as the libp2p identity: operator
-                            // override → the REAL conductor cell key → empty.
-                            let iroh_agent_cid = args
-                                .agent_pubkey
-                                .clone()
-                                .or_else(|| {
-                                    hc_registry_for_http
-                                        .as_ref()
-                                        .and_then(|r| r.lamad_client())
-                                        .map(|hc| hc.agent_key_uhcak())
-                                })
-                                .unwrap_or_default();
-                            Some(Arc::new(elohim_storage::p2p_iroh::IrohReconcilePeers::new(
-                                iroh_agent_cid,
-                            )))
-                        } else {
-                            None
-                        }
-                    }
-                    #[cfg(not(feature = "p2p-iroh"))]
-                    {
-                        None
-                    }
+                None => None,
+            };
+        #[cfg(feature = "p2p-iroh")]
+        let iroh_leg: Option<
+            Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>,
+        > = if elohim_storage::p2p_iroh::iroh_fetch_leg().is_some() {
+            // Same preference as the libp2p identity: operator
+            // override → the REAL conductor cell key → empty.
+            let iroh_agent_cid = args
+                .agent_pubkey
+                .clone()
+                .or_else(|| {
+                    hc_registry_for_http
+                        .as_ref()
+                        .and_then(|r| r.lamad_client())
+                        .map(|hc| hc.agent_key_uhcak())
+                })
+                .unwrap_or_default();
+            Some(Arc::new(elohim_storage::p2p_iroh::IrohReconcilePeers::new(
+                iroh_agent_cid,
+            )))
+        } else {
+            None
+        };
+        #[cfg(not(feature = "p2p-iroh"))]
+        let iroh_leg: Option<
+            Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>,
+        > = None;
+        let reconcile_peers: Option<Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>> =
+            match (libp2p_leg, iroh_leg) {
+                (Some(a), Some(b)) => {
+                    info!(
+                        "projection-reconcile: DUAL peer source — libp2p + iroh legs composed \
+                         (iroh-only peers are now discoverable)"
+                    );
+                    let agent = a.agent_pubkey().to_string();
+                    Some(Arc::new(
+                        elohim_storage::p2p::reconcile_peers::CompositeReconcilePeers::new(
+                            vec![a, b],
+                            agent,
+                        ),
+                    ))
                 }
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => {
+                    info!(
+                        "projection-reconcile: no libp2p node — discovery + heal ride the iroh plane"
+                    );
+                    Some(b)
+                }
+                (None, None) => None,
             };
         match (reconcile_secs, reconcile_peers, db_pool.clone()) {
             (0, _, _) => {
