@@ -16112,3 +16112,27 @@ pub fn get_governance_action_with_children(
 ) -> ExternResult<GovernanceActionWithChildren> {
     governance_action::get_governance_action_with_children(parent_cid)
 }
+
+/// Rung-1 upgrade-vehicle probe: which coordinator build is live in this cell?
+///
+/// The coordinator hot-swap vehicle (`POST /admin/coordinators/sync`,
+/// `scripts/ci/fleet-coordswap.sh`) verifies a swap by wasm-hash readback;
+/// this extern is the human-legible companion — a version/marker string the
+/// driver can call before/after a rolling swap. Coordinator-only by design:
+/// it never moves the DNA hash, so it is itself hot-swappable.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ZomeBuildInfo {
+    pub crate_version: String,
+    /// Set at build time via the COORD_BUILD_MARKER env var (option_env!),
+    /// e.g. a git short-sha or a CI build number. None on plain local builds.
+    pub build_marker: Option<String>,
+}
+
+#[hdk_extern]
+pub fn zome_build_info(_: ()) -> ExternResult<ZomeBuildInfo> {
+    Ok(ZomeBuildInfo {
+        crate_version: env!("CARGO_PKG_VERSION").to_string(),
+        build_marker: option_env!("COORD_BUILD_MARKER").map(|s| s.to_string()),
+    })
+}

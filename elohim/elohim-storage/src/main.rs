@@ -3782,6 +3782,10 @@ async fn async_main(
     if let Some(ref admin_ws) = agent_info_admin_ws {
         http_server = http_server.with_admin_websocket(Arc::clone(admin_ws));
     }
+    // Wire the installed app id so POST /admin/coordinators/sync (rung 1 of the
+    // upgrade-velocity debt snowball — the coordinator hot-swap vehicle) can
+    // default its target app without the caller naming it.
+    http_server = http_server.with_happ_app_id(args.app_id.clone());
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
     // When the iroh node started successfully, thread its blob store so that

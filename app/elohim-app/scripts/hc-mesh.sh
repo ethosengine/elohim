@@ -461,6 +461,10 @@ ELOHIM_ADOPT_BEFORE_AUTHOR="${MESH_ADOPT_BEFORE_AUTHOR:-1}"
 # default ON (the mesh is where the capability is proven); prod ships dormant
 # behind ELOHIM_OBEY_CARRIED_ELECTION.
 ELOHIM_OBEY_CARRIED_ELECTION="${MESH_OBEY_CARRIED_ELECTION:-1}"
+# Rung-1 coordinator hot-swap vehicle (2026-08-31): allow the conductor's
+# update_coordinators hot-swap on the mesh by default — the mesh is where
+# coordinator rollouts are proven before the fleet. Prod gates this per-env.
+ALLOW_COORDINATOR_UPDATE="${MESH_ALLOW_COORDINATOR_UPDATE:-true}"
 # Serialize adopt/contest declares on the mesh: concurrent declares race the
 # conductor source-chain head ("bundle head has moved", 2026-08-16 measure) and
 # every collision costs a fallback + next-sweep retry — fanout 1 lands first-try.
@@ -1144,6 +1148,7 @@ restart_env_overlay() { # <captured-environ> <peer-name>
       "ELOHIM_HEAD_CORPUS_DIGEST=$ELOHIM_HEAD_CORPUS_DIGEST" \
       "ELOHIM_ADOPT_BEFORE_AUTHOR=$ELOHIM_ADOPT_BEFORE_AUTHOR" \
       "ELOHIM_OBEY_CARRIED_ELECTION=$ELOHIM_OBEY_CARRIED_ELECTION" \
+      "ALLOW_COORDINATOR_UPDATE=$ALLOW_COORDINATOR_UPDATE" \
       "ADOPT_CONTEST_FANOUT=$ADOPT_CONTEST_FANOUT" \
       "ELOHIM_NETWORK_STAKES=$ELOHIM_NETWORK_STAKES" \
       "ALLOW_SEED_NETWORK_STAKES=1" \
@@ -1887,6 +1892,7 @@ PYEOF
       ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
       ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
       ELOHIM_OBEY_CARRIED_ELECTION="$ELOHIM_OBEY_CARRIED_ELECTION" \
+      ALLOW_COORDINATOR_UPDATE="$ALLOW_COORDINATOR_UPDATE" \
       ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
       ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
       ALLOW_SEED_NETWORK_STAKES=1 \

@@ -379,6 +379,12 @@ pub struct HttpServer {
     /// connections — it answers 503 only when no admin-capable connection
     /// exists at all.
     admin_websocket: Option<Arc<holochain_client::AdminWebsocket>>,
+    /// Installed app id of the hApp this node runs (`--app-id`), wired at
+    /// startup alongside `admin_websocket`. Used as the default `app_id` for
+    /// `POST /admin/coordinators/sync` so the caller does not have to know the
+    /// node's install name. None → the handler falls back to
+    /// `happ_manager::APP_ID`.
+    happ_app_id: Option<String>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -858,6 +864,7 @@ impl HttpServer {
             conductor_manager: None,
             reconcile_kick: None,
             admin_websocket: None,
+            happ_app_id: None,
             fan_out_ctx: None,
             network_stakes_resolver: None,
             #[cfg(feature = "ssr")]
@@ -990,6 +997,13 @@ impl HttpServer {
     /// state straight from the conductor (Cat-C operational diagnostics).
     pub fn with_admin_websocket(mut self, admin_ws: Arc<holochain_client::AdminWebsocket>) -> Self {
         self.admin_websocket = Some(admin_ws);
+        self
+    }
+
+    /// Wire the installed app id (`--app-id`) so `POST /admin/coordinators/sync`
+    /// can default its target app without the caller naming it.
+    pub fn with_happ_app_id(mut self, app_id: String) -> Self {
+        self.happ_app_id = Some(app_id);
         self
     }
 
@@ -1704,6 +1718,19 @@ impl HttpServer {
             (Method::POST, "/admin/arc-policy/actuate") => {
                 self.handle_arc_policy_actuate(req).await
             }
+
+            // Rung 1 of the upgrade-velocity debt snowball (backlog
+            // `upgrade-propagation-p2p-design-arc`): the fleet coordinator
+            // hot-swap vehicle. POSTs a `.happ` bundle and runs the SAME
+            // coordinator-drift sweep the boot path runs — the conductor's
+            // `update_coordinators` hot-swap preserves agent key, cells and DHT
+            // state, so a coordinator-only change lands in minutes over HTTP
+            // instead of a 2-4h pod-image roll. `apply=false` (default) is a
+            // dry-run and always allowed; `apply=true` is gated by
+            // ALLOW_COORDINATOR_UPDATE (inheriting ALLOW_DNA_REINSTALL).
+            // Node-local: deliberately NOT in build_manifest() — never
+            // doorway-proxied.
+            (Method::POST, "/admin/coordinators/sync") => self.handle_coordinators_sync(req).await,
 
             // Operator/seed deterministic shard-manifest + agent-keyed locations
             // write — the gated lever that lights the resilience card's
@@ -4789,6 +4816,188 @@ impl HttpServer {
                 "rowsUpdated": updated,
             }),
         ))
+    }
+
+    /// Rung 1 of the upgrade-velocity debt snowball — the fleet coordinator
+    /// hot-swap vehicle (backlog `upgrade-propagation-p2p-design-arc`).
+    ///
+    /// `POST /admin/coordinators/sync?apply=true|false&appId=<id>`
+    /// Body: raw `.happ` bundle bytes (`application/octet-stream`, 64 MiB cap).
+    ///
+    /// Runs the SAME per-role coordinator-drift sweep the boot path runs
+    /// (`happ_manager::sync_coordinators_report`), against the posted bundle
+    /// instead of the on-disk one. `update_coordinators` is a conductor
+    /// hot-swap: agent key, cells and DHT state all survive, so a
+    /// coordinator-only change lands in minutes over HTTP rather than a
+    /// multi-hour pod-image roll. Nothing restarts.
+    ///
+    /// A per-role LINEAGE GUARD refuses any role whose posted bundle carries a
+    /// different DNA hash than the installed cell: `update_coordinators` matches
+    /// integrity dependencies by name, so a cross-lineage bundle would splice
+    /// coordinators onto integrity zomes they were never compiled against. Such
+    /// a role reports `error: "dnaHashMismatch: …"` with `applied: false` in
+    /// BOTH modes; the other roles proceed independently. An integrity change
+    /// belongs on the reinstall/migration path, never on this vehicle.
+    ///
+    /// `apply=false` (default) is a dry-run and is ALWAYS allowed — reporting
+    /// drift is diagnostics, not mutation. `apply=true` requires
+    /// `ALLOW_COORDINATOR_UPDATE=true` (inheriting `ALLOW_DNA_REINSTALL`), the
+    /// same gate the boot path honours. Node-local: deliberately NOT in
+    /// build_manifest(), so it is never doorway-proxied.
+    async fn handle_coordinators_sync(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        /// Bundle upload cap. The packed elohim `.happ` is single-digit MiB;
+        /// 64 MiB is generous headroom that still bounds the buffer.
+        const MAX_BUNDLE_BYTES: usize = 64 * 1024 * 1024;
+
+        // Admin-connection selection — SAME resolution as
+        // `GET /db/p2p/conductor-diagnostics`: prefer the embedded conductor's
+        // dedicated admin handle (alpha fleet — conductor in-pod, wired at
+        // startup), fall back to any live external-conductor bridge in the
+        // HcClientRegistry (local mesh / W2 workspace peer / split-conductor
+        // fleet — storage dialed `--admin-url`; every registry role holds an
+        // AdminWebsocket to that same conductor, kept fresh across conductor
+        // restarts by the bridge supervisor).
+        //
+        // The external path is LOAD-BEARING, not a courtesy: `ensure_happ_installed`
+        // (and with it the boot-time coordinator sweep) runs only inside the
+        // embedded conductor boot loop, so an external-attached storage peer
+        // receives coordinator hot-swaps by NO other route today — this endpoint
+        // is that gap's cure (backlog `sovereign-peer-network-read-no-authorities`).
+        // 503 only when NEITHER connection exists: the honest "no conductor"
+        // answer, never a topology artifact.
+        let Some(admin_ws) = self.admin_websocket.as_deref().cloned().or_else(|| {
+            self.hc_registry
+                .as_ref()
+                .and_then(|r| r.any_admin_websocket())
+        }) else {
+            return Ok(response::json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &serde_json::json!({
+                    "error": "coordinator sync unavailable: no conductor admin connection (embedded or external)",
+                }),
+            ));
+        };
+
+        #[derive(Debug, Default, serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SyncQuery {
+            apply: Option<bool>,
+            /// Accepts BOTH `appId` (this crate's camelCase query convention)
+            /// and `app_id` — the rolling driver `scripts/ci/fleet-coordswap.sh`
+            /// sends the latter, and a silent fall-through to the node default
+            /// is exactly the failure this alias makes impossible.
+            #[serde(alias = "app_id")]
+            app_id: Option<String>,
+        }
+        let query: SyncQuery =
+            serde_urlencoded::from_str(req.uri().query().unwrap_or("")).unwrap_or_default();
+        let apply = query.apply.unwrap_or(false);
+        let app_id = query.app_id.clone().unwrap_or_else(|| {
+            self.happ_app_id
+                .clone()
+                .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string())
+        });
+
+        // Gate BEFORE reading the body — a refused apply should not cost a
+        // 64 MiB upload.
+        if apply && !crate::happ_manager::coordinator_update_allowed() {
+            return Ok(response::json_response(
+                StatusCode::FORBIDDEN,
+                &serde_json::json!({
+                    "error": "apply=true refused: coordinator hot-swap is not permitted on this node",
+                    "envVar": "ALLOW_COORDINATOR_UPDATE",
+                    "hint": "set ALLOW_COORDINATOR_UPDATE=true (or ALLOW_DNA_REINSTALL=true); apply=false dry-run is always allowed",
+                }),
+            ));
+        }
+
+        // Refuse an oversized upload on the declared length before buffering it.
+        if let Some(len) = req
+            .headers()
+            .get(hyper::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<usize>().ok())
+        {
+            if len > MAX_BUNDLE_BYTES {
+                return Ok(response::json_response(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    &serde_json::json!({
+                        "error": format!("bundle too large: {len} bytes exceeds the {MAX_BUNDLE_BYTES} byte cap"),
+                    }),
+                ));
+            }
+        }
+
+        let bytes = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        if bytes.is_empty() {
+            return Ok(response::bad_request(
+                "empty body — POST the .happ bundle bytes as application/octet-stream",
+            ));
+        }
+        if bytes.len() > MAX_BUNDLE_BYTES {
+            return Ok(response::json_response(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                &serde_json::json!({
+                    "error": format!("bundle too large: {} bytes exceeds the {MAX_BUNDLE_BYTES} byte cap", bytes.len()),
+                }),
+            ));
+        }
+
+        // `bundle_role_dna_files` reads a PATH, so the upload has to land on
+        // disk. `tempfile` is a dev-dependency only in this crate (a real dep
+        // pulls `getrandom` into build scripts — see Cargo.toml's pprof note),
+        // so this is std + a drop-guard that unlinks on every exit path.
+        struct TempBundle(std::path::PathBuf);
+        impl Drop for TempBundle {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let unique = format!(
+            "elohim-coordinator-sync-{}-{}.happ",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
+        let temp = TempBundle(std::env::temp_dir().join(unique));
+        std::fs::write(&temp.0, &bytes)
+            .map_err(|e| StorageError::Internal(format!("write temp bundle: {e}")))?;
+
+        tracing::info!(
+            app_id = app_id.as_str(),
+            apply,
+            bundle_bytes = bytes.len(),
+            "POST /admin/coordinators/sync — running coordinator drift sweep"
+        );
+
+        let outcome =
+            crate::happ_manager::sync_coordinators_report(&admin_ws, &app_id, &temp.0, apply).await;
+        drop(temp);
+
+        match outcome {
+            Ok(report) => {
+                tracing::info!(
+                    app_id = app_id.as_str(),
+                    apply,
+                    drifted = report.drifted_count,
+                    applied = report.applied_count,
+                    "coordinator drift sweep complete"
+                );
+                Ok(response::ok(&report))
+            }
+            Err(e) => Ok(response::internal_error(&format!(
+                "coordinator sync failed: {e}"
+            ))),
+        }
     }
 
     /// Operator/agent-initiated authority-arc actuation — the explicit POST
