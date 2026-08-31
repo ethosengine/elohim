@@ -1,4 +1,11 @@
-# Adam — Genesis Peer (alpha)
+# Adam — Genesis Peer (alpha), STORAGE workload.
+#
+# Hand-baked twin of _edgenode-consolidated.template.yaml. Its conductor half
+# lives in adam-firstman-conductor.yaml (rung 2 of the upgrade-velocity debt
+# snowball) — see that file and the shared templates' headers for the PVC
+# continuity trick, the two-cadence image pin, the deploy ordering and the
+# rollback. Keep this file and the shared storage template in lockstep.
+#
 # Stewards: all content at network birth, relaxes to commons after replication
 # Trust topology: bootstraps to all five other conductors
 # Resource profile: ELEVATED — handles initial content seed write before P2P replication kicks in
@@ -38,124 +45,14 @@ data:
     # because 0.0.0.0 overlaps with localhost. So the forwarder listens on
     # 8444/8445 externally and bridges to 4444/4445 on localhost — matching
     # the socat convention that legacy-pattern humans use.
-    expose_conductor_externally = true
+    # OFF since rung 2 — no conductor in THIS pod to forward to; the bridge is
+    # the socat ws-proxy sidecar in adam-firstman-conductor.yaml. Keys kept
+    # (PolicyConfig requires the section) but inert while this is false.
+    expose_conductor_externally = false
     conductor_external_bind = "0.0.0.0:8445"
     conductor_internal_port = 4445
     conductor_admin_external_bind = "0.0.0.0:8444"
     conductor_admin_internal_port = 4444
----
-# ConfigMap for conductor configuration
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: RESOURCE_PREFIX_PLACEHOLDER-config
-  namespace: NAMESPACE_PLACEHOLDER
-  labels:
-    app: elohim-edgenode
-    elohim-human: adam-firstman
-    environment: ENV_PLACEHOLDER
-    app.kubernetes.io/name: edgenode
-    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
-    app.kubernetes.io/component: data
-    app.kubernetes.io/part-of: elohim
-    app.kubernetes.io/managed-by: jenkins
-data:
-  # hApp version to fetch from Harbor (dev-latest for dev environments, explicit version for prod)
-  happ-version: "HAPP_TAG_PLACEHOLDER"
-  conductor-config.yaml: |
-    # Holochain Conductor Configuration for Elohim Protocol
-    # Conductor binds to 127.0.0.1:4444/4445 (Holochain's safe default).
-    # elohim-storage's forwarder bridges pod-network:4444/4445 → 127.0.0.1,
-    # so doorway reaches admin via the pod-IP without Holochain itself
-    # exposing externally. See peer-policy ConfigMap in this manifest.
-    admin_interfaces:
-      - driver:
-          type: websocket
-          port: 4444
-          allowed_origins: "*"
-    network:
-      # Bootstrap served by Doorway gateway
-      bootstrap_url: "BOOTSTRAP_URL_PLACEHOLDER"
-      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "SIGNAL_URL_PLACEHOLDER"
-      # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while the
-      # build compiles tx5-only). Hand-rendered (this manifest is not sed-templated for
-      # relay_url): adam is node-type=remote, so deployHumanManifest's primaryDoorway
-      # selection (mirroring signal_url above) resolves him to doorway B — shem/apex,
-      # elohim.host — whose relay is https://relay.elohim.host (Wave 2 relay-sovereignty
-      # design, D2: relay is a per-doorway concern, doorway A -> relay.alpha.elohim.host,
-      # doorway B -> relay.elohim.host). Must be live before any transport-iroh build
-      # ships; never fall back to n0's public relay default.
-      relay_url: "https://relay.elohim.host"
-      webrtc_config:
-        iceServers:
-          - urls: ["stun:stun.cloudflare.com:3478"]
-          - urls: ["stun:stun.l.google.com:19302"]
-          # Sovereign TURN relay — see the edgenode template's comment. adam is
-          # the shem-side genesis anchor, the exact peer whose fetches toward the
-          # household fail. The prior diagnostic relay (openrelay.metered.ca)
-          # went globally dead 2026-07-13; replaced by our own coturn pair
-          # (`genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
-          # `alpha-coturn-shem.yaml`). Keep the credential in sync with those
-          # ConfigMaps' `user=`.
-          # Dual-WAN ICE failover: operations (on-prem, alpha.elohim.host) relay
-          # primary, shem (the apex — adam's own premises) redundant — either
-          # works, ICE gathers candidates from both. Role-named DNS (2026-07-28):
-          # no node names in public DNS; each name is beacon-managed and
-          # dynamic-IP-safe. turns:5349 TLS is a later phase; 3478-first.
-          - urls:
-              - "turn:alpha.elohim.host:3478?transport=udp"
-              - "turn:alpha.elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
-          - urls:
-              - "turn:elohim.host:3478?transport=udp"
-              - "turn:elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
-      # ARC-CONVERGENCE tuning — REVERTED TO UPSTREAM DEFAULTS for adam only
-      # (2026-07-29). This host previously carried the household slow-WAN
-      # profile (roundTimeoutMs 60000, maxConcurrentAcceptedRounds 4, added
-      # 2026-07-20 for a slow-link node whose SQLite write guard was saturated
-      # by concurrent gossip rounds). That profile is WRONG for a multi-tenant
-      # conductor, and it is still correct for households — it stays in
-      # `_edgenode-consolidated.template.yaml`; do not propagate this revert
-      # there.
-      #
-      # Why: a cell is only an authority for a hash when its CURRENT storage arc
-      # covers it, and kitsune2 resets every local agent's current arc to Empty
-      # on join — i.e. on every conductor restart (kitsune2_core
-      # factories/core_space.rs `local_agent_join`). The arc is promoted to FULL
-      # only when a gossip round completes with zero mismatched sectors
-      # (kitsune2_gossip storage_arc.rs). Until then, `target_arc_factor: 1`
-      # notwithstanding, every zome get/get_links leaves the box and dies on
-      # `request_timeout_s`. Probed on adam 2026-07-29: ONE "Updating storage arc
-      # to full" line in the 44 minutes after a 10:57Z boot, across ~28 hosted
-      # agents — arc convergence, not corpus size, is this node's bottleneck.
-      #
-      # The household profile actively slowed that convergence here: a stalled
-      # round held its slot 4× longer (60s vs 15s) while inbound accept slots
-      # were cut 10 → 4, on the one host in the fleet with the most cells
-      # sharing a single per-space gossip initiate slot.
-      advanced:
-        k2Gossip:
-          roundTimeoutMs: 15000
-          maxConcurrentAcceptedRounds: 10
-    # NOTE — `request_timeout_s` was CONSIDERED AND DROPPED here (2026-07-29).
-    # Lowering it from the 60s default was proposed to keep the conductor's own
-    # give-up under elohim-storage's 15s heal deadline. Rejected on review: this
-    # key is CONDUCTOR-WIDE, and tx5 first-contact alone can burn 45-60s in
-    # WebRTC connect, so a 10s cap would fast-fail the declare paths we
-    # deliberately keep on the Network strategy, plus every other DNA's network
-    # gets across all of adam's hosted agents. With the heal read path now Local
-    # (`resolve_content_head_local`), the cap has no remaining purpose. The
-    # convergence-relevant knobs are the k2Gossip ones above. Do not re-propose
-    # this without a per-call timeout mechanism rather than a conductor-wide one.
-    data_root_path: "/var/local/lib/holochain"
-    keystore:
-      type: lair_server_in_proc
-      lair_root: "/var/local/lib/holochain/ks"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -191,20 +88,6 @@ spec:
   template:
     metadata:
       annotations:
-        # Content digest of the hApp behind the floating happ-version tag,
-        # resolved at render time (Jenkinsfile resolveHappDigest). The tag is
-        # mutable — a DNA-pipeline rebuild moves dev-latest/latest to new hApp
-        # bytes with NO edge commit, leaving the rest of this pod template
-        # byte-identical. Stamping the digest here makes such a move change the
-        # StatefulSet spec, so `kubectl apply` reports "configured" and Adam's
-        # genesis-peer surge guard lets the conductor rollout restart proceed —
-        # keeping the bootstrap pair (adam + matthew) on the same DNA hash rather
-        # than skipping the restart on "unchanged" → DNA-hash divergence → DHT
-        # partition. FAIL-SAFE: on resolution failure the Jenkinsfile stamps a
-        # unique marker, never empty/stale, so the deploy still restarts.
-        # (Adam + the consolidated template must carry this in lockstep — the
-        # genesis pair moves together.)
-        elohim.host/happ-digest: "HAPP_DIGEST_PLACEHOLDER"
         # Force a rolling restart on next apply so Adam's pod picks up the
         # Phase A elohim-storage image published by edge #901. Holochain
         # #1125 deployed Adam's peer-policy ConfigMap before edge finished
@@ -217,6 +100,9 @@ spec:
         app: elohim-edgenode
         elohim-human: adam-firstman
         environment: ENV_PLACEHOLDER
+        # Workload discriminator (rung 2) — additive; .spec.selector above is
+        # immutable and keeps matching on the original three labels.
+        elohim-workload: storage
         app.kubernetes.io/name: edgenode
         app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
         app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
@@ -254,43 +140,8 @@ spec:
       # placement for adam never bakes in shem's alpha-specific IP. See
       # genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md.
       hostAliases: HOST_ALIASES_PLACEHOLDER
-      # Init container fetches hApp from Harbor registry using oras
-      initContainers:
-        - name: happ-fetcher
-          image: ghcr.io/oras-project/oras:v1.1.0
-          command: ['sh', '-c']
-          args:
-            - |
-              set -e
-              echo "Fetching hApp from Harbor registry..."
-              echo "Version: ${HAPP_VERSION}"
-
-              # Login to Harbor and pull artifact
-              oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION} -o /happ
-
-              if [ -f /happ/elohim.happ ]; then
-                echo "hApp downloaded successfully from Harbor"
-                ls -lh /happ/elohim.happ
-              else
-                echo "Failed to download hApp from Harbor"
-                exit 1
-              fi
-          env:
-            - name: HAPP_VERSION
-              valueFrom:
-                configMapKeyRef:
-                  name: RESOURCE_PREFIX_PLACEHOLDER-config
-                  key: happ-version
-          volumeMounts:
-            - name: happ-volume
-              mountPath: /happ
-          resources:
-            requests:
-              memory: "32Mi"
-              cpu: "10m"
-            limits:
-              memory: "64Mi"
-              cpu: "100m"
+      # No initContainers: the happ-fetcher moved to
+      # adam-firstman-conductor.yaml with the hApp bundle it fetches (rung 2).
       containers:
         # elohim-node: unified conductor + storage + P2P
         # Manages holochain conductor as embedded child process.
@@ -314,43 +165,38 @@ spec:
               # in kitsune2_bootstrap_client) — remove after
               # backlog/iroh-lane-bootstrap-publish-dark closes.
               value: "info,elohim_storage=debug,kitsune2_core=debug,kitsune2_bootstrap_client=debug"
-            # --- Embedded conductor mode ---
+            # --- External conductor mode (rung 2) ---
+            # EMBEDDED_CONDUCTOR is a clap bool flag with ValueParser::bool(),
+            # so "false" parses as false and a typo hard-errors at startup.
+            # External mode = this flag false AND HOLOCHAIN_ADMIN_URL set;
+            # main.rs then runs HcClientRegistry::connect + the bridge
+            # supervisor, which owns retry/reconnect and token re-minting.
+            # CONDUCTOR_CONFIG_PATH / CONDUCTOR_DATA_DIR / HAPP_PATH /
+            # HAPP_INSTALL_TIMEOUT_SECS / ALLOW_DNA_REINSTALL moved to
+            # adam-firstman-conductor.yaml (they only read in embedded mode).
             - name: EMBEDDED_CONDUCTOR
-              value: "true"
-            - name: CONDUCTOR_CONFIG_PATH
-              value: "/etc/holochain/conductor-config.yaml"
-            - name: CONDUCTOR_DATA_DIR
-              value: "/var/local/lib/holochain"
-            - name: HAPP_PATH
-              value: "/opt/holochain/elohim.happ"
-            # Admin-WS request timeout (seconds) for the embedded conductor. Covers
-            # the cold FIRST hApp install (single-threaded wasm compile + genesis),
-            # which on shem's per-core speed exceeds holochain_client's 60s default
-            # → `install_app ... Websocket error: Timeout` → crash-loop. adam runs
-            # warm today, but a genesis self-heal wipe re-triggers a cold install,
-            # so the apex needs the wider budget too. Tunable here without a
-            # rebuild; keep < the deploy rollout-status timeout (600s). Default 180.
-            - name: HAPP_INSTALL_TIMEOUT_SECS
-              value: "180"
-            # Path to the peer-policy mount — enables conductor forwarders.
+              value: "false"
+            # Path to the peer-policy mount. Still required: [pool] /
+            # [stewardship] gate the PeerStatus heartbeat and the signal
+            # subscribers. Its [network] block is now inert.
             - name: ELOHIM_STORAGE_PEER_POLICY_PATH
               value: "/etc/elohim/peer-policy.toml"
-            # --- Storage config (unchanged) ---
+            # --- Conductor attachment ---
+            # Pod-direct headless DNS of adam's conductor StatefulSet, naming
+            # the socat-bridged CONTAINER ports (8444 admin / 8445 app).
+            # Pod-direct names bypass Service port mapping, so 4444/4445 would
+            # be wrong here even though the conductor ClusterIP Service
+            # publishes them. Rendered from CONDUCTOR_WS_HOST_PLACEHOLDER, the
+            # same value doorway gets from computeConductorUrls.
             - name: HOLOCHAIN_ADMIN_URL
-              value: "ws://localhost:4444"
+              value: "ws://CONDUCTOR_WS_HOST_PLACEHOLDER:8444"
             - name: HOLOCHAIN_APP_URL
-              value: "ws://localhost:4445"
+              value: "ws://CONDUCTOR_WS_HOST_PLACEHOLDER:8445"
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
-            # Hand-rendered manifest (no template sed): set the DNA-drift
-            # auto-reinstall gate directly. adam is alpha (ephemeral, re-seeded)
-            # and the genesis pair with matthew — both MUST land the same DNA
-            # hash or they partition onto different DHTs, so adam needs this too.
-            - name: ALLOW_DNA_REINSTALL
-              value: "true"
-            # Adopt-before-author gate — hand-rendered like the reinstall gate
-            # above (adam is alpha). See the template's inline comment; adam is
-            # a supplier peer, so the both-sides-missing exit needs him on.
+            # Adopt-before-author gate — hand-rendered (adam is alpha). See the
+            # template's inline comment; adam is a supplier peer, so the
+            # both-sides-missing exit needs him on.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "true"
             # Ghost-declaration decay — hand-rendered like the gate above (adam
@@ -415,18 +261,8 @@ spec:
             - name: ELOHIM_TRANSPORT_BACKEND
               value: "dual"
           ports:
-            # Conductor admin WebSocket — exposed via elohim-storage forwarder
-            # on 8444 (bridges to conductor's 127.0.0.1:4444). Port 4444 on
-            # the pod network is unreachable because 0.0.0.0:4444 would
-            # collide with the conductor's localhost bind in the same netns.
-            - name: admin-ws-fwd
-              containerPort: 8444
-              protocol: TCP
-            # Conductor app WebSocket — exposed via forwarder on 8445
-            # (bridges to conductor's 127.0.0.1:4445). Same rationale as admin.
-            - name: app-ws-fwd
-              containerPort: 8445
-              protocol: TCP
+            # Conductor admin/app WS (8444/8445) are NOT served here since
+            # rung 2 — they belong to the conductor StatefulSet's ws-proxy.
             # elohim-storage HTTP API
             - name: storage-http
               containerPort: 8090
@@ -435,40 +271,39 @@ spec:
             - name: p2p
               containerPort: 9876
               protocol: TCP
-          # Cooperative memory pool — conductor + storage share one cgroup.
-          # Sized ABOVE matthew (device-family-node-base baseline): adam is the
-          # shem-side member of the genesis pair (deployments.json adam.
-          # $genesisPeerComment) AND, since 2026-05-27, the storage backend
-          # behind doorway-B (elohim.host) AND the primary /account/import seed
-          # target — three concurrent read-heavy roles vs matthew's single doorway.
-          # $cpuBumpComment (2026-07-07): cpu limit 3000m→8000m, request 1000m→1500m.
-          # ROOT CAUSE: adam's conductor SQLite read pool = max(2*cpus, 8); at the
-          # old 3000m limit it detected 3 cores → floored at 8 readers, which
-          # sustained-saturated (Util 650-3300%; EPR router failed over off adam
-          # for hours — backlog adam-genesis-anchor-sustained-saturation-post-storm).
-          # 8000m → 8 detected cores → max_readers=16 (2x the pool) + doorway-B
-          # request-serving headroom. The 2026-06-15 matthew bump to 4000m/pool-20
-          # never propagated here (adam uses THIS explicit manifest, not the
-          # template) — this closes that drift and then some. Keep limit >4000m to
-          # hold max_readers above the 8 floor; restore toward the archetype floor
-          # once the anchor read-load is measured settled.
+          # Storage's SHARE of adam's one declared envelope since rung 2.
+          # BUDGET NEUTRALITY: this block plus adam-firstman-conductor.yaml's
+          # sums EXACTLY to deployments.json adam.edgenode* (2Gi/8Gi,
+          # 1500m/8000m) — the split re-partitions, it never adds load:
+          #   memory request 2048Mi = 1280Mi (conductor 5/8) +  768Mi (here)
+          #   memory limit   8192Mi = 5120Mi (conductor 5/8) + 3072Mi (here)
+          #   cpu request     1500m =   750m (conductor 1/2) +   750m (here)
+          #   cpu limit       8000m =  4000m (conductor 1/2) +  4000m (here)
+          # validate-deployments.ts check (3) asserts that SUM against the
+          # deployments.json record, so the two files can neither drift apart
+          # nor quietly inflate adam's real footprint.
+          #
+          # The pre-split rationale for the 8000m single-pod limit (2026-07-07,
+          # genesis anchor + doorway-B + seed target: 8 detected cores → the
+          # conductor's SQLite read pool max(2*cpus,8) → 16 readers) now belongs
+          # to the CONDUCTOR side, which is where that pool lives — see the
+          # OPERATOR-OWNED note in adam-firstman-conductor.yaml's header for the
+          # open question it raises. This side keeps 4000m of dedicated,
+          # UNCONTENDED CPU: pre-split the storage handlers had to win a race
+          # against conductor churn inside one cgroup (hence ELOHIM_CONDUCTOR_NICE
+          # =10, now retired as a no-op).
           resources:
             requests:
-              memory: "2Gi"
-              cpu: "1500m"
+              memory: "768Mi"
+              cpu: "750m"
             limits:
-              memory: "8Gi"
-              cpu: "8000m"
+              memory: "3072Mi"
+              cpu: "4000m"
           volumeMounts:
-            - name: holochain-data
-              mountPath: /var/local/lib/holochain
+            # holochain-data / conductor-config / happ-volume moved to
+            # adam-firstman-conductor.yaml (rung 2).
             - name: storage-data
               mountPath: /data
-            - name: conductor-config
-              mountPath: /etc/holochain/conductor-config.yaml
-              subPath: conductor-config.yaml
-            - name: happ-volume
-              mountPath: /opt/holochain
             - name: peer-policy
               mountPath: /etc/elohim/peer-policy.toml
               subPath: peer-policy.toml
@@ -493,28 +328,19 @@ spec:
             timeoutSeconds: 15
             failureThreshold: 5
       volumes:
-        # Shared volume for hApp (fetched by init container)
-        - name: happ-volume
-          emptyDir: {}
-        # Conductor config from ConfigMap
-        - name: conductor-config
-          configMap:
-            name: RESOURCE_PREFIX_PLACEHOLDER-config
         - name: peer-policy
           configMap:
             name: elohim-adam-alpha-peer-policy
   # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
   # Named volumes are referenced in volumeMounts above
+  # The `holochain-data` template was RETIRED here in rung 2. Its already-minted
+  # PVC (holochain-data-<prefix>-0) is Retained and is now mounted by
+  # adam-firstman-conductor.yaml via explicit claimName — no rename, no
+  # re-genesis, adam's agent key survives. Removing a volumeClaimTemplate is a
+  # Forbidden StatefulSet spec update, so the first deploy after this change
+  # takes deployHumanManifest's orphan-delete + reapply path (pods and PVCs
+  # retained by name).
   volumeClaimTemplates:
-    - metadata:
-        name: holochain-data
-      spec:
-        accessModes: [ReadWriteOnce]
-        # Node-local storage — P2P dataplane is the replication layer, not k8s
-        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
-        resources:
-          requests:
-            storage: 20Gi
     - metadata:
         name: storage-data
       spec:
@@ -549,17 +375,9 @@ spec:
     app: elohim-edgenode
     elohim-human: adam-firstman
     environment: ENV_PLACEHOLDER
+    elohim-workload: storage
   ports:
-    # Conductor admin WebSocket (via forwarder bridge 8444→127.0.0.1:4444)
-    - name: admin-ws
-      port: 4444
-      targetPort: 8444
-      protocol: TCP
-    # Conductor app WebSocket (via forwarder bridge 8445→127.0.0.1:4445)
-    - name: app-ws
-      port: 4445
-      targetPort: 8445
-      protocol: TCP
+    # Conductor admin/app WS moved to <prefix>-conductor-headless (rung 2).
     - name: p2p
       port: 9876
       targetPort: 9876
@@ -583,18 +401,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # Conductor admin WebSocket (via elohim-storage forwarder bridge
-    # 0.0.0.0:8444 → 127.0.0.1:4444 — same external port convention as
-    # legacy socat humans, so doorway can hit :4444 uniformly)
-    - name: admin-ws
-      port: 4444
-      targetPort: 8444
-      protocol: TCP
-    # Conductor app WebSocket (via forwarder bridge 8445 → 4445)
-    - name: app-ws
-      port: 4445
-      targetPort: 8445
-      protocol: TCP
+    # Conductor admin/app WS (4444/4445) moved to the <prefix>-conductor
+    # Service in rung 2 — a Service selects ONE pod set, and this one must keep
+    # selecting the storage pod for :8090 and :9876.
     # elohim-storage HTTP API
     - name: storage-db
       port: 8090
@@ -609,3 +418,4 @@ spec:
     app: elohim-edgenode
     elohim-human: adam-firstman
     environment: ENV_PLACEHOLDER
+    elohim-workload: storage

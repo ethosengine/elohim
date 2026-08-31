@@ -17,10 +17,22 @@ const ROOT = resolve(ORCHESTRATOR, '..', '..');
 
 const JENKINS_PATH = join(ROOT, 'elohim', 'holochain', 'Jenkinsfile');
 const DEPLOYMENTS_PATH = join(ORCHESTRATOR, 'data', 'deployments.json');
+// Rung 2 (2026-08-31) split each human into two StatefulSets. Both pod
+// templates must be free of deploy provenance, so the provenance invariant is
+// asserted over all four manifests.
 const MANIFESTS = [
   join(ORCHESTRATOR, 'manifests', 'humans', '_edgenode-consolidated.template.yaml'),
   join(ORCHESTRATOR, 'manifests', 'humans', 'adam-firstman.yaml'),
+  join(ORCHESTRATOR, 'manifests', 'humans', '_edgenode-conductor.template.yaml'),
+  join(ORCHESTRATOR, 'manifests', 'humans', 'adam-firstman-conductor.yaml'),
 ];
+
+// The hApp content digest belongs to whichever pod template actually runs the
+// conductor. Before rung 2 that was the consolidated storage pod; it is now the
+// conductor pod, and the STORAGE templates deliberately no longer carry it (a
+// DNA move must not roll storage). So this invariant is asserted over the
+// conductor manifests only — moving the subject, not weakening the assertion.
+const CONDUCTOR_MANIFESTS = MANIFESTS.slice(2);
 
 const jenkins = readFileSync(JENKINS_PATH, 'utf8');
 const deployments = JSON.parse(readFileSync(DEPLOYMENTS_PATH, 'utf8'));
@@ -73,6 +85,12 @@ for (const manifestPath of MANIFESTS) {
       'Git-SHA-only drift currently changes .spec.template and starts RollingUpdate during apply',
     );
   });
+
+}
+
+for (const manifestPath of CONDUCTOR_MANIFESTS) {
+  const name = manifestPath.split('/').at(-1);
+  const source = readFileSync(manifestPath, 'utf8');
 
   test(`${name}: a real hApp digest change remains rollout-visible`, () => {
     const first = render(source, { HAPP_DIGEST_PLACEHOLDER: 'sha256:first' });

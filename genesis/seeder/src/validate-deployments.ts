@@ -51,6 +51,7 @@ export interface DeploymentRecord {
   humanId: string;
   pattern: string;
   manifest?: string;
+  conductorManifest?: string;
   template?: string;
   deviceArchetype: string;
   affinityComment?: string;
@@ -352,14 +353,19 @@ interface EffectiveResources {
 }
 
 /**
- * Parse the elohim-node container's resources from an explicit manifest YAML
+ * Parse one named container's resources from an explicit manifest YAML
  * (multi-doc k8s). Returns null if the StatefulSet / container / resources
  * can't be found. Lets the validator assert an explicit-manifest human's
  * hardcoded resources match the budget declared in its deployments.json record
  * — the adam two-copy-drift guard.
+ *
+ * `containerName` defaults to the storage pod's `elohim-node`. Rung 2 split the
+ * human across two StatefulSets in two files, so the conductor half is read
+ * from its own manifest with `elohim-conductor`.
  */
 export function extractManifestResources(
   manifestAbsPath: string,
+  containerName = "elohim-node",
 ): EffectiveResources | null {
   if (!existsSync(manifestAbsPath)) return null;
   const docs = parseAllDocuments(readFileSync(manifestAbsPath, "utf-8"));
@@ -370,7 +376,7 @@ export function extractManifestResources(
     const containers = obj?.spec?.template?.spec?.containers;
     if (!Array.isArray(containers)) continue;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = containers.find((x: any) => x?.name === "elohim-node");
+    const c = containers.find((x: any) => x?.name === containerName);
     const r = c?.resources;
     if (!r) continue;
     return {
@@ -439,6 +445,15 @@ export function validateResourceBudget(
   //     the declared edgenode* budget (keeps the two copies from drifting —
   //     the exact adam failure). Template humans render FROM the record, so
   //     there is no second copy to check.
+  //
+  //     Rung 2 (2026-08-31) split each human across TWO StatefulSets in two
+  //     files, so this became a SUM check and thereby the enforcement point for
+  //     the split's budget-neutrality invariant: storage (`elohim-node`) plus
+  //     conductor (`elohim-conductor`) must equal the ONE declared envelope.
+  //     That matters beyond drift — `edgenode*` is what the
+  //     test-bench-aggregate-capacity portfolio validator sums, and it cannot
+  //     see per-pod fields, so a non-neutral split would double a human's real
+  //     footprint invisibly. Here is where that becomes impossible.
   if (record.manifest) {
     const mres = extractManifestResources(resolve(REPO_ROOT, record.manifest));
     if (mres === null) {
@@ -446,14 +461,39 @@ export function validateResourceBudget(
         `${tag} explicit manifest ${record.manifest} — could not extract elohim-node resources to verify against the declared budget`,
       );
     } else {
-      for (const [bkey, field, conv, label] of BUDGET_DIMS) {
-        const declared = record[field];
-        const inManifest = mres[bkey];
-        if (!declared || !inManifest) continue;
-        if (conv(declared) !== conv(inManifest)) {
-          errors.push(
-            `${tag} manifest ${label} (${inManifest}) does not match declared ${field} (${declared}) — explicit-manifest budget drift; keep ${record.manifest} in lockstep with the record`,
-          );
+      // Absent conductorManifest = pre-split single-pod shape: the storage
+      // manifest alone must equal the envelope (cres contributes 0).
+      const cres = record.conductorManifest
+        ? extractManifestResources(
+            resolve(REPO_ROOT, record.conductorManifest),
+            "elohim-conductor",
+          )
+        : null;
+      if (record.conductorManifest && cres === null) {
+        errors.push(
+          `${tag} explicit conductor manifest ${record.conductorManifest} — could not extract elohim-conductor resources; the storage+conductor budget sum cannot be verified`,
+        );
+      } else {
+        for (const [bkey, field, conv, label] of BUDGET_DIMS) {
+          const declared = record[field];
+          const storageSide = mres[bkey];
+          if (!declared || !storageSide) continue;
+          const conductorSide = cres?.[bkey];
+          if (record.conductorManifest && !conductorSide) {
+            errors.push(
+              `${tag} conductor manifest ${record.conductorManifest} declares no ${label} — the split must partition the whole envelope, not leave a side unbounded`,
+            );
+            continue;
+          }
+          const sum = conv(storageSide) + (conductorSide ? conv(conductorSide) : 0);
+          if (conv(declared) !== sum) {
+            const parts = conductorSide
+              ? `${storageSide} storage + ${conductorSide} conductor`
+              : `${storageSide}`;
+            errors.push(
+              `${tag} manifest ${label} (${parts} = ${sum}) does not equal declared ${field} (${declared}) — the conductor/storage split must be BUDGET-NEUTRAL (it re-partitions the human's envelope, never adds to it). Keep ${record.manifest}${record.conductorManifest ? ` + ${record.conductorManifest}` : ""} in lockstep with the record.`,
+            );
+          }
         }
       }
     }

@@ -543,20 +543,38 @@ def computeP2PBootstrapNodes(Map currentHuman, List allHumans) {
 }
 
 /**
+ * Pod-direct headless DNS name of a human's CONDUCTOR pod.
+ *
+ * Since rung 2 the conductor lives in its own StatefulSet
+ * (`<resourcePrefix>-conductor`) with its own headless Service, so the name is
+ * `<prefix>-conductor-0.<prefix>-conductor-headless.<ns>.svc.cluster.local`.
+ * Pod-direct DNS bypasses Service port mapping, so callers name the CONTAINER
+ * ports 8444 (admin) / 8445 (app) — NOT the Service ports 4444/4445.
+ *
+ * Single source of truth for both consumers: doorway's CONDUCTOR_URLS
+ * (computeConductorUrls) and elohim-storage's external-mode
+ * HOLOCHAIN_ADMIN_URL/HOLOCHAIN_APP_URL (CONDUCTOR_WS_HOST_PLACEHOLDER).
+ */
+def conductorWsHost(String resourcePrefix, String namespace) {
+    return "${resourcePrefix}-conductor-0.${resourcePrefix}-conductor-headless.${namespace}.svc.cluster.local"
+}
+
+/**
  * Compute conductor WebSocket URLs for a doorway in a given environment.
  *
- * Both deployment patterns expose the conductor's app WS on containerPort
- * 8445 (mapped from Holochain's 127.0.0.1:4445):
- *   - legacy (edgenode + socat):      socat bridges 0.0.0.0:8445 → 127.0.0.1:4445
- *   - consolidated (elohim-node):     Rust forwarder bridges 0.0.0.0:8445 → 127.0.0.1:4445
- * Headless-service pod-direct DNS bypasses Service port mapping, so we must
- * name the container port directly. Doorway derives the admin URL as
- * app-port minus 1 → :8444, which both patterns also expose.
+ * The conductor's app WS is bridged onto containerPort 8445 (from Holochain's
+ * 127.0.0.1:4445) by the ws-proxy (socat) sidecar in the conductor pod — the
+ * same 8444/8445 convention the legacy edgenode pattern used, so doorway's
+ * "admin = app-port minus 1" derivation still holds.
+ *
+ * Rung 2 changed only WHICH pod answers this name: the conductor StatefulSet's
+ * headless Service instead of the storage StatefulSet's. Storage HTTP URLs
+ * (computeStorageUrls) are deliberately unchanged.
  */
 def computeConductorUrls(String targetEnv, List allHumans) {
     def envHumans = allHumans.findAll { it.env == targetEnv }
     return envHumans.collect { h ->
-        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:8445"
+        "ws://" + conductorWsHost(h.resourcePrefix, "elohim-${targetEnv}") + ":8445"
     }.join(',')
 }
 
@@ -576,7 +594,13 @@ def computeStorageUrls(String targetEnv, List allHumans) {
  */
 def cleanupOrphanedHumans(List allHumans) {
     def namespaces = ['elohim-alpha', 'elohim-staging', 'elohim-prod']
-    def activeResources = allHumans.collect { "${it.namespace}/${it.resourcePrefix}" } as Set
+    // Rung 2: every human now owns TWO StatefulSets — `<prefix>` (storage) and
+    // `<prefix>-conductor`. Both must be in the active set, or the next deploy
+    // scales the conductors of every live human to 0 (they carry the same
+    // `app=elohim-edgenode` label this listing selects on).
+    def activeResources = allHumans.collectMany {
+        ["${it.namespace}/${it.resourcePrefix}", "${it.namespace}/${it.resourcePrefix}-conductor"]
+    } as Set
     def undrained = []   // orphans found but NOT scaled to 0 — RBAC drift, must not phantom-green
 
     namespaces.each { ns ->
@@ -824,7 +848,7 @@ def nonProdTrueGate(String env) {
  * capture); the placeholder set and substitution values are byte-identical
  * to the pre-extraction inline version.
  */
-def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String happDigest, String storageImage, String nonProdGate, Map primaryDoorway, String relayUrl, String hostAliases, String p2pNodes, String nodeTypeValues, String deviceArchetype, String householdId, String nodeRole, String region) {
+def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String happDigest, String storageImage, String conductorImage, String conductorWsHost, String nonProdGate, Map primaryDoorway, String relayUrl, String hostAliases, String p2pNodes, String nodeTypeValues, String deviceArchetype, String householdId, String nodeRole, String region) {
     // Doorway ORIGIN (scheme + host, no path) for the storage-side iroh bootstrap:
     // elohim-storage's transport-manifest announcer POSTs to, and its joiner reads,
     // `${ELOHIM_DOORWAY_URL}/p2p/manifests`. Without this env every fleet storage has
@@ -840,6 +864,18 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
         "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
         "s|STORAGE_IMAGE_PLACEHOLDER|${storageImage}|g",
+        // One image artifact, TWO pin cadences (rung 2). The storage tag above
+        // moves every edge build; this one is whatever the human's conductor
+        // StatefulSet already runs, and only advances on a real conductor roll
+        // (see resolveConductorWorkloadImage). Without the split cadence, every
+        // storage commit would still restart every conductor and the rung buys
+        // nothing.
+        "s|CONDUCTOR_WORKLOAD_IMAGE_PLACEHOLDER|${conductorImage}|g",
+        // Pod-direct headless DNS of this human's conductor pod — consumed by
+        // the storage template's HOLOCHAIN_ADMIN_URL/HOLOCHAIN_APP_URL, which
+        // name the CONTAINER ports 8444/8445 (pod-direct DNS bypasses Service
+        // port mapping, so the Service's 4444/4445 would be wrong there).
+        "s|CONDUCTOR_WS_HOST_PLACEHOLDER|${conductorWsHost}|g",
         "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
         "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
         "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
@@ -874,10 +910,30 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         "s|HUMAN_ID_PLACEHOLDER|${humanConfig.humanId}|g",
         "s|NODE_TYPE_VALUES_PLACEHOLDER|${nodeTypeValues}|g",
         "s|AFFINITY_COMMENT_PLACEHOLDER|${humanConfig.affinityComment ?: ''}|g",
-        "s|EDGENODE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.edgenodeMemoryRequest ?: ''}|g",
-        "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
-        "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
-        "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
+        // ── Budget-neutral two-pod split of the human's ONE declared envelope ──
+        // `edgenode{Cpu,Memory}{Request,Limit}` stays the unit of account and is
+        // NOT re-rendered anywhere: it is now partitioned, never duplicated.
+        // conductorShare + storageShare sum to it exactly on all four
+        // dimensions (see their doc comments for the invariant and ratios).
+        //
+        // OVERRIDE CONTRACT: a per-human `conductor{Memory,Cpu}{Request,Limit}`
+        // in deployments.json wins VERBATIM. It is the operator's explicit
+        // ratification, not a hint — the split arithmetic steps aside entirely
+        // and does NOT compensate on the storage side, so an override breaks
+        // budget neutrality on purpose. The `test-bench-aggregate-capacity`
+        // validator cannot see conductor* fields, so an override that grows the
+        // human's real footprint MUST be paired with a matching edgenode* raise
+        // (which that validator does hold to account) or it hides load from the
+        // portfolio. Prefer moving edgenode* and letting the split follow.
+        "s|CONDUCTOR_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.conductorMemoryRequest ?: conductorShare(humanConfig.edgenodeMemoryRequest ?: '', true)}|g",
+        "s|CONDUCTOR_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.conductorMemoryLimit ?: conductorShare(humanConfig.edgenodeMemoryLimit ?: '', true)}|g",
+        "s|CONDUCTOR_CPU_REQUEST_PLACEHOLDER|${humanConfig.conductorCpuRequest ?: conductorShare(humanConfig.edgenodeCpuRequest ?: '', false)}|g",
+        "s|CONDUCTOR_CPU_LIMIT_PLACEHOLDER|${humanConfig.conductorCpuLimit ?: conductorShare(humanConfig.edgenodeCpuLimit ?: '', false)}|g",
+        // Storage side = the exact remainder. Same override contract, mirrored.
+        "s|STORAGE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.storageMemoryRequest ?: storageShare(humanConfig.edgenodeMemoryRequest ?: '', true)}|g",
+        "s|STORAGE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.storageMemoryLimit ?: storageShare(humanConfig.edgenodeMemoryLimit ?: '', true)}|g",
+        "s|STORAGE_CPU_REQUEST_PLACEHOLDER|${humanConfig.storageCpuRequest ?: storageShare(humanConfig.edgenodeCpuRequest ?: '', false)}|g",
+        "s|STORAGE_CPU_LIMIT_PLACEHOLDER|${humanConfig.storageCpuLimit ?: storageShare(humanConfig.edgenodeCpuLimit ?: '', false)}|g",
         // SQLite pool size (consolidated template only). Defaults to '10' (the
         // code default) so an unset node never leaves an unresolved placeholder.
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
@@ -912,9 +968,285 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
     }.join(' ')
 }
 
+// ── Budget-neutral workload split (rung 2) ─────────────────────────────────
+// THE INVARIANT: splitting the conductor out of the consolidated pod must NEVER
+// add aggregate load to a node. It RE-PARTITIONS the human's existing envelope.
+// conductor + storage sum EXACTLY to the human's declared edgenode* values, on
+// all four dimensions, for every human.
+//
+// This is not cosmetic bookkeeping. `edgenode{Cpu,Memory}{Request,Limit}` in
+// deployments.json is the unit of account for the whole governance stack: the
+// archetype floor check and the explicit-manifest match in
+// genesis/seeder/src/validate-deployments.ts, the `archetype-resource-alignment`
+// EPR validator, and — decisively — `test-bench-aggregate-capacity`, which sums
+// exactly those four fields across active humans and composes them against the
+// promoted Rakia ledger (genesis/data/rakia/compute-capacity.json). Two pods
+// each carrying the full edgenode* budget would double the portfolio's real
+// footprint while remaining INVISIBLE to that validator, because it does not
+// read conductor* fields at all. Budget neutrality keeps edgenode* honest: it
+// now means "this human's total envelope, partitioned across two pods".
+//
+// Re-size only with measured evidence PER SIDE, and do it by moving edgenode*
+// (which the capacity validator holds to account), never by inflating one pod's
+// share behind the ledger's back.
+//
+// Ratios (observed behaviour, 2026-08-31): memory conductor 5/8 — the conductor
+// is the RAM consumer, RSS ∝ corpus at full arc (~2.5 GB on alpha), while
+// storage-alone RSS is a few hundred MB and needs headroom only for import
+// bursts. CPU 1/2 — no measurement yet discriminates the two sides, so the
+// neutral halving is the honest default.
+def _CONDUCTOR_MEMORY_NUMERATOR() { return 5 }
+def _CONDUCTOR_MEMORY_DENOMINATOR() { return 8 }
+def _CONDUCTOR_CPU_NUMERATOR() { return 1 }
+def _CONDUCTOR_CPU_DENOMINATOR() { return 2 }
+
 /**
- * Deploy a human manifest with topology-aware placeholder substitution.
- * Uses | as sed delimiter because URLs contain /.
+ * k8s CPU quantity -> millicores. "1500m" -> 1500, "2" -> 2000.
+ * Fails loudly rather than guessing: an unparseable budget must abort the
+ * render, never silently size a pod at zero.
+ */
+def cpuMillicores(String value) {
+    def v = value.trim()
+    if (v.endsWith('m')) {
+        return Integer.parseInt(v.substring(0, v.length() - 1))
+    }
+    return (int) Math.round(Double.parseDouble(v) * 1000)
+}
+
+/**
+ * k8s memory quantity -> mebibytes. "2Gi" -> 2048, "768Mi" -> 768.
+ * Only the binary suffixes this repo actually uses are accepted; anything else
+ * aborts the render (see cpuMillicores' rationale).
+ */
+def memoryMebibytes(String value) {
+    def v = value.trim()
+    if (v.endsWith('Ti')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) * 1024 * 1024) }
+    if (v.endsWith('Gi')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) * 1024) }
+    if (v.endsWith('Mi')) { return (int) Double.parseDouble(v.substring(0, v.length() - 2)) }
+    if (v.endsWith('Ki')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) / 1024) }
+    error "Unsupported memory quantity '${value}' in a per-human budget — use Ki/Mi/Gi/Ti so the conductor/storage split stays exact."
+}
+
+/**
+ * The conductor's share of one budget dimension, rounded DOWN to a clean unit
+ * (Mi for memory, m for CPU). Integer division is the rounding: any remainder
+ * falls to the storage side via storageShare below, so conductor + storage can
+ * never exceed the original. Empty input renders empty (the pre-split
+ * behaviour for a human that declares nothing).
+ */
+def conductorShare(String total, boolean isMemory) {
+    if (!total) { return '' }
+    if (isMemory) {
+        def mi = memoryMebibytes(total)
+        return "${(int) (mi * _CONDUCTOR_MEMORY_NUMERATOR() / _CONDUCTOR_MEMORY_DENOMINATOR())}Mi"
+    }
+    def m = cpuMillicores(total)
+    return "${(int) (m * _CONDUCTOR_CPU_NUMERATOR() / _CONDUCTOR_CPU_DENOMINATOR())}m"
+}
+
+/**
+ * The storage side: the EXACT remainder of the human's budget after the
+ * conductor's share. Computed by subtraction, never by a second ratio, so the
+ * two sides sum to the original by construction and any rounding remainder
+ * lands here.
+ */
+def storageShare(String total, boolean isMemory) {
+    if (!total) { return '' }
+    if (isMemory) {
+        def mi = memoryMebibytes(total)
+        return "${mi - memoryMebibytes(conductorShare(total, true))}Mi"
+    }
+    def m = cpuMillicores(total)
+    return "${m - cpuMillicores(conductorShare(total, false))}m"
+}
+
+/**
+ * Resolve the image for a human's CONDUCTOR StatefulSet — the "two pin
+ * cadences over one image artifact" rule of rung 2.
+ *
+ * Storage and conductor run the SAME built artifact (elohim-storage, which
+ * COPYs the pinned holochain binary in at build time), but they must not share
+ * a restart cadence: storage rolls per commit, and before the split that rolled
+ * all 7 conductors too (full-arc re-gossip surge, ~20min churn, hours of
+ * catch-up). So the conductor keeps the image it is ALREADY running unless a
+ * roll is actually warranted.
+ *
+ * "Already running" is read from the live StatefulSet rather than a new state
+ * file — the cluster is the durable record, and an absent StatefulSet is
+ * exactly the first-rollout signal.
+ *
+ * Rolls when:
+ *   · the conductor StatefulSet does not exist yet (first rollout) — take the
+ *     current storage image, which is the artifact this commit built;
+ *   · the conductor fork pin this commit means differs from the pin recorded on
+ *     the live StatefulSet (a real conductor/tx5 submodule bump);
+ *   · an operator asks: `[conductor-roll]` in the commit message, or the
+ *     CONDUCTOR_ROLL build parameter.
+ * Otherwise keeps the live image verbatim, so the pod template is byte-stable
+ * and `kubectl apply` reports "unchanged".
+ *
+ * A DNA move is NOT handled here: it flows through the conductor pod template's
+ * `elohim.host/happ-digest` annotation, which is the honest channel for "new
+ * hApp bytes must reach the conductors".
+ *
+ * FAIL SAFE: if the pin cannot be derived (submodule pointers unreadable) we
+ * treat it as "cannot judge" and keep the live image — never guess a roll.
+ */
+def resolveConductorWorkloadImage(Map humanConfig, String storageImage, String conductorPin) {
+    def stsName = "${humanConfig.resourcePrefix}-conductor"
+    def liveImage = sh(
+        script: "kubectl get statefulset/${stsName} -n ${humanConfig.namespace} -o jsonpath='{.spec.template.spec.containers[?(@.name==\"elohim-conductor\")].image}' 2>/dev/null || true",
+        returnStdout: true,
+    ).trim()
+    if (!liveImage) {
+        echo "conductor image ${stsName}: FIRST ROLLOUT — taking this build's storage image ${storageImage}"
+        return storageImage
+    }
+    def livePin = sh(
+        script: "kubectl get statefulset/${stsName} -n ${humanConfig.namespace} -o jsonpath='{.metadata.annotations.elohim\\.host/conductor-pin}' 2>/dev/null || true",
+        returnStdout: true,
+    ).trim()
+
+    def commitMsg = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+    def operatorRoll = commitMsg.contains('[conductor-roll]') || ((params.CONDUCTOR_ROLL ?: false) == true)
+    def pinMoved = (conductorPin != '') && (livePin != '') && (conductorPin != livePin)
+
+    if (operatorRoll) {
+        echo "conductor image ${stsName}: ROLL requested by operator ([conductor-roll] / CONDUCTOR_ROLL) — ${liveImage} -> ${storageImage}"
+        return storageImage
+    }
+    if (pinMoved) {
+        echo "conductor image ${stsName}: conductor fork pin moved (${livePin} -> ${conductorPin}) — ${liveImage} -> ${storageImage}"
+        return storageImage
+    }
+    if (conductorPin == '' || livePin == '') {
+        echo "conductor image ${stsName}: pin unavailable (commit='${conductorPin}' live='${livePin}') — HOLDING live image ${liveImage} (fail safe: never guess a conductor roll)"
+        return liveImage
+    }
+    echo "conductor image ${stsName}: holding ${liveImage} (storage rolls to ${storageImage}; conductor pod template stays byte-stable — this IS rung 2)"
+    return liveImage
+}
+
+/**
+ * Apply a human's CONDUCTOR StatefulSet. Called by deployHumanManifest AFTER
+ * the storage StatefulSet has rolled and reported Ready.
+ *
+ * ORDERING IS THE SINGLE-WRITER GUARANTEE. On the migration deploy the storage
+ * roll is what kills the embedded conductor and releases
+ * `holochain-data-<prefix>-0`; only then may this StatefulSet — which mounts
+ * that same PVC by explicit claimName, no rename, no re-genesis — start its
+ * pod. Reversing the order would put two holochain processes on one lair
+ * keystore + chain DB.
+ *
+ * Note what this def deliberately does NOT do: `kubectl rollout restart`. The
+ * storage path restarts unconditionally (cheap, and it must pick up per-commit
+ * images); the conductor must roll ONLY when its own pod template genuinely
+ * changed — a conductor-pin bump (resolveConductorWorkloadImage) or a hApp
+ * digest move. An unconditional restart here would reinstate exactly the
+ * fleet-wide surge rung 2 exists to remove, and would make the genesis-peer
+ * surge guard moot again.
+ */
+def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
+    // adam carries an explicit `conductorManifest` (twin of his explicit
+    // storage `manifest`); everyone else sed-renders the shared conductor
+    // template. Kept on ONE line: a trailing-operator line break around `?:`
+    // is a Groovy statement-termination hazard.
+    def defaultConductorTemplate = 'genesis/orchestrator/manifests/humans/_edgenode-conductor.template.yaml'
+    def sourceFile = humanConfig.conductorManifest ?: (humanConfig.conductorTemplate ?: defaultConductorTemplate)
+    def stsName = "${humanConfig.resourcePrefix}-conductor"
+    def outputFile = "genesis/orchestrator/manifests/humans/${stsName}-rendered.yaml"
+    sh "sed ${sedArgs} ${sourceFile} > ${outputFile}"
+
+    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    if (remaining != '0') {
+        sh "grep '_PLACEHOLDER' ${outputFile} || true"
+        error "Unresolved placeholders in ${outputFile}!"
+    }
+
+    // The conductor-config ConfigMap moved into this manifest with the workload
+    // that mounts it, so the render-time seam-smoke gate moves with it (the
+    // validator hard-fails a manifest with no conductor-config.yaml).
+    sh "IROH_TARGET=${humanConfig.env == 'alpha' ? '1' : '0'} bash scripts/ci/validate-conductor-config.sh ${outputFile}"
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
+
+    def applyLog = "/tmp/kubectl-apply-${stsName}.log"
+    def applyCode = sh(script: "kubectl apply -f ${outputFile} > ${applyLog} 2>&1", returnStatus: true)
+    sh "cat ${applyLog}"
+    if (applyCode != 0) {
+        def applyOutput = sh(script: "cat ${applyLog}", returnStdout: true).trim()
+        if (applyOutput.contains('Forbidden: updates to statefulset spec')) {
+            // Same retained-PVC orphan dance as the storage path. Safe here for
+            // the same reason: persistentVolumeClaimRetentionPolicy is Retain,
+            // and this StatefulSet owns no volumeClaimTemplates at all — the
+            // chain PVC is referenced by name and cannot be garbage-collected
+            // with the StatefulSet.
+            echo "Forbidden-field drift detected — orphan-deleting StatefulSet ${stsName} (pods + PVCs retained) and reapplying"
+            sh "kubectl delete statefulset/${stsName} -n ${humanConfig.namespace} --cascade=orphan --ignore-not-found=true"
+            sh "kubectl apply -f ${outputFile}"
+        } else {
+            error "kubectl apply failed for ${stsName}:\n${applyOutput}"
+        }
+    }
+
+    // Record the conductor fork pin this deploy believes the workload embeds.
+    // OBJECT annotation, never the pod template — a pod-template value that
+    // moves on ordinary commits is the staggered-restart root cause. Read back
+    // by resolveConductorWorkloadImage on the next deploy.
+    if (conductorPin) {
+        sh "kubectl annotate statefulset/${stsName} -n ${humanConfig.namespace} 'elohim.host/conductor-pin=${conductorPin}' --overwrite"
+    }
+
+    if (applyCode == 0) {
+        def grepCode = sh(
+            script: "grep -Eq 'statefulset\\.apps/${stsName}[[:space:]]+unchanged' ${applyLog}",
+            returnStatus: true,
+        )
+        if (grepCode == 0) {
+            echo "Conductor ${stsName} UNCHANGED — no restart, no re-gossip surge. (Storage may have rolled; that is the point of rung 2.)"
+        }
+    }
+    sh "kubectl rollout status statefulset/${stsName} -n ${humanConfig.namespace} --timeout=600s"
+}
+
+/**
+ * Deploy a human's STORAGE manifest with topology-aware placeholder
+ * substitution, then its CONDUCTOR manifest. Uses | as sed delimiter because
+ * URLs contain /.
+ *
+ * ── RUNG 2 ORDERING (do not reorder) ───────────────────────────────────────
+ * Every human is two StatefulSets sharing one image artifact:
+ *   1. `<prefix>`            — elohim-storage in EXTERNAL conductor mode
+ *   2. `<prefix>-conductor`  — the same binary in embedded-conductor mode
+ * Storage is applied and rolled to Ready FIRST. On the migration deploy that
+ * is what kills the embedded conductor and releases
+ * `holochain-data-<prefix>-0`, which the conductor StatefulSet then mounts by
+ * explicit claimName (no rename, no re-genesis, agent keys survive). Applying
+ * the conductor first would put two holochain processes on one keystore.
+ *
+ * Storage's `holochain-data` volumeClaimTemplate is gone, which is a Forbidden
+ * StatefulSet spec update — the orphan-delete + reapply fallback below handles
+ * it and retains the PVCs by name.
+ *
+ * On steady-state deploys the storage StatefulSet rolls per commit while the
+ * conductor's pod template stays byte-stable and `kubectl apply` reports it
+ * unchanged. That, not the file split, is what stops storage/doorway rolls
+ * from restarting conductors.
+ *
+ * ROLLBACK: delete the `<prefix>-conductor` StatefulSets and revert the
+ * manifests (storage back to EMBEDDED_CONDUCTOR=true with its holochain-data
+ * volumeClaimTemplate). PVCs are untouched in both directions.
+ *
+ * NAMED PRECONDITIONS this rung does NOT fix (carry them into the roll):
+ *   · the PeerStatus heartbeat's own HcClient sits outside the bridge
+ *     supervisor and never re-mints its app-interface token, so a conductor
+ *     restart under a running storage still flaps /health conductor.zomePath
+ *     (backlog storage-stale-app-interface-token-after-conductor-restart.md).
+ *     Independent conductor restarts go from rare to routine here, so that
+ *     defect will fire more often.
+ *   · doorway's ServingHealth does not read storage's /health/serving, so a
+ *     doorway can report serving while its storage cannot anchor.
+ *   · this human's scheduling REQUESTS double (two pods, each with the
+ *     conductor-sized budget). Check node capacity before the migration roll.
  */
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def versions = readProperties(file: envFile)
@@ -1024,7 +1356,18 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // built in humanManifestSedArgs to keep this method under the per-def
     // CPS method-size ceiling. See that def's doc comment for the doorway
     // origin derivation and the doorwayRef digest-pin note.
-    def sedArgs = humanManifestSedArgs(humanConfig, versions, deployVersion, happDigest, storageImage, nonProdGate, primaryDoorway, relayUrl, hostAliases, p2pNodes, nodeTypeValues, deviceArchetype, householdId, nodeRole, region)
+    // Conductor fork pin this commit means (conductor-<hc12>-<tx512>), derived
+    // from the same submodule pointers scripts/ci/build-storage-image.sh uses.
+    // Empty on failure — resolveConductorWorkloadImage treats that as "cannot
+    // judge, hold the live image" rather than guessing a roll.
+    def conductorPin = sh(
+        script: "bash '${env.WORKSPACE}/scripts/ci/conductor-workload-pin.sh' 2>/dev/null || true",
+        returnStdout: true,
+    ).trim()
+    def conductorImage = resolveConductorWorkloadImage(humanConfig, storageImage, conductorPin)
+    def conductorWs = conductorWsHost(humanConfig.resourcePrefix, humanConfig.namespace)
+
+    def sedArgs = humanManifestSedArgs(humanConfig, versions, deployVersion, happDigest, storageImage, conductorImage, conductorWs, nonProdGate, primaryDoorway, relayUrl, hostAliases, p2pNodes, nodeTypeValues, deviceArchetype, householdId, nodeRole, region)
 
     // Output path uses resourcePrefix so multiple humans sharing a template
     // don't collide on a single rendered file.
@@ -1046,18 +1389,20 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
 
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
 
-    // Seam-smoke gate: the conductor's webrtc_config must parse into tx5's
-    // camelCase contract with real ICE servers — catches the dead-key class
-    // (ice_servers ran the fleet with ZERO ICE servers until 2026-07-11).
-    // Alpha renders the transport-iroh image above, so its render gate must
-    // enforce the self-hosted relay contract. Other environments remain on
-    // tx5 and keep the validator's default ICE checks only.
-    sh "IROH_TARGET=${humanConfig.env == 'alpha' ? '1' : '0'} bash scripts/ci/validate-conductor-config.sh ${outputFile}"
+    // The conductor-config seam-smoke gate (webrtc_config camelCase / ICE
+    // servers / relay sovereignty) moved to deployHumanConductor with the
+    // ConfigMap it validates — this manifest no longer carries a
+    // conductor-config.yaml, and the validator hard-fails a manifest without one.
 
     def resetHumans = (params.RESET_HUMANS ?: false) == true
     if (resetHumans) {
-        echo "RESET_HUMANS: deleting StatefulSet ${humanConfig.resourcePrefix} before reapply"
+        echo "RESET_HUMANS: deleting StatefulSets ${humanConfig.resourcePrefix} and ${humanConfig.resourcePrefix}-conductor before reapply"
         sh "kubectl delete statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --ignore-not-found=true"
+        // The conductor goes too: it is the same human, and leaving it up would
+        // hold `holochain-data-<prefix>-0` open while the storage half is
+        // recreated. PVCs survive either way (retention policy Retain, and the
+        // conductor references its PVC by name rather than owning a template).
+        sh "kubectl delete statefulset/${humanConfig.resourcePrefix}-conductor -n ${humanConfig.namespace} --ignore-not-found=true"
     }
 
     // Apply with forbidden-field drift fallback. StatefulSet spec fields like
@@ -1120,12 +1465,26 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         )
         ssUnchanged = (grepCode == 0)
     }
+    // Rung 2 note: this guard now protects the STORAGE StatefulSet only, and is
+    // much less load-bearing than it was — a storage restart no longer touches
+    // the conductor, so it costs no re-gossip surge. The conductor's own guard
+    // is stronger and unconditional: deployHumanConductor never issues a
+    // rollout restart at all, so conductors move only when their pod template
+    // genuinely changed (conductor-pin bump or hApp digest move).
     if (humanConfig.genesisPeer == true && ssUnchanged) {
-        echo "Skipping conductor rollout restart for genesis peer ${humanConfig.resourcePrefix}: StatefulSet unchanged (no image/config change) — avoiding a gratuitous full-arc re-gossip surge."
+        echo "Skipping storage rollout restart for genesis peer ${humanConfig.resourcePrefix}: StatefulSet unchanged (no image/config change)."
     } else {
         sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
     }
     sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
+
+    // ── Conductor half, STRICTLY AFTER storage is Ready ─────────────────────
+    // On the migration deploy the storage rollout above is what releases
+    // holochain-data-<prefix>-0 from the retiring embedded conductor; this call
+    // is what re-adopts it in the conductor StatefulSet. Single writer by
+    // ordering. On steady-state deploys this is a no-op apply that reports
+    // "unchanged" and restarts nothing.
+    deployHumanConductor(humanConfig, sedArgs, conductorPin)
 
     def componentName = humanConfig.resourcePrefix.replace('elohim-', '')
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${humanConfig.namespace} ${deployVersion} ${componentName} || true"
@@ -1463,6 +1822,11 @@ spec:
             name: 'DEPLOY_ONLY',
             defaultValue: false,
             description: 'Skip all build stages and run only Deploy Edge Node - <Env>. Tags are read from genesis/orchestrator/environments/{env}.env. Use after manifest/RBAC-only changes when Harbor tags are already valid.'
+        )
+        booleanParam(
+            name: 'CONDUCTOR_ROLL',
+            defaultValue: false,
+            description: 'Force the per-human conductor StatefulSets to adopt this build\'s storage image. Conductors normally HOLD their image across storage rolls (rung 2: storage/doorway deploys must not restart conductors); they advance on a conductor/tx5 submodule bump, a hApp digest move, this flag, or a [conductor-roll] commit tag. Costs a full-arc re-gossip surge per peer — use deliberately.'
         )
         booleanParam(
             name: 'VALIDATE_ONLY',

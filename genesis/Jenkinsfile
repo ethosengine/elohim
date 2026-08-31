@@ -184,7 +184,14 @@ def getConductorAppUrls() {
             [name: 'jessica'],
         ]
     }
-    def urls = humans.collect { "ws://elohim-${it.name}-alpha.elohim-alpha.svc.cluster.local:4445" }
+    // `-conductor` since rung 2 (2026-08-31): the conductor moved to its own
+    // StatefulSet + Service so storage/doorway rolls stop restarting it. A
+    // Service selects ONE pod set, so the admin/app WS ports (4444/4445 →
+    // container 8444/8445) moved off `elohim-<name>-alpha` — which must keep
+    // selecting the storage pod for :8090 — onto `elohim-<name>-alpha-conductor`.
+    // The app→admin derivation below (adminPort = appPort - 1) is unchanged.
+    // See genesis/orchestrator/manifests/humans/_edgenode-conductor.template.yaml.
+    def urls = humans.collect { "ws://elohim-${it.name}-alpha-conductor.elohim-alpha.svc.cluster.local:4445" }
     return urls.join(',')
 }
 

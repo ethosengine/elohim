@@ -97,6 +97,107 @@ delta to record at next sprint planning: coordinator class 2-4h → ~2min
 (mesh, measured); fleet expected minutes after the one edge roll that ships
 the endpoint.
 
+**Rung 2 IMPLEMENTED IN-TREE 2026-08-31 (repo-only; CI-unverified until the
+operator's next edge pipeline reconciles it).** Every human is now TWO
+StatefulSets sharing one image artifact: `<resourcePrefix>` (elohim-storage in
+external-conductor mode) and `<resourcePrefix>-conductor` (the same binary in
+embedded-conductor mode, storage features off, plus a socat ws-proxy sidecar).
+
+The five load-bearing decisions, so a later reader can re-derive them:
+
+1. **PVC continuity via explicit `claimName`, no renames.** The storage
+   StatefulSet KEEPS its name — its Service DNS, `storage-data` PVC, doorway
+   config and coordswap roster are all byte-identical. The conductor
+   StatefulSet has NO `volumeClaimTemplates`; it mounts the already-minted
+   `holochain-data-<prefix>-0` PVC by explicit `persistentVolumeClaim.claimName`.
+   That PVC is Retained and its openebs-hostpath PV carries node affinity, so
+   the conductor pod is co-scheduled onto the node that already holds the
+   bytes. Zero re-genesis (agent keys survive), zero reseed, zero DNS churn.
+   Retiring the storage STS's `holochain-data` template is a Forbidden
+   StatefulSet spec update — handled by the orphan-delete + reapply fallback
+   that already lives in `deployHumanManifest` and retains PVCs by name.
+
+2. **One image, two pin cadences.** Storage keeps `STORAGE_IMAGE_PLACEHOLDER`
+   (moves every edge build). The conductor gets its own
+   `CONDUCTOR_WORKLOAD_IMAGE_PLACEHOLDER`, resolved by
+   `resolveConductorWorkloadImage` to the image the LIVE conductor StatefulSet
+   already runs — the cluster is the durable record, and an absent StatefulSet
+   is the first-rollout signal. It advances only on a conductor/tx5 submodule
+   bump (`scripts/ci/conductor-workload-pin.sh`, the same derivation
+   `build-storage-image.sh` uses), an operator `[conductor-roll]` /
+   `CONDUCTOR_ROLL`, or a hApp digest move (which flows through the conductor
+   pod template's `elohim.host/happ-digest` annotation). Without this the split
+   would be cosmetic: every storage roll would still roll conductors.
+   Corollary, enforced by construction: NOTHING that changes on an ordinary
+   commit may appear in the conductor pod template — `app.kubernetes.io/version`
+   is on object metadata only, and the recorded pin is an object annotation.
+
+3. **BUDGET NEUTRALITY — the split re-partitions, it never adds.** The first
+   cut gave each pod the full `edgenode*` budget and the pre-commit
+   `epr:validator-test-bench-aggregate-capacity` refused it. That refusal was
+   right for a reason worth recording: the validator sums
+   `edgenode{Cpu,Memory}{Request,Limit}` across active humans and knows nothing
+   about per-pod fields, so two pods each carrying the full budget would have
+   DOUBLED the portfolio's real footprint while the portfolio arithmetic showed
+   no change at all. `edgenode*` now means "this human's TOTAL envelope,
+   partitioned across two pods": `conductorShare`/`storageShare` in the
+   Jenkinsfile split it (memory 5/8 conductor — RSS ∝ corpus at full arc,
+   ~2.5 GB observed on alpha, vs a few hundred MB for storage alone; CPU 1/2 —
+   no measurement yet discriminates the sides, so the neutral halving is the
+   honest default), rounding DOWN with any remainder falling to the storage
+   side, and `validate-deployments.ts` check (3) asserts the two sides sum back
+   to the record. **Re-size only with measured evidence PER SIDE, and do it by
+   moving `edgenode*` — the field the portfolio validator actually holds to
+   account — never by inflating one pod's share behind the ledger's back.**
+   Aggregate requests/limits are byte-identical to pre-split (active humans:
+   requests 4250m / 9472Mi, limits 25000m / 37888Mi), so the standing
+   `$computeEnvelopeRatification` covers the portfolio unchanged.
+
+4. **Ordering is the single-writer guarantee.** Per human:
+   storage apply → rollout → Ready (this is what kills the embedded conductor
+   and releases the chain PVC), THEN conductor apply → rollout status. The
+   conductor path never issues `kubectl rollout restart` — a steady-state
+   deploy reports it `unchanged` and restarts nothing.
+
+5. **Rollback is symmetric and data-free.** Delete the `<prefix>-conductor`
+   StatefulSets and revert the manifests (storage back to
+   `EMBEDDED_CONDUCTOR=true` with its `holochain-data` volumeClaimTemplate).
+   That is exactly today's pre-rung-2 shape and it re-adopts the same PVCs by
+   the same names. PVCs are untouched in both directions.
+
+Why socat rather than elohim-storage's own forwarder: the Rust forwarder is
+only reachable through main.rs's `if let Some(admin_url)` branch, which also
+starts the HcClientRegistry, the bridge supervisor, the signal subscribers and
+the PeerStatus heartbeat. Giving the conductor pod an `admin_url` would run a
+SECOND heartbeat per human, and its `DefaultProbe` measures the disk under its
+own blob path — an emptyDir — so it would publish wrong capacity over the
+storage pod's real numbers every 60s. The conductor pod therefore has no
+`admin_url` at all and uses the legacy ws-proxy shape (still live in
+`genesis/orchestrator/manifests/edgenode/alpha.yaml`) on the same 8444/8445
+ports the whole fleet already speaks.
+
+**Named preconditions carried INTO the migration roll (deliberately not fixed
+here):** (a) the PeerStatus heartbeat's own `HcClient` sits outside the bridge
+supervisor and never re-mints its app-interface token, so a conductor restart
+under a running storage still flaps `/health conductor.zomePath` — this rung
+makes independent conductor restarts routine rather than rare, so that defect
+will fire more often (backlog
+`storage-stale-app-interface-token-after-conductor-restart`); (b) doorway's
+`ServingHealth` does not read storage's `/health/serving`; (c) **adam's conductor read pool halves.** His 8000m single-pod CPU limit was
+chosen 2026-07-07 so the conductor detected 8 cores and its SQLite read pool
+`max(2*cpus, 8)` reached 16 readers; at a neutral 4000m share it detects 4 and
+floors at 8. Restoring 16 is arithmetically incompatible with budget neutrality
+(it needs the entire 8000m on one pod), so it is a RAISE of adam's `edgenode*`
+envelope — a portfolio decision `test-bench-aggregate-capacity` must ratify, not
+something to smuggle in as a `conductorCpuLimit` override. Countervailing
+evidence before raising: pre-split the conductor was `nice`d to 10 to LOSE the
+CPU race to storage inside the shared cgroup, so its 4000m is now uncontended
+where the 8000m never was. Measure first.
+
+Cycle-time delta to record after the first post-split storage-only deploy:
+storage/doorway class 2-4 h → the storage rollout window alone, with
+`statefulset.apps/<prefix>-conductor unchanged` in the build log as the proof.
+
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the
 delivery vehicle by change class** — and pay the small vehicles off first.
