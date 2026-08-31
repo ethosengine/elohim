@@ -82,6 +82,21 @@ churn).
 | 5 | **THE MOON SHOT (deliberately last): artifacts as ELECTED CONTENT + upgrade/revert propagation over p2p** — a content-addressed artifact with an earned canonical head; peers verify locally and adopt at their own pace; mixed versions ride the additive-wire discipline; revert = the election moving back. The carried-election machinery is the proven kernel. Attempted ONLY on top of rungs 1-4's velocity — it is the change that needs the most CI/CD proof, so it gets the cheapest possible iterations. | design arc (/brainstorm, p2p-design-gate) | retires the CI roll as the delivery path for everything above the DNA line; the SDK confidence bar | — |
 | 6 | **DNA lineage migration** — the irreducible network-agreement seam under the moon shot (hash = network identity; data rebinds across lineage). Rare, deliberate, constitutional. | the hard kernel | the last big-bang class, governed | — |
 
+**Rung 1 LANDED 2026-08-31 (local-mesh proven: upgrade → revert → upgrade,
+3 peers, ~40s/peer/pass, conductor PIDs unchanged throughout).** Vehicle =
+`POST /admin/coordinators/sync` (per-role DNA-lineage guard; embedded AND
+external conductors — also cures the T3 external-attach hotswap gap) +
+`scripts/ci/fleet-coordswap.sh` (rolling driver) + a warn-only DNA-pipeline
+stage. **Trajectory note (operator concern, 2026-08-31): the CI push and the
+service-DNS roster are the k8s-shaped SCAFFOLD half of this rung — clean
+toward the dataplane, never extend. The server-side machinery (peer applies
+to its own conductor, lineage-guarded, verified) is the durable half rung 5
+re-drives from an elected bundle head: push inverts to pull, roster inverts
+to election, and delivery moves THROUGH the p2p network.** Cycle-time
+delta to record at next sprint planning: coordinator class 2-4h → ~2min
+(mesh, measured); fleet expected minutes after the one edge roll that ships
+the endpoint.
+
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the
 delivery vehicle by change class** — and pay the small vehicles off first.

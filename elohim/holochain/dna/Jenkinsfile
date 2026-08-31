@@ -888,6 +888,29 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        // Rung-1 coordinator hot-swap vehicle (backlog
+        // upgrade-propagation-p2p-design-arc): after a dev-branch bundle passes
+        // integration, roll it across the alpha fleet's storage nodes via
+        // POST /admin/coordinators/sync. Coordinator-only diffs hot-swap in
+        // minutes (no pod roll, no re-key); integrity diffs are refused per
+        // role by the endpoint's DNA-lineage guard; no-drift builds no-op.
+        // Warn-only while the vehicle earns trust: the dispatch script always
+        // exits 0 (COORDSWAP_ENABLE=false is the kill-switch). Peers still on
+        // a pre-endpoint storage binary answer 404 and read as failed-apply —
+        // expected until the edge roll that ships the endpoint.
+        stage('Fleet Coordinator Hot-Swap') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                branch 'dev'
+            } }
+            options { timeout(time: 30, unit: 'MINUTES') }
+            steps {
+                container('builder') {
+                    sh "bash '${env.WORKSPACE}/scripts/ci/fleet-coordswap-dispatch.sh' '${env.WORKSPACE}/elohim/holochain/dna/elohim/elohim.happ' alpha"
+                }
+            }
+        }
+
         stage('Push to Harbor') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
