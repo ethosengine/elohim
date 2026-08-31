@@ -60,3 +60,18 @@ host `ext4_inode_cache` 1,137,138→991,724. Enforce reported "freed 0B" for kee
   clippies back-to-back with conductors resident; read `/sys/fs/cgroup/.../memory.current` vs
   `memory.max` before heavy cargo. A RAM guard mirroring the disk-guard (soft ~24 GB kill newest
   rustc/lld + marker, hard ~28 GB PreToolUse DENY) is designed but not built.
+
+## 2026-08-29 — it is I/O on worn NVMe, not memory; the PVC idea is retired
+
+- Operator's second report: both 2026-08-29 outages were HARD RESETS (firmware "internal CPU shutdown event", md2 dirty) with psi_io some=77%, 45 D-state procs, md2 queue depth 218–277 at 155 ms write latency; both Crucial P1 (QLC) mirror members are past rated TBW (216/260 TB vs 200). Kernel 7.0 was an accidental bump (GRUB_DEFAULT=0) and is not a fix. The freeze-flight-recorder's `sync -f` (syncfs of the whole fs every 5 s) was noise, since fixed by the operator.
+- **Separate cargo-pool PVC is RETIRED, never provision it:** openebs-hostpath is a directory on the same /dev/md2p1; both NVMes fully partitioned. Only a physical disk moves the pool off the root fs. Devfile now carries the rationale instead of the held block.
+- **In-pod attribution rail (no kubectl):** `/sys/fs/cgroup` in this container is the HOST's root cgroup2 tree — `kubepods/*/pod<uid>/io.stat` (device 9:2 = md2) gives per-pod write bytes; `/proc/pressure/io` is host PSI. Measured idle floor ~13 MB/s ≈ 1.1 TB/day: four other pods 1–3 MB/s each (alpha peers, 4G/8G limits), containerd 2.2 MB/s (container stdout logs), dqlite 1.6 MB/s, this workspace ~1 MB/s idle (3 conductors + 3 storage + 2 doorways ≈ 130 KB/s + 0.5–1 MB/s each). This pod wrote 30 GB in its first 55 min (45% of host) — builds are the bursts; steady writers are mostly not ours. `/proc/<pid>/io` write_bytes includes REAPED children (hooks, tool subshells), so a claude process can "write" MB/s.
+- **Guard rules 3–5 in `cargo-disk-guard.py`** (policy `io` in pool-policy.json): host psi_io deny (full10≥20 / some60≥50), ONE BUILD AT A TIME per container (scans /proc for cargo/rustc/rust-lld/gate-runner), JOBS CAP (deny heavy cargo/`just gate` without -j or CARGO_BUILD_JOBS; devfile sets CARGO_BUILD_JOBS=4 for new workspaces). Test seams: CARGO_GUARD_PSI_FILE, CARGO_GUARD_PROC_DIR. Bash rule: `bc` is not installed — use awk for float math.
+- Not yet gated: node builds (`ng build`, vitest, playwright) write GBs too — ram-guard's `is_heavy` already classifies them; extend the io rules there if bursts persist. Don't leave the local mesh running idle for days (≈100–250 GB/day of writes).
+
+**bindgen in this container lacks clang's builtin headers** (measured 2026-08-30): any crate whose
+build script runs bindgen over C headers (`datachannel-sys` via the sweettest workspace's
+`datachannel-vendored` feature) dies with `fatal error: 'stdbool.h' file not found`. Fix:
+`export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"` (clang 21's resource dir; re-derive
+with `clang -print-resource-dir` after toolchain bumps). With it, `cargo check --tests` in
+`elohim/holochain/tests/sweettest` passes locally.

@@ -55,9 +55,12 @@ async function grant() {
   // FLEET_ADMIN_URL=ws://127.0.0.1:4444, FLEET_APP_PORT=4445, no api-key needed
   // on a loopback admin socket). The doorway admin proxy is permission-gated and
   // does not route app-interface zome calls, so the port-forward is preferred.
-  const adminUrl = process.env.FLEET_ADMIN_URL ?? 'ws://127.0.0.1:4444';
+  const adminUrl = process.env.FLEET_ADMIN_URL ?? 'wss://doorway-alpha.elohim.host/hc/admin';
   const appPort = Number(process.env.FLEET_APP_PORT ?? 4445);
-  const admin = await AdminWebsocket.connect({ url: new URL(adminUrl), wsClientOptions: { origin: APP_ID } });
+  const adminKey = process.env.API_KEY_ADMIN; // doorway wants it as an x-api-key HEADER
+  const wsOpts: any = { origin: APP_ID };
+  if (adminKey) wsOpts.headers = { 'x-api-key': adminKey };
+  const admin = await AdminWebsocket.connect({ url: new URL(adminUrl), wsClientOptions: wsOpts });
   const apps = await admin.listApps({});
   const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
   if (!app) throw new Error(`no app on fleet conductor (saw ${apps.map(a => a.installed_app_id).join(',')})`);
@@ -82,12 +85,13 @@ async function grant() {
     await admin.attachAppInterface({ port: appPort, allowed_origins: APP_ID });
   }
   const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
-  const appHost = new URL(adminUrl).hostname;
-  const appWs = await AppWebsocket.connect({
-    url: new URL(`ws://${appHost}:${appPort}`),
-    token: token.token,
-    wsClientOptions: { origin: APP_ID },
-  });
+  const au = new URL(adminUrl);
+  const loopback = au.hostname === '127.0.0.1' || au.hostname === 'localhost';
+  // Direct conductor → its own app port; through the doorway → the /hc/app/{port} proxy.
+  const appUrl = loopback
+    ? new URL(`ws://${au.hostname}:${appPort}`)
+    : new URL(`${au.protocol}//${au.host}/hc/app/${appPort}`);
+  const appWs = await AppWebsocket.connect({ url: appUrl, token: token.token, wsClientOptions: wsOpts });
 
   const validUntil = (Date.now() + 30 * 24 * 3600 * 1000) * 1000; // 30 days, µs
   const delegation: any = await appWs.callZome({

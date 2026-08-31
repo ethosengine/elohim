@@ -1,21 +1,53 @@
 {
-  "generated_at": "2026-05-15T04:12:38.233732+00:00",
+  "generated_at": "2026-08-30T03:03:59.890201+00:00",
   "totals": {
-    "features_on_disk": 73,
-    "features_canonical_in_some_story": 1,
-    "features_adjacent_only": 5,
-    "features_orphan": 67,
-    "stories_total": 3,
-    "dangling_feature_references": 1
+    "features_on_disk": 174,
+    "features_canonical_in_some_story": 2,
+    "features_adjacent_only": 11,
+    "features_orphan": 161,
+    "stories_total": 7,
+    "dangling_feature_references": 4
   },
   "orphans": [
+    {
+      "feature_path": "genesis/a2o/features/lamad/deep-link-delivery.feature",
+      "feature_slug": "deep-link-delivery",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 13,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 39.0,
+      "leverage_measure": {
+        "value": 39.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "13 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
     {
       "feature_path": "genesis/a2o/features/content/ssr_capability.feature",
       "feature_slug": "ssr_capability",
       "vision_axis_hint": "content",
-      "scenario_count": 14,
+      "scenario_count": 16,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 28.0
+      "leverage_score": 32.0,
+      "leverage_measure": {
+        "value": 32.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "16 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/auth-lifecycle.feature",
@@ -23,7 +55,59 @@
       "vision_axis_hint": "auth",
       "scenario_count": 10,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 25.0
+      "leverage_score": 25.0,
+      "leverage_measure": {
+        "value": 25.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/observable-distribution.feature",
+      "feature_slug": "observable-distribution",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 25,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 25.0,
+      "leverage_measure": {
+        "value": 25.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "25 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/peer-advertisement.feature",
+      "feature_slug": "peer-advertisement",
+      "vision_axis_hint": "federation",
+      "scenario_count": 16,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 24.0,
+      "leverage_measure": {
+        "value": 24.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "16 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/attention-analytics.feature",
@@ -31,7 +115,19 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 8,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 24.0
+      "leverage_score": 24.0,
+      "leverage_measure": {
+        "value": 24.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "8 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/love-map-negotiation.feature",
@@ -39,7 +135,39 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 8,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 24.0
+      "leverage_score": 24.0,
+      "leverage_measure": {
+        "value": 24.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "8 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/network-health-posture.feature",
+      "feature_slug": "network-health-posture",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 23,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 23.0,
+      "leverage_measure": {
+        "value": 23.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "23 scenarios (witnessed) x vision-axis weight for `elohim` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/revocation-emergency-quorum.feature",
@@ -47,15 +175,59 @@
       "vision_axis_hint": "auth",
       "scenario_count": 9,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 22.5
+      "leverage_score": 22.5,
+      "leverage_measure": {
+        "value": 22.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "9 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/federation/peer-advertisement.feature",
-      "feature_slug": "peer-advertisement",
-      "vision_axis_hint": "federation",
-      "scenario_count": 15,
+      "feature_path": "genesis/a2o/features/content/epr-content-addressing.feature",
+      "feature_slug": "epr-content-addressing",
+      "vision_axis_hint": "content",
+      "scenario_count": 11,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 22.5
+      "leverage_score": 22.0,
+      "leverage_measure": {
+        "value": 22.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "11 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/intimate-reach-household.feature",
+      "feature_slug": "intimate-reach-household",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 21.0,
+      "leverage_measure": {
+        "value": 21.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/visitor-boundaries.feature",
@@ -63,7 +235,39 @@
       "vision_axis_hint": "auth",
       "scenario_count": 8,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 20.0
+      "leverage_score": 20.0,
+      "leverage_measure": {
+        "value": 20.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "8 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/landing-discovery.feature",
+      "feature_slug": "landing-discovery",
+      "vision_axis_hint": "content",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 20.0,
+      "leverage_measure": {
+        "value": 20.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/federation/epr-cross-peer-resolution.feature",
@@ -71,39 +275,59 @@
       "vision_axis_hint": "federation",
       "scenario_count": 13,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 19.5
-    },
-    {
-      "feature_path": "genesis/a2o/features/elohim/network-health-posture.feature",
-      "feature_slug": "network-health-posture",
-      "vision_axis_hint": "elohim",
-      "scenario_count": 19,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 19.0
-    },
-    {
-      "feature_path": "genesis/a2o/features/content/epr-content-addressing.feature",
-      "feature_slug": "epr-content-addressing",
-      "vision_axis_hint": "content",
-      "scenario_count": 9,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 18.0
-    },
-    {
-      "feature_path": "genesis/a2o/features/deployment/persona-testnet-validation.feature",
-      "feature_slug": "persona-testnet-validation",
-      "vision_axis_hint": "deployment",
-      "scenario_count": 18,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 18.0
+      "leverage_score": 19.5,
+      "leverage_measure": {
+        "value": 19.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "13 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/spa-bundle-delivery.feature",
       "feature_slug": "spa-bundle-delivery",
       "vision_axis_hint": "delivery",
-      "scenario_count": 17,
+      "scenario_count": 19,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 17.0
+      "leverage_score": 19.0,
+      "leverage_measure": {
+        "value": 19.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "19 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/closure-posture.feature",
+      "feature_slug": "closure-posture",
+      "vision_axis_hint": "content",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 16.0,
+      "leverage_measure": {
+        "value": 16.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "8 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/peer-diversity.feature",
@@ -111,7 +335,19 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 16,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 16.0
+      "leverage_score": 16.0,
+      "leverage_measure": {
+        "value": 16.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "16 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/fixture-humans.feature",
@@ -119,7 +355,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 6,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 15.0
+      "leverage_score": 15.0,
+      "leverage_measure": {
+        "value": 15.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/elohim/content-reach-negotiation.feature",
@@ -127,7 +375,19 @@
       "vision_axis_hint": "elohim",
       "scenario_count": 15,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 15.0
+      "leverage_score": 15.0,
+      "leverage_measure": {
+        "value": 15.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "15 scenarios (witnessed) x vision-axis weight for `elohim` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/know-thyself-discovery.feature",
@@ -135,15 +395,79 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 15.0
+      "leverage_score": 15.0,
+      "leverage_measure": {
+        "value": 15.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/resilience/observable-distribution.feature",
-      "feature_slug": "observable-distribution",
-      "vision_axis_hint": "resilience",
-      "scenario_count": 15,
+      "feature_path": "genesis/a2o/features/qahal/plural-mishpat-lenses.feature",
+      "feature_slug": "plural-mishpat-lenses",
+      "vision_axis_hint": "qahal",
+      "scenario_count": 6,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 15.0
+      "leverage_score": 15.0,
+      "leverage_measure": {
+        "value": 15.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `qahal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/epistemic-standing.feature",
+      "feature_slug": "epistemic-standing",
+      "vision_axis_hint": "content",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 14.0,
+      "leverage_measure": {
+        "value": 14.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/resilience-dimensions.feature",
+      "feature_slug": "resilience-dimensions",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 14,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 14.0,
+      "leverage_measure": {
+        "value": 14.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "14 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/client-resilience.feature",
@@ -151,7 +475,19 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 13,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 13.0
+      "leverage_score": 13.0,
+      "leverage_measure": {
+        "value": 13.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "13 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/delivery-diagnostics.feature",
@@ -159,7 +495,39 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 13,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 13.0
+      "leverage_score": 13.0,
+      "leverage_measure": {
+        "value": 13.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "13 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/hub-topology.feature",
+      "feature_slug": "hub-topology",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 13,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 13.0,
+      "leverage_measure": {
+        "value": 13.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "13 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/operator-onboarding.feature",
@@ -167,7 +535,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.5
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/cross-stack/recovery-cross-stack-transport.feature",
@@ -175,7 +555,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.5
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/revocation-self.feature",
@@ -183,7 +575,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.5
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/session-handoff.feature",
@@ -191,7 +595,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.5
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/user-management.feature",
@@ -199,7 +615,159 @@
       "vision_axis_hint": "auth",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.5
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/qahal/household-formation.feature",
+      "feature_slug": "household-formation",
+      "vision_axis_hint": "qahal",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5,
+      "leverage_measure": {
+        "value": 12.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `qahal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/landing-backing-claims.feature",
+      "feature_slug": "landing-backing-claims",
+      "vision_axis_hint": "content",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/devflow/agent-identity-claim-and-acceptance.feature",
+      "feature_slug": "agent-identity-claim-and-acceptance",
+      "vision_axis_hint": "devflow",
+      "scenario_count": 12,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "12 scenarios (witnessed) x vision-axis weight for `devflow` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/devflow/run-plane.feature",
+      "feature_slug": "run-plane",
+      "vision_axis_hint": "devflow",
+      "scenario_count": 12,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "12 scenarios (witnessed) x vision-axis weight for `devflow` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/doorway/peer-conductor-connection-resilience.feature",
+      "feature_slug": "peer-conductor-connection-resilience",
+      "vision_axis_hint": "doorway",
+      "scenario_count": 12,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "12 scenarios (witnessed) x vision-axis weight for `doorway` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/doorway/self-healing-flow-control.feature",
+      "feature_slug": "self-healing-flow-control",
+      "vision_axis_hint": "doorway",
+      "scenario_count": 12,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "12 scenarios (witnessed) x vision-axis weight for `doorway` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/shefa/human-resilience.feature",
+      "feature_slug": "human-resilience",
+      "vision_axis_hint": "shefa",
+      "scenario_count": 12,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "12 scenarios (witnessed) x vision-axis weight for `shefa` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/protocol-omnibar.feature",
@@ -207,7 +775,19 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 11,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 11.0
+      "leverage_score": 11.0,
+      "leverage_measure": {
+        "value": 11.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "11 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/compute-commitment-bounds.feature",
@@ -215,15 +795,99 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 11,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 11.0
+      "leverage_score": 11.0,
+      "leverage_measure": {
+        "value": 11.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "11 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/shefa/human-resilience.feature",
-      "feature_slug": "human-resilience",
-      "vision_axis_hint": "shefa",
-      "scenario_count": 11,
+      "feature_path": "genesis/a2o/features/auth/agency-context-labels.feature",
+      "feature_slug": "agency-context-labels",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 11.0
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/auth-discovery-neighbourhood.feature",
+      "feature_slug": "auth-discovery-neighbourhood",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/auth-discovery.feature",
+      "feature_slug": "auth-discovery",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/oauth-authorization-code.feature",
+      "feature_slug": "oauth-authorization-code",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/intimate-quorum-happy-path.feature",
@@ -231,7 +895,59 @@
       "vision_axis_hint": "auth",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 10.0
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/steward-login-portal-handoff.feature",
+      "feature_slug": "steward-login-portal-handoff",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/content-graph-resolver-constraints.feature",
+      "feature_slug": "content-graph-resolver-constraints",
+      "vision_axis_hint": "content",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/content/content-lifecycle.feature",
@@ -239,7 +955,39 @@
       "vision_axis_hint": "content",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 10.0
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/doorway-failover.feature",
+      "feature_slug": "doorway-failover",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/peer-mesh.feature",
@@ -247,7 +995,79 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 10,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 10.0
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/grandma-photos-survive-node-loss.feature",
+      "feature_slug": "grandma-photos-survive-node-loss",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/trust/trust-legibility-atlas.feature",
+      "feature_slug": "trust-legibility-atlas",
+      "vision_axis_hint": "trust",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "10 scenarios (witnessed) x vision-axis weight for `trust` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/acquisition-pins.feature",
+      "feature_slug": "acquisition-pins",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 9,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 9.0,
+      "leverage_measure": {
+        "value": 9.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "9 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/human-device-mapping.feature",
@@ -255,15 +1075,39 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 9,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 9.0
+      "leverage_score": 9.0,
+      "leverage_measure": {
+        "value": 9.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "9 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/delivery/landing-page.feature",
-      "feature_slug": "landing-page",
-      "vision_axis_hint": "delivery",
-      "scenario_count": 8,
+      "feature_path": "genesis/a2o/features/content/omni-claims-links.feature",
+      "feature_slug": "omni-claims-links",
+      "vision_axis_hint": "content",
+      "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 8.0
+      "leverage_score": 8.0,
+      "leverage_measure": {
+        "value": 8.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/sync-control.feature",
@@ -271,7 +1115,59 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 8,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 8.0
+      "leverage_score": 8.0,
+      "leverage_measure": {
+        "value": 8.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "8 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/agency-pipeline-coherence.feature",
+      "feature_slug": "agency-pipeline-coherence",
+      "vision_axis_hint": "auth",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/reach-commons.feature",
+      "feature_slug": "reach-commons",
+      "vision_axis_hint": "auth",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-doorway-handoff-to-steward.feature",
@@ -279,7 +1175,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 7.5
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-list-my-keys.feature",
@@ -287,7 +1195,39 @@
       "vision_axis_hint": "auth",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 7.5
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/threshold-login-domain-scoping.feature",
+      "feature_slug": "threshold-login-domain-scoping",
+      "vision_axis_hint": "auth",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/browser/doorway-dashboard-health.feature",
@@ -295,7 +1235,39 @@
       "vision_axis_hint": "browser",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 7.5
+      "leverage_score": 7.5,
+      "leverage_measure": {
+        "value": 7.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature",
+      "feature_slug": "06-heads-converge",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.0,
+      "leverage_measure": {
+        "value": 7.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/web2-absorption.feature",
@@ -303,7 +1275,19 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 7,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 7.0
+      "leverage_score": 7.0,
+      "leverage_measure": {
+        "value": 7.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/p2p-validation.feature",
@@ -311,7 +1295,19 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 7,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 7.0
+      "leverage_score": 7.0,
+      "leverage_measure": {
+        "value": 7.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/browser/auth-browser.feature",
@@ -319,7 +1315,59 @@
       "vision_axis_hint": "browser",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 6.0
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/navigation-browser.feature",
+      "feature_slug": "navigation-browser",
+      "vision_axis_hint": "browser",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/exploration-sidebar.feature",
+      "feature_slug": "exploration-sidebar",
+      "vision_axis_hint": "content",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/content/relationship-idempotency.feature",
@@ -327,7 +1375,59 @@
       "vision_axis_hint": "content",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 6.0
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/doorway/native-epr-projection.feature",
+      "feature_slug": "native-epr-projection",
+      "vision_axis_hint": "doorway",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `doorway` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/peer-loss-failover.feature",
+      "feature_slug": "peer-loss-failover",
+      "vision_axis_hint": "federation",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/epr-link-navigation.feature",
@@ -335,7 +1435,59 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 6.0
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature",
+      "feature_slug": "m1-matthew-terrance-delivery",
+      "vision_axis_hint": "shefa",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `shefa` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/storage/declared-storage-policy.feature",
+      "feature_slug": "declared-storage-policy",
+      "vision_axis_hint": "storage",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `storage` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/conductor-pool-recovery.feature",
@@ -343,7 +1495,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/freeze-floor-blocks-intimate-rotation.feature",
@@ -351,7 +1515,39 @@
       "vision_axis_hint": "auth",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/identity-key-lineage-recovery.feature",
+      "feature_slug": "identity-key-lineage-recovery",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-defender-role-gate.feature",
@@ -359,23 +1555,19 @@
       "vision_axis_hint": "auth",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
-    },
-    {
-      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-lost-key-entry.feature",
-      "feature_slug": "recovery-m5-lost-key-entry",
-      "vision_axis_hint": "auth",
-      "scenario_count": 2,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
-    },
-    {
-      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature",
-      "feature_slug": "recovery-m5-portal-host-discovery",
-      "vision_axis_hint": "auth",
-      "scenario_count": 2,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-self-revoke.feature",
@@ -383,15 +1575,79 @@
       "vision_axis_hint": "auth",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature",
-      "feature_slug": "recovery-m5-vote-as-emergency-contact",
-      "vision_axis_hint": "auth",
-      "scenario_count": 2,
+      "feature_path": "genesis/a2o/features/dataplane/content-sync.feature",
+      "feature_slug": "content-sync",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/notary-authority.feature",
+      "feature_slug": "notary-authority",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/landing-page.feature",
+      "feature_slug": "landing-page",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/transport-perf.feature",
@@ -399,7 +1655,19 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/ingress-body-size-budget.feature",
@@ -407,39 +1675,379 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/elohim/compute-allocation.feature",
-      "feature_slug": "compute-allocation",
-      "vision_axis_hint": "elohim",
+      "feature_path": "genesis/a2o/features/deployment/sovereign-peer-join.feature",
+      "feature_slug": "sovereign-peer-join",
+      "vision_axis_hint": "deployment",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/shefa/m1-matthew-timothy-delivery.feature",
-      "feature_slug": "m1-matthew-timothy-delivery",
-      "vision_axis_hint": "shefa",
+      "feature_path": "genesis/a2o/features/elohim-core/chrome-preferences.feature",
+      "feature_slug": "chrome-preferences",
+      "vision_axis_hint": "elohim-core",
       "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 5.0
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `elohim-core` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/browser/navigation-browser.feature",
-      "feature_slug": "navigation-browser",
-      "vision_axis_hint": "browser",
-      "scenario_count": 3,
+      "feature_path": "genesis/a2o/features/resilience/app-blob-heal-on-read.feature",
+      "feature_slug": "app-blob-heal-on-read",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 5,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.5
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/federation/shard-tracking.feature",
-      "feature_slug": "shard-tracking",
+      "feature_path": "genesis/a2o/features/resilience/governed-distribution.feature",
+      "feature_slug": "governed-distribution",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/operational-weave.feature",
+      "feature_slug": "operational-weave",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/salvage-placement.feature",
+      "feature_slug": "salvage-placement",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/substrate-reconciliation.feature",
+      "feature_slug": "substrate-reconciliation",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "5 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/doorway-multi-address-failover.feature",
+      "feature_slug": "doorway-multi-address-failover",
       "vision_axis_hint": "federation",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.5
+      "leverage_score": 4.5,
+      "leverage_measure": {
+        "value": 4.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/doorway-pool-degrade.feature",
+      "feature_slug": "doorway-pool-degrade",
+      "vision_axis_hint": "federation",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.5,
+      "leverage_measure": {
+        "value": 4.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/membrane-rate-limit.feature",
+      "feature_slug": "membrane-rate-limit",
+      "vision_axis_hint": "federation",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.5,
+      "leverage_measure": {
+        "value": 4.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/peer-recovery.feature",
+      "feature_slug": "peer-recovery",
+      "vision_axis_hint": "federation",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.5,
+      "leverage_measure": {
+        "value": 4.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/contributor-presences.feature",
+      "feature_slug": "contributor-presences",
+      "vision_axis_hint": "content",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/epr-content-facing-raw.feature",
+      "feature_slug": "epr-content-facing-raw",
+      "vision_axis_hint": "content",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/contributor-presence-witnessed-holding.feature",
+      "feature_slug": "contributor-presence-witnessed-holding",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/doorway-catching-up-page.feature",
+      "feature_slug": "doorway-catching-up-page",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature",
+      "feature_slug": "operator-commitment-gated-verbs",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/reach-enforced-http.feature",
+      "feature_slug": "reach-enforced-http",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/11-pull-queue-retires.feature",
+      "feature_slug": "11-pull-queue-retires",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/delivery/content-addressing.feature",
@@ -447,7 +2055,19 @@
       "vision_axis_hint": "delivery",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.0
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/conductor-visibility.feature",
@@ -455,7 +2075,59 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.0
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/device-envelope-floors.feature",
+      "feature_slug": "device-envelope-floors",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/node-resource-tunables.feature",
+      "feature_slug": "node-resource-tunables",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/seeder-registry-coherence.feature",
@@ -463,15 +2135,339 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.0
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
-      "feature_path": "genesis/a2o/features/elohim/elohim-presence.feature",
-      "feature_slug": "elohim-presence",
-      "vision_axis_hint": "elohim",
+      "feature_path": "genesis/a2o/features/elohim-core/epr-link-hypercard.feature",
+      "feature_slug": "epr-link-hypercard",
+      "vision_axis_hint": "elohim-core",
       "scenario_count": 4,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 4.0
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `elohim-core` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/protocol/landing-page-dogfood.feature",
+      "feature_slug": "landing-page-dogfood",
+      "vision_axis_hint": "protocol",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `protocol` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/protocol/protocol-omni.feature",
+      "feature_slug": "protocol-omni",
+      "vision_axis_hint": "protocol",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `protocol` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/chaos-peer-churn.feature",
+      "feature_slug": "chaos-peer-churn",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/commitment-backed-card-lighting.feature",
+      "feature_slug": "commitment-backed-card-lighting",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/ssr/compose-serves-the-projected-app.feature",
+      "feature_slug": "compose-serves-the-projected-app",
+      "vision_axis_hint": "ssr",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `ssr` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/storage/constitutional-ratio-enforcement.feature",
+      "feature_slug": "constitutional-ratio-enforcement",
+      "vision_axis_hint": "storage",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `storage` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/storage/household-resiliency-handshake.feature",
+      "feature_slug": "household-resiliency-handshake",
+      "vision_axis_hint": "storage",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0,
+      "leverage_measure": {
+        "value": 4.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `storage` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/doorway-portal-login-neighbourhood.feature",
+      "feature_slug": "doorway-portal-login-neighbourhood",
+      "vision_axis_hint": "browser",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/doorway-portal-login.feature",
+      "feature_slug": "doorway-portal-login",
+      "vision_axis_hint": "browser",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/blob-replication.feature",
+      "feature_slug": "blob-replication",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/federation-deploy.feature",
+      "feature_slug": "federation-deploy",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/peer-mesh.feature",
+      "feature_slug": "peer-mesh",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/relay-capacity.feature",
+      "feature_slug": "relay-capacity",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/05-co-steward-agreement.feature",
+      "feature_slug": "05-co-steward-agreement",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/happ-coordinator-delivery.feature",
+      "feature_slug": "happ-coordinator-delivery",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `delivery` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/doorway-self-registration.feature",
@@ -479,7 +2475,19 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 3.0
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/staging-validation.feature",
@@ -487,7 +2495,39 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 3.0
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/devflow/antigravity-skill-projection.feature",
+      "feature_slug": "antigravity-skill-projection",
+      "vision_axis_hint": "devflow",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `devflow` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/elohim/compute-coordination.feature",
@@ -495,7 +2535,19 @@
       "vision_axis_hint": "elohim",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 3.0
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `elohim` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/federation/cross-doorway-content.feature",
@@ -503,7 +2555,419 @@
       "vision_axis_hint": "federation",
       "scenario_count": 2,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 3.0
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/cross-mesh-discovery.feature",
+      "feature_slug": "cross-mesh-discovery",
+      "vision_axis_hint": "federation",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/serve-routing-rtt-ordering.feature",
+      "feature_slug": "serve-routing-rtt-ordering",
+      "vision_axis_hint": "federation",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `federation` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/conductor-memory-soak.feature",
+      "feature_slug": "conductor-memory-soak",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/conductor-validation-spin.feature",
+      "feature_slug": "conductor-validation-spin",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/shefa/limitarian-governor.feature",
+      "feature_slug": "limitarian-governor",
+      "vision_axis_hint": "shefa",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `shefa` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/ssr/render-trace-distinguishes-stall-from-empty.feature",
+      "feature_slug": "render-trace-distinguishes-stall-from-empty",
+      "vision_axis_hint": "ssr",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0,
+      "leverage_measure": {
+        "value": 3.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `ssr` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/epr-projection-fallback.feature",
+      "feature_slug": "epr-projection-fallback",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/inventory-convergence.feature",
+      "feature_slug": "inventory-convergence",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resilience-identity-coherence.feature",
+      "feature_slug": "resilience-identity-coherence",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/02-household-forms.feature",
+      "feature_slug": "02-household-forms",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/08-capacity-reported.feature",
+      "feature_slug": "08-capacity-reported",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/10-card-tells-truth.feature",
+      "feature_slug": "10-card-tells-truth",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/served-projected-head.feature",
+      "feature_slug": "served-projected-head",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/transport-comparison-matrix.feature",
+      "feature_slug": "transport-comparison-matrix",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/transport-dual-plane.feature",
+      "feature_slug": "transport-dual-plane",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/peer-oauth-portal/hosted-login.feature",
+      "feature_slug": "hosted-login",
+      "vision_axis_hint": "peer-oauth-portal",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `peer-oauth-portal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/peer-oauth-portal/peer-conductor-login.feature",
+      "feature_slug": "peer-conductor-login",
+      "vision_axis_hint": "peer-oauth-portal",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `peer-oauth-portal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/peer-oauth-portal/rp-consent.feature",
+      "feature_slug": "rp-consent",
+      "vision_axis_hint": "peer-oauth-portal",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `peer-oauth-portal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/protocol/protocol-omnibar-chrome.feature",
+      "feature_slug": "protocol-omnibar-chrome",
+      "vision_axis_hint": "protocol",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `protocol` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/household-reciprocity.feature",
+      "feature_slug": "household-reciprocity",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 2.0,
+      "leverage_measure": {
+        "value": 2.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/browser/spatial-map.feature",
@@ -511,7 +2975,139 @@
       "vision_axis_hint": "browser",
       "scenario_count": 1,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 1.5
+      "leverage_score": 1.5,
+      "leverage_measure": {
+        "value": 1.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `browser` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/01-device-awakens.feature",
+      "feature_slug": "01-device-awakens",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/03-eprfs-upload.feature",
+      "feature_slug": "03-eprfs-upload",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/04-doorway-serves.feature",
+      "feature_slug": "04-doorway-serves",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/07-custody-witnessed.feature",
+      "feature_slug": "07-custody-witnessed",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/resiliency-saga/09-projectors-carry.feature",
+      "feature_slug": "09-projectors-carry",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/dataplane/transport-recovery-measurements.feature",
+      "feature_slug": "transport-recovery-measurements",
+      "vision_axis_hint": "dataplane",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `dataplane` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/deployment/conductor-admin-reachability.feature",
@@ -519,7 +3115,59 @@
       "vision_axis_hint": "deployment",
       "scenario_count": 1,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 1.0
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `deployment` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/doorway-footprint-convergence.feature",
+      "feature_slug": "doorway-footprint-convergence",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/household-diversity-dataplane.feature",
+      "feature_slug": "household-diversity-dataplane",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `resilience` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/ssr/browser-hydrates-without-flash.feature",
@@ -527,7 +3175,19 @@
       "vision_axis_hint": "ssr",
       "scenario_count": 1,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 1.0
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `ssr` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/ssr/external-webfetch-renders-content.feature",
@@ -535,7 +3195,19 @@
       "vision_axis_hint": "ssr",
       "scenario_count": 1,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 1.0
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `ssr` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/ssr/social-card-crawler-gets-rich-preview.feature",
@@ -543,7 +3215,19 @@
       "vision_axis_hint": "ssr",
       "scenario_count": 1,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 1.0
+      "leverage_score": 1.0,
+      "leverage_measure": {
+        "value": 1.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "1 scenarios (witnessed) x vision-axis weight for `ssr` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     }
   ],
   "adjacent_only": [
@@ -553,7 +3237,19 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 11,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 33.0
+      "leverage_score": 33.0,
+      "leverage_measure": {
+        "value": 33.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "11 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/assessment-completion-feedback.feature",
@@ -561,7 +3257,19 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 9,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 27.0
+      "leverage_score": 27.0,
+      "leverage_measure": {
+        "value": 27.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "9 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/qahal/feedback-dialogue-panel.feature",
@@ -569,7 +3277,39 @@
       "vision_axis_hint": "qahal",
       "scenario_count": 7,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 17.5
+      "leverage_score": 17.5,
+      "leverage_measure": {
+        "value": 17.5,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "7 scenarios (witnessed) x vision-axis weight for `qahal` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/contributor-presence-claim-ceremony.feature",
+      "feature_slug": "contributor-presence-claim-ceremony",
+      "vision_axis_hint": "auth",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 15.0,
+      "leverage_measure": {
+        "value": 15.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/content/stewardship-allocation.feature",
@@ -577,7 +3317,39 @@
       "vision_axis_hint": "content",
       "scenario_count": 6,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 12.0
+      "leverage_score": 12.0,
+      "leverage_measure": {
+        "value": 12.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `content` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
+      "feature_slug": "recovery-shamir-optional",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0,
+      "leverage_measure": {
+        "value": 10.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "4 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     },
     {
       "feature_path": "genesis/a2o/features/lamad/learning-journey.feature",
@@ -585,10 +3357,147 @@
       "vision_axis_hint": "lamad",
       "scenario_count": 3,
       "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 9.0
+      "leverage_score": 9.0,
+      "leverage_measure": {
+        "value": 9.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "3 scenarios (witnessed) x vision-axis weight for `lamad` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/devflow/developer-valueflow-projection.feature",
+      "feature_slug": "developer-valueflow-projection",
+      "vision_axis_hint": "devflow",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0,
+      "leverage_measure": {
+        "value": 6.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "6 scenarios (witnessed) x vision-axis weight for `devflow` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-lost-key-entry.feature",
+      "feature_slug": "recovery-m5-lost-key-entry",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature",
+      "feature_slug": "recovery-m5-portal-host-discovery",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature",
+      "feature_slug": "recovery-m5-vote-as-emergency-contact",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0,
+      "leverage_measure": {
+        "value": 5.0,
+        "kind": "level",
+        "confidence": {
+          "claim": "modelled",
+          "interval": {
+            "lo": -Infinity,
+            "hi": Infinity
+          },
+          "basis": "2 scenarios (witnessed) x vision-axis weight for `auth` (a tuning choice). A RANKING KEY: read the order, not the magnitude \u2014 the weights carry no unit and no calibration"
+        }
+      }
     }
   ],
   "stories_with_coverage": [
+    {
+      "slug": "who-wrote-this",
+      "path": "genesis/data/stories/ethosengine--as-plural-author--agent-identity-claim-and-acceptance.md",
+      "author_status": "draft",
+      "canonical_feature_ref": "feature-agent-identity-claim-and-acceptance",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 3,
+      "adjacent_resolved": [
+        "genesis/a2o/features/auth/contributor-presence-claim-ceremony.feature",
+        "genesis/a2o/features/devflow/developer-valueflow-projection.feature",
+        "genesis/a2o/features/qahal/collective-governance.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 1
+    },
+    {
+      "slug": "gertrude-logs-in-with-help-from-her-people",
+      "path": "genesis/data/stories/gertrude-grandma--as-account-claimant--social-recovery-with-help-from-family.md",
+      "author_status": "draft",
+      "canonical_feature_ref": "social-recovery-with-help-from-family",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 4,
+      "adjacent_resolved": [
+        "genesis/a2o/features/auth/recovery/recovery-m5-lost-key-entry.feature",
+        "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature",
+        "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
+        "genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 1
+    },
+    {
+      "slug": "gertrude-holds-the-share",
+      "path": "genesis/data/stories/gertrude-grandma--as-recovery-counterparty--backup-stewardship-for-household-dowell.md",
+      "author_status": "draft",
+      "canonical_feature_ref": "backup-stewardship-for-household-dowell",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 2,
+      "adjacent_resolved": [
+        "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
+        "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 1
+    },
     {
       "slug": "james-and-the-spoke",
       "path": "genesis/data/stories/james-and-the-spoke.md",
@@ -610,13 +3519,27 @@
       "path": "genesis/data/stories/james-son--as-stewardee--stewarded-device-sync.md",
       "author_status": "canonical",
       "canonical_feature_ref": "stewarded-device-sync",
-      "canonical_feature_resolved": null,
+      "canonical_feature_resolved": "genesis/a2o/features/auth/stewarded-device-sync.feature",
       "adjacent_count": 4,
       "adjacent_resolved": [
         "genesis/a2o/features/lamad/learning-journey.feature",
         "genesis/a2o/features/lamad/path-adaptation.feature",
         "genesis/a2o/features/lamad/assessment-completion-feedback.feature",
         "genesis/a2o/features/content/stewardship-allocation.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 0
+    },
+    {
+      "slug": "the-dowells-hold-gertrudes-share",
+      "path": "genesis/data/stories/matthew-manager--as-recovery-counterparty--backup-stewardship-for-household-gertrude.md",
+      "author_status": "draft",
+      "canonical_feature_ref": "backup-stewardship-for-household-gertrude",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 2,
+      "adjacent_resolved": [
+        "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
+        "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature"
       ],
       "covers_legacy_resolved": [],
       "dangling_ref_count": 1
@@ -638,8 +3561,23 @@
   ],
   "dangling_references": [
     {
-      "story_slug": "james-and-the-spoke",
-      "ref": "stewarded-device-sync",
+      "story_slug": "who-wrote-this",
+      "ref": "feature-agent-identity-claim-and-acceptance",
+      "role": "canonical"
+    },
+    {
+      "story_slug": "gertrude-logs-in-with-help-from-her-people",
+      "ref": "social-recovery-with-help-from-family",
+      "role": "canonical"
+    },
+    {
+      "story_slug": "gertrude-holds-the-share",
+      "ref": "backup-stewardship-for-household-dowell",
+      "role": "canonical"
+    },
+    {
+      "story_slug": "the-dowells-hold-gertrudes-share",
+      "ref": "backup-stewardship-for-household-gertrude",
       "role": "canonical"
     }
   ]

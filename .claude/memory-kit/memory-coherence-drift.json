@@ -42,9 +42,9 @@
       "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 109,
+      "hits": 116,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-08-22T06:21:54Z"
+      "last_signal_at": "2026-08-30T18:45:59Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
       "hits": 16,
@@ -52,9 +52,9 @@
       "last_signal_at": "2026-08-22T04:42:22Z"
     },
     "project_sweettest_native_build_env": {
-      "hits": 45,
-      "last_changed": "elohim/holochain/tests/sweettest/src/tests/rea_commitment_replication.rs",
-      "last_signal_at": "2026-08-09T04:51:15Z"
+      "hits": 48,
+      "last_changed": "elohim/holochain/tests/sweettest/src/tests/lamad.rs",
+      "last_signal_at": "2026-08-30T18:57:21Z"
     },
     "feedback_codegen_prettier_oscillation": {
       "hits": 19,
