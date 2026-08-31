@@ -8,8 +8,9 @@
 # the isolated -prof and -iroh variant images can never satisfy the production pin).
 #
 # WHICH conductor is decided by the BUILD, not by this line. CI passes
-# --build-arg CONDUCTOR_SOURCE_IMAGE=…:conductor-<sha12>, where <sha12> is the commit
-# this repo's `elohim/holochain-conductor` submodule pointer records
+# --build-arg CONDUCTOR_SOURCE_IMAGE=…:conductor-<hc12>-<tx512>, where the two
+# suffixes are the commits this repo's `elohim/holochain-conductor` and `elohim/tx5`
+# submodule pointers record
 # (scripts/ci/build-storage-image.sh). The elohim-conductor pipeline publishes that
 # tag from the same pointer, so bumping the submodule is the whole act of moving a
 # conductor onto the fleet — see elohim/conductor-image/README.md.
@@ -411,6 +412,13 @@ RUN strings target/release/elohim-storage | grep -q "CREATE TABLE content" \
 
 # Runtime stage
 FROM debian:bookworm-slim
+
+# Re-declare the global build arg in this stage so the selected conductor
+# source image remains observable after build time. Direct locally-built
+# binaries do not carry this image ENV; runtime consumers must report its
+# absence as "unknown".
+ARG CONDUCTOR_SOURCE_IMAGE
+ENV CONDUCTOR_IMAGE_TAG=${CONDUCTOR_SOURCE_IMAGE}
 
 WORKDIR /app
 
