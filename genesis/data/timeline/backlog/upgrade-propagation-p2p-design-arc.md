@@ -41,26 +41,50 @@ Existing inventory (all proven live 2026-08-31, the carried-election shift):
   (HC 0.6 gates `lineage:` behind unstable-migration; we own the conductor
   fork). Read `2026-06-11-dna-upgrade-governance.md` first.
 
-## The velocity ladder (operator-harvested 2026-08-31)
+## The velocity ladder — a DEBT SNOWBALL (operator-set 2026-08-31)
 
-The change-class taxonomy, measured against the 2026-08-31 arc (three fleet
-rolls paid for changes that mostly had — or nearly had — atomic mechanisms).
-Cheap iterations everywhere possible are what buy the wall-clock to shake out
-the genuinely hard seams; each rung is a workable item on this arc, ordered by
-leverage-per-line-of-code:
+**The ordering rule is a debt snowball, and the direction is deliberate:
+smallest atomic-discipline debts are paid FIRST; the most complex,
+highest-risk change — full upgrade/revert propagation over p2p, and beneath
+it DNA lineage — is deliberately LAST.** It carries the highest cost of
+proof (a LOT of CI/CD cycles to shake out), so every rung paid off before it
+raises iterations-per-day and therefore the odds of landing it. The snowball
+IS the launch program: atomic disciplines are how the moon landing survives
+contact.
 
-| # | Rung | Change class it frees | State |
-|---|------|----------------------|-------|
-| 1 | **Decouple conductor lifecycle from storage** — the conductor is storage's CHILD PROCESS in the fleet pod, so every storage binary swap kills it and resets its arcs. Let storage swap in place (exec-swap or split into separately-imaged containers) while the conductor keeps running. All three 2026-08-31 fixes were storage-side; on the mesh and on W2 storage restarted repeatedly with the conductor untouched. | native storage/doorway binaries — the class that manufactured every catch-up queue today | **pull-forward candidate: highest leverage per line** |
-| 2 | **Staggered rolls** — when a restart IS needed, never all 7 pods at once; the fleet never enters the all-arcs-Empty regime (see backlog `staggered-conductor-fleet-restarts`). | restart-shaped changes generally | existing backlog, fold in |
-| 3 | **Config as runtime surface, not boot env** — flags (e.g. ELOHIM_OBEY_CARRIED_ELECTION, read via OnceLock at boot) become watchable at runtime; protocol-native endgame: config as declared EPRs, so a flag flip is a head declaration that converges. | config flips — one boolean cost a full roll on 2026-08-31 | missing |
-| 4 | **Coordinator hot-swap gets its own delivery vehicle** — the mechanism (admin `update_coordinators`, no re-key, no churn) is atomic and proven twice on 2026-08-31, but it only ships bundled inside the pod-image roll. Separate the vehicle: coordinator bundles propagate as artifacts and apply without a roll. | coordinator zome logic | mechanism exists; vehicle missing |
-| 5 | **Binary/wasm artifacts as ELECTED CONTENT** — an update is a content-addressed artifact with an earned canonical head; peers verify locally and adopt at their own pace; mixed versions coexist via the additive-wire discipline; **revert = the election moving back to the prior head**. The carried-election machinery IS this kernel. | everything above the DNA line | kernel proven (carried-election); propagation + adoption design open |
-| 6 | **DNA lineage migration** — the irreducible network-agreement seam (hash = network identity; data rebinds across lineage). Once rungs 1-5 exist it becomes RARE and governed — a constitutional event, not a Tuesday. | integrity zomes / DNA | the hard kernel; dna-upgrade-governance is the prior art |
+**Cycle-time baseline (measured 2026-08-31 — RE-MEASURE after each rung
+lands and record the delta in sprint planning; cycle-time is this arc's own
+measure):**
+
+| Change class | Cost per iteration TODAY | Anatomy |
+|---|---|---|
+| content / app EPR | ~minutes | already atomic (author→declare→converge) |
+| coordinator zome | **~2-4 h** | bundled into the pod-image roll (the mechanism itself is minutes) |
+| config flip | **~2-4 h** | env read once at boot ⇒ full roll |
+| storage/doorway binary | **~2-4 h** | roll 30-65 min + 1-3 h conductor catch-up before measurements are trustworthy |
+| DNA / integrity | roll + governance | rare by design |
+
+**Structural insight (2026-08-31):** pod recreation restarts the conductor
+regardless of container layout — the catch-up tax dies only when the
+conductor has its OWN lifecycle. The external-conductor mode that does this
+ALREADY EXISTS (`--admin-url`; the workspace peer W2 ran a detached
+conductor through the whole arc — storage restarted 4x, zero conductor
+churn).
+
+**The snowball, smallest debt first:**
+
+| # | Payment | Effort | What it frees | Snowball effect |
+|---|---------|--------|---------------|-----------------|
+| 1 | **Fleet coordinator hot-swap vehicle** — a script/CI step calling admin `update_coordinators` across the pods (done by hand on W2 in one call, 2026-08-31). No roll, no re-key, no churn. | hours | zome-logic iterations: 2-4 h → minutes — the highest-frequency change class in dataplane work | every later rung that touches wasm iterates for free |
+| 2 | **Split the conductor into its own workload** — separate StatefulSet; storage attaches via the proven `--admin-url` mode. Storage/doorway rolls stop touching conductors: no arc reset, no catch-up regime. | days (manifest surgery + one careful migration roll) | storage/doorway iterations: 2-4 h → ~40-70 min; also deletes the fleet-wide no-authorities regime | every later rung's native-code iterations |
+| 3 | **Staggered rolls** for the remaining conductor-touching cases (fold in backlog `staggered-conductor-fleet-restarts`). | ~day (deploy-loop ordering) | conductor rolls: fleet-wide 2.5-3 h churn → bounded per-peer windows | keeps later-rung experiments measurable while they run |
+| 4 | **Config as runtime surface** — watched config first; protocol-native form later (config as declared EPRs: a flag flip = a head declaration that converges). | days | flag flips: 2-4 h → seconds; unblocks operator-runtime-surface verbs (habit #2) | later adoption switches become runtime acts, not deploys |
+| 5 | **THE MOON SHOT (deliberately last): artifacts as ELECTED CONTENT + upgrade/revert propagation over p2p** — a content-addressed artifact with an earned canonical head; peers verify locally and adopt at their own pace; mixed versions ride the additive-wire discipline; revert = the election moving back. The carried-election machinery is the proven kernel. Attempted ONLY on top of rungs 1-4's velocity — it is the change that needs the most CI/CD proof, so it gets the cheapest possible iterations. | design arc (/brainstorm, p2p-design-gate) | retires the CI roll as the delivery path for everything above the DNA line; the SDK confidence bar | — |
+| 6 | **DNA lineage migration** — the irreducible network-agreement seam under the moon shot (hash = network identity; data rebinds across lineage). Rare, deliberate, constitutional. | the hard kernel | the last big-bang class, governed | — |
 
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the
-delivery vehicle by change class.**
+delivery vehicle by change class** — and pay the small vehicles off first.
 
 Brainstorm-class: route through /brainstorm (p2p-design-gate applies —
 upgrade artifacts, lineage records, and adoption elections are data
