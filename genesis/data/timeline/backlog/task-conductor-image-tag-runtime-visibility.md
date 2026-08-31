@@ -14,10 +14,10 @@ cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "backlog-task-runtime-passport-endpoint"
   - "backlog-upgrade-propagation-p2p-design-arc"
-tags: [observability, ci, delegable, codex-suitable]
+tags: [observability, ci, delegable]
 ---
 
-**Claimable by any agent (Codex-suitable). Small, fully disjoint.**
+**Claimable by any implementation agent. Small, fully disjoint.**
 
 ## Why
 
@@ -36,22 +36,26 @@ build-arg (`scripts/ci/build-storage-image.sh` →
    `CONDUCTOR_SOURCE_IMAGE` build-arg (or just its tag suffix) as an
    `ENV CONDUCTOR_IMAGE_TAG=...` in the final image stage, so every
    container from this image carries it.
-2. Verify `scripts/ci/build-storage-image.sh` already passes the
-   build-arg (it does — do not restructure the script; only touch it if
-   the arg is missing on some path).
+2. Verify read-only that `scripts/ci/build-storage-image.sh` already passes
+   the build-arg. It does; do not edit or restructure the script.
 3. Local-dev parity note in the Dockerfile comment: locally-built binaries
    won't have the env; consumers must treat absence as `"unknown"`.
 
 ## Disjointness contract
 
-- MAY edit: `elohim/elohim-storage/Dockerfile`; `scripts/ci/build-storage-image.sh` only if a pass-through is genuinely missing.
-- MUST NOT touch: Jenkinsfiles, manifests, any Rust source, hc-mesh.sh.
+- The delegated implementation agent (Codex or equivalent) MAY edit
+  `elohim/elohim-storage/Dockerfile` only.
+- It MUST NOT edit `scripts/ci/build-storage-image.sh`; `http.rs` (including
+  the `/version` match arm); `happ_manager.rs`; any Jenkinsfile; any
+  deployment/orchestrator manifest; `hc-mesh.sh`;
+  `src/p2p/view_federation.rs`; or any other Rust source. Those are the rung
+  lane's surfaces this week.
 
 ## DoD + verification
 
 - `docker build` is unavailable in the dev container — verification is
   static: show the Dockerfile stage where the ENV lands and confirm the
   build-arg name matches what build-storage-image.sh passes
-  (`grep -n CONDUCTOR_SOURCE_IMAGE scripts/ci/build-storage-image.sh elohim/elohim-storage/Dockerfile`).
+  (`grep -nE 'ARG CONDUCTOR_SOURCE_IMAGE|ENV CONDUCTOR_IMAGE_TAG|--build-arg CONDUCTOR_SOURCE_IMAGE' elohim/elohim-storage/Dockerfile scripts/ci/build-storage-image.sh`).
 - The named CI backstop: the next edge build's image should show the env
   via the passport endpoint once both tasks land.

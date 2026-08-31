@@ -14,10 +14,10 @@ cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "backlog-task-runtime-passport-endpoint"
   - "backlog-upgrade-propagation-p2p-design-arc"
-tags: [observability, a2o, mixed-version, delegable, codex-suitable]
+tags: [observability, a2o, mixed-version, delegable]
 ---
 
-**Claimable by any agent (Codex-suitable). New-file-only; zero collision.**
+**Claimable by any implementation agent. New-file-only; zero collision.**
 
 ## Why
 
@@ -47,9 +47,13 @@ New script `genesis/a2o/scripts/version-matrix.ts` (tsx, patterned on
 
 ## Disjointness contract
 
-- MAY create: `genesis/a2o/scripts/version-matrix.ts` only.
-- MUST NOT touch: hc-mesh.sh, existing scripts, any Rust, Jenkinsfiles,
-  manifests.
+- The delegated implementation agent (Codex or equivalent) MAY create
+  `genesis/a2o/scripts/version-matrix.ts` only.
+- It MUST NOT edit package scripts or any existing script; `http.rs` (including
+  the `/version` match arm); `happ_manager.rs`; any Jenkinsfile; any
+  deployment/orchestrator manifest; `hc-mesh.sh`;
+  `src/p2p/view_federation.rs`; or any Rust source. Those are the rung lane's
+  surfaces this week.
 
 ## DoD + verification
 
