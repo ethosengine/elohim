@@ -358,6 +358,12 @@ spec:
             # discipline and the 2026-08-10 batch-3 diagnosis).
             - name: ELOHIM_GHOST_DECLARATION_DECAY
               value: "true"
+            # Carry-the-election — hand-rendered like the gates above (adam is
+            # alpha; see the template's inline comment). adam is the peer whose
+            # sweep measured 2,603/2,619 divergent-refused per sweep on
+            # 2026-08-31 — this flag is that freeze's exit.
+            - name: ELOHIM_OBEY_CARRIED_ELECTION
+              value: "true"
             # Evidence-absent backoff — same conservative 6h bake as the
             # template (see its inline comment).
             - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS

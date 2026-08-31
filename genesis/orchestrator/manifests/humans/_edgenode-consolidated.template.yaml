@@ -471,6 +471,24 @@ spec:
             # peer's local-cache answer is never read as a fleet fact.
             - name: ELOHIM_GHOST_DECLARATION_DECAY
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
+            # Carry-the-election (head_adoption, 2026-08-31): when the own
+            # conductor sees NO election for a divergent declared row, the obey
+            # arm may fetch the advertising peer's canonical-head declaration
+            # LINK record over view-federation and re-derive it in wasm
+            # (verify_carried_election: self-binding, author signature, anchor
+            # binding, tier) before obeying the merged election under the
+            # ordinary monotonic stamp guard. The election-visibility wall's
+            # supply-side exit (2026-08-31 fleet read: every agent-info at
+            # storageArc None ⇒ election links never gossip in ⇒ both doorways
+            # frozen on divergent declared heads). Deliberately REUSES the
+            # adopt-before-author placeholder: same per-env policy
+            # (alpha/staging true, prod false — participation is a governance
+            # decision), one variable in the edge Jenkinsfile's global sed.
+            # Unset/false is behavior- and allocation-identical to pre-flag;
+            # storage logs a boot WARN when enabled. Mesh proof:
+            # genesis/a2o/scripts/carried-election-mesh-proof.ts (exit 0).
+            - name: ELOHIM_OBEY_CARRIED_ELECTION
+              value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
             # Evidence-absent contest backoff (head_adoption): ids whose
             # advertiser's conductor cleanly holds NO record defer this long
             # before re-contesting (phantom-load relief). Conservative initial
