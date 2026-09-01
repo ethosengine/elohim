@@ -7,7 +7,7 @@ title: "Task: iroh-plane parity for peer version advertisement — the libp2p le
 slug: "task-iroh-plane-version-advertisement"
 written: "2026-08-31"
 author: "session-2026-08-31-velocity-snowball"
-status: "wip"
+status: "done"
 priority: "medium"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -114,14 +114,27 @@ the live `536378 > 262144` refusal and the deployed-reader-floor cure.
 - Wire-compat tests prove both decode directions, old-reader signature
   acceptance, and byte-identical v1 signing bytes.
 
-## Implementation checkpoint (2026-09-01)
+## Implementation + household receipt (2026-09-01)
 
 The additive advisory field, BuildInfo announcement, verified receive log,
 last-seen peer-book projection, and bidirectional v1 compatibility tests are
-implemented. Feature-enabled evidence is green: the `p2p_iroh` filter passed
-111/111 tests (including populated peer-book storage) with Cargo exit 0.
+implemented. The follow-on observable surface now projects those last-seen
+values through `/p2p/status`, and the household receipt read them through
+`version-matrix.ts --observed`:
 
-The task remains `wip` because `just gate elohim-storage` is currently blocked
-at `cargo fmt --check` by the disjoint runtime-config lane's untracked
-`src/runtime_config.rs` and concurrent `src/main.rs` edits. No reported format
-diff is in this task's write set; this lane did not modify those files.
+```text
+OBSERVED IROH USER-AGENTS
+OBSERVER  2b7e91cd1a7d…         4efd566c9125…         b4046adaf596…
+--------  --------------------  --------------------  --------------------
+matthew   elohim-storage/0.1.0  elohim-storage/0.1.0  —
+jessica   —                     elohim-storage/0.1.0  elohim-storage/0.1.0
+james     elohim-storage/0.1.0  —                     elohim-storage/0.1.0
+STATUS
+```
+
+Each observer saw both remote NodeIds at `elohim-storage/0.1.0`; each dash is
+the observer's own diagonal, and no observed column was divergent. The
+feature-enabled `p2p_iroh` filter and the full `just gate elohim-storage`
+passed with exit 0, so the previously concurrent formatting/cache blocker is
+resolved. Fleet confirmation after the next edge roll remains the integrator's
+watch and is not claimed here.

@@ -7,7 +7,7 @@ title: "Task: make the advertised iroh user-agent OBSERVABLE — surface last-se
 slug: "task-iroh-user-agent-observed-receipt"
 written: "2026-09-01"
 author: "session-2026-09-01-integrator"
-status: "open"
+status: "done"
 priority: "medium"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -97,3 +97,32 @@ its missing half.
   matrix with real user-agents on a 3-peer mesh.
 - Fleet-shaped confirmation (the same command against alpha peers after the
   next edge roll) remains the integrator's watch — do not claim it here.
+
+## Implementation + household receipt (2026-09-01)
+
+`/p2p/status` now overlays the live iroh peer book as additive
+`irohPeers: [{nodeId, userAgent}]`: a live empty book is `[]`, a missing book
+omits the field, and an unknown advertised value is `null`. The default
+version matrix is unchanged; `--observed` adds an observer-by-observed NodeId
+matrix and marks a column `DIVERGENT` only when independent observers disagree.
+
+The three-peer household mesh ran dual transport on every peer. Each observer
+reported both remote peers as `elohim-storage/0.1.0`; the dash in each row is
+that observer's own diagonal, and no column was divergent:
+
+```text
+OBSERVED IROH USER-AGENTS
+OBSERVER  2b7e91cd1a7d…         4efd566c9125…         b4046adaf596…
+--------  --------------------  --------------------  --------------------
+matthew   elohim-storage/0.1.0  elohim-storage/0.1.0  —
+jessica   —                     elohim-storage/0.1.0  elohim-storage/0.1.0
+james     elohim-storage/0.1.0  —                     elohim-storage/0.1.0
+STATUS
+```
+
+Verification: the feature-enabled `p2p_iroh` Cargo filter passed with exit 0,
+including focused populated/empty/absent projection tests; `just gate
+elohim-storage` passed in full, including default-feature compilation and
+doctests; Prettier, direct TypeScript checking, and ESLint passed for
+`version-matrix.ts`. Fleet confirmation after the next edge roll remains the
+integrator's watch and is not claimed here.

@@ -10,7 +10,7 @@
  * Usage:
  *   tsx scripts/version-matrix.ts [name=url,...]
  *     [--peers name=url,...] [--conductors name=admin:app,...]
- *     [--timeout <ms>] [--json] [--out <path>]
+ *     [--timeout <ms>] [--observed] [--json] [--out <path>]
  *
  * Peer precedence: --peers / positional CSV, PEER_STORAGE_URLS, then the
  * matthew/jessica/james localhost mesh. Optional conductor ports can also come
@@ -37,6 +37,7 @@ Options:
   --peers <csv>         storage peers as name=http://host:port
   --conductors <csv>    optional mesh conductor ports as name=admin:app
   --timeout <ms>        per-request timeout (default: ${DEFAULT_TIMEOUT_MS})
+  --observed            render who each peer observes on the iroh plane
   --json                emit source evidence plus derived rows as JSON
   --out <path>          also write the selected rendering to this path
   -h, --help            show this help
@@ -49,6 +50,7 @@ interface Options {
   peerCsv: string;
   conductorCsv?: string;
   timeoutMs: number;
+  observed: boolean;
   json: boolean;
   out?: string;
   help: boolean;
@@ -69,10 +71,16 @@ interface VersionResult {
   error?: string;
 }
 
+interface StatusResult {
+  status?: unknown;
+  error?: string;
+}
+
 interface PeerResult extends Peer {
   reachable: boolean;
   passport?: unknown;
   zomeBuildInfo?: unknown;
+  p2pStatus?: unknown;
   error?: string;
 }
 
@@ -85,6 +93,20 @@ interface MatrixRow {
 interface JsonReport {
   peers: PeerResult[];
   rows: MatrixRow[];
+  observed?: ObservedMatrix;
+}
+
+interface ObservedRow {
+  observer: string;
+  observerNodeId?: string;
+  values: Record<string, string>;
+}
+
+interface ObservedMatrix {
+  nodeIds: string[];
+  labels: Record<string, string>;
+  rows: ObservedRow[];
+  divergentNodeIds: string[];
 }
 
 function requiredValue(args: string[], index: number, flag: string): string {
@@ -106,6 +128,7 @@ function parseArgs(argv: string[], env: NodeJS.ProcessEnv): Options {
   let peersFlag: string | undefined;
   let conductorCsv: string | undefined;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
+  let observed = false;
   let json = false;
   let out: string | undefined;
   let help = false;
@@ -127,6 +150,9 @@ function parseArgs(argv: string[], env: NodeJS.ProcessEnv): Options {
         break;
       case '--json':
         json = true;
+        break;
+      case '--observed':
+        observed = true;
         break;
       case '--out':
         out = requiredValue(argv, index, arg);
@@ -157,6 +183,7 @@ function parseArgs(argv: string[], env: NodeJS.ProcessEnv): Options {
     peerCsv: peersFlag ?? positionalPeers ?? env['PEER_STORAGE_URLS'] ?? DEFAULT_PEERS,
     conductorCsv: conductorCsv ?? positionalConductors ?? env['PEER_CONDUCTOR_PORTS'] ?? undefined,
     timeoutMs,
+    observed,
     json,
     out,
     help,
@@ -245,6 +272,19 @@ async function probeVersion(peer: Peer, timeoutMs: number): Promise<VersionResul
   }
 }
 
+async function probeP2pStatus(peer: Peer, timeoutMs: number): Promise<StatusResult> {
+  try {
+    const response = await fetch(`${peer.url}/p2p/status`, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return { error: `HTTP ${response.status} ${response.statusText}`.trim() };
+    return { status: (await response.json()) as unknown };
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+}
+
 async function probeZomeBuildInfo(ports: ConductorPorts): Promise<unknown> {
   const admin = await AdminWebsocket.connect({
     url: new URL(`ws://127.0.0.1:${ports.admin}`),
@@ -286,19 +326,29 @@ async function probeZomeBuildInfo(ports: ConductorPorts): Promise<unknown> {
 async function probePeer(
   peer: Peer,
   ports: ConductorPorts | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  observed: boolean
 ): Promise<PeerResult> {
   const versionPromise = probeVersion(peer, timeoutMs);
+  const statusPromise = observed
+    ? probeP2pStatus(peer, timeoutMs)
+    : Promise.resolve<StatusResult>({});
   const zomePromise = ports
     ? probeZomeBuildInfo(ports).catch(() => undefined)
     : Promise.resolve(undefined);
-  const [version, zomeBuildInfo] = await Promise.all([versionPromise, zomePromise]);
+  const [version, status, zomeBuildInfo] = await Promise.all([
+    versionPromise,
+    statusPromise,
+    zomePromise,
+  ]);
+  const error = version.error ?? (status.error ? `p2p/status: ${status.error}` : undefined);
   return {
     ...peer,
-    reachable: version.error === undefined,
+    reachable: error === undefined,
     passport: version.passport,
     zomeBuildInfo,
-    error: version.error,
+    p2pStatus: status.status,
+    error,
   };
 }
 
@@ -366,13 +416,7 @@ function buildRows(results: PeerResult[]): MatrixRow[] {
   });
 }
 
-function renderTable(results: PeerResult[], rows: MatrixRow[]): string {
-  const headers = ['FIELD', ...results.map(result => result.name), 'STATUS'];
-  const body = rows.map(row => [
-    row.field,
-    ...results.map(result => row.values[result.name]),
-    row.divergent ? 'DIVERGENT' : '',
-  ]);
+function renderGrid(headers: string[], body: string[][]): string {
   const widths = headers.map((header, index) =>
     Math.max(header.length, ...body.map(cells => cells[index].length))
   );
@@ -386,6 +430,111 @@ function renderTable(results: PeerResult[], rows: MatrixRow[]): string {
   );
 }
 
+function renderTable(results: PeerResult[], rows: MatrixRow[]): string {
+  const headers = ['FIELD', ...results.map(result => result.name), 'STATUS'];
+  const body = rows.map(row => [
+    row.field,
+    ...results.map(result => row.values[result.name]),
+    row.divergent ? 'DIVERGENT' : '',
+  ]);
+  return renderGrid(headers, body);
+}
+
+function irohNodeId(status: unknown): string | undefined {
+  if (!isRecord(status)) return undefined;
+  const nodeId = status['irohNodeId'];
+  return typeof nodeId === 'string' && nodeId ? nodeId : undefined;
+}
+
+function irohObservations(status: unknown): Map<string, string> {
+  const observations = new Map<string, string>();
+  if (!isRecord(status) || !Array.isArray(status['irohPeers'])) return observations;
+  for (const peer of status['irohPeers']) {
+    if (!isRecord(peer) || typeof peer['nodeId'] !== 'string' || !peer['nodeId']) continue;
+    observations.set(
+      peer['nodeId'],
+      typeof peer['userAgent'] === 'string' && peer['userAgent'] ? peer['userAgent'] : MISSING
+    );
+  }
+  return observations;
+}
+
+function abbreviateNodeIds(nodeIds: string[]): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (const nodeId of nodeIds) {
+    let width = Math.min(12, nodeId.length);
+    while (
+      width < nodeId.length &&
+      nodeIds.some(
+        candidate => candidate !== nodeId && candidate.startsWith(nodeId.slice(0, width))
+      )
+    ) {
+      width++;
+    }
+    labels[nodeId] = width < nodeId.length ? `${nodeId.slice(0, width)}…` : nodeId;
+  }
+  return labels;
+}
+
+function buildObservedMatrix(results: PeerResult[]): ObservedMatrix {
+  const byObserver = results.map(result => ({
+    observer: result.name,
+    observerNodeId: irohNodeId(result.p2pStatus),
+    observations: irohObservations(result.p2pStatus),
+  }));
+  const rosterNodeIds = new Set<string>();
+  for (const row of byObserver) {
+    if (row.observerNodeId) rosterNodeIds.add(row.observerNodeId);
+  }
+  // The command's peer arguments define the version-matrix roster. A peer
+  // book can legitimately retain observations for late joiners or peers not
+  // selected for this run; letting those entries create columns makes a
+  // three-peer receipt grow without bound and turns stale evidence into false
+  // divergence. Fall back to observed entries only when every queried peer is
+  // too old to expose its own irohNodeId.
+  const nodeIds = rosterNodeIds.size > 0 ? rosterNodeIds : new Set<string>();
+  if (nodeIds.size === 0) {
+    for (const row of byObserver) {
+      for (const nodeId of row.observations.keys()) nodeIds.add(nodeId);
+    }
+  }
+  const orderedNodeIds = [...nodeIds].sort((left, right) => left.localeCompare(right));
+  const rows = byObserver.map(row => ({
+    observer: row.observer,
+    observerNodeId: row.observerNodeId,
+    values: Object.fromEntries(
+      orderedNodeIds.map(nodeId => [nodeId, row.observations.get(nodeId) ?? MISSING])
+    ),
+  }));
+  const divergentNodeIds = orderedNodeIds.filter(nodeId => {
+    // Peer books intentionally exclude self. Compare only independent
+    // observers so the expected diagonal dash is not false divergence.
+    const independentValues = rows
+      .filter(row => row.observerNodeId !== nodeId)
+      .map(row => row.values[nodeId]);
+    return new Set(independentValues).size > 1;
+  });
+  return {
+    nodeIds: orderedNodeIds,
+    labels: abbreviateNodeIds(orderedNodeIds),
+    rows,
+    divergentNodeIds,
+  };
+}
+
+function renderObservedTable(matrix: ObservedMatrix): string {
+  const headers = ['OBSERVER', ...matrix.nodeIds.map(nodeId => matrix.labels[nodeId])];
+  const body = matrix.rows.map(row => [
+    row.observer,
+    ...matrix.nodeIds.map(nodeId => row.values[nodeId]),
+  ]);
+  body.push([
+    'STATUS',
+    ...matrix.nodeIds.map(nodeId => (matrix.divergentNodeIds.includes(nodeId) ? 'DIVERGENT' : '')),
+  ]);
+  return renderGrid(headers, body);
+}
+
 async function main(): Promise<number> {
   const options = parseArgs(process.argv.slice(2), process.env);
   if (options.help) {
@@ -396,11 +545,21 @@ async function main(): Promise<number> {
   const peers = parsePeers(options.peerCsv);
   const conductors = parseConductors(options.conductorCsv);
   const results = await Promise.all(
-    peers.map(async peer => probePeer(peer, conductors.get(peer.name), options.timeoutMs))
+    peers.map(async peer =>
+      probePeer(peer, conductors.get(peer.name), options.timeoutMs, options.observed)
+    )
   );
   const rows = buildRows(results);
-  const report: JsonReport = { peers: results, rows };
-  const rendered = options.json ? JSON.stringify(report, null, 2) : renderTable(results, rows);
+  const observed = options.observed ? buildObservedMatrix(results) : undefined;
+  const report: JsonReport = { peers: results, rows, observed };
+  const rendered = options.json
+    ? JSON.stringify(report, null, 2)
+    : [
+        renderTable(results, rows),
+        observed && `OBSERVED IROH USER-AGENTS\n${renderObservedTable(observed)}`,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
   console.log(rendered);
   if (options.out) await writeFile(options.out, `${rendered}\n`, 'utf8');

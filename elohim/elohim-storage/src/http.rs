@@ -4442,6 +4442,35 @@ impl HttpServer {
         }
     }
 
+    /// Project the live iroh peer book onto the additive `/p2p/status` field.
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    fn overlay_iroh_peers(
+        status: &mut serde_json::Value,
+        book: Option<&crate::p2p_iroh::IrohPeerBook>,
+    ) {
+        let Some(book) = book else {
+            // No live iroh book means there is no iroh observation surface to
+            // report. Omitting the additive field distinguishes that posture
+            // from a live-but-empty book, which renders as `irohPeers: []`.
+            return;
+        };
+        let peers: Vec<_> = book
+            .snapshot(None)
+            .into_iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "nodeId": entry.addr.node_id.to_string(),
+                    // Honest absence: old peers and manifests without the
+                    // advisory extension remain explicitly unknown.
+                    "userAgent": entry.user_agent,
+                })
+            })
+            .collect();
+        if let Some(obj) = status.as_object_mut() {
+            obj.insert("irohPeers".to_string(), serde_json::json!(peers));
+        }
+    }
+
     /// Handle P2P status request
     #[cfg(feature = "p2p")]
     async fn handle_p2p_status(&self) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -4471,6 +4500,11 @@ impl HttpServer {
                     serde_json::json!(crate::p2p::transport_paths::global().view()),
                 );
             }
+            #[cfg(feature = "p2p-iroh")]
+            Self::overlay_iroh_peers(
+                &mut value,
+                crate::p2p_iroh::iroh_fetch_leg().map(|leg| leg.book()),
+            );
             let json = value.to_string();
             return Ok(Response::builder()
                 .status(StatusCode::OK)
@@ -4510,6 +4544,11 @@ impl HttpServer {
                     serde_json::json!(crate::p2p::transport_paths::global().view()),
                 );
             }
+            #[cfg(feature = "p2p-iroh")]
+            Self::overlay_iroh_peers(
+                &mut body,
+                crate::p2p_iroh::iroh_fetch_leg().map(|leg| leg.book()),
+            );
             return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -16383,6 +16422,56 @@ pub struct HttpTestResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    fn observed_iroh_peer(
+        key: &iroh::SecretKey,
+        user_agent: Option<&str>,
+    ) -> crate::p2p_iroh::IrohPeerEntry {
+        crate::p2p_iroh::IrohPeerEntry {
+            addr: iroh::NodeAddr::new(key.public()),
+            agent_cid: None,
+            libp2p_peer_id: None,
+            user_agent: user_agent.map(str::to_string),
+            announced_at_ms: 1,
+        }
+    }
+
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    #[test]
+    fn p2p_status_overlay_renders_observed_iroh_user_agents() {
+        let book = crate::p2p_iroh::IrohPeerBook::new();
+        let mut rng = rand::rngs::OsRng;
+        let known = iroh::SecretKey::generate(&mut rng);
+        let unknown = iroh::SecretKey::generate(&mut rng);
+        assert!(book.upsert(observed_iroh_peer(&known, Some("elohim-storage/1.2.3+abc"))));
+        assert!(book.upsert(observed_iroh_peer(&unknown, None)));
+
+        let mut status = serde_json::json!({ "peerId": "observer" });
+        HttpServer::overlay_iroh_peers(&mut status, Some(&book));
+        let peers = status["irohPeers"].as_array().expect("irohPeers array");
+        assert_eq!(peers.len(), 2);
+        assert!(peers.iter().any(|peer| {
+            peer["nodeId"] == known.public().to_string()
+                && peer["userAgent"] == "elohim-storage/1.2.3+abc"
+        }));
+        assert!(peers.iter().any(|peer| {
+            peer["nodeId"] == unknown.public().to_string() && peer["userAgent"].is_null()
+        }));
+    }
+
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    #[test]
+    fn p2p_status_overlay_distinguishes_empty_and_absent_iroh_books() {
+        let empty_book = crate::p2p_iroh::IrohPeerBook::new();
+        let mut live_empty = serde_json::json!({ "peerId": "observer" });
+        HttpServer::overlay_iroh_peers(&mut live_empty, Some(&empty_book));
+        assert_eq!(live_empty["irohPeers"], serde_json::json!([]));
+
+        let mut absent = serde_json::json!({ "peerId": "observer" });
+        HttpServer::overlay_iroh_peers(&mut absent, None);
+        assert!(absent.get("irohPeers").is_none());
+    }
 
     #[test]
     fn test_hash_format() {
