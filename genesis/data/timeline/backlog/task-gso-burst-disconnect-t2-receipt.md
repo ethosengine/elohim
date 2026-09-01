@@ -7,7 +7,7 @@ title: "Task: household T2 burst/disconnect receipt for the vendored iroh-quinn 
 slug: "task-gso-burst-disconnect-t2-receipt"
 written: "2026-09-01"
 author: "session-2026-09-01-integrator"
-status: "open"
+status: "wip"
 priority: "high"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -96,3 +96,26 @@ first scenario of the burst regime family in `mesh-fixture-fidelity-regimes`.
 - The kill-leg is real: the transcript shows the remote PID gone and the survivor's post-disconnect 200.
 - Parent atom `done` with the receipt pasted; habit DELTA appended; `habits-project.py --check` clean.
 - Fleet-shaped confirmation (the next organic fleet burst with zero pod aborts) remains the integrator's watch — do not claim it here.
+
+## Blocked receipt checkpoint (2026-09-01)
+
+The harness probe is implemented and its fail-closed path was exercised against
+the owned three-peer mixed mesh (`matthew=dual`, `jessica=iroh`,
+`james=dual`). `pnpm exec tsx scripts/gso-burst-receipt.ts` restarted Jessica
+with the Iroh-only posture preserved and all three zome-path checks alive, but
+the full 360 s observation window produced only **12 successful decoded
+head-record replies** against the required 200. The probe therefore exited 2
+at `leg=no-burst`; it correctly did not execute the SIGKILL leg or claim a
+survival receipt. Post-window diagnostics remained the same small regime (17
+head-record attempts, 16 successful-present, 0 absent, 0 unreachable; 94
+inventory attempts), not the measured ~891-exchange failure shape.
+
+Story-graph station: `mesh fixture fidelity / between mesh-harness ->
+burst-regime / missing node: stage a fixture-owned requester with a known
+stale/full-corpus projection so one restart produces >=200 successful
+view-federation head-record replies; probe = successful-response counter
+crosses the threshold before the disconnect leg / current state: an ordinary
+storage restart on the settled household mesh reaches 12 in 360 s`.
+
+Per the disjointness stop rule, no Rust fixture hook was added. This task and
+the parent GSO atom remain `wip`; the household T2 receipt is still owed.
