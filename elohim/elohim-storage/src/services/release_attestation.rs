@@ -72,15 +72,10 @@
 //!
 //! The `attestations` SQL table looks like the obvious source — it carries
 //! `proof_evidence_json` verbatim and is indexed by `subject_cid`. It is NOT
-//! usable as the threshold reader's source, for two defects measured on the
-//! household mesh on 2026-09-01 (both live in files this atom must not edit;
-//! see the atom's "Blockers for the integrator"):
+//! usable as the threshold reader's source because issuer provenance must be
+//! read from the conductor. One defect measured on the household mesh on
+//! 2026-09-01 is still owned by a sibling security atom:
 //!
-//! - **Identity collapse.** The coordinator stamps
-//!   `Content.id = format!("attest-{kind}-{issuer}")`
-//!   (`content_store/src/attestation.rs`). That id is the projection's PRIMARY
-//!   KEY, so one issuer can hold at most ONE row per kind across ALL subjects,
-//!   forever — a second release's soak attestation silently REPLACES the first.
 //! - **Provenance laundering.** `reanchor_backfill::is_canonical_content_type`
 //!   (`:51`) returns TRUE for `attestation:` prefixes, so
 //!   `p2p::projection_reconcile` feeds peer-discovered attestation rows through
@@ -97,16 +92,17 @@
 //!    `AttestationToSubject` links and yields the AUTHENTICATED `(cid, issuer)`
 //!    pairs — the links are only ever created inside `issue_attestation`, so a
 //!    re-authored copy has no link and cannot appear here.
-//! 2. `content_store::get_content_by_id("attest-{kind}-{issuer}")` yields the
-//!    full `Content` — `author_id` plus `metadata_json` with the context.
+//! 2. `content_store::get_content_by_id("attest-{kind}-{issuer}-{subject}")`
+//!    yields the full `Content` — `author_id` plus `metadata_json` with the
+//!    context. The subject-bearing key prevents one release from shadowing
+//!    another release by the same issuer and kind.
 //! 3. The two must AGREE (`content.author_id == link issuer`) and the entry's
 //!    own `subject_cid` / `proof_evidence.releaseCid` must both name the
 //!    release under test.
 //!
-//! Step 3 makes the reader **fail-closed against both defects**: a laundered
-//! copy fails the author check, and an id-collision (the issuer's row now
-//! resolving to a *different* release) fails the release check. Neither can
-//! inflate a count; both can only deflate one — which is why
+//! Step 3 keeps the reader **fail-closed**: a laundered copy fails the author
+//! check, and stale/legacy entries that resolve to a different release fail the
+//! release check. Neither can inflate a count; both can only deflate one — which is why
 //! [`QualifyingEvidence`] reports `provenance_mismatched` and `unresolved`
 //! alongside `qualifying`, so a caller can never read an under-count as a real
 //! evidence deficit.
@@ -543,16 +539,15 @@ impl From<AttestationOutputWire> for AttestationRef {
     }
 }
 
-/// The coordinator's deterministic content id for an attestation:
-/// `format!("attest-{kind}-{issuer}")` (`content_store/src/attestation.rs`).
+/// The coordinator's deterministic, subject-bearing content id for an attestation:
+/// `format!("attest-{kind}-{issuer}-{subject}")`
+/// (`content_store/src/attestation.rs`).
 ///
 /// Reproduced here because it is the ONLY handle by which a context-bearing
 /// attestation entry can be read back through an existing extern — the link
-/// walk yields an `EntryHash` and no extern resolves a `Content` from one. That
-/// this id is not unique per attestation is the identity-collapse defect the
-/// module docs name; the reader is fail-closed against it.
-fn attestation_content_id(kind: &str, issuer_cid: &str) -> String {
-    format!("attest-{kind}-{issuer_cid}")
+/// walk yields an `EntryHash` and no extern resolves a `Content` from one.
+fn attestation_content_id(kind: &str, issuer_cid: &str, subject_cid: &str) -> String {
+    format!("attest-{kind}-{issuer_cid}-{subject_cid}")
 }
 
 // ---------------------------------------------------------------------------
@@ -769,8 +764,9 @@ fn classify(
         return Verdict::ProvenanceMismatch;
     }
 
-    // The entry the (non-unique) id resolved to must actually be about THIS
-    // release — on both the entry's own subject and the attested payload.
+    // The resolved entry must actually be about THIS release — on both the
+    // entry's own subject and the attested payload. This also fails closed for
+    // legacy entries authored before ids became subject-bearing.
     if entry.subject_cid != release_cid || entry.release_cid.as_deref() != Some(release_cid) {
         return Verdict::Unresolved;
     }
@@ -946,7 +942,7 @@ pub async fn count_qualifying_attestations(
         verdicts.push(Verdict::Unresolved);
     }
     for issuer in &resolvable {
-        let id = attestation_content_id(RIDDEN_ATTESTATION_KIND, issuer);
+        let id = attestation_content_id(RIDDEN_ATTESTATION_KIND, issuer, release_cid);
         let resolved =
             match crate::services::conductor_writes::get_content_by_id(&ctx.hc, &id).await {
                 Ok(Some(out)) => Some(ResolvedEntry::from_metadata(
@@ -1161,8 +1157,8 @@ mod tests {
     #[test]
     fn attestation_content_id_matches_the_coordinators_format() {
         assert_eq!(
-            attestation_content_id("attestation:device-health", "uhCAkAgent"),
-            "attest-attestation:device-health-uhCAkAgent"
+            attestation_content_id("attestation:device-health", "uhCAkAgent", "release-abc"),
+            "attest-attestation:device-health-uhCAkAgent-release-abc"
         );
     }
 
@@ -1226,9 +1222,9 @@ mod tests {
     }
 
     #[test]
-    fn an_id_collision_resolving_to_another_release_is_unresolved_not_counted() {
-        // `attest-{kind}-{issuer}` is not unique per attestation, so the id can
-        // resolve to the issuer's soak of a DIFFERENT release. Fail closed.
+    fn a_legacy_or_stale_entry_for_another_release_is_unresolved_not_counted() {
+        // Subject-bearing ids prevent this for newly-authored attestations, but
+        // legacy rows and stale conductors still require a fail-closed check.
         let d = discipline(2, "uhCAkBuilder");
         let other = entry("uhCAkPeer", "release-OTHER", "pass", "home-server");
         assert_eq!(

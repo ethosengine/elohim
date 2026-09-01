@@ -195,7 +195,7 @@ fn build_attestation_row(signal: &ElohimContentSignal) -> Result<AttestationRow,
         )?,
         evidence_json: serde_json::to_string(
             metadata
-                .get("evidence")
+                .get("evidence_json")
                 .unwrap_or(&serde_json::Value::Object(Default::default())),
         )?,
         expires_at: metadata["expires_at"].as_str().map(String::from),
@@ -338,7 +338,7 @@ mod tests {
         let signal = make_signal(
             "attest-001",
             "attestation:humanness",
-            r#"{"subject_cid":"subj-001","subject_kind":"human"}"#,
+            r#"{"subject_cid":"subj-001","subject_kind":"human","evidence_json":{"summary_metric":{"confidence":0.95}}}"#,
         );
         handle_content_signal(&mut conn, &signal).unwrap();
         let row = attestations::get_by_id(&mut conn, "attest-001")
@@ -347,6 +347,47 @@ mod tests {
         assert_eq!(row.attestation_kind, "attestation:humanness");
         assert_eq!(row.subject_cid, "subj-001");
         assert_eq!(row.manifest_ref, "imagodei");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&row.evidence_json).unwrap(),
+            serde_json::json!({"summary_metric": {"confidence": 0.95}})
+        );
+    }
+
+    #[test]
+    fn subject_bearing_ids_project_two_subjects_for_one_issuer_and_kind() {
+        let mut conn = setup();
+        let kind = "attestation:device-health";
+        let first_id = "attest-attestation:device-health-author-001-release-alpha";
+        let second_id = "attest-attestation:device-health-author-001-release-beta";
+
+        handle_content_signal(
+            &mut conn,
+            &make_signal(
+                first_id,
+                kind,
+                r#"{"subject_cid":"release-alpha","subject_kind":"release","evidence_json":{"summary_metric":{"availability":1}}}"#,
+            ),
+        )
+        .unwrap();
+        handle_content_signal(
+            &mut conn,
+            &make_signal(
+                second_id,
+                kind,
+                r#"{"subject_cid":"release-beta","subject_kind":"release","evidence_json":{"summary_metric":{"availability":1}}}"#,
+            ),
+        )
+        .unwrap();
+
+        let first = attestations::get_by_id(&mut conn, first_id)
+            .unwrap()
+            .unwrap();
+        let second = attestations::get_by_id(&mut conn, second_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.subject_cid, "release-alpha");
+        assert_eq!(second.subject_cid, "release-beta");
+        assert_ne!(first.id, second.id);
     }
 
     #[test]

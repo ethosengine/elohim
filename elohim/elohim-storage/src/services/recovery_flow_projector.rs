@@ -484,7 +484,7 @@ fn build_attestation_row(
         )?,
         evidence_json: serde_json::to_string(
             metadata
-                .get("evidence")
+                .get("evidence_json")
                 .unwrap_or(&serde_json::Value::Object(Default::default())),
         )?,
         expires_at: metadata["expires_at"].as_str().map(String::from),

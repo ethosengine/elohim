@@ -84,13 +84,16 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
         )))
     })?;
 
-    // Build a unique id for this attestation
-    // (uuid crate is not available in WASM — derive from entry_hash post-create)
-    let placeholder_id = format!("attest-{}-{}", input.attestation_kind, issuer_cid);
+    // Content.id is the deterministic projection lookup key, not the canonical
+    // attestation identity (the EntryHash returned below is canonical). It must
+    // include the subject: omitting it lets a later attestation by the same
+    // issuer and kind displace an unrelated subject in every storage projection.
+    let projection_id =
+        attestation_content_id(&input.attestation_kind, &issuer_cid, &input.subject_cid);
 
     // Build the Content entry
     let content = content_store_integrity::Content {
-        id: placeholder_id,
+        id: projection_id,
         content_type: input.attestation_kind.clone(),
         title: input.title,
         description: input.description.unwrap_or_default(),
@@ -117,6 +120,11 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
 
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
+
+    // `get_content_by_id` is the existing context-bearing read extern. Make
+    // attestations independently readable on their authoring peer instead of
+    // depending on the generic re-author path to create this link later.
+    crate::create_id_to_content_link(&content.id, &action_hash)?;
 
     // Create AttestationToSubject link
     // Base: StringAnchor keyed on subject_cid (works for any subject type: agent, content, device).
@@ -157,6 +165,10 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
         subject_cid: input.subject_cid,
         issuer_cid,
     })
+}
+
+fn attestation_content_id(kind: &str, issuer_cid: &str, subject_cid: &str) -> String {
+    format!("attest-{kind}-{issuer_cid}-{subject_cid}")
 }
 
 fn determine_validation_method(input: &IssueAttestationInput) -> &'static str {
@@ -290,4 +302,26 @@ pub fn revoke_attestation(input: RevokeAttestationInput) -> ExternResult<Attesta
     };
 
     issue_attestation(revoke_input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::attestation_content_id;
+
+    #[test]
+    fn projection_id_distinguishes_subjects_for_one_issuer_and_kind() {
+        let first =
+            attestation_content_id("attestation:device-health", "uhCAkIssuer", "release-alpha");
+        let second =
+            attestation_content_id("attestation:device-health", "uhCAkIssuer", "release-beta");
+
+        assert_eq!(
+            first,
+            "attest-attestation:device-health-uhCAkIssuer-release-alpha"
+        );
+        assert_ne!(
+            first, second,
+            "different subjects must not share a projection id"
+        );
+    }
 }

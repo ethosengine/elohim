@@ -7,7 +7,7 @@ title: "Attestation projection PK collision — Content.id = attest-{kind}-{issu
 slug: "attestation-projection-id-collision"
 written: "2026-09-01"
 author: "session-2026-09-01-rung5-design (discovered by T5 soak-attestation rail)"
-status: "open"
+status: "complete"
 priority: "high"
 jobs: [elohim-edge, elohim-holochain]
 cluster: "arch-dataplane-refactor-backlog"
@@ -15,6 +15,7 @@ relatedNodeIds:
   - "backlog-task-release-soak-attestation-rail"
   - "backlog-security-attestation-issuer-relaundering"
 tags: [attestation, projection, correctness, coordinator-hotswap, delegable]
+claimedBy: "codex"
 ---
 
 **Claimable by any implementation agent. Two bounded projection-correctness
@@ -61,3 +62,30 @@ contract before choosing which name moves.
 - MUST NOT touch integrity zomes, `generated_attestation_kinds.rs`, or the
   replication path (`reanchor_backfill.rs` / `projection_reconcile.rs` — the
   sibling security atom owns those).
+
+## Completion evidence — 2026-09-01
+
+- `Content.id` is now the deterministic subject-bearing projection key
+  `attest-{kind}-{issuer}-{subject}`; the canonical attestation identity remains
+  the returned `EntryHash`. Issuance also creates the existing `IdToContent`
+  index immediately, so a context-bearing read no longer depends on a later
+  generic re-author pass.
+- Both attestation projection readers now consume the coordinator's canonical
+  `metadata.evidence_json` field. The storage regression suite pins populated
+  evidence and two distinct rows for one issuer/kind across two subjects.
+- DNA gates passed: schema parity, manifest hygiene (9/9), sweettest compile
+  check, and the focused coordinator unit test
+  `projection_id_distinguishes_subjects_for_one_issuer_and_kind`.
+- The elohim-storage format and clippy legs passed; its 3,153 library tests
+  passed with 0 failures, as did the subsequent integration inventory. The
+  final doc-test compilation was blocked outside this task by the concurrent
+  `release_adoption/mod.rs` declaration of a not-yet-present `apply.rs`.
+- Household mesh receipt `release-soak-probe-1788294014323` passed in libp2p
+  mode. One issuer retained two same-kind attestations for distinct subjects,
+  both independently readable and SQL-projected with evidence. The third-peer
+  read then saw 3/3 links, counted 2 qualifying independent issuers, excluded
+  the builder, and reported `mismatched=0`, `unresolved=0`.
+- Story-graph interstitial captured in the receipt: between “attestation
+  issued” and “threshold reader resolves context,” issuance must create the
+  subject-bearing `IdToContent` index. The live conductor read is the probe;
+  no new entity, route, integrity type, or head-plane item was introduced.

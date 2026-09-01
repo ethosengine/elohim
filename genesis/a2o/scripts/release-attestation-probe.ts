@@ -29,14 +29,13 @@
  *      rule: the link walk gives the AUTHENTICATED (cid, issuer) pairs; the
  *      entry read gives `author_id` + context; the two must agree.
  *
- * ## Two measured substrate defects the read leg reports rather than hides
+ * ## Measured substrate defect and projection-id regression axis
  *
- * Both live in files the owning atom must not edit, and both DEFLATE a count
- * (never inflate one), so the reader is fail-closed against them:
+ * Both DEFLATE a count (never inflate one), so the reader is fail-closed:
  *
- *   - **Identity collapse** — the coordinator stamps
- *     `Content.id = "attest-{kind}-{issuer}"`, which is not unique per
- *     attestation and IS the projection's primary key.
+ *   - **Projection-id regression axis** — the coordinator's subject-bearing
+ *     `Content.id = "attest-{kind}-{issuer}-{subject}"` must keep distinct
+ *     releases independently resolvable for one issuer and kind.
  *   - **Provenance laundering** — the generic content-replication path
  *     re-authors that id on receiving peers under THEIR key, so the projected
  *     `issuer_cid` for a foreign attestation is the local agent.
@@ -168,7 +167,8 @@ function soakInput(opts: {
 }
 
 /** The coordinator's deterministic content id (content_store/src/attestation.rs). */
-const attestationContentId = (kind: string, issuer: string) => `attest-${kind}-${issuer}`;
+const attestationContentId = (kind: string, issuer: string, subject: string) =>
+  `attest-${kind}-${issuer}-${subject}`;
 
 type Verdict =
   | { v: 'qualifies'; agent: string; archetype: string }
@@ -189,7 +189,7 @@ async function countQualifying(reader: Peer, releaseCid: string, builderAgent: s
   const verdicts: Verdict[] = [];
   for (const issuer of issuers) {
     const got: any = await reader.call('get_content_by_id', {
-      id: attestationContentId(RIDDEN_KIND, issuer),
+      id: attestationContentId(RIDDEN_KIND, issuer, releaseCid),
     });
     if (!got?.content) {
       verdicts.push({ v: 'unresolved', why: 'entry not on this conductor' });
@@ -280,6 +280,21 @@ async function projection(http: number, releaseCid: string) {
   const r = await fetch(url);
   if (!r.ok) return [];
   return (await r.json()) as any[];
+}
+
+async function waitForProjectedAttestation(http: number, subjectCid: string, expectedId: string) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const row = (await projection(http, subjectCid)).find(candidate => candidate.id === expectedId);
+    if (row) {
+      const evidence = JSON.parse(String(row.evidenceJson ?? '{}'));
+      if (!evidence.summary_metric)
+        throw new Error(`${expectedId}: SQL projection lost evidence_json.summary_metric`);
+      return row;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`${expectedId}: subject-bearing SQL projection did not arrive within 30s`);
 }
 
 async function refused(label: string, fn: () => Promise<unknown>): Promise<string> {
@@ -385,6 +400,47 @@ async function main() {
     console.log(`${p.name} authored soak attestation ${out.cid} (${archetype})`);
   }
 
+  // The collision regression itself: ONE issuer authors the same kind for a
+  // second subject. Both context-bearing ids must remain independently readable
+  // and both SQL rows must retain evidence. This also proves issue_attestation
+  // creates IdToContent at issuance rather than relying on a later re-author.
+  const otherRelease = `${RELEASE}-other-subject`;
+  await a.call(
+    'issue_attestation',
+    soakInput({
+      ...base,
+      releaseCid: otherRelease,
+      deviceId: a.agent,
+      deviceArchetype: 'workstation',
+      capabilityLevel: 4,
+      probeResults: [{ name: 'collision-control', ok: true }],
+      ...window(),
+    })
+  );
+  const subjectIds = [
+    [RELEASE, attestationContentId(RIDDEN_KIND, a.agent, RELEASE)],
+    [otherRelease, attestationContentId(RIDDEN_KIND, a.agent, otherRelease)],
+  ];
+  for (const [subjectCid, id] of subjectIds) {
+    const got: any = await a.call('get_content_by_id', { id });
+    if (!got?.content) {
+      const legacyId = `attest-${RIDDEN_KIND}-${a.agent}`;
+      const legacy: any = await a.call('get_content_by_id', { id: legacyId });
+      throw new Error(
+        `${id}: subject-bearing conductor projection is unreadable; ` +
+          `legacy id ${legacy?.content ? 'still resolves (stale coordinator)' : 'also absent'}`
+      );
+    }
+    const metadata = JSON.parse(String(got.content.metadata_json ?? '{}'));
+    if (metadata.subject_cid !== subjectCid || !metadata.evidence_json?.summary_metric)
+      throw new Error(`${id}: conductor projection lost its subject or evidence`);
+    await waitForProjectedAttestation(a.http, subjectCid, id);
+  }
+  console.log(
+    `PROJECTION ID PASS: ${a.name} retained 2 same-kind attestations for distinct subjects, ` +
+      'both independently readable with evidence'
+  );
+
   // ---- 3. The BUILDER authors one too — the C1 negative control -----------
   const builderOut: any = await c.call(
     'issue_attestation',
@@ -430,10 +486,10 @@ async function main() {
   const proj = await projection(c.http, RELEASE);
   console.log(`SQL PROJECTION on ${c.name} (contrast only): ${proj.length} row(s)`);
   for (const row of proj) {
-    const idIssuer = String(row.id).replace(`attest-${RIDDEN_KIND}-`, '');
-    const laundered = idIssuer !== row.issuerCid;
+    const expectedId = attestationContentId(RIDDEN_KIND, row.issuerCid, row.subjectCid);
+    const laundered = row.id !== expectedId;
     console.log(
-      `   id-issuer=${idIssuer.slice(0, 20)}… issuerCid=${String(row.issuerCid).slice(0, 20)}…` +
+      `   id=${String(row.id).slice(0, 32)}… issuerCid=${String(row.issuerCid).slice(0, 20)}…` +
         (laundered ? '  ← LAUNDERED (issuer column rewritten to the local agent)' : '')
     );
   }
@@ -461,13 +517,13 @@ async function main() {
     console.log(
       `  - PROVENANCE LAUNDERING: ${evidence.mismatched} entr(ies) whose author_id disagrees with ` +
         `the link-walk issuer — a re-authored copy shadowing the real one. Fail-closed here, but ` +
-        `it deflates the count. Root: Content.id = "attest-{kind}-{issuer}" is replicated as an ` +
+        `it deflates the count. Root: the issuer-bound Content is replicated as an ` +
         `ordinary content id.`
     );
   if (evidence.unresolved > 0)
     console.log(
-      `  - UNRESOLVED: ${evidence.unresolved}. Root: the same non-unique Content.id — the issuer's ` +
-        `attestation id can resolve to a different release, or not be present locally at all.`
+      `  - UNRESOLVED: ${evidence.unresolved}. The subject-bearing attestation id was not present ` +
+        `on this conductor, or a stale/legacy entry failed the release cross-check.`
     );
   console.log(`  authored: ${JSON.stringify(authored)}`);
   console.log(
