@@ -1898,11 +1898,12 @@ mod root_unavailable_tests {
 /// Minimal health-probe dispatch for the dedicated health WATCHDOG listener.
 ///
 /// Serves ONLY the liveness/readiness/startup probes, with no CORS, no gate, no
-/// route-registry lookup, and no blocking work. `/health` (liveness) reflects
+/// route-registry lookup, and no synchronous blocking work. `/health` (liveness) reflects
 /// whether the MAIN runtime is scheduling (heartbeat-gated), NOT this listener's
 /// own liveness — so it tells the truth even though it answers from a separate
-/// OS-thread runtime. `/ready` and `/startup` delegate to the normal handlers
-/// (cached-state reads). Anything else 404s.
+/// OS-thread runtime. `/ready` and `/startup` delegate to cached-state handlers;
+/// `/health/serving` makes one bounded async observation of primary storage's
+/// serving verdict. Anything else 404s.
 async fn handle_watchdog_probe(
     state: Arc<AppState>,
     start: std::time::Instant,
@@ -1915,7 +1916,7 @@ async fn handle_watchdog_probe(
             watchdog_liveness_response(start, &heartbeat, threshold_ms)
         }
         (&Method::GET, "/health/startup") => routes::startup_check(Arc::clone(&state)).await,
-        (&Method::GET, "/health/serving") => routes::serving_check(Arc::clone(&state)),
+        (&Method::GET, "/health/serving") => routes::serving_check(Arc::clone(&state)).await,
         (&Method::GET, "/ready") | (&Method::GET, "/readyz") => {
             routes::readiness_check(Arc::clone(&state))
         }
@@ -5113,7 +5114,9 @@ async fn handle_request(
 
         // Serving probe - 503 when an upstream breaker is shedding. NOT a k8s
         // probe (see routes::health::serving_check): /health is liveness.
-        (Method::GET, "/health/serving") => to_boxed(routes::serving_check(Arc::clone(&state))),
+        (Method::GET, "/health/serving") => {
+            to_boxed(routes::serving_check(Arc::clone(&state)).await)
+        }
 
         // Liveness probe - returns 200 if doorway is running
         (Method::GET, "/health") | (Method::GET, "/healthz") => {

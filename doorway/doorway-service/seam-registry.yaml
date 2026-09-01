@@ -886,6 +886,111 @@ decisionPoints:
         testName: snapshot_reports_half_open_as_skipping
         kind: unit
 
+  - name: StorageServingStatus
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/routes/health.rs
+      modulePath: routes::health::StorageServingStatus
+      line: 303
+    summary: >
+      Typed doorway observation of the declared primary storage peer's existing
+      /health/serving contract: not-observed and not-configured preserve honest absence;
+      serving means storage affirmed its conductor path; refused means storage answered a
+      non-success status; unreachable means no HTTP answer arrived within the bounded probe.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The storage peer owns truth-writing/conductor readiness on the peer-hoster plane;
+          doorway only projects that answer outward on Track 4. No breaker, DHT, or hub state is
+          treated as a substitute.
+      - id: C1
+        status: n-a
+        justification: >
+          The observation selects no authored candidate and crowns no value.
+      - id: C2
+        status: n-a
+        justification: >
+          The observation orders no competing version and moves no authority-bearing head.
+      - id: C3
+        status: answered
+        justification: >
+          Every /health/serving request performs a fresh bounded observation, so a later storage
+          200 automatically moves the response from refused/unreachable back to serving without
+          an operator or deploy. serving_probe_stays_green_when_primary_storage_serves pins the
+          green transition target.
+      - id: C4
+        status: answered
+        justification: >
+          not-observed, not-configured, refused, and unreachable are separate typed outcomes;
+          serving_probe_distinguishes_unreachable_storage_from_refusal pins the load-bearing
+          refused-vs-unreachable split.
+      - id: C5
+        status: n-a
+        justification: >
+          This is local operational evidence from the operator-declared primary, not transferred
+          canonical evidence that confers authority or belief about substrate content.
+      - id: C6a
+        status: answered
+        justification: >
+          The one upstream request is bounded by STORAGE_SERVING_TIMEOUT (2 seconds), below the
+          normal 12-second proxy budget; there is no retry ladder or loop on the request path.
+      - id: C6b
+        status: n-a
+        justification: >
+          The observation has no effect beyond constructing the current response and mutates no
+          breaker, cache, projection, or upstream state.
+      - id: C7
+        status: answered
+        justification: >
+          The exact primary storage endpoint that answers /health/serving is rendered as
+          storageServing and its non-serving answer participates in the doorway status code.
+          serving_probe_inherits_primary_storage_refusal_and_retry_after and its 200 sibling pin
+          both directions.
+      - id: C8
+        status: partial
+        justification: >
+          Every outcome is typed and emitted in the response body with the exact HTTP status when
+          one arrived, but this small route change does not add a per-outcome Prometheus counter.
+      - id: C9
+        status: n-a
+        justification: >
+          The observation names a configured endpoint, not an agent identity or lineage key.
+      - id: C10
+        status: answered
+        justification: >
+          Doorway consumes storage's status-code contract rather than defaulting a renamed JSON
+          field; every non-success remains refused with its exact httpStatus exposed.
+      - id: C11
+        status: answered
+        justification: >
+          The externally chosen upstream delay is capped at 2 seconds; a storage refusal becomes
+          doorway 503 and preserves storage's Retry-After instead of queueing or mutating the
+          general read breaker.
+      - id: C12
+        status: n-a
+        justification: >
+          The health observation grants no action and changes no authorization decision.
+      - id: C13
+        status: n-a
+        justification: >
+          No interim authority gate or social-tier scaffold is introduced.
+      - id: C14
+        status: partial
+        justification: >
+          Transport exceptions close into the witnessed unreachable wire outcome rather than
+          disappearing, but no cross-node RCA capsule is minted for the underlying reqwest error.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_inherits_primary_storage_refusal_and_retry_after
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_stays_green_when_primary_storage_serves
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_distinguishes_unreachable_storage_from_refusal
+        kind: unit
+
   - name: ServingHealth
     kind: boundary-answer-type
     sourceLocation:
@@ -896,8 +1001,9 @@ decisionPoints:
       The answer to "can this doorway actually SERVE?", read from the live breaker map via the
       non-mutating snapshot(). Two declared regimes, not one: `shedding` (a circuit is open — the
       cheap, fast refusal) and `degrading` (a non-zero error streak — the EXPENSIVE regime, where
-      the circuit is still Closed and each request rides the full upstream budget). Carried in
-      /health's body and as the status code of /health/serving.
+      the circuit is still Closed and each request rides the full upstream budget). The
+      status-bearing route additionally reads the declared primary storage peer's own serving
+      verdict so a dead conductor anchoring path cannot hide behind a closed doorway breaker.
     concernIds:
       - id: C7
         status: answered
@@ -906,7 +1012,9 @@ decisionPoints:
           and `status` read "online" whenever the conductor was connected — which DEV_MODE forces
           — so elohim.host advertised health continuously while serving 503 on every content
           route for hours (2026-08-20). health_stops_reporting_green_while_the_serving_path_sheds
-          pins the demotion; serving_probe_carries_the_status_code_health_cannot pins the 503.
+          pins the demotion; serving_probe_carries_the_status_code_health_cannot pins the local
+          503; serving_probe_inherits_primary_storage_refusal_and_retry_after pins the cross-seam
+          storage verdict and its retry contract.
       - id: C11
         status: answered
         justification: >
@@ -940,6 +1048,9 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/routes/health.rs
         testName: health_is_green_when_nothing_is_shedding
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_inherits_primary_storage_refusal_and_retry_after
         kind: unit
 
   - name: read_class

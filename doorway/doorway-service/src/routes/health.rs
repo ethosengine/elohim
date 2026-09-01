@@ -17,7 +17,7 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::server::AppState;
 
@@ -292,6 +292,66 @@ pub struct ServingUpstream {
     pub role: &'static str,
 }
 
+/// Doorway's observation of the declared primary storage peer's own
+/// `/health/serving` verdict.
+///
+/// `Refused` and `Unreachable` stay distinct: storage returning 503 means it
+/// is alive but cannot currently anchor writes through its conductor, while a
+/// transport failure means doorway could not ask the question at all.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum StorageServingStatus {
+    NotObserved,
+    NotConfigured,
+    Serving,
+    Refused,
+    Unreachable,
+}
+
+/// The storage-side serving observation carried by doorway's status-bearing
+/// probe. This is doorway-local operational evidence, rebuilt on every
+/// `/health/serving` request; it is not canonical substrate state.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageServingHealth {
+    /// The same declared rank-0 endpoint used by doorway's primary-scoped
+    /// breaker verdict.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+    /// Whether storage served, explicitly refused, or could not be reached.
+    pub status: StorageServingStatus,
+    /// Exact upstream status when an HTTP response arrived.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_status: Option<u16>,
+}
+
+impl StorageServingHealth {
+    fn not_observed() -> Self {
+        Self {
+            endpoint: None,
+            status: StorageServingStatus::NotObserved,
+            http_status: None,
+        }
+    }
+
+    fn not_configured() -> Self {
+        Self {
+            endpoint: None,
+            status: StorageServingStatus::NotConfigured,
+            http_status: None,
+        }
+    }
+
+    fn blocks_serving(&self) -> bool {
+        matches!(
+            self.status,
+            StorageServingStatus::Refused | StorageServingStatus::Unreachable
+        )
+    }
+}
+
+const STORAGE_SERVING_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Can this doorway actually SERVE?
 ///
 /// WHY THIS BLOCK EXISTS. `healthy` was a hardcoded `true` ("the service is
@@ -370,6 +430,16 @@ pub struct ServingHealth {
     /// [`ServingHealth::observe`] form has no `AppState` to read warmup from.
     #[serde(rename = "warmupEmpty", skip_serializing_if = "Option::is_none")]
     pub warmup_empty: Option<bool>,
+    /// The declared primary storage peer's own answer to "can I anchor truth
+    /// through my conductor right now?".
+    ///
+    /// `serving | refused | unreachable` on `/health/serving`, where doorway
+    /// performs the bounded upstream observation. `/health` reports
+    /// `not-observed` because its Kubernetes liveness contract stays a
+    /// non-blocking cached-state read; a status-bearing probe with no declared
+    /// primary reports `not-configured`.
+    #[serde(rename = "storageServing")]
+    pub storage_serving: StorageServingHealth,
 }
 
 impl ServingHealth {
@@ -434,6 +504,7 @@ impl ServingHealth {
             upstreams,
             freshness: None,
             warmup_empty: None,
+            storage_serving: StorageServingHealth::not_observed(),
             // Breaker-only form: no AppState, so no role count. `None` is a
             // real third answer ("not observed here"), never a silent zero —
             // a zero would 503 every caller of the breaker-only form.
@@ -469,6 +540,53 @@ impl ServingHealth {
         health.warmup_empty = state.warmup_state.as_ref().map(|ws| ws.is_empty_warm());
         health
     }
+}
+
+/// Ask the same declared primary that doorway's breaker verdict is scoped to
+/// whether storage can currently anchor writes through its conductor.
+///
+/// The request is deliberately bounded below the normal proxy budget and does
+/// not touch the upstream breaker: storage 503 means "reads still serve, writes
+/// cannot anchor", not "this endpoint is dead for every route".
+async fn observe_primary_storage_serving(
+    state: &AppState,
+) -> (StorageServingHealth, Option<String>) {
+    let Some(endpoint) = state.args.declared_primary_storage_peer() else {
+        return (StorageServingHealth::not_configured(), None);
+    };
+    let url = format!("{}/health/serving", endpoint.trim_end_matches('/'));
+    let observation = tokio::time::timeout(
+        STORAGE_SERVING_TIMEOUT,
+        state.storage_proxy_client.get(&url).send(),
+    )
+    .await;
+
+    let (status, http_status, retry_after) = match observation {
+        Ok(Ok(response)) => {
+            let status_code = response.status();
+            let retry_after = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned);
+            let status = if status_code.is_success() {
+                StorageServingStatus::Serving
+            } else {
+                StorageServingStatus::Refused
+            };
+            (status, Some(status_code.as_u16()), retry_after)
+        }
+        Ok(Err(_)) | Err(_) => (StorageServingStatus::Unreachable, None, None),
+    };
+
+    (
+        StorageServingHealth {
+            endpoint: Some(endpoint),
+            status,
+            http_status,
+        },
+        retry_after,
+    )
 }
 
 /// Projection role details
@@ -695,8 +813,10 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 /// Handle the serving probe (`/health/serving`) — the status-code-bearing
 /// answer to "can this doorway actually serve right now?".
 ///
-/// 200 when every upstream breaker is closed; **503 + Retry-After** when any is
-/// shedding, with the same `ServingHealth` body `/health` carries.
+/// 200 when every upstream breaker is closed and the primary storage reports
+/// serving; **503 + Retry-After** when a breaker sheds or storage refuses/cannot
+/// answer its own bounded serving probe, with the same `ServingHealth` body
+/// `/health` carries.
 ///
 /// This is the endpoint an alert, an a2o scenario, or an operator should watch.
 /// It is deliberately NOT any Kubernetes probe: `/health` is simultaneously the
@@ -706,8 +826,18 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 /// Splitting the signal from the probe is the whole point — the gap this closes
 /// is that on 2026-08-20 NOTHING returned a bad status code while elohim.host
 /// 503'd every content read for hours.
-pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
-    let serving = ServingHealth::observe_with_freshness(&state);
+pub async fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let storage_observation = observe_primary_storage_serving(&state).await;
+    build_serving_response(&state, storage_observation)
+}
+
+fn build_serving_response(
+    state: &AppState,
+    storage_observation: (StorageServingHealth, Option<String>),
+) -> Response<Full<Bytes>> {
+    let mut serving = ServingHealth::observe_with_freshness(state);
+    let (storage_health, storage_retry_after) = storage_observation;
+    serving.storage_serving = storage_health;
     let body = serde_json::to_string(&serving)
         .unwrap_or_else(|_| r#"{"shedding":true,"degrading":true,"upstreams":[]}"#.to_string());
 
@@ -727,7 +857,12 @@ pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     // (doorway up at 22:55, storage at ~23:07) previously answered
     // /health/serving with 200 forever.
     let warmup_empty = serving.warmup_empty == Some(true);
-    let failing = serving.shedding || serving.degrading || conductor_blind || warmup_empty;
+    let storage_not_serving = serving.storage_serving.blocks_serving();
+    let failing = serving.shedding
+        || serving.degrading
+        || conductor_blind
+        || warmup_empty
+        || storage_not_serving;
     let mut builder = Response::builder()
         .header("Content-Type", "application/json")
         .status(if failing {
@@ -738,7 +873,9 @@ pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     if failing {
         builder = builder.header(
             "Retry-After",
-            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS.to_string(),
+            storage_retry_after.unwrap_or_else(|| {
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS.to_string()
+            }),
         );
     }
     builder.body(Full::new(Bytes::from(body))).unwrap()
@@ -1051,6 +1188,8 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http_body_util::BodyExt;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
     fn version_passport_keeps_legacy_fields_and_adds_camel_case_blocks() {
@@ -1091,6 +1230,54 @@ mod tests {
     /// and the one whose `conductor.connected` was hardcoded `true`.
     fn dev_state() -> AppState {
         let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0", "--dev-mode"]);
+        AppState::new(args)
+    }
+
+    async fn storage_serving_server(
+        status: StatusCode,
+        retry_after: Option<&str>,
+    ) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind storage serving stub");
+        let addr = listener.local_addr().expect("stub address");
+        let reason = status.canonical_reason().unwrap_or("Unknown");
+        let body = if status.is_success() {
+            r#"{"servingOk":true}"#
+        } else {
+            r#"{"servingOk":false}"#
+        };
+        let retry_header = retry_after
+            .map(|value| format!("Retry-After: {value}\r\n"))
+            .unwrap_or_default();
+        let response = format!(
+            "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+            status.as_u16(),
+            reason,
+            retry_header,
+            body.len(),
+            body
+        );
+        let handle = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accept health probe");
+            let mut request = vec![0_u8; 2048];
+            let read = stream.read(&mut request).await.expect("read health probe");
+            let request = String::from_utf8_lossy(&request[..read]);
+            assert!(
+                request.starts_with("GET /health/serving HTTP/1.1"),
+                "doorway must read storage's status-bearing serving route: {request}"
+            );
+            stream
+                .write_all(response.as_bytes())
+                .await
+                .expect("write health response");
+        });
+        (format!("http://{addr}"), handle)
+    }
+
+    fn dev_state_with_storage(storage_url: String) -> AppState {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0", "--dev-mode"]);
+        args.storage_url = Some(storage_url);
         AppState::new(args)
     }
 
@@ -1182,10 +1369,10 @@ mod tests {
     /// exists because on 2026-08-20 NOTHING returned a bad status code while
     /// the doorway could not serve. A conductor-blind doorway is that same
     /// hole: 200 while every registration 500s.
-    #[test]
-    fn serving_probe_503s_while_the_role_map_is_empty() {
+    #[tokio::test]
+    async fn serving_probe_503s_while_the_role_map_is_empty() {
         let state = Arc::new(dev_state());
-        let resp = serving_check(Arc::clone(&state));
+        let resp = serving_check(Arc::clone(&state)).await;
         assert_eq!(
             resp.status(),
             StatusCode::SERVICE_UNAVAILABLE,
@@ -1199,12 +1386,87 @@ mod tests {
 
     /// Scoping sibling: the 503 above is caused by the EMPTY role map, not by
     /// the probe having become unconditionally red.
-    #[test]
-    fn serving_probe_200s_once_roles_are_discovered() {
+    #[tokio::test]
+    async fn serving_probe_200s_once_roles_are_discovered() {
         let state = dev_state();
         discover_role(&state, "imagodei");
-        let resp = serving_check(Arc::new(state));
+        let resp = serving_check(Arc::new(state)).await;
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// R6: storage can keep serving projections while its conductor bridge is
+    /// dead, so the doorway breaker stays closed. The sharper storage serving
+    /// verdict must still demote doorway's status-bearing probe.
+    #[tokio::test]
+    async fn serving_probe_inherits_primary_storage_refusal_and_retry_after() {
+        let (storage_url, server) =
+            storage_serving_server(StatusCode::SERVICE_UNAVAILABLE, Some("20")).await;
+        let state = Arc::new(dev_state_with_storage(storage_url.clone()));
+        discover_role(&state, "imagodei");
+
+        let response = serving_check(Arc::clone(&state)).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers().get("Retry-After").unwrap(), "20");
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("serving body")
+            .to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("serving json");
+        assert_eq!(json["storageServing"]["endpoint"], storage_url);
+        assert_eq!(json["storageServing"]["status"], "refused");
+        assert_eq!(json["storageServing"]["httpStatus"], 503);
+        server.await.expect("storage serving stub");
+
+        assert_eq!(
+            health_check(Arc::clone(&state)).status(),
+            StatusCode::OK,
+            "storage write-path refusal must not turn doorway liveness into a CrashLoop"
+        );
+    }
+
+    #[tokio::test]
+    async fn serving_probe_stays_green_when_primary_storage_serves() {
+        let (storage_url, server) = storage_serving_server(StatusCode::OK, None).await;
+        let state = Arc::new(dev_state_with_storage(storage_url));
+        discover_role(&state, "imagodei");
+
+        let response = serving_check(Arc::clone(&state)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("serving body")
+            .to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("serving json");
+        assert_eq!(json["storageServing"]["status"], "serving");
+        assert_eq!(json["storageServing"]["httpStatus"], 200);
+        server.await.expect("storage serving stub");
+    }
+
+    #[tokio::test]
+    async fn serving_probe_distinguishes_unreachable_storage_from_refusal() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("reserve unreachable address");
+        let storage_url = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+        let state = Arc::new(dev_state_with_storage(storage_url));
+        discover_role(&state, "imagodei");
+
+        let response = serving_check(state).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("serving body")
+            .to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("serving json");
+        assert_eq!(json["storageServing"]["status"], "unreachable");
+        assert!(json["storageServing"].get("httpStatus").is_none());
     }
 
     /// A read replica (`--projection-writer=false`) never dials a conductor —
@@ -1212,8 +1474,8 @@ mod tests {
     /// conductor-blind would 503 a doorway that is serving perfectly from the
     /// shared projection store, so the gate reports "not observed here" instead
     /// of a silent zero.
-    #[test]
-    fn a_read_replica_is_never_judged_conductor_blind() {
+    #[tokio::test]
+    async fn a_read_replica_is_never_judged_conductor_blind() {
         let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0", "--dev-mode"]);
         args.projection_writer = false;
         let state = Arc::new(AppState::new(args));
@@ -1228,7 +1490,10 @@ mod tests {
             serving.roles_discovered, None,
             "not observed, never a zero that would 503"
         );
-        assert_eq!(serving_check(Arc::clone(&state)).status(), StatusCode::OK);
+        assert_eq!(
+            serving_check(Arc::clone(&state)).await.status(),
+            StatusCode::OK
+        );
     }
 
     /// The honest `connected` flag must NOT quietly pull a dev doorway out of a
@@ -1327,8 +1592,8 @@ mod tests {
     /// `/health/startup` showed a completed warmup beside `projection.content:
     /// 0` and `servedBundleHeads: []`, and `/health/serving` answered 200 while
     /// the doorway served an empty projection until someone restarted it.
-    #[test]
-    fn an_empty_warmup_is_not_serving() {
+    #[tokio::test]
+    async fn an_empty_warmup_is_not_serving() {
         use crate::projection::warm_stream::WarmupState;
         use std::sync::atomic::Ordering::Relaxed;
 
@@ -1347,15 +1612,15 @@ mod tests {
         let serving = ServingHealth::observe_with_freshness(&state);
         assert_eq!(serving.warmup_empty, Some(true));
         assert_eq!(
-            serving_check(Arc::clone(&state)).status(),
+            serving_check(Arc::clone(&state)).await.status(),
             StatusCode::SERVICE_UNAVAILABLE,
             "a doorway serving an empty projection is NOT serving — this 200'd \
              for the whole boot-order window"
         );
     }
 
-    #[test]
-    fn a_productive_warmup_serves() {
+    #[tokio::test]
+    async fn a_productive_warmup_serves() {
         use crate::projection::warm_stream::WarmupState;
         use std::sync::atomic::Ordering::Relaxed;
 
@@ -1371,19 +1636,22 @@ mod tests {
 
         let serving = ServingHealth::observe_with_freshness(&state);
         assert_eq!(serving.warmup_empty, Some(false));
-        assert_eq!(serving_check(Arc::clone(&state)).status(), StatusCode::OK);
+        assert_eq!(
+            serving_check(Arc::clone(&state)).await.status(),
+            StatusCode::OK
+        );
     }
 
     /// A doorway with no warmup task at all must not be 503'd for an empty
     /// warmup it was never asked to run — `None` is a real third answer.
-    #[test]
-    fn no_warmup_task_is_not_judged_empty() {
+    #[tokio::test]
+    async fn no_warmup_task_is_not_judged_empty() {
         let state = dev_state();
         discover_role(&state, "imagodei");
         let state = Arc::new(state);
         let serving = ServingHealth::observe_with_freshness(&state);
         assert_eq!(serving.warmup_empty, None);
-        assert_eq!(serving_check(state).status(), StatusCode::OK);
+        assert_eq!(serving_check(state).await.status(), StatusCode::OK);
     }
 
     #[test]
@@ -1473,25 +1741,25 @@ mod tests {
         );
     }
 
-    #[test]
-    fn serving_probe_carries_the_status_code_health_cannot() {
+    #[tokio::test]
+    async fn serving_probe_carries_the_status_code_health_cannot() {
         let state = Arc::new(test_state());
         // This test is about the BREAKER regimes; give it a discovered role so
         // the conductor-blind gate (added 2026-08-21) is not what it measures.
         discover_role(&state, "imagodei");
-        let r = serving_check(Arc::clone(&state));
+        let r = serving_check(Arc::clone(&state)).await;
         assert_eq!(r.status(), StatusCode::OK, "nothing shedding yet");
 
         // A single failure — still Closed, but already the slow regime.
         state.upstream_breakers.record("http://peer:8090", false);
         assert_eq!(
-            serving_check(Arc::clone(&state)).status(),
+            serving_check(Arc::clone(&state)).await.status(),
             StatusCode::SERVICE_UNAVAILABLE,
             "the slow regime is a serving failure even before the circuit opens"
         );
 
         open_the_breaker(&state, "http://peer:8090");
-        let r = serving_check(Arc::clone(&state));
+        let r = serving_check(Arc::clone(&state)).await;
         assert_eq!(r.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
             r.headers().get("Retry-After").unwrap(),
@@ -1700,7 +1968,7 @@ mod tests {
         assert_eq!(upstream_of(&serving, PRIMARY_EP).role, "primary");
 
         assert_eq!(
-            serving_check(Arc::new(state)).status(),
+            build_serving_response(&state, (StorageServingHealth::not_observed(), None)).status(),
             StatusCode::OK,
             "a doorway serving off a healthy primary must not 503 for a pool drill"
         );
@@ -1719,7 +1987,7 @@ mod tests {
         );
         assert_eq!(upstream_of(&serving, PRIMARY_EP).role, "primary");
         assert_eq!(
-            serving_check(Arc::new(state)).status(),
+            build_serving_response(&state, (StorageServingHealth::not_observed(), None)).status(),
             StatusCode::SERVICE_UNAVAILABLE
         );
     }
@@ -1739,7 +2007,7 @@ mod tests {
             "a non-zero streak on the PRIMARY is the 20-second-page regime"
         );
         assert_eq!(
-            serving_check(Arc::new(state)).status(),
+            build_serving_response(&state, (StorageServingHealth::not_observed(), None)).status(),
             StatusCode::SERVICE_UNAVAILABLE
         );
     }

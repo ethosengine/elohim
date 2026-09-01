@@ -21,6 +21,7 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-01 (GREEN preserved; cross-seam serving honesty hardened): doorway `/health/serving` now performs one primary-scoped, 2-second-bounded read of storage's own `/health/serving`; storage 503 demotes doorway 503 without opening the general read breaker, preserves storage's `Retry-After: 20`, and renders typed `serving | refused | unreachable | not-configured | not-observed` evidence while `/health` remains 200 liveness. Focused doorway health suite: 35/35 green; concern census: 0 findings.
 DELTA 2026-08-25b (RED -> GREEN on measured evidence; the flip authority
 was mis-assigned): the fleet's first Dataplane Validation admitted by the
 quiesce gate since the acts layering (edge #1381, validate-only on

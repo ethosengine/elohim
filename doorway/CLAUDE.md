@@ -141,7 +141,7 @@ Live federation mechanisms (doorway-service):
 
 Doorway gates projection-cache serving by content reach. The live gate is `can_serve_at_reach` (`doorway-service/src/cache/access_control.rs`), which knows the 8-value ladder (`private`/`invited`/`local`/`neighborhood`/`municipal`/`bioregional`/`regional`/`commons`) but enforces simplified rules: `private` → beneficiary match only; `invited` through `regional` → any authenticated requester (invite-list and relationship checks are NOT yet implemented); `commons` → everyone; unknown value → deny. Do not document a stricter table than the code enforces, and do not canonize any reach vocabulary here — the vocabulary is in known multi-way drift (`genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md`).
 
-Known enforcement gap (HIGH, open): the storage HTTP path behind the proxy applies an even coarser gate — fine-grained reach authorization runs only on the P2P resolve path, so HTTP reads can return 200 to any authenticated caller regardless of reach. Tracked in `genesis/data/timeline/backlog/http-reach-enforcement-gap.md`; acceptance scenarios already exist (`genesis/a2o/features/lamad/intimate-reach-household.feature`).
+Known enforcement gap (HIGH, open): the storage HTTP path behind the proxy applies an even coarser gate — fine-grained reach authorization runs only on the P2P resolve path, so HTTP reads can return 200 to any authenticated caller regardless of reach. Tracked in `genesis/data/timeline/backlog/http-reach-enforcement-gap.md`; acceptance scenarios already exist (`genesis/a2o/features/lms/intimate-reach-household.feature`).
 
 ## Design Vocabulary
 
