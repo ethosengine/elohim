@@ -839,11 +839,82 @@ pub fn followed_from_runtime_config() -> FollowedChannels {
     }
 }
 
-/// Spawn the observe-mode sweep loop.
+/// The empty/non-empty SHAPE of one tick's follow set, plus what it would
+/// apply — extracted so the tick loop's decisions are testable without a
+/// conductor or an async runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FollowShape {
+    channel_count: usize,
+    applying: Vec<String>,
+}
+
+impl FollowShape {
+    fn of(followed: &FollowedChannels) -> Self {
+        Self {
+            channel_count: followed.channels.len(),
+            applying: followed
+                .channels
+                .iter()
+                .filter(|c| c.mode.applies())
+                .map(|c| c.channel_id.clone())
+                .collect(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.channel_count == 0
+    }
+}
+
+/// What one tick should do, decided BEFORE any conductor call is made.
+struct TickDecision {
+    /// An empty follow set pays for the tick (the re-read) and nothing else:
+    /// `sweep_once` is a real per-channel budget-spending walk, so a set with
+    /// nothing to check does not enter it.
+    sweep: bool,
+    /// `Some(line)` exactly when the empty/non-empty shape of the follow set
+    /// changed since the previous tick — a follow or unfollow landing on a
+    /// RUNNING node must be answerable from a log line, the same property the
+    /// boot log already has. `None` on every steady-state tick.
+    transition_log: Option<String>,
+}
+
+/// The pure per-tick decision: sweep-or-skip, and whether this tick's follow
+/// set differs in shape from the previous one enough to log a transition.
 ///
-/// Returns `false` (and spawns nothing) when no channel is followed — a peer
-/// that follows nothing pays nothing, exactly as the runtime-config watcher
-/// does when no path is configured.
+/// `previous = None` means "no prior tick to compare against" (never reached
+/// by the real loop, which always seeds `previous` from the boot-time read
+/// before the first tick — included here only so the function is total).
+fn decide_tick(previous: Option<&FollowShape>, current: &FollowShape) -> TickDecision {
+    let became_nonempty = previous.is_some_and(FollowShape::is_empty) && !current.is_empty();
+    let became_empty = previous.is_some_and(|p| !p.is_empty()) && current.is_empty();
+    let transition_log = if became_nonempty {
+        Some(format!(
+            "release-adoption: follow set changed on a RUNNING node — now following {} \
+             channel(s), applying = {:?}",
+            current.channel_count, current.applying
+        ))
+    } else if became_empty {
+        Some(
+            "release-adoption: follow set changed on a RUNNING node — now following none, idle \
+             until the next follow"
+                .to_string(),
+        )
+    } else {
+        None
+    };
+    TickDecision {
+        sweep: !current.is_empty(),
+        transition_log,
+    }
+}
+
+/// Spawn the sweep loop.
+///
+/// **Always spawns.** A peer that follows nothing at boot must still be a
+/// RUNNING controller — rung 4's whole point is that a follow lands on a
+/// running node, and that node has to be running for it to land on. The empty
+/// case pays for the tick and nothing else (see [`decide_tick`]).
 ///
 /// bounded-work: one tick per [`SWEEP_INTERVAL_SECS`], `MissedTickBehavior::Skip`
 /// so a stalled runtime coalesces missed ticks instead of catching up in a
@@ -854,56 +925,75 @@ pub fn spawn(controller: AdoptionController) -> bool {
         tracing::info!(
             config_key = state::RELEASE_CHANNELS_KEY,
             refused = followed.refused.len(),
-            "release-adoption: controller IDLE — no followed channels configured"
-        );
-        state::reconcile_followed(&followed);
-        return false;
-    }
-    // Say — once, loudly, at boot — exactly which channels this node will ACT
-    // on. "I edited the ConfigMap and my node started swapping coordinators"
-    // must be answerable from a log line at startup, not reconstructed later
-    // from the admin route.
-    let applying: Vec<&str> = followed
-        .channels
-        .iter()
-        .filter(|c| c.mode.applies())
-        .map(|c| c.channel_id.as_str())
-        .collect();
-    if applying.is_empty() {
-        tracing::info!(
-            channels = followed.channels.len(),
-            refused = followed.refused.len(),
-            sweep_secs = SWEEP_INTERVAL_SECS,
-            "release-adoption: controller ACTIVE, every followed channel in OBSERVE mode — it \
-             will report verdicts and apply nothing"
+            "release-adoption: controller IDLE — no followed channels configured, watching for \
+             a follow"
         );
     } else {
-        tracing::warn!(
-            channels = followed.channels.len(),
-            refused = followed.refused.len(),
-            sweep_secs = SWEEP_INTERVAL_SECS,
-            applying = ?applying,
-            vehicles = ?super::apply::registered_vehicle_labels(),
-            "release-adoption: controller ACTIVE and will APPLY on the named channels — a \
-             verified release on one of them changes what this node runs"
-        );
+        // Say — once, loudly, at boot — exactly which channels this node will
+        // ACT on. "I edited the ConfigMap and my node started swapping
+        // coordinators" must be answerable from a log line at startup, not
+        // reconstructed later from the admin route.
+        let applying: Vec<&str> = followed
+            .channels
+            .iter()
+            .filter(|c| c.mode.applies())
+            .map(|c| c.channel_id.as_str())
+            .collect();
+        if applying.is_empty() {
+            tracing::info!(
+                channels = followed.channels.len(),
+                refused = followed.refused.len(),
+                sweep_secs = SWEEP_INTERVAL_SECS,
+                "release-adoption: controller ACTIVE, every followed channel in OBSERVE mode — \
+                 it will report verdicts and apply nothing"
+            );
+        } else {
+            tracing::warn!(
+                channels = followed.channels.len(),
+                refused = followed.refused.len(),
+                sweep_secs = SWEEP_INTERVAL_SECS,
+                applying = ?applying,
+                vehicles = ?super::apply::registered_vehicle_labels(),
+                "release-adoption: controller ACTIVE and will APPLY on the named channels — a \
+                 verified release on one of them changes what this node runs"
+            );
+        }
     }
+    state::reconcile_followed(&followed);
     state::mark_controller_running(true);
 
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(Duration::from_secs(SWEEP_INTERVAL_SECS));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut previous = FollowShape::of(&followed);
         loop {
             ticker.tick().await;
             // Re-read the config every tick: rung 4's whole point is that a
             // follow/unfollow lands on a RUNNING node.
             let followed = followed_from_runtime_config();
-            let checked = controller.sweep_once(&followed).await;
+            let current = FollowShape::of(&followed);
+            let decision = decide_tick(Some(&previous), &current);
+            if let Some(line) = decision.transition_log {
+                tracing::info!("{line}");
+            }
+            let checked = if decision.sweep {
+                controller.sweep_once(&followed).await
+            } else {
+                // Nothing to check. Reconcile the (empty) registry so a
+                // just-unfollowed channel's leftover state is dropped, and pay
+                // for nothing else: `sweep_once`'s own `record_sweep` would
+                // tick `sweeps`/`lastSweepUnixSecs` on `/admin/adoption` for a
+                // tick that examined zero channels, which is not the same
+                // fact as a sweep that ran and found nothing to do.
+                state::reconcile_followed(&followed);
+                0
+            };
             tracing::debug!(
                 channels = followed.channels.len(),
                 checked,
                 "release-adoption: sweep complete"
             );
+            previous = current;
         }
     });
     true
@@ -1275,5 +1365,55 @@ mod tests {
         assert_eq!(followed.channels.len(), 1);
         assert!(followed.channels[0].mode.applies());
         assert!(followed.refused.is_empty());
+    }
+
+    /// **The defect this fixes, in pure-function form.** A node that boots
+    /// with no followed channels must still SWEEP once a follow lands on it
+    /// while running — `decide_tick` is what the spawned loop consults every
+    /// tick, so proving the empty→non-empty transition here proves the loop
+    /// would have acted on it, without needing a conductor or an async
+    /// runtime to exercise the loop itself.
+    #[test]
+    fn an_empty_to_nonempty_follow_transition_is_observed_and_swept() {
+        let empty = FollowShape::of(&FollowedChannels::default());
+        let followed = state::parse_followed_channels("runtime:coordinators:elohim:receipt");
+        let nonempty = FollowShape::of(&followed);
+
+        // Steady state at empty: no sweep, no log — a node with nothing
+        // followed pays for the tick and nothing else.
+        let steady_empty = decide_tick(Some(&empty), &empty);
+        assert!(!steady_empty.sweep, "an empty follow set is never swept");
+        assert!(
+            steady_empty.transition_log.is_none(),
+            "no change in shape must not log"
+        );
+
+        // The transition this bug lost: empty at boot, then a runtime-config
+        // edit lands a follow on the running node.
+        let transition = decide_tick(Some(&empty), &nonempty);
+        assert!(
+            transition.sweep,
+            "a follow landing on a running node must be swept on the very next tick"
+        );
+        let line = transition
+            .transition_log
+            .expect("the empty->non-empty transition must be answerable from a log line");
+        assert!(line.contains("runtime:coordinators:elohim:receipt") || line.contains('1'));
+
+        // Steady state at non-empty: sweeps every tick, no repeated log.
+        let steady_nonempty = decide_tick(Some(&nonempty), &nonempty);
+        assert!(steady_nonempty.sweep);
+        assert!(
+            steady_nonempty.transition_log.is_none(),
+            "an unchanged non-empty shape must not re-log every tick"
+        );
+
+        // The inverse transition: an unfollow landing on a running node.
+        let unfollowed = decide_tick(Some(&nonempty), &empty);
+        assert!(!unfollowed.sweep);
+        assert!(
+            unfollowed.transition_log.is_some(),
+            "an unfollow landing on a running node must also be answerable from a log line"
+        );
     }
 }
