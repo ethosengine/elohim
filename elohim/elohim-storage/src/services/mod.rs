@@ -111,6 +111,7 @@ pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
+pub mod release_attestation; // rung-5 §5 — release soak/build attestations + the promotion-threshold reader
 pub mod replicates_commons_validator;
 pub mod replicates_dwelling_service;
 pub mod replicates_dwelling_validator;
