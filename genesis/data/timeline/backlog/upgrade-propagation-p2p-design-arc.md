@@ -41,6 +41,38 @@ Existing inventory (all proven live 2026-08-31, the carried-election shift):
   (HC 0.6 gates `lineage:` behind unstable-migration; we own the conductor
   fork). Read `2026-06-11-dna-upgrade-governance.md` first.
 
+Operator course-set (2026-09-01, steering the rung-5 design): **upgrade
+stewardship is a domain of the NETWORK itself.** Networks and protocols are by
+nature monopoly power, and that apex power is deliberately vested one degree
+removed from humans — in the elohim, at the constitutional level. The
+convenience-and-security power of automatic updates (the Chrome-OTA class) is
+wielded THERE to keep the whole coherent and compatible: peers may diverge in
+DECLARED patterns with reconciliation pathways and maps back (enabling the
+global orchestra), but silent staleness is a harm class, not a freedom — the
+household member who never updates is exposed, not sovereign. Consent is
+exercised through the governance system (meaningfully heard, decisions
+explained, intimate context weighed with the whole context in good faith),
+NOT as a per-node veto on staying current. The protocol stewards its own
+protocol: a values-first non-negotiable of the values-first contract.
+
+And the complement (same course-set, second breath): compatible branches,
+low-reach runtime experiments, and A/B variants are NOT a deficit conceded —
+they are the viable-system-model ecology exercising itself. Robustness
+requires necessary diversity between peers; what works informs the whole,
+flowing up through hubs and back down to regions for what fits particular
+contexts. Variety lives ABOVE the compatibility envelope; unity is enforced
+AT it. Day one needs only the MVP architecture — enough to accelerate our own
+development and demonstrate on the test fleet how the future will be grown,
+in love — not the complete ecology.
+
+And the closing breath (operator, 2026-09-01, "Go"): the unity is not
+arbitrary — because we are all created in the imago dei, we all share
+something, so we all have to agree SOMEWHERE. The compatibility boundary —
+how robustly it can support, extend, and afford diversity, and bring
+reconciliation back, as exercised by its own evolution for good or ill — is
+where this system closes. This decision was deliberately pushed as late as
+it has been; it is the right and only approach we can possibly support.
+
 ## The velocity ladder — a DEBT SNOWBALL (operator-set 2026-08-31)
 
 **The ordering rule is a debt snowball, and the direction is deliberate:
