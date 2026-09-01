@@ -7,7 +7,7 @@ title: "Task: the household mesh stages an organic late joiner — a peer joinin
 slug: "task-mesh-late-joiner-staging-regime"
 written: "2026-09-01"
 author: "session-2026-09-01-integrator"
-status: "open"
+status: "complete"
 priority: "high"
 jobs: [elohim-app]
 cluster: "arch-dataplane-refactor-backlog"
@@ -95,3 +95,36 @@ be mintable on the mesh, at real-process level, on demand.
   clean.
 - Fleet-shaped confirmation (an organic late join on alpha observed without
   a fleet restart) remains the integrator's watch — do not claim it here.
+
+## Completion evidence — 2026-09-01
+
+- `hc-mesh.sh join-peer <fresh-name>` now appends exactly one sandbox to an
+  already-running roster, reuses the boot roster's extracted storage-launch
+  function, and refuses partial meshes, duplicate names, occupied derived
+  ports, or missing dual/iroh capability before launch. No incumbent restart
+  or reconfiguration is performed.
+- `late-joiner-receipt.ts` begins from non-empty incumbent iroh books, records
+  each incumbent PID plus `/proc` start ticks, stages the fourth peer, and
+  requires the joiner's exact NodeId in the signed doorway board and every
+  unchanged incumbent's additive `irohPeers` surface. The peer-count gauge and
+  recurring watch-read counter must both advance; unreadable samples never
+  become empty/successful observations.
+- Three clean-teardown local runs passed. Per-incumbent discovery windows were
+  2.1–4.2 s (`latejoin-r1`), 12.7–16.8 s (`latejoin-r2`), and 16.6–20.7 s
+  (`latejoin-r3`), all inside the 95 s (three-cadence) bound. Each exact signed
+  board observation arrived without restarting an incumbent. The old
+  empty-book-only watch cannot satisfy this proof because every baseline book
+  is non-empty and its watch counter must move after staging.
+- The untouched three-peer `just mesh start` flow completed from cold state on
+  every successful run. Shell syntax, focused TypeScript typecheck, Prettier,
+  ESLint, diff hygiene, and the owning app gate are green (development build;
+  4,612/4,612 app tests). Fleet confirmation remains explicitly unclaimed and
+  owned by the integrator.
+- The broader unchanged a2o rails carry two independent baseline reds rather
+  than a false green: `just test a2o` passed 277/279 and failed only clean
+  screenshot-path code/tests (`lamad-*` expected versus `lms-*` produced).
+  A standard mesh prologue also failed before scenario dispatch on its existing
+  seed/projection seam (A post-flight initially read 0/5 content and 0/8 paths;
+  `relationship_type 'step'` returned 400; B declare fan-out returned 404).
+  None of those paths invokes `join-peer`; they remain outside this task's
+  disjoint write set and are recorded rather than rewritten here.

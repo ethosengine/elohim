@@ -47,3 +47,19 @@ failed), the complete doorway-bootstrap unit module exited 0, and `just gate
 elohim-storage` exited 0 (including 3,084 core unit tests with 0 failures plus
 the integration and doc-test inventory). This closes the boot-only code defect;
 fleet proof remains pending the separately tracked late-joiner mesh fixture.
+
+## Household process receipt — 2026-09-01
+
+The fixture residue is closed locally. `hc-mesh.sh join-peer` staged a fourth
+dual-transport conductor/storage pair after each ordinary three-peer mesh was
+already running and warm. The standalone receipt required the fresh peer's
+exact signed iroh NodeId on the doorway board and in every incumbent's
+`/p2p/status.irohPeers`, while holding each incumbent PID and process start
+time constant and requiring both the known-peer gauge and recurring watch-read
+counter to advance.
+
+Three clean-teardown runs passed: incumbent discovery completed in 2.1–4.2 s,
+12.7–16.8 s, and 16.6–20.7 s. Because every baseline book was non-empty, the
+retired boot/empty-book-only predicate could not have produced these watch
+deltas. This is the household T2 receipt for the landed cure; an organic alpha
+late join remains the integrator's fleet confirmation and is not claimed here.

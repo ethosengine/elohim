@@ -17,7 +17,7 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart]
+#   ./hc-mesh.sh [start|stop|status|probe|prologue|join-peer|conductors-restart]
 #
 #   `conductors-restart` restarts the N conductors IN PLACE against their
 #   EXISTING sandboxes — no generate, so agent keys, chains and DHT databases
@@ -34,6 +34,10 @@
 #   sourced — see the dispatch guard at the bottom) to reuse its env-shape
 #   helpers (`conductor_csv`, `peer_csv`, `mesh_seed_env`) from another script
 #   or an operator's shell.
+#
+#   `join-peer <name>` stages one NEW conductor + storage peer against an
+#   already-running mesh. It never restarts or reconfigures an incumbent. The
+#   peer name must be fresh; repeating the same name is refused before launch.
 #
 # ENVIRONMENT:
 #   MESH_PEERS      Peer names, comma-separated (default: matthew,jessica,james)
@@ -729,6 +733,36 @@ mesh_network_args() { # -> the `network …` tail for `hc sandbox generate`
   else
     echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap webrtc ws://signal.localhost:$DOORWAY_PORT"
   fi
+}
+
+patch_mesh_gossip_config() { # <conductor-config.yaml>
+  python3 - "$1" <<'PYEOF'
+import sys
+import yaml
+
+path = sys.argv[1]
+with open(path) as f:
+    cfg = yaml.safe_load(f)
+
+network = cfg.setdefault("network", {})
+advanced = network.get("advanced") or {}
+k2gossip = advanced.get("k2Gossip") or {}
+k2gossip["initiateIntervalMs"] = 1000
+k2gossip["minInitiateIntervalMs"] = 1000
+k2gossip["initialInitiateIntervalMs"] = 1000
+advanced["k2Gossip"] = k2gossip
+
+# The fork's `hc` (0.6.3 line, iroh/quic transport) writes a DEFAULT
+# `signal_url` pointing at a PUBLIC Holo server. It is almost certainly inert
+# while irohTransport is active, so preserve it but make the uncertainty loud.
+_sig = network.get("signal_url") or ""
+if _sig and "localhost" not in _sig and "127.0.0.1" not in _sig:
+    print(f"  WARN {path}: signal_url points off-box ({_sig}) — isolated-mesh sovereignty unverified on the fork line", file=sys.stderr)
+network["advanced"] = advanced
+
+with open(path, "w") as f:
+    yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)
+PYEOF
 }
 
 recorded_mesh_pids() {
@@ -1546,6 +1580,222 @@ print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswi
   fi
 }
 
+start_storage_peer() { # <peer-name> <peer-index>
+  local name="$1" i="$2"
+  local doorway_env=()
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    doorway_env=("ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT")
+  fi
+  if ! curl -s -m 2 "http://localhost:$(http_port "$i")/health" >/dev/null; then
+    local agent
+    agent=$(hc sandbox call --running "$(admin_port "$i")" list-apps 2>/dev/null \
+      | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
+    mkdir -p "$MESH_DIR/$name"
+    env "${doorway_env[@]}" \
+    HOLOCHAIN_ADMIN_URL="ws://localhost:$(admin_port "$i")" \
+    HOLOCHAIN_APP_URL="ws://localhost:$(app_port "$i")" \
+    STORAGE_DIR="$MESH_DIR/$name" \
+    ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
+    ENABLE_P2P=true P2P_PORT="$(p2p_port "$i")" \
+    ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \
+    AGENT_PUBKEY="$agent" RELAY_MODE=server \
+    GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
+    HOUSEHOLD_ID=household-dowell \
+    DEVICE_ARCHETYPE=device-family-node-base \
+    ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
+    PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
+    ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
+    CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
+    HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
+    ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
+    ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
+    ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
+    ELOHIM_OBEY_CARRIED_ELECTION="$ELOHIM_OBEY_CARRIED_ELECTION" \
+    ALLOW_COORDINATOR_UPDATE="$ALLOW_COORDINATOR_UPDATE" \
+    ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
+    ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
+    ALLOW_SEED_NETWORK_STAKES=1 \
+    ALLOW_SEED_DELEGATES_COMPUTE=1 \
+    ALLOW_SEED_SHARD_MANIFEST=1 \
+    nohup "$STORAGE_BIN" --http-port "$(http_port "$i")" > "$LOGDIR/$name.log" 2>&1 &
+    record_mesh_pid storage "$name" "$!" || true
+    echo "storage $name: http=$(http_port "$i") p2p=$(p2p_port "$i") transport=$(peer_transport "$name") agent=${agent:0:16}..."
+  else
+    record_listener_pid storage "$name" "$(http_port "$i")" || true
+    echo "storage $name already up on :$(http_port "$i")"
+  fi
+}
+
+join_peer() { # <fresh-peer-name>
+  if [ "$#" -ne 1 ]; then
+    echo "usage: hc-mesh.sh join-peer <fresh-peer-name>" >&2
+    return 2
+  fi
+  local name="$1"
+  if [[ ! "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$ ]]; then
+    echo "join-peer: invalid peer name '$name' (use 1-48 letters, digits, '_' or '-', starting alphanumeric)" >&2
+    return 2
+  fi
+
+  # This verb is deliberately an append to a LIVE mesh. A cold or partial
+  # roster is not a late-join regime, and starting around it would make the
+  # receipt attribute recovery/restart effects to membership refresh.
+  [ -s "$LOCAL_DEV_DIR/.hc" ] || {
+    echo "join-peer: no running mesh roster at $LOCAL_DEV_DIR/.hc; run ./hc-mesh.sh start first" >&2
+    return 2
+  }
+  [ -f "$MESH_DIR/peer-policy.toml" ] || {
+    echo "join-peer: mesh peer policy is absent; run ./hc-mesh.sh start first" >&2
+    return 2
+  }
+  if [ "$MESH_DOORWAYS_EFFECTIVE" != "1" ] || \
+     ! curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null; then
+    echo "join-peer: the running mesh doorway/manifest board is unavailable on :$DOORWAY_PORT" >&2
+    return 2
+  fi
+  local base_i=0 base_name
+  for base_name in "${PEERS[@]}"; do
+    if ! curl -s -m 2 "http://localhost:$(http_port "$base_i")/health" >/dev/null || \
+       ! ss -H -ltn "sport = :$(admin_port "$base_i")" 2>/dev/null | grep -q . || \
+       ! ss -H -ltn "sport = :$(app_port "$base_i")" 2>/dev/null | grep -q .; then
+      echo "join-peer: incumbent $base_name is not fully running; refusing to reshape a partial mesh" >&2
+      return 2
+    fi
+    base_i=$((base_i + 1))
+  done
+
+  local sandbox="$LOCAL_DEV_DIR/$name"
+  if [ -e "$sandbox" ] || grep -Fxq "$sandbox" "$LOCAL_DEV_DIR/.hc" 2>/dev/null || \
+     [ -e "$PID_DIR/storage-$name" ] || [ -e "$PID_DIR/conductor-$name" ] || \
+     [ -e "$PID_DIR/conductor-supervisor-$name" ]; then
+    echo "join-peer: peer '$name' was already staged; refusing a duplicate" >&2
+    return 2
+  fi
+
+  # `hc sandbox generate` appends one path to .hc. Its pre-append line count is
+  # therefore the durable sandbox index and keeps fresh names from colliding
+  # across consecutive late-join receipts.
+  local index
+  index="$(awk 'NF { n += 1 } END { print n + 0 }' "$LOCAL_DEV_DIR/.hc")"
+  local port
+  for port in "$(admin_port "$index")" "$(app_port "$index")" \
+              "$(http_port "$index")" "$(p2p_port "$index")"; do
+    if listener_pids_for_ports "$port" | grep -q .; then
+      echo "join-peer: derived port :$port for index $index is already in use; refusing before launch" >&2
+      return 2
+    fi
+  done
+
+  assert_toolchain_parity
+  [ -x "$STORAGE_BIN" ] || {
+    echo "join-peer: storage binary is not executable: $STORAGE_BIN" >&2
+    return 1
+  }
+  assert_storage_transport_capability "$STORAGE_BIN" "$(peer_transport "$name")" || return 1
+  [ -f "$HAPP_PATH" ] || {
+    echo "join-peer: hApp bundle is absent: $HAPP_PATH" >&2
+    return 1
+  }
+  mkdir -p "$MESH_DIR" "$LOGDIR" "$PID_DIR"
+
+  local netargs generate_log="$LOGDIR/$name.generate.log"
+  netargs="$(mesh_network_args)"
+  echo -n "generating late joiner $name at index $index ($netargs)"
+  (
+    cd "$LOCAL_DEV_DIR" || exit 2
+    timeout 300 sh -c "echo test | hc sandbox --piped -f $(admin_port "$index") generate -n 1 \
+      --app-id elohim --in-process-lair --root \"\$PWD\" -d $name \
+      \"$HAPP_PATH\" $netargs"
+  ) > "$generate_log" 2>&1
+  local generate_status=$?
+  echo " done"
+  if [ "$generate_status" -ne 0 ] || grep -qa "Payload: Could not" "$generate_log"; then
+    echo "join-peer: conductor generate failed (exit=$generate_status) — see $generate_log" >&2
+    return 1
+  fi
+
+  local recorded_index
+  recorded_index="$(awk -v want="$sandbox" '$0 == want { print NR - 1; exit }' "$LOCAL_DEV_DIR/.hc")"
+  if [ -z "$recorded_index" ] || [ "$recorded_index" -ne "$index" ]; then
+    echo "join-peer: generated sandbox index is '${recorded_index:-absent}', expected $index; refusing to guess" >&2
+    return 1
+  fi
+  patch_mesh_gossip_config "$sandbox/conductor-config.yaml" || {
+    echo "join-peer: gossip-config patch failed for $name" >&2
+    return 1
+  }
+
+  local conductor_log="$LOCAL_DEV_DIR/.sandbox_run_log.$name"
+  echo "starting late-join conductor $name: admin=$(admin_port "$index") app=$(app_port "$index")"
+  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
+    local conductor_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
+    [ -x "$conductor_bin" ] || {
+      echo "join-peer: conductor binary is not executable: $conductor_bin" >&2
+      return 1
+    }
+    (
+      export RUST_LOG="$MESH_RUST_LOG"
+      cd "$LOCAL_DEV_DIR" || exit 2
+      setsid nohup sh -c "echo test | '$conductor_bin' --piped --structured=Log --config-path '$sandbox/conductor-config.yaml'" \
+        > "$conductor_log" 2>&1 &
+      record_mesh_pid conductor "$name" "$!" || true
+    )
+  else
+    (
+      export RUST_LOG="$MESH_RUST_LOG"
+      holochain_bin_export
+      cd "$LOCAL_DEV_DIR" || exit 2
+      setsid nohup sh -c "echo test | hc sandbox --piped -f $(admin_port "$index") run $index -p=$(app_port "$index")" \
+        > "$conductor_log" 2>&1 &
+      record_mesh_pid conductor-supervisor "$name" "$!" || true
+    )
+  fi
+
+  local deadline=$((SECONDS + 180))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . && \
+       ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q .; then
+      break
+    fi
+    sleep 3
+  done
+  if ! ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . || \
+     ! ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q .; then
+    echo "join-peer: conductor $name did not expose both interfaces — see $conductor_log" >&2
+    return 1
+  fi
+  record_listener_pid conductor "$name" "$(admin_port "$index")" || true
+
+  # Reuse the boot roster's ONE storage launch path. Appending to PEERS is
+  # invocation-local: status/ownership helpers below see the joiner, while a
+  # later cold `start` retains the byte-identical configured roster flow.
+  PEERS+=("$name")
+  start_storage_peer "$name" "$index"
+  deadline=$((SECONDS + 180))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    curl -s -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null && break
+    sleep 3
+  done
+  if ! curl -s -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null; then
+    echo "join-peer: storage $name did not serve — see $LOGDIR/$name.log" >&2
+    return 1
+  fi
+  refresh_mesh_pidfiles
+
+  local status node_id
+  status="$(curl -fsS -m 5 "http://localhost:$(http_port "$index")/p2p/status" 2>/dev/null)"
+  node_id="$(jq -r '
+    if (.irohNodeId | type) == "string" and (.irohNodeId | length) > 0 then .irohNodeId
+    elif (.peerId | type) == "string" and (.peerId | test("^[0-9a-fA-F]{64}$")) then .peerId
+    else empty end
+  ' <<<"$status" 2>/dev/null)"
+  if [ -z "$node_id" ]; then
+    echo "join-peer: $name serves but exposes no iroh NodeId; the late-join receipt requires dual/iroh" >&2
+    return 1
+  fi
+  echo "JOINED_PEER name=$name index=$index http=http://localhost:$(http_port "$index") irohNodeId=$node_id"
+}
+
 start_all() {
   # The CLI writes the config the conductor must parse — refuse a mismatched
   # pair before anything is generated, not after three conductors panic.
@@ -1802,38 +2052,7 @@ EOF
     # was wired to run for real.
     # -------------------------------------------------------------------
     for name in "${PEERS[@]}"; do
-      python3 - "$LOCAL_DEV_DIR/$name/conductor-config.yaml" <<'PYEOF'
-import sys
-import yaml
-
-path = sys.argv[1]
-with open(path) as f:
-    cfg = yaml.safe_load(f)
-
-network = cfg.setdefault("network", {})
-advanced = network.get("advanced") or {}
-k2gossip = advanced.get("k2Gossip") or {}
-k2gossip["initiateIntervalMs"] = 1000
-k2gossip["minInitiateIntervalMs"] = 1000
-k2gossip["initialInitiateIntervalMs"] = 1000
-advanced["k2Gossip"] = k2gossip
-
-# The fork's `hc` (0.6.3 line, iroh/quic transport) writes a DEFAULT
-# `signal_url` pointing at a PUBLIC Holo server — measured 2026-08-21:
-# `signal_url: wss://dev-test-bootstrap2.holochain.org/` alongside the
-# loopback bootstrap_url and relay_url this script passes. It is almost
-# certainly inert while irohTransport is the active transport, so this
-# only SAYS SO rather than rewriting it: an isolated mesh should not
-# carry a public endpoint, and whether tx5 ever reads it on the fork has
-# not been measured. Settle it before the fork mesh is trusted offline.
-_sig = network.get("signal_url") or ""
-if _sig and "localhost" not in _sig and "127.0.0.1" not in _sig:
-    print(f"  WARN {path}: signal_url points off-box ({_sig}) — isolated-mesh sovereignty unverified on the fork line", file=sys.stderr)
-network["advanced"] = advanced
-
-with open(path, "w") as f:
-    yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)
-PYEOF
+      patch_mesh_gossip_config "$LOCAL_DEV_DIR/$name/conductor-config.yaml"
       if [ $? -ne 0 ]; then
         echo "gossip-config patch failed for $name — see $LOCAL_DEV_DIR/$name/conductor-config.yaml"
         exit 1
@@ -1862,49 +2081,8 @@ PYEOF
 
   # 3. Storage peers: one per conductor, agent key read from its conductor.
   local i=0
-  local doorway_env=()
-  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
-    doorway_env=("ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT")
-  fi
   for name in "${PEERS[@]}"; do
-    if ! curl -s -m 2 "http://localhost:$(http_port $i)/health" >/dev/null; then
-      local agent
-      agent=$(hc sandbox call --running "$(admin_port $i)" list-apps 2>/dev/null \
-        | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
-      mkdir -p "$MESH_DIR/$name"
-      env "${doorway_env[@]}" \
-      HOLOCHAIN_ADMIN_URL="ws://localhost:$(admin_port $i)" \
-      HOLOCHAIN_APP_URL="ws://localhost:$(app_port $i)" \
-      STORAGE_DIR="$MESH_DIR/$name" \
-      ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
-      ENABLE_P2P=true P2P_PORT="$(p2p_port $i)" \
-      ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \
-      AGENT_PUBKEY="$agent" RELAY_MODE=server \
-      GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
-      HOUSEHOLD_ID=household-dowell \
-      DEVICE_ARCHETYPE=device-family-node-base \
-      ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
-      PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
-      ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
-      CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
-      HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
-      ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
-      ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
-      ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
-      ELOHIM_OBEY_CARRIED_ELECTION="$ELOHIM_OBEY_CARRIED_ELECTION" \
-      ALLOW_COORDINATOR_UPDATE="$ALLOW_COORDINATOR_UPDATE" \
-      ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
-      ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
-      ALLOW_SEED_NETWORK_STAKES=1 \
-      ALLOW_SEED_DELEGATES_COMPUTE=1 \
-      ALLOW_SEED_SHARD_MANIFEST=1 \
-      nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
-      record_mesh_pid storage "$name" "$!" || true
-      echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) transport=$(peer_transport "$name") agent=${agent:0:16}..."
-    else
-      record_listener_pid storage "$name" "$(http_port "$i")" || true
-      echo "storage $name already up on :$(http_port $i)"
-    fi
+    start_storage_peer "$name" "$i"
     i=$((i+1))
   done
 
@@ -1934,11 +2112,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     stop)     stop_all ;;
     status)   status_all ;;
     probe)    probe_all ;;
+    join-peer) shift; join_peer "$@" ;;
     conductors-restart) restart_conductors ;;
     storage-restart) shift; restart_storage "$@" ;;
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
   esac
 fi

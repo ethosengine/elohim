@@ -29,9 +29,17 @@ three gates the mesh could not have surfaced, one per roll:
    fleet's restart-cadence-vs-arc-regrowth regime (all 32 agent-infos
    storageArc None) cannot be reproduced locally.
 3. **Late joiner**: mesh peers boot together; a peer joining a running mesh
-   between "rolls" is not a scenario the harness can stage.
+   between "rolls" was not a scenario the harness could stage. **STAGED
+   2026-09-01:** the additive `hc-mesh.sh join-peer` verb and
+   `late-joiner-receipt.ts` now model this regime without restarting an
+   incumbent; three clean-teardown runs learned the exact fourth-peer NodeId
+   across all three warm incumbents in 2.1–20.7 s.
 
 Per the operator's 2026-08-31 course-set, the doctrine is "the fleet CONFIRMS,
 never discovers" and the durable fix is the modeled test-fixture / simulacra
 network that the system can deploy and drive WITHOUT an agent embedded in the
 runtime. These three regimes are that simulacra's first scenario families.
+
+Regime 3 is now household-mintable. Regimes 1 and 2 remain independent work;
+this staging result does not change their state or claim the corresponding
+fleet confirmations.
