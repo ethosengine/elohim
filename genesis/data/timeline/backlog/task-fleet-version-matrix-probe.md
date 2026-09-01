@@ -80,6 +80,25 @@ and did not advance to the other peers: the conductor returned
 `DbConnectionPoolError` opening its local wasm database, and the rolling
 driver's re-check correctly reported that drift remained.
 
+Follow-up diagnosis named the blocker **orphaned-live-conductor / unlinked
+data-root**, not bundle lineage and not an embedded/external endpoint-routing
+error. The `?apply=false` report read the same installed truth as `/version`
+(`get_dna_definition`) and showed the expected coordinator-only Lamad drift:
+installed `content_store = uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd`,
+bundled `content_store = uhCokdzG4oJduMN074ZDZ8VPOKrGIe9OCH_UH5iUAFFApzdeIr6vr`.
+Unpacking the exact 10,308,450-byte proof bundle confirmed that all five DNA
+hashes match the installed/local hApp; only `lamad.dna` differs, so the lineage
+guard correctly allowed the attempt. The apply call reached
+`update_coordinators`, which then failed opening
+`local-dev/matthew/databases/wasm/wasm`. The same run's sandbox log records a
+fresh generation failing with `PermissionDenied`, while the storage process
+subsequently connected to an older conductor still answering on ports 4444/4445
+and immediately reported missing DHT database paths. The sandbox data-root
+directory was absent after shutdown. A corrected coordinator invocation cannot
+be proved until the mesh lifecycle refuses to delete/regenerate a sandbox while
+any matching conductor process still survives (or otherwise verifies the data
+root before declaring that conductor reusable); the guard must remain strict.
+
 Therefore the implementation is materially present, but this atom stays
 `open`: no receipt yet shows `zomeBuildInfo.buildMarker =
 coordswap-rung1-proof` on all three live conductors, and no full alpha storage

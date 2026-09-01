@@ -139,6 +139,26 @@ six connections timed out and susan refused the connection. Those Services
 are not routable from this execution context, so that run is reachability
 evidence, not a version receipt.
 
+The doorway result is now bounded as **replacement-pod rollout evidence
+blindness**, not a proven serving outage. Both doorway rollout testcases first
+turned red in edge `#1405` and remained red through `#1410`; each archived only
+`kubectl rollout status` timing out with one old replica pending termination.
+The `0/2` value counts successful rollout testcases, not Ready pods. Both public
+hosts continued answering `/health` and `/health/serving` with HTTP 200 from the
+older `141cc780` revision, so the failed replacements never displaced the last
+known-good serving pods. This is not the named ServingHealth/stale-app-token
+class: both deployment manifests probe `/health`, and that endpoint deliberately
+keeps HTTP 200 while `/health/serving` owns the status-code verdict. No doorway
+manifest changed between the last green doorway rollout (`#1404`) and `#1410`.
+The first failure coincides with the first conductor-split migration that
+completed, making post-split scheduling/termination pressure the leading
+inference, but Jenkins archives no replacement-pod conditions, events,
+container states, or logs with which to prove it. A repo-side behavioral change
+would therefore be speculative; the blocker is the missing failed-rollout pod
+evidence, and an operator-side pod/event capture (or a subsequent pipeline leg
+that archives it) is required to distinguish scheduling pressure from a new
+container failure.
+
 The two public storage projections did yield a fleet-partial read. At
 `2026-09-01T19:00:12Z`, matthew through `doorway-alpha.elohim.host` and adam
 through `elohim.host` each reported all six remote NodeIds, and all twelve
