@@ -362,8 +362,11 @@ impl HcClientRegistry {
                         continue;
                     };
 
-                    // `ping` folds its own result into the zome-path observer,
-                    // so a node with zero zome traffic still reports honestly.
+                    // `ping` crosses the authenticated APP websocket used by
+                    // zome calls (not merely the independently-live admin
+                    // websocket) and folds its result into the zome-path
+                    // observer, so a node with zero zome traffic still reports
+                    // honestly and an app-only death triggers a full re-mint.
                     if hc.ping().await.is_ok() {
                         continue;
                     }

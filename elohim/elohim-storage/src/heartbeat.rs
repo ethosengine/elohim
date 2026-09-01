@@ -374,11 +374,11 @@ impl LiveProbe for DefaultProbe {
                 }
             };
 
-        // Conductor health: a successful `list_apps` via HcClient::ping is a
-        // reasonable liveness check — admin websocket is responsive AND the
-        // conductor's app manager is answering queries. Resolved through the
-        // registry (not a held handle) so a supervisor re-mint is reflected
-        // on the very next tick.
+        // Conductor health: HcClient::ping crosses the authenticated app
+        // websocket used by zome calls. An admin-only probe is insufficient:
+        // the admin socket can stay live while the app socket/token is dead.
+        // Resolve through the registry (not a held handle) so a supervisor
+        // re-mint is reflected on the very next tick.
         let conductor_healthy = match self.registry.client(self.role) {
             Some(hc) => match hc.ping().await {
                 Ok(()) => true,

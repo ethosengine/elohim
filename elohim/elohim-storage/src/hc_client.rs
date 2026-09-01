@@ -992,15 +992,20 @@ impl HcClient {
             .await
     }
 
-    /// Quick health check - just verify conductor is responsive
+    /// Probe the authenticated APP interface used by every zome call.
+    ///
+    /// The admin websocket is deliberately not the probe. A conductor can keep
+    /// answering admin `list_apps` after the app websocket has closed (or its
+    /// one-shot auth token has become unusable), which is precisely the state
+    /// the bridge supervisor must cure by constructing a fresh `HcClient`.
+    /// `app_info` is side-effect-free, crosses the same authenticated websocket
+    /// as `call_zome`, and inherits the client's bounded request timeout.
     pub async fn ping(&self) -> Result<(), StorageError> {
-        // Use list_apps as a simple ping.
-        //
         // Folded into the zome-path observer because on a node with NO zome
         // traffic this is the only evidence there is — and a node with no
         // traffic is exactly the reported shape: the bridge died at a conductor
         // restart and nothing asked it a question until a person did, 90s later.
-        match self.admin_ws.list_apps(None).await {
+        match self.app_ws.app_info().await {
             Ok(_) => {
                 record_role_success(self.role_key());
                 Ok(())
