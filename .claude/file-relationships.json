@@ -121,7 +121,7 @@
         {
           "trigger_pattern": "app/elohim-app/src/app/lamad/**/*.ts",
           "notify": [],
-          "message": "Lamad implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/lamad/. If exploring, capture intent in .claude/data/dev-intent.jsonl before commit."
+          "message": "Lamad implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/lms/. If exploring, capture intent in .claude/data/dev-intent.jsonl before commit."
         },
         {
           "trigger_pattern": "app/elohim-app/src/app/imagodei/**/*.ts",
@@ -136,7 +136,12 @@
         {
           "trigger_pattern": "app/elohim-app/src/app/shefa/**/*.ts",
           "notify": [],
-          "message": "Shefa implementation changed. Story-first: is there an a2o scenario for this? Check genesis/a2o/features/ for economy/stewardship scenarios."
+          "message": "Shefa implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/rms/ for economy/stewardship scenarios."
+        },
+        {
+          "trigger_pattern": "app/elohim-app/src/app/avodah/**/*.ts",
+          "notify": [],
+          "message": "Avodah implementation changed. Story-first: add the work-management scenario under the governed TBD stub at genesis/a2o/features/wms/."
         }
       ]
     },

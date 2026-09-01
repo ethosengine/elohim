@@ -3,7 +3,7 @@
 /**
  * Deep-link delivery step definitions.
  *
- * Drives genesis/a2o/features/lamad/deep-link-delivery.feature — the §12 URL &
+ * Drives genesis/a2o/features/lms/deep-link-delivery.feature — the §12 URL &
  * Routing Contract (Slice 1, "alpha green"). A learner handed a URL cold lands
  * on the actual rendered surface that URL names, because the doorway SPA
  * deep-link fallback serves the bundle's entry file for ROUTE sub-paths (final

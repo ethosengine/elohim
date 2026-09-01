@@ -253,7 +253,9 @@ Before implementing a feature, find or write the a2o scenario that describes the
 
 | Pillar | A2O Features Directory |
 |--------|----------------------|
-| lamad | `genesis/a2o/features/lamad/` |
+| lamad | `genesis/a2o/features/lms/` |
+| shefa | `genesis/a2o/features/rms/` |
+| avodah | `genesis/a2o/features/wms/` (TBD stub) |
 | imagodei | `genesis/a2o/features/auth/` |
 | qahal | `genesis/a2o/features/` (governance scenarios) |
 | elohim | `genesis/a2o/features/content/`, `federation/` |

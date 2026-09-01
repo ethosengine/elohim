@@ -47,7 +47,7 @@ check("process gospel (timeline CONVENTIONS beats entity)",
       cls("genesis/data/timeline/CONVENTIONS.md") == "process-gospel")
 check("timeline entity doc", cls("genesis/data/timeline/backlog/bundle-styling-token-contract.md") == "timeline-entity")
 check("story", cls("genesis/data/stories/foo.md") == "story")
-check("a2o feature", cls("genesis/a2o/features/lamad/foo.feature") == "a2o-feature")
+check("a2o feature", cls("genesis/a2o/features/lms/foo.feature") == "a2o-feature")
 check("skill", cls(".claude/skills/semantic-links/SKILL.md") == "skill")
 check("agent", cls(".claude/agents/librarian.md") == "agent")
 check("routing config (subject axis)", cls(".claude/subject-routing.yaml") == "routing-config")

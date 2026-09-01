@@ -34,13 +34,13 @@ function input() {
   const scenarios: ScenarioResult[] = [
     {
       name: 'Terrance completes path',
-      feature: 'features/lamad/learning-journey.feature',
+      feature: 'features/lms/learning-journey.feature',
       status: 'passed',
       tags: [],
     },
     {
       name: 'Mary fails on assessment',
-      feature: 'features/lamad/learning-journey.feature',
+      feature: 'features/lms/learning-journey.feature',
       status: 'failed',
       failureMessage: 'AssertionError: expected 500 to be 200',
       tags: [],
@@ -208,14 +208,14 @@ void describe('aggregate', () => {
       // validated-passing
       {
         name: 'Validated and passing',
-        feature: 'features/lamad/a.feature',
+        feature: 'features/lms/a.feature',
         status: 'passed',
         tags: ['@e2e', '@elohim-visually-validated'],
       },
       // validated-regressed
       {
         name: 'Validated but failed',
-        feature: 'features/lamad/b.feature',
+        feature: 'features/lms/b.feature',
         status: 'failed',
         failureMessage: 'AssertionError: visual element missing',
         tags: ['@e2e', '@elohim-visually-validated'],
@@ -223,14 +223,14 @@ void describe('aggregate', () => {
       // pending-passing
       {
         name: 'Untagged passing',
-        feature: 'features/lamad/c.feature',
+        feature: 'features/lms/c.feature',
         status: 'passed',
         tags: ['@e2e'],
       },
       // pending-failing
       {
         name: 'Untagged failed',
-        feature: 'features/lamad/d.feature',
+        feature: 'features/lms/d.feature',
         status: 'failed',
         failureMessage: 'AssertionError: nope',
         tags: ['@e2e'],

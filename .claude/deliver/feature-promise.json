@@ -70,20 +70,20 @@
     "genesis/a2o/features/resilience/observable-distribution.feature: Peer-topology page aggregates by household, not by peer",
     "genesis/a2o/features/resilience/observable-distribution.feature: Reciprocity page shows inflow, outflow, and net hosting",
     "genesis/a2o/features/resilience/observable-distribution.feature: Doorway operator dashboard topology tab is reachable",
-    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Cluster page shows Matthew's device tile with real metrics (@wip)",
-    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Peer topology page shows Terrance's household (@wip)",
-    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Reciprocity page shows inflow from Terrance (@wip)",
-    "genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature: Manifesto chapter content viewer shows distribution badge (@wip)",
+    "genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature: Cluster page shows Matthew's device tile with real metrics (@wip)",
+    "genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature: Peer topology page shows Terrance's household (@wip)",
+    "genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature: Reciprocity page shows inflow from Terrance (@wip)",
+    "genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature: Manifesto chapter content viewer shows distribution badge (@wip)",
     "genesis/a2o/features/browser/doorway-dashboard-health.feature: Dashboard overview tab loads cleanly"
   ],
   "scenarios_missing": [
     {
       "intent": "Visible REA/EPR contract trace — operator-doorway commitment surfaces on the topology pages with its custody+steward chain references",
-      "proposed_location": "genesis/a2o/features/shefa/operator-authority-trace.feature (new)"
+      "proposed_location": "genesis/a2o/features/rms/operator-authority-trace.feature (new)"
     },
     {
       "intent": "Storage-distribution rollup component is reachable, mounted, and renders all 3 tabs with non-stub data",
-      "proposed_location": "genesis/a2o/features/shefa/storage-distribution-rollup.feature (new)"
+      "proposed_location": "genesis/a2o/features/rms/storage-distribution-rollup.feature (new)"
     }
   ],
   "screenshot_targets": [

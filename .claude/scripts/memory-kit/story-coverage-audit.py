@@ -105,6 +105,14 @@ VISION_AXIS_WEIGHTS = {
 }
 DEFAULT_VISION_WEIGHT = 1.0  # for unknown axes (don't down-weight; just don't up-weight)
 
+# Feature directories describe conventional system capabilities; reports retain
+# the branded Elohim pillar vocabulary used by story and delivery metadata.
+CAPABILITY_DIRECTORY_TO_PILLAR = {
+    "lms": "lamad",
+    "rms": "shefa",
+    "wms": "avodah",
+}
+
 _SCENARIO_RE = re.compile(r"^\s*Scenario(?:\s+Outline)?\s*:", re.MULTILINE)
 
 # Strip trailing inline YAML comment ("key: value  # ...") that the shared
@@ -126,14 +134,15 @@ def _clean(val) -> str:
 def _vision_axis_for(feature_rel_path: str) -> str:
     """Extract the vision axis (pillar dir) from a feature path.
 
-    Example: `genesis/a2o/features/lamad/learning-journey.feature` → `lamad`.
+    Example: `genesis/a2o/features/lms/learning-journey.feature` → `lamad`.
     Single-segment features land in `_root` (no pillar)."""
     # Path is repo-relative; we want the segment immediately under
     # genesis/a2o/features/. If the feature lives deeper than that, the
     # next segment is the pillar.
     parts = feature_rel_path.split("/")
     if len(parts) >= 5 and parts[0] == "genesis" and parts[2] == "features":
-        return parts[3]
+        directory = parts[3]
+        return CAPABILITY_DIRECTORY_TO_PILLAR.get(directory, directory)
     return "_root"
 
 

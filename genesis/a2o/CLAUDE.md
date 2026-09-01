@@ -82,7 +82,9 @@ this obligation attached to the authoring surface.
 
 | App Pillar | Feature Directory | Key Feature Files |
 |-----------|-------------------|-------------------|
-| lamad | `features/lamad/` | learning-journey, know-thyself-discovery |
+| lamad | `features/lms/` | learning-journey, know-thyself-discovery |
+| shefa | `features/rms/` | human-resilience, limitarian-governor |
+| avodah | `features/wms/` | TBD — governed stub for future work-management stories |
 | imagodei | `features/auth/` | auth-lifecycle, fixture-humans |
 | elohim | `features/content/` | content-lifecycle |
 | federation | `features/federation/` | cross-doorway-content |

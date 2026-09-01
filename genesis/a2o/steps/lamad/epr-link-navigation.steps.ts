@@ -3,7 +3,7 @@
 /**
  * EPR relationship navigation step definitions.
  *
- * Drives genesis/a2o/features/lamad/epr-link-navigation.feature: a learner
+ * Drives genesis/a2o/features/lms/epr-link-navigation.feature: a learner
  * opens a concept and sees its typed EPR-Head relationships rendered as
  * navigable cards with trust signals (reach glyph + stewardship-resilience
  * glyph + a subtle distinct-peers count). The relationship cards are the

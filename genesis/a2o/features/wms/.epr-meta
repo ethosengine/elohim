@@ -1,0 +1,14 @@
+---
+epr-meta-version: 1
+id: a2o-work-management-system
+covers: subtree
+purpose: >
+  Governed stub for future work management system acceptance stories: projects, stories,
+  contribution, commitments, and work coordination. The filesystem boundary is capability-named
+  (`wms`); Avodah remains the app-pillar name for future `@avodah` tags and report grouping.
+rules: []
+---
+# wms/ — work management system stories
+
+TBD: no executable Avodah scenarios live here yet. The directory exists now so the first work-story
+lands in a governed, capability-named home and inherits the parent a2o story-review gate from birth.

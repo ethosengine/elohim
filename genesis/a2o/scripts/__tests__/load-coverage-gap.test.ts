@@ -10,7 +10,7 @@ void describe('loadCoverageGap', () => {
   void it('returns every gap entry with feature + missing', () => {
     const gaps = loadCoverageGap(fixturePath);
     assert.equal(gaps.length, 2);
-    assert.equal(gaps[0].feature, 'features/lamad/path-adaptation.feature');
+    assert.equal(gaps[0].feature, 'features/lms/path-adaptation.feature');
     assert.match(gaps[0].missing, /path reorders/);
   });
 

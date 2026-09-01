@@ -2,7 +2,7 @@
   "generatedAt": "2026-04-19T10:00:00Z",
   "gaps": [
     {
-      "feature": "features/lamad/path-adaptation.feature",
+      "feature": "features/lms/path-adaptation.feature",
       "missing": "Scenario: Terrance's path reorders after rapid mastery",
       "severity": "high"
     },

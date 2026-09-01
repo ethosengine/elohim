@@ -1,7 +1,7 @@
 /**
  * Intimate-reach household step definitions.
  *
- * Feature: features/lamad/intimate-reach-household.feature
+ * Feature: features/lms/intimate-reach-household.feature
  *
  * EPR content at reach "intimate" belongs to a consented dyad. The serving
  * gate (epr_service::check_reach_authorization, intimate branch) serves such

@@ -94,9 +94,9 @@ sourced_from:
     # No role-* record files exist in genesis/data/humans/ (roles encoded in tags + body); the @as-stewardee
     # role lives in the `role:` triple field + tags, not a separate persona record.
   scenarios:
-    - "genesis/a2o/features/lamad/learning-journey.feature"
-    - "genesis/a2o/features/lamad/path-adaptation.feature"
-    - "genesis/a2o/features/lamad/assessment-completion-feedback.feature"
+    - "genesis/a2o/features/lms/learning-journey.feature"
+    - "genesis/a2o/features/lms/path-adaptation.feature"
+    - "genesis/a2o/features/lms/assessment-completion-feedback.feature"
     - "genesis/a2o/features/content/stewardship-allocation.feature"
     # CANONICAL FEATURE GAP: the story's `feature:` triple-slot is `stewarded-device-sync` but
     # `genesis/a2o/features/**/stewarded-device-sync.feature` does not yet exist (delivery-debt; see

@@ -43,3 +43,22 @@ manifest): exclude `**/CLAUDE.md`, `**/AGENTS.md`, `**/*.md` from source matchin
 with `git diff --name-only a5607e938..286089679 -- 'app/**/CLAUDE.md' | node genesis/orchestrator/graph-walker.mjs`
 → no app, no storybook. Not applied mid-landing (shift 2026-08-25T0210: an orchestrator change
 would have re-dispatched and muddied attribution).
+
+## 2026-09-01 recurrence — unmapped dataplane stories trigger Storybook
+
+Orchestrator #1768/#1769/#1770 routed
+`genesis/a2o/features/dataplane/coordinator-hot-swap.feature` and
+`genesis/a2o/features/dataplane/conductor-bridge-recovery.feature` into Storybook builds
+#298/#299/#300 through the blanket `genesis/a2o/features/**` input. Storybook's Genesis sync
+imports an explicit mapping set and does not import `dataplane/`, so these dispatches could not
+change the rendered artifact.
+
+The recurrence is fixed by replacing that blanket input with the exact feature globs exported by
+`scripts/sync-genesis.mjs`. A parity test now requires the build-manifest feature watches to equal
+the sync mappings, preventing either side from drifting independently. Graph-walker verification:
+
+- `features/dataplane/coordinator-hot-swap.feature` → no `elohim-storybook` project or pipeline.
+- mapped `features/lms/`, `features/rms/`, and future `features/wms/` stories →
+  `elohim-storybook` remains selected.
+
+The backlog item stays open for the distinct 2026-08-25 app-gospel recurrence above.

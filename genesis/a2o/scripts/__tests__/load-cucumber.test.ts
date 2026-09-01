@@ -11,7 +11,7 @@ void describe('loadCucumber', () => {
     const results = loadCucumber(fixture);
     assert.equal(results.length, 3);
     assert.equal(results[0].name, 'Terrance completes path');
-    assert.equal(results[0].feature, 'features/lamad/learning-journey.feature');
+    assert.equal(results[0].feature, 'features/lms/learning-journey.feature');
   });
 
   void it('classifies passed scenario', () => {

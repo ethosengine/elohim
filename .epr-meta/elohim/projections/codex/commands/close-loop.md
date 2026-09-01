@@ -20,7 +20,9 @@ git diff --name-only
 
 | Domain | Feature Directory | Existing Features |
 |--------|-------------------|-------------------|
-| lamad | `genesis/a2o/features/lamad/` | learning-journey, know-thyself-discovery |
+| lamad | `genesis/a2o/features/lms/` | learning-journey, know-thyself-discovery |
+| shefa | `genesis/a2o/features/rms/` | human-resilience, limitarian-governor |
+| avodah | `genesis/a2o/features/wms/` | TBD — governed stub |
 | imagodei/auth | `genesis/a2o/features/auth/` | auth-lifecycle, fixture-humans |
 | content | `genesis/a2o/features/content/` | content-lifecycle |
 | federation | `genesis/a2o/features/federation/` | cross-doorway-content |

@@ -1,0 +1,15 @@
+---
+epr-meta-version: 1
+id: a2o-resource-management-system
+covers: subtree
+purpose: >
+  Acceptance stories for the resource management system: resilience, stewardship, allocation,
+  limits, reciprocity, and resource-flow behavior. The filesystem boundary is capability-named
+  (`rms`); Shefa remains the app-pillar name used in `@shefa` tags and report grouping.
+rules: []
+---
+# rms/ — resource management system stories
+
+This directory is the canonical feature-story home for resource-management behavior. It inherits
+the parent a2o story-review gate. Keep filesystem references system-scoped (`features/rms/`) while
+retaining pillar vocabulary where the scenario actually names the Shefa product surface.

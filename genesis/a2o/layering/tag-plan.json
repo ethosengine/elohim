@@ -3282,7 +3282,7 @@
       ],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/assessment-completion-feedback.feature": {
+    "features/lms/assessment-completion-feedback.feature": {
       "act": "mixed",
       "actBreakdown": {
         "III": 6,
@@ -3344,7 +3344,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/attention-analytics.feature": {
+    "features/lms/attention-analytics.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 8
@@ -3359,7 +3359,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/deep-link-delivery.feature": {
+    "features/lms/deep-link-delivery.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 13
@@ -3430,7 +3430,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/epr-link-navigation.feature": {
+    "features/lms/epr-link-navigation.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 2
@@ -3445,7 +3445,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/intimate-reach-household.feature": {
+    "features/lms/intimate-reach-household.feature": {
       "act": "mixed",
       "actBreakdown": {
         "I": 6,
@@ -3497,7 +3497,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/know-thyself-discovery.feature": {
+    "features/lms/know-thyself-discovery.feature": {
       "act": "I",
       "actBreakdown": {
         "III": 3,
@@ -3551,7 +3551,7 @@
       ],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/learning-journey.feature": {
+    "features/lms/learning-journey.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 3
@@ -3566,7 +3566,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/love-map-negotiation.feature": {
+    "features/lms/love-map-negotiation.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 8
@@ -3598,7 +3598,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/lamad/path-adaptation.feature": {
+    "features/lms/path-adaptation.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 11
@@ -4279,7 +4279,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/shefa/human-resilience.feature": {
+    "features/rms/human-resilience.feature": {
       "act": "mixed",
       "actBreakdown": {
         "I": 9,
@@ -4356,7 +4356,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/shefa/limitarian-governor.feature": {
+    "features/rms/limitarian-governor.feature": {
       "act": "I",
       "actBreakdown": {
         "I": 3
@@ -4371,7 +4371,7 @@
       "hold": [],
       "heldByFormNowEnabled": []
     },
-    "features/shefa/m1-matthew-terrance-delivery.feature": {
+    "features/rms/m1-matthew-terrance-delivery.feature": {
       "act": "mixed",
       "actBreakdown": {
         "I": 4,

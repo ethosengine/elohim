@@ -93,7 +93,7 @@ Every new canonical story frontmatter must include:
 sourced_from:
   epics: ["governance_layers/family.md", "social_medium/community-attestation.md"]
   personas: ["human-jessica-spouse", "role-as-attention-steward"]
-  scenarios: ["genesis/a2o/features/lamad/attention-analytics.feature"]
+  scenarios: ["genesis/a2o/features/lms/attention-analytics.feature"]
   devices: ["device-chromebook-edu", "device-family-node-base"]
   historian_precedents:
     - "mempalace:wing_memory/drawer-id"   # mempalace tunnel target

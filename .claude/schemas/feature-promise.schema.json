@@ -112,7 +112,7 @@
               },
               "proposed_location": {
                 "type": "string",
-                "description": "Suggested feature file path, e.g. 'features/lamad/topology-discovery.feature'"
+                "description": "Suggested feature file path, e.g. 'features/lms/topology-discovery.feature'"
               }
             }
           }

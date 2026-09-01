@@ -15,7 +15,7 @@ import { vi } from 'vitest';
  * Path Adaptation Service — Story-First Tests
  *
  * These tests are derived directly from the a2o scenario language in:
- *   genesis/a2o/features/lamad/path-adaptation.feature
+ *   genesis/a2o/features/lms/path-adaptation.feature
  *
  * Each describe block maps to a scenario or scenario group.
  * The feature file is the specification; these tests prove the service honours it.

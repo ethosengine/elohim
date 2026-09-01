@@ -1,0 +1,16 @@
+---
+epr-meta-version: 1
+id: a2o-learning-management-system
+covers: subtree
+purpose: >
+  Acceptance stories for the learning management system: content journeys, assessments,
+  mastery, path adaptation, and learning-facing reach behavior. The filesystem boundary is
+  capability-named (`lms`); Lamad remains the app-pillar name used in `@lamad` tags and report
+  grouping.
+rules: []
+---
+# lms/ — learning management system stories
+
+This directory is the canonical feature-story home for learning-management behavior. It inherits
+the parent a2o story-review gate. Keep filesystem references system-scoped (`features/lms/`) while
+retaining pillar vocabulary where the scenario actually names the Lamad product surface.

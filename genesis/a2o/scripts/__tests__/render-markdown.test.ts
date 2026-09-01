@@ -114,7 +114,7 @@ void describe('renderMarkdown', () => {
           scenarios: [
             {
               name: 'Starting a Journey',
-              feature: 'features/lamad/learning-journey.feature',
+              feature: 'features/lms/learning-journey.feature',
               human: 'Matthew',
             },
           ],

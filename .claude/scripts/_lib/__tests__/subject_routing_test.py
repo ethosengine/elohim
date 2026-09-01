@@ -32,7 +32,7 @@ check("product targets -> protocol-canonical",
       sr.classify(["app/elohim-app/foo.ts", "genesis/docs/content/elohim-protocol/architecture/x.md"]) == "protocol-canonical")
 check("no targets -> provisional", sr.classify([]) == "provisional")
 check("a2o HARNESS (scripts) is process", sr.classify(["genesis/a2o/scripts/look.ts"]) == "process-meta")
-check("a2o FEATURES (pillar scenario) is product", sr.classify(["genesis/a2o/features/lamad/x.feature"]) == "protocol-canonical")
+check("a2o FEATURES (pillar scenario) is product", sr.classify(["genesis/a2o/features/lms/x.feature"]) == "protocol-canonical")
 check("root CLAUDE.md is process", sr.classify(["CLAUDE.md"]) == "process-meta")
 check("product wins over process (mixed)",
       sr.classify([".claude/x.py", "app/y.ts"]) == "protocol-canonical")
@@ -47,7 +47,7 @@ sigs2 = sr.gate_check({"domain": "D2"}, ["app/x.ts"])
 check("no mismatch when a product target is present",
       not any(s.id == "vocab-vs-target-mismatch" for s in sigs2))
 
-sigs3 = sr.gate_check({"class": "process-meta"}, ["genesis/a2o/features/lamad/x.feature"])
+sigs3 = sr.gate_check({"class": "process-meta"}, ["genesis/a2o/features/lms/x.feature"])
 check("forced-a2o-leg fires on features/<pillar>", any(s.id == "forced-a2o-leg" for s in sigs3))
 sigs4 = sr.gate_check({"class": "process-meta"}, ["genesis/a2o/scripts/look.ts"])
 check("forced-a2o-leg does NOT fire on a2o harness", not any(s.id == "forced-a2o-leg" for s in sigs4))

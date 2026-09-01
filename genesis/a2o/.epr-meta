@@ -74,7 +74,8 @@ Executable BDD scenarios that verify deployed artifacts match genesis intent.
 
 ## What lives here
 
-- `features/` — Gherkin feature files organised by domain (`lamad/`, `auth/`, `dataplane/`, …)
+- `features/` — Gherkin feature files organised by system capability (`lms/`, `rms/`, `wms/`,
+  `auth/`, `dataplane/`, …); pillar names remain in scenario tags and report grouping
 - `steps/` — Cucumber step-definition TypeScript
 - `src/framework/` — world, fixtures, page-models, substrate-scope gate
 - `scripts/` — sprint-report aggregator, coverage scanner, `look`/`graphos` tooling

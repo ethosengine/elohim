@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { runSync, validateMappings, MAPPINGS, gherkinToMarkdown, expandGlob, runSyncWithGlobs } from './sync-genesis.mjs';
+
+const LIBRARY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function setupFixtureRepo() {
   const root = mkdtempSync(join(tmpdir(), 'graphos-sync-'));
@@ -55,6 +58,19 @@ test('MAPPINGS constant includes the manifesto entry', () => {
   const entry = MAPPINGS.find(m => m.from === 'docs/content/elohim-protocol/manifesto.md');
   assert.ok(entry, 'manifesto mapping must exist');
   assert.equal(entry.title, 'I. Why / Manifesto');
+});
+
+test('Storybook feature watches exactly match the feature mappings it imports', () => {
+  const manifest = JSON.parse(readFileSync(join(LIBRARY_ROOT, 'build-manifest.json'), 'utf-8'));
+  const watchedFeatures = manifest.steps['build-storybook'].inputs.sources
+    .filter(source => source.startsWith('genesis/a2o/features/'))
+    .sort();
+  const importedFeatures = MAPPINGS
+    .filter(mapping => mapping.fromGlob?.startsWith('a2o/features/'))
+    .map(mapping => `genesis/${mapping.fromGlob}`)
+    .sort();
+
+  assert.deepEqual(watchedFeatures, importedFeatures);
 });
 
 test('gherkinToMarkdown wraps feature content in a code fence with gherkin language', () => {

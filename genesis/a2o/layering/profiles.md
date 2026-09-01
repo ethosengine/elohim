@@ -18,7 +18,7 @@ act's baseline caps; `@requires:` appears only for a cap outside that baseline.
 ```js
 // Act I — the household. Runs against a mesh this run OWNS (`just mesh start`, or the CI
 // mesh stage). Paths are the whole tree because the act is declared by TAG, not by directory:
-// Act I scenarios live in features/dataplane, features/auth, features/lamad, features/qahal … alike.
+// Act I scenarios live in features/dataplane, features/auth, features/lms, features/qahal … alike.
 mesh: {
   ...base,
   paths: ['features/**/*.feature'],

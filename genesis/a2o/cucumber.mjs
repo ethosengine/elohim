@@ -52,7 +52,7 @@ export default function () {
     // Act I — THE HOUSEHOLD. Runs against a mesh this run OWNS (`just mesh start` + `just mesh
     // prologue`, or the CI mesh stage). `paths` is the whole tree on purpose: an act is declared by
     // TAG, not by directory — Act I scenarios live in features/dataplane, features/auth,
-    // features/lamad and features/qahal alike.
+    // features/lms and features/qahal alike.
     //
     // SCOPING: cucumber MERGES a profile's `paths` with CLI positionals rather than replacing them,
     // so `cucumber-js --profile mesh features/x.feature` runs the WHOLE tree plus that file. To
