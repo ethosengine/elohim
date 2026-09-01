@@ -149,3 +149,5 @@ chunked-blob-over-16mb-not-durable-mesh-repro, HIGH — pins saga
 ch03/04/05/09/10 on any bundle over the threshold).
 
 - 2026-08-31 — rung-1 coordinator hot-swap vehicle landed as an operator verb: `POST /admin/coordinators/sync` (dry-run/apply, per-role DNA-lineage guard, embedded+external conductors) + `scripts/ci/fleet-coordswap.sh` rolling driver. Local-mesh proof: upgrade → revert → upgrade, 3 peers, ~40s/peer/pass, conductor PIDs unchanged. Fleet leg = warn-only DNA-pipeline stage; endpoint reaches the fleet on the next edge roll.
+
+- 2026-09-01 — rung-4 operator verbs live: `GET /admin/runtime-config` (effective values + provenance + boot-only reasons) and `POST /admin/runtime-config/reload`; watched-config flip proven on a RUNNING mesh node (same PID, WARN-logged old→new, boot restore on key removal). Fleet wiring: per-human runtime-config ConfigMap → mounted file → watcher.

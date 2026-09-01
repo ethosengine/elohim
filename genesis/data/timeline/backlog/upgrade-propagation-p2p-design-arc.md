@@ -198,6 +198,35 @@ Cycle-time delta to record after the first post-split storage-only deploy:
 storage/doorway class 2-4 h → the storage rollout window alone, with
 `statefulset.apps/<prefix>-conductor unchanged` in the build log as the proof.
 
+**Rungs 2-4 LANDED overnight 2026-09-01 (velocity-rungs shift):**
+- **Rung 2 (conductor split)**: applied to alpha on edge #1405 after two
+  FAIL-SAFE attempts (CPS sandbox rejected Double.parseDouble then DGM
+  toBigDecimal at RUNTIME — arithmetic now lives in
+  scripts/ci/conductor-split-budget.sh; museum lesson: pipeline arithmetic
+  belongs in shell, and catchError + old-STS retention turned both failures
+  into log lines instead of incidents). All 7 <prefix>-conductor STSs
+  created, existing holochain-data PVCs adopted by claimName, zero
+  re-genesis (both doorways kept serving declared content throughout),
+  budget-neutral splits enforced by validate-deployments check (3).
+- **Rung 3 (staggered rolls)**: conductor deploys drained sequentially from
+  a synchronized queue after ALL storage rollouts reach Ready — genesis
+  pair last, matthew final, soak-on-change only (CONDUCTOR_STAGGER_SOAK_SECS).
+- **Rung 4 (config as runtime surface, watched half)**: proven live on the
+  mesh — flag flip applied to a RUNNING storage node in seconds (same PID
+  through activation, two WARN-logged flips, and boot-value restore);
+  fleet wiring = per-human runtime-config ConfigMap -> mounted file ->
+  in-process watcher; GET /admin/runtime-config reports effective values,
+  provenance, and the deliberately boot-only knobs with reasons.
+
+**Cycle-time deltas (record in sprint planning):**
+
+| Change class | Was | Now (measured) |
+|---|---|---|
+| coordinator zome | 2-4 h | ~2 min mesh (proven x3: upgrade/revert/upgrade + post-refactor rerun); fleet = DNA-pipeline auto-stage (first live run pending) |
+| config flip | 2-4 h | SECONDS on a running node (mesh-proven); fleet ≈ push+apply, no roll |
+| storage/doorway binary | 2-4 h (incl. conductor churn + catch-up) | roll only storage pods — conductors keep arcs (first storage-only roll measuring on edge #1406) |
+| conductor roll | fleet-wide 2.5-3 h churn | staggered per-peer windows, genesis anchor last |
+
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the
 delivery vehicle by change class** — and pay the small vehicles off first.
