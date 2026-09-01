@@ -7,7 +7,7 @@ title: "Task: mesh lifecycle refuses orphaned-live conductors — a surviving co
 slug: "task-mesh-orphaned-conductor-guard"
 written: "2026-09-01"
 author: "session-2026-09-01-rung5-design (from the matthew coordswap diagnosis)"
-status: "open"
+status: "complete"
 priority: "medium"
 jobs: [elohim-genesis]
 cluster: "arch-dataplane-refactor-backlog"
@@ -58,3 +58,34 @@ ways downstream of the real defect.
   `orphaned-data-root`; a healthy mesh is unaffected (two consecutive clean
   `just mesh start` → `status` runs).
 - MUST NOT edit Rust source, zomes, or CI scripts.
+
+## Completion evidence — 2026-09-01
+
+- `hc-mesh.sh` now identifies each live conductor from its admin listener,
+  verifies that the named sandbox still exists, and inspects `/proc/<pid>/fd`
+  plus `cwd` for handles ending in `(deleted)`. `status` returns nonzero and
+  names `state=orphaned-data-root`; `start`, `probe`, `join-peer`,
+  `conductors-restart`, and the guarded `coordswap` path refuse without killing
+  the process. Diagnostics include the sandbox path, permissions, uid/gid, and
+  the deleted-handle target.
+- The live-process fixture deletes a running process's sandbox and proves the
+  healthy-to-orphan transition, nonzero `status`, coordswap refusal, unchanged
+  PID, and named stop/start remediation:
+  `bash app/elohim-app/scripts/__tests__/hc-mesh-orphan-guard.test.sh` — GREEN.
+- The original mesh reproduced the exact real failure before remediation:
+  matthew, jessica, and james retained deleted Lair `store_file` handles; the
+  public `status` and coordswap preflight named and refused all three. A guarded
+  stop removed the five owned processes. Two consecutive clean
+  `start` → `status` passes then reported all three data roots live with stable
+  conductor PIDs (`matthew=1374384`, `jessica=1374385`, `james=1374383`).
+- The adjacent T4 restart station is closed in the same harness lane:
+  `<storage_dir>/release-adoption/slot/elohim-storage.next` now outranks the
+  running executable and restore fallbacks. A healthy boot archives the binary
+  and sidecar under an `.applied-<timestamp>` slot path and records that
+  executable; a failed boot archives them under `.failed-<timestamp>` and
+  restores the previous executable record, so neither outcome can loop
+  `.next`. The real-process proof is
+  `bash app/elohim-app/scripts/__tests__/hc-mesh-storage-slot.test.sh` — GREEN.
+- `just gate app/elohim-app/scripts/hc-mesh.sh` — GREEN (220 files / 4612
+  tests), and scoped agent-package projection verification — GREEN (1697
+  checks). No Rust, zome, or CI source was edited by this task.

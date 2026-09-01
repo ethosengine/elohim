@@ -17,7 +17,7 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|stop|status|probe|prologue|join-peer|conductors-restart]
+#   ./hc-mesh.sh [start|stop|status|probe|prologue|join-peer|conductors-restart|coordswap]
 #
 #   `conductors-restart` restarts the N conductors IN PLACE against their
 #   EXISTING sandboxes — no generate, so agent keys, chains and DHT databases
@@ -304,6 +304,95 @@ refresh_mesh_pidfiles() {
     record_listener_pid storage "$name" "$(http_port "$i")" || true
     i=$((i+1))
   done
+}
+
+# Resolve the conductor that owns one peer's admin listener. The listener is
+# the strongest evidence because it names the process actually serving the
+# mesh port. The pgrep fallback covers platforms where `ss -p` cannot expose
+# process ownership; candidates still have to be the holochain executable and
+# carry this peer's exact config path.
+conductor_pid_for_index() { # <peer-name> <peer-index>
+  local name="$1" index="$2" pid raw
+  pid="$(listener_pids_for_ports "$(admin_port "$index")" | head -1)"
+  if [ -n "$pid" ]; then
+    echo "$pid"
+    return 0
+  fi
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    raw="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
+    [[ "$raw" == *"$LOCAL_DEV_DIR/$name/conductor-config.yaml"* ]] || continue
+    echo "$pid"
+    return 0
+  done < <(pgrep -x holochain 2>/dev/null)
+  return 1
+}
+
+path_mode() { # <path> — diagnostic only; never changes permissions
+  local path="$1" parent
+  if stat -Lc 'mode=%A(%a) uid=%u gid=%g' "$path" 2>/dev/null; then
+    return 0
+  fi
+  parent="$(dirname "$path")"
+  printf 'mode=missing parent=%s parent-' "$parent"
+  stat -Lc 'mode=%A(%a) uid=%u gid=%g' "$parent" 2>/dev/null || printf 'mode=unreadable'
+}
+
+# A live conductor is reusable only while its named sandbox still exists and
+# none of its handles into that sandbox resolve to an unlinked inode. The
+# second leg catches the subtler recreate-at-the-same-path case: `-d` sees the
+# new directory while the old process continues writing the deleted database.
+check_conductor_data_root() { # <peer-name> <pid> [sandbox]
+  local name="$1" pid="$2" sandbox="${3:-$LOCAL_DEV_DIR/$1}" link raw evidence=""
+  if [ ! -d "$sandbox" ]; then
+    evidence="sandbox-path-missing"
+  fi
+  for link in "/proc/$pid"/fd/* "/proc/$pid/cwd"; do
+    [ -L "$link" ] || continue
+    raw="$(readlink "$link" 2>/dev/null)"
+    case "$raw" in
+      "$sandbox"*" (deleted)")
+        evidence="${evidence:+$evidence; }handle=$link target=$raw $(path_mode "$link")"
+        break ;;
+    esac
+  done
+  [ -z "$evidence" ] && return 0
+
+  echo "  $name: state=orphaned-data-root pid=$pid sandbox=$sandbox $(path_mode "$sandbox")" >&2
+  echo "    evidence: $evidence" >&2
+  return 1
+}
+
+report_conductor_data_roots() {
+  local i=0 name pid failed=0
+  for name in "${PEERS[@]}"; do
+    pid="$(conductor_pid_for_index "$name" "$i" || true)"
+    if [ -z "$pid" ]; then
+      echo "  $name: not-running"
+    elif check_conductor_data_root "$name" "$pid"; then
+      echo "  $name: live pid=$pid sandbox=$LOCAL_DEV_DIR/$name"
+    else
+      failed=1
+    fi
+    i=$((i + 1))
+  done
+  return "$failed"
+}
+
+guard_conductor_data_roots() { # <verb>
+  local verb="$1" i=0 name pid failed=0
+  for name in "${PEERS[@]}"; do
+    pid="$(conductor_pid_for_index "$name" "$i" || true)"
+    if [ -n "$pid" ] && ! check_conductor_data_root "$name" "$pid"; then
+      failed=1
+    fi
+    i=$((i + 1))
+  done
+  [ "$failed" -eq 0 ] && return 0
+  echo "REFUSING $verb: state=orphaned-data-root" >&2
+  echo "  remediation: ./hc-mesh.sh stop && ./hc-mesh.sh start" >&2
+  echo "  stop kills the surviving conductor; start then regenerates its sandbox." >&2
+  return 1
 }
 
 # The storage CLI has no --print-features surface. The p2p-iroh build does,
@@ -907,7 +996,9 @@ mesh_footprint() {
 
 status_all() {
   echo "conductors:"; ss -tln 2>/dev/null | grep -E "127.0.0.1:44[0-9]{2} " || echo "  (none)"
-  local i=0 port transport
+  local i=0 port transport data_root_status=0
+  echo "conductor data roots:"
+  report_conductor_data_roots || data_root_status=1
   for name in "${PEERS[@]}"; do
     port="$(http_port $i)"
     transport="$(storage_transport_for "$name" "$port")"
@@ -971,9 +1062,11 @@ status_all() {
   # a version skew here is a start failure waiting to happen, not a detail.
   echo "hc CLI:            $(command -v hc) ($(hc --version 2>&1 | head -1))$([ "$(hc_version)" = "$(conductor_version)" ] && printf ' [matches the conductor]' || printf ' [MISMATCH — `start` will refuse; see HOLOCHAIN_BIN]')"
   echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" CONDUCTOR_URLS=\"$(conductor_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\" API_KEY_ADMIN=\"${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}\""
+  return "$data_root_status"
 }
 
 probe_all() {
+  guard_conductor_data_roots probe || return 1
   cd "$REPO_ROOT/genesis/a2o" || exit 2
   mkdir -p "$MESH_DIR/reports"
   local failures=0
@@ -1006,6 +1099,39 @@ resolve_exe() { # <pid> [fallback]
   return 1
 }
 
+release_adoption_slot_for() { # <peer-name>
+  echo "$MESH_DIR/$1/release-adoption/slot/elohim-storage.next"
+}
+
+# Disarm one attempted release slot. A successful candidate is retained at an
+# immutable applied path so `/proc/<pid>/exe` and the dead-peer exe record keep
+# resolving. A failed candidate is retained with a failed suffix for diagnosis,
+# while the exe record returns to the previous known-good binary. Both outcomes
+# remove `.next`, so an operator retry cannot loop the same failed boot.
+archive_release_adoption_slot() { # <peer> <slot> <applied|failed> <exe-record> [previous-exe]
+  local name="$1" slot="$2" outcome="$3" exefile="$4" previous="${5:-}"
+  local stamp destination receipt receipt_destination
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  destination="$slot.$outcome-$stamp"
+  receipt="$slot.json"
+  receipt_destination="$receipt.$outcome-$stamp"
+  if ! mv -- "$slot" "$destination"; then
+    echo "  $name: could not disarm release slot $slot after $outcome boot" >&2
+    return 1
+  fi
+  [ ! -e "$receipt" ] || mv -- "$receipt" "$receipt_destination" || {
+    echo "  $name: WARN could not archive release receipt $receipt" >&2
+  }
+  if [ "$outcome" = "applied" ]; then
+    printf '%s\n' "$destination" > "$exefile"
+  elif [ -n "$previous" ] && [ -x "$previous" ]; then
+    printf '%s\n' "$previous" > "$exefile"
+  else
+    rm -f "$exefile"
+  fi
+  echo "  $name: release slot $outcome; exe record=$(head -1 "$exefile" 2>/dev/null || echo absent) receipt=${receipt_destination}"
+}
+
 restart_storage() {
   # Restart storage peers in place, each with the EXACT environment it is already
   # running with — recovered from /proc/<pid>/environ, never rebuilt from this
@@ -1025,13 +1151,25 @@ restart_storage() {
   local workdir="${MESH_DIR}/storage-restart"
   mkdir -p "$workdir"
 
-  local name port pid envfile exefile cwd bin key k failed=""
+  local name port pid envfile exefile cwd bin previous_bin slot receipt key k failed=""
+  declare -A staged_slots=()
+  declare -A previous_bins=()
   for name in "${targets[@]}"; do
     port=""; k=0
     for n2 in "${PEERS[@]}"; do [ "$n2" = "$name" ] && port="$(http_port $k)"; k=$((k+1)); done
     [ -n "$port" ] || { echo "  $name: not a mesh peer ($MESH_PEERS)" >&2; continue; }
     envfile="$workdir/$name.environ"
     exefile="$workdir/$name.exe"
+    slot="$(release_adoption_slot_for "$name")"
+    receipt="$slot.json"
+    if [ -e "$slot" ]; then
+      if [ ! -x "$slot" ]; then
+        echo "  $name: staged release slot is not executable: $slot" >&2
+        failed+=" $name"; continue
+      fi
+      staged_slots["$name"]="$slot"
+      echo "  $name: staged release candidate=$slot receipt=$([ -s "$receipt" ] && echo "$receipt" || echo absent)"
+    fi
 
     # Exact pid: the storage binary's argv carries --http-port <port>, which no
     # other process has, and which never appears in this script's own argv.
@@ -1052,10 +1190,12 @@ with open(destination, "wb") as target:
 PY
     then
       cwd="$(readlink "/proc/$pid/cwd")"
-      if ! bin="$(resolve_exe "$pid" "$STORAGE_BIN")"; then
-        echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
+      if ! previous_bin="$(resolve_exe "$pid" "$STORAGE_BIN")"; then
+        echo "  $name: binary is gone (was '$previous_bin'); rebuild it or set STORAGE_BIN" >&2
         failed+=" $name"; continue
       fi
+      previous_bins["$name"]="$previous_bin"
+      bin="${staged_slots[$name]:-$previous_bin}"
       if ! assert_storage_transport_capability "$bin" "$(peer_transport "$name")"; then
         failed+=" $name"; continue
       fi
@@ -1071,11 +1211,12 @@ PY
       kill -0 "$pid" 2>/dev/null && { kill -9 "$pid" 2>/dev/null; sleep 2; }
     elif [ -s "$envfile" ]; then
       cwd="$LOCAL_DEV_DIR"
-      # Binary, in order of trust: the capture's own exe record (written by this
-      # script's live branch and by the a2o drills' writeRestartCapture), the
-      # exe of any sibling peer still running (same build), then STORAGE_BIN.
-      bin="$(restore_binary_for "$exefile")"
-      if [ -z "$bin" ]; then
+      # A staged release beats every restore fallback. Without one, use the
+      # capture's exe record, a live sibling's exe, then STORAGE_BIN.
+      previous_bin="$(restore_binary_for "$exefile")"
+      [ -n "$previous_bin" ] && previous_bins["$name"]="$previous_bin"
+      bin="${staged_slots[$name]:-$previous_bin}"
+      if [ -z "$bin" ] || [ ! -x "$bin" ]; then
         echo "  $name: no executable storage binary — $exefile absent, no sibling peer running, STORAGE_BIN=$STORAGE_BIN not executable" >&2
         failed+=" $name"; continue
       fi
@@ -1140,8 +1281,19 @@ os.execve(binpath, [binpath, "--http-port", port], env)
     port="$(http_port $k)"; k=$((k+1))
     case " ${targets[*]} " in *" $n2 "*) ;; *) continue ;; esac
     case "$failed" in *" $n2"*) continue ;; esac
-    curl -s -m 2 "http://localhost:$port/health" >/dev/null || {
-      echo "  $n2 :$port did not come back within the wait" >&2; failed+=" $n2"; }
+    if curl -s -m 2 "http://localhost:$port/health" >/dev/null; then
+      if [ -n "${staged_slots[$n2]:-}" ]; then
+        archive_release_adoption_slot "$n2" "${staged_slots[$n2]}" applied \
+          "$workdir/$n2.exe" "${previous_bins[$n2]:-}" || failed+=" $n2"
+      fi
+    else
+      echo "  $n2 :$port did not come back within the wait" >&2
+      if [ -n "${staged_slots[$n2]:-}" ]; then
+        archive_release_adoption_slot "$n2" "${staged_slots[$n2]}" failed \
+          "$workdir/$n2.exe" "${previous_bins[$n2]:-}" || true
+      fi
+      failed+=" $n2"
+    fi
   done
   refresh_fixture_pids
   # /health is not the question. "Serving" and "able to anchor" are different
@@ -1322,6 +1474,7 @@ restart_conductors() {
   # after this returns, and check /health. If a peer does not reconnect on its
   # own, restart THAT peer deliberately — this action will not do it for you,
   # because a storage restart is a different blast radius.
+  guard_conductor_data_roots conductors-restart || return 1
   cd "$LOCAL_DEV_DIR" || exit 2
 
   local fports="" aports="" i=0
@@ -1636,6 +1789,7 @@ join_peer() { # <fresh-peer-name>
     echo "join-peer: invalid peer name '$name' (use 1-48 letters, digits, '_' or '-', starting alphanumeric)" >&2
     return 2
   fi
+  guard_conductor_data_roots join-peer || return 1
 
   # This verb is deliberately an append to a LIVE mesh. A cold or partial
   # roster is not a late-join regime, and starting around it would make the
@@ -1797,6 +1951,7 @@ join_peer() { # <fresh-peer-name>
 }
 
 start_all() {
+  guard_conductor_data_roots start || return 1
   # The CLI writes the config the conductor must parse — refuse a mismatched
   # pair before anything is generated, not after three conductors panic.
   assert_toolchain_parity
@@ -2102,6 +2257,11 @@ EOF
   echo "next: ./hc-mesh.sh probe   # run the CI Dataplane Validation probes here"
 }
 
+mesh_coordswap() {
+  guard_conductor_data_roots coordswap || return 1
+  "$REPO_ROOT/scripts/ci/fleet-coordswap.sh" "$@"
+}
+
 # Dispatch guard: only run the action switch when this file is EXECUTED, not
 # when it is SOURCED. hc-mesh-prologue.sh (and an operator's shell) source
 # this script to reuse conductor_csv/peer_csv/mesh_seed_env without risking an
@@ -2114,10 +2274,11 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     probe)    probe_all ;;
     join-peer) shift; join_peer "$@" ;;
     conductors-restart) restart_conductors ;;
+    coordswap) shift; mesh_coordswap "$@" ;;
     storage-restart) shift; restart_storage "$@" ;;
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
   esac
 fi

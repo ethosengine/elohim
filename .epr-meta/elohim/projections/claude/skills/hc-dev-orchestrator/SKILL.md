@@ -321,7 +321,12 @@ not the release path the script defaults to — rebuild into that slot first
 (`CARGO_TARGET_DIR=<slot> cargo build --bin elohim-storage`) when a Rust cure must reach the mesh.
 A live peer's binary is read from `/proc/<pid>/exe` and recorded beside the environ
 (`$MESH_DIR/storage-restart/<name>.exe`); a DEAD peer is restored from that record, then a running
-sibling's exe, then `STORAGE_BIN` — so the default path no longer has to exist. The restart FAILS
+sibling's exe, then `STORAGE_BIN` — so the default path no longer has to exist. Before those
+fallbacks, each peer consumes its per-storage-dir release slot at
+`$MESH_DIR/<peer>/release-adoption/slot/elohim-storage.next`; the adjacent `.next.json` is printed as
+the adoption receipt. A healthy boot archives both with an `.applied-<timestamp>` suffix and records
+the archived slot executable; a failed boot archives them as `.failed-<timestamp>` and restores the
+previous exe record, so no candidate can become a restart loop. The restart FAILS
 (non-zero, `storage-restart FAILED for: …`) when any requested peer has no usable capture or does
 not answer `/health` by port afterwards; an empty `.environ` is named out loud (a capture taken with
 `fs.copyFile` on procfs is 0 bytes — the 2026-08-22 cascade; read to EOF instead, which is what
@@ -331,7 +336,12 @@ pacing knobs on the re-exec (a knob added after boot reaches a running mesh with
 it; never touches `AGENT_PUBKEY`), and `MESH_RESTART_ENV_OVERLAY="K=V K=V"` overlays ad-hoc keys.
 Mesh starts default `ALLOW_COORDINATOR_UPDATE=true` (`MESH_ALLOW_COORDINATOR_UPDATE` overrides) so
 the rung-1 coordinator hot-swap vehicle (`POST /admin/coordinators/sync` +
-`scripts/ci/fleet-coordswap.sh`) works out of the box — but a peer restarted via `storage-restart`
+`scripts/ci/fleet-coordswap.sh`) works out of the box. Run a local swap through the guarded mesh path:
+`app/elohim-app/scripts/hc-mesh.sh coordswap --happ <bundle> --peers <roster> [--apply]`. Before
+`status`, `probe`, `start`, `join-peer`, `conductors-restart`, or that coordswap pass-through, the
+harness checks every live conductor sandbox exists and that no open handle into it is deleted. An
+`orphaned-data-root` result refuses mutation and names path/mode evidence plus the explicit
+`hc-mesh.sh stop && hc-mesh.sh start` kill-and-regenerate remediation. A peer restarted via `storage-restart`
 re-execs the CAPTURED environ, so a mesh booted before that flag existed needs the overlay
 (`MESH_RESTART_ENV_OVERLAY="ALLOW_COORDINATOR_UPDATE=true"`) or a full mesh restart to accept swaps.
 The re-exec closes inherited fds ≥3 first — a caller holding a `flock` (the a2o

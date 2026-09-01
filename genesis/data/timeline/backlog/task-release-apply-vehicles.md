@@ -172,18 +172,18 @@ another peer's threshold arm would count toward promotion. A channel left
 `pendingRestart` authors a FAILING soak — that window observed the previous
 artifact.
 
-### Story-graph node this task discovered (BLOCKED — harness change fenced)
+### Story-graph node this task discovered (RESOLVED — 2026-09-01)
 
 chain: rung-5 mesh receipt (T6) / between `storage-binary apply stages the slot`
 → `just mesh storage-restart <peer> boots the staged binary` / **missing node:**
 *the restart arm consumes the slot*. `hc-mesh.sh restart_storage` resolves the
 binary as `/proc/<pid>/exe` (live peer) → the recorded `exefile` → `STORAGE_BIN`
-(`resolve_exe` / `restore_binary_for`), and the live branch always PREFERS the
-running exe — so a staged `elohim-storage.next` is never picked up, at any
-`STORAGE_BIN` value. current state: the slot is written, digest-verified,
-chmod 0755 and reported `pendingRestart: true`; nothing consumes it. Assertion
-the missing node needs: *a peer restarted with a staged slot present boots the
-staged binary, and its exe record names the slot.* Probe: `resolve_exe` prefers
-`<staging_root>/slot/elohim-storage.next` when it exists (and ideally moves it
-aside on success, so a failed boot cannot loop). This atom's disjointness
-contract forbids editing `hc-mesh.sh`, so it is reported, not done.
+(`resolve_exe` / `restore_binary_for`), and the live branch previously preferred
+the running exe — so a staged `elohim-storage.next` was never picked up, at any
+`STORAGE_BIN` value. The adjacent mesh-guard lane now consumes the exact
+per-peer slot before either fallback. A healthy boot archives the binary and
+sidecar to `.applied-<timestamp>` and records that executable; a failed boot
+archives them to `.failed-<timestamp>` and restores the known-good executable
+record, so `.next` cannot loop. Current state: GREEN by the real-process fixture
+`app/elohim-app/scripts/__tests__/hc-mesh-storage-slot.test.sh`. The full T4
+foreground apply/revert ceremony remains this atom's graduation receipt.
