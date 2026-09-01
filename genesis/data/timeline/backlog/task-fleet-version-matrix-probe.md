@@ -11,6 +11,7 @@ status: "open"
 priority: "medium"
 jobs: [elohim-genesis]
 cluster: "arch-dataplane-refactor-backlog"
+claimedBy: "codex"
 relatedNodeIds:
   - "backlog-task-runtime-passport-endpoint"
   - "backlog-upgrade-propagation-p2p-design-arc"
@@ -59,3 +60,27 @@ New script `genesis/a2o/scripts/version-matrix.ts` (tsx, patterned on
 
 - Against the running local mesh: `cd genesis/a2o && pnpm exec tsx scripts/version-matrix.ts` renders 3 peer columns with build info; with conductor ports supplied it adds the coordinator row (expect `coordswap-rung1-proof` marker on all three).
 - Unreachable-peer path proven (point one entry at a dead port → exit 2, table shows the gap).
+
+## Implementation + verification status (2026-09-01)
+
+The script is implemented in `60850aa72`; `fbcdedee8` later added the
+orthogonal `--observed` rendering without changing the default matrix. Focused
+ESLint, Prettier, and isolated strict TypeScript checks pass. A three-server
+localhost fixture proved mixed nested/legacy `/version` shapes, `DIVERGENT`
+marking, `--json`, environment input, and the dead-peer path (exit 2 with an
+explicit gap).
+
+At `2026-09-01T19:02Z`, a live three-peer dual mesh answered the default probe
+with exit 0: matthew, jessica, and james each rendered the runtime passport and
+reported `elohim-storage/0.1.0`. The optional conductor leg remains unproven.
+Both this script and the known-good `coordswap-probe-build-info.ts` found
+`zome_build_info` absent from the freshly installed coordinator. Applying the
+previously proven `coordswap-rung1-proof` bundle then failed closed on matthew
+and did not advance to the other peers: the conductor returned
+`DbConnectionPoolError` opening its local wasm database, and the rolling
+driver's re-check correctly reported that drift remained.
+
+Therefore the implementation is materially present, but this atom stays
+`open`: no receipt yet shows `zomeBuildInfo.buildMarker =
+coordswap-rung1-proof` on all three live conductors, and no full alpha storage
+version matrix has been captured.

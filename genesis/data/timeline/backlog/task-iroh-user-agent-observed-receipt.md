@@ -126,3 +126,26 @@ elohim-storage` passed in full, including default-feature compilation and
 doctests; Prettier, direct TypeScript checking, and ESLint passed for
 `version-matrix.ts`. Fleet confirmation after the next edge roll remains the
 integrator's watch and is not claimed here.
+
+## Fleet-partial receipt (2026-09-01)
+
+Edge build `#1410` completed `UNSTABLE` after deploying storage build
+`0abe0b344`, which contains the observed user-agent surface; its deploy gate
+reported 6/7 storage peers Ready (adam was not Ready) and 0/2 doorways Ready.
+The active alpha roster is seven peers: adam, matthew, jessica, james,
+gertrude, susan, and eve. A full probe against their canonical cluster-local
+service URLs exited 2 from this workspace: all seven DNS names resolved, but
+six connections timed out and susan refused the connection. Those Services
+are not routable from this execution context, so that run is reachability
+evidence, not a version receipt.
+
+The two public storage projections did yield a fleet-partial read. At
+`2026-09-01T19:00:12Z`, matthew through `doorway-alpha.elohim.host` and adam
+through `elohim.host` each reported all six remote NodeIds, and all twelve
+observer→observed cells carried `elohim-storage/0.1.0+0abe0b3`. That is
+twelve populated cells: the observers agreed on the five third-party NodeIds
+both independently saw, and each also observed the other at the same build.
+All storage Services are cluster-internal; the five peers without public
+doorway projections cannot be queried as observers from here. This proves
+2×6 cells, not the required seven-observer 7×6 matrix; fleet confirmation
+remains open and is not claimed.

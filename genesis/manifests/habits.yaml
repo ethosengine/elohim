@@ -107,6 +107,8 @@ habits:
     evidence: >
       DELTA 2026-09-01 (iroh observed-version receipt; NO status flip): `/p2p/status` now projects the live peer book as nullable `irohPeers`, and `version-matrix.ts --observed` read a green three-peer dual household matrix: every observer reported both remote NodeIds as `elohim-storage/0.1.0`, with no divergent column. Fleet confirmation remains the integrator's post-roll watch, so this habit stays red.
       ---
+      DELTA 2026-09-01 (iroh observed-version fleet-partial; NO status flip): edge #1410 completed UNSTABLE after deploying storage build `0abe0b344` (6/7 storage peers Ready; 0/2 doorways Ready), yet the two public storage projections (matthew and adam) each reported all six remote alpha NodeIds as `elohim-storage/0.1.0+0abe0b3` — 12 populated cells, agreement on the five independently cross-observed third-party NodeIds, and each observer seeing the other at the same build. All storage Services are cluster-internal; the five peers without public doorway projections cannot be queried as observers from this workspace, so the required seven-observer 42-cell matrix is still unmeasured and this habit stays red.
+      ---
       DELTA 2026-09-01 (late-joiner fixture regime, NO status flip): an additive
       `hc-mesh.sh join-peer` verb plus exact-identity receipt now stage a fourth peer
       after the ordinary three-peer mesh is warm. Three clean-teardown runs passed:
