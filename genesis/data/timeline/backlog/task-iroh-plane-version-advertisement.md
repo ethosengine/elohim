@@ -7,7 +7,7 @@ title: "Task: iroh-plane parity for peer version advertisement — the libp2p le
 slug: "task-iroh-plane-version-advertisement"
 written: "2026-08-31"
 author: "session-2026-08-31-velocity-snowball"
-status: "open"
+status: "wip"
 priority: "medium"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -15,6 +15,7 @@ relatedNodeIds:
   - "backlog-task-runtime-passport-endpoint"
   - "backlog-upgrade-propagation-p2p-design-arc"
 tags: [observability, iroh, transport-parity, mixed-version, delegable]
+claimedBy: "codex"
 ---
 
 **Claimable by any implementation agent. The exchange seam is grounded below;
@@ -90,8 +91,18 @@ the live `536378 > 262144` refusal and the deployed-reader-floor cure.
   `seam-registry.yaml` when the birth rule requires it.
 - It MUST NOT edit `src/p2p/view_federation.rs` or its frame-cap constants;
   `http.rs` (including the `/version` match arm); `happ_manager.rs`;
-  `reconcile_peers`; any Jenkinsfile; any deployment/orchestrator manifest;
-  or `hc-mesh.sh`. Those are the rung lane's surfaces this week.
+  `reconcile_peers` PRODUCTION logic; any Jenkinsfile; any
+  deployment/orchestrator manifest; or `hc-mesh.sh`. Those are the rung
+  lane's surfaces this week.
+- AMENDMENT (rung lane, 2026-09-01): a compile-FORCED `#[cfg(test)]`
+  fixture touch in `reconcile_peers` is permitted — the minimal edit only
+  (add the new field with its default to existing struct literals; no
+  fixture restructuring, no style changes, no other lines). If the field
+  addition forces any non-test line in that file, stop and report instead.
+  Preferred long-term shape (optional, in the task's own scope): a
+  `Default` impl or test-constructor for the gossiped entry in its home
+  module, so future additive fields stop rippling into other files'
+  fixtures.
 
 ## DoD + verification
 
