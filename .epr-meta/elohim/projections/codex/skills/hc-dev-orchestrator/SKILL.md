@@ -2,12 +2,9 @@
 name: hc-dev-orchestrator
 description: START and manage the Elohim P2P Framework local DEVELOPMENT STACK — runs conductor (identity/provenance), storage (content), doorway (unified API) as a coordinated service trio. Use when "start the local dev stack", "spin up holochain locally", "why isn't the conductor reachable", "is the doorway alive?", or checking service health during development. NOT for desktop Tauri shell knowledge (use tauri-desktop).
 metadata:
-  runtime: codex
   sourceRuntime: claude
   master: package
-  sourcePath: .epr-meta/elohim/packages/skills/hc-dev-orchestrator.json
-  packageKind: SkillPackage
-governance: "epr:elohim-agent/skills/hc-dev-orchestrator"
+  governance: "epr:elohim-agent/skills/hc-dev-orchestrator"
 ---
 
 # Elohim Local Development Orchestrator
@@ -324,6 +321,11 @@ not answer `/health` by port afterwards; an empty `.environ` is named out loud (
 environment is authoritative; `MESH_RESTART_APPLY_PROFILE=1` overlays THIS script's dev-tier
 pacing knobs on the re-exec (a knob added after boot reaches a running mesh without regenerating
 it; never touches `AGENT_PUBKEY`), and `MESH_RESTART_ENV_OVERLAY="K=V K=V"` overlays ad-hoc keys.
+Mesh starts default `ALLOW_COORDINATOR_UPDATE=true` (`MESH_ALLOW_COORDINATOR_UPDATE` overrides) so
+the rung-1 coordinator hot-swap vehicle (`POST /admin/coordinators/sync` +
+`scripts/ci/fleet-coordswap.sh`) works out of the box — but a peer restarted via `storage-restart`
+re-execs the CAPTURED environ, so a mesh booted before that flag existed needs the overlay
+(`MESH_RESTART_ENV_OVERLAY="ALLOW_COORDINATOR_UPDATE=true"`) or a full mesh restart to accept swaps.
 The re-exec closes inherited fds ≥3 first — a caller holding a `flock` (the a2o
 mesh lock `/tmp/elohim-local-mesh/a2o.lock`, which serializes concurrent agents' mesh-touching
 commands) otherwise leaks the lock into the long-lived peer (2026-08-22: three peers owned the lock
