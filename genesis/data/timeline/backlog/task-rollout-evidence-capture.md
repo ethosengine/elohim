@@ -7,10 +7,11 @@ title: "Task: capture pod conditions/events/logs on failed rollouts — cure the
 slug: "task-rollout-evidence-capture"
 written: "2026-09-01"
 author: "session-2026-09-01-rung5-design (from the #1410 diagnosis)"
-status: "open"
+status: "in-progress"
 priority: "high"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
+claimedBy: "codex"
 relatedNodeIds:
   - "backlog-task-iroh-user-agent-observed-receipt"
 tags: [ci, rollout, evidence, observability, delegable]
@@ -52,3 +53,39 @@ behind trustworthy rollout verdicts.
 - The doorway-readiness summary line on an UNSTABLE build names actual pod
   states.
 - MUST NOT change deploy ordering, budgets, or manifests.
+
+## Implementation evidence (2026-09-01)
+
+The repo-side capture path is wired. Every edge rollout wait (human storage,
+split conductor, and doorway Deployment; plus the legacy generic helper) now
+routes through one wrapper that preserves the original rollout exit, invokes a
+read-only bash/coreutils collector synchronously on failure, and only then
+propagates the failure. The collector resolves the workload's real
+`.spec.selector.matchLabels` instead of the invalid historical
+`app.kubernetes.io/name=<resource>` guess, so it captures both old and
+replacement pods. Its stable
+`rollout-evidence/<namespace>--<kind>--<name>/` bundle contains the workload,
+wide/YAML pod state, a Ready-condition summary that excludes terminating pods,
+deep describe/events for every non-Ready or terminating pod, current and
+previous 200-line tails for all init and regular containers, and a best-effort
+node-pressure table. Failed diagnostic reads (including node RBAC denial) are
+recorded with their exit code and never replace the rollout verdict.
+
+The Jenkins summary now says `rollout testcases passed`; actual pod readiness
+comes only from pod `Ready` conditions plus deletion state. A hermetic mocked
+failure proved the #1410 shape explicitly: one healthy pod, one non-Ready
+replacement, and one Ready-but-terminating old pod produced `1/3 pods Ready`,
+captured only the two attention pods, tailed every container, retained a
+simulated node-RBAC denial, and exited zero. The Jenkinsfile method-size gate
+remained below its hard ceiling, and `post.always` archives
+`rollout-evidence/**` so a failed/UNSTABLE build exposes the bundle on its build
+page.
+
+This atom remains `in-progress` until the next natural or deliberately failed
+Jenkins rollout supplies the final live build-page archive receipt required by
+the DoD. No deploy ordering, timeout, restart budget, or manifest changed.
+
+Story-graph interstitial: this atom already is the missing station between
+`rollout testcase failed` and `fleet receipt trusted` — **the named workload's
+actual pod conditions, termination state, events, and bounded logs are archived
+before control leaves the failed rollout**. No second atom is needed.

@@ -338,6 +338,28 @@ def runSimulationTest() {
 }
 
 /**
+ * Wait for one workload rollout and synchronously preserve pod evidence before
+ * propagating a timeout/failure. The bash helper is best-effort and read-only;
+ * its artifact must never replace the rollout's original verdict.
+ */
+def waitForRolloutWithEvidence(String resourceType, String resourceName, String namespace, String timeout) {
+    def rolloutStatus = sh(
+        script: "kubectl rollout status ${resourceType}/${resourceName} -n ${namespace} --timeout=${timeout}",
+        returnStatus: true,
+    )
+    if (rolloutStatus != 0) {
+        def captureStatus = sh(
+            script: "bash '${env.WORKSPACE}/scripts/ci/capture-rollout-evidence.sh' '${resourceType}' '${resourceName}' '${namespace}'",
+            returnStatus: true,
+        )
+        if (captureStatus != 0) {
+            echo "WARNING: rollout evidence collector exited ${captureStatus}; the rollout failure remains authoritative"
+        }
+        error "${resourceType}/${resourceName} rollout failed with exit ${rolloutStatus}; evidence capture exit ${captureStatus}, expected artifact: rollout-evidence/${namespace}--${resourceType}--${resourceName}/"
+    }
+}
+
+/**
  * Deploy edge node using environment manifest for per-component tags.
  * Reads tag values from envFile, substitutes named placeholders in the manifest template,
  * validates no placeholders remain, then applies to Kubernetes.
@@ -384,7 +406,7 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
         returnStdout: true
     ).trim()
     sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
-    sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=600s"
+    waitForRolloutWithEvidence(resourceType, "${resourceName}-${env}", namespace, '600s')
 
     // Post-deploy: detect stale resources (advisory only)
     def componentName = resourceName.replace('elohim-', '')
@@ -739,6 +761,8 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
     def cases = humans.collect { hc ->
         [
             name: hc.resourcePrefix,
+            namespace: (hc.namespace ?: "elohim-${envName}"),
+            workloadKind: (hc.workloadKind ?: 'statefulset'),
             archetype: (hc.deviceArchetype ?: 'unknown'),
             passed: outcomes[hc.resourcePrefix] == true,
         ]
@@ -751,7 +775,7 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
         if (c.passed) {
             "  <testcase ${attrs}/>"
         } else {
-            def msg = "StatefulSet ${c.name} (archetype=${c.archetype}) did not reach Ready within rollout-status timeout, or kubectl apply failed. See build log for the specific kubectl error; run `kubectl describe pod -l app.kubernetes.io/name=${c.name}` against the alpha cluster for the pod-level reason (OOMKilled, CrashLoopBackOff, ImagePullBackOff, PVC pending, etc.)."
+            def msg = "${c.workloadKind}/${c.name} (archetype=${c.archetype}) rollout did not complete, or kubectl apply failed. See the build log and archived rollout-evidence/${c.namespace}--${c.workloadKind}--${c.name}/ bundle for actual pod conditions, events, states, and bounded container logs."
             // Minimal XML escape for the attribute value.
             msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
             "  <testcase ${attrs}><failure message=\"${msg}\" type=\"rollout-failed\"/></testcase>"
@@ -768,10 +792,10 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
     writeFile(file: reportFile, text: xml)
     archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
     junit(testResults: reportFile, allowEmptyResults: true)
-    echo "Edge deploy result for ${envName}: ${passed}/${cases.size()} peers Ready"
+    echo "Edge rollout result for ${envName}: ${passed}/${cases.size()} rollout testcases passed"
     if (failed > 0) {
         def failedNames = cases.findAll { !it.passed }.collect { it.name }.join(', ')
-        echo "Edge deploy partial failure: ${failed}/${cases.size()} peers did not reach Ready — ${failedNames}. Stage marked UNSTABLE (test-result shape); downstream pipelines proceed."
+        echo "Edge rollout partial failure: ${failed}/${cases.size()} rollout testcases failed — ${failedNames}. Actual pod readiness is reported by the rollout evidence collector above; stage marked UNSTABLE and downstream pipelines proceed."
     }
 }
 
@@ -1203,7 +1227,7 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
             echo "Conductor ${stsName} UNCHANGED — no restart, no re-gossip surge. (Storage may have rolled; that is the point of rung 2.)"
         }
     }
-    sh "kubectl rollout status statefulset/${stsName} -n ${humanConfig.namespace} --timeout=600s"
+    waitForRolloutWithEvidence('statefulset', stsName, humanConfig.namespace, '600s')
     return changed
 }
 
@@ -1475,7 +1499,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     } else {
         sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
     }
-    sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
+    waitForRolloutWithEvidence('statefulset', humanConfig.resourcePrefix, humanConfig.namespace, '600s')
 
     // ── Conductor half is DEFERRED to the staggered phase (rung 3) ──────────
     // Ordering still holds: deployHumansInParallel runs EVERY storage rollout
@@ -1542,7 +1566,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     // edge #1306/#1308/#1309. Everything else still fails the deploy.
     sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' ${outputFile}"
     sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
-    sh "kubectl rollout status deployment/${depName} -n elohim-${targetEnv} --timeout=300s"
+    waitForRolloutWithEvidence('deployment', depName, "elohim-${targetEnv}", '300s')
 }
 
 /**
@@ -1564,7 +1588,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
 def deployDoorwaysWithTestShape(String targetEnv, String envFile, List allHumans) {
     def outcomes = java.util.Collections.synchronizedMap([:])
     def cases = [
-        [resourcePrefix: "elohim-doorway-${targetEnv}", env: targetEnv, deviceArchetype: "doorway-${targetEnv}"],
+        [resourcePrefix: "elohim-doorway-${targetEnv}", env: targetEnv, namespace: "elohim-${targetEnv}", workloadKind: 'deployment', deviceArchetype: "doorway-${targetEnv}"],
     ]
     catchError(
         buildResult: 'UNSTABLE',
@@ -1575,7 +1599,7 @@ def deployDoorwaysWithTestShape(String targetEnv, String envFile, List allHumans
         outcomes["elohim-doorway-${targetEnv}"] = true
     }
     if (targetEnv == 'alpha') {
-        cases.add([resourcePrefix: 'elohim-doorway-alpha-b', env: 'alpha', deviceArchetype: 'doorway-alpha-federation'])
+        cases.add([resourcePrefix: 'elohim-doorway-alpha-b', env: 'alpha', namespace: 'elohim-alpha', workloadKind: 'deployment', deviceArchetype: 'doorway-alpha-federation'])
         catchError(
             buildResult: 'UNSTABLE',
             stageResult: 'UNSTABLE',
@@ -2870,6 +2894,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
     post {
         always {
+            archiveArtifacts artifacts: 'rollout-evidence/**', allowEmptyArchive: true
             script {
                 def props = loadBuildVars()
 

@@ -150,7 +150,9 @@
           "genesis/orchestrator/manifests/infra/**",
           "genesis/orchestrator/manifests/humans/**",
           "genesis/orchestrator/environments/**",
-          "genesis/orchestrator/data/**"
+          "genesis/orchestrator/data/**",
+          "scripts/ci/capture-rollout-evidence.sh",
+          "scripts/ci/capture-rollout-evidence.test.sh"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"
