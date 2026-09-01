@@ -1778,6 +1778,22 @@ impl HttpServer {
                 Ok(response::ok(&crate::runtime_config::reload_json()))
             }
 
+            // Rung 5 of the same snowball: the release-adoption controller's
+            // report. Per followed channel — the resolved head (cid + election
+            // tier, or null when this conductor could not resolve it at all),
+            // the typed verdict, and when it was last actually checked.
+            // OBSERVE MODE: this build compiles no apply vehicle, so nothing
+            // here has changed what the node runs — `controller.applyVehicles
+            // Compiled: false` states that as a fact of the binary rather than
+            // of the config. Read-only; the whole surface is a projection of
+            // process-local state (Ephemeral C, spec §5), so there is no gate
+            // and no mutation to gate. Node-local (deliberately NOT in
+            // build_manifest) — same posture as the other /admin routes.
+            // All logic lives in `crate::services::release_adoption`.
+            (Method::GET, "/admin/adoption") => Ok(response::ok(
+                &crate::services::release_adoption::state::report_json(),
+            )),
+
             // Operator/seed deterministic shard-manifest + agent-keyed locations
             // write — the gated lever that lights the resilience card's
             // distributionState + stewardingCollectives for blob-backed demo/test

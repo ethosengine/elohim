@@ -281,6 +281,122 @@ pub static SPECS: [SettingSpec; 6] = [
     },
 ];
 
+// ─── text settings ───────────────────────────────────────────────────────────
+//
+// The registry above is a lock-free array of `AtomicU64`, which is exactly
+// right for a flag or a duration and cannot hold a LIST. The release-adoption
+// controller (rung 5) needs one: the set of release channels this peer follows,
+// each with a participation mode. Rather than widen `Kind` — which would cost
+// every `AtomicU64` read site a branch for a shape almost nothing uses — text
+// settings are a small parallel family with the SAME semantics: the file value
+// overrides, an absent key restores the boot-env value, and provenance stays
+// visible on the admin route.
+
+/// Static description of a registered TEXT setting.
+pub struct TextSettingSpec {
+    /// The env-var name, which is ALSO the runtime-config file key.
+    pub name: &'static str,
+    /// What this value means, for the `/admin/runtime-config` reader.
+    pub doc: &'static str,
+}
+
+/// The registered text settings.
+pub static TEXT_SPECS: [TextSettingSpec; 1] = [TextSettingSpec {
+    name: "ELOHIM_RELEASE_CHANNELS",
+    doc: "Release channels this peer follows, as `channelId[=mode]` entries separated by \
+          commas, semicolons or newlines. `observe` is the only legal mode until the apply \
+          vehicles land; any other mode is REFUSED and reported on GET /admin/adoption \
+          rather than silently downgraded. Empty (the default) leaves the adoption \
+          controller idle.",
+}];
+
+struct TextSetting {
+    /// The file override, when the watched file names this key.
+    current: Mutex<Option<String>>,
+    /// The boot-env value, restored when the file stops naming the key.
+    boot: Mutex<Option<String>>,
+}
+
+static TEXT_SETTINGS: LazyLock<Vec<TextSetting>> = LazyLock::new(|| {
+    TEXT_SPECS
+        .iter()
+        .map(|spec| TextSetting {
+            current: Mutex::new(std::env::var(spec.name).ok().filter(|v| !v.is_empty())),
+            boot: Mutex::new(std::env::var(spec.name).ok().filter(|v| !v.is_empty())),
+        })
+        .collect()
+});
+
+fn text_index(name: &str) -> Option<usize> {
+    TEXT_SPECS.iter().position(|spec| spec.name == name)
+}
+
+/// The effective value of a registered text setting, or `None` when neither the
+/// file nor the boot environment names it.
+///
+/// An unregistered name returns `None` rather than reading the environment
+/// directly: a caller that can ask for any key at all is a caller that will
+/// eventually ask for one nothing publishes, and get a permanent silent `None`.
+pub fn get_text(name: &str) -> Option<String> {
+    let idx = text_index(name)?;
+    TEXT_SETTINGS[idx].current.lock().unwrap().clone()
+}
+
+/// Apply the parsed config map to the text settings. Same three cases as
+/// [`Registry::apply`]: file wins, absent restores boot, unchanged is silent.
+fn apply_text(parsed: &BTreeMap<String, String>) -> usize {
+    let mut changed = 0usize;
+    for (idx, spec) in TEXT_SPECS.iter().enumerate() {
+        let setting = &TEXT_SETTINGS[idx];
+        let from_file = parsed
+            .get(spec.name)
+            .map(|raw| raw.trim().to_string())
+            .filter(|v| !v.is_empty());
+        let want = match from_file {
+            Some(v) => Some(v),
+            None => setting.boot.lock().unwrap().clone(),
+        };
+        let mut current = setting.current.lock().unwrap();
+        if *current != want {
+            warn!(
+                setting = spec.name,
+                old = %current.as_deref().unwrap_or("<unset>"),
+                new = %want.as_deref().unwrap_or("<unset>"),
+                "runtime-config: setting changed on a RUNNING node"
+            );
+            *current = want;
+            changed += 1;
+        }
+    }
+    changed
+}
+
+fn text_snapshot() -> Vec<serde_json::Value> {
+    TEXT_SPECS
+        .iter()
+        .enumerate()
+        .map(|(idx, spec)| {
+            let setting = &TEXT_SETTINGS[idx];
+            let current = setting.current.lock().unwrap().clone();
+            let boot = setting.boot.lock().unwrap().clone();
+            let provenance = if current == boot {
+                Provenance::BootEnv
+            } else {
+                Provenance::RuntimeConfig
+            };
+            serde_json::json!({
+                "name": spec.name,
+                "kind": "text",
+                "effectiveValue": current,
+                "bootValue": boot,
+                "provenance": provenance.as_str(),
+                "hotReloadable": true,
+                "doc": spec.doc,
+            })
+        })
+        .collect()
+}
+
 /// A knob this module deliberately does NOT hot-wire, and why. Surfaced on the
 /// admin route so "why didn't my flip land?" is answerable without reading code.
 pub struct BootOnlyFlag {
@@ -676,7 +792,7 @@ pub fn reload_now() -> ReloadOutcome {
     }
 
     let keys_seen = parsed.len();
-    let changed = GLOBAL.apply(&parsed);
+    let changed = GLOBAL.apply(&parsed) + apply_text(&parsed);
     WATCH.file_present.store(present, Ordering::Release);
     WATCH.last_reload_unix.store(now_unix(), Ordering::Release);
     WATCH.reload_count.fetch_add(1, Ordering::AcqRel);
@@ -781,6 +897,7 @@ pub fn report_json() -> serde_json::Value {
             "lastError": WATCH.last_error.lock().unwrap().clone(),
         },
         "settings": GLOBAL.snapshot(),
+        "textSettings": text_snapshot(),
         "bootOnly": BOOT_ONLY.iter().map(|f| serde_json::json!({
             "name": f.name,
             "reason": f.reason,

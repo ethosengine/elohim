@@ -2544,3 +2544,353 @@ decisionPoints:
         testName: an_epoch_carrying_restart_needs_no_gap_heuristic
         kind: unit
 
+
+  # ── rung 5: the release-adoption controller (observe mode) ────────────────
+  # Spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md §6.
+  # Registered AT BIRTH per the task atom's design-gate clause — the C8/C6a/C4
+  # bindings below are what the module was built to, not what was noticed later.
+
+  - name: release_adoption::verify::verify
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/release_adoption/verify.rs
+      modulePath: services::release_adoption::verify::verify
+      line: 546
+    summary: >
+      The composed verify FLOOR for a runtime release (spec §6.3, floor-protected — never
+      stage-priced). Pure: takes the manifest body, this peer's installed reality, the channel's
+      L2 lineage evidence, the fetched artifact digests and the attestation count, and returns
+      either a VerifiedRelease or one typed AdoptionRefusal. It is the ONLY constructor of
+      VerifiedRelease, so "verified" is a type fact rather than a call-order convention. Five
+      arms in cheapest-refusal order: manifest shape against T1's schema (patterns serde cannot
+      see — a `sha256-<hex>` in a blobCid field is refused), channel identity, the compatibility
+      envelope against the runtime passport's INSTALLED reality (the per-role DNA-hash guard
+      happ_manager::lineage_mismatch_error enforces at apply time, moved to verify time), the
+      lineage parent against the channel's L2 version chain (the body field is a HINT that must
+      match), and the attestation threshold via release_attestation::count_qualifying_attestations.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Never re-derived here. The threshold arm can only be reached with an AdoptionDiscipline,
+          and the sole constructor of that type (ChannelAdoptionDiscipline::for_release) takes the
+          release's builderAgent — so the builder's own attestation is excluded by construction
+          before this function is called, not by a remembered WHERE clause.
+      - id: C2
+        status: n-a
+        justification: >
+          This function moves no head and stamps no row. Head-plane monotonicity is decided
+          upstream by the conductor's own election; verify only judges what that election named.
+      - id: C4
+        status: answered
+        justification: >
+          Every input that can be unknown is an Answer<T>, never an Option flattened into a
+          verdict. An unreadable runtime passport is `installed_reality_unknown` (transient), NOT
+          `dna_lineage_mismatch` — reading a failed conductor inventory as a mismatch would be a
+          claim with no evidence, in the direction that looks like diligence. An unreadable L2
+          chain is `lineage_unverifiable`, never a pass. Pinned by
+          an_unreadable_passport_is_unknown_reality_never_a_mismatch and
+          an_unreadable_lineage_chain_is_unverifiable_never_a_pass.
+      - id: C5
+        status: answered
+        justification: >
+          Attestations, peer-served bytes and the manifest's self-declared lineage parent are all
+          EVIDENCE: each is checked against something this peer resolved itself (its own passport,
+          the L2 chain from its own conductor's head declaration, the declared digest). Evidence
+          that cannot be evaluated confers nothing in either direction — the
+          `threshold_unchecked` / `lineage_unverifiable` arms exist so it cannot silently confer
+          consent.
+      - id: C6a
+        status: answered
+        justification: >
+          Pure function over already-assembled evidence — no loop, no retry ladder, no I/O, no
+          conductor call. The bounded budgets belong to the sweep that feeds it
+          (release_adoption::watch), which sizes every call before making it.
+      - id: C6b
+        status: answered
+        justification: >
+          Deterministic in its inputs; re-running it on the same (channel, releaseCid, installed
+          reality) re-derives the identical verdict. Nothing is written.
+      - id: C7
+        status: n-a
+        justification: Not a serving surface; it consumes fetched bytes, it does not advertise any.
+      - id: C8
+        status: answered
+        justification: >
+          Every arm returns an AdoptionRefusal carrying a typed RefusalReason — a ReasonLabel
+          implementor, so a duplicate or unstable label is a failing test rather than a silently
+          merged metric series. The reason also names the arm it belongs to, so
+          elohim_release_adoption_decisions_total{arm,reason} cannot be mislabelled at the call
+          site. Pinned by refusal_reason_labels_are_conformant / _are_stable.
+      - id: C9
+        status: answered
+        justification: >
+          THE DNA LINE. verify_envelope refuses per-role when the release's dnaHash differs from
+          the installed cell's — update_coordinators matches integrity dependencies by NAME, so a
+          cross-lineage bundle would splice coordinators onto integrity zomes they were never
+          compiled against. Crossing it is rung 6's migration ceremony, structurally refused here.
+          A coordinator-generation mismatch is a SEPARATE reason because the cures differ (a
+          hot-swap can reach one, only a migration the other).
+      - id: C10
+        status: answered
+        justification: >
+          The envelope IS the contract-evolution answer: wireEpochs against this build's
+          SUPPORTED_WIRE_EPOCHS, and additiveOnly asserted. The Rust mirror of T1's schema is
+          deliberately OPEN (no deny_unknown_fields, every optional field defaulted) so a peer one
+          build behind still reads a release that ADDED a field within the lineage window — pinned
+          by an_unknown_property_is_tolerated_because_the_wire_floor_is_additive.
+      - id: C11
+        status: n-a
+        justification: >
+          No external backpressure source is read here. Scheduling deference belongs to the sweep.
+      - id: C12
+        status: answered
+        justification: >
+          The adoptionDiscipline this function gates on is the CHANNEL's constitutional
+          declaration carried in the release manifest, not a per-peer preference — consent is
+          read from the ceremony's artifact, never assumed from silence.
+      - id: C13
+        status: answered
+        justification: >
+          The election tier (earned / staging / none) is carried through to the report unchanged;
+          verify judges the release, it never promotes a tier.
+      - id: C14
+        status: answered
+        justification: >
+          A refusal is never dropped: it reaches both GET /admin/adoption and the per-decision
+          metric, and its `transient` flag says whether a later sweep could cure it.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: the_envelope_broken_fixture_refuses_on_the_dna_line
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: an_unreadable_passport_is_unknown_reality_never_a_mismatch
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: a_lineage_hint_that_disagrees_with_the_l2_chain_is_refused
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: an_unreadable_attestation_count_is_unchecked_never_a_pass
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: the_composed_floor_mints_a_verified_release_only_when_every_arm_passes
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/verify.rs
+        testName: release_manifest_mirror_agrees_with_the_rakia_schema
+        kind: unit
+
+  - name: release_adoption::RefusalReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/services/release_adoption/mod.rs
+      modulePath: services::release_adoption::RefusalReason
+      line: 384
+    summary: >
+      The adoption controller's closed refusal vocabulary — twenty causes, one per genuinely
+      distinct story, projected to the `reason` label of
+      elohim_release_adoption_decisions_total{arm,reason}. Paired with DecisionArm (watch / fetch
+      / verify / apply) via RefusalReason::arm(), so the metric's arm label is a property of the
+      reason rather than of the call site, and with RefusalReason::is_transient(), which is the
+      retry axis the backoff ladder reads. `apply` is enumerated (T4 shares the vocabulary) but no
+      reason maps to it and it is deliberately NOT pre-touched at registration: this build
+      compiles no vehicle, so a measured zero there would claim an arm that has no code.
+    concernIds:
+      - id: C0
+        status: n-a
+        justification: A label vocabulary names no plane.
+      - id: C1
+        status: n-a
+        justification: No authority is elected here.
+      - id: C2
+        status: n-a
+        justification: No head moves.
+      - id: C3
+        status: answered
+        justification: >
+          is_transient() is the liveness axis: a transient refusal climbs a FINITE ladder and holds
+          at its ceiling (never stops asking), a terminal one parks at the ceiling immediately
+          (never hammers). Without the split a controller either burns a conductor on a decided
+          question or sleeps through a cured substrate.
+      - id: C4
+        status: answered
+        justification: >
+          `installed_reality_unknown`, `lineage_unverifiable`, `threshold_unchecked` and
+          `conductor_unavailable` exist precisely so unreachability is never spelled as a
+          substantive refusal, and `artifact_unavailable` is documented as "not replicated yet",
+          never as absence.
+      - id: C5
+        status: answered
+        justification: >
+          `threshold_unchecked` is the may-believe clause made countable: evidence that could not
+          be evaluated is its own outcome, and explicitly NOT a pass.
+      - id: C6a
+        status: n-a
+        justification: An enum performs no work.
+      - id: C6b
+        status: answered
+        justification: label() is a total, pure match — deterministic across calls by construction.
+      - id: C7
+        status: n-a
+        justification: Not a serving surface.
+      - id: C8
+        status: answered
+        justification: >
+          THE binding. ReasonLabel conformance is asserted (distinct, non-empty, metric-safe
+          labels) and the label SET is pinned, so a rename is a deliberate act with a failing test
+          attached rather than a silently broken dashboard series — the
+          inc_contest_failed(&str) failure class, closed by type.
+      - id: C9
+        status: n-a
+        justification: No identity is joined.
+      - id: C10
+        status: answered
+        justification: >
+          The vocabulary is closed and pinned; adding a variant requires editing the golden set,
+          which is what makes the metric contract legible to a consumer one build behind.
+      - id: C11
+        status: n-a
+        justification: No backpressure decision.
+      - id: C12
+        status: n-a
+        justification: No authorization decision.
+      - id: C13
+        status: n-a
+        justification: No authority graduation.
+      - id: C14
+        status: answered
+        justification: >
+          Every refusal is witnessed twice — once on GET /admin/adoption with its evidence string,
+          once as a counter increment — so no refused state is left invisible.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/release_adoption/mod.rs
+        testName: refusal_reason_labels_are_conformant
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/mod.rs
+        testName: refusal_reason_labels_are_stable
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/mod.rs
+        testName: the_dna_line_refusal_is_terminal_and_absence_is_not
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/mod.rs
+        testName: every_refusal_names_the_arm_it_can_come_from
+        kind: unit
+
+  - name: release_adoption::state::ChannelAdoptionState::record
+    kind: state-transition
+    sourceLocation:
+      file: src/services/release_adoption/state.rs
+      modulePath: services::release_adoption::state::ChannelAdoptionState::record
+      line: 330
+    summary: >
+      The per-channel state transition and the backoff ladder it owns. Takes one completed check's
+      (head, verdict) and advances the channel: Ok/Idle clear the ladder entirely (a cured channel
+      is re-checked at full cadence on the very next sweep); a TRANSIENT refusal climbs the finite
+      BACKOFF_LADDER_SECS and holds at its ceiling; a TERMINAL refusal parks at the ceiling
+      immediately. The method owns the ladder so a caller cannot forget either to advance it or to
+      reset it. AdoptionState is Ephemeral (C) throughout — process-local, reconstructable from one
+      sweep, surfaced on the node-local GET /admin/adoption, never notarized and never gossiped as
+      authority (spec §5).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Projection plane only, by construction: this state is a record of what this peer's
+          controller saw and decided. Authority lives at L2 in the conductor's election; nothing
+          here is ever read back as one.
+      - id: C1
+        status: n-a
+        justification: No election.
+      - id: C2
+        status: n-a
+        justification: No head is moved or stamped.
+      - id: C3
+        status: answered
+        justification: >
+          The ladder is FINITE and holds rather than growing, so a channel is never abandoned; and
+          Ok/Idle reset it to zero, so a cured substrate is noticed on the next tick. Pinned by
+          transient_refusals_climb_a_finite_ladder_and_hold_at_the_ceiling and
+          success_and_honest_idle_both_clear_the_backoff.
+      - id: C4
+        status: answered
+        justification: >
+          Three structurally distinct records: `resolved_head: null` (could not ask),
+          `tier: "none"` (asked, no election), and a substantive verdict. Verdict::Idle is its own
+          variant rather than a success or a failure, so "no head to judge" can never be read as
+          either. HeadTier::from_canonical_earned maps a missing canonical_earned to `none`, never
+          to `staging` — the meter must not claim an election it has no evidence for. Pinned by
+          head_tier_never_invents_an_election.
+      - id: C5
+        status: n-a
+        justification: Records a decision; evaluates no evidence.
+      - id: C6a
+        status: answered
+        justification: >
+          The declared budget IS this ladder: BACKOFF_LADDER_SECS is a fixed 5-rung array with a
+          named ceiling, and record() is O(1). The sweep's own per-tick caps
+          (MAX_CHANNELS_PER_SWEEP / MAX_THRESHOLD_READS_PER_SWEEP / MAX_ARTIFACT_BYTES_PER_SWEEP)
+          are read BEFORE any conductor call is made — never as a caller-side timeout, which would
+          only abandon a conductor that keeps running.
+      - id: C6b
+        status: answered
+        justification: >
+          Idempotent on (channel, releaseCid): re-recording the same verdict re-derives the same
+          state, and a channel SKIPPED for backoff or byte budget has its record left untouched, so
+          lastCheckedAt never claims a check that did not happen. The artifact source re-uses
+          already-staged bytes (digest re-checked, never assumed) instead of re-fetching.
+      - id: C7
+        status: n-a
+        justification: Not a serving surface.
+      - id: C8
+        status: answered
+        justification: >
+          Verdict::reason_label() is the single projection into the metric's reason label, so a
+          verdict that reaches the report and not the meter is impossible.
+      - id: C9
+        status: n-a
+        justification: Keyed by channel id; no cross-namespace identity join.
+      - id: C10
+        status: n-a
+        justification: No wire shape.
+      - id: C11
+        status: partial
+        justification: >
+          The per-sweep byte budget defers a large release to the next tick rather than churning,
+          and deferral is recorded as a SKIP (not a refusal) so a healthy channel is never pushed
+          into the ladder for a reason that is about us. Deference to ram-guard / PVC / quiesce
+          state (spec §7 C11) is NOT wired: the controller does not yet read those signals.
+      - id: C12
+        status: answered
+        justification: >
+          Only AdoptionMode::Observe is constructible, and an unknown mode in the runtime-config
+          value is REFUSED and reported rather than silently downgraded to observe — a peer told to
+          apply must never look compliant while doing something else. Pinned by
+          an_illegal_mode_is_refused_and_reported_never_downgraded.
+      - id: C13
+        status: answered
+        justification: >
+          The election tier is recorded as observed and never promoted; this build carries no apply
+          vehicle at all, which is the strongest form of "authority bounded".
+      - id: C14
+        status: answered
+        justification: >
+          Refused config entries are reported on GET /admin/adoption alongside the channels, so a
+          mis-edited ConfigMap line is visible rather than silently dropped.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: transient_refusals_climb_a_finite_ladder_and_hold_at_the_ceiling
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: a_terminal_refusal_parks_at_the_ceiling_immediately
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: success_and_honest_idle_both_clear_the_backoff
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: head_tier_never_invents_an_election
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: an_illegal_mode_is_refused_and_reported_never_downgraded
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/watch.rs
+        testName: a_controller_without_a_conductor_refuses_honestly_and_applies_nothing
+        kind: unit

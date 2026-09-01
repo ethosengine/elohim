@@ -7,6 +7,7 @@ title: "Task: adoption controller (observe mode) — watch followed release chan
 slug: "task-release-adoption-controller-observe"
 written: "2026-09-01"
 author: "session-2026-09-01-rung5-design"
+claimedBy: "claude-opus-t3"
 status: "open"
 priority: "high"
 jobs: [elohim-edge]
@@ -101,3 +102,106 @@ register the verdict predicate in the crate's `seam-registry.yaml` at birth.
   nothing (conductor PIDs + coordinator hashes unchanged).
 - `seam-registry.yaml` row present; `placement-audit.py --epr-meta` clean for
   the crate.
+
+## Implementation notes (2026-09-01)
+
+Landed by `claude-opus-t3` against the T1/T2/T5 outputs as they actually exist,
+which differs from this atom's prose in three places worth naming.
+
+### Where the manifest actually lives (differs from Scope §3)
+
+The atom says "fetch manifest content + artifact blobs by CID." T2's ceremony
+driver does **not** publish the manifest as a content body: `release-ceremony.ts
+publish` patches the channel's own `metadata_json` to
+`{"kind":"release-manifest","publishedAt":…,"manifest":{…}}` and declares that
+version canonical. So the manifest arrives **inside the head resolve** — one
+`resolve_content_head` call yields head + tier + `supersedes` + the manifest,
+and the only bytes still to fetch are the artifact blobs. Three consequences
+baked into `watch.rs::extract_release_body`:
+
+- a channel ROOT (`kind: "release-channel"`) is `Idle`, not malformed;
+- an envelope that *claims* `release-manifest` and is unreadable is
+  `manifest_undecodable` — reading it as "no release here" would let a corrupt
+  publish look like an empty channel;
+- the **L2 lineage evidence is free**: the head declaration's own `supersedes`
+  IS the version chain, so the lineage check needs no second call.
+
+### Config key shape
+
+The rung-4 registry (`runtime_config.rs`) is a lock-free `AtomicU64` array —
+`Kind::{Bool, Seconds}` only, and it cannot hold a list. Rather than widen
+`Kind` (a branch on every hot read site for a shape almost nothing uses), a
+small parallel **text-setting family** was added with identical semantics
+(file overrides, absent key restores boot-env, provenance visible):
+
+```toml
+ELOHIM_RELEASE_CHANNELS = "runtime:coordinators:elohim:canary-a=observe, runtime:config:elohim:commons"
+```
+
+Comma/semicolon/newline separated; a bare id defaults to `observe`. An unknown
+mode is **refused and reported** on `/admin/adoption` (`configRefusals`), never
+downgraded to `observe` — a peer told to `apply` that quietly observes looks
+compliant while doing something else. Text settings render under
+`textSettings` on `GET /admin/runtime-config`.
+
+### Verdict / refusal vocabulary
+
+`AdoptionRefusal` is a data-bearing struct (`reason` label, `detail`, `arm`,
+`transient`) over a `Copy` **`RefusalReason`** enum that implements
+`seam_contracts::ReasonLabel` — so duplicate/unstable labels are a failing test,
+not a silently merged metric series. 20 variants, pinned by
+`refusal_reason_labels_are_stable`. Two axes hang off the reason rather than the
+call site:
+
+- `RefusalReason::arm() -> DecisionArm` — the metric's `arm` label is a property
+  of the reason, so it cannot be mislabelled where it is emitted;
+- `RefusalReason::is_transient()` — the retry axis. `dna_lineage_mismatch` is
+  terminal (only a new release reopens it) and parks at the ladder ceiling on
+  the first sweep; `artifact_unavailable` / `threshold_unchecked` /
+  `installed_reality_unknown` are transient and climb the finite ladder.
+
+`Verdict` is a three-way sum — `Idle | Ok | Refused` — so C4's honest absence is
+structurally distinct from both success and failure.
+
+### Schema vendoring decision
+
+**Vendored as typed Rust in `mod.rs`, deliberately OPEN** (no
+`deny_unknown_fields`, every optional field `serde(default)`) because T1's schema
+is open by design for the mixed-version additive floor. Serde alone is not
+enough — the schema pins `pattern`s a `String` field happily accepts — so
+`verify::verify_shape` enforces them by hand (no `regex` dependency added; the
+crate's hand-written-scanner convention). Pinned to T1 by
+`release_manifest_mirror_agrees_with_the_rakia_schema`, which loads
+`elohim/rakia/schemas/v1/release-manifest.schema.json` and all five committed
+fixtures **from disk** and runs a real JSON-Schema validator alongside the Rust
+mirror — two independent sources, so neither measures the other.
+
+### seam-registry rows (3, registered at birth)
+
+- `release_adoption::verify::verify` — `verdict-fn`, the floor. C1/C4/C5/C6a/
+  C6b/C8/C9/C10/C12/C13/C14 answered; C2/C7/C11 n-a.
+- `release_adoption::RefusalReason` — `reason-outcome-enum`. C3/C4/C5/C8/C10/
+  C14 answered.
+- `release_adoption::state::ChannelAdoptionState::record` — `state-transition`,
+  the backoff ladder. C0/C3/C4/C6a/C6b/C8/C12/C13/C14 answered; **C11 partial**
+  (per-sweep byte budget defers, but ram-guard / PVC / quiesce state is not read
+  — the one honest gap, recorded as `partial` with its reason).
+
+### What did NOT land, and why
+
+- **No apply, anywhere.** `ApplyVehicle` is declared with the atom's normative
+  signature plus an additive `handles()` defaulting to `&[]`; there is no impl,
+  and `AdoptionController` deliberately has no field that could hold one.
+  `DecisionArm::Apply` is in the vocabulary (T4 shares it) but is **not
+  pre-touched** at metric registration — this build compiles no vehicle, so a
+  measured zero there would claim an arm with no code.
+- **Peer blob pull is behind the `ArtifactSource` trait, not wired.**
+  `BlobStoreArtifactSource` reads only what is already local; a missing blob is
+  the transient `artifact_unavailable`. Wiring `p2p::blob_fetch::race_fetch`
+  needs the swarm command channel + inventory candidates threaded into the
+  controller — an integrator decision, not a side effect of an observe sweep.
+- **`conductor_writes` was not edited.** The head resolve reuses that module's
+  `ContentHeadWire` decode mirror but issues the call as
+  `AdmissionClass::Background` (a sweep must not take the lane a person is
+  standing in). Residual: `conductor_writes` wants a `call_resolve_content_head_classed`
+  the way its declare path already has one — another lane's file.
