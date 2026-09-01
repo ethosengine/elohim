@@ -25,9 +25,7 @@ Feature: Coordinator logic rolls across peers without anyone restarting
   spreading.
 
   Background:
-    Given a mesh of peers whose conductors (the runtime process hosting each
-      peer's cells) run the installed hApp bundle (the application
-      package every peer deploys)
+    Given a mesh whose conductor-hosted cells run the installed hApp bundle
     And a steward has rebuilt the bundle with a coordinator-only fix
     And the rebuilt bundle's DNA hash is IDENTICAL to the installed one
     And the rebuilt bundle's coordinator code differs from what peers run
@@ -39,8 +37,7 @@ Feature: Coordinator logic rolls across peers without anyone restarting
     And each peer's re-check confirms zero drift before the next peer is touched
     Then every peer serves a function that only the new coordinator code provides
     And no conductor process restarted during the rollout
-    And the community's shared data — every declared content version, every
-      stored file, every governance tally — is byte-identical to before
+    And every declared content version, stored file, and governance tally is byte-identical to before
 
   @wip @concern:coordinator-hot-swap
   Scenario: a peer that refuses mid-roll halts the rollout instead of spreading
