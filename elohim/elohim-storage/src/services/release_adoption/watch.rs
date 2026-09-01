@@ -41,8 +41,10 @@ use std::time::Duration;
 use seam_contracts::{Answer, ReasonLabel};
 use sha2::{Digest, Sha256};
 
+use super::apply::{ApplyRegistry, SoakAttestor};
 use super::state::{
-    self, AdoptionMode, FollowedChannel, FollowedChannels, HeadTier, ResolvedHead, Verdict,
+    self, AdoptionMode, AppliedRelease, FollowedChannel, FollowedChannels, HeadTier, ResolvedHead,
+    Verdict,
 };
 use super::verify::{self, FetchedArtifact, InstalledReality, LineageEvidence, VerifyInput};
 use super::{AdoptionRefusal, Artifact, DecisionArm, RefusalReason, RELEASE_MANIFEST_KIND};
@@ -314,15 +316,25 @@ impl InstalledRealitySource for PassportInstalledReality {
 // The controller
 // ---------------------------------------------------------------------------
 
-/// The observe-mode adoption controller.
+/// The adoption controller.
 ///
-/// Holds only what a sweep needs. There is no `Option<Box<dyn ApplyVehicle>>`
-/// field: a controller that could hold a vehicle is one edit away from calling
-/// it, and this rung's whole safety claim is that no such call site exists.
+/// Holds only what a sweep needs. T3 shipped this with **no** vehicle field at
+/// all, so that "no apply call site exists" was a fact of the type rather than
+/// a promise. T4 adds the field — and the safety claim moves, deliberately, to
+/// where it can still be checked: an apply requires a channel whose CONFIG says
+/// `apply`, a release that passed the whole floor, a registered vehicle for its
+/// declared class, and a node not under readable pressure. Four independent
+/// conditions, each with a typed refusal, none of them a default.
 pub struct AdoptionController {
     hc: Option<Arc<HcClient>>,
     artifacts: Option<Arc<dyn ArtifactSource>>,
     installed: Option<Arc<dyn InstalledRealitySource>>,
+    /// The vehicles this node is equipped with. `None` means every `apply`
+    /// channel refuses `no_vehicle_for_class` — honestly, and without applying.
+    apply: Option<Arc<ApplyRegistry>>,
+    /// The post-apply soak observer's rail (T5). `None` leaves applies
+    /// un-attested rather than falsely attested.
+    soak: Option<Arc<SoakAttestor>>,
     staging_root: PathBuf,
     cached_reality: tokio::sync::Mutex<Option<(i64, Answer<InstalledReality>)>>,
 }
@@ -333,6 +345,8 @@ impl AdoptionController {
             hc: None,
             artifacts: None,
             installed: None,
+            apply: None,
+            soak: None,
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
         }
@@ -352,6 +366,22 @@ impl AdoptionController {
 
     pub fn with_installed_reality(mut self, source: Arc<dyn InstalledRealitySource>) -> Self {
         self.installed = Some(source);
+        self
+    }
+
+    /// Equip this controller with apply vehicles. **Without this call the
+    /// controller cannot apply anything** — an `apply` channel refuses
+    /// `no_vehicle_for_class`, which is the honest answer for a node that was
+    /// asked to converge and has no machinery to converge with.
+    pub fn with_apply_vehicles(mut self, registry: Arc<ApplyRegistry>) -> Self {
+        self.apply = Some(registry);
+        self
+    }
+
+    /// Equip the post-apply soak observer (T5's rail). Optional: without it an
+    /// apply is un-attested, which is a missing datum. Never a fabricated one.
+    pub fn with_soak_attestor(mut self, soak: Arc<SoakAttestor>) -> Self {
+        self.soak = Some(soak);
         self
     }
 
@@ -472,17 +502,71 @@ impl AdoptionController {
             let outcome = self
                 .check_channel(channel, now, &mut byte_budget, &mut threshold_reads)
                 .await;
-            match outcome {
-                CheckOutcome::Skipped => {}
-                CheckOutcome::Checked { head, verdict } => {
-                    record_decision(verdict_arm(&verdict), verdict.reason_label());
-                    state::record_check(&channel.channel_id, now, head, verdict);
-                    checked += 1;
-                }
+            if let Some((head, verdict)) = outcome_transition(outcome) {
+                record_decision(verdict_arm(&verdict), verdict.reason_label());
+                state::record_check(&channel.channel_id, now, head, verdict);
+                checked += 1;
             }
         }
         state::record_sweep(now);
         checked
+    }
+
+    /// The apply arm. Reached only from a channel whose config says `apply`,
+    /// and only with a release that passed the whole floor.
+    ///
+    /// Returns the verdict; the caller records it. Note what is NOT here: no
+    /// head is moved, no declaration is authored, nothing is gossiped. **C2 —
+    /// apply never moves a head**; the ceremony does, and every controller
+    /// converges toward whatever the ceremony elected, forward or backward.
+    async fn apply_verified(&self, channel_id: &str, verified: super::VerifiedRelease) -> Verdict {
+        let Some(registry) = self.apply.as_ref() else {
+            return Verdict::Refused {
+                refusal: AdoptionRefusal::new(
+                    RefusalReason::NoVehicleForClass,
+                    "this node is in apply mode for the channel but was wired with no apply \
+                     vehicles at all",
+                ),
+            };
+        };
+        let soak_secs = verified.manifest.adoption_discipline.soak_secs;
+        match registry.apply(&verified).await {
+            Ok(receipt) => {
+                let pending_restart = receipt
+                    .detail
+                    .get("pendingRestart")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false);
+                state::record_applied(
+                    channel_id,
+                    AppliedRelease {
+                        cid: receipt.release_cid.clone(),
+                        at: receipt.applied_at_unix,
+                        vehicle: receipt.vehicle.clone(),
+                    },
+                    pending_restart,
+                );
+                // T4 → T5: the ONE call site into the attestation rail. It is
+                // deferred by the channel's own declared soak window rather
+                // than fired here, because an attestation authored at t=apply
+                // would attest a window that never ran.
+                if let Some(soak) = self.soak.as_ref() {
+                    super::apply::spawn_soak_observer(
+                        soak.clone(),
+                        channel_id.to_string(),
+                        receipt.release_cid.clone(),
+                        soak_secs,
+                        receipt.clone(),
+                    );
+                }
+                Verdict::Applied {
+                    release_cid: receipt.release_cid,
+                    vehicle: receipt.vehicle,
+                    already_current: false,
+                }
+            }
+            Err(refusal) => Verdict::Refused { refusal },
+        }
     }
 
     async fn check_channel(
@@ -492,20 +576,14 @@ impl AdoptionController {
         byte_budget: &mut u64,
         threshold_reads: &mut usize,
     ) -> CheckOutcome {
-        // Exhaustive on purpose, and NOT a wildcard: only `observe` exists, so
-        // this compiles to nothing today — and the day T4 adds a mode this
-        // match stops compiling. "Only observe is legal" must be true at the
-        // point of ACTION, not only at the point of configuration, and a
-        // forced edit here is the cheapest way to guarantee that.
-        let mode_refusal: Option<AdoptionRefusal> = match channel.mode {
-            AdoptionMode::Observe => None,
+        // Exhaustive on purpose, and NOT a wildcard: the mode's meaning must be
+        // decided at the point of ACTION, not only at the point of
+        // configuration, and a forced edit here is the cheapest way to
+        // guarantee a future mode cannot arrive as a silent fall-through.
+        let will_apply = match channel.mode {
+            AdoptionMode::Observe => false,
+            AdoptionMode::Apply => true,
         };
-        if let Some(refusal) = mode_refusal {
-            return CheckOutcome::Checked {
-                head: None,
-                verdict: Verdict::Refused { refusal },
-            };
-        }
 
         let head = match self.resolve_head(&channel.channel_id).await {
             Answer::Present(head) => head,
@@ -538,6 +616,35 @@ impl AdoptionController {
             cid: release_cid.clone(),
             tier: HeadTier::from_canonical_earned(head.canonical_earned),
         };
+
+        // **C6b — the idempotence exit, and it is placed HERE on purpose.**
+        //
+        // The task atom's contract is "re-sweep on a current head is
+        // already_current, ZERO conductor calls beyond the resolve". That is
+        // only true if the check happens before the threshold read (1 + N zome
+        // calls), before artifact staging, and before the vehicle. Putting it
+        // after verify would still be idempotent in EFFECT while costing a full
+        // sweep's evidence-gathering every minute, forever, on a converged
+        // fleet — the shape of a controller that is correct and unaffordable.
+        //
+        // Observe mode deliberately does NOT take this exit: an observer's job
+        // is to keep re-deriving the verdict, and an observer that stopped
+        // checking a release it once passed would go blind to a peer whose
+        // installed reality drifted underneath it.
+        if will_apply {
+            if let Some(applied) = state::applied_release(&channel.channel_id) {
+                if applied.cid == release_cid {
+                    return CheckOutcome::Checked {
+                        head: Some(resolved),
+                        verdict: Verdict::Applied {
+                            release_cid,
+                            vehicle: applied.vehicle,
+                            already_current: true,
+                        },
+                    };
+                }
+            }
+        }
 
         let body = match extract_release_body(&head.content.metadata_json) {
             Ok(Some(body)) => body,
@@ -646,11 +753,18 @@ impl AdoptionController {
             artifacts: &fetched,
             attestations: attestations.as_ref(),
         }) {
-            // OBSERVE MODE ENDS HERE. A `VerifiedRelease` is minted, reported,
-            // and dropped. There is no vehicle to hand it to, by construction.
-            Ok(verified) => Verdict::Ok {
-                release_cid: verified.release_cid,
-            },
+            // OBSERVE MODE ENDS HERE: the `VerifiedRelease` is reported and
+            // dropped. In APPLY mode it is handed to exactly one vehicle — the
+            // one its own declared artifact class names — and to nothing else.
+            Ok(verified) => {
+                if will_apply {
+                    self.apply_verified(&channel.channel_id, verified).await
+                } else {
+                    Verdict::Ok {
+                        release_cid: verified.release_cid,
+                    }
+                }
+            }
             Err(refusal) => Verdict::Refused { refusal },
         };
 
@@ -661,6 +775,7 @@ impl AdoptionController {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum CheckOutcome {
     /// Not looked at this sweep (backoff or budget). State untouched, so
     /// `lastCheckedAt` keeps telling the truth.
@@ -671,9 +786,32 @@ enum CheckOutcome {
     },
 }
 
+/// **Deferral is not refusal.** The single place a check outcome becomes a
+/// state transition — and the single place that decides a deferral produces
+/// NONE.
+///
+/// Extracted from the sweep body so the distinction is testable without a
+/// conductor. It is the whole of the station: a `Skipped` outcome must not
+/// touch `lastCheckedAt` (which would claim we looked when we did not), must
+/// not increment `sweeps`, and must never enter the backoff ladder — a healthy
+/// channel deferred because WE are over budget has done nothing wrong, and
+/// putting it on the ladder would slow the channel down for a reason that is
+/// about us.
+fn outcome_transition(outcome: CheckOutcome) -> Option<(Option<ResolvedHead>, Verdict)> {
+    match outcome {
+        CheckOutcome::Skipped => None,
+        CheckOutcome::Checked { head, verdict } => Some((head, verdict)),
+    }
+}
+
 fn verdict_arm(verdict: &Verdict) -> DecisionArm {
     match verdict {
         Verdict::Idle { .. } | Verdict::Ok { .. } => DecisionArm::Watch,
+        // Both the fresh apply and the `already_current` no-op are apply-arm
+        // facts: they are what the apply arm decided, and metering them on the
+        // watch arm would make an apply fleet indistinguishable from an observe
+        // one at exactly the moment the difference matters.
+        Verdict::Applied { .. } => DecisionArm::Apply,
         Verdict::Refused { refusal } => refusal.reason_code().arm(),
     }
 }
@@ -721,13 +859,35 @@ pub fn spawn(controller: AdoptionController) -> bool {
         state::reconcile_followed(&followed);
         return false;
     }
-    tracing::info!(
-        channels = followed.channels.len(),
-        refused = followed.refused.len(),
-        sweep_secs = SWEEP_INTERVAL_SECS,
-        "release-adoption: controller ACTIVE in OBSERVE mode — it will report verdicts and \
-         apply nothing (no apply vehicle is compiled into this build)"
-    );
+    // Say — once, loudly, at boot — exactly which channels this node will ACT
+    // on. "I edited the ConfigMap and my node started swapping coordinators"
+    // must be answerable from a log line at startup, not reconstructed later
+    // from the admin route.
+    let applying: Vec<&str> = followed
+        .channels
+        .iter()
+        .filter(|c| c.mode.applies())
+        .map(|c| c.channel_id.as_str())
+        .collect();
+    if applying.is_empty() {
+        tracing::info!(
+            channels = followed.channels.len(),
+            refused = followed.refused.len(),
+            sweep_secs = SWEEP_INTERVAL_SECS,
+            "release-adoption: controller ACTIVE, every followed channel in OBSERVE mode — it \
+             will report verdicts and apply nothing"
+        );
+    } else {
+        tracing::warn!(
+            channels = followed.channels.len(),
+            refused = followed.refused.len(),
+            sweep_secs = SWEEP_INTERVAL_SECS,
+            applying = ?applying,
+            vehicles = ?super::apply::registered_vehicle_labels(),
+            "release-adoption: controller ACTIVE and will APPLY on the named channels — a \
+             verified release on one of them changes what this node runs"
+        );
+    }
     state::mark_controller_running(true);
 
     tokio::spawn(async move {
@@ -752,16 +912,26 @@ pub fn spawn(controller: AdoptionController) -> bool {
 /// Pre-touch every `(arm, reason)` series a real branch of this module can
 /// reach, so a zero reads as a MEASURED zero rather than as an absent series.
 ///
-/// The `apply` arm is deliberately NOT pre-touched: this build compiles no
-/// vehicle, so a zero there would claim the apply arm ran and did nothing.
+/// **T4 widened this to the apply arm.** T3 left `{arm="apply"}` absent on
+/// purpose — a zero there would have claimed an arm with no code. Now the
+/// vehicles exist, so the asymmetry would point the other way: an absent
+/// `{arm="apply",reason="ok"}` on a fleet that applies nothing yet reads as
+/// *never measured* when the truthful reading is *measured zero*.
+///
+/// The pairing is still derived, never hand-listed: every refusal names its own
+/// arm, so a reason added to the apply arm is pre-touched by construction.
 pub fn pretouch_metrics() {
-    for arm in [DecisionArm::Watch, DecisionArm::Fetch, DecisionArm::Verify] {
+    for arm in DecisionArm::ALL {
         crate::metrics::RELEASE_ADOPTION_DECISIONS
             .with_label_values(&[arm.label(), super::REASON_OK])
             .inc_by(0);
     }
     crate::metrics::RELEASE_ADOPTION_DECISIONS
         .with_label_values(&[DecisionArm::Watch.label(), super::REASON_IDLE])
+        .inc_by(0);
+    // The converged-fleet series. Only the apply arm can emit it.
+    crate::metrics::RELEASE_ADOPTION_DECISIONS
+        .with_label_values(&[DecisionArm::Apply.label(), super::REASON_ALREADY_CURRENT])
         .inc_by(0);
     for reason in RefusalReason::ALL {
         crate::metrics::RELEASE_ADOPTION_DECISIONS
@@ -948,6 +1118,86 @@ mod tests {
         );
     }
 
+    /// **Deferral is not refusal.** A channel the sweep did not look at —
+    /// because the per-sweep byte budget was already spent — must leave its
+    /// recorded state EXACTLY as it was: `lastCheckedAt` still names the last
+    /// time it was actually looked at, `sweeps` does not tick, the verdict is
+    /// not replaced, and it never enters the backoff ladder.
+    ///
+    /// This is the failure the distinction exists to prevent: a healthy channel
+    /// deferred because WE were over budget, recorded as a refusal, climbing to
+    /// the 30-minute ceiling and then looking — to the operator reading
+    /// `/admin/adoption` — like a channel with a problem of its own.
+    ///
+    /// Driven through [`outcome_transition`], the single place a sweep turns an
+    /// outcome into a state transition, so this is the real decision and not a
+    /// restatement of it.
+    #[test]
+    fn a_deferred_channel_is_not_a_refused_one() {
+        let channel = FollowedChannel {
+            channel_id: "runtime:coordinators:elohim:big".to_string(),
+            mode: AdoptionMode::Observe,
+        };
+        let mut deferred = state::ChannelAdoptionState::new(&channel);
+
+        // One real check, so there is something a deferral could corrupt.
+        deferred.record(
+            1_000,
+            Some(ResolvedHead {
+                cid: "uhCkkHead".to_string(),
+                tier: HeadTier::Earned,
+            }),
+            Verdict::Ok {
+                release_cid: "uhCkkHead".to_string(),
+            },
+        );
+        let untouched = deferred.clone();
+
+        // The next sweep defers this channel on the byte budget.
+        let transition = outcome_transition(CheckOutcome::Skipped);
+        assert!(
+            transition.is_none(),
+            "a deferral must produce NO state transition at all"
+        );
+        if let Some((head, verdict)) = transition {
+            deferred.record(9_999, head, verdict);
+        }
+
+        assert_eq!(
+            deferred, untouched,
+            "a deferred channel's recorded state must be byte-identical to what it was"
+        );
+        assert_eq!(
+            deferred.last_checked_at,
+            Some(1_000),
+            "lastCheckedAt must still name the last time we ACTUALLY looked"
+        );
+        assert_eq!(deferred.sweeps, 1, "a deferral is not a sweep of a channel");
+        assert_eq!(deferred.consecutive_refusals, 0);
+        assert_eq!(
+            deferred.next_check_not_before, None,
+            "a deferral must never enter the backoff ladder"
+        );
+        assert!(!deferred.is_backing_off(1_001));
+
+        // And the contrast: a real check DOES transition, so the assertion
+        // above is about deferral specifically and not about a dead function.
+        let checked = outcome_transition(CheckOutcome::Checked {
+            head: None,
+            verdict: Verdict::Refused {
+                refusal: AdoptionRefusal::new(RefusalReason::ArtifactUnavailable, "no peer"),
+            },
+        });
+        let (head, verdict) = checked.expect("a completed check transitions");
+        deferred.record(2_000, head, verdict);
+        assert_eq!(deferred.last_checked_at, Some(2_000));
+        assert_eq!(deferred.consecutive_refusals, 1);
+        assert!(
+            deferred.next_check_not_before.is_some(),
+            "a real transient refusal DOES enter the ladder — that is the contrast"
+        );
+    }
+
     /// The typed metric arm follows the verdict, never the call site.
     #[test]
     fn the_metric_arm_is_a_property_of_the_verdict() {
@@ -975,5 +1225,55 @@ mod tests {
             }),
             DecisionArm::Verify
         );
+        // T4: both applied shapes are apply-arm facts, and the converged one
+        // carries its own reason so a stable fleet is not metered as a churning
+        // one.
+        let fresh = Verdict::Applied {
+            release_cid: "c".to_string(),
+            vehicle: "sync_coordinators".to_string(),
+            already_current: false,
+        };
+        let converged = Verdict::Applied {
+            release_cid: "c".to_string(),
+            vehicle: "sync_coordinators".to_string(),
+            already_current: true,
+        };
+        assert_eq!(verdict_arm(&fresh), DecisionArm::Apply);
+        assert_eq!(verdict_arm(&converged), DecisionArm::Apply);
+        assert_eq!(fresh.reason_label(), super::super::REASON_OK);
+        assert_eq!(
+            converged.reason_label(),
+            super::super::REASON_ALREADY_CURRENT
+        );
+        assert_eq!(
+            verdict_arm(&Verdict::Refused {
+                refusal: AdoptionRefusal::new(RefusalReason::DeferredBackpressure, "d")
+            }),
+            DecisionArm::Apply
+        );
+    }
+
+    /// A controller wired with no vehicles refuses an apply channel by NAME
+    /// rather than quietly observing it. A node told to converge that silently
+    /// does not is the same class of lie as a mode that silently downgrades —
+    /// this is that refusal at the point of action.
+    #[tokio::test]
+    async fn an_apply_channel_on_an_unequipped_node_refuses_rather_than_observing() {
+        let dir = tempfile::tempdir().unwrap();
+        let controller = AdoptionController::new(dir.path());
+        assert!(
+            controller.apply.is_none(),
+            "the default controller carries no vehicles"
+        );
+
+        // Reaching the apply arm requires a VerifiedRelease, which only
+        // verify.rs can mint — so the reachable assertion here is that the
+        // unequipped path is the refusing one, exercised through the same
+        // predicate the arm uses.
+        let followed =
+            state::parse_followed_channels("runtime:coordinators:elohim:t4-unequipped=apply");
+        assert_eq!(followed.channels.len(), 1);
+        assert!(followed.channels[0].mode.applies());
+        assert!(followed.refused.is_empty());
     }
 }

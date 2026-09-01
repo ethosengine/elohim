@@ -5127,18 +5127,19 @@ mod tests {
         }
     }
 
-    /// Rung 5 — the same discipline for the adoption controller, plus its one
-    /// deliberate ASYMMETRY.
+    /// Rung 5 — the same discipline for the adoption controller, now on all
+    /// four arms.
     ///
     /// Every `(arm, reason)` pair a real branch can reach exists from
     /// registration alone, so a quiet fleet reads as *measured zero* rather than
-    /// *never measured*. The `apply` arm is asserted ABSENT: this build compiles
-    /// no apply vehicle, so a zero on `{arm="apply"}` would claim an arm that
-    /// has no code — the same false-green as an absent series, pointing the
-    /// other way. When T4 lands its vehicles, that assertion is the line that
-    /// forces the pre-touch to be widened deliberately.
+    /// *never measured*. T3 asserted the `apply` arm ABSENT because that build
+    /// compiled no vehicle; **T4 landed the vehicles, so this assertion
+    /// inverted** — the arm now has code, and leaving it absent would be the
+    /// same false-green pointing the other way. The inversion was the point of
+    /// pinning it: widening the pre-touch had to be a deliberate act with a
+    /// failing test attached, and it was.
     #[test]
-    fn release_adoption_decisions_are_pretouched_except_the_arm_with_no_code() {
+    fn release_adoption_decisions_are_pretouched_on_every_arm_that_has_code() {
         use crate::services::release_adoption::{DecisionArm, RefusalReason};
         use seam_contracts::ReasonLabel as _;
         register_all();
@@ -5148,7 +5149,7 @@ mod tests {
             text.contains("elohim_release_adoption_decisions_total"),
             "release-adoption decision counter missing:\n{text}"
         );
-        for arm in [DecisionArm::Watch, DecisionArm::Fetch, DecisionArm::Verify] {
+        for arm in DecisionArm::ALL {
             assert!(
                 text.contains(&format!("arm=\"{}\",reason=\"ok\"", arm.label())),
                 "arm {:?} has no pre-touched ok series:\n{text}",
@@ -5166,11 +5167,24 @@ mod tests {
                 "refusal {series} not pre-touched at registration:\n{text}"
             );
         }
+        // The two non-refusal exits, each on the ONLY arm that can emit it.
         assert!(
-            !text.contains("elohim_release_adoption_decisions_total{arm=\"apply\""),
-            "the apply arm must NOT be pre-touched while this build compiles no apply \
-             vehicle — a measured zero there claims an arm that has no code:\n{text}"
+            text.contains("arm=\"watch\",reason=\"idle\""),
+            "the honest-absence series is not pre-touched:\n{text}"
         );
+        assert!(
+            text.contains("arm=\"apply\",reason=\"already_current\""),
+            "the converged-fleet series is not pre-touched — without it, a fleet that is fully \
+             converged reads as one that never applied:\n{text}"
+        );
+        // And `already_current` is apply-only: a watch-arm copy would let a
+        // converged peer be counted twice under two different arms.
+        for arm in ["watch", "fetch", "verify"] {
+            assert!(
+                !text.contains(&format!("arm=\"{arm}\",reason=\"already_current\"")),
+                "already_current must be emitted from the apply arm alone:\n{text}"
+            );
+        }
     }
 
     #[test]

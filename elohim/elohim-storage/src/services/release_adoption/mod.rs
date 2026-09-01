@@ -1,4 +1,4 @@
-//! Release adoption controller — **observe mode**.
+//! Release adoption controller — observe **and apply**.
 //!
 //! Rung 5 of the upgrade-velocity debt snowball (backlog
 //! `upgrade-propagation-p2p-design-arc`; design
@@ -14,11 +14,16 @@
 //! reconciles toward the head that authority elected. Every prior arm of this
 //! snowball landed dry-run-first (`POST /admin/coordinators/sync?apply=false`
 //! is always allowed because *reporting drift is diagnostics, not mutation*);
-//! this one does the same thing at module granularity. `apply.rs` is T4's
-//! (`task-release-apply-vehicles`) and the only thing this module leaves it is
-//! the [`ApplyVehicle`] seam — declared here so the currency T4 implements
-//! against is fixed before any vehicle exists, and **deliberately with no
-//! implementations in this tree**.
+//! this one did the same thing at module granularity, landing observe-only.
+//!
+//! **T4 (`task-release-apply-vehicles`, 2026-09-01) landed the second half.**
+//! [`apply`] now implements one [`ApplyVehicle`] per artifact class, and
+//! `mode: apply` is a legal declaration in `ELOHIM_RELEASE_CHANNELS`. What did
+//! NOT change is the direction of the safety argument: observe is still the
+//! default; a vehicle is still handed a [`VerifiedRelease`] and nothing else;
+//! and every vehicle routes to machinery that already existed and was already
+//! proven (`happ_manager::sync_coordinators_report`, the rung-4 runtime-config
+//! reload, the mesh exe-slot). Apply invents no mechanics — it routes.
 //!
 //! # The shape of one sweep
 //!
@@ -43,7 +48,10 @@
 //!        │        (the body field is a HINT that must match)
 //!        │      · attestation threshold per the manifest's adoptionDiscipline
 //!        │
-//!   [apply]   ── T4. Not in this tree. ──
+//!   [apply]   observe → report and stop. apply → route by artifact class to
+//!        │    the EXISTING vehicle (coordinator hot-swap · runtime-config
+//!        │    reload · exe-slot staging), idempotent on (channel, releaseCid),
+//!        │    deferred under readable pressure, never self-exec'ing.
 //! ```
 //!
 //! # P2P design gate (spec §5, carried)
@@ -98,6 +106,7 @@
 //! schema file and T2's fixtures from disk — two independent sources, so the
 //! test cannot be measuring its own mirror.
 
+pub mod apply;
 pub mod state;
 pub mod verify;
 pub mod watch;
@@ -302,27 +311,41 @@ pub struct AppliedReceipt {
     pub detail: serde_json::Value,
 }
 
-/// The apply seam. **Deliberately unimplemented in this tree.**
-///
-/// T4 (`task-release-apply-vehicles`) implements one per artifact class. The
-/// `apply` signature is normative and fixed by the task atom;
-/// [`handles`](ApplyVehicle::handles) is additive with a default so a vehicle
-/// written against the bare signature still compiles.
+/// The apply seam. Implemented per artifact class in [`apply`] (T4).
 ///
 /// A vehicle takes a [`VerifiedRelease`] and nothing else — it cannot re-read
 /// the channel, re-fetch bytes, or second-guess the floor. That is the point:
 /// verification is floor-protected and happens exactly once, here.
-pub trait ApplyVehicle {
+///
+/// # Why this is `async` (a T4 amendment to T3's declared shape)
+///
+/// T3 declared `fn apply(&self, …)` — synchronous — before any vehicle existed.
+/// Two of the four vehicles (`coordinator-bundle`, `happ-bundle`) route to
+/// `happ_manager::sync_coordinators_report`, which is an `async` conductor
+/// admin call, and there is no honest way to reach it from a sync fn on this
+/// runtime: `Handle::block_on` panics inside a tokio worker and
+/// `block_in_place` parks a worker thread for the whole of a multi-second
+/// hot-swap. Widening to `async` is therefore the minimum change that lets the
+/// seam mean what it says. Everything else about the currency is unchanged —
+/// the argument, the return type, the typed refusal, and the additive
+/// [`handles`](ApplyVehicle::handles) default are all exactly as declared.
+#[async_trait::async_trait]
+pub trait ApplyVehicle: Send + Sync {
     /// Apply a verified release locally. Refuse with a typed reason; never
     /// panic, never partially apply without saying so in the receipt.
-    fn apply(&self, v: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal>;
+    async fn apply(&self, v: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal>;
 
     /// Which artifact classes this vehicle handles. The default is **none** —
     /// a vehicle that does not declare its classes is never routed to, which
-    /// is the safe direction for a seam whose implementations do not exist yet.
+    /// is the safe direction: a vehicle that forgets to declare its classes is
+    /// inert rather than promiscuous.
     fn handles(&self) -> &'static [ArtifactClass] {
         &[]
     }
+
+    /// A short, stable name for the receipt's `vehicle` field. Also the name an
+    /// operator reads on `/admin/adoption`.
+    fn name(&self) -> &'static str;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,12 +354,11 @@ pub trait ApplyVehicle {
 
 /// Which arm of the loop produced a decision. The metric's `arm` label.
 ///
-/// [`DecisionArm::Apply`] exists because the vocabulary is T4's too, and a
-/// reason enum that cannot name the arm it will be used from is a rename
-/// waiting to happen. It is deliberately **not** pre-touched at registration:
-/// this build has no vehicle, so a zero on `{arm="apply"}` would read as "the
-/// apply arm ran and did nothing", which is exactly the false-green the
-/// pre-touch discipline exists to deny.
+/// [`DecisionArm::Apply`] was named by T3 before any vehicle existed and was
+/// deliberately left un-pre-touched then — a zero on `{arm="apply"}` would have
+/// read as "the apply arm ran and did nothing". **T4 landed the vehicles, so it
+/// is now pre-touched like every other arm** (`watch::pretouch_metrics`): a
+/// zero there is a measured zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecisionArm {
     Watch,
@@ -369,6 +391,18 @@ pub const REASON_OK: &str = "ok";
 /// The `reason` label for the honest-absence exit: the channel resolved, and
 /// there is no head to judge. Not a refusal — C3/C4's idle.
 pub const REASON_IDLE: &str = "idle";
+
+/// **C6b.** The `reason` label for the idempotent apply exit: this peer has
+/// already applied exactly this `(channelId, releaseCid)` pair, so a re-sweep
+/// is a no-op.
+///
+/// Deliberately NOT a [`RefusalReason`]: nothing refused, and nothing needs to
+/// change. It is also deliberately not folded into [`REASON_OK`] — a run of
+/// `already_current` is the shape of a CONVERGED peer, and reading that as a
+/// run of fresh applies is how a dashboard reports a stable fleet as a churning
+/// one. It is emitted from the apply arm before ANY conductor call beyond the
+/// head resolve.
+pub const REASON_ALREADY_CURRENT: &str = "already_current";
 
 /// Why the controller refused. One variant per genuinely distinct cause: the
 /// metric is only as useful as its ability to tell a correct refusal from a
@@ -435,6 +469,56 @@ pub enum RefusalReason {
     /// This peer has no conductor to resolve through. Unreachable, never
     /// absence — a topology fact about us, not a fact about the channel.
     ConductorUnavailable,
+
+    // ── the apply arm (T4) ────────────────────────────────────────────────
+    //
+    // Every reason below belongs to [`DecisionArm::Apply`]. They exist as
+    // separate variants rather than one `apply_failed` because the CURES
+    // differ, and a metric that cannot tell an operator-gate refusal from a
+    // conductor failure from a stakes refusal is a metric that sends every
+    // investigation down the same wrong path.
+    /// The release verified, this peer is in `apply` mode, and no compiled
+    /// vehicle declares the release's `artifactClass`. Terminal: only a new
+    /// release (of a class this build handles) changes it.
+    NoVehicleForClass,
+    /// The vehicle's operator gate refuses. Today that is
+    /// `ALLOW_COORDINATOR_UPDATE` (inheriting `ALLOW_DNA_REINSTALL`) for the
+    /// coordinator/hApp classes — the SAME gate the boot path and
+    /// `POST /admin/coordinators/sync` honour, so the three can never drift.
+    ApplyNotPermitted,
+    /// **C11.** The node is under a pressure signal it can read cheaply, so
+    /// the apply is deferred to a later sweep — lag-within-window rather than
+    /// churn. Transient by definition.
+    DeferredBackpressure,
+    /// The vehicle ran and its mechanism failed (a conductor error, an IO
+    /// error, a drifted role the hot-swap could not heal). Transient: the
+    /// substrate may be different next sweep. The detail carries what broke.
+    ApplyFailed,
+    /// **Spec §9.** A `storage-binary` release, on a peer whose DECLARED
+    /// network stakes are not `Simulacra`. Fleet binaries stay out of this
+    /// rung; the local/mesh developer trust context is the only one where a
+    /// binary may be staged. Fail-closed: the default declaration is
+    /// `Bootstrap`, so a node that declares nothing refuses.
+    BinaryStakesNotSimulacra,
+    /// **Spec §6.4.** A `happ-bundle` release on a peer that is not joined —
+    /// it has no cell on this network's DNA, so it structurally cannot have
+    /// performed the verified local resolve for the very channel that supplies
+    /// the DNA. Its first bundle is seeded out of band. Transient: once the
+    /// peer joins, the same release applies.
+    BootstrapOutOfBand,
+    /// A `config-epr` release names a knob this process captures once at boot
+    /// (`runtime_config::BOOT_ONLY`). Writing it would report `applied` and
+    /// change nothing — the exact lie that list exists to prevent. Terminal:
+    /// only a new release, naming different keys, changes it.
+    ConfigKnobBootOnly,
+    /// A `config-epr` release on a node with no watched runtime-config path
+    /// (`ELOHIM_RUNTIME_CONFIG_PATH` unset). Writing a file nothing reads is
+    /// the same lie in a different costume.
+    RuntimeConfigUnwatched,
+    /// The verified artifact bytes are not usable by the vehicle its class
+    /// routes to (no artifact at all, or a payload the vehicle cannot parse).
+    /// Terminal — the bytes verified, so they will not become different.
+    ApplyPayloadUnusable,
 }
 
 impl ReasonLabel for RefusalReason {
@@ -459,6 +543,15 @@ impl ReasonLabel for RefusalReason {
         RefusalReason::ThresholdUnmet,
         RefusalReason::ThresholdEvidenceDegraded,
         RefusalReason::ConductorUnavailable,
+        RefusalReason::NoVehicleForClass,
+        RefusalReason::ApplyNotPermitted,
+        RefusalReason::DeferredBackpressure,
+        RefusalReason::ApplyFailed,
+        RefusalReason::BinaryStakesNotSimulacra,
+        RefusalReason::BootstrapOutOfBand,
+        RefusalReason::ConfigKnobBootOnly,
+        RefusalReason::RuntimeConfigUnwatched,
+        RefusalReason::ApplyPayloadUnusable,
     ];
 
     fn label(&self) -> &'static str {
@@ -483,6 +576,15 @@ impl ReasonLabel for RefusalReason {
             RefusalReason::ThresholdUnmet => "threshold_unmet",
             RefusalReason::ThresholdEvidenceDegraded => "threshold_evidence_degraded",
             RefusalReason::ConductorUnavailable => "conductor_unavailable",
+            RefusalReason::NoVehicleForClass => "no_vehicle_for_class",
+            RefusalReason::ApplyNotPermitted => "apply_not_permitted",
+            RefusalReason::DeferredBackpressure => "deferred_backpressure",
+            RefusalReason::ApplyFailed => "apply_failed",
+            RefusalReason::BinaryStakesNotSimulacra => "binary_stakes_not_simulacra",
+            RefusalReason::BootstrapOutOfBand => "bootstrap_out_of_band",
+            RefusalReason::ConfigKnobBootOnly => "config_knob_boot_only",
+            RefusalReason::RuntimeConfigUnwatched => "runtime_config_unwatched",
+            RefusalReason::ApplyPayloadUnusable => "apply_payload_unusable",
         }
     }
 }
@@ -516,6 +618,16 @@ impl RefusalReason {
             | RefusalReason::ThresholdUnchecked
             | RefusalReason::ThresholdUnmet
             | RefusalReason::ThresholdEvidenceDegraded => DecisionArm::Verify,
+
+            RefusalReason::NoVehicleForClass
+            | RefusalReason::ApplyNotPermitted
+            | RefusalReason::DeferredBackpressure
+            | RefusalReason::ApplyFailed
+            | RefusalReason::BinaryStakesNotSimulacra
+            | RefusalReason::BootstrapOutOfBand
+            | RefusalReason::ConfigKnobBootOnly
+            | RefusalReason::RuntimeConfigUnwatched
+            | RefusalReason::ApplyPayloadUnusable => DecisionArm::Apply,
         }
     }
 
@@ -537,6 +649,20 @@ impl RefusalReason {
                 | RefusalReason::ThresholdUnmet
                 | RefusalReason::ThresholdEvidenceDegraded
                 | RefusalReason::ConductorUnavailable
+                // The apply arm's transient half. `deferred_backpressure` is
+                // transient BY DEFINITION (it is a statement about us, not the
+                // release); `apply_failed` because the mechanism may work next
+                // sweep; `bootstrap_out_of_band` because a peer that joins has
+                // changed the fact the refusal was about — the same release
+                // then applies. Everything else on this arm is a standing
+                // declaration (a stakes level, an operator gate, a key the
+                // manifest names) that only a NEW release or a deliberate
+                // operator act reopens, so it parks at the ladder's ceiling
+                // rather than climbing to it — still re-checked every half
+                // hour, never hammered.
+                | RefusalReason::DeferredBackpressure
+                | RefusalReason::ApplyFailed
+                | RefusalReason::BootstrapOutOfBand
         )
     }
 }
@@ -624,8 +750,34 @@ mod tests {
             "threshold_unmet",
             "threshold_evidence_degraded",
             "conductor_unavailable",
+            "no_vehicle_for_class",
+            "apply_not_permitted",
+            "deferred_backpressure",
+            "apply_failed",
+            "binary_stakes_not_simulacra",
+            "bootstrap_out_of_band",
+            "config_knob_boot_only",
+            "runtime_config_unwatched",
+            "apply_payload_unusable",
         ]);
         assert_reason_labels_stable::<DecisionArm>(&["watch", "fetch", "verify", "apply"]);
+    }
+
+    /// The two non-refusal reason labels are distinct from each other and from
+    /// every refusal label. `already_current` sharing a bucket with `ok` would
+    /// report a CONVERGED fleet as a continuously-applying one — which is
+    /// exactly the reading that makes an apply-rate panel useless.
+    #[test]
+    fn the_non_refusal_reason_labels_never_collide_with_a_refusal() {
+        assert_ne!(REASON_OK, REASON_IDLE);
+        assert_ne!(REASON_OK, REASON_ALREADY_CURRENT);
+        assert_ne!(REASON_IDLE, REASON_ALREADY_CURRENT);
+        for reason in RefusalReason::ALL {
+            let label = reason.label();
+            assert_ne!(label, REASON_OK);
+            assert_ne!(label, REASON_IDLE);
+            assert_ne!(label, REASON_ALREADY_CURRENT);
+        }
     }
 
     /// A terminal refusal and a transient one must not share a retry posture.
@@ -649,8 +801,41 @@ mod tests {
             let refusal = AdoptionRefusal::new(*reason, "fixture");
             assert_eq!(refusal.arm, reason.arm().label());
             assert_eq!(refusal.reason_code(), *reason);
-            // No refusal may claim the apply arm: this build has no vehicle.
-            assert_ne!(reason.arm(), DecisionArm::Apply);
         }
+    }
+
+    /// **T4.** The apply arm is now REACHABLE — the inverse of T3's assertion
+    /// that no refusal could claim it. Every one of the four arms must have at
+    /// least one reason that can be emitted from it, or the arm vocabulary
+    /// carries a name with no code behind it (the false-green the pre-touch
+    /// discipline exists to deny, pointing the other way).
+    #[test]
+    fn every_decision_arm_has_at_least_one_reachable_refusal() {
+        for arm in DecisionArm::ALL {
+            assert!(
+                RefusalReason::ALL.iter().any(|r| r.arm() == *arm),
+                "arm {:?} names no refusal that can be emitted from it",
+                arm
+            );
+        }
+    }
+
+    /// The apply arm's transient/terminal split is a COST decision, and it is
+    /// deliberately asymmetric: a pressure deferral or a failed mechanism may
+    /// cure itself, while a stakes declaration, an operator gate, or a key the
+    /// manifest names does not — those park at the ladder's ceiling instead of
+    /// spending four more sweeps climbing to it.
+    #[test]
+    fn the_apply_arms_retry_posture_splits_substrate_from_declaration() {
+        assert!(RefusalReason::DeferredBackpressure.is_transient());
+        assert!(RefusalReason::ApplyFailed.is_transient());
+        assert!(RefusalReason::BootstrapOutOfBand.is_transient());
+
+        assert!(!RefusalReason::BinaryStakesNotSimulacra.is_transient());
+        assert!(!RefusalReason::ApplyNotPermitted.is_transient());
+        assert!(!RefusalReason::ConfigKnobBootOnly.is_transient());
+        assert!(!RefusalReason::NoVehicleForClass.is_transient());
+        assert!(!RefusalReason::RuntimeConfigUnwatched.is_transient());
+        assert!(!RefusalReason::ApplyPayloadUnusable.is_transient());
     }
 }

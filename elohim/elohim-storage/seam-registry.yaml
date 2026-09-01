@@ -2854,22 +2854,39 @@ decisionPoints:
       - id: C11
         status: partial
         justification: >
-          The per-sweep byte budget defers a large release to the next tick rather than churning,
-          and deferral is recorded as a SKIP (not a refusal) so a healthy channel is never pushed
-          into the ladder for a reason that is about us. Deference to ram-guard / PVC / quiesce
-          state (spec §7 C11) is NOT wired: the controller does not yet read those signals.
+          THREE legs, one wired (T4, 2026-09-01). (1) The per-sweep byte budget defers a large
+          release to the next tick rather than churning, and deferral is recorded as a SKIP (not a
+          refusal) so a healthy channel is never pushed into the ladder for a reason that is about
+          us — pinned by a_deferred_channel_is_not_a_refused_one, which drives the single
+          outcome->transition function and asserts the deferred channel's recorded state is
+          byte-identical (lastCheckedAt untouched, sweeps not ticked, ladder not entered).
+          (2) The APPLY arm additionally defers on the conductor admission lane
+          (release_adoption::apply::backpressure_signal — in_flight >= capacity), with the typed
+          transient reason deferred_backpressure, so a node whose lane is saturated lags within
+          window instead of queueing an apply ahead of a person. (3) REMAINING PARTIAL: ram-guard
+          and PVC watermarks live in the pre-push/hook layer and quiesce state in the p2p plane;
+          neither is readable from this process without new plumbing, and inventing a reader for
+          them inside an apply vehicle would be an instrument with no reader. Named here rather
+          than forced.
       - id: C12
         status: answered
         justification: >
-          Only AdoptionMode::Observe is constructible, and an unknown mode in the runtime-config
-          value is REFUSED and reported rather than silently downgraded to observe — a peer told to
-          apply must never look compliant while doing something else. Pinned by
-          an_illegal_mode_is_refused_and_reported_never_downgraded.
+          Observe is what a bare channel id means, and apply must be asked for BY EXACT NAME per
+          channel; an unknown mode in the runtime-config value is REFUSED and reported rather than
+          silently downgraded (a peer told to apply must never look compliant while doing something
+          else) or silently upgraded (a typo must never start swapping coordinators). Pinned by
+          an_illegal_mode_is_refused_and_reported_never_downgraded and
+          apply_is_legal_but_only_when_asked_for_by_exact_name, which walks a table of near-misses.
       - id: C13
         status: answered
         justification: >
-          The election tier is recorded as observed and never promoted; this build carries no apply
-          vehicle at all, which is the strongest form of "authority bounded".
+          The election tier is recorded as observed and never promoted. Applying is bounded by four
+          independent conditions, none of them a default: a channel whose config says apply, a
+          release that passed the whole floor, a registered vehicle for its DECLARED class, and a
+          node not under readable pressure. Above them sits the spec §9 stakes fence — the
+          storage-binary vehicle applies only where the declared network stakes are Simulacra, and
+          the resolver fails closed to Bootstrap, so fleet binaries are refused by default rather
+          than by remembering to configure a refusal.
       - id: C14
         status: answered
         justification: >
@@ -2893,4 +2910,179 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/services/release_adoption/watch.rs
         testName: a_controller_without_a_conductor_refuses_honestly_and_applies_nothing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/watch.rs
+        testName: a_deferred_channel_is_not_a_refused_one
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: apply_is_legal_but_only_when_asked_for_by_exact_name
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: a_pending_restart_is_never_cleared_by_a_later_sweep
+        kind: unit
+
+  # ── rung 5 (T4): the apply vehicles ───────────────────────────────────────
+  # Spec §6 step 4 + §9. Registered at birth per the task atom's design-gate
+  # clause, same as the observe half above.
+
+  - name: release_adoption::apply::ApplyRegistry::apply
+    kind: state-transition
+    sourceLocation:
+      file: src/services/release_adoption/apply.rs
+      modulePath: services::release_adoption::apply::ApplyRegistry::apply
+      line: 200
+    summary: >
+      The single routing point from a VerifiedRelease to a running change. Reads the cheap
+      backpressure signal FIRST (a deferral is about the node, not the class it would have
+      reached), then routes strictly by the manifest's DECLARED artifactClass to the one vehicle
+      that names it — coordinator-bundle to happ_manager::sync_coordinators_report (the exact
+      in-process fn behind POST /admin/coordinators/sync), config-epr to the watched
+      runtime-config file plus an in-process reload_now(), storage-binary to the exe SLOT (staged,
+      never executed), happ-bundle to the same coordinator hot-swap gated on being joined. A class
+      with no registered vehicle is no_vehicle_for_class — never a fallback to the closest
+      vehicle, because routing by anything but the declared class would apply a release through
+      machinery it was never verified against. The module invents no apply mechanics; every
+      vehicle composes one that was already proven, which is what makes revert free (the ceremony
+      declares a prior head canonical and every controller converges backward through the
+      identical loop).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Apply touches the RUNTIME plane only. It never writes an entry, never declares a head,
+          never gossips. Authority stays at L2 in the conductor's election; this is the arm that
+          obeys it.
+      - id: C1
+        status: n-a
+        justification: >
+          Self-election is decided upstream at the threshold arm, which cannot be reached without
+          an AdoptionDiscipline naming the release's builder. Nothing here can widen it.
+      - id: C2
+        status: answered
+        justification: >
+          APPLY NEVER MOVES A HEAD. There is no declare call, no supersede, no link write on this
+          path — the ceremony moves heads and the controller converges toward whatever it elected,
+          forward or backward. That is also why revert needs no separate mechanism.
+      - id: C3
+        status: answered
+        justification: >
+          A successful apply (and an already_current no-op) clears the backoff ladder entirely, so
+          a channel that just converged is re-checked at FULL cadence on the very next sweep —
+          which is what makes a revert land in one sweep instead of up to half an hour later.
+          Pinned by a_successful_apply_clears_the_backoff_so_a_revert_lands_next_sweep.
+      - id: C4
+        status: answered
+        justification: >
+          The hApp-bundle vehicle reads a conductor it cannot ask as UNREACHABLE (apply_failed),
+          never as "not joined" — reading unreachable as absence there would send an operator to
+          join-peer for a peer that has already joined. Absence (the app genuinely not installed)
+          is its own reason, bootstrap_out_of_band.
+      - id: C5
+        status: answered
+        justification: >
+          A vehicle is handed a VerifiedRelease and nothing else: it cannot re-read the channel,
+          re-fetch bytes, or second-guess the floor. Every input it acts on was already checked
+          against something this peer resolved itself.
+      - id: C6a
+        status: answered
+        justification: >
+          One vehicle call per applying channel per sweep, inside the sweep's own channel budget,
+          and the post-apply soak observer sleeps min(soakSecs, MAX_SOAK_WAIT_SECS = 24h) before
+          making exactly one zome call — a discipline may declare any window, this process will not
+          hold a task open past a day, because a soak longer than the peer's own uptime attests to
+          whatever process happens to be running when the timer fires.
+      - id: C6b
+        status: answered
+        justification: >
+          IDEMPOTENT ON (channelId, releaseCid), and the check is placed before the threshold read,
+          before staging and before the vehicle — so a re-sweep on a current head costs exactly one
+          head resolve and nothing else, which is the atom's literal contract. The exit carries its
+          own reason label (already_current) rather than folding into ok, so a converged fleet is
+          not metered as a continuously-applying one.
+      - id: C7
+        status: n-a
+        justification: Not a serving surface.
+      - id: C8
+        status: answered
+        justification: >
+          Ten typed apply-arm RefusalReasons, one per genuinely distinct CURE — an operator gate,
+          a stakes declaration, a bootstrap fact, a boot-only knob, an unwatched config path, an
+          unusable payload, an absent vehicle, a pressure deferral, a failed mechanism. Each names
+          its own arm, so elohim_release_adoption_decisions_total{arm,reason} cannot be mislabelled
+          at the call site, and the apply arm is now pre-touched (T3 asserted it ABSENT while it
+          had no code; T4 inverted that assertion deliberately). Partial applies are reported: a
+          per-role hot-swap failure lands on the receipt's failedRoles rather than silently
+          succeeding.
+      - id: C9
+        status: answered
+        justification: >
+          The DNA line is refused upstream at verify (dna_lineage_mismatch) and again per role
+          inside sync_coordinators_for_app_info. That is why the happ-bundle vehicle routes to the
+          hot-swap rather than to ensure_happ_installed: the install path's stale branch mints a
+          NEW agent key, and a rung whose failure mode is "your peer silently got a new identity"
+          is not a rung that ships.
+      - id: C10
+        status: answered
+        justification: >
+          The config vehicle CARRIES keys the registry does not know rather than refusing them —
+          the additive-wire floor applied to config, so a peer one build behind can still take a
+          release that added a key. They are reported as ignoredKeys so the silence is legible.
+      - id: C11
+        status: partial
+        justification: >
+          backpressure_signal() reads the conductor admission lane (in_flight >= capacity) before
+          any routing, and refuses with the transient deferred_backpressure. ram-guard, PVC and
+          quiesce remain unread — see the same concern on ChannelAdoptionState::record.
+      - id: C12
+        status: answered
+        justification: >
+          The conductor-touching vehicles honour ALLOW_COORDINATOR_UPDATE (inheriting
+          ALLOW_DNA_REINSTALL) through happ_manager::coordinator_update_allowed() — the SAME
+          predicate the boot path and the HTTP vehicle read, so three call sites cannot drift.
+      - id: C13
+        status: answered
+        justification: >
+          Spec §9's fleet fence is enforced on the DECLARED network stakes rather than a hostname
+          or an env sniff: the storage-binary vehicle applies only under NetworkStage::Simulacra,
+          and StakesResolver fails closed to Bootstrap, so a node that declares nothing refuses.
+          Pinned by the_binary_gate_is_closed_by_default_and_opens_only_on_a_simulacra_declaration.
+      - id: C14
+        status: answered
+        justification: >
+          A staged binary is reported as pendingRestart on GET /admin/adoption AND as a sidecar
+          receipt beside the slot, and the flag is STICKY — never cleared by a later sweep, because
+          a slot on disk that the report says is not pending is exactly the residual T6's receipt
+          would misread as "the swap already happened". The post-apply soak observer authors a
+          FAILING attestation for a pending-restart window rather than a passing one, so the
+          residual is witnessed on the DHT too.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: the_staged_binary_slot_path_is_normative
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: the_binary_gate_is_closed_by_default_and_opens_only_on_a_simulacra_declaration
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: a_class_with_no_vehicle_is_refused_by_name_never_routed_elsewhere
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: every_vehicle_declares_exactly_the_class_it_handles
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: the_boot_only_refusal_reads_the_value_when_the_entry_names_one
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: a_staged_write_is_atomic_and_its_temp_name_cannot_collide
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/apply.rs
+        testName: the_soak_wait_is_bounded_whatever_the_discipline_declares
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: a_successful_apply_clears_the_backoff_so_a_revert_lands_next_sweep
+        kind: unit
+      - path: elohim/elohim-storage/src/services/release_adoption/state.rs
+        testName: the_applied_verdict_extends_the_pinned_shape_without_breaking_it
+        kind: unit
+      - path: elohim/elohim-storage/src/metrics.rs
+        testName: release_adoption_decisions_are_pretouched_on_every_arm_that_has_code
         kind: unit

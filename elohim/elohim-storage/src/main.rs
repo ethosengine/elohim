@@ -5381,6 +5381,134 @@ async fn async_main(
         info!("Tending TTL sweep task started (5-min interval, shutdown-aware)");
     }
 
+    // ── Rung 5: the release-adoption controller ───────────────────────────────
+    //
+    // Spec §6 (`2026-09-01-runtime-artifacts-elected-content-design.md`). The
+    // controller resolves each followed channel's canonical head through THIS
+    // node's own conductor (I1), verifies the release against this node's
+    // installed reality, and — for a channel whose runtime-config mode says
+    // `apply` — routes it to the vehicle its artifact class names.
+    //
+    // Wired LAST on purpose: every dependency it takes is something an earlier
+    // stage established (the blob store, the conductor bridges, the admin
+    // websocket, the declared-stakes resolver), and it must never be the reason
+    // one of them is constructed. `watch::spawn` is a no-op when
+    // ELOHIM_RELEASE_CHANNELS names nothing, which is the default — so a node
+    // that follows no channel pays exactly nothing for this block.
+    {
+        use elohim_storage::services::release_adoption::{apply, watch};
+
+        // Staging root for verified artifact bytes and the exe slot: the node's
+        // OWN storage dir, which is already per-node and already durable. On the
+        // local mesh `hc-mesh.sh` sets `STORAGE_DIR=$MESH_DIR/<peer>`, so this
+        // resolves to `$MESH_DIR/<peer>/release-adoption/slot/…` — per-peer by
+        // construction rather than by reading an env var the mesh never exports
+        // to the process (`MESH_DIR` and the peer name are script-local there;
+        // deriving the path from either would have been a guess that silently
+        // collapses every peer onto one slot).
+        // `ELOHIM_RELEASE_STAGING_ROOT` overrides for an operator who wants the
+        // slot somewhere else.
+        let staging_root = match std::env::var("ELOHIM_RELEASE_STAGING_ROOT") {
+            Ok(explicit) if !explicit.trim().is_empty() => std::path::PathBuf::from(explicit),
+            _ => config.storage_dir.join("release-adoption"),
+        };
+
+        let hc_for_adoption = hc_registry_for_http.as_ref().and_then(|r| r.lamad_client());
+        // Same admin-connection resolution as POST /admin/coordinators/sync:
+        // the embedded conductor's handle, else any live external-conductor
+        // bridge. The external path is load-bearing for a split-conductor or
+        // local-mesh peer, which receives coordinator hot-swaps by no other
+        // route.
+        let admin_for_adoption = agent_info_admin_ws.as_deref().cloned().or_else(|| {
+            hc_registry_for_http
+                .as_ref()
+                .and_then(|r| r.any_admin_websocket())
+        });
+
+        // The vehicles. Each is registered ONLY when the machinery it routes to
+        // actually exists on this node — an unregistered class refuses
+        // `no_vehicle_for_class`, which is the honest answer, rather than
+        // failing at the moment of apply with something that reads like a bug.
+        let mut vehicles = apply::ApplyRegistry::new();
+        if let Some(ref admin) = admin_for_adoption {
+            vehicles = vehicles
+                .with(std::sync::Arc::new(apply::CoordinatorBundleVehicle::new(
+                    admin.clone(),
+                    args.app_id.clone(),
+                )))
+                .with(std::sync::Arc::new(apply::HappBundleVehicle::new(
+                    admin.clone(),
+                    args.app_id.clone(),
+                )));
+        }
+        if elohim_storage::runtime_config::config_path().is_some() {
+            vehicles = vehicles.with(std::sync::Arc::new(apply::ConfigEprVehicle::new()));
+        }
+        // The storage-binary vehicle is registered on every node and refuses at
+        // APPLY time on the declared stakes — deliberately, so the refusal is a
+        // typed, reported `binary_stakes_not_simulacra` rather than an absence
+        // an operator has to infer. Fail-closed either way: with no declared
+        // stakes the resolver answers Bootstrap and the gate stays shut.
+        {
+            let stakes: std::sync::Arc<dyn elohim_storage::trust::StakesResolver + Send + Sync> =
+                match reconcile_stakes_resolver.clone() {
+                    Some(resolver) => resolver,
+                    None => std::sync::Arc::new(
+                        elohim_storage::trust::FixedStakesResolver::bootstrap_default(),
+                    ),
+                };
+            vehicles = vehicles.with(std::sync::Arc::new(apply::StorageBinaryVehicle::new(
+                staging_root.clone(),
+                stakes,
+                "lamad",
+            )));
+        }
+
+        let mut controller = watch::AdoptionController::new(staging_root.clone())
+            .with_artifact_source(std::sync::Arc::new(watch::BlobStoreArtifactSource::new(
+                blob_store.clone(),
+            )))
+            .with_apply_vehicles(std::sync::Arc::new(vehicles));
+        if let Some(hc) = hc_for_adoption.clone() {
+            controller = controller.with_conductor(hc.clone());
+            // T5's rail. Requires a conductor to author through, so it is
+            // wired here and nowhere else; without it an apply is un-attested
+            // rather than falsely attested.
+            controller = controller.with_soak_attestor(std::sync::Arc::new(
+                apply::SoakAttestor::from_runtime(
+                    hc.clone(),
+                    &config,
+                    args.agent_pubkey
+                        .clone()
+                        .unwrap_or_else(|| hc.agent_key_uhcak()),
+                    0,
+                    // The RUNNING binary's own build info — never a pin tag.
+                    // Re-read here rather than threaded from the startup line
+                    // because it is a compile-time constant read, and a
+                    // thread-through across the runtime boundary would be a
+                    // second place for it to go stale.
+                    &elohim_compute::BuildInfo::new("elohim-storage"),
+                ),
+            ));
+        }
+        if let Some(ref admin) = admin_for_adoption {
+            controller = controller.with_installed_reality(std::sync::Arc::new(
+                watch::PassportInstalledReality {
+                    admin_websocket: Some(admin.clone()),
+                    app_id: args.app_id.clone(),
+                },
+            ));
+        }
+
+        if watch::spawn(controller) {
+            info!(
+                staging_root = %staging_root.display(),
+                slot = %apply::slot_path(&staging_root).display(),
+                "release-adoption controller spawned"
+            );
+        }
+    }
+
     info!("Press Ctrl+C to stop.");
 
     // Handle shutdown signal

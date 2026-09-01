@@ -12,10 +12,13 @@
 //!
 //! 1. **The followed-channel set** — parsed from the rung-4 runtime-config
 //!    surface, so a peer can start or stop following a channel on a running
-//!    node in seconds. Only `observe` is a legal mode until T4 lands, and an
-//!    illegal mode is recorded as a typed refusal rather than dropped: a
-//!    channel that silently vanishes from the report because its mode was
-//!    misspelled is the failure this module refuses to ship.
+//!    node in seconds. `observe` and `apply` are the legal modes (T4 landed
+//!    the second); `observe` is what a bare channel id means, so applying is
+//!    always something an operator asked for by name. An illegal mode is
+//!    recorded as a typed refusal rather than dropped — a channel that
+//!    silently vanishes from the report because its mode was misspelled is the
+//!    failure this module refuses to ship, and a misspelling that silently
+//!    became `apply` would be the far worse half of the same bug.
 //!
 //! 2. **The backoff ladder** — finite by construction (C6a). A refusal that a
 //!    later sweep could plausibly cure backs off along
@@ -50,6 +53,17 @@ pub const RELEASE_CHANNELS_KEY: &str = "ELOHIM_RELEASE_CHANNELS";
 /// and then **holds at the last rung** — it never grows without bound and never
 /// stops asking entirely, which is the shape C6a asks for: bounded work per
 /// sweep, and a liveness floor so a cured substrate is noticed.
+///
+/// bounded-work: `watch::MAX_CHANNELS_PER_SWEEP` head resolves per tick (with
+/// `watch::MAX_THRESHOLD_READS_PER_SWEEP` attestation reads and
+/// `watch::MAX_ARTIFACT_BYTES_PER_SWEEP` bytes staged inside it). Those are the
+/// per-SWEEP budget — the ceiling on what one tick may cost. This ladder is the
+/// per-CHANNEL half of the same discipline: it decides how much of that budget
+/// a channel is allowed to keep asking for. Without it a single permanently
+/// refusing channel would consume its slice of `MAX_CHANNELS_PER_SWEEP` every
+/// 60 s forever, which is bounded per tick and unbounded in total; with it, a
+/// terminal refusal costs one resolve per `TERMINAL_BACKOFF_SECS`. The two must
+/// be read together — neither alone bounds the work.
 pub const BACKOFF_LADDER_SECS: [u64; 5] = [0, 30, 120, 600, 1800];
 
 /// Where a terminal refusal parks immediately: the ladder's ceiling. Only a new
@@ -63,22 +77,31 @@ pub const TERMINAL_BACKOFF_SECS: u64 = BACKOFF_LADDER_SECS[BACKOFF_LADDER_SECS.l
 
 /// How this peer participates in a channel.
 ///
-/// Exactly one legal value until T4 lands. The enum exists as an enum (rather
-/// than a bool) because the apply modes are already named in the spec, and a
-/// bool would have to be widened — with every call site re-read — the day the
-/// second one arrives.
+/// **`Observe` remains the default** — a bare `channelId` with no `=mode`
+/// suffix parses to it, so a config that says nothing about applying never
+/// applies. `Apply` (T4) must be asked for by name, per channel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AdoptionMode {
     /// Watch, fetch, verify, report. Applies nothing, ever.
     Observe,
+    /// Everything `Observe` does, and then routes a release that passed the
+    /// whole floor to the vehicle its artifact class names
+    /// (`super::apply`). Idempotent on `(channelId, releaseCid)`.
+    Apply,
 }
 
 impl AdoptionMode {
     pub fn label(self) -> &'static str {
         match self {
             AdoptionMode::Observe => "observe",
+            AdoptionMode::Apply => "apply",
         }
+    }
+
+    /// Whether this mode may hand a verified release to a vehicle.
+    pub fn applies(self) -> bool {
+        matches!(self, AdoptionMode::Apply)
     }
 
     /// Parse a mode from the runtime-config value.
@@ -86,10 +109,13 @@ impl AdoptionMode {
     /// An unknown mode is an ERROR, not a fallback to `observe`. Falling back
     /// would make a peer that asked for `apply` look like it was following
     /// instructions while doing something else — the config-lever failure mode
-    /// this crate has already paid for once.
+    /// this crate has already paid for once. The inverse matters just as much
+    /// now that `apply` is legal: a TYPO must never silently become `apply`,
+    /// which is why the match is exact and there is no prefix or fuzzy leg.
     pub fn parse(raw: &str) -> Result<Self, RefusalReason> {
         match raw.trim().to_ascii_lowercase().as_str() {
             "observe" => Ok(AdoptionMode::Observe),
+            "apply" => Ok(AdoptionMode::Apply),
             _ => Err(RefusalReason::ModeNotPermitted),
         }
     }
@@ -158,8 +184,8 @@ pub fn parse_followed_channels(raw: &str) -> FollowedChannels {
                     refusal: AdoptionRefusal::new(
                         reason,
                         format!(
-                            "mode '{mode_raw}' is not permitted on this build — only 'observe' \
-                             is legal until the apply vehicles land"
+                            "mode '{mode_raw}' is not a mode — legal values are 'observe' \
+                             (the default) and 'apply'"
                         ),
                     ),
                 });
@@ -253,8 +279,21 @@ pub enum Verdict {
     /// The channel resolved and there is no head to judge (no election, or the
     /// channel carries no release manifest yet).
     Idle { note: String },
-    /// The release passed the whole verify floor on this peer.
+    /// The release passed the whole verify floor on this peer. In `observe`
+    /// mode this is where a sweep ends.
     Ok { release_cid: String },
+    /// **T4.** The release passed the floor AND this peer is converged on it.
+    ///
+    /// `already_current` distinguishes the two ways that is true: a fresh apply
+    /// this sweep (`false`), or an idempotent no-op because the peer had
+    /// already applied this exact `(channelId, releaseCid)` (`true`). Both are
+    /// success; only one is a change, and a report that could not tell them
+    /// apart would show a converged fleet as a continuously-applying one.
+    Applied {
+        release_cid: String,
+        vehicle: String,
+        already_current: bool,
+    },
     /// The controller refused, with a typed reason.
     Refused { refusal: AdoptionRefusal },
 }
@@ -280,6 +319,20 @@ impl Serialize for Verdict {
                 map.serialize_entry("ok", &true)?;
                 map.serialize_entry("releaseCid", release_cid)?;
             }
+            Verdict::Applied {
+                release_cid,
+                vehicle,
+                already_current,
+            } => {
+                map.serialize_entry("state", "applied")?;
+                // ADDITIVE: `applied` still answers `ok: true`, so a T6 reader
+                // keyed on the atom's `{ok} | {refusal}` contract keeps working
+                // unchanged when a channel moves from observe to apply.
+                map.serialize_entry("ok", &true)?;
+                map.serialize_entry("releaseCid", release_cid)?;
+                map.serialize_entry("vehicle", vehicle)?;
+                map.serialize_entry("alreadyCurrent", already_current)?;
+            }
             Verdict::Refused { refusal } => {
                 map.serialize_entry("state", "refused")?;
                 map.serialize_entry("refusal", refusal)?;
@@ -295,9 +348,35 @@ impl Verdict {
         match self {
             Verdict::Idle { .. } => super::REASON_IDLE,
             Verdict::Ok { .. } => super::REASON_OK,
+            Verdict::Applied {
+                already_current: true,
+                ..
+            } => super::REASON_ALREADY_CURRENT,
+            Verdict::Applied { .. } => super::REASON_OK,
             Verdict::Refused { refusal } => &refusal.reason,
         }
     }
+}
+
+/// What this peer has actually applied on a channel — the `appliedRelease` row
+/// on `GET /admin/adoption`, and the **idempotency key** the apply arm reads
+/// before it spends anything.
+///
+/// Ephemeral (C) like everything else here: it is a record of what THIS process
+/// did, not an authority claim, and it is deliberately not persisted. A
+/// restarted peer re-derives convergence from its own installed reality via the
+/// verify floor rather than trusting a file about its own past — which is the
+/// same reason `already_current` is cheap to be wrong about in the safe
+/// direction (a re-apply of the current head is a no-op at the vehicle too).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppliedRelease {
+    /// The release CID (the winning version's action hash).
+    pub cid: String,
+    /// Unix seconds the apply completed.
+    pub at: i64,
+    /// Which vehicle acted.
+    pub vehicle: String,
 }
 
 /// Everything the controller knows about one followed channel right now.
@@ -323,6 +402,18 @@ pub struct ChannelAdoptionState {
     pub consecutive_refusals: u32,
     /// Total sweeps that touched this channel.
     pub sweeps: u64,
+    /// **T4, additive.** What this peer has applied on this channel, or `None`
+    /// in `observe` mode / before the first apply. The apply arm's idempotency
+    /// key: a sweep that resolves this same `cid` again is `already_current`
+    /// and spends nothing beyond the resolve.
+    #[serde(default)]
+    pub applied_release: Option<AppliedRelease>,
+    /// **T4, additive.** True when a vehicle staged something that only takes
+    /// effect on the next process start — today exactly the `storage-binary`
+    /// exe-slot, which is STAGED and never self-exec'd. T6's mesh receipt reads
+    /// this alongside the slot path.
+    #[serde(default)]
+    pub pending_restart: bool,
 }
 
 impl ChannelAdoptionState {
@@ -336,6 +427,8 @@ impl ChannelAdoptionState {
             next_check_not_before: None,
             consecutive_refusals: 0,
             sweeps: 0,
+            applied_release: None,
+            pending_restart: false,
         }
     }
 
@@ -352,7 +445,7 @@ impl ChannelAdoptionState {
         self.last_checked_at = Some(now_unix);
         self.resolved_head = head;
         let backoff = match &verdict {
-            Verdict::Ok { .. } | Verdict::Idle { .. } => {
+            Verdict::Ok { .. } | Verdict::Idle { .. } | Verdict::Applied { .. } => {
                 self.consecutive_refusals = 0;
                 BACKOFF_LADDER_SECS[0]
             }
@@ -375,6 +468,16 @@ impl ChannelAdoptionState {
             Some(now_unix.saturating_add(backoff as i64))
         };
         self.verdict = Some(verdict);
+    }
+
+    /// Record that a vehicle applied a release on this channel.
+    ///
+    /// `pending_restart` is OR-ed in, never assigned: a staged artifact that
+    /// only a process restart consumes stays pending until that restart ends
+    /// this process. A later apply of a different class must not clear it.
+    pub fn record_applied(&mut self, applied: AppliedRelease, pending_restart: bool) {
+        self.applied_release = Some(applied);
+        self.pending_restart = self.pending_restart || pending_restart;
     }
 }
 
@@ -452,6 +555,33 @@ pub fn record_check(
     }
 }
 
+/// The release this peer has applied on `channel_id`, if any.
+///
+/// **C6b — the idempotency read.** The apply arm calls this BEFORE it spends a
+/// threshold read, a byte of staging, or a conductor call: a sweep that
+/// resolves a head this peer has already applied costs exactly one head
+/// resolve and nothing else.
+pub fn applied_release(channel_id: &str) -> Option<AppliedRelease> {
+    REGISTRY
+        .channels
+        .lock()
+        .unwrap()
+        .get(channel_id)
+        .and_then(|s| s.applied_release.clone())
+}
+
+/// Record that a vehicle applied a release on `channel_id`.
+///
+/// Separate from [`record_check`] because it is a different KIND of fact: a
+/// check is per-sweep and is overwritten every tick, while an apply is a thing
+/// this peer did, and it survives every later verdict — including a refusal, so
+/// "we applied X and are now refusing Y" is readable rather than erased.
+pub fn record_applied(channel_id: &str, applied: AppliedRelease, pending_restart: bool) {
+    if let Some(state) = REGISTRY.channels.lock().unwrap().get_mut(channel_id) {
+        state.record_applied(applied, pending_restart);
+    }
+}
+
 /// Record that a sweep completed.
 pub fn record_sweep(now_unix_secs: i64) {
     *REGISTRY.last_sweep_unix.lock().unwrap() = Some(now_unix_secs);
@@ -481,11 +611,17 @@ pub fn report_json() -> serde_json::Value {
     serde_json::json!({
         "controller": {
             "running": *REGISTRY.controller_running.lock().unwrap(),
-            // Observe is the ONLY mode this build can run. Stated as a fact of
-            // the build, not of the config, so `mode: observe` on every channel
-            // is never mistaken for a per-channel operator choice that could
-            // have been otherwise.
-            "applyVehiclesCompiled": false,
+            // Whether this BINARY can apply at all, stated as a fact of the
+            // build rather than of the config — so `mode: observe` on every
+            // channel is never mistaken for a build that could not have done
+            // otherwise, and (since T4) `mode: apply` is never mistaken for a
+            // build that has a vehicle for the class in question.
+            "applyVehiclesCompiled": true,
+            // Which artifact classes THIS process actually has a vehicle for.
+            // Registered at boot; empty when no vehicles were wired (a node
+            // with no conductor and no config path), which is the honest
+            // reading of "compiled but not equipped".
+            "applyVehicles": super::apply::registered_vehicle_labels(),
             "configKey": RELEASE_CHANNELS_KEY,
             "sweepIntervalSecs": super::watch::SWEEP_INTERVAL_SECS,
             "maxChannelsPerSweep": super::watch::MAX_CHANNELS_PER_SWEEP,
@@ -540,7 +676,7 @@ mod tests {
     /// "I edited the ConfigMap and nothing happened" becomes unanswerable.
     #[test]
     fn an_illegal_mode_is_refused_and_reported_never_downgraded() {
-        let parsed = parse_followed_channels("runtime:coordinators:elohim:commons=apply");
+        let parsed = parse_followed_channels("runtime:coordinators:elohim:commons=aply");
         assert!(parsed.channels.is_empty());
         assert_eq!(parsed.refused.len(), 1);
         assert_eq!(
@@ -549,8 +685,69 @@ mod tests {
         );
         assert_eq!(
             parsed.refused[0].entry,
-            "runtime:coordinators:elohim:commons=apply"
+            "runtime:coordinators:elohim:commons=aply"
         );
+    }
+
+    /// **T4's mode gate, and its default.** `apply` is now a legal declaration
+    /// — and it must be spelled exactly, per channel. A bare channel id, and
+    /// anything that merely LOOKS like `apply`, must never become one: a peer
+    /// that applies because of a typo is the failure mode the whole
+    /// observe-first ladder exists to avoid.
+    #[test]
+    fn apply_is_legal_but_only_when_asked_for_by_exact_name() {
+        let parsed = parse_followed_channels(
+            "runtime:coordinators:elohim:canary-a=apply, runtime:config:elohim:commons",
+        );
+        assert_eq!(
+            parsed.channels,
+            vec![
+                FollowedChannel {
+                    channel_id: "runtime:coordinators:elohim:canary-a".to_string(),
+                    mode: AdoptionMode::Apply,
+                },
+                observe("runtime:config:elohim:commons"),
+            ],
+            "apply must be per-channel and observe must remain the bare default"
+        );
+        assert!(parsed.refused.is_empty());
+        assert!(AdoptionMode::Apply.applies());
+        assert!(!AdoptionMode::Observe.applies());
+
+        // Near-misses are refusals, never applies.
+        for typo in ["aply", "apply!", "applying", "app ly", "APPLY-", "auto"] {
+            let entry = format!("runtime:coordinators:elohim:x={typo}");
+            let parsed = parse_followed_channels(&entry);
+            assert!(
+                parsed.channels.is_empty() && parsed.refused.len() == 1,
+                "'{typo}' must refuse, not apply"
+            );
+        }
+        // Case and surrounding whitespace are the only tolerances.
+        assert_eq!(AdoptionMode::parse(" APPLY "), Ok(AdoptionMode::Apply));
+    }
+
+    /// A mode CHANGE resets the channel's state — the previous verdict was
+    /// reached under a different participation contract, and an
+    /// `appliedRelease` carried across an observe⇄apply flip would let a
+    /// re-enabled channel claim convergence it never re-established.
+    #[test]
+    fn flipping_a_channel_between_observe_and_apply_resets_its_state() {
+        let mut state = ChannelAdoptionState::new(&observe("c"));
+        state.applied_release = Some(AppliedRelease {
+            cid: "uhCkkOld".to_string(),
+            at: 1_000,
+            vehicle: "sync_coordinators".to_string(),
+        });
+        state.pending_restart = true;
+
+        let flipped = ChannelAdoptionState::new(&FollowedChannel {
+            channel_id: "c".to_string(),
+            mode: AdoptionMode::Apply,
+        });
+        assert_eq!(flipped.applied_release, None);
+        assert!(!flipped.pending_restart);
+        assert_ne!(flipped.mode, state.mode);
     }
 
     #[test]
@@ -710,13 +907,131 @@ mod tests {
         );
     }
 
-    /// The report names the build's posture as a FACT OF THE BINARY, so a
-    /// reader never has to infer from `mode: observe` on every channel whether
-    /// applying was a config choice that could have gone the other way.
+    /// **T4, additive.** The `applied` verdict extends the pinned shape without
+    /// breaking it: a T6 reader keyed on the atom's `{ok} | {refusal}` contract
+    /// still sees `ok: true`, while a reader keyed on the tagged `state` gets
+    /// the strictly more informative `applied` plus the vehicle that acted and
+    /// whether anything actually changed.
     #[test]
-    fn the_report_states_that_no_apply_vehicle_is_compiled() {
+    fn the_applied_verdict_extends_the_pinned_shape_without_breaking_it() {
+        let fresh = serde_json::to_value(Verdict::Applied {
+            release_cid: "uhCkkWinner".to_string(),
+            vehicle: "sync_coordinators".to_string(),
+            already_current: false,
+        })
+        .unwrap();
+        assert_eq!(fresh["state"], "applied");
+        assert_eq!(fresh["ok"], true, "T6's keyed contract still answers");
+        assert_eq!(fresh["releaseCid"], "uhCkkWinner");
+        assert_eq!(fresh["vehicle"], "sync_coordinators");
+        assert_eq!(fresh["alreadyCurrent"], false);
+
+        let converged = Verdict::Applied {
+            release_cid: "uhCkkWinner".to_string(),
+            vehicle: "sync_coordinators".to_string(),
+            already_current: true,
+        };
+        assert_eq!(
+            converged.reason_label(),
+            super::super::REASON_ALREADY_CURRENT,
+            "a converged peer must not be metered as a continuously-applying one"
+        );
+        assert_eq!(
+            Verdict::Applied {
+                release_cid: "c".to_string(),
+                vehicle: "v".to_string(),
+                already_current: false,
+            }
+            .reason_label(),
+            super::super::REASON_OK
+        );
+    }
+
+    /// A successful apply clears the backoff exactly as `Ok`/`Idle` do — a
+    /// converged channel is re-checked at full cadence, which is what makes a
+    /// REVERT (the ceremony declaring a prior head canonical) land in one
+    /// sweep instead of up to half an hour later.
+    #[test]
+    fn a_successful_apply_clears_the_backoff_so_a_revert_lands_next_sweep() {
+        let mut state = ChannelAdoptionState::new(&FollowedChannel {
+            channel_id: "c".to_string(),
+            mode: AdoptionMode::Apply,
+        });
+        state.record(
+            1_000,
+            None,
+            Verdict::Refused {
+                refusal: AdoptionRefusal::new(RefusalReason::DeferredBackpressure, "under load"),
+            },
+        );
+        assert!(state.next_check_not_before.is_some());
+        state.record(
+            2_000,
+            None,
+            Verdict::Applied {
+                release_cid: "uhCkkA".to_string(),
+                vehicle: "sync_coordinators".to_string(),
+                already_current: false,
+            },
+        );
+        assert_eq!(state.next_check_not_before, None);
+        assert_eq!(state.consecutive_refusals, 0);
+        assert!(!state.is_backing_off(2_001));
+    }
+
+    /// `pendingRestart` is STICKY. A staged binary is on disk until a restart
+    /// consumes it; a later sweep reporting `pendingRestart: false` while the
+    /// slot still exists is exactly the lie T6's receipt would read as "the
+    /// swap already happened".
+    #[test]
+    fn a_pending_restart_is_never_cleared_by_a_later_sweep() {
+        let mut state = ChannelAdoptionState::new(&FollowedChannel {
+            channel_id: "runtime:binary:elohim:mesh".to_string(),
+            mode: AdoptionMode::Apply,
+        });
+        state.record_applied(
+            AppliedRelease {
+                cid: "uhCkkBinary".to_string(),
+                at: 1_000,
+                vehicle: "exe_slot_stage".to_string(),
+            },
+            true,
+        );
+        // A LATER apply of a class that stages nothing must not clear it.
+        state.record_applied(
+            AppliedRelease {
+                cid: "uhCkkConfig".to_string(),
+                at: 2_000,
+                vehicle: "runtime_config_reload".to_string(),
+            },
+            false,
+        );
+        assert!(state.pending_restart, "pendingRestart must not be cleared");
+        assert_eq!(state.applied_release.as_ref().map(|a| a.at), Some(2_000));
+
+        // And an ordinary sweep verdict leaves both alone entirely.
+        state.record(
+            3_000,
+            None,
+            Verdict::Idle {
+                note: "no election".to_string(),
+            },
+        );
+        assert!(state.pending_restart);
+        assert_eq!(state.applied_release.as_ref().map(|a| a.at), Some(2_000));
+    }
+
+    /// The report names the build's posture as a FACT OF THE BINARY, so a
+    /// reader never has to infer from the per-channel modes whether applying
+    /// was a config choice that could have gone the other way.
+    #[test]
+    fn the_report_states_the_builds_apply_posture() {
         let report = report_json();
-        assert_eq!(report["controller"]["applyVehiclesCompiled"], false);
+        assert_eq!(report["controller"]["applyVehiclesCompiled"], true);
+        assert!(
+            report["controller"]["applyVehicles"].is_array(),
+            "the equipped classes are a fact this node reports, not one a reader infers"
+        );
         assert_eq!(report["controller"]["configKey"], RELEASE_CHANNELS_KEY);
         assert!(report["channels"].is_array());
         assert!(report["configRefusals"].is_array());
