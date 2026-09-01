@@ -17,7 +17,7 @@ tags: [ci, genesis, e2e, lamad, epr, lens-complete, deploy-coherence, host-green
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1108/
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1107/
-  - genesis/a2o/features/lamad/deep-link-delivery.feature
+  - genesis/a2o/features/lms/deep-link-delivery.feature
   - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
   - genesis/a2o/src/framework/pages/selectors.ts
   - app/lamad/src/app/renderers/path-viewer/path-viewer.component.html
@@ -39,7 +39,7 @@ deploy the app.
 ## The failure
 
 `a33fea18bb6b` — Scenario "Universal EPR address renders a claimed type
-lens-complete, not a 302" (`features/lamad/deep-link-delivery.feature:54`,
+lens-complete, not a 302" (`features/lms/deep-link-delivery.feature:54`,
 `@browser-only @regression`), step "Then the lamad composite outline renders"
 (`steps/lamad/deep-link-delivery.steps.ts:327`):
 

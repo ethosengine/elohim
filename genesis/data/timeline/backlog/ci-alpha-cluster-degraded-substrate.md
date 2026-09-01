@@ -34,7 +34,7 @@ cites:
   - https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1053/
   - genesis/manifests/cluster-state.yaml
   - genesis/a2o/features/resilience/household-reciprocity.feature
-  - genesis/a2o/features/lamad/deep-link-delivery.feature
+  - genesis/a2o/features/lms/deep-link-delivery.feature
   - genesis/a2o/steps/resilience.steps.ts
   - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
   - genesis/a2o/steps/common.steps.ts
@@ -458,7 +458,7 @@ stabilizes OR the tags hold the scenarios out of the degraded run.
   can't sync content from `adam-alpha`'s degraded storage/conductor.
 
   **Root cause is the ALREADY-DOCUMENTED "tagging seam" gap above, not a new
-  pattern**: `genesis/a2o/features/lamad/deep-link-delivery.feature` (steps
+  pattern**: `genesis/a2o/features/lms/deep-link-delivery.feature` (steps
   are `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts`) declares only
   `@requires:doorway` at the feature level (line 1) — and per
   `genesis/a2o/CLAUDE.md`, `@requires:doorway` is explicitly a **fixture

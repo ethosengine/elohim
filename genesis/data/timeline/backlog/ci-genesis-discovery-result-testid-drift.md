@@ -16,8 +16,8 @@ relatedNodeIds: []
 tags: [ci, genesis, lamad, discovery, browser-only, testid-drift, requires-shem, scope-return, host-green-not-ci-green]
 cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1234/
-  - genesis/a2o/features/lamad/know-thyself-discovery.feature
-  - genesis/a2o/features/lamad/assessment-completion-feedback.feature
+  - genesis/a2o/features/lms/know-thyself-discovery.feature
+  - genesis/a2o/features/lms/assessment-completion-feedback.feature
   - genesis/a2o/steps/ui/discovery-assessment.steps.ts
   - genesis/a2o/steps/ui/completion-feedback.steps.ts
   - genesis/a2o/src/framework/pages/selectors.ts
@@ -129,10 +129,10 @@ Residual (the true resolution — story-owner / lamad work, not triage now-work)
 
 ## Fix trail
 
-- `genesis/a2o/features/lamad/know-thyself-discovery.feature` — `@wip` +
+- `genesis/a2o/features/lms/know-thyself-discovery.feature` — `@wip` +
   explanatory comments on the 3 result scenarios (this commit).
 - Local verification: `npx cucumber-js --dry-run --tags '@e2e and @browser-only
-  and not @wip' features/lamad/know-thyself-discovery.feature` — parses clean
+  and not @wip' features/lms/know-thyself-discovery.feature` — parses clean
   (no gherkin abort), 3 result scenarios excluded, 2 `@regression` retained.
 - Ledger `529bba700060`: `status: triaged`, `triaged_at_build: 1234`. NO
   `decompose_on_confirm` — this backlog graduates (consolidation + facet-2
