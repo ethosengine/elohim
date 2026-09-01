@@ -14,6 +14,7 @@ cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "backlog-task-runtime-passport-endpoint"
   - "backlog-upgrade-propagation-p2p-design-arc"
+  - "habit:dataplane-convergence"
 tags: [observability, iroh, transport-parity, mixed-version, delegable]
 claimedBy: "codex"
 ---
@@ -112,3 +113,15 @@ the live `536378 > 262144` refusal and the deployed-reader-floor cure.
   from always-compiled code).
 - Wire-compat tests prove both decode directions, old-reader signature
   acceptance, and byte-identical v1 signing bytes.
+
+## Implementation checkpoint (2026-09-01)
+
+The additive advisory field, BuildInfo announcement, verified receive log,
+last-seen peer-book projection, and bidirectional v1 compatibility tests are
+implemented. Feature-enabled evidence is green: the `p2p_iroh` filter passed
+111/111 tests (including populated peer-book storage) with Cargo exit 0.
+
+The task remains `wip` because `just gate elohim-storage` is currently blocked
+at `cargo fmt --check` by the disjoint runtime-config lane's untracked
+`src/runtime_config.rs` and concurrent `src/main.rs` edits. No reported format
+diff is in this task's write set; this lane did not modify those files.

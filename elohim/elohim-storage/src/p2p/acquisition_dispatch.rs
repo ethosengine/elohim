@@ -185,6 +185,7 @@ mod tests {
                 .with_direct_addresses([([127, 0, 0, 1], 4433u16).into()]),
             agent_cid: agent_cid.map(|s| s.to_string()),
             libp2p_peer_id: libp2p_peer_id.map(|s| s.to_string()),
+            user_agent: None,
             announced_at_ms: 1,
         }
     }

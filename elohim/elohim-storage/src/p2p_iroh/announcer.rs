@@ -71,13 +71,14 @@ pub fn build_announcement(
     if direct.is_empty() && relay.is_none() {
         return None;
     }
-    Some(TransportManifestAnnouncement::sign(
+    Some(TransportManifestAnnouncement::sign_with_user_agent(
         &inputs.secret,
         direct,
         relay,
         inputs.agent_cid.clone(),
         inputs.libp2p_peer_id.clone(),
         inputs.planes.clone(),
+        Some(elohim_compute::BuildInfo::new("elohim-storage").user_agent()),
         now_ms,
     ))
 }
@@ -198,6 +199,10 @@ mod tests {
         assert_eq!(ann.iroh_node_id, endpoint.node_id().to_string());
         assert!(!ann.iroh_direct_addrs.is_empty());
         assert_eq!(ann.agent_cid.as_deref(), Some("uhCAktest"));
+        assert_eq!(
+            ann.user_agent,
+            Some(elohim_compute::BuildInfo::new("elohim-storage").user_agent())
+        );
         endpoint.close().await;
     }
 }

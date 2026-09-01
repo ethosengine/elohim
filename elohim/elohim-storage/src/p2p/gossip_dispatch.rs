@@ -762,6 +762,7 @@ fn handle_transport_manifest(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &
             from = %source, node = %ann.iroh_node_id,
             addrs = ?ann.iroh_direct_addrs, relay = ?ann.iroh_relay_url,
             agent = ?ann.agent_cid, libp2p = ?ann.libp2p_peer_id,
+            user_agent = ?ann.user_agent,
             "iroh peer learned from transport manifest"
         );
     }
@@ -1006,6 +1007,7 @@ mod tests {
             .get(&ann.iroh_node_id.parse().unwrap())
             .expect("in book");
         assert_eq!(got.agent_cid.as_deref(), Some("uhCAkJames"));
+        assert_eq!(got.user_agent, None);
         let mut conn = pool.get().unwrap();
         let row = crate::p2p_iroh::peer_map::lookup_by_iroh_node_id(&mut conn, &ann.iroh_node_id)
             .expect("query")

@@ -147,6 +147,7 @@ async fn a_fresh_change_converges_on_the_announce_alone() -> Result<()> {
         addr: fixture.provider_addr.clone(),
         agent_cid: None,
         libp2p_peer_id: None,
+        user_agent: None,
         announced_at_ms: 1,
     });
     assert!(peer_backend.set_pull_back(fixture.fetcher.endpoint().clone(), peer_book, None));
@@ -157,6 +158,7 @@ async fn a_fresh_change_converges_on_the_announce_alone() -> Result<()> {
         addr: fixture.fetcher.node_addr().await?,
         agent_cid: None,
         libp2p_peer_id: None,
+        user_agent: None,
         announced_at_ms: 1,
     });
 
@@ -220,6 +222,7 @@ async fn an_announce_whose_deps_the_peer_lacks_falls_back_to_a_pull() -> Result<
         addr: fixture.provider_addr.clone(),
         agent_cid: None,
         libp2p_peer_id: None,
+        user_agent: None,
         announced_at_ms: 1,
     });
     assert!(peer_backend.set_pull_back(fixture.fetcher.endpoint().clone(), peer_book, None));
@@ -229,6 +232,7 @@ async fn an_announce_whose_deps_the_peer_lacks_falls_back_to_a_pull() -> Result<
         addr: fixture.fetcher.node_addr().await?,
         agent_cid: None,
         libp2p_peer_id: None,
+        user_agent: None,
         announced_at_ms: 1,
     });
 

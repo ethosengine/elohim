@@ -18,12 +18,16 @@
 //! and does `Endpoint::add_node_addr` + gossip `join_peers` for every new
 //! entry — the membership layer lights, and the round driver has targets.
 //!
-//! **Trust.** The signature binds the whole payload to the iroh key. A peer
-//! can only ever advertise addresses for a NodeId it holds the secret for;
-//! a third party cannot steer our dials to an address of its choosing. What
-//! the signature does NOT prove is that `agent_cid` / `libp2p_peer_id` belong
-//! to the same operator — that binding is the identity-binding gossip's job
-//! (DHT-anchored). Here they are routing hints, never authority.
+//! **Trust.** The v1 signature binds the dial/routing payload to the iroh key.
+//! A peer can only ever advertise addresses for a NodeId it holds the secret
+//! for; a third party cannot steer our dials to an address of its choosing.
+//! The additive `user_agent` observation is deliberately outside those v1
+//! signing bytes so old readers can ignore it and still verify the routing
+//! payload. It is advisory evidence only, never authority or capability
+//! negotiation. The signature also does NOT prove that `agent_cid` /
+//! `libp2p_peer_id` belong to the same operator — that binding is the
+//! identity-binding gossip's job (DHT-anchored). Here they are routing hints,
+//! never authority.
 //!
 //! This is a transport-neutral wire type (sibling of `custody_announce`); it
 //! depends on ed25519 only, never on the iroh crate, so it compiles with
@@ -62,6 +66,13 @@ pub struct TransportManifestAnnouncement {
     /// `sync`, `epr`, `epr-atom`, `shard`, `view-fed`, `identity-handshake`,
     /// `trust`).
     pub planes: Vec<String>,
+    /// Advisory build identity (`service/version[+commit]`) observed from the
+    /// running peer. This additive extension is intentionally NOT covered by
+    /// the v1 signature: old readers ignore the map key and must still verify
+    /// the signed routing payload. Never infer capabilities or authority from
+    /// this value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_agent: Option<String>,
     /// Wall-clock ms at signing. Receivers keep the newest per NodeId.
     pub announced_at_ms: i64,
     /// ed25519 signature (64 bytes, hex) over [`Self::signing_bytes`].
@@ -94,6 +105,31 @@ impl TransportManifestAnnouncement {
         planes: Vec<String>,
         announced_at_ms: i64,
     ) -> Self {
+        Self::sign_with_user_agent(
+            secret,
+            iroh_direct_addrs,
+            iroh_relay_url,
+            agent_cid,
+            libp2p_peer_id,
+            planes,
+            None,
+            announced_at_ms,
+        )
+    }
+
+    /// Build and sign an announcement carrying an optional advisory build
+    /// identity. `user_agent` stays outside the v1 signing bytes by contract.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_with_user_agent(
+        secret: &[u8; 32],
+        iroh_direct_addrs: Vec<String>,
+        iroh_relay_url: Option<String>,
+        agent_cid: Option<String>,
+        libp2p_peer_id: Option<String>,
+        planes: Vec<String>,
+        user_agent: Option<String>,
+        announced_at_ms: i64,
+    ) -> Self {
         let key = SigningKey::from_bytes(secret);
         let mut ann = Self {
             iroh_node_id: hex::encode(key.verifying_key().to_bytes()),
@@ -102,6 +138,7 @@ impl TransportManifestAnnouncement {
             agent_cid,
             libp2p_peer_id,
             planes,
+            user_agent,
             announced_at_ms,
             signature: String::new(),
         };
@@ -110,8 +147,9 @@ impl TransportManifestAnnouncement {
         ann
     }
 
-    /// The canonical bytes the signature covers: every field except
-    /// `signature`, joined with a separator no field can contain.
+    /// The canonical v1 bytes the signature covers. The additive advisory
+    /// `user_agent` and `signature` fields are excluded so old readers ignore
+    /// the extension without rejecting an otherwise valid announcement.
     pub fn signing_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(b"elohim/transport/manifest/v1\n");
@@ -185,6 +223,78 @@ impl TransportManifestAnnouncement {
 mod tests {
     use super::*;
 
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct LegacyTransportManifestAnnouncement {
+        iroh_node_id: String,
+        iroh_direct_addrs: Vec<String>,
+        iroh_relay_url: Option<String>,
+        agent_cid: Option<String>,
+        libp2p_peer_id: Option<String>,
+        planes: Vec<String>,
+        announced_at_ms: i64,
+        signature: String,
+    }
+
+    impl LegacyTransportManifestAnnouncement {
+        fn from_current(ann: &TransportManifestAnnouncement) -> Self {
+            Self {
+                iroh_node_id: ann.iroh_node_id.clone(),
+                iroh_direct_addrs: ann.iroh_direct_addrs.clone(),
+                iroh_relay_url: ann.iroh_relay_url.clone(),
+                agent_cid: ann.agent_cid.clone(),
+                libp2p_peer_id: ann.libp2p_peer_id.clone(),
+                planes: ann.planes.clone(),
+                announced_at_ms: ann.announced_at_ms,
+                signature: ann.signature.clone(),
+            }
+        }
+
+        fn signing_bytes(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(b"elohim/transport/manifest/v1\n");
+            out.extend_from_slice(self.iroh_node_id.as_bytes());
+            out.push(b'\n');
+            for addr in &self.iroh_direct_addrs {
+                out.extend_from_slice(addr.as_bytes());
+                out.push(b',');
+            }
+            out.push(b'\n');
+            out.extend_from_slice(self.iroh_relay_url.as_deref().unwrap_or("").as_bytes());
+            out.push(b'\n');
+            out.extend_from_slice(self.agent_cid.as_deref().unwrap_or("").as_bytes());
+            out.push(b'\n');
+            out.extend_from_slice(self.libp2p_peer_id.as_deref().unwrap_or("").as_bytes());
+            out.push(b'\n');
+            for plane in &self.planes {
+                out.extend_from_slice(plane.as_bytes());
+                out.push(b',');
+            }
+            out.push(b'\n');
+            out.extend_from_slice(self.announced_at_ms.to_string().as_bytes());
+            out
+        }
+
+        fn verify_signature(&self) -> bool {
+            let Ok(pk_bytes) = hex::decode(&self.iroh_node_id) else {
+                return false;
+            };
+            let Ok(pk_bytes) = <[u8; 32]>::try_from(pk_bytes) else {
+                return false;
+            };
+            let Ok(pk) = VerifyingKey::from_bytes(&pk_bytes) else {
+                return false;
+            };
+            let Ok(sig_bytes) = hex::decode(&self.signature) else {
+                return false;
+            };
+            let Ok(sig_bytes) = <[u8; 64]>::try_from(sig_bytes) else {
+                return false;
+            };
+            pk.verify(&self.signing_bytes(), &Signature::from_bytes(&sig_bytes))
+                .is_ok()
+        }
+    }
+
     fn secret() -> [u8; 32] {
         let mut s = [7u8; 32];
         s[0] = 1;
@@ -211,6 +321,62 @@ mod tests {
         assert_eq!(ann, back);
         assert_eq!(back.verify(), Ok(()));
         assert_eq!(back.iroh_node_id.len(), 64);
+        assert_eq!(back.user_agent, None);
+    }
+
+    #[test]
+    fn old_message_decodes_on_new_reader_with_byte_identical_v1_shape() {
+        let ann = sample();
+        let legacy = LegacyTransportManifestAnnouncement::from_current(&ann);
+        let legacy_bytes = rmp_serde::to_vec_named(&legacy).unwrap();
+        let decoded = TransportManifestAnnouncement::from_bytes(&legacy_bytes).unwrap();
+
+        assert_eq!(decoded.user_agent, None);
+        assert_eq!(decoded.verify(), Ok(()));
+        assert_eq!(decoded.to_bytes().unwrap(), legacy_bytes);
+    }
+
+    #[test]
+    fn populated_user_agent_round_trips_and_old_reader_still_verifies() {
+        let ann = TransportManifestAnnouncement::sign_with_user_agent(
+            &secret(),
+            vec!["127.0.0.1:10701".into()],
+            None,
+            Some("agent-matthew".into()),
+            Some("12D3KooWexample".into()),
+            vec!["sync".into(), "blob".into()],
+            Some("elohim-storage/1.2.3+abc1234".into()),
+            1_700_000_000_000,
+        );
+        let bytes = ann.to_bytes().unwrap();
+        let current = TransportManifestAnnouncement::from_bytes(&bytes).unwrap();
+        let legacy: LegacyTransportManifestAnnouncement = rmp_serde::from_slice(&bytes).unwrap();
+
+        assert_eq!(
+            current.user_agent.as_deref(),
+            Some("elohim-storage/1.2.3+abc1234")
+        );
+        assert_eq!(current.verify(), Ok(()));
+        assert!(legacy.verify_signature());
+        assert_eq!(
+            current.signing_bytes(),
+            LegacyTransportManifestAnnouncement::from_current(&current).signing_bytes()
+        );
+    }
+
+    #[test]
+    fn v1_signing_bytes_are_pinned_and_ignore_advisory_user_agent() {
+        let plain = sample();
+        let mut populated = plain.clone();
+        populated.user_agent = Some("elohim-storage/9.9.9+different".into());
+        let expected = format!(
+            "elohim/transport/manifest/v1\n{}\n127.0.0.1:10701,\n\nagent-matthew\n12D3KooWexample\nsync,blob,\n1700000000000",
+            plain.iroh_node_id
+        );
+
+        assert_eq!(plain.signing_bytes(), expected.as_bytes());
+        assert_eq!(populated.signing_bytes(), expected.as_bytes());
+        assert_eq!(populated.verify(), Ok(()));
     }
 
     #[test]

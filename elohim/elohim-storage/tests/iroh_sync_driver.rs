@@ -62,6 +62,7 @@ async fn hand_filled_peer_book_converges_a_to_bs_document() -> Result<()> {
         addr: fixture.provider_addr.clone(),
         agent_cid: Some("provider-b".into()),
         libp2p_peer_id: None,
+        user_agent: None,
         announced_at_ms: 1,
     }));
     let fetcher_sync = sync_manager(fetcher_sync_dir.path()).await;

@@ -111,6 +111,7 @@ mod tests {
             addr: NodeAddr::new(key.public()),
             agent_cid: agent.map(str::to_string),
             libp2p_peer_id: libp2p.map(str::to_string),
+            user_agent: None,
             announced_at_ms: 1,
         }
     }

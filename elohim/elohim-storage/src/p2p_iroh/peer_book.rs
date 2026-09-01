@@ -37,6 +37,10 @@ pub struct IrohPeerEntry {
     /// The peer's libp2p PeerId (base58), when it runs dual — lets the
     /// cross-plane dedup and the `/p2p/status` projection join both legs.
     pub libp2p_peer_id: Option<String>,
+    /// Last advisory build identity observed on a verified manifest. This is
+    /// diagnostic evidence only; routing and capability decisions must not
+    /// depend on it.
+    pub user_agent: Option<String>,
     /// Wall-clock ms of the announcement this entry came from. A later
     /// announcement replaces an earlier one; an older one never does.
     pub announced_at_ms: i64,
@@ -168,6 +172,7 @@ pub fn entry_from_announcement(
         addr,
         agent_cid: ann.agent_cid.clone(),
         libp2p_peer_id: ann.libp2p_peer_id.clone(),
+        user_agent: ann.user_agent.clone(),
         announced_at_ms: ann.announced_at_ms,
     })
 }
@@ -195,13 +200,14 @@ mod tests {
     fn announcement_becomes_a_dialable_entry() {
         use crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement;
         let secret = [3u8; 32];
-        let ann = TransportManifestAnnouncement::sign(
+        let ann = TransportManifestAnnouncement::sign_with_user_agent(
             &secret,
             vec!["127.0.0.1:10702".into(), "[::1]:10702".into()],
             None,
             Some("agent-j".into()),
             Some("12D3KooWj".into()),
             vec!["sync".into()],
+            Some("elohim-storage/1.2.3+abc".into()),
             42,
         );
         assert_eq!(ann.verify(), Ok(()));
@@ -209,11 +215,22 @@ mod tests {
         assert_eq!(entry.addr.node_id.to_string(), ann.iroh_node_id);
         assert_eq!(entry.addr.direct_addresses.len(), 2);
         assert_eq!(entry.agent_cid.as_deref(), Some("agent-j"));
+        assert_eq!(
+            entry.user_agent.as_deref(),
+            Some("elohim-storage/1.2.3+abc")
+        );
         let book = IrohPeerBook::new();
         use crate::p2p::gossip_dispatch::TransportManifestSink;
         assert!(book.accept(&ann));
         assert!(!book.accept(&ann));
         assert_eq!(book.len(), 1);
+        let stored_user_agent = book
+            .get(&entry.addr.node_id)
+            .and_then(|stored| stored.user_agent);
+        assert_eq!(
+            stored_user_agent.as_deref(),
+            Some("elohim-storage/1.2.3+abc")
+        );
     }
 
     fn entry(key: &SecretKey, at: i64, port: u16) -> IrohPeerEntry {
@@ -222,6 +239,7 @@ mod tests {
                 .with_direct_addresses([([127, 0, 0, 1], port).into()]),
             agent_cid: Some("agent-a".into()),
             libp2p_peer_id: None,
+            user_agent: None,
             announced_at_ms: at,
         }
     }
