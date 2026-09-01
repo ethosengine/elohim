@@ -1762,6 +1762,22 @@ impl HttpServer {
             // doorway-proxied.
             (Method::POST, "/admin/coordinators/sync") => self.handle_coordinators_sync(req).await,
 
+            // Rung 4 of the same upgrade-velocity snowball: config as a RUNTIME
+            // surface. GET reports the watcher (active/path/poll) plus every
+            // registered setting's effective value, boot value and provenance
+            // (`boot-env` vs `runtime-config`), alongside the boot-only knobs
+            // this node deliberately does NOT hot-wire and why. POST forces an
+            // immediate re-read — the 10s poller makes it optional in prod, but
+            // it is what a test or a mesh run drives. Node-local (deliberately
+            // NOT in build_manifest); same posture as the other /admin routes.
+            // All logic lives in `crate::runtime_config`.
+            (Method::GET, "/admin/runtime-config") => {
+                Ok(response::ok(&crate::runtime_config::report_json()))
+            }
+            (Method::POST, "/admin/runtime-config/reload") => {
+                Ok(response::ok(&crate::runtime_config::reload_json()))
+            }
+
             // Operator/seed deterministic shard-manifest + agent-keyed locations
             // write — the gated lever that lights the resilience card's
             // distributionState + stewardingCollectives for blob-backed demo/test

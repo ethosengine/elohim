@@ -119,19 +119,19 @@ pub fn contest_undeclared_divergence_enabled() -> bool {
     *CONTEST_UNDECLARED_DIVERGENCE.get().unwrap_or(&true)
 }
 
-/// Process-wide mirror of [`Config::adopt_before_author`] — the OPERATOR-RESERVED
-/// switch for the both-sides-missing residual. Same `OnceLock` rationale as
-/// [`CONTEST_TWO_WAY_DECLARED`].
+/// Publish the adopt-before-author BOOT value for the reconcile sweep.
 ///
-/// Defaults **false** when `main` never published a value, matching the config
-/// field, so the two homes cannot diverge and an embedded/test use is dormant
-/// exactly like a shipped pod.
-static ADOPT_BEFORE_AUTHOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-
-/// Publish the adopt-before-author switch for the reconcile sweep. Idempotent
-/// (`OnceLock::set` semantics — the first call wins).
+/// Backed by [`crate::runtime_config`] rather than a `OnceLock` since rung 4 of
+/// the upgrade-velocity snowball: the boot value still comes from the env
+/// exactly as before, but a watched runtime-config file may now override it on a
+/// RUNNING node (provenance stays visible on `GET /admin/runtime-config`).
+/// Publishing after an override has landed moves the fallback target only — it
+/// does not clobber the live value.
 pub fn set_adopt_before_author(enabled: bool) {
-    let _ = ADOPT_BEFORE_AUTHOR.set(enabled);
+    crate::runtime_config::publish_boot_bool(
+        crate::runtime_config::Key::AdoptBeforeAuthor,
+        enabled,
+    );
 }
 
 /// May this node ask the conductor to declare a canonical head for an id it holds
@@ -139,21 +139,23 @@ pub fn set_adopt_before_author(enabled: bool) {
 ///
 /// **Default FALSE.** This is shipped DORMANT: the capability is built, tested,
 /// and wired, and turning it on is an env-var flip (`ELOHIM_ADOPT_BEFORE_AUTHOR`)
-/// rather than a build cycle. Off, every call site is byte-for-byte the prior
-/// behaviour — see `services::head_adoption::adopt_before_author_param`.
+/// at boot, or a runtime-config file edit on a live node — never a build cycle.
+/// Off, every call site is byte-for-byte the prior behaviour — see
+/// `services::head_adoption::adopt_before_author_param`.
+///
+/// Read PER-DECISION (`head_adoption` consults it on each candidate), which is
+/// exactly why it is safe to hot-reload.
 pub fn adopt_before_author_enabled() -> bool {
-    *ADOPT_BEFORE_AUTHOR.get().unwrap_or(&false)
+    crate::runtime_config::get_bool(crate::runtime_config::Key::AdoptBeforeAuthor)
 }
 
-/// Process-wide mirror of [`Config::obey_carried_election`] — the
-/// OPERATOR-RESERVED switch for carry-the-election (the election-visibility
-/// wall's supply-side exit). Same `OnceLock` rationale as
-/// [`ADOPT_BEFORE_AUTHOR`].
-static OBEY_CARRIED_ELECTION: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-
-/// Publish the obey-carried-election switch. Idempotent (first call wins).
+/// Publish the obey-carried-election BOOT value. Same runtime-config backing as
+/// [`set_adopt_before_author`] — env at boot, watched file while running.
 pub fn set_obey_carried_election(enabled: bool) {
-    let _ = OBEY_CARRIED_ELECTION.set(enabled);
+    crate::runtime_config::publish_boot_bool(
+        crate::runtime_config::Key::ObeyCarriedElection,
+        enabled,
+    );
 }
 
 /// May the obey arm, when its OWN conductor sees no election for a divergent
@@ -165,8 +167,12 @@ pub fn set_obey_carried_election(enabled: bool) {
 /// **Default FALSE.** Shipped DORMANT, same discipline as
 /// [`adopt_before_author_enabled`]: off, every call site is byte-for-byte the
 /// prior behaviour (no extra fetch, no extra conductor call, no allocation).
+///
+/// Read PER-DECISION (the heal leg and `head_adoption` both consult it inside
+/// the sweep), so a runtime-config flip takes effect on the next divergent row
+/// rather than at the next process start.
 pub fn obey_carried_election_enabled() -> bool {
-    *OBEY_CARRIED_ELECTION.get().unwrap_or(&false)
+    crate::runtime_config::get_bool(crate::runtime_config::Key::ObeyCarriedElection)
 }
 
 /// Process-wide mirror of [`Config::ghost_declaration_decay`] — the
@@ -273,20 +279,21 @@ pub fn trust_memo_ttl_seconds() -> u64 {
 /// env read on the hot path is the parallel-test-flake anti-pattern.
 static ADOPT_CONTEST_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
 
-/// Process-wide mirror of [`Config::contest_backoff_seconds`].
-static CONTEST_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-
-/// Process-wide mirror of [`Config::heal_missing_backoff_seconds`].
-static HEAL_MISSING_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+// The three sweep-pacing windows below (contest, heal-missing, evidence-absent)
+// are no longer `OnceLock` mirrors: they live in [`crate::runtime_config`], whose
+// registry is the SAME "no env read on the hot path" discipline with one addition
+// — a watched file may move them on a RUNNING node. Each is read per-decision
+// inside the sweep (`services::contest_backoff::BackoffWindows::from_config`,
+// `p2p::projection_reconcile`'s replay partition), so a flip lands on the next
+// tick rather than the next pod roll.
 
 /// Process-wide mirror of [`Config::evidence_fallback_max_alternates`].
+///
+/// Deliberately still a `OnceLock`: this knob is one factor in
+/// [`assert_courier_ladder_budget`], a fail-FAST BOOT invariant. Hot-reloading it
+/// would bypass the assertion instead of tripping it — see
+/// `runtime_config::BOOT_ONLY`.
 static EVIDENCE_FALLBACK_MAX_ALTERNATES: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-
-/// Process-wide mirror of [`Config::evidence_absent_backoff_seconds`]. Same
-/// `OnceLock` rationale as [`CONTEST_BACKOFF_SECONDS`] — the reconcile sweep
-/// carries no `Config`, and an env read on the hot path is the parallel-test
-/// flake this codebase has already paid for once.
-static EVIDENCE_ABSENT_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 
 /// Publish the adopt-sweep fan-out for the reconcile sweep. Idempotent
 /// (`OnceLock::set` semantics).
@@ -306,9 +313,13 @@ pub fn adopt_contest_fanout() -> usize {
     .max(1)
 }
 
-/// Publish the heal-leg conductor-missing backoff window. Idempotent.
+/// Publish the heal-leg conductor-missing backoff window's BOOT value.
+/// Runtime-config backed — see [`set_adopt_before_author`].
 pub fn set_heal_missing_backoff_seconds(seconds: u64) {
-    let _ = HEAL_MISSING_BACKOFF_SECONDS.set(seconds);
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::HealMissingBackoffSeconds,
+        seconds,
+    );
 }
 
 /// How long the content heal leg may REPLAY a known `Ok(None)` own-conductor
@@ -317,11 +328,9 @@ pub fn set_heal_missing_backoff_seconds(seconds: u64) {
 /// `Duration::ZERO` DISABLES the elision — every pending id pays for a fresh
 /// conductor resolve every sweep, which is byte-for-byte the pre-lever leg.
 pub fn heal_missing_backoff_window() -> std::time::Duration {
-    std::time::Duration::from_secs(
-        *HEAL_MISSING_BACKOFF_SECONDS
-            .get()
-            .unwrap_or(&DEFAULT_HEAL_MISSING_BACKOFF_SECONDS),
-    )
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::HealMissingBackoffSeconds,
+    ))
 }
 
 /// Publish the advertiser-diversity breadth for the reconcile sweep. Idempotent.
@@ -379,26 +388,31 @@ pub fn assert_courier_ladder_budget(fanout: usize, max_alternates: usize) {
     );
 }
 
-/// Publish the contest-backoff window for the reconcile sweep. Idempotent.
+/// Publish the contest-backoff window's BOOT value for the reconcile sweep.
+/// Runtime-config backed — see [`set_adopt_before_author`].
 pub fn set_contest_backoff_seconds(seconds: u64) {
-    let _ = CONTEST_BACKOFF_SECONDS.set(seconds);
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::ContestBackoffSeconds,
+        seconds,
+    );
 }
 
 /// How long a predictable contest failure holds an id back
 /// (`services::contest_backoff`). `Duration::ZERO` DISABLES the backoff, which
 /// restores the pre-F-B behaviour exactly.
 pub fn contest_backoff_window() -> std::time::Duration {
-    std::time::Duration::from_secs(
-        *CONTEST_BACKOFF_SECONDS
-            .get()
-            .unwrap_or(&DEFAULT_CONTEST_BACKOFF_SECONDS),
-    )
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::ContestBackoffSeconds,
+    ))
 }
 
-/// Publish the evidence-absent backoff window for the reconcile sweep.
-/// Idempotent.
+/// Publish the evidence-absent backoff window's BOOT value for the reconcile
+/// sweep. Runtime-config backed — see [`set_adopt_before_author`].
 pub fn set_evidence_absent_backoff_seconds(seconds: u64) {
-    let _ = EVIDENCE_ABSENT_BACKOFF_SECONDS.set(seconds);
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::EvidenceAbsentBackoffSecs,
+        seconds,
+    );
 }
 
 /// How long an id whose ONLY advertising peer reports "my conductor holds no
@@ -414,11 +428,9 @@ pub fn set_evidence_absent_backoff_seconds(seconds: u64) {
 /// behaviour before this window existed. It is deliberately NOT "no backoff at
 /// all" — disabling a lever must never be worse than never having it.
 pub fn evidence_absent_backoff_window() -> std::time::Duration {
-    std::time::Duration::from_secs(
-        *EVIDENCE_ABSENT_BACKOFF_SECONDS
-            .get()
-            .unwrap_or(&DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS),
-    )
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::EvidenceAbsentBackoffSecs,
+    ))
 }
 
 /// Default ghost-decay dwell: one hour — 12 sweeps at the 300s cadence, and a

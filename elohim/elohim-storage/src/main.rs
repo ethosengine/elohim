@@ -726,6 +726,15 @@ async fn async_main(
          exclusions"
     );
 
+    // CONFIG AS A RUNTIME SURFACE (upgrade-velocity rung 4). Spawned here, AFTER
+    // every `config::set_*` above has published its boot value, so the registry's
+    // fallback targets are the real env-derived values before the first file read
+    // can override any of them. Disabled and free unless
+    // ELOHIM_RUNTIME_CONFIG_PATH names a file; when active, a flag flip lands on
+    // this RUNNING node within one poll instead of costing a pod roll. Provenance
+    // and the boot-only knobs are readable at GET /admin/runtime-config.
+    elohim_storage::runtime_config::spawn_watcher();
+
     // BACKOFF LEDGER PERSISTENCE. Restore before any sweep runs, then snapshot
     // periodically. The ledger is process-local operational state (Category C,
     // no table, no migration), but losing it on every deploy re-churned the
@@ -4832,6 +4841,16 @@ async fn async_main(
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(300);
+        // Publish the boot value into the runtime-config registry so the running
+        // loop can re-source its cadence from a watched file (rung 4). This does
+        // NOT change the boot behaviour: with no runtime-config file, the
+        // registry answers with exactly this value forever. The DISABLED case
+        // (0) stays boot-only — at 0 the loop below is never spawned, so there
+        // is nothing for a live cadence change to reach.
+        elohim_storage::runtime_config::publish_boot_secs(
+            elohim_storage::runtime_config::Key::ProjectionReconcileSecs,
+            reconcile_secs,
+        );
         let p2p_handle = p2p_node.as_ref().map(|n| n.handle());
 
         // One-shot shard-manifest backfill — gives legacy content (seeded
@@ -5126,6 +5145,13 @@ async fn async_main(
 
                     let mut ticker = interval(Duration::from_secs(secs));
                     ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    // Cadence currently in force. Compared against the
+                    // runtime-config registry at the top of every wake so an
+                    // operator can re-pace a saturated conductor's sweep without
+                    // a pod roll (rung 4). Only the interval SOURCE changes here
+                    // — the sweep body, the kick arm and the shutdown arm are
+                    // untouched.
+                    let mut ticker_secs = secs;
                     // Rotating inventory window, owned by this single discovery
                     // loop (no locking). Carries the per-table offset across sweeps
                     // so a corpus larger than the responder's page cap is windowed
@@ -5148,6 +5174,26 @@ async fn async_main(
                     let mut kick_rx = reconcile_kick_rx;
                     let mut kick_open = true;
                     loop {
+                        // Re-source the cadence from the runtime-config registry
+                        // (no-op without a runtime-config file). Built with
+                        // `interval_at` so a re-source does NOT fire an immediate
+                        // extra sweep — the next tick is one full new period out.
+                        let want =
+                            elohim_storage::runtime_config::projection_reconcile_secs_running(secs);
+                        if want != ticker_secs {
+                            tracing::warn!(
+                                old_secs = ticker_secs,
+                                new_secs = want,
+                                "projection-reconcile: cadence re-sourced from runtime-config \
+                                 on a RUNNING node"
+                            );
+                            ticker = tokio::time::interval_at(
+                                tokio::time::Instant::now() + Duration::from_secs(want),
+                                Duration::from_secs(want),
+                            );
+                            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                            ticker_secs = want;
+                        }
                         tokio::select! {
                             _ = ticker.tick() => {}
                             kick = kick_rx.recv(), if kick_open => {

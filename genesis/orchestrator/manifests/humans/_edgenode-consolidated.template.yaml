@@ -62,6 +62,28 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER-runtime-config
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/component: runtime-config
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  runtime-config.toml: |
+    # Rung 4 — config as runtime surface (upgrade-propagation-p2p-design-arc).
+    # Keys here OVERRIDE the node's boot env WITHOUT any restart: kubelet
+    # propagates edits to the mounted file and src/runtime_config.rs applies
+    # hot-reloadable settings within its poll interval, logging old -> new.
+    # Removing a key restores the boot value. GET /admin/runtime-config on the
+    # node shows effective values + provenance. Example:
+    #   ELOHIM_OBEY_CARRIED_ELECTION = "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: RESOURCE_PREFIX_PLACEHOLDER-peer-policy
   namespace: NAMESPACE_PLACEHOLDER
   labels:
@@ -353,6 +375,10 @@ spec:
             # genesis/a2o/scripts/carried-election-mesh-proof.ts (exit 0).
             - name: ELOHIM_OBEY_CARRIED_ELECTION
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
+            # Rung 4: where the runtime-config watcher reads (mounted from the
+            # <prefix>-runtime-config ConfigMap; see that ConfigMap's header).
+            - name: ELOHIM_RUNTIME_CONFIG_PATH
+              value: "/etc/elohim/runtime-config.toml"
             # Evidence-absent contest backoff (head_adoption): ids whose
             # advertiser's conductor cleanly holds NO record defer this long
             # before re-contesting (phantom-load relief). Conservative initial
@@ -483,6 +509,16 @@ spec:
               mountPath: /etc/elohim/peer-policy.toml
               subPath: peer-policy.toml
               readOnly: true
+            # Rung 4 (config as runtime surface): a watched config file the
+            # RUNNING node re-reads — kubelet propagates ConfigMap edits to
+            # this mount without a pod restart, and the in-process watcher
+            # (src/runtime_config.rs, ELOHIM_RUNTIME_CONFIG_PATH) applies
+            # hot-reloadable settings in seconds. A flag flip is a ConfigMap
+            # edit + apply, never a roll.
+            - name: runtime-config
+              mountPath: /etc/elohim/runtime-config.toml
+              subPath: runtime-config.toml
+              readOnly: true
           # Generous-probe pattern (2026-05-27): the embedded Holochain
           # conductor compiles WASM ribosomes during install_app on cold
           # start; under CPU contention this regularly blows past a 1s
@@ -527,6 +563,9 @@ spec:
         - name: peer-policy
           configMap:
             name: RESOURCE_PREFIX_PLACEHOLDER-peer-policy
+        - name: runtime-config
+          configMap:
+            name: RESOURCE_PREFIX_PLACEHOLDER-runtime-config
   # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
   # Named volumes are referenced in volumeMounts above
   # The `holochain-data` template was RETIRED here in rung 2. Its already-minted

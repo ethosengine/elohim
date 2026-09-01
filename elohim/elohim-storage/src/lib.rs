@@ -118,6 +118,7 @@ pub mod observation; // Observation/Event Layer — peer-witnessed evidence (Tra
 pub mod pprof_endpoint; // Go-compatible /debug/pprof/profile CPU exposition — env-gated, default OFF
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
 pub mod recursion; // CoverageRollup — aggregate-with-descent keystone (recursive-architecture §2.1)
+pub mod runtime_config; // Watched-file config — flag flips apply to a RUNNING node (upgrade-velocity rung 4)
 pub mod runtime_passport; // Node-local build/conductor/hApp/host passport (`GET /version`)
 pub mod shard_service;
 pub mod sharding;
