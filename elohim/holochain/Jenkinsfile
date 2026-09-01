@@ -660,6 +660,11 @@ def cleanupOrphanedHumans(List allHumans) {
  * Localizes humanConfig per closure to avoid Groovy's capture-by-reference
  * trap in loops.
  */
+// Rung-3 handoff: per-human conductor deploy args, written by the parallel
+// storage branches, drained by the sequential staggered conductor phase.
+@groovy.transform.Field
+def CONDUCTOR_DEPLOY_QUEUE = java.util.Collections.synchronizedMap([:])
+
 def deployHumansInParallel(List humans, String envFile, List allHumans) {
     if (!humans) {
         echo "deployHumansInParallel: no humans to deploy — skipping"
@@ -685,6 +690,38 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
         }
     }
     parallel(branches)
+
+    // ── Rung 3: staggered conductor phase ───────────────────────────────────
+    // Sequential, non-genesis first, genesis peers last (matthew — the
+    // always-on genesis anchor — very last). Soak between peers only after an
+    // apply that actually CHANGED a StatefulSet, so steady-state deploys pay
+    // zero extra wall-clock. Soak seconds: CONDUCTOR_STAGGER_SOAK_SECS
+    // (default 90) — long enough for the restarted conductor to rejoin
+    // gossip before the next one drops.
+    def ordered = []
+    for (h in humans) { if (!(h.genesisPeer == true)) { ordered.add(h) } }
+    for (h in humans) { if (h.genesisPeer == true && h.name != 'matthew') { ordered.add(h) } }
+    for (h in humans) { if (h.genesisPeer == true && h.name == 'matthew') { ordered.add(h) } }
+    def soakSecs = env.CONDUCTOR_STAGGER_SOAK_SECS ?: '90'
+    for (h in ordered) {
+        def queued = CONDUCTOR_DEPLOY_QUEUE[h.resourcePrefix]
+        if (queued == null) {
+            echo "conductor phase: ${h.resourcePrefix} has no queued conductor deploy (storage phase failed) — skipping"
+            continue
+        }
+        catchError(
+            buildResult: 'UNSTABLE',
+            stageResult: 'UNSTABLE',
+            message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; see log",
+        ) {
+            def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin)
+            if (changed) {
+                echo "conductor ${h.resourcePrefix}-conductor CHANGED — soaking ${soakSecs}s before the next peer (staggered roll)"
+                // shell sleep: zero Groovy conversions, zero sandbox surface
+                sh "sleep ${soakSecs}"
+            }
+        }
+    }
     emitDeployJunit((humans[0]?.env ?: 'unknown'), humans, outcomes)
 }
 
@@ -1155,16 +1192,19 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
         sh "kubectl annotate statefulset/${stsName} -n ${humanConfig.namespace} 'elohim.host/conductor-pin=${conductorPin}' --overwrite"
     }
 
+    def changed = true
     if (applyCode == 0) {
         def grepCode = sh(
             script: "grep -Eq 'statefulset\\.apps/${stsName}[[:space:]]+unchanged' ${applyLog}",
             returnStatus: true,
         )
         if (grepCode == 0) {
+            changed = false
             echo "Conductor ${stsName} UNCHANGED — no restart, no re-gossip surge. (Storage may have rolled; that is the point of rung 2.)"
         }
     }
     sh "kubectl rollout status statefulset/${stsName} -n ${humanConfig.namespace} --timeout=600s"
+    return changed
 }
 
 /**
@@ -1437,13 +1477,16 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     }
     sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
 
-    // ── Conductor half, STRICTLY AFTER storage is Ready ─────────────────────
-    // On the migration deploy the storage rollout above is what releases
-    // holochain-data-<prefix>-0 from the retiring embedded conductor; this call
-    // is what re-adopts it in the conductor StatefulSet. Single writer by
-    // ordering. On steady-state deploys this is a no-op apply that reports
-    // "unchanged" and restarts nothing.
-    deployHumanConductor(humanConfig, sedArgs, conductorPin)
+    // ── Conductor half is DEFERRED to the staggered phase (rung 3) ──────────
+    // Ordering still holds: deployHumansInParallel runs EVERY storage rollout
+    // to Ready (releasing each holochain-data-<prefix>-0 from its retiring
+    // embedded conductor) before the sequential conductor phase re-adopts
+    // them — single writer by phase ordering instead of per-branch chaining.
+    // A conductor-touching change therefore rolls ONE conductor at a time,
+    // genesis pair last, instead of all seven at once (the 2026-08-06
+    // fleet-wide no-authorities regime; spec
+    // 2026-08-06-staggered-conductor-restart-mitigation-design.md).
+    CONDUCTOR_DEPLOY_QUEUE[humanConfig.resourcePrefix] = [sedArgs: sedArgs, conductorPin: conductorPin]
 
     def componentName = humanConfig.resourcePrefix.replace('elohim-', '')
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${humanConfig.namespace} ${deployVersion} ${componentName} || true"
