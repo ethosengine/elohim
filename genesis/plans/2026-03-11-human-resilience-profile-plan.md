@@ -947,7 +947,7 @@ git commit -m "test(shefa): add compile-time type verification for ResiliencePro
 Create the acceptance scenarios that drive the resilience projection through our genesis human trust topology.
 
 **Files:**
-- Create: `genesis/a2o/features/shefa/human-resilience.feature`
+- Create: `genesis/a2o/features/rms/human-resilience.feature`
 
 **Context:**
 - Follow existing feature file conventions from `genesis/a2o/CLAUDE.md`
@@ -1106,14 +1106,14 @@ Feature: Human Resilience — P2P Data Protection at a Glance
 
 **Step 2: Verify the feature file parses**
 
-Run: `cd genesis/a2o && npx gherkin-lint features/shefa/human-resilience.feature 2>&1 || echo "gherkin parsed (lint may not be configured)"`
+Run: `cd genesis/a2o && npx gherkin-lint features/rms/human-resilience.feature 2>&1 || echo "gherkin parsed (lint may not be configured)"`
 
 Expected: File parses without syntax errors (lint rules may flag @wip but that's expected)
 
 **Step 3: Commit**
 
 ```bash
-git add genesis/a2o/features/shefa/human-resilience.feature
+git add genesis/a2o/features/rms/human-resilience.feature
 git commit -m "feat(a2o): add graduated resilience scenarios through genesis humans"
 ```
 

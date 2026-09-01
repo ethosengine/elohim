@@ -11,7 +11,7 @@
 **Design:** `genesis/plans/2026-04-02-doorway-spa-as-blob-design.md` (for context on delivery infrastructure)
 
 **A2O Scenarios:**
-- `genesis/a2o/features/lamad/attention-analytics.feature` — to be written in Task 1
+- `genesis/a2o/features/lms/attention-analytics.feature` — to be written in Task 1
 
 **Depends on:** Nothing (self-contained)
 
@@ -42,14 +42,14 @@
 | `src/app/lamad/components/content-viewer/content-viewer.component.html` | **MODIFY** — Add ContentAnalyticsComponent to Network tab |
 | `src/app/lamad/components/learner-dashboard/learner-dashboard.component.ts` | **MODIFY** — Import and embed AttentionFlowComponent |
 | `src/app/lamad/components/learner-dashboard/learner-dashboard.component.html` | **MODIFY** — Add attention flow section |
-| `genesis/a2o/features/lamad/attention-analytics.feature` | **NEW** — BDD scenarios |
+| `genesis/a2o/features/lms/attention-analytics.feature` | **NEW** — BDD scenarios |
 
 ---
 
 ### Task 1: Write a2o scenarios for attention analytics
 
 **Files:**
-- Create: `genesis/a2o/features/lamad/attention-analytics.feature`
+- Create: `genesis/a2o/features/lms/attention-analytics.feature`
 
 - [ ] **Step 1: Write the scenario file**
 
@@ -126,7 +126,7 @@ Feature: Protocol-Native Attention Analytics
 - [ ] **Step 2: Commit**
 
 ```bash
-git add genesis/a2o/features/lamad/attention-analytics.feature
+git add genesis/a2o/features/lms/attention-analytics.feature
 git commit -m "feat(a2o): add attention analytics scenarios for GA replacement"
 ```
 

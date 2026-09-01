@@ -846,7 +846,7 @@ Recommendations dismissed via the panel or cleared when the gate is passed."
 ### Task 6: Add A2O scenario for graph-aware recommendations
 
 **Files:**
-- Modify: `genesis/a2o/features/lamad/path-adaptation.feature`
+- Modify: `genesis/a2o/features/lms/path-adaptation.feature`
 
 **Step 1: Add the scenario**
 
@@ -884,7 +884,7 @@ After the "Layer 3: Discovery-Informed Recommendations" comment, before the exis
 **Step 2: Commit**
 
 ```bash
-git add genesis/a2o/features/lamad/path-adaptation.feature
+git add genesis/a2o/features/lms/path-adaptation.feature
 git commit -m "feat(a2o): add graph-aware recommendation scenarios
 
 Three new scenarios covering prerequisite content surfacing,
@@ -929,4 +929,4 @@ Expected: No new lint errors
 | `elohim-app/.../components/index.ts` | Modify | Export RecommendationListComponent |
 | `elohim-app/.../components/assessment-completion-summary/assessment-completion-summary.component.ts` | Modify | Embed recommendations inline after failure |
 | `elohim-app/.../components/path-overview/path-overview.component.ts` | Modify | Embed recommendations in overview panel |
-| `genesis/a2o/features/lamad/path-adaptation.feature` | Modify | Add graph-aware recommendation scenarios |
+| `genesis/a2o/features/lms/path-adaptation.feature` | Modify | Add graph-aware recommendation scenarios |

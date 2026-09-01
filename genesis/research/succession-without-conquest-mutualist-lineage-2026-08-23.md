@@ -384,7 +384,7 @@ warned it would — which is why every pointer here carries a branch and a date.
 
 - `genesis/manifests/habits.yaml` declares 12 habits — 7 green, 5 red, 0 unwired. **Not one concerns
   economics, currency, settlement, or social governance.** ✅
-- **Zero `@concern:` tags** exist in `genesis/a2o/features/shefa/` or `/qahal/`. Since `@concern` is
+- **Zero `@concern:` tags** exist in `genesis/a2o/features/rms/` or `/qahal/`. Since `@concern` is
   the only join between a scenario and a habit check, economics and governance have no habit-bound
   proof **by construction** — not a weak one, none. All 21 shefa scenarios are `@wip`;
   `qahal/collective-governance.feature` is HELD with 220 undefined steps. ✅

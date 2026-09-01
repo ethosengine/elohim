@@ -13,7 +13,7 @@
 | `genesis/a2o/features/federation/peer-advertisement.feature` | Sprint 2 | 16 — gossipsub heartbeat, neighbor table, dynamic state changes |
 | `genesis/a2o/features/delivery/peer-mesh.feature` | Sprint 3 | 10 — LAN mesh, multi-peer resolution, fallback chain, QueryDelivery |
 | `genesis/a2o/features/elohim/network-health-posture.feature` | Sprint 3+ | 19 — aggregate posture, attestation-gated introspection, elohim reasoning |
-| `genesis/a2o/features/shefa/human-resilience.feature` | Future | — resilience profile, mutual aid, stewardship |
+| `genesis/a2o/features/rms/human-resilience.feature` | Future | — resilience profile, mutual aid, stewardship |
 
 ## Problem
 

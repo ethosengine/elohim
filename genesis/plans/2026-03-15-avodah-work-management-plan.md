@@ -1409,4 +1409,4 @@ git commit -m "feat(avodah): complete MVP pillar — kanban, backlog, task list,
 - **Real backend** — replace mock data with storage API calls
 - **Cadence advance engine** — service-layer cron to advance nextOccurrence and reset status
 - **Elohim agent hooks** — visibility promotion on life event detection
-- **A2O scenario coverage** — `genesis/a2o/features/avodah/` feature files
+- **A2O scenario coverage** — `genesis/a2o/features/wms/` feature files

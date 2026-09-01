@@ -1878,7 +1878,7 @@ is legitimate only while it is *derivable* — the moment it is authoritative fo
 ledger, and the null `dht_anchor_hash` means no peer could check it anyway.
 
 **And the structural finding that gates everything above.** There is **no economy habit** among the
-twelve, and **zero `@concern:` tags** in `genesis/a2o/features/shefa/` or `/qahal/` — so economics and
+twelve, and **zero `@concern:` tags** in `genesis/a2o/features/rms/` or `/qahal/` — so economics and
 governance have no habit-bound proof by construction. All 21 shefa scenarios are `@wip`. ✅ Under this
 repo's covenant, none of this paper's takes is schedulable as first-class delivery until a red habit
 exists with a runnable check. **The first deliverable is the red, not the spec.**
