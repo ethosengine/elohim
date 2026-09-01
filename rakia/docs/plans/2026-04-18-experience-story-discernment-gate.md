@@ -454,7 +454,7 @@ export function momentFixture(
     roleRef: 'role:as-entrepreneur',
     featureRef: 'feature:learning-journey',
     scenarioName: 'Welcome flow loads in under 2s',
-    scenarioUri: 'features/lamad/learning-journey.feature',
+    scenarioUri: 'features/lms/learning-journey.feature',
     scenarioLine: 47,
     scenarioTags: ['@e2e', '@lamad'],
     status: 'passed',
