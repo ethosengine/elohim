@@ -91,7 +91,7 @@ The Observation's universal reference is already `(observer_cid, log_cid, log_of
 
 ## 6. The FIRST a2o SCENARIO (story-first — this is the spec)
 
-`genesis/a2o/features/shefa/observed-care-becomes-mutual-value.feature` (proposed — `@requires:household-nodes`):
+`genesis/a2o/features/rms/observed-care-becomes-mutual-value.feature` (proposed — `@requires:household-nodes`):
 
 ```gherkin
 Feature: A family member's care is observed and becomes visible mutual value

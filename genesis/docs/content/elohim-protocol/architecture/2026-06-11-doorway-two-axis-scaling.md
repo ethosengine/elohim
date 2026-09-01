@@ -16,10 +16,10 @@ informs:
 derived_from:
   - doorway/doorway-service/SCALING.md  # retired to git 2026-06-11 (doorway island recompose; authored 2026-04-30)
 cites:
-  - resilience-protocol-spec | the canon this seed refines (truth:DERIVED) — Part V stewardship surface + Part VI patron-CDN originate the graduation/recovery story | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
-  - session-bridge-design | origin of the staged-participation vocabulary — anti-binary visitor-to-peer graduation patterns (§0) | sha256:1d52dbaa44affce5 | path: genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md
-  - app-manifest-staged-intents-design | manifest-level grammar for graduation intents (substrate landed, feature held) | sha256:98e0a6576d9a197a | path: genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md
-  - doorway-access-tier-patterns | the three access tiers each flywheel stage is served by (Tier 1 anon / Tier 2 hosted / Tier 3 steward-via-web) | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+  - "resilience-protocol-spec | the canon this seed refines (truth:DERIVED) — Part V stewardship surface + Part VI patron-CDN originate the graduation/recovery story | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
+  - "session-bridge-design | origin of the staged-participation vocabulary — anti-binary visitor-to-peer graduation patterns (§0) | sha256:1d52dbaa44affce5 | path: genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md"
+  - "app-manifest-staged-intents-design | manifest-level grammar for graduation intents (substrate landed, feature held) | sha256:98e0a6576d9a197a | path: genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md"
+  - "doorway-access-tier-patterns | the three access tiers each flywheel stage is served by (Tier 1 anon / Tier 2 hosted / Tier 3 steward-via-web) | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
 ---
 
 # Doorway Two-Axis Scaling

@@ -13,23 +13,23 @@ informed-by:
   - genesis/docs/architecture/rea-compute-commitment-primitive.md
 refines: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
 cites:
-  - epr-route-claims-link-conformance-design | the parent spec this refines — its Appendix E is the verbatim acquisition-family seed (affordance ladder + pull-queue + striping evidence audit); its R1-R3 gradient invariants and §5.3 hint envelope are inherited rails | sha256:30b7cd1baf222922 | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
+  - "epr-route-claims-link-conformance-design | the parent spec this refines — its Appendix E is the verbatim acquisition-family seed (affordance ladder + pull-queue + striping evidence audit); its R1-R3 gradient invariants and §5.3 hint envelope are inherited rails | sha256:1d9969399472335d | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
   - genesis/data/timeline/backlog/epr-routing-complementary-captures.md
   - genesis/plans/2026-04-06-identity-driven-replication-design.md
   - genesis/plans/2026-03-22-epr-body-plane-design.md
   - genesis/plans/2026-03-30-resilient-html5-app-delivery-design.md
-  - blob-custody-reconciliation-design | the FetchBlob per-peer contract (timeout, fail-fast-on-mismatch, serve-only-verified) the pull queue inherits, plus the candidate-list/no-Kademlia-for-blob-hashes resolver seam (R-I) | sha256:b5a567ba337539a2 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-blob-custody-reconciliation-design.md
-  - tiered-quilt-stewardship-design | the D5 custody seed — RS(N,K) erasure quilt the striping seam reconstructs against; quilt diversity accounting the dwelling tier participates in; source of the BLAKE3-vs-sha256 divergence flagged in §14 | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - records-lifecycle-design | the typed relation vocabulary and lifecycle the cluster-closure walks (reach boundary + closed-state termini), and custody-quilt Commitments as accepted-at-authoring REA — the pin commitment shape | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
-  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - "blob-custody-reconciliation-design | the FetchBlob per-peer contract (timeout, fail-fast-on-mismatch, serve-only-verified) the pull queue inherits, plus the candidate-list/no-Kademlia-for-blob-hashes resolver seam (R-I) | sha256:b5a567ba337539a2 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-blob-custody-reconciliation-design.md"
+  - "tiered-quilt-stewardship-design | the D5 custody seed — RS(N,K) erasure quilt the striping seam reconstructs against; quilt diversity accounting the dwelling tier participates in; source of the BLAKE3-vs-sha256 divergence flagged in §14 | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "records-lifecycle-design | the typed relation vocabulary and lifecycle the cluster-closure walks (reach boundary + closed-state termini), and custody-quilt Commitments as accepted-at-authoring REA — the pin commitment shape | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
+  - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
-  - elohim-protocol-specification | protocol-specification | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md
+  - "trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
+  - "elohim-protocol-specification | protocol-specification | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
   - genesis/docs/content/elohim-protocol/architecture/cluster-topology.md
   - doorway/CLAUDE.md
-  - rea-compute-substrate-native-roadmap | 2026-05-28-rea-compute-substrate-native-roadmap | sha256:64e5ffe3b8756e6e | path: genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md
-  - compute-commitment-substrate-floor-design | Substrate Floor / Elohim Ceiling | sha256:614e30134ee0d7ab | path: genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md
-  - sprint2-bounds-validator-standing-aggregator | 2026-05-28-sprint2-bounds-validator-standing-aggregator | sha256:8923ad357ea4ee80 | path: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md
+  - "rea-compute-substrate-native-roadmap | 2026-05-28-rea-compute-substrate-native-roadmap | sha256:64e5ffe3b8756e6e | path: genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md"
+  - "compute-commitment-substrate-floor-design | Substrate Floor / Elohim Ceiling | sha256:614e30134ee0d7ab | path: genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md"
+  - "sprint2-bounds-validator-standing-aggregator | 2026-05-28-sprint2-bounds-validator-standing-aggregator | sha256:8923ad357ea4ee80 | path: genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md"
 ---
 
 # EPR Acquisition Family — Dual Pins, the Async Pull Queue & the Striping Seam

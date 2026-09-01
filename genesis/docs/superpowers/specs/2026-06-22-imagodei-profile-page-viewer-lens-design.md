@@ -10,11 +10,11 @@ informed-by:
 refines:
   - genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
 cites:
-  - imagodei-surfaces | CANONICAL three-surface identity decomposition this refines; Surface 1 (social) IS the viewer-relative lens designed here | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
-  - epr-route-claims-link-conformance-design | the addressing + no-undesigned-wall mechanism the page landing + pretty handle compose (universal /epr/{id} floor, pretty mounts, doorway dispatch, validate_project_epr_commitment) | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
-  - contributor-presence-bootstrap-whoswho-design | the page substrate: ContributorPresence, the claim flow, recognition-before-registration | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md
-  - resilience-facings-select-fold-aggregate-design | the pure DB-free fold framework the viewer-lens fold is a child of | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - contributor-visual-surfaces-plan | the frontend plan whose Sprint 2 (imagodei profile) this design reframes onto the viewer-lens architecture | path: genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md
+  - "imagodei-surfaces | CANONICAL three-surface identity decomposition this refines; Surface 1 (social) IS the viewer-relative lens designed here | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md"
+  - "epr-route-claims-link-conformance-design | the addressing + no-undesigned-wall mechanism the page landing + pretty handle compose (universal /epr/{id} floor, pretty mounts, doorway dispatch, validate_project_epr_commitment) | sha256:1d9969399472335d | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
+  - "contributor-presence-bootstrap-whoswho-design | the page substrate: ContributorPresence, the claim flow, recognition-before-registration | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
+  - "resilience-facings-select-fold-aggregate-design | the pure DB-free fold framework the viewer-lens fold is a child of | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "contributor-visual-surfaces-plan | the frontend plan whose Sprint 2 (imagodei profile) this design reframes onto the viewer-lens architecture | path: genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md"
 requires_env: [household-nodes]
 ---
 

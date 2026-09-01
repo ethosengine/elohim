@@ -6,9 +6,9 @@ class: protocol-canonical
 domain: D8
 sprint: slice-1
 cites:
-  - lens-complete-epr-resolution-four-leg-coupling-design | the parent design; this plan implements Slice 1 (demote claims-302 + focal epr-composite render + Open-in-pillar lens) | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
-  - epr-acquisition-pull-queue-design | owns the typed-relation ClusterClosure (HELD here, composed in Slice 3) + the value-leg provide-content substrate (HELD, Slice 2) — do not fork | sha256:fc4a0cdd9828a377 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
-  - epr-slice0-raw-node-surface-plan | the prior slice (raw-node surface); this builds on its EprSubview dispatch + the shell /epr routing | sha256:a09175be8e1817bb | path: genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md
+  - "lens-complete-epr-resolution-four-leg-coupling-design | the parent design; this plan implements Slice 1 (demote claims-302 + focal epr-composite render + Open-in-pillar lens) | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md"
+  - "epr-acquisition-pull-queue-design | owns the typed-relation ClusterClosure (HELD here, composed in Slice 3) + the value-leg provide-content substrate (HELD, Slice 2) — do not fork | sha256:fc4a0cdd9828a377 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md"
+  - "epr-slice0-raw-node-surface-plan | the prior slice (raw-node surface); this builds on its EprSubview dispatch + the shell /epr routing | sha256:4487dd4b33bb4f4f | path: genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md"
 ---
 
 # EPR Slice 1 — lens-complete `/epr/{id}`
@@ -91,7 +91,7 @@ acceptable — do NOT invent a new substrate surface). `data-testid` for a2o.
 **Verify:** lamad vitest + route-literal lint.
 
 ### Task 4 — a2o: rewrite the 302 scenario → lens-complete render
-**Files:** `genesis/a2o/features/lamad/deep-link-delivery.feature` (the scenario at ~:54 "Universal EPR
+**Files:** `genesis/a2o/features/lms/deep-link-delivery.feature` (the scenario at ~:54 "Universal EPR
 address 302s a claimed type to its pretty mount") + steps + selectors.
 **Approach:** that scenario asserts the OLD 302 — INVERT it: `/epr/{claimed-path}` now renders the
 lens-complete viewer (the focal composite outline + the knowledge leg; assert the Open-in-pillar

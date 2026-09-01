@@ -12,7 +12,7 @@ priority: "high"
 themes: [reach-enforcement, intimate-reach, p2p, privacy, epr-service, security]
 relatedNodeIds:
   - "backlog-http-reach-enforcement-gap"
-  - "genesis/a2o/features/lamad/intimate-reach-household.feature"
+  - "genesis/a2o/features/lms/intimate-reach-household.feature"
 tags: [security, reach, cross-node, household-testable, follow-on]
 ---
 

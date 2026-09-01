@@ -16,7 +16,7 @@ tags: [governor, limitarian, shefa, mishpat, attention-substrate, follow-on, ove
 cites:
   - genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md
   - genesis/docs/superpowers/plans/2026-06-10-limitarian-governor-v1-plan.md
-  - genesis/a2o/features/shefa/limitarian-governor.feature
+  - genesis/a2o/features/rms/limitarian-governor.feature
 ---
 
 # Limitarian governor v1 — follow-ons

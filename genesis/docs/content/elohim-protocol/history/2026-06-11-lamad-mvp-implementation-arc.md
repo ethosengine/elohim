@@ -68,7 +68,7 @@ dates, attestation-model dedup). Only Phase 7 (Mastery) was deferred as "Post-MV
 - **Status tables rot silently.** The table still reads "Phase 7: 🔮 Post-MVP" six
   months after mastery shipped, and lists priorities (Profile UI, trust badge UI,
   Cypress e2e) that landed long ago (`app/lamad/src/app/components/profile-page/`,
-  trust badges in `content-viewer`, a2o coverage in `genesis/a2o/features/lamad/`).
+  trust badges in `content-viewer`, a2o coverage in `genesis/a2o/features/lms/`).
   Completion tracking belongs to living gates (CI, a2o, delivery scoreboard), not
   to a hand-updated markdown table.
 

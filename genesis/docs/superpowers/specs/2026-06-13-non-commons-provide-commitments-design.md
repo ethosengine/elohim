@@ -6,9 +6,9 @@ class: substrate
 artifact_kind: spec
 written: 2026-06-13
 cites:
-  - init-authoring-native-seeding-design | the per-corpus author-steward routing + story-derived collective graph this design's eligibility-and-visibility model must align with | sha256:c8efe09b9262401b | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md
-  - resilience-protocol-spec | Part V's three-class stewardship surface (encrypted / social / commons); the non-commons provide row lights the "social" class | sha256:2c832b517c7204cc | path: genesis/docs/content/elohim-protocol/resilience/README.md
-  - ontology-keel-slice1-verdict-spine-plan | the shared permit/refuse/refer decision spine Q-eligible must return instead of a bespoke boolean | sha256:059f604e7ebc7821 | path: genesis/docs/superpowers/plans/2026-07-23-ontology-keel-slice1-verdict-spine-plan.md
+  - "init-authoring-native-seeding-design | the per-corpus author-steward routing + story-derived collective graph this design's eligibility-and-visibility model must align with | sha256:c8efe09b9262401b | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md"
+  - "resilience-protocol-spec | Part V's three-class stewardship surface (encrypted / social / commons); the non-commons provide row lights the \"social\" class | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
+  - "ontology-keel-slice1-verdict-spine-plan | the shared permit/refuse/refer decision spine Q-eligible must return instead of a bespoke boolean | sha256:059f604e7ebc7821 | path: genesis/docs/superpowers/plans/2026-07-23-ontology-keel-slice1-verdict-spine-plan.md"
   # legacy path cites — no-id (slice2b spec predates frontmatter) / non-doc-root (data/ backlog); relationship documented in body prose (§"Companion to", §6)
   - genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md

@@ -15,7 +15,7 @@ cites:
   - genesis/data/timeline/backlog/ci-genesis-conductor-adminws-unreachable.md
   - genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md
   - genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md
-  - topology-resilience-qahal-synthesis | 2026-05-19-topology-resilience-qahal-synthesis | sha256:8f294b7d71bc51a6 | path: genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md
+  - "topology-resilience-qahal-synthesis | 2026-05-19-topology-resilience-qahal-synthesis | sha256:561936762e08fb58 | path: genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md"
 informed-by:
   - genesis/a2o/features/federation/
 ---

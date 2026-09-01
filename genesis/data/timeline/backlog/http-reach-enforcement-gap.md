@@ -11,7 +11,7 @@ status: "refined"
 priority: "high"
 themes: [reach-enforcement, intimate-reach, doorway, privacy, epr-service]
 relatedNodeIds:
-  - "genesis/a2o/features/lamad/intimate-reach-household.feature"
+  - "genesis/a2o/features/lms/intimate-reach-household.feature"
   - "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md"
 tags: [security, reach, household-testable]
 ---
@@ -39,7 +39,7 @@ local stack. Two coupled gaps, both empirically proven:
    `content_diesel.rs:155-160`).
 
 **Acceptance spec already exists:** the two `@wip` read/refuse scenarios in
-`genesis/a2o/features/lamad/intimate-reach-household.feature` (step defs real and binding in
+`genesis/a2o/features/lms/intimate-reach-household.feature` (step defs real and binding in
 `genesis/a2o/steps/lamad/intimate-reach.steps.ts`). When HTTP-path reach enforcement lands,
 run them and flip `@wip` — no new test authoring needed.
 

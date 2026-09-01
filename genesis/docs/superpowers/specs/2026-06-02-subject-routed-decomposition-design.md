@@ -8,9 +8,9 @@ class: process-meta
 process_subdomain: doc-lifecycle
 topic: [decomposition, routing, subject-class, manifest, brainstorm-gate, placement, meta-vs-substrate, gospel-diff, decompose-flow, MAP-axis, process-meta, method-bridge, run-output, lossless-discard]
 cites:
-  - placement | the contract this proposes a subject-class axis section for, mirroring its cluster-state env pointer | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
+  - "placement | the contract this proposes a subject-class axis section for, mirroring its cluster-state env pointer | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md"
   - genesis/docs/claude.md
-  - map | the product-domain lattice this proposes Axis 0 above — subject class before D#+pillar | sha256:de878342b28843e8 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/MAP.md
+  - "map | the product-domain lattice this proposes Axis 0 above — subject class before D#+pillar | sha256:4d707bfda967a21a | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
   - .claude/scripts/memory-kit/decompose.py
   - .claude/commands/brainstorm.md
   - .claude/memory-kit/CLAUDE.md

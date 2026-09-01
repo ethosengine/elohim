@@ -6,7 +6,7 @@ class: protocol-canonical
 domain: D7
 topic: [qahal, household, formation, affirm-membership, seeder, custody-blob, quiltPolicy, a2o, plan]
 cites:
-  - household-formation-ceremony-design | the spec this plan implements — Stage 1 of its §12 build order (ceremony floor: coordinators, projection, soft action gate, seeder driver, scenario spine, quiltPolicy); stages 2/3 get their own plans | sha256:c4c55b654b2cb763 | path: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md
+  - "household-formation-ceremony-design | the spec this plan implements — Stage 1 of its §12 build order (ceremony floor: coordinators, projection, soft action gate, seeder driver, scenario spine, quiltPolicy); stages 2/3 get their own plans | sha256:78bd3f2f9cda2df4 | path: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md"
 derived_from: genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md
 ---
 
@@ -1157,8 +1157,8 @@ git commit -m "feat(qahal): household quiltPolicy class — stocked floor, house
 - Create: `genesis/a2o/features/qahal/household-formation.feature`
 - Create: `genesis/a2o/steps/qahal-formation.steps.ts`
 - Modify: `genesis/a2o/features/resilience/household-reciprocity.feature`
-- Modify: `genesis/a2o/features/shefa/human-resilience.feature` (retags at L27, L82, L94, L105; persona swap Susan→Jessica in scenarios 2/7/8)
-- Modify: `genesis/a2o/held/features/lamad/love-map-negotiation.feature:1` (feature tag)
+- Modify: `genesis/a2o/features/rms/human-resilience.feature` (retags at L27, L82, L94, L105; persona swap Susan→Jessica in scenarios 2/7/8)
+- Modify: `genesis/a2o/held/features/lms/love-map-negotiation.feature:1` (feature tag)
 - Modify: `genesis/data/collectives/collectives.json` (family-dowell "Terrance"→"James")
 
 - [ ] **Step 1: Write the formation feature**
@@ -1294,13 +1294,13 @@ Expected: all steps BIND (no undefined); scenarios listed.
     And an active "custody-blob" commitment exists from "human-james-student" to "human-jessica-spouse"
 ```
 
-- [ ] **Step 5: The retags + persona reconciliation** — in `features/shefa/human-resilience.feature`:
+- [ ] **Step 5: The retags + persona reconciliation** — in `features/rms/human-resilience.feature`:
   - L27 `  @wip @requires:shem` → `  @wip @requires:household-nodes` and in scenario 2 (L28+) replace every `Susan` → `Jessica` (title + steps).
   - L82 `  @wip @requires:shem` → `  @wip @requires:household-nodes` (scenario 6; Maria/Susan personas left as-is — 2-node mechanics, household-class).
   - L94 `  @wip @requires:shem` → `  @wip @requires:household-nodes` + `Susan` → `Jessica` (scenario 7).
   - L105 `  @wip @requires:shem` → `  @wip @requires:household-nodes` + `Susan` → `Jessica` (scenario 8).
   - L39 (scenario 3) and L55 (scenario 4): KEEP `@requires:shem`; add above L39: `  # household arm is household-testable; Pete's congregation reach is the shem dependency — split when shem returns`.
-  - `held/features/lamad/love-map-negotiation.feature` L1: `@e2e @lamad @love-map @requires:shem` → `@e2e @lamad @love-map @requires:household-nodes` and add comment line 2: `# Adam/Eve dyad on a single doorway — household-class compute; Adam persona is shem-deployed today, so scenarios stay @wip until a household-deployable dyad or persona swap (see formation spec §9).`
+  - `held/features/lms/love-map-negotiation.feature` L1: `@e2e @lamad @love-map @requires:shem` → `@e2e @lamad @love-map @requires:household-nodes` and add comment line 2: `# Adam/Eve dyad on a single doorway — household-class compute; Adam persona is shem-deployed today, so scenarios stay @wip until a household-deployable dyad or persona swap (see formation spec §9).`
   - `genesis/data/collectives/collectives.json`: in the `family-dowell` entry, replace `"Matthew, Jessica, Terrance"` description with `"Matthew, Jessica, James"`.
 
 - [ ] **Step 6: Run scope-reconcile to return love-map to live**
@@ -1308,7 +1308,7 @@ Expected: all steps BIND (no undefined); scenarios listed.
 ```bash
 python3 .claude/scripts/memory-kit/scope-reconcile.py --apply
 ```
-Expected output includes: `git mv genesis/a2o/held/features/lamad/love-map-negotiation.feature → genesis/a2o/features/lamad/love-map-negotiation.feature` (held→live escape; household-nodes is available). Verify: `test -f genesis/a2o/features/lamad/love-map-negotiation.feature && echo MOVED`.
+Expected output includes: `git mv genesis/a2o/held/features/lms/love-map-negotiation.feature → genesis/a2o/features/lms/love-map-negotiation.feature` (held→live escape; household-nodes is available). Verify: `test -f genesis/a2o/features/lms/love-map-negotiation.feature && echo MOVED`.
 
 - [ ] **Step 7: Full a2o dry-run + commit**
 
@@ -1316,7 +1316,7 @@ Expected output includes: `git mv genesis/a2o/held/features/lamad/love-map-negot
 cd genesis/a2o && npx cucumber-js --dry-run --tags '@e2e'
 git add genesis/a2o/features/qahal/household-formation.feature genesis/a2o/steps/qahal-formation.steps.ts \
         genesis/a2o/steps/resilience.steps.ts genesis/a2o/features/resilience/household-reciprocity.feature \
-        genesis/a2o/features/shefa/human-resilience.feature genesis/a2o/features/lamad/love-map-negotiation.feature \
+        genesis/a2o/features/rms/human-resilience.feature genesis/a2o/features/lms/love-map-negotiation.feature \
         genesis/data/collectives/collectives.json
 git commit -m "feat(a2o): household-formation spine + triad reciprocity scenarios; retag household scenarios off @requires:shem (shem≠multi-node); love-map returns to live"
 ```

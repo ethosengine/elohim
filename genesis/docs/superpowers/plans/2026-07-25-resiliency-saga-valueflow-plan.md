@@ -9,12 +9,12 @@ sprint: verify-track
 requires_env: []
 topic: [resiliency-saga, valueflow, epr-flow, fulfill, a2o, dataplane, custody, commitment, capacity, identity-fill, frontier]
 cites:
-  - epr-rea-valueflow-fabric | EPR-REA ValueFlow Fabric | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
-  - sealed-contract-edges-governor-frontier | Sealed Contract Edges | sha256:ace1788fa44a293f | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
-  - epr-durability-replication-arc-plan | EPR Content Durability Arc | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
-  - resiliency-card-p2p-weave-sprint-plan | Resiliency-card + P2P-sync + Operational-Weave sprint | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md
-  - resilience-card-lighting-plan | Resilience card lighting | sha256:be6dfb65e5e8a433 | path: genesis/docs/superpowers/plans/2026-06-19-resilience-card-lighting-plan.md
-  - experience-story-epr-design | Experience-Story EPRs | sha256:b1dc5838ffab2e5d | path: genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md
+  - "epr-rea-valueflow-fabric | EPR-REA ValueFlow Fabric | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md"
+  - "sealed-contract-edges-governor-frontier | Sealed Contract Edges | sha256:ace1788fa44a293f | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md"
+  - "epr-durability-replication-arc-plan | EPR Content Durability Arc | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md"
+  - "resiliency-card-p2p-weave-sprint-plan | Resiliency-card + P2P-sync + Operational-Weave sprint | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md"
+  - "resilience-card-lighting-plan | Resilience card lighting | sha256:be6dfb65e5e8a433 | path: genesis/docs/superpowers/plans/2026-06-19-resilience-card-lighting-plan.md"
+  - "experience-story-epr-design | Experience-Story EPRs | sha256:6a82cd4508e28a39 | path: genesis/docs/content/elohim-protocol/architecture/2026-04-18-experience-story-epr-design.md"
 ---
 
 # Resiliency Saga — executable eprfs valueflow driving the epic to live completion

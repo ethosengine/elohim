@@ -10,16 +10,16 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 cites:
-  - pillar-epr-decomposition-design | THE parent: §12 URL & Routing Contract whose §12.3/§12.8 routeClaims sketch this spec elevates; refines edge | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
-  - epr-slice2-universal-address-plan | landed Slice-2 plan: locked decisions (universal address, bridge rationale, /auth vocabulary) this design builds on | sha256:78644191dd11bf3d | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md
-  - omnibar-consolidation-epr-native-links-design | locked cross-bundle link mechanics (plain href + interceptor, ServingContext) this spec must not contradict | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
-  - semantic-computable-links-design | docs-corpus content-addressed link integrity (slug/fingerprint/status) — the model extended here to runtime links (claims-stale isomorphism) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
-  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
-  - doorway-stewardship-chain-design | grant/snapshot precedent: Commitment+Attestation chain, JWT fast-path, supersession — the visitor-reach and grant mechanics template | sha256:f90729e7a9887de8 | path: genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
+  - "pillar-epr-decomposition-design | THE parent: §12 URL & Routing Contract whose §12.3/§12.8 routeClaims sketch this spec elevates; refines edge | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md"
+  - "epr-slice2-universal-address-plan | landed Slice-2 plan: locked decisions (universal address, bridge rationale, /auth vocabulary) this design builds on | sha256:880308dfea0c8688 | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md"
+  - "omnibar-consolidation-epr-native-links-design | locked cross-bundle link mechanics (plain href + interceptor, ServingContext) this spec must not contradict | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md"
+  - "semantic-computable-links-design | docs-corpus content-addressed link integrity (slug/fingerprint/status) — the model extended here to runtime links (claims-stale isomorphism) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md"
+  - "trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
+  - "doorway-stewardship-chain-design | grant/snapshot precedent: Commitment+Attestation chain, JWT fast-path, supersession — the visitor-reach and grant mechanics template | sha256:f90729e7a9887de8 | path: genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
-  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - "records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
+  - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - genesis/docs/architecture/pillar-bundle-split-runbook.md
 ---
 
@@ -385,7 +385,7 @@ the DHT per-request. The `/epr/{id}` arm calls the §5.1 pure classifier.
   no HTTP; grant-validator cases (conflicts, reserved prefixes, chains).
 - **Contract**: route-claims vectors consumed by both planes (§8.4); schema contract test for
   the view extension; codegen-freshness via the existing pre-push gate.
-- **a2o** (`genesis/a2o/features/lamad/deep-link-delivery.feature` extends; doorway subject for
+- **a2o** (`genesis/a2o/features/lms/deep-link-delivery.feature` extends; doorway subject for
   sitemap/conformance):
   1. Cold `/epr/{id}` for a claimed commons EPR 302s to the pretty mount and renders.
   2. Cold legacy share `GET /lamad/resource/{id}` 302s at the doorway (no bundle boot) —

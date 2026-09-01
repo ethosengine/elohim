@@ -48,7 +48,7 @@ L6.1 (schema) and L6.2 (Rust struct) collapse to **verification-only**; the actu
 - `app/elohim-app/src/app/shefa/pages/reciprocity/reciprocity.component.html` — template
 - `app/elohim-app/src/app/shefa/pages/reciprocity/reciprocity.component.scss` — styles
 - `app/elohim-app/src/app/shefa/pages/reciprocity/reciprocity.component.spec.ts` — component spec
-- `genesis/a2o/features/shefa/steps/ui/reciprocity.steps.ts` — Cucumber step bindings for the reciprocity scenario
+- `genesis/a2o/features/rms/steps/ui/reciprocity.steps.ts` — Cucumber step bindings for the reciprocity scenario
 
 **Modify:**
 - `genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md` — §2 GraphQL schema sketch + §5 Epic B narrative renamed for viewer.* symmetry
@@ -63,7 +63,7 @@ L6.1 (schema) and L6.2 (Rust struct) collapse to **verification-only**; the actu
 - `app/elohim-app/src/environments/environment.prod.ts` — `useGraphqlTopology: true`
 - `app/elohim-app/src/app/shefa/shefa.routes.ts` (or equivalent loader; verify path at execution time) — register `/reciprocity` route
 - `app/elohim-app/src/app/shefa/components/shefa-sidenav/shefa-sidenav.component.{ts,html,spec.ts}` — add nav entry for Reciprocity (currently modified per `git status`; verify wiring)
-- `genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature` — lift `@wip` on cluster + peers scenarios (post flag-flip) and reciprocity scenario (post Epic B landing)
+- `genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature` — lift `@wip` on cluster + peers scenarios (post flag-flip) and reciprocity scenario (post Epic B landing)
 
 ### L7 — Qahal substrate design (design only)
 
@@ -1132,17 +1132,17 @@ git commit -m "feat(shefa): /shefa/reciprocity page + route + sidenav entry"
 ### Task L6.8: a2o step bindings + lift @wip
 
 **Files:**
-- Create: `genesis/a2o/features/shefa/steps/ui/reciprocity.steps.ts`
-- Modify: `genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature`
+- Create: `genesis/a2o/features/rms/steps/ui/reciprocity.steps.ts`
+- Modify: `genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature`
 
 - [ ] **Step 1: Inspect existing shefa step bindings for pattern**
 
 ```bash
-ls genesis/a2o/features/shefa/steps/ 2>&1
-cat genesis/a2o/features/shefa/steps/ui/peer-topology.steps.ts 2>/dev/null | head -60
+ls genesis/a2o/features/rms/steps/ 2>&1
+cat genesis/a2o/features/rms/steps/ui/peer-topology.steps.ts 2>/dev/null | head -60
 ```
 
-If `steps/ui/` doesn't exist for shefa yet, mirror the pattern from `genesis/a2o/features/lamad/steps/ui/` or whichever pillar already uses Playwright steps.
+If `steps/ui/` doesn't exist for shefa yet, mirror the pattern from `genesis/a2o/features/lms/steps/ui/` or whichever pillar already uses Playwright steps.
 
 - [ ] **Step 2: Write `reciprocity.steps.ts`**
 
@@ -1189,14 +1189,14 @@ Verify exact import paths for `E2EWorld` and `requirePlaywright` from a neighbor
 
 - [ ] **Step 3: Lift @wip on the reciprocity scenario**
 
-In `genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature` line 26, delete the `@wip` tag on the "Reciprocity page shows inflow from Terrance" scenario. Cluster + peers scenarios remain `@wip` for now — those depend on the seeder having real `household-terrance` data; that gate is delivery work, not part of this plan.
+In `genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature` line 26, delete the `@wip` tag on the "Reciprocity page shows inflow from Terrance" scenario. Cluster + peers scenarios remain `@wip` for now — those depend on the seeder having real `household-terrance` data; that gate is delivery work, not part of this plan.
 
 - [ ] **Step 4: Run the a2o scenario locally (if Playwright stack is up)**
 
 ```bash
 cd /projects/elohim/genesis/a2o
 E2E_DEVICE_MODE=playwright pnpm exec cucumber-js \
-  features/shefa/m1-matthew-terrance-delivery.feature \
+  features/rms/m1-matthew-terrance-delivery.feature \
   --name 'Reciprocity page shows inflow from Terrance'
 ```
 
@@ -1205,8 +1205,8 @@ If the local stack isn't running, document the gate as "pending CI green on Jenk
 - [ ] **Step 5: Commit**
 
 ```bash
-git add genesis/a2o/features/shefa/steps/ui/reciprocity.steps.ts \
-        genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature
+git add genesis/a2o/features/rms/steps/ui/reciprocity.steps.ts \
+        genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature
 git commit -m "test(a2o): reciprocity scenario steps + lift @wip on m1 reciprocity row"
 ```
 
@@ -1415,7 +1415,7 @@ The L6 plan deliberately left the wire/internal divergence in place (`Viewer.hub
 
 ### FU-2 — Lift `@wip` on the m1 reciprocity scenario
 
-`genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature:26-31` — "Reciprocity page shows inflow from Terrance" — still `@wip` after this sprint. The step bindings exist (added in L6.8); the page renders with the right testids and bytes attributes; the GraphQL transport works. What's missing is **seeded test data** in the e2e environment: a `household-terrance` with REA commitments to and from Matthew, plus cross-pod delivery to produce non-zero `deliveredBytes`.
+`genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature:26-31` — "Reciprocity page shows inflow from Terrance" — still `@wip` after this sprint. The step bindings exist (added in L6.8); the page renders with the right testids and bytes attributes; the GraphQL transport works. What's missing is **seeded test data** in the e2e environment: a `household-terrance` with REA commitments to and from Matthew, plus cross-pod delivery to produce non-zero `deliveredBytes`.
 
 **Scope:**
 - Add seed-data fixture in `genesis/data/lamad/` (or wherever the e2e seeder reads from) for household-terrance + matching REA commitments to/from Matthew.

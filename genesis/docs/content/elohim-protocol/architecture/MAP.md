@@ -137,7 +137,7 @@ five-step reading order for working on that pillar.
    (REA events) + [`lamad CLAUDE.md`](../../../../../app/lamad/CLAUDE.md) (observation vocabulary).
 4. **Code** → `elohim/elohim-storage/src/` (the REA substrate) + `app/elohim-app/src/app/shefa/` +
    the value-scanner content in [`value_scanner/`](../value_scanner/).
-5. **Scenarios** → `genesis/a2o/features/shefa/`, `genesis/a2o/features/lamad/`,
+5. **Scenarios** → `genesis/a2o/features/rms/`, `genesis/a2o/features/lms/`,
    `genesis/a2o/features/resilience/`.
 
 ### elohim — protocol core (the substrate everything rests on)
@@ -154,7 +154,7 @@ five-step reading order for working on that pillar.
 (2) seeds **D9, D5** (wave3-valueflows-hrea-interop, tiered-quilt-stewardship); (3) pillar guide
 [`shefa/CLAUDE.md`](../../../../../app/elohim-app/src/app/shefa/CLAUDE.md); (4) code
 `app/elohim-app/src/app/shefa/` + `bridges/valueflows/` (the REA bridge in elohim-storage, not
-doorway); (5) scenarios `genesis/a2o/features/shefa/`.
+doorway); (5) scenarios `genesis/a2o/features/rms/`.
 
 ### imagodei — identity, recovery, agent memory
 **To work on `imagodei`:** read (1) [`resilience/README.md`](../resilience/README.md) (recovery is
@@ -170,7 +170,7 @@ observation) + the seed-content `lamad.md`; (2) seeds **D2, D3** (observation-ev
 experience-story-epr); (3) pillar guide [`app/lamad/CLAUDE.md`](../../../../../app/lamad/CLAUDE.md)
 (lamad is a **separate SPA** at `app/lamad/`, not a view inside elohim-app — that decomposition is
 itself a known gap); (4) code `app/lamad/src/` + the `@elohim/sophia-*` renderer wrap; (5) scenarios
-`genesis/a2o/features/lamad/`, `content/`.
+`genesis/a2o/features/lms/`, `content/`.
 
 ### qahal — community & governance
 **To work on `qahal`:** read (1) [`governance/epic.md`](../governance/epic.md) +

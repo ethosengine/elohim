@@ -1163,7 +1163,7 @@ git commit -m "test(governor): the §11 convergence test (bounded, monotone, res
 ### Task 10: Story-first a2o scenario
 
 **Files:**
-- Create: `genesis/a2o/features/shefa/limitarian-governor.feature`
+- Create: `genesis/a2o/features/rms/limitarian-governor.feature`
 
 - [ ] **Step 1: Write the feature** (mold: qahal/collective-governance.feature; API-mode; the live-loop scenario is `@wip` until the HTTP poke surface exists — v1 is harness-driven per spec §11):
 
@@ -1210,12 +1210,12 @@ Feature: A community ratifies the limit it cannot set for itself
 
 **Why all-@wip is honest here (not a dump):** the v1 slice's done-when (spec §11) is the native convergence + wall + seam tests; the a2o layer needs zome-call/HTTP probe steps that don't exist yet. The feature pins the STORY now (story-first), the steps land when the HTTP poke surface does (deferred per spec §11 "explicitly deferred: the aggregate-tick scheduler … HTTP poke"). The follow-on is captured in the close as an Objective candidate, which owns the un-@wip.
 
-- [ ] **Step 2: Gherkin-parse check** (the parse-abort trap): `cd genesis/a2o && pnpm exec cucumber-js --dry-run features/shefa/limitarian-governor.feature 2>&1 | tail -3` — expect a clean dry-run (undefined steps OK, no parse error).
+- [ ] **Step 2: Gherkin-parse check** (the parse-abort trap): `cd genesis/a2o && pnpm exec cucumber-js --dry-run features/rms/limitarian-governor.feature 2>&1 | tail -3` — expect a clean dry-run (undefined steps OK, no parse error).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add genesis/a2o/features/shefa/limitarian-governor.feature
+git add genesis/a2o/features/rms/limitarian-governor.feature
 git commit -m "story(shefa): limitarian-governor ratification + friction scenarios — story-first pin for the v1 slice (@wip pending zome-probe steps)"
 ```
 

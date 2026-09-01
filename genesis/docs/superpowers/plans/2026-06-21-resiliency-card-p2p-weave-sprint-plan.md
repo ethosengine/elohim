@@ -13,14 +13,14 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-14-recursive-architecture-design.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 cites:
-  - weave-epic-arc-design | the tiered-weave index this sprint integrates incrementally as bonus; its #4 (private-replica encryption) is Wave 5 | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md
-  - lens-complete-epr-resolution-four-leg-coupling-design | the EPR-head resolution law Wave 3 finishes (Slices 2/3 — relationships closure + value leg) | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
-  - rea-economic-facing-lens-design | the compute-contracts facing Wave 4 lands (Mishpat→REA bridge + compute-fulfilled event) | sha256:b83ead21be13bbaa | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
-  - operational-weave-facing-lens-design | the lens spec priority-#2 Wave 2 finishes (Slices 2-4 + WeaveView + GET /api/v1/weave) | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md
-  - resilience-facings-select-fold-aggregate-design | the §11 select→fold→aggregate framework the card folds descend from; Wave 1.1 proof-gates it | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - epr-slice1-lens-complete-resolver-plan | the EPR-head plan Wave 3 drains (the epr-composite renderer keystone, Task 2) | sha256:3dd888dbe730d5b3 | path: genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md
-  - p2p-dataplane-sync-engine-design-arc | the dead/lesson the binding-constraints honor — no 3rd sync dialect; sharding/sync already shipped | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
-  - dht-is-a-notary-not-a-byte-store | the binding constraint: the who-has-what index is gossip+projection, never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md
+  - "weave-epic-arc-design | the tiered-weave index this sprint integrates incrementally as bonus; its #4 (private-replica encryption) is Wave 5 | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
+  - "lens-complete-epr-resolution-four-leg-coupling-design | the EPR-head resolution law Wave 3 finishes (Slices 2/3 — relationships closure + value leg) | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md"
+  - "rea-economic-facing-lens-design | the compute-contracts facing Wave 4 lands (Mishpat→REA bridge + compute-fulfilled event) | sha256:b83ead21be13bbaa | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md"
+  - "operational-weave-facing-lens-design | the lens spec priority-#2 Wave 2 finishes (Slices 2-4 + WeaveView + GET /api/v1/weave) | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md"
+  - "resilience-facings-select-fold-aggregate-design | the §11 select→fold→aggregate framework the card folds descend from; Wave 1.1 proof-gates it | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "epr-slice1-lens-complete-resolver-plan | the EPR-head plan Wave 3 drains (the epr-composite renderer keystone, Task 2) | sha256:7eef8df32ead0079 | path: genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md"
+  - "p2p-dataplane-sync-engine-design-arc | the dead/lesson the binding-constraints honor — no 3rd sync dialect; sharding/sync already shipped | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
+  - "dht-is-a-notary-not-a-byte-store | the binding constraint: the who-has-what index is gossip+projection, never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md"
   - elohim/elohim-storage/src/services/shard_manifest_backfill.rs
   - elohim/elohim-storage/src/services/seed_shard_manifest.rs
   - elohim/elohim-storage/src/services/household_resilience.rs

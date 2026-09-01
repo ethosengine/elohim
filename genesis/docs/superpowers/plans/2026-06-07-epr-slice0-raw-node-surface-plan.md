@@ -105,7 +105,7 @@ anchor `href` in a component spec.
 **Verify:** `pnpm --filter lamad test` (or the lamad project's vitest); lint.
 
 ### Task 6 — a2o: regression scenario (the contradiction guard)
-**Files:** `genesis/a2o/features/lamad/deep-link-delivery.feature` (+ steps).
+**Files:** `genesis/a2o/features/lms/deep-link-delivery.feature` (+ steps).
 **Approach:** scenario(s): (a) `/epr/{path-id}/raw` renders the raw-node view (`data-testid=epr-raw-node`),
 NOT a 302 to the pillar mount; (b) from the path overview, clicking "View as Content" lands on
 `/epr/{id}/raw` (the round-trip is gone). Tag `@regression` (guards the captured contradiction).

@@ -61,7 +61,7 @@ Replace the entire contents of `genesis/a2o/scripts/__tests__/fixtures/cucumber-
 ```json
 [
   {
-    "uri": "features/lamad/learning-journey.feature",
+    "uri": "features/lms/learning-journey.feature",
     "name": "Learning Journey",
     "elements": [
       {
@@ -239,13 +239,13 @@ function input() {
   const scenarios: ScenarioResult[] = [
     {
       name: 'Terrance completes path',
-      feature: 'features/lamad/learning-journey.feature',
+      feature: 'features/lms/learning-journey.feature',
       status: 'passed',
       tags: [],
     },
     {
       name: 'Mary fails on assessment',
-      feature: 'features/lamad/learning-journey.feature',
+      feature: 'features/lms/learning-journey.feature',
       status: 'failed',
       failureMessage: 'AssertionError: expected 500 to be 200',
       tags: [],
@@ -467,14 +467,14 @@ Append these tests at the end of the existing `describe('aggregate', () => { ...
       // validated-passing
       {
         name: 'Validated and passing',
-        feature: 'features/lamad/a.feature',
+        feature: 'features/lms/a.feature',
         status: 'passed',
         tags: ['@e2e', '@elohim-visually-validated'],
       },
       // validated-regressed
       {
         name: 'Validated but failed',
-        feature: 'features/lamad/b.feature',
+        feature: 'features/lms/b.feature',
         status: 'failed',
         failureMessage: 'AssertionError: visual element missing',
         tags: ['@e2e', '@elohim-visually-validated'],
@@ -482,14 +482,14 @@ Append these tests at the end of the existing `describe('aggregate', () => { ...
       // pending-passing
       {
         name: 'Untagged passing',
-        feature: 'features/lamad/c.feature',
+        feature: 'features/lms/c.feature',
         status: 'passed',
         tags: ['@e2e'],
       },
       // pending-failing
       {
         name: 'Untagged failed',
-        feature: 'features/lamad/d.feature',
+        feature: 'features/lms/d.feature',
         status: 'failed',
         failureMessage: 'AssertionError: nope',
         tags: ['@e2e'],
@@ -1037,7 +1037,7 @@ Append the following at the end of `render-markdown.test.ts`, just before the fi
           scenarios: [
             {
               name: 'Starting a Journey',
-              feature: 'features/lamad/learning-journey.feature',
+              feature: 'features/lms/learning-journey.feature',
               human: 'Matthew',
             },
           ],
@@ -1500,7 +1500,7 @@ mkdir -p /tmp/a2o-smoke
 cat > /tmp/a2o-smoke/cucumber-report.json <<'EOF'
 [
   {
-    "uri": "features/lamad/learning-journey.feature",
+    "uri": "features/lms/learning-journey.feature",
     "name": "Learning Journey",
     "elements": [
       {

@@ -242,7 +242,7 @@ role: role:as-entrepreneur
 feature: feature:learning-journey
 scenario:
   name: "Welcome flow loads in under 2s"
-  uri: features/lamad/learning-journey.feature
+  uri: features/lms/learning-journey.feature
   line: 47
   tags: ["@e2e", "@lamad", "@regression"]
 status: passed | failed | pending | skipped

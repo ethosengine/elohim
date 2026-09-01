@@ -6,9 +6,9 @@ class: protocol-canonical
 domain: D8
 topic: [epr, routing, routeClaims, redirect, alias, sitemap, conformance, doorway, dispatch]
 cites:
-  - epr-route-claims-link-conformance-design | THE spec this plan implements — Slice-3 routing contract (claims, alias law, conformance); plan tasks map to its gap items | sha256:69717bb30c4113be | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
-  - pillar-epr-decomposition-design | the canonical parent whose §12.3/§12.6/§12.8 get forward-pointer amendments in Task 13 | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md
-  - epr-slice2-universal-address-plan | the landed predecessor plan — Slice-2 surfaces (universal address, client claims, bridge component) this plan builds on and partially retires | sha256:78644191dd11bf3d | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md
+  - "epr-route-claims-link-conformance-design | THE spec this plan implements — Slice-3 routing contract (claims, alias law, conformance); plan tasks map to its gap items | sha256:1d9969399472335d | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
+  - "pillar-epr-decomposition-design | the canonical parent whose §12.3/§12.6/§12.8 get forward-pointer amendments in Task 13 | sha256:8029079cea758380 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md"
+  - "epr-slice2-universal-address-plan | the landed predecessor plan — Slice-2 surfaces (universal address, client claims, bridge component) this plan builds on and partially retires | sha256:880308dfea0c8688 | path: genesis/docs/superpowers/plans/2026-06-06-epr-slice2-universal-address-plan.md"
 ---
 
 # EPR Slice 3 — Route Claims, Alias Law & Conformance Implementation Plan
@@ -47,7 +47,7 @@ cites:
 | Modify `doorway/doorway-service/src/projection/epr_router.rs` | claims index + alias index + pure template fns | 8 |
 | Modify `doorway/doorway-service/src/server/http.rs` | alias 302 at B13; `classify_epr_universal` + rewritten `dispatch_epr_universal`; `/sitemap.xml` arm | 9, 10 |
 | Create `scripts/lint-route-literals.mjs`; modify `app/elohim-app/package.json`, `app/lamad/package.json` | minted-never-literal CI gate | 11 |
-| Modify `genesis/a2o/features/lamad/deep-link-delivery.feature` + `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts` | scenario-5 flip, doorway-302 bridge scenario, sitemap scenario | 12 |
+| Modify `genesis/a2o/features/lms/deep-link-delivery.feature` + `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts` | scenario-5 flip, doorway-302 bridge scenario, sitemap scenario | 12 |
 | Modify `genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md` | §12.3/§12.6/§12.8 forward pointers | 13 |
 
 ---
@@ -1271,7 +1271,7 @@ Expected: a handful of hits. For each: legitimate keepers (`<base href>`, SEO ca
 ### Task 12: a2o — scenario flips + new conformance scenarios
 
 **Files:**
-- Modify: `genesis/a2o/features/lamad/deep-link-delivery.feature`
+- Modify: `genesis/a2o/features/lms/deep-link-delivery.feature`
 - Modify: `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts`
 
 Slice-3 dispatch CHANGES two scenario expectations (this is the point — the substrate took over):
@@ -1352,7 +1352,7 @@ Then('the response body contains {string}', function (this: E2EWorld, needle: st
 
 (Adapt `fetchApp`'s options parameter to its actual signature — read `genesis/a2o/steps/delivery.steps.ts` first; if it takes no options, add a local `fetchAppNoRedirect` helper in this file using the same transport with `redirect: 'manual'`. Before adding any step, grep the steps tree for an existing `response status`/`Location`/`body contains` step to avoid ambiguous redefinition.)
 
-- [ ] **Step 5: Gherkin-parse check** — `cd genesis/a2o && pnpm exec cucumber-js --dry-run features/lamad/deep-link-delivery.feature` (or the repo's a2o dry-run equivalent). Expected: parses, steps bind, no ambiguity.
+- [ ] **Step 5: Gherkin-parse check** — `cd genesis/a2o && pnpm exec cucumber-js --dry-run features/lms/deep-link-delivery.feature` (or the repo's a2o dry-run equivalent). Expected: parses, steps bind, no ambiguity.
 
 - [ ] **Step 6: Commit** — `git commit -m "test(a2o): Slice-3 routing scenarios — claimed 302, alias promise at the doorway, sitemap enumeration (spec §10)"`
 

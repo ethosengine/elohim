@@ -9,11 +9,11 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
   - genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
 cites:
-  - contributor-presence-bootstrap-whoswho-design | the Wave 1-2 spec these two surfaces consume + render; this plan refines its visual layer | sha256:08d11210fd816f68 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md
-  - resilience-facings-select-fold-aggregate-design | the §11 facings framework the reflexive aggregator (surface B feed) is a child of | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - imagodei-surfaces | CANONICAL three-surface identity decomposition (social/self-knowledge/account-mgmt); Sprint 2 builds Surface 1 + a thin Surface 3 touch | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
-  - epr-route-claims-link-conformance-design | the addressing mechanism the pretty-handle reuses (universal /epr/{id} floor + steward-granted routeClaims + doorway dispatch + claimed/unclaimed classifier) | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md
-  - imagodei-profile-page-viewer-lens-design | the design + slices Sprint 2 now executes (viewer-relative lens, profile/page split, in-arc legs 1+2 hardening) | path: genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md
+  - "contributor-presence-bootstrap-whoswho-design | the Wave 1-2 spec these two surfaces consume + render; this plan refines its visual layer | sha256:08d11210fd816f68 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
+  - "resilience-facings-select-fold-aggregate-design | the §11 facings framework the reflexive aggregator (surface B feed) is a child of | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "imagodei-surfaces | CANONICAL three-surface identity decomposition (social/self-knowledge/account-mgmt); Sprint 2 builds Surface 1 + a thin Surface 3 touch | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md"
+  - "epr-route-claims-link-conformance-design | the addressing mechanism the pretty-handle reuses (universal /epr/{id} floor + steward-granted routeClaims + doorway dispatch + claimed/unclaimed classifier) | sha256:1d9969399472335d | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
+  - "imagodei-profile-page-viewer-lens-design | the design + slices Sprint 2 now executes (viewer-relative lens, profile/page split, in-arc legs 1+2 hardening) | path: genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md"
 refines:
   - genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md
   - genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md

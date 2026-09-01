@@ -14,7 +14,7 @@ jobs: [elohim-genesis]
 
 ## The gap (spec-ahead-of-implementation, NOT a bug)
 
-a2o `features/lamad/know-thyself-discovery.feature` scenarios 29/30/31 fail because
+a2o `features/lms/know-thyself-discovery.feature` scenarios 29/30/31 fail because
 the asserted contract does not exist in shipped code (wave-2 fixer verdict: UNBUILT —
 no patch). Three independent pieces are missing; adding one testid would not make them
 pass:

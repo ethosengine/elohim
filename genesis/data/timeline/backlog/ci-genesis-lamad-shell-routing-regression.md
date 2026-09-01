@@ -20,7 +20,7 @@ cites:
   - https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1104/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1522/
   - genesis/a2o/features/deployment/staging-validation.feature
-  - genesis/a2o/features/lamad/deep-link-delivery.feature
+  - genesis/a2o/features/lms/deep-link-delivery.feature
   - genesis/a2o/steps/ui/navigation.steps.ts
   - genesis/a2o/steps/lamad/deep-link-delivery.steps.ts
   - app/elohim-app/src/index.html
@@ -59,7 +59,7 @@ title is "Welcome"). This is a doorway-dispatch / root-route regression, not an
 app title-tag drift.
 
 `a969e96c4361` — Scenario "Legacy doubled URL shows the designed not-found"
-(`features/lamad/deep-link-delivery.feature:38`, `@browser-only`,
+(`features/lms/deep-link-delivery.feature:38`, `@browser-only`,
 data-flow spec §12.4.2):
 
 ```

@@ -6,19 +6,19 @@ written: 2026-06-23
 class: governance
 artifact_kind: spec
 cites:
-  - justice-manifesto | the vision this spec implements; §1 Vision Alignment cites its articles (floor/ceiling, sight-as-virtue, humility-not-apotheosis, no-backdoor) | path: genesis/docs/architecture/justice-manifesto.md
-  - stewardship-over-sovereignty | the substrate gate every new authority path must pass — absolute lockout impossible, no self-sovereign apex, trust made load-bearing not eliminated | path: genesis/docs/architecture/stewardship-over-sovereignty.md
-  - cradle-to-grave-capability-gradient | the 4-layer graduated authority + orthogonal CryptographicQuorum the InspectionAuthority enum mirrors structurally | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md
-  - rea-compute-commitment-primitive | the Mishpat::Commitment + delegates-compute primitive the non-standing warrant composes from, never an admin-key grant | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - recovery-protocol-phase-2-revised-design | the §10 Anti-Lockout Audit this spec's No-Backdoor Audit mirrors; the Rescue/Dissolution-only NetworkWitnessPurpose the Inspection act must NOT extend; §8.3 hidden-defense-is-a-backdoor generalized | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md
-  - resilience-protocol-spec | absolute-lockout-is-a-design-failure + breach-never-contaminates-attribution; the dignity floor the ceiling is bounded by | path: genesis/docs/content/elohim-protocol/resilience/README.md
-  - governance-epic | the sortition mechanics + appeal cascade this spec turns from narrative into a DHT entry type + coordinator function | path: genesis/docs/content/elohim-protocol/governance/epic.md
-  - governance-layers-architecture | cryptographic-sortition params, term limits, commons co-steward; the un-buyable/un-lobbyable properties the Inspection quorum encodes | path: genesis/docs/content/elohim-protocol/governance-layers-architecture.md
-  - constitution | the existential floors as HARD-BLOCK code; the floors the ceiling can never cross | path: genesis/docs/content/elohim-protocol/constitution.md
-  - confession | the El Roi limit (no verdict-over-a-person; no god-mode read) the Inspection Ceiling act encodes as a hard constraint | path: genesis/docs/content/elohim-protocol/confession.md
-  - elohim-oracle | the RefusalCode::ReservedPlace / limit_owner audit primitive the JudgmentCall record extends | path: genesis/docs/content/elohim-protocol/ORACLE.md
-  - wisdom-layer-floor-ceiling-judgment-culminating-design | the BUILT floor/ceiling primitive (InferenceTier, GateResult, JudgmentCall, audit-the-guardian); names the termination↔scalability tradeoff | path: genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-floor-ceiling-judgment-culminating-design.md
-  - trust-compute-gradient-brainstorm | trust-as-compute-property; the capability/trust/safety-gated substrate framing for the ~1T-param model; bad-elohim detection + model-diversity defense | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
+  - "justice-manifesto | the vision this spec implements; §1 Vision Alignment cites its articles (floor/ceiling, sight-as-virtue, humility-not-apotheosis, no-backdoor) | path: genesis/docs/architecture/justice-manifesto.md"
+  - "stewardship-over-sovereignty | the substrate gate every new authority path must pass — absolute lockout impossible, no self-sovereign apex, trust made load-bearing not eliminated | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "cradle-to-grave-capability-gradient | the 4-layer graduated authority + orthogonal CryptographicQuorum the InspectionAuthority enum mirrors structurally | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "rea-compute-commitment-primitive | the Mishpat::Commitment + delegates-compute primitive the non-standing warrant composes from, never an admin-key grant | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
+  - "recovery-protocol-phase-2-revised-design | the §10 Anti-Lockout Audit this spec's No-Backdoor Audit mirrors; the Rescue/Dissolution-only NetworkWitnessPurpose the Inspection act must NOT extend; §8.3 hidden-defense-is-a-backdoor generalized | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md"
+  - "resilience-protocol-spec | absolute-lockout-is-a-design-failure + breach-never-contaminates-attribution; the dignity floor the ceiling is bounded by | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
+  - "governance-epic | the sortition mechanics + appeal cascade this spec turns from narrative into a DHT entry type + coordinator function | path: genesis/docs/content/elohim-protocol/governance/epic.md"
+  - "governance-layers-architecture | cryptographic-sortition params, term limits, commons co-steward; the un-buyable/un-lobbyable properties the Inspection quorum encodes | path: genesis/docs/content/elohim-protocol/governance-layers-architecture.md"
+  - "constitution | the existential floors as HARD-BLOCK code; the floors the ceiling can never cross | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "confession | the El Roi limit (no verdict-over-a-person; no god-mode read) the Inspection Ceiling act encodes as a hard constraint | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "elohim-oracle | the RefusalCode::ReservedPlace / limit_owner audit primitive the JudgmentCall record extends | path: genesis/docs/content/elohim-protocol/ORACLE.md"
+  - "wisdom-layer-floor-ceiling-judgment-culminating-design | the BUILT floor/ceiling primitive (InferenceTier, GateResult, JudgmentCall, audit-the-guardian); names the termination↔scalability tradeoff | path: genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-floor-ceiling-judgment-culminating-design.md"
+  - "trust-compute-gradient-brainstorm | trust-as-compute-property; the capability/trust/safety-gated substrate framing for the ~1T-param model; bad-elohim detection + model-diversity defense | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
 related:
   - ../../content/elohim-protocol/governance/epic.md
   - ../../architecture/justice-manifesto.md

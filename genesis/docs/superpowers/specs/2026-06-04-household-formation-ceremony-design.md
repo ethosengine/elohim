@@ -240,13 +240,13 @@ household quorum, under five minutes, no seed phrase — the executable home for
 cross-doorway leg stays shem-gated). M1 named-pair flag persists.
 
 **Corrections (land with this spec):**
-- `features/shefa/human-resilience.feature`: scenarios "Matthew + Susan — household
+- `features/rms/human-resilience.feature`: scenarios "Matthew + Susan — household
   reciprocation", "Maria builds resilience through first connection", "Degradation —
   Matthew goes offline", "Recovery — after-action review" retag `@requires:shem` →
   `@requires:household-nodes`. "Matthew + Susan + Pete" splits (household arm →
   household-nodes; congregation arm keeps shem). "Full network — 5 conductors"
   keeps shem (genuinely multi-tenant).
-- `held/features/lamad/love-map-negotiation.feature` → `@requires:household-nodes`
+- `held/features/lms/love-map-negotiation.feature` → `@requires:household-nodes`
   (verified single-doorway dyad), returns to live.
 - **Persona reconciliation**: household scenarios converge on the canonical triad
   (matthew/jessica/james) per the named-pair anti-drift principle.

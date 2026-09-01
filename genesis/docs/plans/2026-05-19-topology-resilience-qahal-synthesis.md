@@ -189,9 +189,9 @@ These are the visual-delivery gates. A scenario is "visually delivered" when its
 
 | Feature file | Gate scenarios | What's missing today |
 |---|---|---|
-| `genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature` | All `@wip`: Matthew sees Terrance on `/shefa/peers`, real reciprocity on `/shefa/reciprocity`, device tiles on `/shefa/cluster` | `/shefa/reciprocity` route + page; substrate hydration into `peer-household-card` |
+| `genesis/a2o/features/rms/m1-matthew-terrance-delivery.feature` | All `@wip`: Matthew sees Terrance on `/shefa/peers`, real reciprocity on `/shefa/reciprocity`, device tiles on `/shefa/cluster` | `/shefa/reciprocity` route + page; substrate hydration into `peer-household-card` |
 | `genesis/a2o/features/resilience/observable-distribution.feature` | `@wip` content-viewer resilience tooltip; `@resilience-p1` placement-gaps row | Resilience tooltip component on content viewer; `/api/v1/placement-gaps` route surfacing (or GraphQL equivalent) |
-| `genesis/a2o/features/shefa/human-resilience.feature` | All `@wip`: at-risk → partial → protected progression per person, per reach | Trust-circle-depth + reciprocal-commitment-count computation; relationship-type joined into peer-topology edges |
+| `genesis/a2o/features/rms/human-resilience.feature` | All `@wip`: at-risk → partial → protected progression per person, per reach | Trust-circle-depth + reciprocal-commitment-count computation; relationship-type joined into peer-topology edges |
 | `genesis/a2o/features/qahal/collective-governance.feature` | Voting mechanics, proxy-elohim voting, REA stewardship recognition (mostly `@wip`) | Governance-decision → REA economic-event bridge; elohim governance-disposition computation; Collective view |
 | `genesis/a2o/features/auth/recovery/intimate-quorum-happy-path.feature` | `@stage1-structural @recovery-m3` — cross-doorway invitation delivery | Gossipsub `recovery.invitation` topic across doorways; qahal-lens visibility of emergency-contact relationships |
 | `genesis/a2o/features/auth/recovery/revocation-emergency-quorum.feature` | `@recovery-m4 @emergency-contact-quorum` | Cross-doorway vote aggregation; revoke-by-quorum surface |

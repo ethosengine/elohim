@@ -17,7 +17,7 @@ relatedNodeIds:
   - "genesis/docs/content/elohim-protocol/history/2026-06-02-light-up-topology-operational-visibility-arc.md"
   - "genesis/a2o/features/resilience/observable-distribution.feature"
   - "genesis/a2o/features/elohim-core/epr-link-hypercard.feature"
-  - "genesis/a2o/features/lamad/epr-link-navigation.feature"
+  - "genesis/a2o/features/lms/epr-link-navigation.feature"
   - "memory:project_household_living_core_lived_contrast_diffusion"
   - "memory:project_placement_signals_are_shefa_inputs"
 tags: [topology, epr, resilience, browser-tier, household-testable]

@@ -56,7 +56,7 @@ of the slice.
 
 ## Task 0: Story-first anchor (no new gherkin)
 
-**Files:** read-only — `genesis/a2o/features/lamad/attention-analytics.feature`
+**Files:** read-only — `genesis/a2o/features/lms/attention-analytics.feature`
 
 - [ ] **Step 1: Confirm the experience is already covered.** `attention-analytics.feature:13-19` asserts
   *content-view → economic event, action "use", resource type "attention"* — the human-facing anchor this

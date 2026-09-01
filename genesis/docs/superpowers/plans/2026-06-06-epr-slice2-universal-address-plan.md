@@ -113,7 +113,7 @@ MODIFIED — portal
   app/imagodei-portal/src/main.ts (interceptor install)
 
 MODIFIED — a2o / fixtures
-  genesis/a2o/features/lamad/deep-link-delivery.feature (+2 scenarios)
+  genesis/a2o/features/lms/deep-link-delivery.feature (+2 scenarios)
   genesis/a2o/steps/lamad/deep-link-delivery.steps.ts (+2 steps)
   genesis/a2o/src/framework/pages/selectors.ts (+CONTENT_VIEWER.ROOT)
   app/lamad/src/app/components/content-viewer/content-viewer.component.html (root testid if missing)
@@ -1903,7 +1903,7 @@ git commit -m "feat(imagodei-portal): install the epr-link interceptor safety ne
 **Files:**
 - Modify: `app/lamad/src/app/components/content-viewer/content-viewer.component.html` (root testid, IF missing)
 - Modify: `genesis/a2o/src/framework/pages/selectors.ts` (+CONTENT_VIEWER)
-- Modify: `genesis/a2o/features/lamad/deep-link-delivery.feature` (+2 scenarios)
+- Modify: `genesis/a2o/features/lms/deep-link-delivery.feature` (+2 scenarios)
 - Modify: `genesis/a2o/steps/lamad/deep-link-delivery.steps.ts` (+2 steps)
 
 - [ ] **Step 15.1: Ensure the content-viewer root testid.** `grep -n 'data-testid' app/lamad/src/app/components/content-viewer/content-viewer.component.html | head -3` — if no root-container `data-testid="content-viewer"` exists, add it to the outermost container element. Register in `selectors.ts` (follow the PATH_NAV/PATH_OVERVIEW pattern):
@@ -1979,7 +1979,7 @@ Expected: 0 undefined steps. (Full e2e runs on alpha post-merge via CI; do not a
 - [ ] **Step 15.6: Commit**
 
 ```bash
-git add genesis/a2o/features/lamad/deep-link-delivery.feature genesis/a2o/steps/lamad/deep-link-delivery.steps.ts \
+git add genesis/a2o/features/lms/deep-link-delivery.feature genesis/a2o/steps/lamad/deep-link-delivery.steps.ts \
         genesis/a2o/src/framework/pages/selectors.ts genesis/a2o/steps/ui \
         app/lamad/src/app/components/content-viewer/content-viewer.component.html
 git commit -m "test(a2o): universal /epr address + cross-bundle resource handoff — render-verified (§12.5)"

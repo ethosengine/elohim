@@ -14,11 +14,11 @@ informed-by:
   - genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
   - genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md
 cites:
-  - resiliency-card-p2p-weave-sprint-plan | the parent sprint plan; this drains its FOLLOW-ON Waves 3–5 (gap-items #16/#17/#18), inheriting its binding constraints + honest-verification boundary | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md
-  - epr-slice1-lens-complete-resolver-plan | Wave 3 drains its Tasks 2/3/4 (Task 1 claims-302 demotion already landed); the epr-composite renderer is the keystone | path: genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md
-  - lens-complete-epr-resolution-four-leg-coupling-design | the four-leg coupling law Wave 3's relationships-population serves (knowledge leg from existing head relations, NOT the held ClusterClosure walk) | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
-  - rea-economic-facing-lens-design | Wave 4 lands its slice sequence (REA folds proof-gate → MishpatCommitmentView + route → mishpat→rea delegates-compute bridge + compute-fulfilled) | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
-  - weave-epic-arc-design | Wave 5 lands #4's Slice-0 single-host encryption round-trip proof; live encryption (KeyEnvelope + ShardManifest field-add + X25519 substrate) HELD | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md
+  - "resiliency-card-p2p-weave-sprint-plan | the parent sprint plan; this drains its FOLLOW-ON Waves 3–5 (gap-items #16/#17/#18), inheriting its binding constraints + honest-verification boundary | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md"
+  - "epr-slice1-lens-complete-resolver-plan | Wave 3 drains its Tasks 2/3/4 (Task 1 claims-302 demotion already landed); the epr-composite renderer is the keystone | sha256:7eef8df32ead0079 | path: genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md"
+  - "lens-complete-epr-resolution-four-leg-coupling-design | the four-leg coupling law Wave 3's relationships-population serves (knowledge leg from existing head relations, NOT the held ClusterClosure walk) | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md"
+  - "rea-economic-facing-lens-design | Wave 4 lands its slice sequence (REA folds proof-gate → MishpatCommitmentView + route → mishpat→rea delegates-compute bridge + compute-fulfilled) | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md"
+  - "weave-epic-arc-design | Wave 5 lands #4's Slice-0 single-host encryption round-trip proof; live encryption (KeyEnvelope + ShardManifest field-add + X25519 substrate) HELD | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
   - elohim/elohim-storage/src/epr_head.rs
   - elohim/elohim-storage/src/services/sealed_against_self.rs
   - elohim/elohim-storage/src/sharding.rs
@@ -109,7 +109,7 @@ Prereq check: resolver-plan **Task 1 (claims-302 demotion) — VERIFY it landed*
 | 3.1 `epr-composite` renderer (KEYSTONE) | NEW renderer under `app/lamad/src/app/renderers/`; register in `content-io.module.ts` | Vitest: epr-composite node (sections/items fixture) → navigable outline, one `/epr/{ref}` link per item (via `eprToUniversalHref`, never a literal), root `data-testid`, degrades on empty body. | **LAND-NOW** |
 | 3.2 "Open in {pillar}" affordance | `content-viewer.component.{ts,html}` | Vitest: claimed type → affordance present w/ right cross-bundle href; unclaimed → absent. `data-testid`. | **LAND-NOW** |
 | 3.3 populate `epr_head.rs:148 relationships` | `epr_head.rs` enrich=true path (mirror how `attestation_requirements` fills from `query_direct_prerequisites`) | fill from existing `EprRelationship` head relations (`query_direct_relationships`-style); **NOT** the transitive `ClusterClosure` walk (design-only, acquisition #11 — HELD). Rust unit test: enrich=true returns head relations; enrich=false stays diesel-only `vec![]`. | **LAND-NOW** |
-| 3.4 a2o 302-inversion scenario | `genesis/a2o/features/lamad/deep-link-delivery.feature` + steps + selectors | invert the old 302 assertion → `/epr/{claimed-path}` renders lens-complete (composite outline + knowledge leg + Open-in-pillar affordance), no 302; `@regression`; testid-sync. | impl LAND-NOW; **live run HELD** (alpha) |
+| 3.4 a2o 302-inversion scenario | `genesis/a2o/features/lms/deep-link-delivery.feature` + steps + selectors | invert the old 302 assertion → `/epr/{claimed-path}` renders lens-complete (composite outline + knowledge leg + Open-in-pillar affordance), no 302; `@regression`; testid-sync. | impl LAND-NOW; **live run HELD** (alpha) |
 | — value-leg substrate | `provide-content` REA action + scorer (acquisition #7–9) | (not in scope) | **HELD** — own slice; value data partly flows from Wave 4 |
 | — ClusterClosure walk | transitive typed-relation closure (acquisition §5.1 / #11) | (not in scope) | **HELD** — design-only substrate |
 
