@@ -9,6 +9,7 @@ written: "2026-09-01"
 author: "session-2026-09-01-rung5-design"
 status: "open"
 priority: "high"
+claimedBy: "claude-sonnet-t6-story"
 jobs: [elohim-genesis, elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
@@ -80,3 +81,123 @@ convergence assertion reads from EVERY peer, and unreachable ≠ absent.
   compatibly throughout.
 - Arc-doc cycle-time row + habit delta appended; `habits-project.py --check`
   clean.
+
+## Implementation notes (2026-09-01)
+
+Story half landed:
+`genesis/a2o/features/delivery/runtime-upgrade-propagation.feature`
+(`@concern:runtime-upgrade-propagation @requires:household-nodes @wip @act:i`,
+household mesh = matthew/jessica/james per `household-mesh.ts`). Ten
+scenarios: eight map to §10's receipt chain in order (publish → staging
+converges on all three peers → canary (james) adopts + attests with
+context → earned promotion on james's evidence, never matthew's own
+say-so → fleet convergence with conductor PIDs unchanged and jessica shown
+no prompt → revert-by-re-election → james's personal `canary-james` channel
+diverging compatibly throughout → the observed version matrix reading every
+transition back honestly), plus two scenarios giving §4's constitutional
+posture its own assertions: jessica's "protection is not a veto" framing,
+and a negative control refusing an envelope-breaking release. Design read:
+grandma's proof case (spec §4) is staged through jessica rather than a new
+fixture persona, to stay inside the canonical household triad and the
+3-peer-mesh framing the receipt's own DoD names; "canary" is read as
+in-household (james), not a literal neighboring peer, to keep the story at
+Act I / `@requires:household-nodes` rather than Act II's `@requires:shem`.
+
+**Revision pass 1 (2026-09-01, from the first context-isolated blind-reader
+verdict REVISE):**
+
+- BLOCKER fixed — canary-a had no follower, so the publish→promote chain had
+  no mechanism. Resolved the channel model explicitly: canary-a is now the
+  household's shared SOAK channel (Background wires all three peers onto
+  it), distinct from james's personal `canary-james` experiment channel
+  (his alone); james's narrative role is "serves as the canary" on the
+  shared channel, not sole-follower.
+- Vocabulary expanded to close five gaps the reader named: the
+  follow → resolve → adopt lifecycle (each verb now defined, not just
+  ADOPTION); the conductor-mediated-resolution vs. adopting-from-a-hint
+  distinction (Station 2's Then step now says a peer hint may point a
+  runtime at a channel, but the runtime's own conductor still does the
+  resolving — gossip isn't refused, only *unverified* adoption is); a
+  coordinator/integrity-line sentence; a concrete example of what an
+  attestation probes; and one line pinning ELECTION to "the deterministic
+  arbiter," not a ballot (title's "election" left unchanged, as directed).
+- "governance tally" (undefined jargon) replaced with a plain-language
+  Then step naming content/files/recorded-agreements directly.
+- jessica's veto scenario reframed from an untestable absence claim to an
+  inspectable one (no setting/flag/control exposed) plus a named, non-abstract
+  governance surface (the release's own explanation + escalation reach —
+  both literally named in spec §4, not invented here).
+- Station numbers moved from comments into scenario titles ("Station N —
+  …", 8 of them, one per §10 receipt link) since runners strip comments;
+  short comments retained alongside as rationale, not as the sole carrier.
+- "the ceremony above" (a positional reference) replaced in both Station 7
+  and Station 8 with a self-contained Given ("a complete ceremony has
+  staged, promoted, and reverted a release on the commons channel").
+- Minors: safety-property Then steps now lead with the human-legible claim
+  and subordinate PIDs/agent-keys/DNA-lineage as parentheticals (Stations 3,
+  5, and the negative control). Doorway Background line kept, not cut — the
+  a2o `CLAUDE.md` convention states "Background: always include `Given
+  doorway "alpha" at ...`" unconditionally; no step here exercises it yet,
+  but future admin-surface reads may proxy through it, and the convention
+  itself is unconditional, not usage-gated.
+
+Scenario count is unchanged (ten); none were added or removed, only
+retitled/reworded.
+
+**Revision pass 2 (2026-09-01, from the second context-isolated blind-reader
+verdict REVISE-but-converging — vocabulary block, station chain, and
+jessica's thread independently praised; coordinator flagged this the FINAL
+revision round, merging on integrator judgment next):**
+
+- Arc framing moved from header comments into the Feature description's
+  opening two sentences ("rung 5 of the household's upgrade-velocity
+  ladder... rungs 1-4... already landed: the ground this rung stands on");
+  header comments trimmed to only the spec-path and backlog-atom pointers.
+- Vocabulary gained three definitions the reader named as missing: the
+  COMPATIBILITY ENVELOPE (validation-rule identity + additive-only wire
+  changes + a matching declared lineage parent — diverging inside it is
+  welcome, breaking it is refused); a one-sentence COORDINATOR/INTEGRITY
+  grounding (coordinator = hot-swappable behavioral layer; integrity =
+  shared validation identity, moving it needs a heavier ceremony); and an
+  ELECTION mechanism line (a deterministic rule every peer applies locally
+  to the same declared candidates — no consensus round, no judge).
+- Station 2's Then step reworded from a universal negative ("never adopted
+  from a hint") to an observable claim: each runtime's own adoption record
+  names its own conductor as the resolution path, so a hint is visible as a
+  verified pointer, never as the thing adopted.
+- Station 3's Then step reworded from an unbounded "nothing changed" claim
+  to an observable one: james's runtime's own passport reports the same
+  agent identity and cells, human claim first, infrastructure detail
+  subordinate.
+- Station 7 reworked from "at any point during that ceremony" (unsteppable)
+  to three named, sequential checkpoints — after staging, after promotion,
+  after the revert — as three When/Then pairs inside the SAME scenario
+  block (the acquisition-pins.feature multi-When/Then-pair pattern), so the
+  scenario count stays ten and no Scenario Outline expansion was needed.
+- Background's soak-channel Given split in two: "follows its shared soak
+  channel" / "james is designated the canary on that channel" — was one
+  compound line.
+- Ceremony agency unified on "matthew runs the ceremony" across Stations
+  4/6/7/8 (6 and 7/8 previously had the ceremony itself as grammatical
+  subject — "a ceremony has staged…" — inconsistent with 4's "matthew runs
+  the promotion ceremony"; Station 8 was fixed too for the same reason even
+  though the coordinator's list named only 4/6/7, since it shared the exact
+  phrase Station 7 had).
+- Left unchanged per explicit instruction: the "But" clause in jessica's
+  scenario, the doorway Background line, the Feature title (including the
+  word "election"), scenario count (ten), and the station structure/order.
+
+**Pending, explicitly not run here:** the coordinator stated this is the
+final revision round and will merge on integrator judgment — no further
+blind-reader dispatch from this side. Step-definition/receipt-script wiring
+stays blocked on sibling tasks T1-T4 and is the integrator's.
+
+**Blind-reader loop record (integrator, 2026-09-01):** two context-isolated
+rounds run. Round 1 REVISE (1 blocker — canary-a unwired — + 6 majors), all
+applied. Round 2 (fresh reader) REVISE converging — independently praised the
+vocabulary block, station chain, and jessica thread; its named path-to-READY
+items all applied (envelope + coordinator + election definitions, arc framing
+into prose, observable Then steps, named observation points). Merged on
+integrator judgment: no structural findings remain; the story is `@wip` and
+CANNOT pass until T1-T4 land, so the final fresh-reader pass is deliberately
+attached to the step-wiring half of this task, before `@wip` lifts.
