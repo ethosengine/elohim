@@ -7,7 +7,7 @@ title: "A peer joining between fleet boots is never discovered by the reconcile 
 slug: "late-joiner-peer-discovery-boot-only-board"
 written: "2026-08-31"
 author: "shift 2026-08-31T02-40-fleet-carried-election-convergence"
-status: "open"
+status: "resolved"
 priority: "high"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -33,3 +33,17 @@ book at runtime. Design belongs with (or inside) the p2p upgrade-propagation
 arc, since organic joining is the same seam. Fixture note: the household mesh
 cannot currently model a late joiner — see
 backlog-mesh-fixture-fidelity-regimes.
+
+## Resolution — 2026-09-01
+
+The post-grace doorway board watch now refreshes at the existing retry cadence
+even while the peer book is warm. Each result still crosses the existing
+bounded response and entry limits, signature verification, self-filter, and
+monotone peer-book upsert; no membership authority or wire shape moved to the
+doorway.
+
+Evidence: the focused warm-book late-joiner regression passed (1 passed, 0
+failed), the complete doorway-bootstrap unit module exited 0, and `just gate
+elohim-storage` exited 0 (including 3,084 core unit tests with 0 failures plus
+the integration and doc-test inventory). This closes the boot-only code defect;
+fleet proof remains pending the separately tracked late-joiner mesh fixture.

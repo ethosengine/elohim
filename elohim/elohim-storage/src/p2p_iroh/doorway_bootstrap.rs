@@ -308,8 +308,8 @@ pub const BOOT_SEED_RETRY: Duration = Duration::from_secs(2);
 pub const BOOT_SEED_ATTEMPTS: u32 = 5;
 
 /// Spawn the bootstrap joiner: one **boot seed** if the book is empty right
-/// now, then — after `grace` — whenever the book is EMPTY, read the doorway's
-/// board and seed it.
+/// now, then — after `grace` — periodically read the doorway's board so peers
+/// that register after this node booted join the live membership projection.
 ///
 /// The boot seed is the pull leg's release. `acquisition::first_drain` holds
 /// the first acquisition drain on this book for at most `FIRST_DRAIN_HOLD`
@@ -320,18 +320,19 @@ pub const BOOT_SEED_ATTEMPTS: u32 = 5;
 /// from a deadline into an event: the board holds every survivor's signed
 /// manifest (24 h TTL), verified here before the book sees it.
 ///
-/// Empty-only after that, by design. Gossip is the primary channel and fills the book
-/// within seconds on any node that can reach a peer; the doorway leg exists for
-/// the node that cannot. Gating on emptiness means a dual-mode node pays one
-/// cheap check per tick and never a request, while a pure-iroh node — or one
-/// whose book a partition emptied — re-bootstraps without any mode flag to set.
+/// Gossip remains the primary channel and can fill the book within seconds on
+/// any node that can already reach the announcer. The recurring board read is
+/// the liveness leg for an organic late joiner that has registered with the
+/// doorway but has no gossip adjacency to the running fleet yet. Every entry
+/// still passes client-side signature verification and the book's monotone
+/// upsert, so making membership live adds no doorway authority.
 ///
 /// Nothing here joins gossip topics: the receive loop already re-runs
 /// `join_peers` on every book change (`gossip_receive::run_topic_receive`
 /// selects on `book.subscribe()`), so seeding the book IS joining.
 ///
-/// bounded-work: at most one GET per `retry` tick, and only when the book is
-/// empty.
+/// bounded-work: at most one GET per `retry` tick; each response is already
+/// bounded by [`MAX_MANIFEST_RESPONSE_BYTES`] and [`MAX_BOOTSTRAP_ENTRIES`].
 pub fn spawn_doorway_bootstrap(
     inputs: DoorwayBootstrapInputs,
     grace: Duration,
@@ -359,20 +360,18 @@ pub fn spawn_doorway_bootstrap(
                 tokio::time::sleep(BOOT_SEED_RETRY).await;
             }
         }
-        // The grace period is what makes the WATCH a fallback: gossip gets
-        // first refusal on keeping the book filled.
+        // The grace period gives gossip first refusal. After it elapses the
+        // board becomes a recurring membership source: an already-warm book
+        // must still learn peers that registered after this node booted.
         tokio::time::sleep(grace).await;
         info!(
             doorway = %inputs.base_url,
-            "doorway bootstrap: watching for an empty peer book"
+            "doorway bootstrap: watching the live membership board"
         );
         let mut ticker = tokio::time::interval(retry);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
-            if !inputs.book.is_empty() {
-                continue;
-            }
             read_board(&client, &inputs, BootstrapPhase::Watch).await;
         }
     })
@@ -730,7 +729,53 @@ mod tests {
         handle.abort();
         assert!(
             server.received_requests().await.unwrap().is_empty(),
-            "a warm book must not issue a boot read"
+            "a warm book must not issue a boot read before the watch grace elapses"
+        );
+    }
+
+    /// A peer that registers after this node has already booted must be learned
+    /// without clearing the warm book or restarting the fleet. This is the
+    /// W2 late-joiner shape from `late-joiner-peer-discovery-boot-only-board`.
+    #[tokio::test]
+    async fn a_warm_book_learns_a_peer_that_joins_after_boot() {
+        let server = wiremock::MockServer::start().await;
+        let late_joiner = signed(&[29u8; 32], 4800, 200);
+        let book = IrohPeerBook::new();
+        assert!(book.accept(&signed(&[27u8; 32], 4700, 100)));
+        let handle = spawn_doorway_bootstrap(
+            DoorwayBootstrapInputs {
+                base_url: server.uri(),
+                book: book.clone(),
+                self_node_id: "self".into(),
+            },
+            Duration::from_millis(25),
+            Duration::from_millis(50),
+        );
+
+        // The node is already running with a warm book when the new peer
+        // appears on the doorway board.
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(MANIFESTS_PATH))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(board_with(&late_joiner)),
+            )
+            .mount(&server)
+            .await;
+
+        let late_node_id: iroh::NodeId = late_joiner.iroh_node_id.parse().unwrap();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+        while book.get(&late_node_id).is_none() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        handle.abort();
+
+        assert!(
+            book.get(&late_node_id).is_some(),
+            "the recurring board read must add a late joiner to an already-warm book"
+        );
+        assert!(
+            !server.received_requests().await.unwrap().is_empty(),
+            "the watch leg must read the board even while the book is warm"
         );
     }
 }
