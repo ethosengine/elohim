@@ -1,6 +1,7 @@
 /**
- * Step glue for ONE scenario in features/resilience/app-blob-heal-on-read.feature:
- * "An artifact over the erasure-coding threshold is accepted whole and served whole".
+ * Step glue for the self-ingesting scenarios in
+ * features/resilience/app-blob-heal-on-read.feature: the 17 MiB sequential-
+ * chunk restart proof and the 68 MiB erasure-coded ingest proof.
  *
  * WHY THIS IS ITS OWN FILE. Every other blob step in this concern reads a blob
  * some other producer put there (the seeder, a deploy stage, a peer heal). This
@@ -34,7 +35,9 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 import { Given, Then, When } from '@cucumber/cucumber';
 
@@ -52,6 +55,13 @@ interface OversizedArtifact {
   hash: string;
   putStatus?: number;
   putBody?: string;
+}
+
+const BASH_BIN = process.env['E2E_BASH_BIN'] ?? '/bin/bash';
+
+/** This step file lives at genesis/a2o/steps/mesh. */
+function hcMeshScriptPath(): string {
+  return fileURLToPath(new URL('../../../../app/elohim-app/scripts/hc-mesh.sh', import.meta.url));
 }
 
 /**
@@ -120,11 +130,24 @@ Given(
   }
 );
 
+Given(
+  'an artifact of {int} MiB, in the sequential chunked-blob band',
+  function (this: E2EWorld, mib: number) {
+    assert.ok(
+      mib > 16 && mib <= 64,
+      `an artifact of ${mib} MiB is outside the sequential chunked-blob band ` +
+        '(>16 MiB and <=64 MiB)'
+    );
+    const bytes = deterministicBytes(mib * 1024 * 1024);
+    artifacts.set(this, { bytes, hash: sha256Address(bytes) });
+  }
+);
+
 When(
   'I PUT the artifact to the storage peer under its own hash',
   { timeout: 300_000 },
   async function (this: E2EWorld) {
-    const held = heldForOwnership('PUT a 68 MiB artifact into a storage peer');
+    const held = heldForOwnership('PUT an oversized artifact into a storage peer');
     if (held) return held;
     const art = artifact(this);
     const response = await fetch(`${storageUrl()}/blob/${art.hash}`, {
@@ -146,11 +169,43 @@ Then('the storage peer accepts the artifact', function (this: E2EWorld) {
   assert.ok(
     art.putStatus === 200 || art.putStatus === 201,
     `PUT /blob/${art.hash} → ${String(art.putStatus)} (body: ${art.putBody ?? ''}). ` +
-      'An artifact above the erasure-coding threshold must be accepted whole; a dropped ' +
-      'connection here is the ingest task panicking on shard arithmetic.'
+      'An artifact above the inline threshold must be accepted whole; a dropped connection ' +
+      'here means the ingest task failed on shard arithmetic.'
   );
   return undefined;
 });
+
+When('the storage peer restarts', { timeout: 320_000 }, function () {
+  const peer = process.env['E2E_MESH_RESTART_PEER'] ?? 'matthew';
+  const held = heldForOwnership(`restart mesh storage peer "${peer}"`);
+  if (held) return held;
+
+  const script = hcMeshScriptPath();
+  const result = spawnSync(BASH_BIN, [script, 'storage-restart', peer], {
+    encoding: 'utf8',
+    timeout: 300_000,
+  });
+  assert.equal(
+    result.status,
+    0,
+    `${script} storage-restart ${peer} exited ${String(result.status)}: ` +
+      `${(result.stderr ?? '').slice(-2000)}`
+  );
+  return undefined;
+});
+
+async function fetchAfterPossibleRestart(url: string): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(240_000) });
+    } catch (error) {
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  throw lastError;
+}
 
 Then(
   'GET {string} for that artifact from the same storage peer returns it byte-identical',
@@ -163,9 +218,7 @@ Then(
     // `/blob/{hash}` — so a reader sees the whole request, not a prefix plus
     // an inference about how the address gets appended.
     const path = route.replace('{hash}', art.hash);
-    const response = await fetch(`${storageUrl()}${path}`, {
-      signal: AbortSignal.timeout(240_000),
-    });
+    const response = await fetchAfterPossibleRestart(`${storageUrl()}${path}`);
     assert.equal(
       response.status,
       200,
@@ -176,7 +229,7 @@ Then(
       served.length,
       art.bytes.length,
       `served ${served.length} bytes for a ${art.bytes.length}-byte artifact — ` +
-        'RS pads the last data shard, so a length drift here is the padding leaking into the read'
+        'chunked and RS reassembly must both preserve the exact original length'
     );
     assert.equal(
       sha256Address(served),

@@ -84,3 +84,16 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     When I PUT the artifact to the storage peer under its own hash
     Then the storage peer accepts the artifact
     And GET "/blob/{hash}" for that artifact from the same storage peer returns it byte-identical
+
+  # A sequentially chunked blob has no composite file under its own hash: the
+  # peer stores 1 MiB shards plus a durable manifest. Before the manifest was
+  # projected to SQLite, the minting process's in-memory map was the only
+  # reconstruction recipe. PUT and warm GET both passed, then a restart made
+  # the same bytes 404 through both /blob and the /apps resolver.
+  @requires:owned-substrate @regression @chunked-restart
+  Scenario: A chunked artifact remains byte-identical after its storage process restarts
+    Given an artifact of 17 MiB, in the sequential chunked-blob band
+    When I PUT the artifact to the storage peer under its own hash
+    Then the storage peer accepts the artifact
+    When the storage peer restarts
+    Then GET "/blob/{hash}" for that artifact from the same storage peer returns it byte-identical

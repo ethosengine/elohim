@@ -7,7 +7,7 @@ invariant: >
 status: green
 active: false
 checks:
-  - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
+  - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
 refs:
   - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
   - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
@@ -16,6 +16,11 @@ retire-when: >
   silent and irreversible — nobody reports the blob they can no longer fetch — which is
   exactly the class that must not depend on someone remembering to look.
 ---
+DELTA 2026-09-01 (GREEN preserved; sequential-chunk restart receipt):
+`@chunked-restart` PUT a deterministic 17 MiB artifact to matthew, restarted
+the actual storage process, then proved the composite GET byte-identical —
+1 scenario / 7 steps green in 3m06s. This closes the stale >16 MiB local
+restart backlog with process-boundary evidence, not a warm in-memory read.
 DELTA 2026-08-23c (swarm rows landed by Codex, 4009362f0: parity-aware
 completion, bounded snapshot+delta inventory, data-shard-first placement;
 re-verified live on the mesh in DUAL transport on a p2p-iroh build:

@@ -7,9 +7,18 @@ title: "Blobs over the 16MB chunk threshold are not durably persisted — chunke
 slug: "chunked-blob-over-16mb-not-durable-mesh-repro"
 written: "2026-08-16"
 author: "claude (local-mesh-saga-delivery shift, live RCA)"
-status: "open"
+status: "resolved"
 priority: "high"
-tags: [blob-store, chunking, durability, dataplane, local-mesh, ssr, resiliency-saga]
+tags:
+  [
+    blob-store,
+    chunking,
+    durability,
+    dataplane,
+    local-mesh,
+    ssr,
+    resiliency-saga,
+  ]
 cites:
   - elohim/elohim-storage/src/blob_store.rs
   - genesis/data/timeline/backlog/doorway-boot-self-heal-family-mesh-repro.md
@@ -22,7 +31,7 @@ Evidence trail from the 2026-08-16 local mesh (matthew peer,
 
 1. `PUT /blob/sha256-889c…` (18,372,047 bytes — the elohim-host-landing
    browser bundle) at 04:33Z → log `"Stored blob with manifest …
-   shards: 18, encoding: chunked"` (blob_store.rs `MAX_INLINE_SIZE` = 16MB,
+shards: 18, encoding: chunked"` (blob_store.rs `MAX_INLINE_SIZE` = 16MB,
    chunk threshold comment "matches Holochain entry limit").
 2. 04:33–04:35Z: `GET /blob/sha256-889c…` → 200, log
    `"Serving reassembled blob … shards: 18"`. An 18MB control blob
@@ -42,7 +51,7 @@ Evidence trail from the 2026-08-16 local mesh (matthew peer,
    chunk manifest).
 6. Same loss at first staging attempt (hash 798c…, 04:11Z upload,
    absent by 04:18Z sweep: `shard_manifest_backfill … missing_blob: 2,
-   restamp_bytes_missing: 1`) — reproducible, both times only the >16MB
+restamp_bytes_missing: 1`) — reproducible, both times only the >16MB
    member of a 4-blob staging batch (2.7/3.5/14.4MB siblings all persisted
    under `blobs/blobs/<prefix>` and survive).
 
@@ -205,6 +214,7 @@ before 404ing. Pinned by `tests/chunked_blob_local_read_unification.rs`
 on shard-shape) alongside the existing durability pins.
 
 Residuals surfaced by the RCA, still open here:
+
 - **>64MB RS-band blobs are broken at ingest**: `put_blob_bytes` slices raw
   data by shard_size for any `encoding != "none"`, but an rs-4-7 manifest's
   hashes are of erasure-coded shards — mismatch is warn-only and the bytes
@@ -214,3 +224,28 @@ Residuals surfaced by the RCA, still open here:
   swarm work.
 - Cross-peer manifest propagation (W1.2) and the blobHash-rotation restamp
   orphan remain open as recorded above.
+
+## Resolution receipt (2026-09-01) — real process restart is green
+
+The local durability class named by this record is now closed by both the
+implementation and its missing owned-substrate acceptance proof. The durable
+manifest and unified local-read changes landed in `6eace7952` and `fb90a3322`;
+the fresh-`BlobStore` integration coverage in
+`tests/chunked_blob_local_read_unification.rs` passes in the storage gate.
+
+The decisive mesh run used the new `@chunked-restart` scenario in
+`features/resilience/app-blob-heal-on-read.feature`:
+
+1. PUT a deterministic 17 MiB artifact (the sequential chunk band) to
+   `matthew` under its own sha256 address.
+2. Restart the actual `matthew` storage process through
+   `hc-mesh.sh storage-restart matthew`, preserving its storage directory and
+   SQLite projection while discarding all process memory.
+3. GET the composite address from the restarted peer and compare every byte
+   with the original payload.
+
+Result: **1 scenario passed, 7/7 steps passed** in 3m06s. The post-restart GET
+returned 200 and was byte-identical. The acceptance step and its explicit
+`@chunked-restart` tag make this exact regression independently rerunnable;
+the older cross-peer, inventory, and >64 MiB findings remain separate concern
+histories rather than reasons to keep this local restart defect open.
