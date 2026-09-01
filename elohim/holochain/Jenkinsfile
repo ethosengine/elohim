@@ -849,6 +849,7 @@ def nonProdTrueGate(String env) {
  * to the pre-extraction inline version.
  */
 def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String happDigest, String storageImage, String conductorImage, String conductorWsHost, String nonProdGate, Map primaryDoorway, String relayUrl, String hostAliases, String p2pNodes, String nodeTypeValues, String deviceArchetype, String householdId, String nodeRole, String region) {
+    def shares = splitBudget(humanConfig)
     // Doorway ORIGIN (scheme + host, no path) for the storage-side iroh bootstrap:
     // elohim-storage's transport-manifest announcer POSTs to, and its joiner reads,
     // `${ELOHIM_DOORWAY_URL}/p2p/manifests`. Without this env every fleet storage has
@@ -925,15 +926,15 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         // human's real footprint MUST be paired with a matching edgenode* raise
         // (which that validator does hold to account) or it hides load from the
         // portfolio. Prefer moving edgenode* and letting the split follow.
-        "s|CONDUCTOR_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.conductorMemoryRequest ?: conductorShare(humanConfig.edgenodeMemoryRequest ?: '', true)}|g",
-        "s|CONDUCTOR_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.conductorMemoryLimit ?: conductorShare(humanConfig.edgenodeMemoryLimit ?: '', true)}|g",
-        "s|CONDUCTOR_CPU_REQUEST_PLACEHOLDER|${humanConfig.conductorCpuRequest ?: conductorShare(humanConfig.edgenodeCpuRequest ?: '', false)}|g",
-        "s|CONDUCTOR_CPU_LIMIT_PLACEHOLDER|${humanConfig.conductorCpuLimit ?: conductorShare(humanConfig.edgenodeCpuLimit ?: '', false)}|g",
+        "s|CONDUCTOR_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.conductorMemoryRequest ?: shares.conductorMemoryRequest}|g",
+        "s|CONDUCTOR_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.conductorMemoryLimit ?: shares.conductorMemoryLimit}|g",
+        "s|CONDUCTOR_CPU_REQUEST_PLACEHOLDER|${humanConfig.conductorCpuRequest ?: shares.conductorCpuRequest}|g",
+        "s|CONDUCTOR_CPU_LIMIT_PLACEHOLDER|${humanConfig.conductorCpuLimit ?: shares.conductorCpuLimit}|g",
         // Storage side = the exact remainder. Same override contract, mirrored.
-        "s|STORAGE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.storageMemoryRequest ?: storageShare(humanConfig.edgenodeMemoryRequest ?: '', true)}|g",
-        "s|STORAGE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.storageMemoryLimit ?: storageShare(humanConfig.edgenodeMemoryLimit ?: '', true)}|g",
-        "s|STORAGE_CPU_REQUEST_PLACEHOLDER|${humanConfig.storageCpuRequest ?: storageShare(humanConfig.edgenodeCpuRequest ?: '', false)}|g",
-        "s|STORAGE_CPU_LIMIT_PLACEHOLDER|${humanConfig.storageCpuLimit ?: storageShare(humanConfig.edgenodeCpuLimit ?: '', false)}|g",
+        "s|STORAGE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.storageMemoryRequest ?: shares.storageMemoryRequest}|g",
+        "s|STORAGE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.storageMemoryLimit ?: shares.storageMemoryLimit}|g",
+        "s|STORAGE_CPU_REQUEST_PLACEHOLDER|${humanConfig.storageCpuRequest ?: shares.storageCpuRequest}|g",
+        "s|STORAGE_CPU_LIMIT_PLACEHOLDER|${humanConfig.storageCpuLimit ?: shares.storageCpuLimit}|g",
         // SQLite pool size (consolidated template only). Defaults to '10' (the
         // code default) so an unset node never leaves an unresolved placeholder.
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
@@ -995,73 +996,27 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
 // storage-alone RSS is a few hundred MB and needs headroom only for import
 // bursts. CPU 1/2 — no measurement yet discriminates the two sides, so the
 // neutral halving is the honest default.
-def _CONDUCTOR_MEMORY_NUMERATOR() { return 5 }
-def _CONDUCTOR_MEMORY_DENOMINATOR() { return 8 }
-def _CONDUCTOR_CPU_NUMERATOR() { return 1 }
-def _CONDUCTOR_CPU_DENOMINATOR() { return 2 }
-
 /**
- * k8s CPU quantity -> millicores. "1500m" -> 1500, "2" -> 2000.
- * Fails loudly rather than guessing: an unparseable budget must abort the
- * render, never silently size a pod at zero.
+ * Budget-neutral conductor/storage split, computed by
+ * scripts/ci/conductor-split-budget.sh (memory 5/8 : 3/8, cpu 1/2 : 1/2,
+ * floor rounding, remainder to storage — conductor + storage sum EXACTLY to
+ * the human's edgenode* envelope on every dimension).
+ *
+ * WHY A SHELL-OUT: this arithmetic was Groovy twice and the CPS
+ * script-security sandbox killed it at runtime both times (#1403
+ * Double.parseDouble, #1404 DGM toBigDecimal — each a RejectedAccessException
+ * only visible on a live build). sh(returnStdout:) + readJSON are
+ * sandbox-free and already load-bearing in this pipeline; per the repo rule,
+ * bash bodies live in scripts/ci/*.sh.
  */
-def cpuMillicores(String value) {
-    def v = value.trim()
-    if (v.endsWith('m')) {
-        return v.substring(0, v.length() - 1).toInteger()
-    }
-    // Groovy-native conversions only: the CPS script-security sandbox
-    // rejected staticMethod Double.parseDouble at runtime on build #1403
-    // (RejectedAccessException) — String.toBigDecimal()/toInteger() are
-    // DGM-whitelisted and need no approval.
-    return (v.toBigDecimal() * 1000).toInteger()
-}
-
-/**
- * k8s memory quantity -> mebibytes. "2Gi" -> 2048, "768Mi" -> 768.
- * Only the binary suffixes this repo actually uses are accepted; anything else
- * aborts the render (see cpuMillicores' rationale).
- */
-def memoryMebibytes(String value) {
-    def v = value.trim()
-    if (v.endsWith('Ti')) { return (v.substring(0, v.length() - 2).toBigDecimal() * 1024 * 1024).toInteger() }
-    if (v.endsWith('Gi')) { return (v.substring(0, v.length() - 2).toBigDecimal() * 1024).toInteger() }
-    if (v.endsWith('Mi')) { return v.substring(0, v.length() - 2).toBigDecimal().toInteger() }
-    if (v.endsWith('Ki')) { return (v.substring(0, v.length() - 2).toBigDecimal() / 1024).toInteger() }
-    error "Unsupported memory quantity '${value}' in a per-human budget — use Ki/Mi/Gi/Ti so the conductor/storage split stays exact."
-}
-
-/**
- * The conductor's share of one budget dimension, rounded DOWN to a clean unit
- * (Mi for memory, m for CPU). Integer division is the rounding: any remainder
- * falls to the storage side via storageShare below, so conductor + storage can
- * never exceed the original. Empty input renders empty (the pre-split
- * behaviour for a human that declares nothing).
- */
-def conductorShare(String total, boolean isMemory) {
-    if (!total) { return '' }
-    if (isMemory) {
-        def mi = memoryMebibytes(total)
-        return "${(int) (mi * _CONDUCTOR_MEMORY_NUMERATOR() / _CONDUCTOR_MEMORY_DENOMINATOR())}Mi"
-    }
-    def m = cpuMillicores(total)
-    return "${(int) (m * _CONDUCTOR_CPU_NUMERATOR() / _CONDUCTOR_CPU_DENOMINATOR())}m"
-}
-
-/**
- * The storage side: the EXACT remainder of the human's budget after the
- * conductor's share. Computed by subtraction, never by a second ratio, so the
- * two sides sum to the original by construction and any rounding remainder
- * lands here.
- */
-def storageShare(String total, boolean isMemory) {
-    if (!total) { return '' }
-    if (isMemory) {
-        def mi = memoryMebibytes(total)
-        return "${mi - memoryMebibytes(conductorShare(total, true))}Mi"
-    }
-    def m = cpuMillicores(total)
-    return "${m - cpuMillicores(conductorShare(total, false))}m"
+def splitBudget(Map humanConfig) {
+    def out = sh(
+        returnStdout: true,
+        script: "bash '${env.WORKSPACE}/scripts/ci/conductor-split-budget.sh' " +
+                "'${humanConfig.edgenodeMemoryRequest ?: ''}' '${humanConfig.edgenodeMemoryLimit ?: ''}' " +
+                "'${humanConfig.edgenodeCpuRequest ?: ''}' '${humanConfig.edgenodeCpuLimit ?: ''}'"
+    ).trim()
+    return readJSON(text: out)
 }
 
 /**
