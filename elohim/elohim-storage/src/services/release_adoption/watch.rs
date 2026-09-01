@@ -616,9 +616,9 @@ impl AdoptionController {
             let outcome = self
                 .check_channel(channel, now, &mut byte_budget, &mut threshold_reads)
                 .await;
-            if let Some((head, verdict)) = outcome_transition(outcome) {
+            if let Some((head, verdict, attestations)) = outcome_transition(outcome) {
                 record_decision(verdict_arm(&verdict), verdict.reason_label());
-                state::record_check(&channel.channel_id, now, head, verdict);
+                state::record_check(&channel.channel_id, now, head, verdict, attestations);
                 checked += 1;
             }
         }
@@ -694,10 +694,10 @@ impl AdoptionController {
         // decided at the point of ACTION, not only at the point of
         // configuration, and a forced edit here is the cheapest way to
         // guarantee a future mode cannot arrive as a silent fall-through.
-        let will_apply = match channel.mode {
-            AdoptionMode::Observe => false,
-            AdoptionMode::Apply => true,
-        };
+        // `applies()` covers both `Apply` and `Canary` — WHICH of a STAGING
+        // vs EARNED head each of them actually applies is decided after
+        // verify, once the tier is known (`decide_post_verify_action`).
+        let will_apply = channel.mode.applies();
 
         let head = match self.resolve_head(&channel.channel_id).await {
             Answer::Present(head) => head,
@@ -709,6 +709,7 @@ impl AdoptionController {
                     verdict: Verdict::Idle {
                         note: "this conductor sees no declared head for the channel".to_string(),
                     },
+                    attestations: None,
                 };
             }
             Answer::Unreachable => {
@@ -721,6 +722,7 @@ impl AdoptionController {
                              — unreachable, which is never absence",
                         ),
                     },
+                    attestations: None,
                 };
             }
         };
@@ -755,6 +757,7 @@ impl AdoptionController {
                             vehicle: applied.vehicle,
                             already_current: true,
                         },
+                        attestations: None,
                     };
                 }
             }
@@ -770,12 +773,14 @@ impl AdoptionController {
                                root, or a non-release version)"
                             .to_string(),
                     },
+                    attestations: None,
                 }
             }
             Err(refusal) => {
                 return CheckOutcome::Checked {
                     head: Some(resolved),
                     verdict: Verdict::Refused { refusal },
+                    attestations: None,
                 }
             }
         };
@@ -788,6 +793,7 @@ impl AdoptionController {
                 return CheckOutcome::Checked {
                     head: Some(resolved),
                     verdict: Verdict::Refused { refusal },
+                    attestations: None,
                 }
             }
         };
@@ -836,12 +842,14 @@ impl AdoptionController {
             return CheckOutcome::Checked {
                 head: Some(resolved),
                 verdict: Verdict::Refused { refusal },
+                attestations: None,
             };
         }
         if let Err(refusal) = verify::verify_lineage(&manifest, &lineage) {
             return CheckOutcome::Checked {
                 head: Some(resolved),
                 verdict: Verdict::Refused { refusal },
+                attestations: None,
             };
         }
 
@@ -868,6 +876,7 @@ impl AdoptionController {
                         return CheckOutcome::Checked {
                             head: Some(resolved),
                             verdict: Verdict::Refused { refusal },
+                            attestations,
                         }
                     }
                 }
@@ -882,25 +891,39 @@ impl AdoptionController {
             lineage: &lineage,
             artifacts: &fetched,
             attestations: attestations.as_ref(),
+            tier: resolved.tier,
         }) {
             // OBSERVE MODE ENDS HERE: the `VerifiedRelease` is reported and
-            // dropped. In APPLY mode it is handed to exactly one vehicle — the
-            // one its own declared artifact class names — and to nothing else.
-            Ok(verified) => {
-                if will_apply {
-                    self.apply_verified(&channel.channel_id, verified).await
-                } else {
-                    Verdict::Ok {
-                        release_cid: verified.release_cid,
-                    }
-                }
-            }
+            // dropped. `apply` and `canary` diverge on a STAGING head — see
+            // `decide_post_verify_action`, the single source both this call
+            // site and its table test consult: `apply` adopts EARNED heads
+            // only (a verified STAGING head there is `Waiting`), `canary`
+            // adopts either tier.
+            Ok(verified) => match decide_post_verify_action(channel.mode, resolved.tier, true) {
+                PostVerifyAction::Apply => self.apply_verified(&channel.channel_id, verified).await,
+                PostVerifyAction::Waiting => Verdict::Waiting {
+                    release_cid: verified.release_cid,
+                    detail: "verified; this peer adopts only earned releases — the canary \
+                                 soaks it first"
+                        .to_string(),
+                },
+                PostVerifyAction::Observed => Verdict::Ok {
+                    release_cid: verified.release_cid,
+                },
+                PostVerifyAction::Refused => unreachable!(
+                    "verify::verify already enforced the threshold for tier {:?} — \
+                         Ok(verified) implies it was met (or was Staging, which never enforces \
+                         it)",
+                    resolved.tier
+                ),
+            },
             Err(refusal) => Verdict::Refused { refusal },
         };
 
         CheckOutcome::Checked {
             head: Some(resolved),
             verdict,
+            attestations,
         }
     }
 }
@@ -913,6 +936,11 @@ enum CheckOutcome {
     Checked {
         head: Option<ResolvedHead>,
         verdict: Verdict,
+        /// The threshold evidence this check actually read, or `None` when it
+        /// never reached that arm — reported on `/admin/adoption` regardless
+        /// of whether it was ENFORCED (only `HeadTier::Earned`/`None` enforce
+        /// it; a `Staging` head's evidence here is soak progress).
+        attestations: Option<release_attestation::QualifyingEvidence>,
     },
 }
 
@@ -927,10 +955,21 @@ enum CheckOutcome {
 /// channel deferred because WE are over budget has done nothing wrong, and
 /// putting it on the ladder would slow the channel down for a reason that is
 /// about us.
-fn outcome_transition(outcome: CheckOutcome) -> Option<(Option<ResolvedHead>, Verdict)> {
+#[allow(clippy::type_complexity)]
+fn outcome_transition(
+    outcome: CheckOutcome,
+) -> Option<(
+    Option<ResolvedHead>,
+    Verdict,
+    Option<release_attestation::QualifyingEvidence>,
+)> {
     match outcome {
         CheckOutcome::Skipped => None,
-        CheckOutcome::Checked { head, verdict } => Some((head, verdict)),
+        CheckOutcome::Checked {
+            head,
+            verdict,
+            attestations,
+        } => Some((head, verdict, attestations)),
     }
 }
 
@@ -940,9 +979,48 @@ fn verdict_arm(verdict: &Verdict) -> DecisionArm {
         // Both the fresh apply and the `already_current` no-op are apply-arm
         // facts: they are what the apply arm decided, and metering them on the
         // watch arm would make an apply fleet indistinguishable from an observe
-        // one at exactly the moment the difference matters.
-        Verdict::Applied { .. } => DecisionArm::Apply,
+        // one at exactly the moment the difference matters. `Waiting` is the
+        // same family: it is the apply arm declining to act on a STAGING head,
+        // not a watch-arm observation.
+        Verdict::Applied { .. } | Verdict::Waiting { .. } => DecisionArm::Apply,
         Verdict::Refused { refusal } => refusal.reason_code().arm(),
+    }
+}
+
+/// The post-verify routing decision — pure, and the single source both
+/// [`AdoptionController::check_channel`] and the table test below consult.
+///
+/// **`threshold_met` matters only when `tier` is NOT `Staging`.**
+/// `verify::verify` enforces the threshold for `Earned` (and, unchanged from
+/// before this design, `None`) and never for `Staging`, so a `Staging` row's
+/// answer must not move when `threshold_met` flips — the table test pins
+/// exactly that.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PostVerifyAction {
+    /// Route the verified release to a vehicle.
+    Apply,
+    /// Verified, but this mode adopts EARNED heads only — a canary soaks a
+    /// STAGING head first. Neither a pass-and-stop nor a refusal.
+    Waiting,
+    /// Verified, not applied. `observe`, on either tier.
+    Observed,
+    /// The threshold was enforced (tier != `Staging`) and was not met.
+    Refused,
+}
+
+fn decide_post_verify_action(
+    mode: AdoptionMode,
+    tier: HeadTier,
+    threshold_met: bool,
+) -> PostVerifyAction {
+    if tier != HeadTier::Staging && !threshold_met {
+        return PostVerifyAction::Refused;
+    }
+    match mode {
+        AdoptionMode::Observe => PostVerifyAction::Observed,
+        AdoptionMode::Canary => PostVerifyAction::Apply,
+        AdoptionMode::Apply if tier == HeadTier::Staging => PostVerifyAction::Waiting,
+        AdoptionMode::Apply => PostVerifyAction::Apply,
     }
 }
 
@@ -1152,6 +1230,15 @@ pub fn pretouch_metrics() {
     // The converged-fleet series. Only the apply arm can emit it.
     crate::metrics::RELEASE_ADOPTION_DECISIONS
         .with_label_values(&[DecisionArm::Apply.label(), super::REASON_ALREADY_CURRENT])
+        .inc_by(0);
+    // **Design 2026-09-01 (canary-first adoption).** `Verdict::Waiting` is
+    // apply-arm exactly like `already_current` above and is not a
+    // `RefusalReason`, so it needs the same manual pre-touch: an absent
+    // `{arm="apply",reason="awaiting_promotion"}` on a fleet with no `apply`
+    // channel yet reads as *never measured* when the honest reading is
+    // *measured zero*.
+    crate::metrics::RELEASE_ADOPTION_DECISIONS
+        .with_label_values(&[DecisionArm::Apply.label(), super::REASON_AWAITING_PROMOTION])
         .inc_by(0);
     for reason in RefusalReason::ALL {
         crate::metrics::RELEASE_ADOPTION_DECISIONS
@@ -1412,6 +1499,7 @@ mod tests {
             Verdict::Ok {
                 release_cid: "uhCkkHead".to_string(),
             },
+            None,
         );
         let untouched = deferred.clone();
 
@@ -1421,8 +1509,8 @@ mod tests {
             transition.is_none(),
             "a deferral must produce NO state transition at all"
         );
-        if let Some((head, verdict)) = transition {
-            deferred.record(9_999, head, verdict);
+        if let Some((head, verdict, attestations)) = transition {
+            deferred.record(9_999, head, verdict, attestations);
         }
 
         assert_eq!(
@@ -1449,9 +1537,10 @@ mod tests {
             verdict: Verdict::Refused {
                 refusal: AdoptionRefusal::new(RefusalReason::ArtifactUnavailable, "no peer"),
             },
+            attestations: None,
         });
-        let (head, verdict) = checked.expect("a completed check transitions");
-        deferred.record(2_000, head, verdict);
+        let (head, verdict, attestations) = checked.expect("a completed check transitions");
+        deferred.record(2_000, head, verdict, attestations);
         assert_eq!(deferred.last_checked_at, Some(2_000));
         assert_eq!(deferred.consecutive_refusals, 1);
         assert!(
@@ -1513,6 +1602,52 @@ mod tests {
             }),
             DecisionArm::Apply
         );
+        // **Canary-first adoption.** `Waiting` is an apply-arm fact — the
+        // apply arm declining to act on a STAGING head — with its own
+        // non-refusal reason, exactly like `already_current` above.
+        let waiting = Verdict::Waiting {
+            release_cid: "c".to_string(),
+            detail: "d".to_string(),
+        };
+        assert_eq!(verdict_arm(&waiting), DecisionArm::Apply);
+        assert_eq!(
+            waiting.reason_label(),
+            super::super::REASON_AWAITING_PROMOTION
+        );
+    }
+
+    /// **The pure decision table (design 2026-09-01, canary-first adoption).**
+    /// The threshold gates EARNED adoption only: a `Staging` row's answer must
+    /// not move when `threshold_met` flips, and only `apply` on a `Staging`
+    /// head produces `Waiting` — `canary` never does (it is what closes the
+    /// loop `apply` cannot), and `observe` never applies on either tier.
+    #[test]
+    fn decide_post_verify_action_gates_the_threshold_at_earned_only() {
+        use AdoptionMode::{Apply, Canary, Observe};
+        use HeadTier::{Earned, Staging};
+        use PostVerifyAction::{Apply as DoApply, Observed, Refused, Waiting};
+
+        let cases: &[(AdoptionMode, HeadTier, bool, PostVerifyAction)] = &[
+            (Observe, Earned, true, Observed),
+            (Observe, Earned, false, Refused),
+            (Observe, Staging, true, Observed),
+            (Observe, Staging, false, Observed),
+            (Apply, Earned, true, DoApply),
+            (Apply, Earned, false, Refused),
+            (Apply, Staging, true, Waiting),
+            (Apply, Staging, false, Waiting),
+            (Canary, Earned, true, DoApply),
+            (Canary, Earned, false, Refused),
+            (Canary, Staging, true, DoApply),
+            (Canary, Staging, false, DoApply),
+        ];
+        for (mode, tier, met, expected) in cases.iter().copied() {
+            assert_eq!(
+                decide_post_verify_action(mode, tier, met),
+                expected,
+                "mode={mode:?} tier={tier:?} threshold_met={met}"
+            );
+        }
     }
 
     /// A controller wired with no vehicles refuses an apply channel by NAME

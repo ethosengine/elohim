@@ -46,7 +46,7 @@ use std::path::PathBuf;
 use seam_contracts::Answer;
 
 use super::{
-    AdoptionRefusal, Artifact, RefusalReason, ReleaseManifest, VerifiedRelease,
+    AdoptionRefusal, Artifact, HeadTier, RefusalReason, ReleaseManifest, VerifiedRelease,
     RELEASE_MANIFEST_KIND,
 };
 use crate::services::release_attestation::QualifyingEvidence;
@@ -681,6 +681,14 @@ pub struct VerifyInput<'a> {
     pub artifacts: &'a [FetchedArtifact],
     /// `None` when the attestation count could not be taken.
     pub attestations: Option<&'a QualifyingEvidence>,
+    /// **Design 2026-09-01 (canary-first adoption).** The election tier
+    /// behind the head this manifest rode in on. Gates WHETHER the threshold
+    /// is enforced: `Earned` (and `None`, unchanged from before this design)
+    /// enforce it exactly as `verify_threshold` always has; `Staging` does
+    /// not — the threshold gates PROMOTION, never staging adoption, so a
+    /// canary soaking a staging head must be able to verify it with zero
+    /// qualifying attestations.
+    pub tier: HeadTier,
 }
 
 /// Run the whole floor. The ONLY constructor of a [`VerifiedRelease`].
@@ -703,7 +711,14 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifiedRelease, AdoptionRefusal
 
     verify_envelope(&manifest, input.installed)?;
     verify_lineage(&manifest, input.lineage)?;
-    verify_threshold(&manifest, input.attestations)?;
+    // The threshold gates PROMOTION (an EARNED head), never staging adoption
+    // — a STAGING head's evidence is read and reported elsewhere (the
+    // sweep's `attestations` field on `/admin/adoption`), never enforced
+    // here. `None` is UNCHANGED from before this design: it enforces exactly
+    // as `Earned` does.
+    if input.tier != HeadTier::Staging {
+        verify_threshold(&manifest, input.attestations)?;
+    }
     let artifact_paths = verify_artifacts(&manifest, input.artifacts)?;
 
     Ok(VerifiedRelease {
@@ -1141,6 +1156,7 @@ mod tests {
             lineage: &lineage,
             artifacts: &[],
             attestations: None,
+            tier: HeadTier::Earned,
         })
         .expect_err("wrong channel");
         assert_eq!(refusal.reason_code(), RefusalReason::ChannelIdMismatch);
@@ -1180,10 +1196,100 @@ mod tests {
             lineage: &lineage,
             artifacts: &artifacts,
             attestations: Some(&evidence),
+            tier: HeadTier::Earned,
         })
         .expect("every arm passes");
         assert_eq!(verified.channel_id, manifest.channel_id);
         assert_eq!(verified.release_cid, "uhCkkTheWinningVersion");
         assert_eq!(verified.artifact_paths.len(), manifest.artifacts.len());
+    }
+
+    /// **Design 2026-09-01 (canary-first adoption) — the defect this fixes.**
+    /// An EARNED head still enforces the threshold through the full
+    /// `verify()` composition (unchanged); a STAGING head with the exact
+    /// same unmet evidence verifies anyway — the threshold gates PROMOTION,
+    /// never staging adoption, so a canary in observe of its own soak must be
+    /// able to verify a staging head with zero qualifying attestations.
+    #[test]
+    fn the_threshold_gates_earned_adoption_only_not_staging() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from(
+            "lamad",
+            &binding.dna_hash,
+            "content_store",
+            &binding.coordinator_wasm_hashes[0],
+        );
+        let lineage = Answer::Present(LineageEvidence { supersedes: None });
+        let declared = &manifest.artifacts[0];
+        let artifacts = vec![FetchedArtifact {
+            blob_cid: declared.blob_cid.clone(),
+            path: PathBuf::from("/var/lib/elohim/release-staging/x/content_store.wasm"),
+            bytes: declared.bytes,
+            sha256: declared.sha256.clone(),
+        }];
+        let unmet = QualifyingEvidence {
+            qualifying: 0,
+            threshold: 1,
+            total: 0,
+            ..Default::default()
+        };
+
+        let earned_refused = verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkEarnedButUnmet",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: Some(&unmet),
+            tier: HeadTier::Earned,
+        })
+        .expect_err("an EARNED head with an unmet threshold is still refused");
+        assert_eq!(earned_refused.reason_code(), RefusalReason::ThresholdUnmet);
+
+        let staging_verified = verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkStagingUnmet",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: Some(&unmet),
+            tier: HeadTier::Staging,
+        })
+        .expect("the SAME unmet evidence never refuses a STAGING head");
+        assert_eq!(staging_verified.release_cid, "uhCkkStagingUnmet");
+
+        // And with no evidence at all (`threshold_unchecked` on a real read
+        // failure): still refused on Earned, still verified on Staging.
+        let earned_unchecked = verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkEarnedUnchecked",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: None,
+            tier: HeadTier::Earned,
+        })
+        .expect_err("unchecked is not a pass on an EARNED head");
+        assert_eq!(
+            earned_unchecked.reason_code(),
+            RefusalReason::ThresholdUnchecked
+        );
+
+        verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkStagingUnchecked",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: None,
+            tier: HeadTier::Staging,
+        })
+        .expect("an unread threshold never gates a STAGING head either");
     }
 }

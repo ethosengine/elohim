@@ -25,6 +25,18 @@
 //! proven (`happ_manager::sync_coordinators_report`, the rung-4 runtime-config
 //! reload, the mesh exe-slot). Apply invents no mechanics — it routes.
 //!
+//! **The canary-first-adoption fix (2026-09-01) landed the same day.** The
+//! attestation threshold gates PROMOTION — an EARNED head — never staging
+//! adoption; `mode: apply` had been refusing every STAGING head on
+//! `threshold_unmet`, which meant a canary in apply mode could never adopt
+//! the very head its own soak was supposed to attest, a deadlock by
+//! construction. `mode: canary` is now the third legal declaration: it
+//! adopts a verified STAGING head (threshold read and reported, never
+//! enforced — the soak IS the evidence) as well as an EARNED one (threshold
+//! enforced, same as `apply`). `mode: apply` still adopts EARNED heads only;
+//! a verified STAGING head there is [`state::Verdict::Waiting`], not a
+//! refusal.
+//!
 //! # The shape of one sweep
 //!
 //! ```text
@@ -46,12 +58,18 @@
 //!        │        happ_manager enforces, moved to verify time
 //!        │      · lineage parent against the channel's L2 version chain
 //!        │        (the body field is a HINT that must match)
-//!        │      · attestation threshold per the manifest's adoptionDiscipline
+//!        │      · attestation threshold per the manifest's adoptionDiscipline —
+//!        │        EARNED heads only; a STAGING head's threshold is read and
+//!        │        reported, never enforced (the threshold gates PROMOTION, not
+//!        │        staging adoption)
 //!        │
-//!   [apply]   observe → report and stop. apply → route by artifact class to
-//!        │    the EXISTING vehicle (coordinator hot-swap · runtime-config
-//!        │    reload · exe-slot staging), idempotent on (channel, releaseCid),
-//!        │    deferred under readable pressure, never self-exec'ing.
+//!   [apply]   observe → report and stop, on either tier. canary → route a
+//!        │    verified release of EITHER tier by artifact class to the EXISTING
+//!        │    vehicle (coordinator hot-swap · runtime-config reload · exe-slot
+//!        │    staging). apply → route only an EARNED release the same way; a
+//!        │    verified STAGING release there is `waiting`, not applied and not
+//!        │    refused. Idempotent on (channel, releaseCid), deferred under
+//!        │    readable pressure, never self-exec'ing.
 //! ```
 //!
 //! # P2P design gate (spec §5, carried)
@@ -403,6 +421,17 @@ pub const REASON_IDLE: &str = "idle";
 /// one. It is emitted from the apply arm before ANY conductor call beyond the
 /// head resolve.
 pub const REASON_ALREADY_CURRENT: &str = "already_current";
+
+/// **Design 2026-09-01 (canary-first adoption).** The `reason` label for
+/// [`state::Verdict::Waiting`]: a peer in `apply` mode verified a STAGING
+/// head and is doing nothing wrong — `apply` adopts EARNED heads only, and
+/// only a `canary` soaks a staging one. Deliberately NOT a [`RefusalReason`]
+/// (nothing refused) and deliberately not folded into [`REASON_OK`]
+/// (dashboarding "waiting for promotion" as "verified and stopped" would hide
+/// the exact deadlock this mode exists to avoid: a fleet stuck here forever
+/// with no canary configured looks identical to a fleet in healthy observe
+/// mode unless the reason is its own series).
+pub const REASON_AWAITING_PROMOTION: &str = "awaiting_promotion";
 
 /// Why the controller refused. One variant per genuinely distinct cause: the
 /// metric is only as useful as its ability to tell a correct refusal from a
@@ -772,11 +801,15 @@ mod tests {
         assert_ne!(REASON_OK, REASON_IDLE);
         assert_ne!(REASON_OK, REASON_ALREADY_CURRENT);
         assert_ne!(REASON_IDLE, REASON_ALREADY_CURRENT);
+        assert_ne!(REASON_OK, REASON_AWAITING_PROMOTION);
+        assert_ne!(REASON_IDLE, REASON_AWAITING_PROMOTION);
+        assert_ne!(REASON_ALREADY_CURRENT, REASON_AWAITING_PROMOTION);
         for reason in RefusalReason::ALL {
             let label = reason.label();
             assert_ne!(label, REASON_OK);
             assert_ne!(label, REASON_IDLE);
             assert_ne!(label, REASON_ALREADY_CURRENT);
+            assert_ne!(label, REASON_AWAITING_PROMOTION);
         }
     }
 
