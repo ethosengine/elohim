@@ -1008,9 +1008,13 @@ def _CONDUCTOR_CPU_DENOMINATOR() { return 2 }
 def cpuMillicores(String value) {
     def v = value.trim()
     if (v.endsWith('m')) {
-        return Integer.parseInt(v.substring(0, v.length() - 1))
+        return v.substring(0, v.length() - 1).toInteger()
     }
-    return (int) Math.round(Double.parseDouble(v) * 1000)
+    // Groovy-native conversions only: the CPS script-security sandbox
+    // rejected staticMethod Double.parseDouble at runtime on build #1403
+    // (RejectedAccessException) — String.toBigDecimal()/toInteger() are
+    // DGM-whitelisted and need no approval.
+    return (v.toBigDecimal() * 1000).toInteger()
 }
 
 /**
@@ -1020,10 +1024,10 @@ def cpuMillicores(String value) {
  */
 def memoryMebibytes(String value) {
     def v = value.trim()
-    if (v.endsWith('Ti')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) * 1024 * 1024) }
-    if (v.endsWith('Gi')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) * 1024) }
-    if (v.endsWith('Mi')) { return (int) Double.parseDouble(v.substring(0, v.length() - 2)) }
-    if (v.endsWith('Ki')) { return (int) (Double.parseDouble(v.substring(0, v.length() - 2)) / 1024) }
+    if (v.endsWith('Ti')) { return (v.substring(0, v.length() - 2).toBigDecimal() * 1024 * 1024).toInteger() }
+    if (v.endsWith('Gi')) { return (v.substring(0, v.length() - 2).toBigDecimal() * 1024).toInteger() }
+    if (v.endsWith('Mi')) { return v.substring(0, v.length() - 2).toBigDecimal().toInteger() }
+    if (v.endsWith('Ki')) { return (v.substring(0, v.length() - 2).toBigDecimal() / 1024).toInteger() }
     error "Unsupported memory quantity '${value}' in a per-human budget — use Ki/Mi/Gi/Ti so the conductor/storage split stays exact."
 }
 
