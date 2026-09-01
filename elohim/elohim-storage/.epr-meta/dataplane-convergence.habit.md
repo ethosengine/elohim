@@ -70,6 +70,12 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-09-01 (iroh-quinn GSO crash cure, NO status flip): vendored the
+published iroh-quinn-proto 0.13.0 and backported Quinn #2167 / 434c3586's
+one-line tail-loss-probe bound; `just test-iroh` and `just gate
+elohim-storage` are green. Fleet-shaped ~891-exchange burst/disconnect T2
+receipt remains owed, so the task and this habit stay red/wip.
+---
 DELTA 2026-08-29c (FLEET CONFIRM of the 2026-08-29 batch; NO status flip —
 the habit's own fleet leg is still red on federation-deploy). Push
 38eb75677..71f310ce6 (37 commits) → orchestrator #1742: edge #1389 built,

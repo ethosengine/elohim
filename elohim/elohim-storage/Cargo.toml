@@ -470,3 +470,9 @@ path = "src/main.rs"
 # stay on holo_hash 0.6.0, so no DNA hash moves.
 [patch.crates-io]
 holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }
+# Fleet-crash fix (2026-09-01): iroh 0.92 resolves iroh-quinn-proto 0.13.0,
+# whose GSO tail-loss-probe path can violate `untracked_bytes <= segment_size`,
+# poison the connection mutex, and abort storage. This vendored crate carries
+# only Quinn upstream fix 434c3586. See its VENDOR-NOTE.md for evidence and the
+# Wave-3 retirement condition; real cargo tests are mandatory for this patch.
+iroh-quinn-proto = { path = "../../vendor/iroh-quinn-proto-0.13.0" }
