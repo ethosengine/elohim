@@ -201,3 +201,81 @@ into prose, observable Then steps, named observation points). Merged on
 integrator judgment: no structural findings remain; the story is `@wip` and
 CANNOT pass until T1-T4 land, so the final fresh-reader pass is deliberately
 attached to the step-wiring half of this task, before `@wip` lifts.
+
+## Local verification handoff — the pre-push adoption ceremony (2026-09-01)
+
+**Purpose:** prove the full election-and-upgrade chain E2E on the local mesh
+BEFORE the queued ~18 commits push (local-mesh-first: the fleet confirms,
+never discovers). Everything below is staged; nothing is pushed until the
+transcript exists.
+
+**State at handoff:**
+- Fresh debug `elohim-storage` (T3 controller + T4 vehicles + T5 rail) built
+  20:58Z at `/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/dev/debug/elohim-storage`
+  — the slot `hc-mesh.sh` auto-selects when the release slot is absent.
+- Conductors healthy post-orphan-remediation (135f272ea; PIDs 1374383-5);
+  **storage arms DOWN** — they boot INTO the new binary.
+- Harness carries the orphan guard + the `.next` slot consumption (both
+  fixture-proven GREEN).
+- Drivers ready: `epr-release-package.ts` (T1), `release-ceremony.ts` (T2),
+  `release-attestation-probe.ts` (T5). All run from `genesis/a2o`.
+
+**Ceremony stations (transcript each; exit codes on their own lines):**
+
+0. **Preflight** — `just mesh status`: conductors live, no
+   `orphaned-data-root`, storage down as expected.
+1. **Storage up on the new binary** — `just mesh storage-restart matthew
+   jessica james` (preserved `.environ` + exe records; verify each peer's
+   recorded exe names the debug slot). Then per peer: `GET /version` shows
+   the new build commit; `GET /admin/adoption` EXISTS (404 before this
+   binary = wrong slot).
+2. **Follow the channel (rung-4, no restart)** — write
+   `ELOHIM_RELEASE_CHANNELS = "runtime:coordinators:elohim:receipt-<date>=observe"`
+   into each peer's watched runtime-config file + `POST
+   /admin/runtime-config/reload`. `/admin/adoption` lists the channel,
+   `mode: observe`.
+3. **Package** — T1 packager on a repacked coordinator bundle
+   (`content_store.wasm`), `adoptionDiscipline` small for the receipt
+   (`soakSecs≈30, attestationThreshold: 1`). **PUT the artifact blob to ALL
+   THREE peers** (controller blob fetch is local-only by design — recorded
+   T3 station; per-peer PUT is the interim).
+4. **Publish + staging convergence** — `release-ceremony.ts channel create`
+   + `publish` (fresh channel id), then `status` until **3/3 conductors**
+   answer the same staged head (this settles T2's open ~2-min gossip
+   question — allow up to the ~20-min churn norm, record actual).
+5. **Observe verdicts** — `/admin/adoption` on all 3: `verdict: ok` (or the
+   precise typed refusal — `threshold_unchecked` is expected until an
+   attestation exists; that is honest, not a failure).
+6. **Canary apply** — flip james's entry to `=apply` (config reload).
+   Next sweep: `appliedRelease` on his row, `/version` coordinator wasm
+   hashes flip, **conductor PID unchanged**; after `soakSecs`, his soak
+   attestation authors (T5 rail — it deliberately waits out the window).
+7. **Promote + fleet convergence** — `release-ceremony.ts promote` (earned,
+   on james's evidence); flip matthew+jessica to `=apply`; 3/3 converge,
+   PIDs unchanged. Record wall-clock (expect ~2-min class).
+8. **Revert-by-re-election** — `release-ceremony.ts revert` to the prior
+   release; 3/3 converge BACK (wasm hashes restore); no flag, no re-key,
+   no reset.
+9. **Attestation cross-peer proof** — `release-attestation-probe.ts`
+   (expect qualifying count with builder excluded; `mismatched=0` post-
+   56fe4b802).
+10. **Optional stretch (binary class)** — package the debug binary as a
+    `storage-binary` release on a second channel; james applies → slot +
+    sidecar staged, `pendingRestart: true` sticky → `just mesh
+    storage-restart james` consumes `.next` (archives `.applied-<ts>`), exe
+    record names the slot. If refused `binary_stakes_not_simulacra`: the
+    mesh is not DECLARING Simulacra stakes — that refusal is the fail-closed
+    design working; declare the stage explicitly or record the refusal as
+    the receipt.
+11. **Record + push** — append the cycle-time row to the arc doc's table
+    (`upgrade-propagation-p2p-design-arc.md`), one-line delta + transcript
+    refs here, commit path-limited; THEN the operator pushes the batch (one
+    push; rakia submodule already pushed).
+
+**Failure routing:** typed refusals on `/admin/adoption` are the diagnosis —
+never work around them (`manifest_undecodable`→publish shape;
+`dna_lineage_mismatch`→bundle vs installed; `artifact_unavailable`→blob not
+on that peer; `already_current`→idempotence working). Cross-peer election
+questions → `version-matrix --observed` + `release-ceremony.ts status`
+(unreachable ≠ absent). Harness states (`orphaned-data-root`) refuse loudly
+by design — remediate stop/start, never bypass.
