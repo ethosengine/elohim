@@ -250,6 +250,15 @@ storage/doorway class 2-4 h → the storage rollout window alone, with
   in-process watcher; GET /admin/runtime-config reports effective values,
   provenance, and the deliberately boot-only knobs with reasons.
 
+**Rung 5 DESIGN LANDED 2026-09-01** (five-lens adversarially verified):
+spec `genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md`
++ the six-task implementation family (`task-release-manifest-schema-packager` ·
+`task-release-channel-ceremony-driver` · `task-release-adoption-controller-observe`
+· `task-release-apply-vehicles` · `task-release-soak-attestation-rail` ·
+`task-runtime-upgrade-a2o-receipt`) — discrete, disjoint, dependency-edged,
+claimable. Ladder: local → hybrid → mesh → cluster; end-state names Jenkins an
+external observer and retires k8s as the operations plane.
+
 **Cycle-time deltas (record in sprint planning):**
 
 | Change class | Was | Now (measured) |

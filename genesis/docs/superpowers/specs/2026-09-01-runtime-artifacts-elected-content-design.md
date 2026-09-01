@@ -409,18 +409,25 @@ subsystem rather than inventing a parallel structure.
 ## 9. MVP cut and non-goals
 
 **In (MVP, mesh-first):** coordinator-bundle channel + config channel +
-happ-bundle channel for joined peers; the adoption controller; release-manifest
+happ-bundle channel for joined peers; **the storage-binary channel for the
+LOCAL and MESH rungs only** — the binary packaged as an EPR object on the same
+dataplane (inheriting resiliency, replication, reach — all substrate
+primitives come along) and applied via the proven exe-slot swap
+(`hc-mesh.sh restart_storage`), under the developer/test-fixture trust context
+(Simulacra stakes, declared); the adoption controller; release-manifest
 schema; context-bearing attestations (riding an existing kind, §5); the a2o
 receipt (§10). Three things must be in the bones day one so the ecology is
 never precluded: channel ids carry reach scope from birth; manifests carry the
 envelope declaration; attestations carry context fields.
 
 **Out (deliberately):**
-- **Native binaries self-updating over p2p** — the mesh exe-slot mechanism
-  (`hc-mesh.sh restart_storage`) is the local prior art, but a fleet binary
-  replacing itself is a bigger safety bite; binaries stay on the now-cheap
-  staggered, conductor-preserving k8s roll until the coordinator-class loop
-  has fleet soak. Revisit with steward/node as the update agent (§11.5).
+- **FLEET binaries self-updating over p2p** — a fleet binary replacing itself
+  is a bigger safety bite; fleet binaries stay on the now-cheap staggered,
+  conductor-preserving k8s roll until the coordinator-class loop and the
+  local/mesh binary rung have soak. Revisit with steward/node as the update
+  agent (§11.5). The graduated ladder (operator DoD, 2026-09-01): **local →
+  hybrid (the T3 workspace conductor rung) → mesh → cluster** — each rung's
+  receipt is the next rung's admission.
 - **Rung 6** — integrity/DNA-hash moves and breaking canonical-bytes
   migrations; fenced to `governance-native-dna-upgrade-path.md`.
 - **The full consensus/psephos ceremony** — MVP declare authority is the
@@ -429,6 +436,18 @@ envelope declaration; attestations carry context fields.
   substrate shape.
 
 ## 10. Definition of done (the receipt)
+
+The operator's DoD framing (2026-09-01): **in the same way we — as developers
+authorized as matthew's runtime/device — drive the ceremony that converges
+peers on an elected head for epr-content** (synced, picked up, and served in
+projection by doorways), we package our binaries as EPR objects on the same
+dataplane, each component of the stack discovers them, and — leveraging the
+trust the developer/test-fixture context provides — updates its own runtime
+from those DHT-signed, attested packages. Driven **locally first, then hybrid,
+then mesh, then eventually the whole cluster.** Long term, the Jenkins
+pipeline becomes an **external observer** of the CI/CD process (the
+build-system roadmap's Stage-3 end-state), and the k8s cluster ceases to be
+needed as the operations plane.
 
 The a2o story, `@concern:runtime-upgrade-propagation`, on the 3-peer mesh
 (fleet confirms, never discovers): publish a coordinator release to a low-reach
@@ -440,6 +459,13 @@ transition. Cycle-time delta recorded in the arc doc's table (the arc's own
 measure). One peer rides an experiment channel throughout — compatible,
 divergent, and heard — proving both halves at once: the protocol stewarding
 itself, and the diversity that teaches it.
+
+**Implementation decomposition** — six discrete, disjoint, connected backlog
+atoms (cluster `arch-dataplane-refactor-backlog`, each claimable by an
+implementation agent; dependency edges declared in each):
+`task-release-manifest-schema-packager` · `task-release-channel-ceremony-driver`
+· `task-release-adoption-controller-observe` · `task-release-apply-vehicles`
+· `task-release-soak-attestation-rail` · `task-runtime-upgrade-a2o-receipt`.
 
 ## 11. Open questions
 
