@@ -88,7 +88,7 @@
 #   2  status sweep: at least one peer unreachable/errored
 #   64 usage error (bad/missing args)
 #
-# Implementation notes: bash + curl + jq only. No heredocs feeding remote
+# Implementation notes: bash + curl + (jq OR python3). No heredocs feeding remote
 # shells, no eval. curl responses are split into body/http_code via a
 # trailing `\n%{http_code}` marker so a non-2xx response is always handled
 # as structured error data, never a silent script death.
@@ -164,7 +164,64 @@ done
 [ -n "${PEERS_RAW}" ] || { echo "${SCRIPT_NAME}: --peers is required" >&2; usage; }
 
 command -v curl >/dev/null 2>&1 || { echo "${SCRIPT_NAME}: curl is required" >&2; exit 64; }
-command -v jq >/dev/null 2>&1 || { echo "${SCRIPT_NAME}: jq is required" >&2; exit 64; }
+# JSON engine: jq preferred, python3 fallback (2026-09-01: the DNA builder
+# container ships no jq — first fleet dispatch died rc=64 on the old hard
+# requirement — so the driver degrades to python3).
+JSON_ENGINE=""
+if command -v jq >/dev/null 2>&1; then
+  JSON_ENGINE="jq"
+elif command -v python3 >/dev/null 2>&1; then
+  JSON_ENGINE="python3"
+else
+  echo "${SCRIPT_NAME}: no JSON engine (need jq or python3)" >&2
+  exit 64
+fi
+
+# json_field <json> <field> <default> — top-level field as text.
+json_field() {
+  if [ "${JSON_ENGINE}" = "jq" ]; then
+    printf '%s' "$1" | jq -r ".${2} // \"${3}\"" 2>/dev/null || printf '%s' "$3"
+  else
+    python3 -c 'import json, sys
+try:
+    v = json.loads(sys.argv[1]).get(sys.argv[2])
+except Exception:
+    v = None
+sys.stdout.write(sys.argv[3] if v is None else str(v))' "$1" "$2" "$3" 2>/dev/null || printf '%s' "$3"
+  fi
+}
+
+# json_is_valid <json> — exit 0 iff parseable JSON.
+json_is_valid() {
+  if [ "${JSON_ENGINE}" = "jq" ]; then
+    printf '%s' "$1" | jq -e . >/dev/null 2>&1
+  else
+    python3 -c 'import json,sys; json.loads(sys.argv[1])' "$1" >/dev/null 2>&1
+  fi
+}
+
+# json_obj <k> <v> [<k> <v> ...] — compact JSON object of string values.
+json_obj() {
+  if [ "${JSON_ENGINE}" = "jq" ]; then
+    local args=() k v
+    while [ "$#" -ge 2 ]; do k="$1"; v="$2"; shift 2; args+=(--arg "${k}" "${v}"); done
+    jq -nc "${args[@]}" '$ARGS.named'
+  else
+    python3 -c 'import json, sys
+a = sys.argv[1:]
+print(json.dumps(dict(zip(a[0::2], a[1::2])), separators=(",", ":")))' "$@"
+  fi
+}
+
+# json_slurp — stdin lines of JSON objects -> one JSON array.
+json_slurp() {
+  if [ "${JSON_ENGINE}" = "jq" ]; then
+    jq -s '.'
+  else
+    python3 -c 'import json, sys
+print(json.dumps([json.loads(l) for l in sys.stdin if l.strip()], indent=1))'
+  fi
+}
 
 [ -f "${HAPP_PATH}" ] || { echo "${SCRIPT_NAME}: happ file not found: ${HAPP_PATH}" >&2; exit 64; }
 [ -s "${HAPP_PATH}" ] || { echo "${SCRIPT_NAME}: happ file is empty: ${HAPP_PATH}" >&2; exit 64; }
@@ -243,7 +300,7 @@ post_sync() {
     rm -f "${stderr_file}"
     [ -n "${err_text}" ] || err_text="curl exit ${curl_status} (no diagnostic output)"
     printf '000\n'
-    jq -nc --arg err "${err_text}" '{"error": $err}'
+    json_obj error "${err_text}"
     return 0
   fi
   rm -f "${stderr_file}"
@@ -253,15 +310,15 @@ post_sync() {
 
   if [ -z "${http_code}" ] || [ "${http_code}" = "${raw}" ]; then
     printf '000\n'
-    jq -nc --arg err "malformed curl response (no status code split)" '{"error": $err}'
+    json_obj error "malformed curl response (no status code split)"
     return 0
   fi
 
   printf '%s\n' "${http_code}"
-  if echo "${body}" | jq -e . >/dev/null 2>&1; then
+  if json_is_valid "${body}"; then
     printf '%s\n' "${body}"
   else
-    jq -nc --arg err "non-JSON response body" --arg body "${body}" '{"error": $err, "rawBody": $body}'
+    json_obj error "non-JSON response body" rawBody "${body}"
   fi
 }
 
@@ -276,9 +333,9 @@ call_sync() {
   LAST_BODY="$(printf '%s' "${out}" | tail -n +2)"
 }
 
-drifted_count() { printf '%s' "$1" | jq -r '.driftedCount // "?"' 2>/dev/null || printf '?'; }
-applied_count()  { printf '%s' "$1" | jq -r '.appliedCount // "?"' 2>/dev/null || printf '?'; }
-err_message()    { printf '%s' "$1" | jq -r '.error // empty' 2>/dev/null || true; }
+drifted_count() { json_field "$1" driftedCount "?"; }
+applied_count()  { json_field "$1" appliedCount "?"; }
+err_message()    { json_field "$1" error ""; }
 
 # ---------------------------------------------------------------------------
 # Per-peer report accumulator (for the final table and --json output).
@@ -288,15 +345,9 @@ REPORTS=()
 
 add_report() {
   local name="$1" url="$2" verdict="$3" http_code="$4" drifted="$5" applied="$6" note="$7"
-  REPORTS+=("$(jq -nc \
-    --arg name "${name}" \
-    --arg url "${url}" \
-    --arg verdict "${verdict}" \
-    --arg httpCode "${http_code}" \
-    --arg drifted "${drifted}" \
-    --arg applied "${applied}" \
-    --arg note "${note}" \
-    '{peer: $name, url: $url, verdict: $verdict, httpCode: $httpCode, driftedRoles: $drifted, appliedRoles: $applied, note: $note}')")
+  REPORTS+=("$(json_obj peer "${name}" url "${url}" verdict "${verdict}" \
+    httpCode "${http_code}" driftedRoles "${drifted}" appliedRoles "${applied}" \
+    note "${note}")")
 }
 
 print_human_line() {
@@ -310,17 +361,17 @@ print_final_table() {
   printf '  %-16s %-10s %-10s %-8s %s\n' "PEER" "DRIFTED" "APPLIED" "HTTP" "VERDICT"
   for r in "${REPORTS[@]}"; do
     printf '  %-16s %-10s %-10s %-8s %s\n' \
-      "$(echo "${r}" | jq -r '.peer')" \
-      "$(echo "${r}" | jq -r '.driftedRoles')" \
-      "$(echo "${r}" | jq -r '.appliedRoles')" \
-      "$(echo "${r}" | jq -r '.httpCode')" \
-      "$(echo "${r}" | jq -r '.verdict')"
+      "$(json_field "${r}" peer "?")" \
+      "$(json_field "${r}" driftedRoles "?")" \
+      "$(json_field "${r}" appliedRoles "?")" \
+      "$(json_field "${r}" httpCode "?")" \
+      "$(json_field "${r}" verdict "?")"
   done
 }
 
 emit_json() {
   local joined
-  joined="$(printf '%s\n' "${REPORTS[@]}" | jq -s '.')"
+  joined="$(printf '%s\n' "${REPORTS[@]}" | json_slurp)"
   printf '%s\n' "${joined}"
 }
 
