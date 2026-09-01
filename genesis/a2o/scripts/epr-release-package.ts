@@ -1,0 +1,938 @@
+/**
+ * Package a runtime artifact as an EPR object on the content dataplane.
+ *
+ * A release is blob bytes plus a validated, content-addressed manifest, so every
+ * substrate primitive (resiliency, replication, reach) comes along for free.
+ * This tool does the LOCAL half: PUT the artifact bytes to a storage peer's blob
+ * route, prove they come back by address, derive what the artifact applies to,
+ * fill provenance, validate against
+ * `elohim/rakia/schemas/v1/release-manifest.schema.json`, and emit the manifest.
+ *
+ * It authors NOTHING to the DHT. Declaring a release manifest canonical on its
+ * channel is the ceremony driver's act, not this tool's.
+ *
+ * Packaging is not verification. A deliberately envelope-broken input still
+ * packages — the manifest records what the artifact actually is, and the
+ * adoption controller's verify step is the floor that refuses it.
+ *
+ * Spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md §5, §8.
+ *
+ * Run from genesis/a2o:
+ *   pnpm exec tsx scripts/epr-release-package.ts --artifact <path> --artifact-class <class> …
+ *   pnpm exec tsx scripts/epr-release-package.ts --validate <manifest.json> …
+ */
+
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import * as AjvNs from 'ajv/dist/2020.js';
+
+interface AjvOptions {
+  strict: boolean;
+  allErrors: boolean;
+}
+const AjvCtor: new (opts: AjvOptions) => AjvNs.default =
+  (AjvNs as unknown as { default: new (opts: AjvOptions) => AjvNs.default }).default ??
+  (AjvNs as unknown as new (opts: AjvOptions) => AjvNs.default);
+
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
+const SCHEMA_PATH = path.join(REPO_ROOT, 'elohim/rakia/schemas/v1/release-manifest.schema.json');
+
+const DEFAULT_PEER = 'http://localhost:8090';
+const DEFAULT_NETWORK = 'elohim';
+const DEFAULT_CHANNEL = 'commons';
+const DEFAULT_REACH = 'commons';
+const DEFAULT_SOAK_SECS = 900;
+const DEFAULT_ATTESTATION_THRESHOLD = 2;
+const DEFAULT_AGENT_ID = 'did:elohim:release-packager';
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+// Absolute paths so the probes cannot be shadowed by a writable PATH entry —
+// the convention late-joiner-receipt.ts already uses for its BASH/FLOCK binaries.
+// Both probes are optional: `--git-commit` and `--toolchain` override them, and
+// the toolchain probe reports "unknown" rather than failing the run.
+const GIT_BIN = process.env['GIT_BIN'] ?? '/usr/bin/git';
+const RUSTC_BIN = process.env['RUSTC_BIN'] ?? '/opt/rust/cargo/bin/rustc';
+
+const ARTIFACT_CLASSES = [
+  'coordinator-bundle',
+  'config-epr',
+  'storage-binary',
+  'happ-bundle',
+] as const;
+type ArtifactClass = (typeof ARTIFACT_CLASSES)[number];
+
+/**
+ * Channel-id segment each artifact class conventionally publishes under
+ * (spec §3). Advisory: the packager warns on a mismatch instead of refusing,
+ * because only three of the four segments are named upstream and a channel id
+ * given explicitly is the author's declaration, not a typo to be corrected.
+ */
+const CLASS_CHANNEL_SEGMENT: Record<ArtifactClass, string> = {
+  'coordinator-bundle': 'coordinators',
+  'config-epr': 'config',
+  'storage-binary': 'storage-binary',
+  'happ-bundle': 'happ',
+};
+
+const USAGE = `Usage: epr-release-package.ts --artifact <path> --artifact-class <class> [options]
+       epr-release-package.ts --validate <manifest.json> [<manifest.json>…]
+
+Artifact:
+  --artifact <path>             file to package; repeat for a multi-blob release
+  --artifact-class <class>      ${ARTIFACT_CLASSES.join(' | ')}
+
+Channel and reach:
+  --channel-id <id>             full runtime:<class>:<network>:<name> id
+  --network <name>              network segment (default: ${DEFAULT_NETWORK})
+  --channel <name>              channel-name segment (default: ${DEFAULT_CHANNEL})
+  --declared-reach <reach>      audience for this release (default: ${DEFAULT_REACH})
+
+Compatibility envelope (spec §8):
+  --wire-epoch <n>              protocol wire epoch this release speaks; repeatable (default: 0)
+  --lineage-parent <cid>        previous release CID on this channel (default: null)
+  --additive-only <true|false>  additive-wire floor assertion (default: true)
+
+appliesTo (what installed reality this release binds to):
+  --applies-to-from <url>       derive roles from a peer's GET /version passport
+  --applies-to <json|@file>     literal { "roles": { … } } or { role: … } map
+  --applies-to-role <name>      restrict the derived roles; repeatable
+
+Provenance:
+  --builder-agent <id>          who built the artifact (default: $USER@$HOSTNAME)
+  --toolchain <string>          toolchain identity (default: probed rustc, else "unknown")
+  --build-info <json|@file>     the artifact's OWN build info
+  --build-info-from <url>       read it from a runtime's GET /version envelope
+  --git-commit <sha>            override the probed HEAD commit
+
+Adoption discipline (spec §5):
+  --soak-secs <n>               green-run budget before a peer may attest (default: ${DEFAULT_SOAK_SECS})
+  --attestation-threshold <n>   independent attestations to earn (default: ${DEFAULT_ATTESTATION_THRESHOLD})
+  --canary <name>               ordered rollout wave; repeatable
+
+Blob plane:
+  --peer <url>                  storage peer for the blob PUT (default: ${DEFAULT_PEER})
+  --agent-id <id>               x-agent-id on the PUT (default: ${DEFAULT_AGENT_ID})
+  --no-put                      package offline: address the bytes, skip PUT and round-trip
+  --request-timeout <ms>        per-request timeout (default: ${DEFAULT_REQUEST_TIMEOUT_MS})
+
+Output:
+  --out <path>                  write the manifest here (default: stdout)
+  --compact                     emit single-line JSON
+  --strict                      fail on properties the schema does not name
+  --notes <text>                human-readable release note
+  -h, --help                    show this help
+
+Modes:
+  --validate <file>…            validate existing manifests against the schema and exit
+
+Exit codes: 0 ok · 2 manifest invalid or blob round-trip failed · 64 usage · 1 unexpected.`;
+
+class UsageError extends Error {}
+
+/** The packaging contract broke: invalid manifest, or bytes that did not come back. */
+class PackagingFailure extends Error {
+  constructor(
+    message: string,
+    readonly detail: string[] = []
+  ) {
+    super(message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Content addressing — CIDv1 raw / sha2-256 / base32-lower
+// ---------------------------------------------------------------------------
+
+const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+
+/** RFC 4648 base32, lower-case, unpadded — multibase 'b'. */
+export function base32Encode(bytes: Uint8Array): string {
+  let out = '';
+  let buffer = 0;
+  let bits = 0;
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += BASE32_ALPHABET[(buffer >> bits) & 0x1f];
+    }
+  }
+  if (bits > 0) out += BASE32_ALPHABET[(buffer << (5 - bits)) & 0x1f];
+  return out;
+}
+
+/**
+ * The canonical blob address: `Cid::new_v1(0x55, Sha2_256(bytes))` rendered as
+ * multibase base32-lower — the same `bafkrei…` form `elohim-storage/src/epr_codec.rs`
+ * mints. A bare `sha256-<hex>` is the legacy blob-path form and never an address.
+ */
+export function blobCid(bytes: Buffer): string {
+  const digest = createHash('sha256').update(bytes).digest();
+  const multihash = Buffer.concat([Buffer.from([0x12, 0x20]), digest]);
+  const cidBytes = Buffer.concat([Buffer.from([0x01, 0x55]), multihash]);
+  return `b${base32Encode(cidBytes)}`;
+}
+
+export function sha256Hex(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+interface Options {
+  help: boolean;
+  validate: string[];
+  artifacts: string[];
+  artifactClass: ArtifactClass | null;
+  channelId: string | null;
+  network: string;
+  channel: string;
+  declaredReach: string;
+  wireEpochs: number[];
+  lineageParent: string | null;
+  additiveOnly: boolean;
+  appliesToFrom: string | null;
+  appliesToLiteral: string | null;
+  appliesToRoles: string[];
+  builderAgent: string | null;
+  toolchain: string | null;
+  buildInfo: string | null;
+  buildInfoFrom: string | null;
+  gitCommit: string | null;
+  soakSecs: number;
+  attestationThreshold: number;
+  canaryOrder: string[];
+  peer: string;
+  agentId: string;
+  put: boolean;
+  requestTimeoutMs: number;
+  out: string | null;
+  compact: boolean;
+  strict: boolean;
+  notes: string | null;
+}
+
+function requiredValue(args: string[], index: number, flag: string): string {
+  const value = args[index + 1];
+  if (!value || value.startsWith('--')) throw new UsageError(`${flag} requires a value`);
+  return value;
+}
+
+function nonNegativeInteger(value: string, flag: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new UsageError(`${flag} expects a non-negative integer, got: ${value}`);
+  }
+  return parsed;
+}
+
+function parseBoolean(value: string, flag: string): boolean {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new UsageError(`${flag} expects true or false, got: ${value}`);
+}
+
+function parseHttpUrl(rawUrl: string, flag: string): string {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new UsageError(`${flag} expects an HTTP(S) URL, got: ${rawUrl}`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new UsageError(`${flag} expects an HTTP(S) URL, got: ${rawUrl}`);
+  }
+  return url.toString().replace(/\/$/, '');
+}
+
+function parseArtifactClass(value: string): ArtifactClass {
+  const found = ARTIFACT_CLASSES.find(candidate => candidate === value);
+  if (!found) {
+    throw new UsageError(
+      `--artifact-class expects one of ${ARTIFACT_CLASSES.join(' | ')}, got: ${value}`
+    );
+  }
+  return found;
+}
+
+function parseArgs(argv: string[]): Options {
+  const options: Options = {
+    help: false,
+    validate: [],
+    artifacts: [],
+    artifactClass: null,
+    channelId: null,
+    network: DEFAULT_NETWORK,
+    channel: DEFAULT_CHANNEL,
+    declaredReach: DEFAULT_REACH,
+    wireEpochs: [],
+    lineageParent: null,
+    additiveOnly: true,
+    appliesToFrom: null,
+    appliesToLiteral: null,
+    appliesToRoles: [],
+    builderAgent: null,
+    toolchain: null,
+    buildInfo: null,
+    buildInfoFrom: null,
+    gitCommit: null,
+    soakSecs: DEFAULT_SOAK_SECS,
+    attestationThreshold: DEFAULT_ATTESTATION_THRESHOLD,
+    canaryOrder: [],
+    peer: parseHttpUrl(process.env['RELEASE_PEER_URL'] ?? DEFAULT_PEER, '--peer'),
+    agentId: DEFAULT_AGENT_ID,
+    put: true,
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    out: null,
+    compact: false,
+    strict: false,
+    notes: null,
+  };
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+    switch (arg) {
+      case '-h':
+      case '--help':
+        options.help = true;
+        break;
+      case '--validate':
+        // Consume every following non-flag token: `--validate a.json b.json`.
+        while (index + 1 < argv.length && !argv[index + 1].startsWith('--')) {
+          options.validate.push(path.resolve(argv[++index]));
+        }
+        if (options.validate.length === 0) throw new UsageError('--validate requires a file');
+        break;
+      case '--artifact':
+        options.artifacts.push(path.resolve(requiredValue(argv, index, arg)));
+        index++;
+        break;
+      case '--artifact-class':
+        options.artifactClass = parseArtifactClass(requiredValue(argv, index, arg));
+        index++;
+        break;
+      case '--channel-id':
+        options.channelId = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--network':
+        options.network = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--channel':
+        options.channel = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--declared-reach':
+        options.declaredReach = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--wire-epoch':
+        options.wireEpochs.push(nonNegativeInteger(requiredValue(argv, index, arg), arg));
+        index++;
+        break;
+      case '--lineage-parent':
+        options.lineageParent = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--additive-only':
+        options.additiveOnly = parseBoolean(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--applies-to-from':
+        options.appliesToFrom = parseHttpUrl(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--applies-to':
+        options.appliesToLiteral = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--applies-to-role':
+        options.appliesToRoles.push(requiredValue(argv, index, arg));
+        index++;
+        break;
+      case '--builder-agent':
+        options.builderAgent = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--toolchain':
+        options.toolchain = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--build-info':
+        options.buildInfo = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--build-info-from':
+        options.buildInfoFrom = parseHttpUrl(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--git-commit':
+        options.gitCommit = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--soak-secs':
+        options.soakSecs = nonNegativeInteger(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--attestation-threshold':
+        options.attestationThreshold = nonNegativeInteger(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--canary':
+        options.canaryOrder.push(requiredValue(argv, index, arg));
+        index++;
+        break;
+      case '--peer':
+        options.peer = parseHttpUrl(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--agent-id':
+        options.agentId = requiredValue(argv, index, arg);
+        index++;
+        break;
+      case '--no-put':
+        options.put = false;
+        break;
+      case '--request-timeout':
+        options.requestTimeoutMs = nonNegativeInteger(requiredValue(argv, index, arg), arg);
+        index++;
+        break;
+      case '--out':
+        options.out = path.resolve(requiredValue(argv, index, arg));
+        index++;
+        break;
+      case '--compact':
+        options.compact = true;
+        break;
+      case '--strict':
+        options.strict = true;
+        break;
+      case '--notes':
+        options.notes = requiredValue(argv, index, arg);
+        index++;
+        break;
+      default:
+        throw new UsageError(`unknown option: ${arg}`);
+    }
+  }
+
+  if (options.help || options.validate.length > 0) return options;
+  if (options.artifacts.length === 0) throw new UsageError('--artifact is required');
+  if (!options.artifactClass) throw new UsageError('--artifact-class is required');
+  if (options.wireEpochs.length === 0) options.wireEpochs.push(0);
+  return options;
+}
+
+// ---------------------------------------------------------------------------
+// Manifest shape (mirrors elohim/rakia/schemas/v1/release-manifest.schema.json)
+// ---------------------------------------------------------------------------
+
+interface ArtifactEntry {
+  blobCid: string;
+  bytes: number;
+  sha256: string;
+  filename: string;
+  mimeType?: string;
+}
+
+interface RoleBinding {
+  dnaHash: string;
+  coordinatorWasmHashes: string[];
+  coordinatorZomes?: Record<string, string>;
+}
+
+interface ReleaseManifest {
+  kind: 'release-manifest';
+  manifestVersion: '1.0';
+  channelId: string;
+  artifactClass: ArtifactClass;
+  artifacts: ArtifactEntry[];
+  appliesTo: { roles: Record<string, RoleBinding> };
+  envelope: { wireEpochs: number[]; lineageParentCid: string | null; additiveOnly: boolean };
+  provenance: {
+    builderAgent: string;
+    toolchain: string;
+    buildInfo: Record<string, unknown>;
+    builtFrom: { gitCommit: string; gitBranch?: string; dirty?: boolean };
+  };
+  declaredReach: string;
+  adoptionDiscipline: { soakSecs: number; attestationThreshold: number; canaryOrder: string[] };
+  notes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Schema validation + open-schema strict lint
+// ---------------------------------------------------------------------------
+
+type JsonObject = Record<string, unknown>;
+
+function loadSchema(): JsonObject {
+  return JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')) as JsonObject;
+}
+
+function validateAgainstSchema(schema: JsonObject, manifest: unknown): string[] {
+  const ajv = new AjvCtor({ strict: false, allErrors: true });
+  const validate = ajv.compile(schema);
+  if (validate(manifest)) return [];
+  return (validate.errors ?? []).map(
+    error => `${error.instancePath || '/'} ${error.message ?? 'invalid'}`
+  );
+}
+
+function resolveRef(schema: JsonObject, node: JsonObject): JsonObject {
+  const ref = node['$ref'];
+  if (typeof ref !== 'string' || !ref.startsWith('#/$defs/')) return node;
+  const defs = schema['$defs'] as Record<string, JsonObject> | undefined;
+  return defs?.[ref.slice('#/$defs/'.length)] ?? node;
+}
+
+/**
+ * The schema is deliberately OPEN so mixed-version peers tolerate fields they
+ * do not know (spec §8.2). That tolerance also swallows a producer's typo, so
+ * `--strict` walks the schema and reports every property the schema does not
+ * name — a lint for the author, never a rule for the reader.
+ */
+function lintUnknownKeys(
+  schema: JsonObject,
+  node: JsonObject,
+  value: unknown,
+  pointer: string,
+  found: string[]
+): void {
+  const resolved = resolveRef(schema, node);
+  if (Array.isArray(value)) {
+    const items = resolved['items'];
+    if (items && typeof items === 'object') {
+      value.forEach((entry, i) =>
+        lintUnknownKeys(schema, items as JsonObject, entry, `${pointer}/${i}`, found)
+      );
+    }
+    return;
+  }
+  if (typeof value !== 'object' || value === null) return;
+
+  const properties = resolved['properties'] as Record<string, JsonObject> | undefined;
+  const additional = resolved['additionalProperties'];
+  for (const [key, child] of Object.entries(value)) {
+    const declared = properties?.[key];
+    if (declared) {
+      lintUnknownKeys(schema, declared, child, `${pointer}/${key}`, found);
+    } else if (additional && typeof additional === 'object') {
+      lintUnknownKeys(schema, additional as JsonObject, child, `${pointer}/${key}`, found);
+    } else if (properties) {
+      found.push(`${pointer}/${key}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Inputs the packager reads rather than invents
+// ---------------------------------------------------------------------------
+
+/**
+ * `fetch` rejects with an opaque TypeError when a peer is down. A packager that
+ * prints a stack trace there reads as a bug in the tool rather than an absent
+ * peer, so every network reach reports the URL it could not hold.
+ */
+async function reach(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new PackagingFailure(`could not reach ${url}`, [
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+}
+
+async function getJson(url: string, timeoutMs: number): Promise<JsonObject> {
+  const response = await reach(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!response.ok) throw new PackagingFailure(`GET ${url} returned ${response.status}`);
+  return (await response.json()) as JsonObject;
+}
+
+/** `@path` reads a file; anything else is parsed as literal JSON. */
+function readJsonArgument(raw: string, flag: string): JsonObject {
+  const text = raw.startsWith('@') ? readFileSync(path.resolve(raw.slice(1)), 'utf8') : raw;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('not a JSON object');
+    }
+    return parsed as JsonObject;
+  } catch (error) {
+    throw new UsageError(`${flag} could not be read as a JSON object: ${String(error)}`);
+  }
+}
+
+interface PassportRole {
+  role?: unknown;
+  dnaHash?: unknown;
+  coordinatorWasmHashes?: unknown;
+}
+
+/**
+ * Derive `appliesTo.roles` from a live peer's runtime passport.
+ *
+ * The honest source for per-role DNA hashes is the conductor that installed the
+ * bundle. Re-deriving them from a `.happ` in TypeScript would mean reproducing
+ * Holochain's `DnaDef` serialization and blake2b hashing byte-exactly — a
+ * second implementation of a consensus-critical hash, with no way to detect its
+ * own drift. `GET /version` reports the same hashes `happ_manager::bundle_dna_hashes`
+ * resolves, already authoritative, so the packager reads them instead of
+ * recomputing them.
+ */
+function roleBindingFrom(entry: PassportRole): [string, RoleBinding] | null {
+  const role = typeof entry.role === 'string' ? entry.role : null;
+  const dnaHash = typeof entry.dnaHash === 'string' ? entry.dnaHash : null;
+  if (!role || !dnaHash) return null;
+  const zomes =
+    typeof entry.coordinatorWasmHashes === 'object' && entry.coordinatorWasmHashes !== null
+      ? (entry.coordinatorWasmHashes as Record<string, string>)
+      : {};
+  return [
+    role,
+    {
+      dnaHash,
+      coordinatorWasmHashes: [...new Set(Object.values(zomes))].sort((a, b) => a.localeCompare(b)),
+      ...(Object.keys(zomes).length > 0 ? { coordinatorZomes: zomes } : {}),
+    },
+  ];
+}
+
+function rolesFromPassport(passport: JsonObject, only: string[]): Record<string, RoleBinding> {
+  const runtime = (passport['passport'] ?? passport) as JsonObject;
+  const happ = runtime['happ'] as JsonObject | undefined;
+  const roles = happ?.['roles'];
+  if (!Array.isArray(roles) || roles.length === 0) {
+    const reason = typeof happ?.['error'] === 'string' ? ` (${String(happ['error'])})` : '';
+    throw new PackagingFailure(`runtime passport reported no installed hApp roles${reason}`);
+  }
+
+  const out: Record<string, RoleBinding> = {};
+  for (const entry of roles as PassportRole[]) {
+    const binding = roleBindingFrom(entry);
+    if (!binding) continue;
+    if (only.length > 0 && !only.includes(binding[0])) continue;
+    out[binding[0]] = binding[1];
+  }
+
+  const missing = only.filter(role => !(role in out));
+  if (missing.length > 0) {
+    throw new PackagingFailure(`passport has no role(s): ${missing.join(', ')}`);
+  }
+  if (Object.keys(out).length === 0) {
+    throw new PackagingFailure('runtime passport yielded no usable roles');
+  }
+  return out;
+}
+
+function normaliseAppliesTo(raw: JsonObject): { roles: Record<string, RoleBinding> } {
+  const roles = (raw['roles'] ?? raw) as Record<string, RoleBinding>;
+  if (typeof roles !== 'object' || Object.keys(roles).length === 0) {
+    throw new UsageError('--applies-to needs a non-empty { "roles": { … } } map');
+  }
+  return { roles };
+}
+
+function git(args: string[]): string | null {
+  try {
+    return execFileSync(GIT_BIN, args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function probeToolchain(): string {
+  try {
+    return execFileSync(RUSTC_BIN, ['--version'], { encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blob plane
+// ---------------------------------------------------------------------------
+
+interface BlobResult {
+  entry: ArtifactEntry;
+  putStatus: number | null;
+  storedAs: string | null;
+  roundTripBytes: number | null;
+}
+
+function mimeFor(file: string, artifactClass: ArtifactClass): string {
+  if (artifactClass === 'config-epr' || file.endsWith('.json')) return 'application/json';
+  return 'application/octet-stream';
+}
+
+async function putAndVerify(
+  file: string,
+  bytes: Buffer,
+  entry: ArtifactEntry,
+  options: Options
+): Promise<BlobResult> {
+  const putPath = `${options.peer}/blob/sha256-${entry.sha256}`;
+  const putResponse = await reach(putPath, {
+    method: 'PUT',
+    headers: {
+      'content-type': entry.mimeType ?? 'application/octet-stream',
+      'x-agent-id': options.agentId,
+    },
+    body: new Uint8Array(bytes),
+    signal: AbortSignal.timeout(options.requestTimeoutMs),
+  });
+  if (!putResponse.ok) {
+    throw new PackagingFailure(
+      `blob PUT for ${path.basename(file)} returned ${putResponse.status}`,
+      [(await putResponse.text()).slice(0, 400)]
+    );
+  }
+  const putBody = (await putResponse.json()) as { blobHash?: unknown };
+  const storedAs =
+    typeof putBody.blobHash === 'string' ? putBody.blobHash : `sha256-${entry.sha256}`;
+
+  // The interface contract: the bytes must be fetchable by address from the peer
+  // they were PUT to BEFORE this tool exits 0. Nothing downstream can recover a
+  // manifest that points at bytes no peer will serve.
+  const getResponse = await reach(`${options.peer}/blob/${storedAs}`, {
+    signal: AbortSignal.timeout(options.requestTimeoutMs),
+  });
+  if (!getResponse.ok) {
+    throw new PackagingFailure(
+      `blob round-trip for ${path.basename(file)} failed: GET returned ${getResponse.status}`
+    );
+  }
+  const fetched = Buffer.from(await getResponse.arrayBuffer());
+  const fetchedSha = sha256Hex(fetched);
+  if (fetchedSha !== entry.sha256) {
+    throw new PackagingFailure(
+      `blob round-trip for ${path.basename(file)} returned different bytes`,
+      [`expected sha256 ${entry.sha256}`, `observed sha256 ${fetchedSha}`]
+    );
+  }
+  return { entry, putStatus: putResponse.status, storedAs, roundTripBytes: fetched.length };
+}
+
+async function packageArtifact(
+  file: string,
+  options: Options,
+  artifactClass: ArtifactClass
+): Promise<BlobResult> {
+  const stats = statSync(file);
+  if (!stats.isFile()) throw new UsageError(`--artifact is not a file: ${file}`);
+  const bytes = readFileSync(file);
+  const entry: ArtifactEntry = {
+    blobCid: blobCid(bytes),
+    bytes: bytes.length,
+    sha256: sha256Hex(bytes),
+    filename: path.basename(file),
+    mimeType: mimeFor(file, artifactClass),
+  };
+  if (!options.put) {
+    return { entry, putStatus: null, storedAs: null, roundTripBytes: null };
+  }
+  return putAndVerify(file, bytes, entry, options);
+}
+
+// ---------------------------------------------------------------------------
+// Assembly
+// ---------------------------------------------------------------------------
+
+function resolveChannelId(options: Options, artifactClass: ArtifactClass): string {
+  if (options.channelId) {
+    const segment = options.channelId.split(':')[1];
+    const expected = CLASS_CHANNEL_SEGMENT[artifactClass];
+    if (segment !== expected) {
+      console.error(
+        `warn: channel id segment "${segment ?? '(none)'}" is not the conventional "${expected}" for artifact class ${artifactClass}`
+      );
+    }
+    return options.channelId;
+  }
+  return `runtime:${CLASS_CHANNEL_SEGMENT[artifactClass]}:${options.network}:${options.channel}`;
+}
+
+async function resolveAppliesTo(options: Options): Promise<{ roles: Record<string, RoleBinding> }> {
+  if (options.appliesToLiteral) {
+    return normaliseAppliesTo(readJsonArgument(options.appliesToLiteral, '--applies-to'));
+  }
+  if (options.appliesToFrom) {
+    const passport = await getJson(`${options.appliesToFrom}/version`, options.requestTimeoutMs);
+    return { roles: rolesFromPassport(passport, options.appliesToRoles) };
+  }
+  throw new UsageError('one of --applies-to-from <url> or --applies-to <json|@file> is required');
+}
+
+async function resolveBuildInfo(options: Options): Promise<Record<string, unknown>> {
+  if (options.buildInfo) return readJsonArgument(options.buildInfo, '--build-info');
+  if (options.buildInfoFrom) {
+    const version = await getJson(`${options.buildInfoFrom}/version`, options.requestTimeoutMs);
+    // The artifact's own build envelope, minus the runtime passport that wraps it.
+    const build = { ...version };
+    delete build['passport'];
+    return build;
+  }
+  return {};
+}
+
+async function assembleManifest(options: Options): Promise<{
+  manifest: ReleaseManifest;
+  blobs: BlobResult[];
+}> {
+  const artifactClass = options.artifactClass as ArtifactClass;
+  const blobs: BlobResult[] = [];
+  for (const file of options.artifacts) {
+    blobs.push(await packageArtifact(file, options, artifactClass));
+  }
+
+  const appliesTo = await resolveAppliesTo(options);
+  const buildInfo = await resolveBuildInfo(options);
+  const gitCommit = options.gitCommit ?? git(['rev-parse', 'HEAD']);
+  if (!gitCommit) {
+    throw new UsageError('could not probe the source commit; pass --git-commit <sha>');
+  }
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const porcelain = git(['status', '--porcelain']);
+
+  const manifest: ReleaseManifest = {
+    kind: 'release-manifest',
+    manifestVersion: '1.0',
+    channelId: resolveChannelId(options, artifactClass),
+    artifactClass,
+    artifacts: blobs.map(blob => blob.entry),
+    appliesTo,
+    envelope: {
+      wireEpochs: [...new Set(options.wireEpochs)].sort((a, b) => a - b),
+      lineageParentCid: options.lineageParent,
+      additiveOnly: options.additiveOnly,
+    },
+    provenance: {
+      builderAgent:
+        options.builderAgent ??
+        `${process.env['USER'] ?? 'unknown'}@${process.env['HOSTNAME'] ?? 'unknown'}`,
+      toolchain: options.toolchain ?? probeToolchain(),
+      buildInfo,
+      builtFrom: {
+        gitCommit,
+        ...(branch && branch !== 'HEAD' ? { gitBranch: branch } : {}),
+        ...(porcelain === null ? {} : { dirty: porcelain.length > 0 }),
+      },
+    },
+    declaredReach: options.declaredReach,
+    adoptionDiscipline: {
+      soakSecs: options.soakSecs,
+      attestationThreshold: options.attestationThreshold,
+      canaryOrder: options.canaryOrder,
+    },
+    ...(options.notes ? { notes: options.notes } : {}),
+  };
+
+  return { manifest, blobs };
+}
+
+// ---------------------------------------------------------------------------
+// Modes
+// ---------------------------------------------------------------------------
+
+function runValidate(files: string[], strict: boolean): void {
+  const schema = loadSchema();
+  const failures: string[] = [];
+  for (const file of files) {
+    const manifest: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const errors = validateAgainstSchema(schema, manifest);
+    const unknown: string[] = [];
+    if (strict) lintUnknownKeys(schema, schema, manifest, '', unknown);
+    if (errors.length === 0 && unknown.length === 0) {
+      console.log(`PASS ${path.relative(REPO_ROOT, file)}`);
+      continue;
+    }
+    failures.push(file);
+    console.error(`FAIL ${path.relative(REPO_ROOT, file)}`);
+    for (const error of errors) console.error(`  schema: ${error}`);
+    for (const key of unknown) console.error(`  unknown property: ${key}`);
+  }
+  if (failures.length > 0) {
+    throw new PackagingFailure(`${failures.length}/${files.length} manifest(s) invalid`);
+  }
+  console.log(
+    `${files.length}/${files.length} manifests validate against the release-manifest schema`
+  );
+}
+
+async function runPackage(options: Options): Promise<void> {
+  const { manifest, blobs } = await assembleManifest(options);
+  const schema = loadSchema();
+  const errors = validateAgainstSchema(schema, manifest);
+  const unknown: string[] = [];
+  if (options.strict) lintUnknownKeys(schema, schema, manifest, '', unknown);
+  if (errors.length > 0 || unknown.length > 0) {
+    throw new PackagingFailure('emitted manifest does not validate', [
+      ...errors.map(error => `schema: ${error}`),
+      ...unknown.map(key => `unknown property: ${key}`),
+    ]);
+  }
+
+  const json = options.compact
+    ? JSON.stringify(manifest)
+    : `${JSON.stringify(manifest, null, 2)}\n`;
+  if (options.out) {
+    mkdirSync(path.dirname(options.out), { recursive: true });
+    writeFileSync(options.out, json);
+  } else {
+    process.stdout.write(json);
+  }
+
+  for (const blob of blobs) {
+    if (blob.roundTripBytes === null) {
+      console.error(
+        `addressed ${blob.entry.filename}: ${blob.entry.blobCid} (${blob.entry.bytes} bytes) — --no-put, no round-trip`
+      );
+      continue;
+    }
+    console.error(
+      `round-trip ${blob.entry.filename}: PUT ${blob.putStatus} as ${blob.storedAs}; ` +
+        `GET returned ${blob.roundTripBytes} bytes matching sha256 ${blob.entry.sha256.slice(0, 12)}…; cid ${blob.entry.blobCid}`
+    );
+  }
+  console.error(
+    `PASS ${manifest.artifactClass} release for ${manifest.channelId}: ` +
+      `${manifest.artifacts.length} blob(s), ${Object.keys(manifest.appliesTo.roles).length} role(s), ` +
+      `reach ${manifest.declaredReach}` +
+      (options.out ? `; manifest at ${path.relative(REPO_ROOT, options.out)}` : '')
+  );
+}
+
+try {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    console.log(USAGE);
+    process.exitCode = 0;
+  } else if (options.validate.length > 0) {
+    runValidate(options.validate, options.strict);
+    process.exitCode = 0;
+  } else {
+    await runPackage(options);
+    process.exitCode = 0;
+  }
+} catch (error) {
+  if (error instanceof UsageError) {
+    console.error(`${error.message}\n\n${USAGE}`);
+    process.exitCode = 64;
+  } else if (error instanceof PackagingFailure) {
+    console.error(`PACKAGING FAILED: ${error.message}`);
+    for (const line of error.detail) console.error(`  ${line}`);
+    process.exitCode = 2;
+  } else {
+    console.error(error instanceof Error ? error.stack : String(error));
+    process.exitCode = 1;
+  }
+}

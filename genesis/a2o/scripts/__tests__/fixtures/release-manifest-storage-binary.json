@@ -1,0 +1,83 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:storage-binary:elohim:household",
+  "artifactClass": "storage-binary",
+  "artifacts": [
+    {
+      "blobCid": "bafkreidybjt3ccgs6i5up43vegwm2afnstdwyvt2dgnz6tn6n4h667wsiu",
+      "bytes": 381123176,
+      "sha256": "780a67b108d2f23b47f37521accd00ad94c76c567a199b9f4dbe6f0fef7ed245",
+      "filename": "elohim-storage",
+      "mimeType": "application/octet-stream"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "imagodei": {
+        "dnaHash": "uhC0kEfShje8Xq8IrBRYUdwGM9L9kFR9V4aiwdaEM3yLLODVJQ4Be",
+        "coordinatorWasmHashes": ["uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"],
+        "coordinatorZomes": {
+          "imagodei": "uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"
+        }
+      },
+      "mishpat": {
+        "dnaHash": "uhC0ksdXLQVAtPhApeKrkthoZy7IdoUNyBYOlKA3pnR0kuf2-WR1d",
+        "coordinatorWasmHashes": ["uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"],
+        "coordinatorZomes": {
+          "mishpat": "uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"
+        }
+      },
+      "infrastructure": {
+        "dnaHash": "uhC0k5yyuYaXlhRmo6_qyEpPpl5ApbseOWxc3rklPha3TH_pz8pQQ",
+        "coordinatorWasmHashes": ["uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"],
+        "coordinatorZomes": {
+          "infrastructure": "uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"
+        }
+      },
+      "node_registry": {
+        "dnaHash": "uhC0kqjFQkI5pz0V5u8jMqAu0LsTI-2MkMMYUMajUsYHNlCkvU-9n",
+        "coordinatorWasmHashes": ["uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"],
+        "coordinatorZomes": {
+          "node_registry_coordinator": "uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"
+        }
+      },
+      "lamad": {
+        "dnaHash": "uhC0kSCgQh19oJMsMmZpirEuCK2NvtW0ULJYQ_Rmpx6AzH8H2Saco",
+        "coordinatorWasmHashes": ["uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"],
+        "coordinatorZomes": {
+          "content_store": "uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"
+        }
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "buildInfo": {
+      "version": "0.1.0",
+      "commit": "unknown",
+      "commitFull": "unknown",
+      "buildTime": "unknown",
+      "rustcVersion": "unknown",
+      "service": "elohim-storage"
+    },
+    "builtFrom": {
+      "gitCommit": "c446aa743a2ecbac3eb5c016d4c8b9fc6008be70",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "self",
+  "adoptionDiscipline": {
+    "soakSecs": 600,
+    "attestationThreshold": 1,
+    "canaryOrder": ["matthew"]
+  },
+  "notes": "Simulacra stakes, developer/test-fixture trust context: LOCAL and MESH rungs only (spec §9). Applied via the proven exe-slot swap."
+}

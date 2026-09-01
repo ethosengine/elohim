@@ -1,0 +1,80 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:happ:elohim:commons",
+  "artifactClass": "happ-bundle",
+  "artifacts": [
+    {
+      "blobCid": "bafkreie7bmyi6srdkummlem5rmxh4nqfg4suwdxkkppwa5yvvyy2dcrvie",
+      "bytes": 10897977,
+      "sha256": "9f0b308f4a235518c5919d8b2e7e360537254b0eea53df607715ae31a18a3541",
+      "filename": "elohim.happ",
+      "mimeType": "application/octet-stream"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "imagodei": {
+        "dnaHash": "uhC0kEfShje8Xq8IrBRYUdwGM9L9kFR9V4aiwdaEM3yLLODVJQ4Be",
+        "coordinatorWasmHashes": ["uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"],
+        "coordinatorZomes": {
+          "imagodei": "uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"
+        }
+      },
+      "mishpat": {
+        "dnaHash": "uhC0ksdXLQVAtPhApeKrkthoZy7IdoUNyBYOlKA3pnR0kuf2-WR1d",
+        "coordinatorWasmHashes": ["uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"],
+        "coordinatorZomes": {
+          "mishpat": "uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"
+        }
+      },
+      "infrastructure": {
+        "dnaHash": "uhC0k5yyuYaXlhRmo6_qyEpPpl5ApbseOWxc3rklPha3TH_pz8pQQ",
+        "coordinatorWasmHashes": ["uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"],
+        "coordinatorZomes": {
+          "infrastructure": "uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"
+        }
+      },
+      "node_registry": {
+        "dnaHash": "uhC0kqjFQkI5pz0V5u8jMqAu0LsTI-2MkMMYUMajUsYHNlCkvU-9n",
+        "coordinatorWasmHashes": ["uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"],
+        "coordinatorZomes": {
+          "node_registry_coordinator": "uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"
+        }
+      },
+      "lamad": {
+        "dnaHash": "uhC0kSCgQh19oJMsMmZpirEuCK2NvtW0ULJYQ_Rmpx6AzH8H2Saco",
+        "coordinatorWasmHashes": ["uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"],
+        "coordinatorZomes": {
+          "content_store": "uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"
+        }
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "hc 0.6 pack / holochain 0.6",
+    "buildInfo": {
+      "bundle": "elohim.happ",
+      "source": "elohim/holochain/dna/elohim",
+      "packedBy": "hc pack"
+    },
+    "builtFrom": {
+      "gitCommit": "b7cd6d88b6cddc0804356c0acbdf001b9ff27c4b",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "commons",
+  "adoptionDiscipline": {
+    "soakSecs": 900,
+    "attestationThreshold": 2,
+    "canaryOrder": ["matthew", "jessica", "james"]
+  },
+  "notes": "Install source for already-joined or re-installing peers; a fresh joiner is seeded out-of-band (spec §6.4 bootstrap caveat)."
+}

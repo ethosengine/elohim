@@ -1,0 +1,51 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:coordinators:elohim:canary-a",
+  "artifactClass": "coordinator-bundle",
+  "artifacts": [
+    {
+      "blobCid": "bafkreih55t4vyzozvjgu7b62baj5oe2oyrkshcgw4yq7oamvmo3eainmsa",
+      "bytes": 13558512,
+      "sha256": "fdecf95c65d9aa4d4f87da0813d7134ec4552388d6e621f7019563b64021ac90",
+      "filename": "content_store.wasm",
+      "mimeType": "application/octet-stream"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "lamad": {
+        "dnaHash": "uhC0kSCgQh19oJMsMmZpirEuCK2NvtW0ULJYQ_Rmpx6AzH8H2Saco",
+        "coordinatorWasmHashes": ["uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"],
+        "coordinatorZomes": {
+          "content_store": "uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"
+        }
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0, 1],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "holochain 0.6 / wasm32-unknown-unknown release",
+    "buildInfo": {
+      "zome": "content_store",
+      "profile": "release",
+      "target": "wasm32-unknown-unknown"
+    },
+    "builtFrom": {
+      "gitCommit": "b7cd6d88b6cddc0804356c0acbdf001b9ff27c4b",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "trusted",
+  "adoptionDiscipline": {
+    "soakSecs": 1800,
+    "attestationThreshold": 2,
+    "canaryOrder": ["matthew"]
+  }
+}

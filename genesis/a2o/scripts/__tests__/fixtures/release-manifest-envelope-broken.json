@@ -1,0 +1,49 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:coordinators:elohim:envelope-broken",
+  "artifactClass": "coordinator-bundle",
+  "artifacts": [
+    {
+      "blobCid": "bafkreih55t4vyzozvjgu7b62baj5oe2oyrkshcgw4yq7oamvmo3eainmsa",
+      "bytes": 13558512,
+      "sha256": "fdecf95c65d9aa4d4f87da0813d7134ec4552388d6e621f7019563b64021ac90",
+      "filename": "content_store.wasm",
+      "mimeType": "application/octet-stream"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "lamad": {
+        "dnaHash": "uhC0kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "coordinatorWasmHashes": ["uhCokBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"]
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "holochain 0.6 / wasm32-unknown-unknown release",
+    "buildInfo": {
+      "zome": "content_store",
+      "profile": "release",
+      "target": "wasm32-unknown-unknown"
+    },
+    "builtFrom": {
+      "gitCommit": "c446aa743a2ecbac3eb5c016d4c8b9fc6008be70",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "self",
+  "adoptionDiscipline": {
+    "soakSecs": 300,
+    "attestationThreshold": 1,
+    "canaryOrder": ["matthew"]
+  },
+  "notes": "Deliberately envelope-broken: appliesTo.roles.lamad names a DNA hash no peer runs. Packaging is not verification — the adoption controller's verify step is the floor that refuses this."
+}

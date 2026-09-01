@@ -1,0 +1,82 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:config:elohim:commons",
+  "artifactClass": "config-epr",
+  "artifacts": [
+    {
+      "blobCid": "bafkreigx5jdmfj3ob6b3mqfcsq5higrp2jgdxczyjpy2mtf7pwgzkqzubq",
+      "bytes": 127,
+      "sha256": "d7ea46c2a76e0f83b640a2943a741a2fd24c3b8b384bf1a64cbf7d8d9543340c",
+      "filename": "runtime-config.json",
+      "mimeType": "application/json"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "imagodei": {
+        "dnaHash": "uhC0kEfShje8Xq8IrBRYUdwGM9L9kFR9V4aiwdaEM3yLLODVJQ4Be",
+        "coordinatorWasmHashes": ["uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"],
+        "coordinatorZomes": {
+          "imagodei": "uhCok-MOkV1fS8Yfo0EcxR2m01MOFvJ_-9NAkE2ZfwZ6CMGFingfP"
+        }
+      },
+      "mishpat": {
+        "dnaHash": "uhC0ksdXLQVAtPhApeKrkthoZy7IdoUNyBYOlKA3pnR0kuf2-WR1d",
+        "coordinatorWasmHashes": ["uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"],
+        "coordinatorZomes": {
+          "mishpat": "uhCokFaBqpGbIXI7QEGoJfYFo30IuF5ZBIP8QKfcxc2CEQDws9ARg"
+        }
+      },
+      "infrastructure": {
+        "dnaHash": "uhC0k5yyuYaXlhRmo6_qyEpPpl5ApbseOWxc3rklPha3TH_pz8pQQ",
+        "coordinatorWasmHashes": ["uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"],
+        "coordinatorZomes": {
+          "infrastructure": "uhCokyGZk-6tLpTwh67Lx695vhYYYVq1Nwj2KXOwUFYS-Tdf_PyU2"
+        }
+      },
+      "node_registry": {
+        "dnaHash": "uhC0kqjFQkI5pz0V5u8jMqAu0LsTI-2MkMMYUMajUsYHNlCkvU-9n",
+        "coordinatorWasmHashes": ["uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"],
+        "coordinatorZomes": {
+          "node_registry_coordinator": "uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"
+        }
+      },
+      "lamad": {
+        "dnaHash": "uhC0kSCgQh19oJMsMmZpirEuCK2NvtW0ULJYQ_Rmpx6AzH8H2Saco",
+        "coordinatorWasmHashes": ["uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"],
+        "coordinatorZomes": {
+          "content_store": "uhCokJ38rRzUyb_lejmSZVryqTqJ8xqccMhErjIMB22210eSKRcNd"
+        }
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+    "buildInfo": {
+      "version": "0.1.0",
+      "commit": "unknown",
+      "commitFull": "unknown",
+      "buildTime": "unknown",
+      "rustcVersion": "unknown",
+      "service": "elohim-storage"
+    },
+    "builtFrom": {
+      "gitCommit": "b7cd6d88b6cddc0804356c0acbdf001b9ff27c4b",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "commons",
+  "adoptionDiscipline": {
+    "soakSecs": 900,
+    "attestationThreshold": 2,
+    "canaryOrder": ["matthew", "jessica", "james"]
+  }
+}
