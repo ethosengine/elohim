@@ -89,23 +89,24 @@ impl From<BootstrapStewardError> for WasmError {
 #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
 pub struct DnaProperties {
     /// Holochain-primitive name. Surface language: "bootstrap steward pubkey".
-    pub progenitor_pubkey: String,
+    #[serde(default)]
+    pub progenitor_pubkey: Option<String>,
 }
 
 impl DnaProperties {
     /// Read the DNA's modifier properties from the current conductor context.
     ///
-    /// Returns `NotConfigured` if no properties were provided at install time
+    /// Returns `None` if no properties were provided at install time
     /// (e.g., `happ.yaml` left `modifiers.properties: ~`).
-    pub fn read() -> ExternResult<Self> {
+    pub fn read() -> ExternResult<Option<Self>> {
         let info = dna_info().map_err(|e| BootstrapStewardError::DnaInfo(e.to_string()))?;
         let bytes = info.modifiers.properties;
         // `properties` is `SerializedBytes`. An empty/nil properties block
         // deserializes as unit `()` or empty bytes — treat as NotConfigured.
         if bytes.bytes().is_empty() {
-            return Err(BootstrapStewardError::NotConfigured.into());
+            return Ok(None);
         }
-        bytes.try_into().map_err(|e: SerializedBytesError| {
+        holochain_serialized_bytes::decode(bytes.bytes()).map_err(|e: SerializedBytesError| {
             BootstrapStewardError::Malformed(e.to_string()).into()
         })
     }
@@ -118,29 +119,26 @@ impl DnaProperties {
 /// "no bootstrap steward" as a legitimate state should use
 /// [`maybe_bootstrap_steward`] instead.
 pub fn bootstrap_steward() -> ExternResult<AgentPubKey> {
-    let props = DnaProperties::read()?;
-    AgentPubKey::try_from(props.progenitor_pubkey.clone())
+    let props = DnaProperties::read()?.ok_or(BootstrapStewardError::NotConfigured)?;
+    let pubkey = props
+        .progenitor_pubkey
+        .ok_or(BootstrapStewardError::NotConfigured)?;
+    AgentPubKey::try_from(pubkey)
         .map_err(|e| BootstrapStewardError::Malformed(e.to_string()).into())
 }
 
 /// Like [`bootstrap_steward`] but returns `None` when the DNA has no bootstrap
 /// steward configured. Malformed pubkeys still error.
 pub fn maybe_bootstrap_steward() -> ExternResult<Option<AgentPubKey>> {
-    match DnaProperties::read() {
-        Ok(props) => AgentPubKey::try_from(props.progenitor_pubkey.clone())
-            .map(Some)
-            .map_err(|e| BootstrapStewardError::Malformed(e.to_string()).into()),
-        Err(e) => {
-            // Match the typed error (which was converted to WasmError::Guest).
-            // If it's NotConfigured, surface as None; otherwise propagate.
-            let msg = e.to_string();
-            if msg.contains("bootstrap steward is not configured") {
-                Ok(None)
-            } else {
-                Err(e)
-            }
-        }
-    }
+    let Some(props) = DnaProperties::read()? else {
+        return Ok(None);
+    };
+    let Some(pubkey) = props.progenitor_pubkey else {
+        return Ok(None);
+    };
+    AgentPubKey::try_from(pubkey)
+        .map(Some)
+        .map_err(|e| BootstrapStewardError::Malformed(e.to_string()).into())
 }
 
 /// Returns true when the calling agent is the bootstrap steward for this DNA.
@@ -150,7 +148,9 @@ pub fn maybe_bootstrap_steward() -> ExternResult<Option<AgentPubKey>> {
 /// checks (e.g., a later attestation from the bootstrap steward delegating
 /// the capability). Per stewardship philosophy, authority is graduated.
 pub fn am_i_bootstrap_steward() -> ExternResult<bool> {
-    let steward = bootstrap_steward()?;
+    let Some(steward) = maybe_bootstrap_steward()? else {
+        return Ok(false);
+    };
     let me = agent_info()?.agent_initial_pubkey;
     Ok(steward == me)
 }
@@ -168,11 +168,5 @@ pub fn get_bootstrap_steward(_: ()) -> ExternResult<Option<AgentPubKey>> {
 /// Expose the "am I the bootstrap steward?" check.
 #[hdk_extern]
 pub fn is_bootstrap_steward(_: ()) -> ExternResult<bool> {
-    // When no steward is configured, no agent is the bootstrap steward.
-    let maybe_steward = maybe_bootstrap_steward()?;
-    let Some(steward) = maybe_steward else {
-        return Ok(false);
-    };
-    let my_pubkey = agent_info()?.agent_initial_pubkey;
-    Ok(steward == my_pubkey)
+    am_i_bootstrap_steward()
 }

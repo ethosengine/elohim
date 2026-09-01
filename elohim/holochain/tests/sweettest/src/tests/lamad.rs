@@ -17,6 +17,9 @@
 //!    live conductor (order preserved, honest per-id `Resolved(None)`
 //!    absence, zero-budget starves every id as `unattempted` with
 //!    `stop_reason: BudgetExhausted`, `schema_version` present).
+//! 7. `absent_bootstrap_steward_refuses_earned_declaration_cleanly` — an
+//!    unset/null progenitor is honest absence: identity is false and the
+//!    earned authority arm returns its clean refusal rather than raw Serde.
 //!
 //! The coordinator zome is `content_store` (per dna/elohim/dna.yaml).
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
@@ -34,6 +37,7 @@ use tokio::time::sleep;
 use elohim_sweettest::common::{
     conductors::{
         load_dna, single_agent_conductor, two_agent_conductors, two_agent_conductors_isolated,
+        SweetAgents,
     },
     fixtures::network_seed,
 };
@@ -1244,6 +1248,63 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
     assert!(
         format!("{:?}", refused.unwrap_err()).contains("earned head is protected"),
         "guard error must contain the HTTP-mappable 'earned head is protected' substring"
+    );
+
+    Ok(())
+}
+
+/// An unset/null `progenitor_pubkey` is a legitimate network shape, not a
+/// malformed configured identity. This is the isolated equivalent of the
+/// release-ceremony driver's `promote --as jessica` negative control: the
+/// non-author is refused cleanly, while the bootstrap-steward predicate
+/// degrades to false instead of leaking a Deserialize failure.
+#[tokio::test(flavor = "multi_thread")]
+async fn absent_bootstrap_steward_refuses_earned_declaration_cleanly() -> Result<()> {
+    let (mut conductor, a1) = single_agent_conductor().await?;
+    let a2 = SweetAgents::one(conductor.keystore()).await;
+    let dna_file = load_dna(DNA, &network_seed(DNA), None).await?;
+    let app1 = conductor
+        .setup_app_for_agent("content-no-bootstrap", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = conductor
+        .setup_app_for_agent("content-no-bootstrap-non-author", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().expect("first cell installed").clone();
+    let cell2 = app2.cells().first().expect("second cell installed").clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    let steward: Option<AgentPubKey> = conductor.call(&zome2, "get_bootstrap_steward", ()).await;
+    let is_steward: bool = conductor.call(&zome2, "is_bootstrap_steward", ()).await;
+    assert!(steward.is_none(), "unset progenitor must be honest absence");
+    assert!(!is_steward, "no agent self-elects when progenitor is unset");
+
+    let id = unique_id("absent-bootstrap-steward");
+    let root: ContentOutput = conductor
+        .call(&zome1, "create_content", test_content(&id))
+        .await;
+
+    let refused: std::result::Result<ContentHeadOutput, _> = conductor
+        .call_fallible(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id,
+                head_action_hash: ActionHashB64::from(root.action_hash).to_string(),
+            },
+        )
+        .await;
+    let error = format!(
+        "{:?}",
+        refused.expect_err("non-author without bootstrap stewardship must be refused")
+    );
+    assert!(
+        error.contains("restricted to the root author, a device it delegated, or the bootstrap"),
+        "negative control must reach the clean authority refusal: {error}"
+    );
+    assert!(
+        !error.contains("Deserialize"),
+        "null progenitor must not leak a raw Deserialize error: {error}"
     );
 
     Ok(())

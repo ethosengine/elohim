@@ -198,6 +198,20 @@ than this local mesh's happ.yaml. Left for the integrator or a fresh
 triage — outside this task's write-set (Rust source / happ.yaml are both
 off-limits here).
 
+**Follow-up resolved (2026-09-01, Codex task 3)**: the null field and null
+properties-block shapes now decode as honest absence, and both bootstrap
+identity predicates share the optional path (`None` → `false`); a non-null
+malformed key still errors. The coordinator-only fix was applied consistently
+to the imagodei reference plus lamad/content_store, mishpat, and node-registry
+ports. `content_store` unit tests passed 70/70, the sibling coordinator suites
+passed 24/24 + 55/55 + 0/0, and the isolated sweettest
+`absent_bootstrap_steward_refuses_earned_declaration_cleanly` passed against a
+freshly packed lamad DNA: a distinct non-author reached the clean
+root-author/delegate/bootstrap-steward refusal with no `Deserialize` leakage.
+Story-graph node state: **green by coordinator sweettest**; the persistent
+household mesh was down, so the literal CLI rerun remains a future live receipt,
+not claimed here.
+
 **Deferred / not exercised**: `--delegation` (arm 2) live path; T1 schema
 validation (schema doesn't exist yet); full multi-minute gossip-convergence
 observation (bounded by the 2-minute Bash tool ceiling during this session,
