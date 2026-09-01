@@ -325,7 +325,7 @@ void describe('aggregate', () => {
     });
     const regression = r.findings.find(f => f.source === VISUAL_REGRESSION)!;
     assert.ok(regression.screenshotPath);
-    assert.match(regression.screenshotPath, /^reports\/screenshots\/lamad-b\//);
+    assert.match(regression.screenshotPath, /^reports\/screenshots\/lms-b\//);
     assert.match(regression.screenshotPath, /\.png$/);
     assert.match(regression.screenshotPath, /--\*\.png$/);
   });
@@ -343,7 +343,7 @@ void describe('aggregate', () => {
     );
     assert.ok(failure);
     assert.ok(failure.screenshotPath);
-    assert.match(failure.screenshotPath, /^reports\/screenshots\/lamad-d\//);
+    assert.match(failure.screenshotPath, /^reports\/screenshots\/lms-d\//);
     assert.match(failure.screenshotPath, /--\*\.png$/);
   });
 
