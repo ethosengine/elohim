@@ -111,3 +111,31 @@ its storage keeps sweeping. That is regime 2 of
 - The fleet observation (W2 poll → obeyed{path="peer_carried"} on alpha →
   both doorways on uhCkk1kms…) remains the integrator's watch via
   `dataplane-convergence-measure.ts` — do not claim it here.
+
+## 2026-09-01 attempt — structural stop
+
+`peer-carried-sweep-receipt.ts` now stages fresh divergent heads, proves the
+conductor-up negative control, records the labeled counter deltas, pauses the
+adopter conductor while storage remains the sweep owner, and always resumes it.
+The negative control converged to the elected head with
+`peer_carried_delta=0`.
+
+The proposed stopped-conductor regime is not equivalent to the fleet's
+arc-Empty regime. In `try_obey_visible_election`, a local election answer of
+`Absent` is the ONLY branch that calls `try_carried_election_supply`; an
+`Unreachable`/blocked conductor returns before the peer fetch. Even the
+`Absent` branch then needs that same local conductor for
+`verify_carried_election` and `validate_carried_head_record`. Removing or
+pausing the conductor therefore removes both the election supplier AND the
+required verifier; the sweep cannot reach `path="peer_carried"` under this
+fixture without changing production logic, which this task forbids. The run
+stopped without a receipt or habit-status flip.
+
+**Story-graph node:** chain / between sweep-hint→peer_carried-adopt / missing
+node: fixture an observed-absent canonical-election read while the adopter
+conductor remains callable for `verify_carried_election` +
+`validate_carried_head_record`; assertion = hint observed, local answer absent,
+peer evidence fetched, wasm verification succeeds, `peer_carried` increments;
+probe = `peer-carried-sweep-receipt.ts`; current state = stopped/paused
+conductor makes the local answer unreachable or blocked and the arm stalls
+before peer fetch.
