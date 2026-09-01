@@ -794,7 +794,7 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 /// Returns build information for deployment verification.
 /// The orchestrator uses this to verify deployments match expected commits.
 pub fn version_info() -> Response<Full<Bytes>> {
-    let info = elohim_compute::BuildInfo::new("elohim-doorway");
+    let info = doorway_version_document();
     let body = serde_json::to_string(&info)
         .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
 
@@ -803,6 +803,99 @@ pub fn version_info() -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct DoorwayVersionResponse {
+    #[serde(flatten)]
+    build: elohim_compute::BuildInfo,
+    passport: DoorwayPassport,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DoorwayPassport {
+    service: DoorwayServicePassport,
+    host: DoorwayHostPassport,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DoorwayServicePassport {
+    #[serde(flatten)]
+    build: elohim_compute::BuildInfo,
+    compiled_features: Vec<String>,
+    active_transports: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DoorwayHostPassport {
+    kernel: String,
+    release: String,
+    os: String,
+    arch: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    container_hint: Option<String>,
+}
+
+fn doorway_version_document() -> DoorwayVersionResponse {
+    let build = elohim_compute::BuildInfo::new("elohim-doorway");
+    DoorwayVersionResponse {
+        build: build.clone(),
+        passport: DoorwayPassport {
+            service: DoorwayServicePassport {
+                build,
+                compiled_features: Vec::new(),
+                // Doorway is a Track-4 projection, not a P2P participant.
+                active_transports: Vec::new(),
+            },
+            host: doorway_host_passport(),
+        },
+    }
+}
+
+fn doorway_host_passport() -> DoorwayHostPassport {
+    DoorwayHostPassport {
+        kernel: read_host_fact("/proc/sys/kernel/ostype")
+            .unwrap_or_else(|| std::env::consts::OS.to_string()),
+        release: read_host_fact("/proc/sys/kernel/osrelease")
+            .unwrap_or_else(|| "unknown".to_string()),
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+        container_hint: doorway_container_hint(),
+    }
+}
+
+fn read_host_fact(path: &str) -> Option<String> {
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn doorway_container_hint() -> Option<String> {
+    if std::env::var_os("KUBERNETES_SERVICE_HOST").is_some() {
+        return Some("kubernetes".to_string());
+    }
+    if std::path::Path::new("/.dockerenv").exists() {
+        return Some("docker".to_string());
+    }
+    if std::path::Path::new("/run/.containerenv").exists() {
+        return Some("container".to_string());
+    }
+    let cgroup = std::fs::read_to_string("/proc/1/cgroup").ok()?;
+    for (needle, hint) in [
+        ("kubepods", "kubernetes"),
+        ("containerd", "containerd"),
+        ("docker", "docker"),
+        ("podman", "podman"),
+    ] {
+        if cgroup.contains(needle) {
+            return Some(hint.to_string());
+        }
+    }
+    None
 }
 
 /// Handle startup progress endpoint (/health/startup)
@@ -958,6 +1051,34 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn version_passport_keeps_legacy_fields_and_adds_camel_case_blocks() {
+        let expected = elohim_compute::BuildInfo::new("elohim-doorway");
+        let expected_json = serde_json::to_value(&expected).unwrap();
+        let actual = serde_json::to_value(doorway_version_document()).unwrap();
+
+        for key in [
+            "version",
+            "commit",
+            "commitFull",
+            "buildTime",
+            "rustcVersion",
+            "service",
+        ] {
+            assert_eq!(actual[key], expected_json[key], "legacy field {key}");
+        }
+        assert_eq!(actual["service"], serde_json::json!("elohim-doorway"));
+        assert!(actual["passport"]["service"].is_object());
+        assert!(actual["passport"]["service"]
+            .get("compiledFeatures")
+            .is_some());
+        assert!(actual["passport"]["service"]
+            .get("activeTransports")
+            .is_some());
+        assert!(actual["passport"]["host"].get("arch").is_some());
+        assert!(actual["passport"]["host"].get("container_hint").is_none());
+    }
     use crate::config::Args;
     use clap::Parser;
 

@@ -1454,7 +1454,37 @@ impl HttpServer {
 
             // Build/version info
             (Method::GET, "/version") => {
-                let info = elohim_compute::BuildInfo::new("elohim-storage");
+                // Resolve the admin connection exactly as conductor-diagnostics
+                // and coordinator-sync do: embedded first, then any live role
+                // from the external-conductor registry.
+                let admin_websocket = self.admin_websocket.as_deref().cloned().or_else(|| {
+                    self.hc_registry
+                        .as_ref()
+                        .and_then(|registry| registry.any_admin_websocket())
+                });
+                #[cfg(feature = "p2p")]
+                let libp2p_active = self.p2p_handle.is_some();
+                #[cfg(not(feature = "p2p"))]
+                let libp2p_active = false;
+                #[cfg(feature = "p2p-iroh")]
+                let iroh_active = self.iroh_blob_store.is_some();
+                #[cfg(not(feature = "p2p-iroh"))]
+                let iroh_active = false;
+
+                let info = crate::runtime_passport::assemble_storage_passport(
+                    crate::runtime_passport::StoragePassportContext {
+                        embedded_conductor: self.embedded_conductor,
+                        external_conductor_configured: self.hc_registry.is_some(),
+                        admin_websocket,
+                        app_id: self
+                            .happ_app_id
+                            .clone()
+                            .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string()),
+                        libp2p_active,
+                        iroh_active,
+                    },
+                )
+                .await;
                 let body = serde_json::to_string(&info)
                     .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
                 Ok(Response::builder()
