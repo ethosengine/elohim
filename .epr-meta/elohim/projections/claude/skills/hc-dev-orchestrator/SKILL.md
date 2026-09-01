@@ -116,6 +116,14 @@ sprint report stamps the mode in JSON and its Markdown header so runs remain com
 conductor, storage, doorway, and mongod process, followed by `footprint total rss=<MB>`. The values
 come from `ps` and describe what is running, not the next-launch configuration.
 
+`hc-mesh.sh join-peer <fresh-name>` appends ONE additional conductor + storage
+peer to an already-running warm mesh — the late-join staging regime (regime 3 of
+mesh-fixture-fidelity). It never restarts or reconfigures an incumbent, and it
+refuses duplicate names, partial/cold meshes, and occupied derived ports before
+launch. The receipt probe is `genesis/a2o/scripts/late-joiner-receipt.ts` (run
+from `genesis/a2o`): exact signed NodeId discovery by every warm incumbent, no
+restarts, bounded by three announce cadences.
+
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
 write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never

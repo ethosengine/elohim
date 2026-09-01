@@ -2,9 +2,12 @@
 name: hc-dev-orchestrator
 description: START and manage the Elohim P2P Framework local DEVELOPMENT STACK — runs conductor (identity/provenance), storage (content), doorway (unified API) as a coordinated service trio. Use when "start the local dev stack", "spin up holochain locally", "why isn't the conductor reachable", "is the doorway alive?", or checking service health during development. NOT for desktop Tauri shell knowledge (use tauri-desktop).
 metadata:
+  runtime: codex
   sourceRuntime: claude
   master: package
-  governance: "epr:elohim-agent/skills/hc-dev-orchestrator"
+  sourcePath: .epr-meta/elohim/packages/skills/hc-dev-orchestrator.json
+  packageKind: SkillPackage
+governance: "epr:elohim-agent/skills/hc-dev-orchestrator"
 ---
 
 # Elohim Local Development Orchestrator
@@ -115,6 +118,14 @@ sprint report stamps the mode in JSON and its Markdown header so runs remain com
 `mesh status` also prints one `footprint <role> <name> rss=<MB> cpu=<pct>` line per running
 conductor, storage, doorway, and mongod process, followed by `footprint total rss=<MB>`. The values
 come from `ps` and describe what is running, not the next-launch configuration.
+
+`hc-mesh.sh join-peer <fresh-name>` appends ONE additional conductor + storage
+peer to an already-running warm mesh — the late-join staging regime (regime 3 of
+mesh-fixture-fidelity). It never restarts or reconfigures an incumbent, and it
+refuses duplicate names, partial/cold meshes, and occupied derived ports before
+launch. The receipt probe is `genesis/a2o/scripts/late-joiner-receipt.ts` (run
+from `genesis/a2o`): exact signed NodeId discovery by every warm incumbent, no
+restarts, bounded by three announce cadences.
 
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline

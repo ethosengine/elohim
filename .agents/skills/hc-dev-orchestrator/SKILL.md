@@ -119,6 +119,14 @@ sprint report stamps the mode in JSON and its Markdown header so runs remain com
 conductor, storage, doorway, and mongod process, followed by `footprint total rss=<MB>`. The values
 come from `ps` and describe what is running, not the next-launch configuration.
 
+`hc-mesh.sh join-peer <fresh-name>` appends ONE additional conductor + storage
+peer to an already-running warm mesh — the late-join staging regime (regime 3 of
+mesh-fixture-fidelity). It never restarts or reconfigures an incumbent, and it
+refuses duplicate names, partial/cold meshes, and occupied derived ports before
+launch. The receipt probe is `genesis/a2o/scripts/late-joiner-receipt.ts` (run
+from `genesis/a2o`): exact signed NodeId discovery by every warm incumbent, no
+restarts, bounded by three announce cadences.
+
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
 write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never
@@ -324,6 +332,11 @@ not answer `/health` by port afterwards; an empty `.environ` is named out loud (
 environment is authoritative; `MESH_RESTART_APPLY_PROFILE=1` overlays THIS script's dev-tier
 pacing knobs on the re-exec (a knob added after boot reaches a running mesh without regenerating
 it; never touches `AGENT_PUBKEY`), and `MESH_RESTART_ENV_OVERLAY="K=V K=V"` overlays ad-hoc keys.
+Mesh starts default `ALLOW_COORDINATOR_UPDATE=true` (`MESH_ALLOW_COORDINATOR_UPDATE` overrides) so
+the rung-1 coordinator hot-swap vehicle (`POST /admin/coordinators/sync` +
+`scripts/ci/fleet-coordswap.sh`) works out of the box — but a peer restarted via `storage-restart`
+re-execs the CAPTURED environ, so a mesh booted before that flag existed needs the overlay
+(`MESH_RESTART_ENV_OVERLAY="ALLOW_COORDINATOR_UPDATE=true"`) or a full mesh restart to accept swaps.
 The re-exec closes inherited fds ≥3 first — a caller holding a `flock` (the a2o
 mesh lock `/tmp/elohim-local-mesh/a2o.lock`, which serializes concurrent agents' mesh-touching
 commands) otherwise leaks the lock into the long-lived peer (2026-08-22: three peers owned the lock

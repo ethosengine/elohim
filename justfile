@@ -237,7 +237,8 @@ mesh action="status" *args:
       # recovery harness drives, reachable through the verb so a shift never has to know the script.
       conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
       storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
-      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]" >&2; exit 2 ;;
+      join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
+      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
