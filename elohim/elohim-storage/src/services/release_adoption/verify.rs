@@ -134,9 +134,11 @@ impl InstalledReality {
 /// The channel's L2 version chain, as far as the resolve could see it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LineageEvidence {
-    /// The release CID the channel's current head supersedes, from the head
-    /// declaration itself — the L2 chain, not the manifest's self-report.
-    /// `None` means the head declaration supersedes nothing (a first release).
+    /// The cid of the prior RELEASE on this channel, from the L2 chain — not
+    /// the manifest's self-report. `None` for a channel's first release: the
+    /// head's declaration may still structurally supersede an EARLIER action
+    /// (the channel root, or an ordinary content version), but the root is
+    /// not itself a release, so it is never reported here as one.
     pub supersedes: Option<String>,
 }
 
@@ -533,9 +535,9 @@ pub fn verify_lineage(
         return Err(refuse(
             RefusalReason::LineageParentMismatch,
             format!(
-                "envelope.lineageParentCid declares {declared:?} but the channel's head \
-                 declaration supersedes {actual:?} — the body field is a hint that MUST match \
-                 the L2 chain"
+                "envelope.lineageParentCid declares {declared:?} but the channel's release \
+                 chain supersedes {actual:?} — the body field is a hint that MUST match the L2 \
+                 chain"
             ),
         ));
     }
@@ -993,6 +995,21 @@ mod tests {
             &Answer::Present(LineageEvidence { supersedes: None }),
         )
         .expect("a first release with a null parent agrees with an empty chain");
+    }
+
+    /// The first-release defect, at the verify boundary: a fresh channel's
+    /// first release declares a null parent, and the L2 chain evidence for a
+    /// first release is ALSO `supersedes: None` — never the channel root's
+    /// cid — so the two agree and the release is not refused.
+    #[test]
+    fn a_first_release_with_no_prior_release_evidence_passes() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        verify_lineage(
+            &manifest,
+            &Answer::Present(LineageEvidence { supersedes: None }),
+        )
+        .expect("a first release agrees with L2 evidence that names no prior release");
     }
 
     /// **C5.** An unreadable chain establishes nothing in either direction.

@@ -20,8 +20,9 @@
 //!
 //! The head comes from THIS node's conductor and nowhere else. A peer hint or a
 //! `ContentHeadDeclared` signal may *trigger* a sweep; it may never *supply* an
-//! answer. That is why the resolve is a `resolve_content_head` call rather than
-//! a read of the local projection: the projection is a record of what we were
+//! answer. That is why the resolve is a `resolve_content_head_local` call
+//! (`GetStrategy::Local` — gossip already delivered, never a network fetch)
+//! rather than a read of the local projection: the projection is a record of what we were
 //! told, and this loop is deciding whether to change what we RUN.
 //!
 //! # Where the manifest actually lives
@@ -144,6 +145,43 @@ pub fn extract_release_body(
             "metadata_json declares kind=release-manifest but carries no `manifest` key",
         )),
     }
+}
+
+/// The bare envelope `kind` tag out of a content version's `metadata_json` —
+/// the same discriminator [`extract_release_body`] and
+/// [`verify::verify_shape`] both key on (`RELEASE_MANIFEST_KIND`), without the
+/// manifest-body validation neither the lineage question nor this call site
+/// needs. `None` for empty/unparseable JSON or an object with no `kind` field
+/// — read honestly as "not a release", never guessed.
+fn envelope_kind_tag(metadata_json: &str) -> Option<String> {
+    let trimmed = metadata_json.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let envelope: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    envelope
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+/// Decide the prior-RELEASE lineage evidence from what the head's declaration
+/// supersedes.
+///
+/// `superseded` is `None` when the head supersedes nothing at all (the head
+/// IS the channel root). `Some((cid, kind))` pairs the superseded record's
+/// action-hash cid with its envelope `kind` tag ([`envelope_kind_tag`]).
+///
+/// Only a superseded record whose kind is [`RELEASE_MANIFEST_KIND`] is a
+/// prior release — a channel ROOT supersedes nothing releases-wise even
+/// though the head's declaration structurally supersedes the root's create
+/// action. This is the fix for the first-release defect: a fresh channel's
+/// first release has `head.supersedes = Some(<root action hash>)`, and
+/// without this filter that root cid was reported as a prior release no
+/// manifest could ever agree with.
+fn prior_release_from(superseded: Option<(String, Option<&str>)>) -> Option<String> {
+    let (cid, kind) = superseded?;
+    (kind == Some(RELEASE_MANIFEST_KIND)).then_some(cid)
 }
 
 // ---------------------------------------------------------------------------
@@ -400,16 +438,22 @@ impl AdoptionController {
         fresh
     }
 
-    /// Resolve one channel's canonical head through THIS node's conductor.
+    /// Resolve one channel's canonical head through THIS node's conductor —
+    /// `resolve_content_head_local` (`GetStrategy::Local`), never the network
+    /// variant. This controller reads what gossip has already delivered to
+    /// THIS conductor, which is exactly what "3/3 convergence" measures; a
+    /// network `get` inside a zome call is unbounded work this caller cannot
+    /// cancel (a saturated/cold-arc peer returns `NoPeersForLocation`, which
+    /// is a transport fault, not the honest absence C4 needs).
     ///
     /// Deliberately a `Background`-classed call: a controller sweep must never
     /// occupy the admission lane a person is standing in.
     /// [`crate::services::conductor_writes::call_resolve_content_head`] is the
     /// owner of this wire shape and its `ContentHeadWire` decode mirror is
-    /// reused verbatim here; only the admission class differs. (Residual: that
-    /// module wants a `_classed` variant the way its declare path already has
-    /// one — it belongs to another lane, so this reuses the type rather than
-    /// editing the file.)
+    /// reused verbatim here; only the admission class (and now the Local
+    /// zome fn) differ. (Residual: that module wants a `_classed` variant the
+    /// way its declare path already has one — it belongs to another lane, so
+    /// this reuses the type rather than editing the file.)
     async fn resolve_head(&self, channel_id: &str) -> Answer<ContentHeadWire> {
         let Some(hc) = self.hc.as_ref() else {
             return Answer::Unreachable;
@@ -421,7 +465,7 @@ impl AdoptionController {
         let bytes = match hc
             .call_zome_timed(
                 "content_store",
-                "resolve_content_head",
+                "resolve_content_head_local",
                 payload,
                 AdmissionClass::Background,
             )
@@ -446,6 +490,76 @@ impl AdoptionController {
                     channel = %channel_id,
                     error = %e,
                     "release-adoption: could not decode ContentHeadWire"
+                );
+                Answer::Unreachable
+            }
+        }
+    }
+
+    /// Resolve the envelope `kind` tag of ONE specific content version
+    /// (`action_hash_b64`) through THIS node's conductor — the same
+    /// `content_store`/`HcClient` path [`Self::resolve_head`] uses, aimed at a
+    /// historical action instead of the live head.
+    ///
+    /// This is the read the lineage fix needs: `head.supersedes` names an
+    /// ACTION, not necessarily a RELEASE — on a fresh channel's first release
+    /// it names the channel root. Deciding "is a prior release" requires
+    /// looking at what that action actually carries, never guessing from the
+    /// action hash alone.
+    async fn resolve_superseded_kind(&self, action_hash_b64: &str) -> Answer<Option<String>> {
+        let Some(hc) = self.hc.as_ref() else {
+            return Answer::Unreachable;
+        };
+        let action_hash =
+            match crate::services::conductor_writes::decode_action_hash(action_hash_b64) {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::warn!(
+                        action_hash = %action_hash_b64,
+                        error = %e,
+                        "release-adoption: superseded action hash undecodable — unreachable, \
+                         never a guess at what it names"
+                    );
+                    return Answer::Unreachable;
+                }
+            };
+        let payload = match rmp_serde::to_vec_named(&action_hash) {
+            Ok(p) => p,
+            Err(_) => return Answer::Unreachable,
+        };
+        let bytes = match hc
+            .call_zome_timed(
+                "content_store",
+                "get_content",
+                payload,
+                AdmissionClass::Background,
+            )
+            .await
+        {
+            Ok((bytes, _timing)) => bytes,
+            Err(e) => {
+                tracing::debug!(
+                    action_hash = %action_hash_b64,
+                    error = %e,
+                    "release-adoption: superseded-version resolve failed — unreachable, never \
+                     absence"
+                );
+                return Answer::Unreachable;
+            }
+        };
+        match rmp_serde::from_slice::<Option<lamad_types::ContentOutput>>(&bytes) {
+            // The conductor answered and holds no record for this action —
+            // honest absence (gossip-missing), not a verdict about lineage.
+            // A retrieved record with no `kind` tag at all (`Present(None)`)
+            // is equally honest: it is simply not a release.
+            Ok(out) => {
+                Answer::observed_absence(out.map(|o| envelope_kind_tag(&o.content.metadata_json)))
+            }
+            Err(e) => {
+                tracing::warn!(
+                    action_hash = %action_hash_b64,
+                    error = %e,
+                    "release-adoption: could not decode ContentOutput for the superseded version"
                 );
                 Answer::Unreachable
             }
@@ -695,9 +809,25 @@ impl AdoptionController {
         }
 
         let installed = self.installed_reality(now).await;
-        let lineage = Answer::Present(LineageEvidence {
-            supersedes: head.supersedes.as_ref().map(|h| h.0.clone()),
-        });
+
+        // The head's `supersedes` names an ACTION, not necessarily a RELEASE:
+        // on a fresh channel's first release it names the channel root. Read
+        // what that action actually carries before reporting it as prior
+        // lineage — the fix for the first-release defect (a root mistaken for
+        // a prior release refused every first publish on every channel).
+        let lineage = match head.supersedes.as_ref() {
+            None => Answer::Present(LineageEvidence { supersedes: None }),
+            Some(superseded_action_hash) => {
+                let superseded_cid = superseded_action_hash.0.clone();
+                match self.resolve_superseded_kind(&superseded_cid).await {
+                    Answer::Present(kind) => Answer::Present(LineageEvidence {
+                        supersedes: prior_release_from(Some((superseded_cid, kind.as_deref()))),
+                    }),
+                    Answer::Absent => Answer::Absent,
+                    Answer::Unreachable => Answer::Unreachable,
+                }
+            }
+        };
 
         // Refuse on the cheap arms BEFORE spending a threshold read or a byte
         // of staging: an envelope that cannot match will not match after we pay
@@ -1079,6 +1209,48 @@ mod tests {
             extract_release_body("{not json").unwrap_err().reason_code(),
             RefusalReason::ManifestUndecodable
         );
+    }
+
+    /// The first-release defect, isolated to the pure decision: a channel
+    /// ROOT is never a prior release, no matter that the head's declaration
+    /// structurally supersedes its create action.
+    #[test]
+    fn a_superseded_channel_root_yields_no_prior_release() {
+        assert_eq!(
+            prior_release_from(Some(("uhCkkROOT".to_string(), Some("release-channel")))),
+            None
+        );
+    }
+
+    /// A superseded record that IS a release is reported as the prior
+    /// release, by its own cid.
+    #[test]
+    fn a_superseded_release_manifest_yields_that_prior_release_cid() {
+        assert_eq!(
+            prior_release_from(Some((
+                "uhCkkPRIOR".to_string(),
+                Some(RELEASE_MANIFEST_KIND)
+            ))),
+            Some("uhCkkPRIOR".to_string())
+        );
+    }
+
+    /// The head supersedes nothing at all (it IS the channel root) — the
+    /// honest floor, and not merely the root-kind case above.
+    #[test]
+    fn nothing_superseded_yields_no_prior_release() {
+        assert_eq!(prior_release_from(None), None);
+    }
+
+    #[test]
+    fn envelope_kind_tag_reads_the_bare_kind_field() {
+        assert_eq!(
+            envelope_kind_tag(r#"{"kind":"release-channel"}"#),
+            Some("release-channel".to_string())
+        );
+        assert_eq!(envelope_kind_tag(""), None);
+        assert_eq!(envelope_kind_tag("{not json"), None);
+        assert_eq!(envelope_kind_tag("{}"), None);
     }
 
     /// A base64 action hash carries `/` and `+`. A staging directory named from
