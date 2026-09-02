@@ -16,6 +16,7 @@
   <main *ngIf="slug && !error" class="delivery-content" data-testid="delivery-content">
     <app-epr-focal
       [slug]="slug"
+      [showFallbackTitle]="true"
       (nodeLoaded)="onNodeLoaded($event)"
       (notFound)="onNotFound()"
       (failed)="onFailed()"

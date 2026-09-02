@@ -11,6 +11,7 @@ import { SeoService } from '../../../services/seo.service';
 @Component({ selector: 'app-epr-focal', standalone: true, template: '' })
 class EprFocalStub {
   @Input() slug = '';
+  @Input() showFallbackTitle = false;
   @Output() nodeLoaded = new EventEmitter<unknown>();
   @Output() notFound = new EventEmitter<string>();
   @Output() failed = new EventEmitter<string>();

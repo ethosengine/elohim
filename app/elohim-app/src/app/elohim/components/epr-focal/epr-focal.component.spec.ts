@@ -86,4 +86,22 @@ describe('EprFocalComponent', () => {
     setSlug('succession');
     expect(contentServiceSpy.getContentBySlug).toHaveBeenNthCalledWith(2, 'succession');
   });
+
+  it('renders the fallback title when showFallbackTitle is set and no renderer is registered', () => {
+    contentServiceSpy.getContentBySlug.mockReturnValue(
+      of({ ...mockNode, contentFormat: 'gherkin' })
+    );
+    fixture.componentRef.setInput('showFallbackTitle', true);
+    setSlug('manifesto');
+    const h1 = fixture.nativeElement.querySelector('.fallback-content h1');
+    expect(h1?.textContent).toContain('The Elohim Protocol Manifesto');
+  });
+
+  it('renders no fallback title by default', () => {
+    contentServiceSpy.getContentBySlug.mockReturnValue(
+      of({ ...mockNode, contentFormat: 'gherkin' })
+    );
+    setSlug('manifesto');
+    expect(fixture.nativeElement.querySelector('.fallback-content h1')).toBeNull();
+  });
 });

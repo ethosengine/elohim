@@ -17,6 +17,9 @@
       <div class="html-content" [innerHTML]="node.content"></div>
     } @else {
       <div class="fallback-content">
+        @if (showFallbackTitle) {
+          <h1>{{ node.title }}</h1>
+        }
         <p class="fallback-meta">{{ node.contentType }} &middot; {{ node.contentFormat }}</p>
         <pre>{{ getStringContent(node.content) }}</pre>
       </div>

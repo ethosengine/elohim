@@ -54,6 +54,11 @@ export type FocalNode = ContentNode;
 })
 export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy {
   @Input({ required: true }) slug!: string;
+  // Chrome opt-in: the atom home renders no title of its own, but the legacy
+  // delivery page still needs one when the format falls through to the raw
+  // fallback (no registered renderer, not plaintext/html). Default false
+  // keeps the focal slot chrome-free by design.
+  @Input() showFallbackTitle = false;
   @Output() readonly nodeLoaded = new EventEmitter<FocalNode>();
   @Output() readonly notFound = new EventEmitter<string>();
   @Output() readonly failed = new EventEmitter<string>();
