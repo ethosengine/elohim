@@ -13,5 +13,12 @@ path = "src/main.rs"
 [dependencies]
 elohim-ark-core = { path = "../core" }
 elohim-ark-supervisor = { path = "../supervisor" }
+elohim-epr = { path = "../../epr" }
+cid = { workspace = true }
 clap = { workspace = true }
 serde_json = { workspace = true }
+nix = { workspace = true }
+
+[dev-dependencies]
+sha2 = { workspace = true }
+tempfile = { workspace = true }

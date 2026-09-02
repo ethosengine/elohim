@@ -81,6 +81,12 @@ const FILE_MODE: u32 = 0o600;
 type SharedSink = Arc<Mutex<Box<dyn WitnessSink + Send>>>;
 type SharedClock = Arc<dyn Clock + Send + Sync>;
 
+/// Receives the process state associated with every durable passport rewrite.
+pub trait StateObserver: Send + Sync {
+    /// Observes one process state after its passport has reached the sink.
+    fn on_state(&self, process: &str, state: &str, pid: Option<u32>, incarnation: u64);
+}
+
 /// The host clock, which is the only clock outside tests.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemClock;
@@ -187,6 +193,7 @@ pub struct Supervisor {
     sink: SharedSink,
     clock: SharedClock,
     shutdown: Arc<AtomicBool>,
+    observer: Option<Arc<dyn StateObserver>>,
 }
 
 impl Supervisor {
@@ -245,7 +252,14 @@ impl Supervisor {
             sink: Arc::new(Mutex::new(sink)),
             clock: Arc::from(clock),
             shutdown: Arc::new(AtomicBool::new(false)),
+            observer: None,
         })
+    }
+
+    /// Adds an observer for state-bearing passport rewrites.
+    pub fn with_observer(mut self, observer: Arc<dyn StateObserver>) -> Self {
+        self.observer = Some(observer);
+        self
     }
 
     /// The flag a signal handler sets to ask every child to stop.
@@ -261,6 +275,11 @@ impl Supervisor {
         self.berth.incarnation = incarnation;
         let passport = Arc::new(Mutex::new(self.initial_passport(incarnation)?));
         write_passport(&self.sink, &passport)?;
+        if let Some(observer) = &self.observer {
+            for process in &self.manifest.processes {
+                observer.on_state(&process.name, "idle", None, incarnation);
+            }
+        }
 
         let logs = self.berth.data_root.join("ark").join("logs");
         DirBuilder::new()
@@ -283,6 +302,7 @@ impl Supervisor {
                 sink: Arc::clone(&self.sink),
                 clock: Arc::clone(&self.clock),
                 shutdown: Arc::clone(&self.shutdown),
+                observer: self.observer.clone(),
                 passport: Arc::clone(&passport),
                 logs: logs.clone(),
                 state: ChildState::Idle,
@@ -426,6 +446,7 @@ struct Worker {
     sink: SharedSink,
     clock: SharedClock,
     shutdown: Arc<AtomicBool>,
+    observer: Option<Arc<dyn StateObserver>>,
     passport: Arc<Mutex<Passport>>,
     logs: PathBuf,
 
@@ -1040,7 +1061,9 @@ impl Worker {
             }
             passport.updated_at_epoch_ms = self.clock.now_epoch_ms();
         }
-        write_passport(&self.sink, &self.passport)
+        write_passport(&self.sink, &self.passport)?;
+        self.notify_state();
+        Ok(())
     }
 
     fn set_last_verdict(&self, verdict: RestartVerdict) -> Result<(), SupervisorError> {
@@ -1049,11 +1072,46 @@ impl Worker {
             passport.last_verdict = Some(verdict);
             passport.updated_at_epoch_ms = self.clock.now_epoch_ms();
         }
-        write_passport(&self.sink, &self.passport)
+        write_passport(&self.sink, &self.passport)?;
+        self.notify_state();
+        Ok(())
+    }
+
+    fn notify_state(&self) {
+        let Some(observer) = &self.observer else {
+            return;
+        };
+        let pid = match self.state {
+            ChildState::Booting { pid, .. }
+            | ChildState::Live { pid }
+            | ChildState::Dying { pid, .. } => Some(pid),
+            ChildState::Idle
+            | ChildState::Spawning { .. }
+            | ChildState::Dead
+            | ChildState::GaveUp => None,
+        };
+        observer.on_state(
+            &self.spec.name,
+            child_state_name(&self.state),
+            pid,
+            self.incarnation,
+        );
     }
 
     fn now_ms(&self) -> u64 {
         self.clock.now_epoch_ms()
+    }
+}
+
+fn child_state_name(state: &ChildState) -> &'static str {
+    match state {
+        ChildState::Idle => "idle",
+        ChildState::Spawning { .. } => "spawning",
+        ChildState::Booting { .. } => "booting",
+        ChildState::Live { .. } => "live",
+        ChildState::Dying { .. } => "dying",
+        ChildState::Dead => "dead",
+        ChildState::GaveUp => "give_up",
     }
 }
 

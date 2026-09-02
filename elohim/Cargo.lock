@@ -1115,10 +1115,15 @@ dependencies = [
 name = "elohim-ark"
 version = "0.1.0"
 dependencies = [
+ "cid",
  "clap",
  "elohim-ark-core",
  "elohim-ark-supervisor",
+ "elohim-epr",
+ "nix",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
 ]
 
 [[package]]
