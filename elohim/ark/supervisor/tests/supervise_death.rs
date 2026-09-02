@@ -292,6 +292,17 @@ fn a_sigkilled_child_leaves_a_witness_then_restarts_then_gives_up_on_same_cause(
         .iter()
         .find(|summary| summary.verdict.is_none())
         .expect("the write-ahead witness is durable before anything is decided");
+    let witnessed_passport = spool.read_witness(&write_ahead.cid).unwrap().passport;
+    let witnessed_child = witnessed_passport
+        .processes
+        .iter()
+        .find(|entry| entry.name == "child")
+        .expect("the witness passport carries the child process");
+    assert_eq!(witnessed_child.pid, Some(first_pid));
+    assert!(
+        witnessed_child.ready,
+        "the witness carries the passport as it stood at the moment of death"
+    );
     assert_eq!(write_ahead.incident, restart.incident);
     assert_ne!(write_ahead.cid, restart.cid);
 

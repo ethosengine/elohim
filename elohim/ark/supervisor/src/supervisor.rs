@@ -492,6 +492,7 @@ struct PendingDeath {
     pid: u32,
     class: ExitClass,
     sample: ProcessSample,
+    passport: Passport,
     artifact_sha256: String,
     artifact_path: PathBuf,
     started_at_epoch_ms: u64,
@@ -709,6 +710,7 @@ impl Worker {
             None => (String::new(), PathBuf::new(), 0),
         };
 
+        let passport = self.passport.lock().expect("passport lock").clone();
         self.running = None;
         // The passport says what is true NOW, and what is true now is that nothing is
         // running under this name — on every death path, including a deliberate stop, which
@@ -721,6 +723,7 @@ impl Worker {
             pid,
             class,
             sample: merge_samples(live, accounted),
+            passport,
             artifact_sha256,
             artifact_path,
             started_at_epoch_ms,
@@ -960,7 +963,6 @@ impl Worker {
     }
 
     fn build_witness(&self, death: &PendingDeath) -> DeathWitness {
-        let passport = self.passport.lock().expect("passport lock").clone();
         DeathWitness {
             schema: RECORD_SCHEMA,
             kind: WITNESS_KIND.to_string(),
@@ -984,7 +986,7 @@ impl Worker {
             last_stdout: death.stdout_tail.clone(),
             sample: Some(death.sample.clone()),
             last_intent: self.last_intent.clone(),
-            passport,
+            passport: death.passport.clone(),
             verdict: None,
             refusal: None,
             // S0 runs on manifest policy: no commitment bounds this runtime yet, and an
