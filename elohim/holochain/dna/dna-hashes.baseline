@@ -1,21 +1,27 @@
-# Committed baseline of the DNA hashes currently INSTALLED on the fleet.
+# Committed baseline of the DNA hashes the fleet is contracted to run.
 #
 # Format: <role>=<uhC0k… DNA hash>, one per line, blank lines and `#` comments
 # ignored. `role` matches the happ.yaml role name (elohim/workdir/happ.yaml),
 # not the DNA directory name (node-registry dir -> node_registry role).
 #
-# Read and enforced by scripts/ci/dna-hash-guard.sh in the "Build DNA" stage
+# Read and enforced by scripts/ci/dna-hash-guard.sh in the "DNA Hash Guard" stage
 # of elohim/holochain/dna/Jenkinsfile: a build whose packed DNA hash diverges
-# from this file fails the build (INTEGRITY-HASH-MOVED) unless the triggering
-# commit message carries `[dna:migrate]` — see the incident this guards
-# against: commit 03f331f21 (2026-09-02) moved all five INTEGRITY wasm hashes
-# via an unconditional linker-flag change believed hash-neutral, uninstalling
-# the fleet's hApp and tearing every source chain.
+# from this file FAILS unless its commit is tagged [dna:migrate] — a moved
+# integrity hash orphans the fleet's DHT data and re-keys every node, so it is a
+# declared migration, never a side effect.
 #
-# Update this file in the SAME commit as any change that is meant to move a
-# DNA hash, and tag that commit `[dna:migrate]`.
-lamad=uhC0kkLdCTgRohBd10TDia-kYXPfRDHmPsKdUFLVmAMmGAlEIjiO0
-imagodei=uhC0knLGOq34BpiNYjKgxeBbjyzFbN9OlabVGZhVmLIKBB1UDskoZ
+# 2026-09-02 [dna:migrate] — MIGRATION. The previous baseline was the hashes the
+# alpha fleet had installed; the archived-artifact walk (elohim-holochain #1363..#1420,
+# `hc dna hash` per build) showed lamad/imagodei/mishpat matched NO CI build since
+# 2026-07-18 — the fleet ran pre-July integrity zomes for six weeks while every build
+# shipped newer ones that never installed. These are elohim-holochain #1420's hashes
+# (byte-identical to #1414, the last pre-incident build): the operator chose to
+# re-genesis the fleet on the current DNAs rather than revert six weeks of integrity
+# work. Escalation atom:
+#   genesis/data/timeline/backlog/alpha-conductor-crash-loop-after-wave4-roll-and-moved-dna-hashes.md
+# The same five values are the DNA_MIGRATION_INTENT for that one roll.
+lamad=uhC0k8x1UsBQjMyiU-c_rgoi9dF2YnhwAjVqUg_DrVnXitSAQli-E
+imagodei=uhC0kRA0NgxsLmrTNiK8Rm-OhAKHD91jXr_Y8OrEJbNlwyTzCaOGf
 infrastructure=uhC0kq1eGfzYnt6hpAgmNMixaCmiffBlbI4vm9p3EVgnQTfws2tJA
-node_registry=uhC0kBewxOTSg-jE83-GmWwKwgzgZkV1mhR0I6v7QlCsxsai0AFH4
-mishpat=uhC0kmZ1B1Vy3fEjpCYB0wZ-43SVbwYKINNY5WLSNJv-TcSiEuJ4I
+node_registry=uhC0kL99ixoFpZ0EUnAuXGpR_nOjRieBMZF-94QGTkdHe19pwpq85
+mishpat=uhC0kRnr6SB8cs5HYMq8PVmJXYVY4Y4FLnoIrMvNmwnY7Szue3lA2
