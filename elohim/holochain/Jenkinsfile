@@ -760,18 +760,45 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
     for (h in humans) { if (h.genesisPeer == true && h.name != 'matthew') { ordered.add(h) } }
     for (h in humans) { if (h.genesisPeer == true && h.name == 'matthew') { ordered.add(h) } }
     def soakSecs = env.CONDUCTOR_STAGGER_SOAK_SECS ?: '90'
+    // HALT-ON-FIRST-FAILURE (2026-09-02, edge #1413/#1414). The storage phase
+    // above is parallel and per-peer-independent, so one peer's rollout failure
+    // is genuinely a per-peer test failure there. This phase is NOT that: a
+    // conductor only rolls when a SHARED artifact moved (hApp bytes / conductor
+    // pin — see resolveConductorWorkloadImage), so the first peer whose
+    // conductor will not come Ready is a leading indicator for every peer
+    // behind it. #1413 proved the cost of continuing: it captured failed-rollout
+    // evidence for jessica, gertrude, susan and eve in ONE run and kept going,
+    // walking `ordered` at one 600s rollout timeout per peer while each freshly
+    // rolled conductor reinstalled a drifted DNA and tore its source chain.
+    // A skipped peer keeps its RUNNING conductor — the safe state.
+    // Compounding tell this cures: the soak below sits AFTER the throw point, so
+    // pre-halt a FAILING peer advanced to the next one faster than a healthy one.
+    // Escape hatch (operator, deliberate): CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1.
+    // Map mutation, not local reassignment — the capture-by-reference idiom this
+    // function already uses for `outcomes`.
+    def rollState = [halted: false]
+    def haltOnFailure = (env.CONDUCTOR_ROLL_CONTINUE_ON_FAILURE ?: '0') != '1'
     for (h in ordered) {
         def queued = CONDUCTOR_DEPLOY_QUEUE[h.resourcePrefix]
         if (queued == null) {
             echo "conductor phase: ${h.resourcePrefix} has no queued conductor deploy (storage phase failed) — skipping"
             continue
         }
+        if (rollState.halted) {
+            echo "conductor phase: HALTED — NOT rolling ${h.resourcePrefix}-conductor. An earlier peer's conductor rollout failed, and this phase only runs when a shared artifact moved, so the same failure is expected here. ${h.resourcePrefix} keeps its RUNNING conductor. Fix the failed peer and re-deploy, or set CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1 to roll the whole fleet anyway."
+            continue
+        }
+        // Pessimistic: cleared only on a clean return from the block below.
+        rollState.halted = haltOnFailure
         catchError(
             buildResult: 'UNSTABLE',
             stageResult: 'UNSTABLE',
-            message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; see log",
+            message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; remaining conductors HELD; see log",
         ) {
             def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin)
+            // Only reached on clean return — catchError swallows exceptions
+            // before this line on any failure path.
+            rollState.halted = false
             if (changed) {
                 echo "conductor ${h.resourcePrefix}-conductor CHANGED — soaking ${soakSecs}s before the next peer (staggered roll)"
                 // shell sleep: zero Groovy conversions, zero sandbox surface

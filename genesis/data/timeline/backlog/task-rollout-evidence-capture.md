@@ -85,6 +85,38 @@ This atom remains `in-progress` until the next natural or deliberately failed
 Jenkins rollout supplies the final live build-page archive receipt required by
 the DoD. No deploy ordering, timeout, restart budget, or manifest changed.
 
+## Live receipt — supplied by elohim-edge/dev #1413, NOT #1414 (ci-failure-triage, 2026-09-02)
+
+The first natural failed rollouts arrived on 2026-09-02. **#1413 satisfies the
+DoD's build-page archive receipt**: its artifact list carries five complete
+bundles — `rollout-evidence/elohim-alpha--statefulset--elohim-{jessica,gertrude,susan,eve}-alpha-conductor/`
+and `rollout-evidence/elohim-alpha--deployment--elohim-doorway-alpha-b/` — each
+with `capture.meta`, `summary.txt`, `pods.yaml`, `pods-wide.txt`,
+`pod-state.tsv`, `selector.txt`, `node-pressure.txt`, per-pod `describe.txt` /
+`events.txt`, and current+previous tails for every init and regular container
+(`happ-fetcher`, `elohim-conductor`, `ws-proxy`). Scope item 2 is verified live
+too — the summary names actual container states, not rollout testcase counts:
+`… 0/1 pods Ready — elohim-jessica-alpha-conductor-0=Running/NotReady[node=ethosengine;containers=happ-fetcher=true/Completed;elohim-conductor=false/CrashLoopBackOff;ws-proxy=true/;]`.
+#1413 ended **ABORTED** (superseded) and still archived, which is the stronger
+receipt.
+
+**Do NOT close this atom on #1414.** #1414 (UNSTABLE) logged both the
+collector's readiness summary and the wrapper's `expected artifact:
+rollout-evidence/…` line for `elohim-jessica-alpha-conductor`, yet its build
+page carries **only `build.env`** — no `rollout-evidence/**` at all, from the
+same pipeline-level `post { always { archiveArtifacts artifacts:
+'rollout-evidence/**', allowEmptyArchive: true } }`
+(`elohim/holochain/Jenkinsfile:2945`), where `allowEmptyArchive: true` makes the
+miss silent. There is an unexplained gap between "the collector ran and said so
+in the log" and "the bundle reached the build page" — the residual blindness
+this atom exists to remove. Suggested next read: whether #1414's deploy stage
+and its `post` block shared a workspace, and whether the collector's relative
+`OUTPUT_ROOT` (`scripts/ci/capture-rollout-evidence.sh:19`) resolved to the
+archive glob's base in that run.
+
+Both builds' context:
+`genesis/data/timeline/backlog/ci-edge-conductor-roll-no-halt-walks-the-fleet.md`.
+
 Story-graph interstitial: this atom already is the missing station between
 `rollout testcase failed` and `fleet receipt trusted` — **the named workload's
 actual pod conditions, termination state, events, and bounded logs are archived
