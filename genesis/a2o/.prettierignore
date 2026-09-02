@@ -1,0 +1,5 @@
+# Frozen oracles (habit dataplane-convergence): their bytes are fixed by rule so the measures
+# they produce stay comparable across shifts. Formatting is exempted, never applied.
+# Retire each line with its oracle. Mirrors the eslint ignores in eslint.config.js.
+scripts/carried-election-mesh-proof.ts
+scripts/dataplane-convergence-measure.ts
