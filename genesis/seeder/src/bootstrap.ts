@@ -417,7 +417,7 @@ async function main(): Promise<void> {
         console.log(`    -H "Content-Type: application/json" \\`);
         console.log(`    -d '{"identifier":"${args.email}","password":"<your-password>"}'`);
 
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
         process.exit(0);
       }
       throw err;
@@ -443,7 +443,7 @@ async function main(): Promise<void> {
     console.log('JWT Token (valid for 24h):');
     console.log(`  ${authResult.token.substring(0, 50)}...`);
 
-    await appWs.client.close();
+    await (appWs.client as unknown as { close(): unknown }).close();
     process.exit(0);
   } catch (err) {
     console.error('\nBootstrap failed:', err instanceof Error ? err.message : err);

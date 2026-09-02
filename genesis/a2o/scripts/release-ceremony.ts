@@ -350,7 +350,7 @@ async function resolveElectionOnPeer(peer: PeerConfig, channelId: string, timeou
       };
     } finally {
       try {
-        await conn.appWs.client.close();
+        await (conn.appWs.client as unknown as { close(): unknown }).close();
       } catch {
         /* best-effort */
       }

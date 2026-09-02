@@ -410,7 +410,7 @@ async function seedBindingsForHuman(
       }
     } finally {
       try {
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // ignore close errors
       }

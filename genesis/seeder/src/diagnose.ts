@@ -237,7 +237,7 @@ async function diagnoseContent(adminWs: AdminWebsocket, apps: AppInfo[]): Promis
       console.log(`   ⚠️  Could not get path count: ${e.message}`);
     }
 
-    await appWs.client.close();
+    await (appWs.client as unknown as { close(): unknown }).close();
   } catch (e: any) {
     console.log(`   ❌ Error: ${e.message}`);
   }

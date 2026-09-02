@@ -61,7 +61,7 @@
   },
   "dependencies": {
     "@elohim/storage-client": "workspace:*",
-    "@holochain/client": "^0.20.1",
+    "@holochain/client": "^0.21.0",
     "multiformats": "^13.4.1",
     "ws": "^8.16.0",
     "yaml": "^2.8.3"

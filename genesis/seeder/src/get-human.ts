@@ -49,7 +49,7 @@ async function getHumanInfo() {
   console.log('Current human:', JSON.stringify(human, null, 2));
   console.log('Agent PubKey (base64):', agentPubKey);
 
-  await appWs.client.close();
+  await (appWs.client as unknown as { close(): unknown }).close();
   await adminWs.client.close();
 }
 

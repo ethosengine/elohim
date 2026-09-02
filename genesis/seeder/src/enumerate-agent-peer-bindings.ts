@@ -196,7 +196,11 @@ export async function main(): Promise<void> {
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      if (session) await session.appWs.client.close().catch(() => undefined);
+      if (session) {
+        await Promise.resolve(
+          (session.appWs.client as unknown as { close(): unknown }).close(),
+        ).catch(() => undefined);
+      }
     }
   }
 

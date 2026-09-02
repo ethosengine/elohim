@@ -418,7 +418,7 @@ async function main(): Promise<void> {
     console.log(`    -H "Content-Type: application/json" \\`);
     console.log(`    -d '{"identifier":"${TEST_USER.email}","password":"${TEST_USER.password}"}'`);
 
-    await appWs.client.close();
+    await (appWs.client as unknown as { close(): unknown }).close();
     process.exit(0);
   } catch (err) {
     console.error('\nSeed failed:', err instanceof Error ? err.message : err);

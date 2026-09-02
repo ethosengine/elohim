@@ -398,7 +398,7 @@ async function findMemberSessions(
     } else {
       // Not a member we need (or already bound) — release the session.
       try {
-        await session.appWs.client.close();
+        await (session.appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // ignore close errors
       }
@@ -726,7 +726,7 @@ async function main(): Promise<void> {
   const closeAll = async () => {
     for (const s of sessions.values()) {
       try {
-        await s.session.appWs.client.close();
+        await (s.session.appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // ignore close errors
       }
@@ -1065,7 +1065,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     // Best-effort close any sessions that were opened before the fatal error.
     for (const s of activeSessions.values()) {
       try {
-        await s.session.appWs.client.close();
+        await (s.session.appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // ignore close errors during fatal cleanup
       }

@@ -230,6 +230,6 @@ export async function connect(config: {
  * Close both WebSocket connections
  */
 export async function disconnect(conn: HolochainConnection): Promise<void> {
-  await conn.appWs.client.close();
+  await (conn.appWs.client as unknown as { close(): unknown }).close();
   await conn.adminWs.client.close();
 }

@@ -60,7 +60,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/source-serif-4": "^5.2.9",
     "@helia/verified-fetch": "^7.0.3",
-    "@holochain/client": "0.20.0",
+    "@holochain/client": "^0.21.0",
     "@ipld/dag-cbor": "^9.2.5",
     "@phosphor-icons/core": "^2.1.1",
     "@popperjs/core": "^2.11.8",

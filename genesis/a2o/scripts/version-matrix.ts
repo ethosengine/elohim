@@ -317,8 +317,12 @@ async function probeZomeBuildInfo(ports: ConductorPorts): Promise<unknown> {
       payload: null,
     });
   } finally {
-    const closes = [admin.client.close()];
-    if (appWebsocket) closes.push(appWebsocket.client.close());
+    const closes: Promise<unknown>[] = [admin.client.close()];
+    if (appWebsocket) {
+      closes.push(
+        Promise.resolve((appWebsocket.client as unknown as { close(): unknown }).close()),
+      );
+    }
     await Promise.allSettled(closes);
   }
 }

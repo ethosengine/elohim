@@ -422,7 +422,7 @@ When(
       state.peerRead = found;
       state.peerReadUsedHostedToken = false; // admin-issued app token only; no doorway session involved
     } finally {
-      await app.client.close();
+      await (app.client as unknown as { close(): unknown }).close();
     }
   }
 );

@@ -324,7 +324,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
   async disconnect(): Promise<void> {
     try {
       if (this.appWs) {
-        await this.appWs.client.close();
+        await (this.appWs.client as unknown as { close(): unknown }).close();
         this.appWs = null;
       }
       if (this.adminWs) {

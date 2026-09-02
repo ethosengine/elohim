@@ -141,7 +141,7 @@ async function main() {
   }
 
   await adminWs.client.close();
-  await appWs.client.close();
+  await (appWs.client as unknown as { close(): unknown }).close();
   console.log('\n✅ Done!');
 }
 

@@ -120,7 +120,7 @@ async function getStats() {
     console.log(`total_count: ${contentCount + pathCount}`);
 
     await adminWs.client.close();
-    await appWs.client.close();
+    await (appWs.client as unknown as { close(): unknown }).close();
   } catch (error: any) {
     // If we can't connect, assume no content
     console.log('total_count: 0');

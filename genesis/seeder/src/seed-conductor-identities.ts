@@ -507,12 +507,12 @@ async function seedHumanOnConductor(
       const existingId = extractHumanId(existing);
 
       if (existingId === human.id) {
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
         return { ...base, conductorUrl, result: 'exists' };
       }
 
       if (existingId !== undefined) {
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
         if (affine) {
           return {
             ...base,
@@ -537,11 +537,11 @@ async function seedHumanOnConductor(
       };
 
       await createHuman(appWs, cellId, input);
-      await appWs.client.close();
+      await (appWs.client as unknown as { close(): unknown }).close();
       return { ...base, conductorUrl, result: 'created' };
     } catch (err) {
       try {
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // ignore
       }

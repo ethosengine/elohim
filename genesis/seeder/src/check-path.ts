@@ -96,7 +96,7 @@ async function main() {
     }
   }
 
-  await appWs.client.close();
+  await (appWs.client as unknown as { close(): unknown }).close();
   await adminWs.client.close();
   console.log('\n✅ Done');
 }

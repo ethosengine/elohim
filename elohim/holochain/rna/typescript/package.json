@@ -22,7 +22,7 @@
   },
   "license": "MIT OR Apache-2.0",
   "dependencies": {
-    "@holochain/client": "^0.19.2"
+    "@holochain/client": "^0.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

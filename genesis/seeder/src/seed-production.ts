@@ -571,7 +571,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           console.log(`\nManifest registration: ${results.manifestsRegistered} success, ${results.manifestErrors} errors`);
         }
 
-        await appWs.client.close();
+        await (appWs.client as unknown as { close(): unknown }).close();
         await adminWs.client.close();
       } catch (e) {
         console.error(`\n❌ Holochain error: ${e instanceof Error ? e.message : 'Unknown'}`);

@@ -307,7 +307,9 @@ async function main(): Promise<void> {
     process.exit(2);
   } finally {
     if (appWs) {
-      try { await appWs.client.close(); } catch {}
+      try {
+        await (appWs.client as unknown as { close(): unknown }).close();
+      } catch {}
     }
     if (adminWs) {
       try { await adminWs.client.close(); } catch {}

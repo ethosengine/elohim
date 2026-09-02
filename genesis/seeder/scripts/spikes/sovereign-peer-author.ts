@@ -32,5 +32,7 @@ const id = `spike-sovereign-peer-${Date.now()}`;
     if (r.status === 200) break;
     await new Promise(res => setTimeout(res, 10000));
   }
-  await app.client.close(); await admin.client.close(); process.exit(0);
+  await (app.client as unknown as { close(): unknown }).close();
+  await admin.client.close();
+  process.exit(0);
 })().catch(e => { console.error('SPIKE ERROR', e?.message ?? e); process.exit(1); });

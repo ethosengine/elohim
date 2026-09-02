@@ -197,7 +197,7 @@ export class HolochainClientService {
   async disconnect(): Promise<void> {
     if (this.appWs) {
       try {
-        await this.appWs.client.close();
+        await (this.appWs.client as unknown as { close(): unknown }).close();
       } catch {
         // Ignore close errors
       }

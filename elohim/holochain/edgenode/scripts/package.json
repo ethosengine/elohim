@@ -7,7 +7,7 @@
     "install-happ": "node install-happ.cjs"
   },
   "dependencies": {
-    "@holochain/client": "^0.20.0"
+    "@holochain/client": "^0.21.0"
   },
   "overrides": {
     "libsodium": "0.7.15",

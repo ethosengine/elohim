@@ -235,7 +235,7 @@ async function findHouseholdSessions(
           payload: null,
         });
         if (extractHumanId(human) !== member.humanId) {
-          await connected.appWs.client.close();
+          await (connected.appWs.client as unknown as { close(): unknown }).close();
           continue;
         }
         sessions.set(member.humanId, { member, ...connected });
@@ -244,7 +244,7 @@ async function findHouseholdSessions(
         );
         break;
       } catch (error) {
-        if (connected) await connected.appWs.client.close();
+        if (connected) await (connected.appWs.client as unknown as { close(): unknown }).close();
         console.error(
           `  [X] ${member.humanId} at ${conductorUrl}: ${error instanceof Error ? error.message : error}`,
         );
@@ -259,7 +259,9 @@ async function closeSessions(
   sessions: Map<string, HouseholdSession>,
 ): Promise<void> {
   await Promise.allSettled(
-    [...sessions.values()].map((session) => session.appWs.client.close()),
+    [...sessions.values()].map((session) =>
+      (session.appWs.client as unknown as { close(): unknown }).close(),
+    ),
   );
 }
 
