@@ -2314,6 +2314,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
+name = "elohim-ark-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cid",
+ "elohim-compute",
+ "elohim-epr",
+ "elohim-epr-rea",
+ "elohim-seam-contracts",
+ "hex",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-cache-core"
 version = "0.1.0"
 dependencies = [
@@ -2363,6 +2381,19 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "ts-rs",
+]
+
+[[package]]
+name = "elohim-epr-rea"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "elohim-epr",
+ "multihash-codetable",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -2444,6 +2475,7 @@ dependencies = [
  "doorway-client",
  "dryoc",
  "ed25519-dalek",
+ "elohim-ark-core",
  "elohim-cache-core",
  "elohim-chrome-asset",
  "elohim-compute",

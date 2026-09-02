@@ -9,6 +9,7 @@ license = "AGPL-3.0"
 [dependencies]
 # EPR canonical codec (Phase 1 — generalized atom)
 elohim-epr = { path = "../epr" }
+elohim-ark-core = { path = "../ark/core" }
 
 # Executable seam contracts — the concern canon as compile shapes: Answer<T>
 # (C4 honest absence) and ReasonLabel (C8 observability-per-decision). Leaf

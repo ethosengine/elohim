@@ -139,6 +139,7 @@ pub mod sla_service;
 pub mod spatial;
 pub mod spatial_capacity;
 pub mod spatial_dashboard;
+pub mod spool_ingest;
 pub mod standing;
 pub mod standing_projector;
 pub mod standing_query;

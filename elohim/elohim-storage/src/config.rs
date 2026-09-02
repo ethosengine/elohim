@@ -72,6 +72,10 @@ pub fn default_storage_dir() -> PathBuf {
         .join("elohim-storage")
 }
 
+fn default_ark_spool_poll_seconds() -> u64 {
+    5
+}
+
 /// Process-wide mirror of [`Config::contest_two_way_declared`], published once
 /// by `main` after the config is fully assembled.
 ///
@@ -568,6 +572,15 @@ pub struct Config {
     /// Storage directory for blobs
     #[serde(default = "default_storage_dir")]
     pub storage_dir: PathBuf,
+
+    /// Optional ark spool root (`<data_root>/ark`) watched for death witnesses.
+    /// Unset keeps spool ingest entirely off.
+    #[serde(default)]
+    pub ark_spool_path: Option<PathBuf>,
+
+    /// Cadence for polling `ark_spool_path/witnesses` for complete `.cbor` files.
+    #[serde(default = "default_ark_spool_poll_seconds")]
+    pub ark_spool_poll_seconds: u64,
 
     /// Holochain admin websocket URL
     #[serde(default = "default_admin_url")]
@@ -1239,6 +1252,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             storage_dir: default_storage_dir(),
+            ark_spool_path: None,
+            ark_spool_poll_seconds: default_ark_spool_poll_seconds(),
             holochain_admin_url: default_admin_url(),
             app_id: default_app_id(),
             role_name: default_role_name(),

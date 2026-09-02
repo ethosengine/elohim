@@ -332,6 +332,19 @@ async fn async_main(
     if let Ok(v) = std::env::var("REGION") {
         config.region = Some(v);
     }
+    if let Ok(v) = std::env::var("ELOHIM_ARK_SPOOL_PATH") {
+        let path = v.trim();
+        config.ark_spool_path = (!path.is_empty()).then(|| PathBuf::from(path));
+    }
+    if let Ok(v) = std::env::var("ELOHIM_ARK_SPOOL_POLL_SECONDS") {
+        match v.trim().parse::<u64>() {
+            Ok(seconds) if seconds > 0 => config.ark_spool_poll_seconds = seconds,
+            _ => warn!(
+                value = %v,
+                "ELOHIM_ARK_SPOOL_POLL_SECONDS is not a positive integer — keeping configured value"
+            ),
+        }
+    }
     if let Ok(v) = std::env::var("INVENTORY_BROADCAST_SECONDS") {
         if let Ok(n) = v.parse::<u64>() {
             config.inventory_broadcast_seconds = Some(n);
@@ -1302,6 +1315,39 @@ async fn async_main(
 
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
+
+    match config.ark_spool_path.clone() {
+        Some(spool_root) => {
+            if let Some(pool) = db_pool.clone() {
+                let content = Arc::new(elohim_storage::services::ContentService::new(
+                    pool,
+                    elohim_storage::db::AppContext::default_lamad(),
+                    Arc::new(elohim_storage::services::events::EventBus::new()),
+                ));
+                let poll = std::time::Duration::from_secs(config.ark_spool_poll_seconds);
+                info!(
+                    spool_root = %spool_root.display(),
+                    poll_secs = config.ark_spool_poll_seconds,
+                    "spool-ingest: watcher ACTIVE"
+                );
+                elohim_storage::services::spool_ingest::SpoolIngest::new(
+                    elohim_storage::services::spool_ingest::SpoolIngestConfig { spool_root, poll },
+                    content,
+                    Arc::clone(&blob_store),
+                )
+                .spawn();
+            } else {
+                warn!(
+                    spool_root = %spool_root.display(),
+                    "spool-ingest: watcher DISABLED because the content database is unavailable"
+                );
+            }
+        }
+        None => info!(
+            env = "ELOHIM_ARK_SPOOL_PATH",
+            "spool-ingest: watcher DISABLED (no path configured)"
+        ),
+    }
 
     // One-shot shard-manifest backfill (no-p2p build). The p2p build runs the
     // distribution-capable variant later, once the p2p handle exists; here we
