@@ -152,6 +152,60 @@ makes a silent integrity move impossible, and `happ_manager` (867e4bf9b) makes a
 node holding data impossible without `DNA_MIGRATION_INTENT` naming these exact hashes — set it
 on the alpha StatefulSets for this one roll, then remove it.
 
+## RECOVERY PROCEDURE (operator-owned; written 2026-09-02 17:4xZ for the k8s dev; grounded in the manifests)
+
+**Preconditions (met at 17:28Z):** all seven `elohim-<human>-alpha-0` storage pods run
+`elohim-storage-iroh:1.0.0-dev-7d909626` (the happ_manager intent gate + supervisor fix), the
+hApp baked into that image is holochain #1420's, and #1421's DNA Hash Guard read MATCH ×5 against
+the `[dna:migrate]` baseline. Because the storage code is new, a cleared conductor presents NO app
+and the runtime performs a first install — no `DNA_MIGRATION_INTENT`, no `FORCE_DNA_REINSTALL`.
+
+**What is being cleared, exactly.** Each conductor pod mounts one PVC:
+`holochain-data-elohim-<human>-alpha-0` at `/var/local/lib/holochain` (= `CONDUCTOR_DATA_DIR` =
+the conductor config's `data_root_path`). Under it holochain keeps `databases/` (conductor state,
+authored chains, DHT, cache) and the lair keystore `ks/`. Clear **the entire contents of that
+mount** — both `databases/` and `ks/`. This is byte-for-byte what the runtime's own node-repair
+primitive does (`ConductorManager::clear_conductor_state` = `remove_dir_all(data_dir)` +
+recreate). Clearing `ks/` is required: keeping the old lair key on an empty chain would re-genesis
+the SAME agent key on a new chain — a fork, worse than a new key.
+
+**What must NOT be touched.**
+- The PVC objects themselves (`holochain-data-elohim-<human>-alpha-0`) and their PVs — delete
+  contents, never the claim (openebs-hostpath node affinity keeps each on its node).
+- The storage pods `elohim-<human>-alpha-0` (container `elohim-node`) and their `/data` PVC
+  (`content.db`, blobs) — untouched.
+- The conductor pod's `/data` mount — that is a scratch emptyDir, irrelevant.
+- No StatefulSet spec edits, no env changes, no image changes.
+
+**The seven, and where they live.** Namespace `elohim-alpha`. StatefulSet
+`elohim-<human>-alpha-conductor`, pod `elohim-<human>-alpha-conductor-0`, containers
+`elohim-conductor` + `ws-proxy`. matthew, jessica, james on node `ethosengine`; adam, eve, susan,
+gertrude on node `shem`.
+
+**Steps, per human (do adam and matthew FIRST — they are the bootstrap pair — confirm both Ready,
+then the other five in any order):**
+1. `kubectl -n elohim-alpha scale statefulset elohim-<human>-alpha-conductor --replicas=0` and wait
+   for `elohim-<human>-alpha-conductor-0` to be gone (nothing may hold the SQLite files).
+2. Mount the PVC from a throwaway pod on the same node (a busybox/alpine pod with
+   `persistentVolumeClaim.claimName: holochain-data-elohim-<human>-alpha-0` at
+   `/var/local/lib/holochain`; the PV's node affinity places it), then inside it:
+   `ls -la /var/local/lib/holochain` (expect `databases/` and `ks/`; note sizes), then
+   `rm -rf /var/local/lib/holochain/databases /var/local/lib/holochain/ks`, then `ls -la` again
+   (expect empty). Delete the throwaway pod.
+3. `kubectl -n elohim-alpha scale statefulset elohim-<human>-alpha-conductor --replicas=1`.
+4. Verify, in order: the conductor pod reaches Ready with 0 restarts (startup probe allows 600 s;
+   first install compiles WASM ribosomes — minutes); the storage pod `elohim-<human>-alpha-0` logs
+   a first install (`Installing hApp` / `App already installed … Enabled` on the next tick) and NO
+   `DNA drift detected` / `Stale hApp detected` lines; `GET /version` via the doorway that fronts
+   that human shows lamad `coordinatorWasmHashes` present and the DNA hash `uhC0k8x1UsBQ…`.
+5. Only after all seven are Ready: the elohim operator runs the re-seed (genesis pipeline; app
+   `[build:app]` to redeclare the SPA heads) — the shift asks before pushing that.
+
+**Abort conditions.** A conductor that panics again after the clear with `CellWithoutGenesis` means
+the mount was not fully cleared (a leftover `databases/conductor/`). A storage log line
+`DNA drift detected … keeping the installed cells` means the pod is NOT on the wave-8 image (check
+`kube_pod_container_info`); stop and say so — do not set any force flag.
+
 ## Why the operator had to act first (original framing, kept for the trail)
 
 The fleet's conductors are in a restart livelock on a persistent PVC; every edge roll (#1413,
