@@ -6,6 +6,11 @@ set dotenv-load := false
 
 export RUSTFLAGS := '--cfg getrandom_backend="custom"'
 
+# 2026-09-02: --import-undefined is a local rustc-1.98/lld need only —
+# CI (elohim/holochain/dna/Jenkinsfile) invokes cargo directly and must
+# never see this, or the INTEGRITY wasm bytes move (see build.rs comment).
+export ELOHIM_WASM_IMPORT_UNDEFINED := "1"
+
 wasm_target := "wasm32-unknown-unknown"
 dna_name    := "infrastructure"
 workdir     := justfile_directory() / "../elohim/workdir"

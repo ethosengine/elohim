@@ -1,0 +1,21 @@
+# Committed baseline of the DNA hashes currently INSTALLED on the fleet.
+#
+# Format: <role>=<uhC0k… DNA hash>, one per line, blank lines and `#` comments
+# ignored. `role` matches the happ.yaml role name (elohim/workdir/happ.yaml),
+# not the DNA directory name (node-registry dir -> node_registry role).
+#
+# Read and enforced by scripts/ci/dna-hash-guard.sh in the "Build DNA" stage
+# of elohim/holochain/dna/Jenkinsfile: a build whose packed DNA hash diverges
+# from this file fails the build (INTEGRITY-HASH-MOVED) unless the triggering
+# commit message carries `[dna:migrate]` — see the incident this guards
+# against: commit 03f331f21 (2026-09-02) moved all five INTEGRITY wasm hashes
+# via an unconditional linker-flag change believed hash-neutral, uninstalling
+# the fleet's hApp and tearing every source chain.
+#
+# Update this file in the SAME commit as any change that is meant to move a
+# DNA hash, and tag that commit `[dna:migrate]`.
+lamad=uhC0kkLdCTgRohBd10TDia-kYXPfRDHmPsKdUFLVmAMmGAlEIjiO0
+imagodei=uhC0knLGOq34BpiNYjKgxeBbjyzFbN9OlabVGZhVmLIKBB1UDskoZ
+infrastructure=uhC0kq1eGfzYnt6hpAgmNMixaCmiffBlbI4vm9p3EVgnQTfws2tJA
+node_registry=uhC0kBewxOTSg-jE83-GmWwKwgzgZkV1mhR0I6v7QlCsxsai0AFH4
+mishpat=uhC0kmZ1B1Vy3fEjpCYB0wZ-43SVbwYKINNY5WLSNJv-TcSiEuJ4I

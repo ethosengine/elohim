@@ -583,6 +583,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "    directory = *" >> "$HOME/.gitconfig"
                                 export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
+                                # Collects one `role=hash` line per packed DNA for the
+                                # DNA Hash Guard stage (scripts/ci/dna-hash-guard.sh) —
+                                # see the INCIDENT comment on each zome's build.rs.
+                                export DNA_HASH_FILE="$(pwd)/dna-hashes.actual"
+                                : > "$DNA_HASH_FILE"
+
                                 echo "=== Entering Nix development shell ==="
                                 echo "This will download/build Holochain toolchain from Cachix..."
 
@@ -600,6 +606,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     echo "=== Building lamad DNA (elohim) ==="
                                     cargo build --release --target wasm32-unknown-unknown
                                     hc dna pack . -o workdir/lamad.dna
+                                    _h_lamad=$(hc dna hash workdir/lamad.dna)
+                                    echo "DNA-HASH lamad ${_h_lamad}"
+                                    echo "lamad=${_h_lamad}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ lamad.dna"
 
                                     echo ""
@@ -607,6 +616,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     cd ../imagodei
                                     cargo build --release --target wasm32-unknown-unknown
                                     hc dna pack . -o ../elohim/workdir/imagodei.dna
+                                    _h_imagodei=$(hc dna hash ../elohim/workdir/imagodei.dna)
+                                    echo "DNA-HASH imagodei ${_h_imagodei}"
+                                    echo "imagodei=${_h_imagodei}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ imagodei.dna"
 
                                     echo ""
@@ -614,6 +626,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     cd ../infrastructure
                                     cargo build --release --target wasm32-unknown-unknown
                                     hc dna pack . -o ../elohim/workdir/infrastructure.dna
+                                    _h_infrastructure=$(hc dna hash ../elohim/workdir/infrastructure.dna)
+                                    echo "DNA-HASH infrastructure ${_h_infrastructure}"
+                                    echo "infrastructure=${_h_infrastructure}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ infrastructure.dna"
 
                                     echo ""
@@ -621,6 +636,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     cd ../node-registry
                                     cargo build --release --target wasm32-unknown-unknown
                                     hc dna pack . -o node-registry.dna
+                                    _h_node_registry=$(hc dna hash node-registry.dna)
+                                    echo "DNA-HASH node_registry ${_h_node_registry}"
+                                    echo "node_registry=${_h_node_registry}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ node-registry.dna"
 
                                     echo ""
@@ -628,6 +646,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     cd ../mishpat
                                     cargo build --release --target wasm32-unknown-unknown
                                     hc dna pack . -o ../elohim/workdir/mishpat.dna
+                                    _h_mishpat=$(hc dna hash ../elohim/workdir/mishpat.dna)
+                                    echo "DNA-HASH mishpat ${_h_mishpat}"
+                                    echo "mishpat=${_h_mishpat}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ mishpat.dna"
 
                                     echo ""
@@ -646,7 +667,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 '
                             '''
 
-                            archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna', allowEmptyArchive: false
+                            archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna,dna-hashes.actual', allowEmptyArchive: false
                             stash name: 'happ-bundle', includes: 'elohim.happ'
 
                             def props = loadBuildVars()
@@ -671,6 +692,28 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
                         }
+                    }
+                }
+            }
+        }
+
+        // Guards against the 2026-09-02 incident: commit 03f331f21 added an
+        // unconditional wasm-ld link arg believed hash-neutral in CI. It
+        // moved every packed INTEGRITY wasm's bytes instead, moving all five
+        // DNA hashes and orphaning the fleet's installed hApp + source
+        // chains. Bash body lives in scripts/ci/dna-hash-guard.sh (Jenkinsfile
+        // stays heredoc-free per repo rules — see build.rs on each zome for
+        // the incident detail this guard exists to catch).
+        stage('DNA Hash Guard') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('build-dna-wasm') }
+            } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        sh "bash '${env.WORKSPACE}/scripts/ci/dna-hash-guard.sh' '${env.WORKSPACE}/elohim/holochain/dna/dna-hashes.baseline' '${env.WORKSPACE}/elohim/holochain/dna/elohim/dna-hashes.actual'"
                     }
                 }
             }
