@@ -2,7 +2,7 @@
 
 use std::{
     collections::BTreeMap,
-    fs,
+    env, fs,
     io::{self, Write},
     path::{Path, PathBuf},
     process::ExitCode,
@@ -13,7 +13,7 @@ use std::{
     },
 };
 
-use ark_core::{Berth, RuntimeManifest, RuntimeScope, WitnessSink};
+use ark_core::{Berth, LogLevel, RuntimeManifest, RuntimeScope, WitnessSink};
 use ark_supervisor::{
     sha256_file,
     spool::{Spool, SpoolError, WitnessSummary},
@@ -34,6 +34,8 @@ const EXIT_DATA: u8 = 65;
 const EXIT_ARTIFACT: u8 = 66;
 const EXIT_SPOOL: u8 = 67;
 
+/// Process-lifetime signal bridge. Its pointer owns a deliberately retained strong `Arc`, so a
+/// signal arriving after `Supervisor::run` returns can never dereference freed storage.
 static ACTIVE_SHUTDOWN: AtomicPtr<AtomicBool> = AtomicPtr::new(ptr::null_mut());
 
 #[derive(Parser, Debug)]
@@ -57,6 +59,9 @@ enum Command {
         /// Path to the Berth JSON.
         #[arg(long)]
         berth: PathBuf,
+        /// Override the ark's own diagnostic verbosity.
+        #[arg(long)]
+        log_level: Option<LogLevel>,
     },
     /// Print the berth's passport as JSON.
     Describe {
@@ -155,7 +160,11 @@ fn main() -> ExitCode {
 
 fn execute(command: Command) -> Result<u8, Failure> {
     match command {
-        Command::Run { manifest, berth } => run(&manifest, &berth),
+        Command::Run {
+            manifest,
+            berth,
+            log_level,
+        } => run(&manifest, &berth, log_level),
         Command::Describe { berth } => describe(&berth),
         Command::Witness { command } => match command {
             WitnessCommand::Ls { berth } => witness_ls(&berth),
@@ -168,9 +177,23 @@ fn execute(command: Command) -> Result<u8, Failure> {
     }
 }
 
-fn run(manifest_path: &Path, berth_path: &Path) -> Result<u8, Failure> {
+fn run(
+    manifest_path: &Path,
+    berth_path: &Path,
+    command_log_level: Option<LogLevel>,
+) -> Result<u8, Failure> {
     let manifest = read_manifest(manifest_path)?;
     let berth = read_berth(berth_path)?;
+    let log_level = effective_log_level(command_log_level, &berth)?;
+    if log_level >= LogLevel::Info {
+        eprintln!(
+            "{}",
+            json!({
+                "ark": "log_level",
+                "level": log_level.as_str(),
+            })
+        );
+    }
     let scope = Supervisor::scope_for(&manifest, &berth).map_err(supervisor_validation)?;
     let spool = Spool::open(&berth.data_root, scope).map_err(spool_failure)?;
     let supervisor = Supervisor::new(
@@ -181,14 +204,31 @@ fn run(manifest_path: &Path, berth_path: &Path) -> Result<u8, Failure> {
         Box::new(SystemClock),
     )
     .map_err(supervisor_validation)?
-    .with_observer(Arc::new(JsonStateObserver::default()));
+    .with_observer(Arc::new(JsonStateObserver::new(log_level)));
 
     let shutdown = supervisor.shutdown_flag();
-    install_signal_handlers(&shutdown)?;
-    let outcome = supervisor.run().map_err(supervisor_run_failure);
-    ACTIVE_SHUTDOWN.store(ptr::null_mut(), Ordering::SeqCst);
-    let outcome = outcome?;
+    publish_shutdown_bridge(&shutdown);
+    install_signal_handlers()?;
+    let outcome = supervisor.run().map_err(supervisor_run_failure)?;
     Ok(outcome.exit_code as u8)
+}
+
+fn effective_log_level(
+    command_log_level: Option<LogLevel>,
+    berth: &Berth,
+) -> Result<LogLevel, Failure> {
+    if let Some(level) = command_log_level {
+        return Ok(level);
+    }
+    let Some(value) = env::var_os("ARK_LOG") else {
+        return Ok(berth.log_level);
+    };
+    let value = value
+        .into_string()
+        .map_err(|_| Failure::data("ARK_LOG is not valid Unicode"))?;
+    value
+        .parse()
+        .map_err(|error| Failure::data(format!("ARK_LOG: {error}")))
 }
 
 fn describe(berth_path: &Path) -> Result<u8, Failure> {
@@ -204,7 +244,7 @@ fn describe(berth_path: &Path) -> Result<u8, Failure> {
 fn witness_ls(berth_path: &Path) -> Result<u8, Failure> {
     let berth = read_berth(berth_path)?;
     let spool = open_berth_spool(&berth)?;
-    let summaries = spool.list_witnesses().map_err(spool_read_failure)?;
+    let summaries = spool.list_witnesses().map_err(spool_failure)?;
     print_json(Value::Array(pair_witnesses(summaries)?))?;
     Ok(EXIT_OK)
 }
@@ -212,9 +252,7 @@ fn witness_ls(berth_path: &Path) -> Result<u8, Failure> {
 fn witness_show(berth_path: &Path, witness_cid: &str) -> Result<u8, Failure> {
     let berth = read_berth(berth_path)?;
     let spool = open_berth_spool(&berth)?;
-    let witness = spool
-        .read_witness(witness_cid)
-        .map_err(spool_read_failure)?;
+    let witness = spool.read_witness(witness_cid).map_err(spool_failure)?;
     print_json(serde_json::to_value(witness).map_err(json_failure)?)?;
     Ok(EXIT_OK)
 }
@@ -339,13 +377,6 @@ fn spool_failure(error: SpoolError) -> Failure {
     Failure::spool(error.to_string())
 }
 
-fn spool_read_failure(error: SpoolError) -> Failure {
-    match error {
-        SpoolError::Data(message) => Failure::data(message),
-        other => Failure::spool(other.to_string()),
-    }
-}
-
 fn supervisor_validation(error: SupervisorError) -> Failure {
     Failure::data(error.to_string())
 }
@@ -367,15 +398,20 @@ fn supervisor_run_failure(error: SupervisorError) -> Failure {
 
 extern "C" fn request_shutdown(_signal: libc::c_int) {
     let shutdown = ACTIVE_SHUTDOWN.load(Ordering::SeqCst);
-    if !shutdown.is_null() {
-        // SAFETY: `install_signal_handlers` stores the pointee from an `Arc<AtomicBool>`
-        // retained by both that function's caller and the supervisor until `run` returns.
-        unsafe { &*shutdown }.store(true, Ordering::SeqCst);
+    if shutdown.is_null() {
+        return;
     }
+    // SAFETY: `publish_shutdown_bridge` stores a strong `Arc` that is retained for the
+    // process lifetime, so this pointee remains allocated after the supervisor exits.
+    unsafe { &*shutdown }.store(true, Ordering::SeqCst);
 }
 
-fn install_signal_handlers(shutdown: &Arc<AtomicBool>) -> Result<(), Failure> {
-    ACTIVE_SHUTDOWN.store(Arc::as_ptr(shutdown).cast_mut(), Ordering::SeqCst);
+fn publish_shutdown_bridge(shutdown: &Arc<AtomicBool>) {
+    let retained = Arc::into_raw(Arc::clone(shutdown)).cast_mut();
+    ACTIVE_SHUTDOWN.store(retained, Ordering::SeqCst);
+}
+
+fn install_signal_handlers() -> Result<(), Failure> {
     let action = SigAction::new(
         SigHandler::Handler(request_shutdown),
         SaFlags::empty(),
@@ -385,22 +421,29 @@ fn install_signal_handlers(shutdown: &Arc<AtomicBool>) -> Result<(), Failure> {
     let installed = unsafe {
         sigaction(Signal::SIGTERM, &action).and_then(|_| sigaction(Signal::SIGINT, &action))
     };
-    if let Err(error) = installed {
-        ACTIVE_SHUTDOWN.store(ptr::null_mut(), Ordering::SeqCst);
-        return Err(Failure::data(format!(
-            "installing signal handlers: {error}"
-        )));
-    }
+    installed.map_err(|error| Failure::data(format!("installing signal handlers: {error}")))?;
     Ok(())
 }
 
-#[derive(Default)]
 struct JsonStateObserver {
+    log_level: LogLevel,
     states: Mutex<BTreeMap<String, String>>,
+}
+
+impl JsonStateObserver {
+    fn new(log_level: LogLevel) -> Self {
+        Self {
+            log_level,
+            states: Mutex::new(BTreeMap::new()),
+        }
+    }
 }
 
 impl StateObserver for JsonStateObserver {
     fn on_state(&self, process: &str, state: &str, pid: Option<u32>, incarnation: u64) {
+        if self.log_level < LogLevel::Info {
+            return;
+        }
         let mut states = self.states.lock().expect("state observer lock");
         if states
             .get(process)

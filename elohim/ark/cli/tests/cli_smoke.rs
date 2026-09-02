@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
     process::{Child, Command, Output, Stdio},
     thread,
@@ -86,6 +87,52 @@ fn wait_until<T>(what: &str, timeout: Duration, mut probe: impl FnMut() -> Optio
     }
 }
 
+fn run_until_ready_then_stop(log_level: Option<&str>) -> String {
+    let root = tempfile::tempdir().expect("temp data root");
+    let manifest = manifest_json("child");
+    let cid = manifest_cid(&manifest);
+    let (manifest_path, berth_path) = write_declarations(root.path(), &manifest, &cid);
+    let mut command = Command::new(ARK);
+    command.env_remove("ARK_LOG");
+    command.args([
+        "run",
+        "--manifest",
+        manifest_path.to_str().unwrap(),
+        "--berth",
+        berth_path.to_str().unwrap(),
+    ]);
+    if let Some(level) = log_level {
+        command.args(["--log-level", level]);
+    }
+    let child = command
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn ark run");
+    let mut ark_process = ArkProcess(child);
+
+    wait_until("ready child passport", Duration::from_secs(5), || {
+        let bytes = fs::read(root.path().join("ark/passport.json")).ok()?;
+        let passport: Value = serde_json::from_slice(&bytes).ok()?;
+        passport["processes"][0]["ready"].as_bool()?.then_some(())
+    });
+    kill(ark_process.pid(), Signal::SIGTERM).expect("SIGTERM ark");
+    let status = wait_until("ark to stop cleanly", Duration::from_secs(5), || {
+        ark_process.0.try_wait().expect("wait ark")
+    });
+    assert_eq!(status.code(), Some(0));
+
+    let mut stderr = String::new();
+    ark_process
+        .0
+        .stderr
+        .take()
+        .expect("piped ark stderr")
+        .read_to_string(&mut stderr)
+        .expect("read ark stderr");
+    stderr
+}
+
 struct ArkProcess(Child);
 
 impl ArkProcess {
@@ -170,6 +217,42 @@ fn witness_ls_on_empty_spool_prints_empty_array() {
         serde_json::from_slice::<Value>(&output.stdout).unwrap(),
         json!([])
     );
+}
+
+#[test]
+fn witness_show_invalid_cid_is_spool_failure_67() {
+    let root = tempfile::tempdir().expect("temp data root");
+    let manifest = manifest_json("child");
+    let cid = manifest_cid(&manifest);
+    let (_, berth_path) = write_declarations(root.path(), &manifest, &cid);
+
+    let output = ark(&[
+        "witness",
+        "show",
+        "--berth",
+        berth_path.to_str().unwrap(),
+        "../passport",
+    ]);
+
+    assert_eq!(output.status.code(), Some(67));
+}
+
+#[test]
+fn run_with_error_log_level_prints_no_state_lines() {
+    let stderr = run_until_ready_then_stop(Some("error"));
+
+    assert!(!stderr.contains(r#""ark":"state""#), "{stderr}");
+}
+
+#[test]
+fn run_with_default_log_level_prints_state_lines() {
+    let stderr = run_until_ready_then_stop(None);
+
+    assert!(
+        stderr.contains(r#"{"ark":"log_level","level":"info"}"#),
+        "{stderr}"
+    );
+    assert!(stderr.contains(r#""ark":"state""#), "{stderr}");
 }
 
 #[test]

@@ -2,10 +2,65 @@
 
 use std::{
     collections::BTreeMap,
+    fmt,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use serde::{Deserialize, Serialize};
+
+/// Verbosity of the ark's own operator-facing diagnostics.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LogLevel {
+    /// Print failures only.
+    Error,
+    /// Print warnings and failures.
+    Warn,
+    /// Print lifecycle state changes.
+    #[default]
+    Info,
+    /// Print per-poll, ladder, and reap detail.
+    Debug,
+    /// Print every syscall result.
+    Trace,
+}
+
+impl LogLevel {
+    /// Returns the lowercase configuration name of this level.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warn => "warn",
+            Self::Info => "info",
+            Self::Debug => "debug",
+            Self::Trace => "trace",
+        }
+    }
+}
+
+impl fmt::Display for LogLevel {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for LogLevel {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.to_ascii_lowercase().as_str() {
+            "error" => Ok(Self::Error),
+            "warn" => Ok(Self::Warn),
+            "info" => Ok(Self::Info),
+            "debug" => Ok(Self::Debug),
+            "trace" => Ok(Self::Trace),
+            _ => Err(format!(
+                "unknown log level {value:?}; expected error, warn, info, debug, or trace"
+            )),
+        }
+    }
+}
 
 /// The local placement and resolution inputs for one runtime-manifest instance.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -20,6 +75,9 @@ pub struct Berth {
     /// Root of the process instance's durable local data.
     #[serde(default)]
     pub data_root: PathBuf,
+    /// Verbosity of this ark instance's own diagnostics.
+    #[serde(default)]
+    pub log_level: LogLevel,
     /// Passphrase source supplied to processes that request one.
     #[serde(default)]
     pub passphrase: PassphraseSource,
@@ -104,6 +162,7 @@ impl Berth {
             "data_root" => Ok(self.data_root.display().to_string()),
             "name" => Ok(process.to_string()),
             "artifact" => Ok(artifact_path.display().to_string()),
+            "log_level" => Ok(self.log_level.to_string()),
             _ => {
                 if let Some(port_key) = key.strip_prefix("port.") {
                     if let Some(port) = self.ports.get(port_key) {
@@ -120,6 +179,7 @@ impl Berth {
 mod tests {
     use super::*;
     use std::path::Path;
+    use std::str::FromStr;
 
     #[test]
     fn berth_resolves_templates_and_names_unknown_keys() {
@@ -132,6 +192,8 @@ mod tests {
         )
         .unwrap();
         let artifact = Path::new("/opt/elohim/conductor");
+
+        assert_eq!(berth.log_level, LogLevel::Info);
 
         assert_eq!(
             berth
@@ -157,5 +219,34 @@ mod tests {
             berth.resolve_template("conductor", artifact, "{data_root"),
             Err(BerthError::Malformed(_))
         ));
+    }
+
+    #[test]
+    fn log_level_parses_case_insensitively() {
+        assert_eq!(LogLevel::from_str("error").unwrap(), LogLevel::Error);
+        assert_eq!(LogLevel::from_str("WARN").unwrap(), LogLevel::Warn);
+        assert_eq!(LogLevel::from_str("Info").unwrap(), LogLevel::Info);
+        assert_eq!(LogLevel::from_str("dEbUg").unwrap(), LogLevel::Debug);
+        assert_eq!(LogLevel::from_str("TRACE").unwrap(), LogLevel::Trace);
+        assert!(LogLevel::from_str("verbose").is_err());
+    }
+
+    #[test]
+    fn berth_resolves_log_level_template() {
+        let berth = Berth {
+            log_level: LogLevel::Debug,
+            ..Berth::default()
+        };
+
+        assert_eq!(
+            berth
+                .resolve_template(
+                    "conductor",
+                    Path::new("/opt/elohim/conductor"),
+                    "RUST_LOG={log_level}",
+                )
+                .unwrap(),
+            "RUST_LOG=debug"
+        );
     }
 }

@@ -19,7 +19,7 @@ pub mod verdict;
 pub mod witness;
 
 // Re-exports are uncommented by the task that creates each type.
-pub use berth::{Berth, PassphraseSource};
+pub use berth::{Berth, LogLevel, PassphraseSource};
 pub use elohim_compute::{LimitOwner, Refusal};
 pub use exit::{classify_readiness_outcome, ExitClass, ReadinessOutcome};
 pub use intent::{Intent, IntentAction};
