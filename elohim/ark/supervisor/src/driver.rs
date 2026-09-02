@@ -62,7 +62,13 @@ pub struct Started {
 }
 
 /// The seam between a declared child and a running one.
-pub trait Driver {
+///
+/// `Send + Sync` is part of the seam, not an implementation detail: the supervisor gives each
+/// supervised process its own thread and every one of them reaches the same driver, so a
+/// `Box<dyn Driver>` (or `Arc<dyn Driver>`) has to cross thread boundaries and be shared while
+/// it is there. A driver that needed a lock to be shared would push that lock into the
+/// supervision loop, where a slow `start` on one child would stall every other child's death.
+pub trait Driver: Send + Sync {
     /// Reports what this host is and what it will enforce.
     fn fingerprint(&self) -> Fingerprint;
 

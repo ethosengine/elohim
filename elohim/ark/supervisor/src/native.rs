@@ -98,12 +98,18 @@ impl Driver for NativeDriver {
             ArtifactRef::Pinned { sha256, .. } => sha256.clone(),
         };
 
-        let path = berth
+        let declared = berth
             .artifacts
             .get(&spec.name)
             .cloned()
             // No entry at all: there is no path to name, which the empty path records.
             .ok_or_else(|| DriverError::ArtifactMissing(PathBuf::new()))?;
+        // Absolutised BEFORE the hash, so that the file hashed here and the file `exec`ed
+        // below cannot be two different files. The child is spawned with
+        // `current_dir(data_root)`, and a relative program is resolved by the kernel against
+        // that new directory — so a relative artifact would be hashed against the
+        // supervisor's cwd and executed against the berth's.
+        let path = absolute_artifact_path(&declared)?;
 
         let actual = match sha256_file(&path) {
             Ok(digest) => digest,
@@ -205,7 +211,10 @@ impl NativeDriver {
         if spec.env_scrub {
             command.env_clear();
             for key in SCRUB_SURVIVORS {
-                if let Ok(value) = std::env::var(key) {
+                // `var_os`, not `var`: an environment value is bytes, not text, and a `HOME`
+                // or `PATH` that is not valid UTF-8 must be passed through unchanged rather
+                // than silently dropped by a lossy decode the child never asked for.
+                if let Some(value) = std::env::var_os(key) {
                     command.env(key, value);
                 }
             }
@@ -219,6 +228,27 @@ impl NativeDriver {
             command.current_dir(&berth.data_root);
         }
         Ok(command)
+    }
+}
+
+/// Resolves an artifact path to an absolute one before anything is hashed or executed.
+///
+/// [`std::fs::canonicalize`] is asked first because it answers with the file the kernel will
+/// actually open — symlinks resolved, `..` collapsed — which is the identity the passport
+/// claims. When it fails the path is merely joined onto the current directory: a missing
+/// artifact must still reach [`DriverError::ArtifactMissing`] naming a path someone can look
+/// at, rather than being swallowed here as a resolution failure.
+fn absolute_artifact_path(declared: &Path) -> Result<PathBuf, DriverError> {
+    match std::fs::canonicalize(declared) {
+        Ok(resolved) => Ok(resolved),
+        Err(_) => std::env::current_dir()
+            .map(|cwd| cwd.join(declared))
+            .map_err(|error| {
+                DriverError::Spawn(format!(
+                    "resolving {} against the current directory: {error}",
+                    declared.display()
+                ))
+            }),
     }
 }
 
@@ -257,14 +287,29 @@ fn passphrase(berth: &Berth) -> Result<String, DriverError> {
     match &berth.passphrase {
         PassphraseSource::Empty => Ok(String::new()),
         PassphraseSource::Literal(secret) => Ok(secret.clone()),
-        // Trimmed: a passphrase file written by an editor ends in a newline that is not part
-        // of the secret, and the driver appends its own line terminator.
         PassphraseSource::File(path) => std::fs::read_to_string(path)
-            .map(|contents| contents.trim().to_string())
+            .map(strip_one_terminal_line_ending)
             .map_err(|error| {
                 DriverError::Spawn(format!("passphrase file {}: {error}", path.display()))
             }),
     }
+}
+
+/// Removes exactly one trailing `\n` or `\r\n` and nothing else.
+///
+/// A passphrase file written by an editor ends in a newline that is not part of the secret,
+/// and the driver appends its own terminator — so one line ending comes off. Everything else
+/// stays: leading spaces, trailing spaces, interior tabs and blank lines are all secret
+/// material, and `trim()` here would silently unlock a conductor with the wrong passphrase
+/// (or, worse, lock one out of a passphrase it was created with).
+fn strip_one_terminal_line_ending(mut contents: String) -> String {
+    if contents.ends_with('\n') {
+        contents.pop();
+        if contents.ends_with('\r') {
+            contents.pop();
+        }
+    }
+    contents
 }
 
 fn proc_line(path: &str) -> String {
@@ -358,10 +403,13 @@ mod tests {
             std::ffi::OsStr::new(&format!("{}/store", dir.path().display()))
         );
         for key in SCRUB_SURVIVORS {
+            // Compared against `var_os`, and byte-for-byte: the survivor a child receives is
+            // the parent's raw value, never a lossy re-encoding of it, and a value that is
+            // not valid UTF-8 survives rather than reading as absent.
             assert_eq!(
-                env.contains_key(std::ffi::OsStr::new(key)),
-                std::env::var(key).is_ok(),
-                "{key} should survive the scrub exactly when the parent has it"
+                env.get(std::ffi::OsStr::new(key)).cloned(),
+                std::env::var_os(key),
+                "{key} should survive the scrub exactly as the parent holds it"
             );
         }
     }
@@ -383,26 +431,37 @@ mod tests {
     #[test]
     fn passphrase_sources_resolve_to_their_bytes() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("passphrase");
-        std::fs::write(&path, "  from-file\n").unwrap();
-
-        assert_eq!(passphrase(&Berth::default()).unwrap(), "");
-        assert_eq!(
-            passphrase(&Berth {
-                passphrase: PassphraseSource::Literal("literal".into()),
-                ..Default::default()
-            })
-            .unwrap(),
-            "literal"
-        );
-        assert_eq!(
+        let from_file = |name: &str, contents: &str| {
+            let path = dir.path().join(name);
+            std::fs::write(&path, contents).unwrap();
             passphrase(&Berth {
                 passphrase: PassphraseSource::File(path),
                 ..Default::default()
             })
+            .unwrap()
+        };
+
+        assert_eq!(passphrase(&Berth::default()).unwrap(), "");
+        assert_eq!(
+            passphrase(&Berth {
+                passphrase: PassphraseSource::Literal("  a literal  ".into()),
+                ..Default::default()
+            })
             .unwrap(),
-            "from-file"
+            "  a literal  "
         );
+
+        // Exactly one terminal line ending comes off — the one an editor added — and every
+        // other byte is secret material the child must receive unchanged.
+        assert_eq!(from_file("unix", "  from file  \n"), "  from file  ");
+        assert_eq!(from_file("dos", "  from file  \r\n"), "  from file  ");
+        assert_eq!(from_file("bare", "  from file  "), "  from file  ");
+        assert_eq!(from_file("blank-line", "secret\n\n"), "secret\n");
+        assert_eq!(
+            from_file("interior", "two\twords\nand more\n"),
+            "two\twords\nand more"
+        );
+        assert_eq!(from_file("only-newline", "\n"), "");
     }
 
     #[test]
