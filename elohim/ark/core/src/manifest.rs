@@ -125,7 +125,7 @@ pub enum ArtifactRef {
         /// Optional artifact CID string.
         #[serde(default)]
         cid: Option<String>,
-        /// Mandatory lowercase or uppercase hexadecimal SHA-256 digest.
+        /// Mandatory lowercase hexadecimal SHA-256 digest.
         sha256: String,
         /// Optional expected file size.
         #[serde(default)]
@@ -373,6 +373,11 @@ impl RuntimeManifest {
 
         let mut names = BTreeSet::new();
         for process in &self.processes {
+            if process.name.is_empty() {
+                return Err(ManifestError::Invalid(
+                    "process name must not be empty".to_string(),
+                ));
+            }
             if !names.insert(process.name.as_str()) {
                 return Err(ManifestError::Invalid(format!(
                     "duplicate process name: {}",
@@ -386,11 +391,13 @@ impl RuntimeManifest {
                 )));
             }
             if let ArtifactRef::Pinned { sha256, .. } = &process.artifact {
-                let valid =
-                    sha256.len() == 64 && sha256.bytes().all(|byte| byte.is_ascii_hexdigit());
+                let valid = sha256.len() == 64
+                    && sha256
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
                 if !valid {
                     return Err(ManifestError::Invalid(format!(
-                        "process {} pinned artifact sha256 must be 64 hexadecimal characters",
+                        "process {} pinned artifact sha256 must be 64 lowercase hexadecimal characters",
                         process.name
                     )));
                 }
@@ -533,6 +540,21 @@ mod tests {
         let bad_sha = minimal_manifest_json().replace(SHA256, "not-a-sha256");
         assert!(matches!(
             RuntimeManifest::from_json(&bad_sha),
+            Err(ManifestError::Invalid(_))
+        ));
+
+        // Uppercase hex would never equal the driver's lowercase digest (exit 66) and
+        // would make one artifact CID-distinct from itself — refused at the manifest.
+        let upper_sha = minimal_manifest_json().replace(SHA256, &SHA256.to_ascii_uppercase());
+        assert!(matches!(
+            RuntimeManifest::from_json(&upper_sha),
+            Err(ManifestError::Invalid(_))
+        ));
+
+        // `#[serde(default)]` lets a mistyped key yield a nameless process; refused.
+        let nameless = minimal_manifest_json().replace("\"name\"", "\"nme\"");
+        assert!(matches!(
+            RuntimeManifest::from_json(&nameless),
             Err(ManifestError::Invalid(_))
         ));
     }

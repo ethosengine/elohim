@@ -56,6 +56,9 @@ pub enum BerthError {
     /// A template key has no value in this berth.
     #[error("unknown berth template: {0}")]
     UnknownTemplate(String),
+    /// A template opened a brace it never closed.
+    #[error("malformed template: {0}")]
+    Malformed(String),
 }
 
 impl Berth {
@@ -78,7 +81,9 @@ impl Berth {
             resolved.push_str(&remainder[..open]);
             let after_open = &remainder[open + 1..];
             let Some(close) = after_open.find('}') else {
-                return Err(BerthError::UnknownTemplate(after_open.to_string()));
+                return Err(BerthError::Malformed(format!(
+                    "unterminated template near '{{{after_open}'"
+                )));
             };
             let key = &after_open[..close];
             resolved.push_str(&self.template_value(process, artifact_path, key)?);
@@ -148,5 +153,9 @@ mod tests {
             berth.resolve_template("conductor", artifact, "{port.nope}"),
             Err(BerthError::UnknownTemplate("port.nope".to_string()))
         );
+        assert!(matches!(
+            berth.resolve_template("conductor", artifact, "{data_root"),
+            Err(BerthError::Malformed(_))
+        ));
     }
 }
