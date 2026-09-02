@@ -51,7 +51,16 @@
  * relevant to a single-conductor ceremony driver (LOCAL-DHT arm only); the
  * full sweep-controller semantics (PEER-HINT / AUTHOR-THEN-ADOPT /
  * CONTEST-THEN-OBEY) belong to `task-release-adoption-controller-observe`,
- * not this driver.
+ * not this driver. `revert <channelId> <manifest.json>` is the one caller
+ * that bypasses this refusal: it re-elects a NEW version bound to OLD bytes
+ * (a revert target can never be an existing version's action hash — a
+ * release manifest's `appliesTo.coordinatorWasmHashes` names what it
+ * SUPERSEDES, and the adoption controller refuses a peer not running them).
+ * Revert is exempt because it is not a staging candidate contending for the
+ * head at all — it declares EARNED directly, so the thing the pre-flight
+ * guards against (crowning an un-adopted commit over an authority
+ * declaration) does not apply; the declaring peer IS the authority moving
+ * the earned head.
  *
  * ## Usage
  *
@@ -60,7 +69,7 @@
  *   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
  *   publish <manifest.json>
  *   promote <channelId> <releaseCid> [--delegation <file>]
- *   revert <channelId> <priorReleaseCid> [--delegation <file>]
+ *   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
  *   status <channelId>
  *
  * Common flags:
@@ -79,7 +88,7 @@
  * is never read as absent.
  */
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 
 const APP_ID = 'elohim';
 const ROLE = 'lamad'; // the role name carrying the content_store cell — same as the oracle
@@ -108,7 +117,7 @@ Verbs:
   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
   publish <manifest.json>
   promote <channelId> <releaseCid> [--delegation <file>]
-  revert <channelId> <priorReleaseCid> [--delegation <file>]
+  revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
   status <channelId>
 
 Options:
@@ -401,13 +410,38 @@ async function cmdChannelCreate(
   process.exit(0);
 }
 
-async function cmdPublish(manifestPath: string, flags: Flags, peers: PeerConfig[], timeoutMs: number) {
+interface AuthoredVersion {
+  conn: Awaited<ReturnType<typeof conductor>>;
+  channelId: string;
+  releaseCid: string;
+  actingPeer: PeerConfig;
+}
+
+/**
+ * Shared "author a version from a release manifest" path: read + duck-type
+ * validate the manifest, connect as the acting peer, run the
+ * adopt-before-author pre-flight, then call `update_content` with the
+ * release manifest riding `metadata_json` (spec §5) — exactly the steps
+ * `publish` always ran. `refuseIfEarned` is the ONLY behavioral fork:
+ * `publish` (true) refuses locally when the channel already has an EARNED
+ * head (see module doc "Adopt-before-author"); `revert` (false) is itself
+ * the authority moving that head, so it logs the fact and proceeds instead
+ * of refusing.
+ */
+async function authorVersionFromManifest(
+  manifestPath: string,
+  flags: Flags,
+  peers: PeerConfig[],
+  timeoutMs: number,
+  refuseIfEarned: boolean,
+): Promise<AuthoredVersion> {
+  const label = refuseIfEarned ? 'publish' : 'revert';
   const manifestRaw = readFileSync(manifestPath, 'utf8');
   const manifest = JSON.parse(manifestRaw);
   const channelId: string | undefined = manifest.channelId;
   if (!channelId || typeof channelId !== 'string') {
     throw new Error(
-      `publish: manifest at ${manifestPath} has no string 'channelId' field. ` +
+      `${label}: manifest at ${manifestPath} has no string 'channelId' field. ` +
         `NOTE: task-release-manifest-schema-packager (T1) had not landed a schema/packager ` +
         `as of this driver's authoring, so this manifest is read duck-typed (channelId + ` +
         `whatever else it carries), not schema-validated — see the atom's Implementation notes.`,
@@ -421,12 +455,18 @@ async function cmdPublish(manifestPath: string, flags: Flags, peers: PeerConfig[
   // Adopt-before-author pre-flight (LOCAL-DHT arm; see module doc).
   const currentElection: any = await conn.call('resolve_canonical_election', channelId);
   if (currentElection?.canonical_earned) {
-    throw new Error(
-      `publish refused: channel '${channelId}' already has an EARNED head ` +
-        `(${toB64(currentElection.winner_target)}). Publishing a fresh staging candidate over ` +
-        `an earned head would crown this peer's own commit without adopting the standing ` +
-        `authority declaration — promote/revert are the earned-tier verbs; adopt/resolve first ` +
-        `if this peer genuinely intends to supersede it.`,
+    if (refuseIfEarned) {
+      throw new Error(
+        `publish refused: channel '${channelId}' already has an EARNED head ` +
+          `(${toB64(currentElection.winner_target)}). Publishing a fresh staging candidate over ` +
+          `an earned head would crown this peer's own commit without adopting the standing ` +
+          `authority declaration — promote/revert are the earned-tier verbs; adopt/resolve first ` +
+          `if this peer genuinely intends to supersede it.`,
+      );
+    }
+    console.error(
+      `revert: re-electing over earned head ${toB64(currentElection.winner_target)} — this ` +
+        `declarer is the authority moving the earned head, not a staging candidate`,
     );
   }
 
@@ -449,13 +489,24 @@ async function cmdPublish(manifestPath: string, flags: Flags, peers: PeerConfig[
     const msg = String(e);
     if (msg.includes('no Content entry found for id')) {
       throw new Error(
-        `publish: channel '${channelId}' not found on ${actingPeer.name} — run ` +
+        `${label}: channel '${channelId}' not found on ${actingPeer.name} — run ` +
           `'channel create ${channelId}' first. (${msg.slice(0, 200)})`,
       );
     }
-    throw new Error(`publish: update_content failed on ${actingPeer.name}: ${msg.slice(0, 400)}`);
+    throw new Error(`${label}: update_content failed on ${actingPeer.name}: ${msg.slice(0, 400)}`);
   }
   const releaseCid = toB64(updated.action_hash);
+  return { conn, channelId, releaseCid, actingPeer };
+}
+
+async function cmdPublish(manifestPath: string, flags: Flags, peers: PeerConfig[], timeoutMs: number) {
+  const { conn, channelId, releaseCid, actingPeer } = await authorVersionFromManifest(
+    manifestPath,
+    flags,
+    peers,
+    timeoutMs,
+    true,
+  );
 
   const declarePayload = {
     id: channelId,
@@ -553,6 +604,64 @@ async function declareEarned(
   process.exit(0);
 }
 
+function isManifestFile(value: string): boolean {
+  try {
+    return statSync(value).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `revert <channelId> <priorReleaseCid | manifest.json>`. When the second
+ * positional is a readable file, it is a release manifest for the bytes
+ * being reverted TO (see module doc "Adopt-before-author"): author it as a
+ * new version via `authorVersionFromManifest` (bypassing the earned-head
+ * refusal — this declarer IS the authority moving the earned head), then
+ * declare that new version's action hash EARNED via the existing
+ * `declareEarned`, skipping the staging tier entirely. Otherwise this is the
+ * original form — declare the given action hash EARNED directly.
+ */
+async function cmdRevert(
+  channelId: string,
+  priorReleaseCidOrManifest: string,
+  flags: Flags,
+  peers: PeerConfig[],
+  timeoutMs: number,
+) {
+  if (!isManifestFile(priorReleaseCidOrManifest)) {
+    await declareEarned('revert', channelId, priorReleaseCidOrManifest, flags, peers, timeoutMs);
+    return;
+  }
+
+  const manifestPath = priorReleaseCidOrManifest;
+  const authored = await authorVersionFromManifest(manifestPath, flags, peers, timeoutMs, false);
+  if (authored.channelId !== channelId) {
+    throw new Error(
+      `revert: channelId mismatch — command line said '${channelId}' but manifest ` +
+        `'${manifestPath}' declares channelId '${authored.channelId}'`,
+    );
+  }
+
+  // Same fields `publish` prints for a freshly authored version (releaseCid
+  // greppable); tier/canonical are omitted because revert never calls
+  // declare_canonical_content_head — it goes straight to the earned tier.
+  console.log(
+    JSON.stringify(
+      {
+        verb: 'publish',
+        channelId,
+        actingPeer: authored.actingPeer.name,
+        releaseCid: authored.releaseCid,
+      },
+      null,
+      2,
+    ),
+  );
+
+  await declareEarned('revert', channelId, authored.releaseCid, flags, peers, timeoutMs);
+}
+
 async function cmdStatus(channelId: string, _flags: Flags, peers: PeerConfig[], timeoutMs: number) {
   const rows = await Promise.all(peers.map((p) => resolveElectionOnPeer(p, channelId, timeoutMs)));
   const report = {
@@ -602,9 +711,10 @@ async function main() {
     if (!channelId || !releaseCid) throw new Error('usage: promote <channelId> <releaseCid>');
     await declareEarned('promote', channelId, releaseCid, flags, peers, timeoutMs);
   } else if (verb === 'revert') {
-    const [channelId, priorReleaseCid] = positionals;
-    if (!channelId || !priorReleaseCid) throw new Error('usage: revert <channelId> <priorReleaseCid>');
-    await declareEarned('revert', channelId, priorReleaseCid, flags, peers, timeoutMs);
+    const [channelId, priorReleaseCidOrManifest] = positionals;
+    if (!channelId || !priorReleaseCidOrManifest)
+      throw new Error('usage: revert <channelId> <priorReleaseCid | manifest.json>');
+    await cmdRevert(channelId, priorReleaseCidOrManifest, flags, peers, timeoutMs);
   } else if (verb === 'status') {
     const [channelId] = positionals;
     if (!channelId) throw new Error('usage: status <channelId>');
