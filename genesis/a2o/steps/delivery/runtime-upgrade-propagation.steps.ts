@@ -483,11 +483,21 @@ async function pollAdoption(
   throw new Error('unreachable');
 }
 
-async function readRoles(world: E2EWorld, peer: PeerName): Promise<VersionRole[]> {
-  const { status, text } = await getRaw(`${peerUrl(world, peer)}${VERSION_PATH}`);
-  assert.equal(status, 200, `GET ${VERSION_PATH} on ${peer} returned ${status}`);
+/**
+ * Reads one peer's `/version` passport roles from an already-resolved URL —
+ * the primitive `readRoles` wraps for `World`-based callers, and the one the
+ * pre/post-run convergence-to-baseline routines use directly (no `World` is
+ * available in `AfterAll`; see `directPeerUrl`).
+ */
+async function readRolesAt(url: string, peerLabel: string): Promise<VersionRole[]> {
+  const { status, text } = await getRaw(`${url}${VERSION_PATH}`);
+  assert.equal(status, 200, `GET ${VERSION_PATH} on ${peerLabel} returned ${status}`);
   const body = JSON.parse(text) as VersionResponse;
   return body.passport?.happ?.roles ?? [];
+}
+
+async function readRoles(world: E2EWorld, peer: PeerName): Promise<VersionRole[]> {
+  return readRolesAt(peerUrl(world, peer), peer);
 }
 
 function lamadRole(roles: VersionRole[]): VersionRole | undefined {
@@ -524,9 +534,9 @@ function wasmHashValues(record: Record<string, string> | undefined): string[] {
  * `pollAdoption` — gives the real swap the time it needs while still failing
  * loudly (with the last observed value) if it never lands.
  */
-async function pollLamadWasmHashMatch(
-  world: E2EWorld,
-  peer: PeerName,
+async function pollLamadWasmHashMatchAt(
+  url: string,
+  peerLabel: string,
   expected: Record<string, string> | undefined,
   timeoutMs: number,
   intervalMs = 5_000
@@ -536,7 +546,7 @@ async function pollLamadWasmHashMatch(
   let lastObserved: Record<string, string> | undefined;
   while (Date.now() - start < timeoutMs) {
     try {
-      const roles = await readRoles(world, peer);
+      const roles = await readRolesAt(url, peerLabel);
       lastObserved = lamadRole(roles)?.coordinatorWasmHashes;
       if (JSON.stringify(wasmHashValues(lastObserved)) === JSON.stringify(expectedValues)) {
         return { observed: lastObserved, elapsedMs: Date.now() - start };
@@ -547,10 +557,20 @@ async function pollLamadWasmHashMatch(
     await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
   }
   assert.fail(
-    `${peer}'s /version passport never converged on the expected lamad coordinatorWasmHashes within ` +
+    `${peerLabel}'s /version passport never converged on the expected lamad coordinatorWasmHashes within ` +
       `${timeoutMs}ms (expected ${JSON.stringify(expected)}, last observed ${JSON.stringify(lastObserved)})`
   );
   throw new Error('unreachable');
+}
+
+async function pollLamadWasmHashMatch(
+  world: E2EWorld,
+  peer: PeerName,
+  expected: Record<string, string> | undefined,
+  timeoutMs: number,
+  intervalMs = 5_000
+): Promise<{ observed: Record<string, string> | undefined; elapsedMs: number }> {
+  return pollLamadWasmHashMatchAt(peerUrl(world, peer), peer, expected, timeoutMs, intervalMs);
 }
 
 async function readBlobTotal(world: E2EWorld, peer: PeerName): Promise<number> {
@@ -833,13 +853,31 @@ async function confirmOnePeerRestored(peer: PeerName): Promise<void> {
   }
 }
 
-AfterAll(async function () {
+AfterAll({ timeout: 900_000 }, async function () {
   // Restore whenever ANY peer was snapshotted — not gated on full
   // establishment completing, so a mid-loop throw (a station/env failure
   // partway through `ensureRunOwnedFollowSet`) still restores whatever
   // peers it already touched, rather than leaving them run-owned forever.
   if (Object.keys(originalRuntimeConfigBytes).length === 0 || runOwnedFollowSetRestored) return;
   runOwnedFollowSetRestored = true;
+
+  // Converge every peer back onto baseline N BEFORE the byte-restore below
+  // — see the "Pre/post-run convergence to baseline N" section for the r5
+  // diagnosis this closes — so the mesh is left homogeneous on N for
+  // whichever run starts next, not on whatever hash this run's own stations
+  // (station 7's never-reverted personal channel, or a station 6 that never
+  // converged) happened to leave behind. Best-effort: a convergence failure
+  // here must never block the byte-restore that follows, or a run-owned
+  // file becomes permanent.
+  try {
+    await convergeAllToBaseline(directPeerUrl, 'post');
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ⚠️  post-run convergence-to-baseline failed before byte-restore: ${String(error)} — ` +
+        'proceeding to byte-restore anyway so the next run does not inherit a run-owned file.'
+    );
+  }
 
   for (const peer of PEER_NAMES) {
     const originalBytes = originalRuntimeConfigBytes[peer];
@@ -908,6 +946,305 @@ function extractLastJson<T>(stdout: string): T {
 }
 
 // ---------------------------------------------------------------------------
+// Pre/post-run convergence to baseline N — the fix for the flaw the
+// 2026-09-02 06:16Z (r5) run measured: this ceremony's own steady state
+// after a green run is HETEROGENEOUS, not converged. Station 6 restores the
+// commons channel (`CHANNEL_ID`) to `BASELINE_HAPP`, but station 7 leaves
+// james on his own personal channel's candidate forever — nobody reverts a
+// personal channel, and nobody is meant to — so a green run's own receipt
+// ends with james on one coordinator hash and matthew/jessica on another.
+// If a PRIOR run's own station 6 revert never converged either (as r4's did
+// not), matthew/jessica are left on THAT run's candidate too. The next run's
+// station 1/3 packages its release with `--applies-to-from <matthew>`,
+// baking matthew's LIVE hash into the manifest's "supersedes" list — a hash
+// james, running a different leftover, does not run — so his canary apply
+// is refused `coordinator_lineage_mismatch`. The controller is correct to
+// refuse; the fixture lacked a teardown.
+//
+// The fix: before this run's own station 1 ever packages a release
+// (`ensurePreRunConvergedToBaseline`, called from `ensureCeremonyBaseline`
+// below), and again after this run's own stations finish but BEFORE its
+// runtime-config byte-restore (`AfterAll`, so whichever run starts next
+// inherits a homogeneous fleet), read every peer's live lamad
+// `coordinatorWasmHashes` and, for every DISTINCT hash present that is not
+// `BASELINE_COORDINATOR_WASM_HASH`, package `BASELINE_HAPP`'s own bytes as a
+// throwaway "teardown" release bound to that exact hash, publish + promote
+// it on a fresh teardown channel followed (in `apply` mode) by exactly the
+// peer(s) reporting it, wait for their passports to converge on the
+// baseline, then drop the teardown channel from the run-owned follow set
+// again. Bounded by peer count: at most `PEER_NAMES.length` distinct
+// non-baseline groups can ever exist.
+// ---------------------------------------------------------------------------
+
+/**
+ * The coordinator `WasmHash` (Holochain's own blake2b + holo-hash encoding —
+ * NOT the bare sha256 `coordinator-candidate.ts` computes over different
+ * bytes; see `MintedCandidate.coordinatorWasmSha256`'s own doc) the fleet
+ * reports for lamad's `content_store` coordinator when running
+ * `BASELINE_HAPP` (bundle "N") unmodified. This file has no local way to
+ * compute a `WasmHash` (that needs Holochain's own hashing, not a plain TS
+ * script), so the literal is read once from a peer known to run N on the
+ * 2026-09-02 household mesh — and asserted again, for real, every time
+ * `runOneTeardown` polls a peer back onto it below: a wrong literal here
+ * fails that poll loudly rather than silently declaring the wrong hash
+ * "baseline."
+ */
+const BASELINE_COORDINATOR_WASM_HASH = 'uhCok88IBM4RXPCWLyz_y00a8Ksyyys03p8Fq7dzOWj1gyqRx7H0B';
+
+/** At most this many distinct non-baseline hash groups can exist across `PEER_NAMES`. */
+const MAX_TEARDOWN_GROUPS = PEER_NAMES.length;
+const TEARDOWN_POLL_TIMEOUT_MS = 4 * 60_000;
+
+/**
+ * Resolves a peer's base URL without a `World` — `(peer) => peerUrl(world,
+ * peer)` for the Background-driven pre-run pass, `directPeerUrl` itself for
+ * `AfterAll`'s post-run pass (no `World` exists there — see `directPeerUrl`'s
+ * own doc).
+ */
+type PeerUrlResolver = (peer: PeerName) => string;
+
+interface PeerHashGroup {
+  /** Sorted, deduped hash values shared by every peer in `peers` (see `wasmHashValues`). */
+  hashValues: string[];
+  peers: PeerName[];
+}
+
+async function readAllPeerLamadHashValues(
+  resolveUrl: PeerUrlResolver
+): Promise<Partial<Record<PeerName, string[]>>> {
+  const out: Partial<Record<PeerName, string[]>> = {};
+  for (const peer of PEER_NAMES) {
+    const roles = await readRolesAt(resolveUrl(peer), peer);
+    out[peer] = wasmHashValues(lamadRole(roles)?.coordinatorWasmHashes);
+  }
+  return out;
+}
+
+/** Groups peers NOT already on the baseline hash by their shared, distinct hash-set. */
+function groupNonBaselinePeers(readings: Partial<Record<PeerName, string[]>>): PeerHashGroup[] {
+  const groups = new Map<string, PeerHashGroup>();
+  for (const peer of PEER_NAMES) {
+    const values = readings[peer] ?? [];
+    if (values.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ⚠️  ${peer} reports no lamad coordinatorWasmHashes at all — nothing to bind a ` +
+          'teardown supersedes to; leaving it untouched.'
+      );
+      continue;
+    }
+    if (values.length === 1 && values[0] === BASELINE_COORDINATOR_WASM_HASH) continue;
+    const hashKey = values.join(',');
+    const existing = groups.get(hashKey);
+    if (existing) existing.peers.push(peer);
+    else groups.set(hashKey, { hashValues: values, peers: [peer] });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Tears down ONE distinct non-baseline hash group: packages `BASELINE_HAPP`
+ * bound to that exact hash on a fresh teardown channel, has exactly the
+ * affected peers follow it in `apply` mode, declares it earned, waits for
+ * their passports to converge, then drops the channel from the run-owned
+ * follow set again.
+ */
+async function runOneTeardown(
+  resolveUrl: PeerUrlResolver,
+  phase: 'pre' | 'post',
+  group: PeerHashGroup,
+  index: number
+): Promise<void> {
+  const teardownChannelId = `runtime:coordinators:elohim:a2o-teardown-${RUN_STAMP}-${phase}-${index}`;
+  const teardownManifestPath = path.join(
+    REPORT_DIR,
+    `a2o-teardown-${RUN_STAMP}-${phase}-${index}.json`
+  );
+  mkdirSync(REPORT_DIR, { recursive: true });
+  const start = Date.now();
+  // eslint-disable-next-line no-console
+  console.log(
+    `[${phase}-run-convergence] teardown ${index}: ${group.peers.join('+')} report ` +
+      `${JSON.stringify(group.hashValues)} — packaging baseline N bound to that hash on ` +
+      `channel ${teardownChannelId}`
+  );
+
+  const created = runDriver(RELEASE_CEREMONY_SCRIPT, [
+    'channel',
+    'create',
+    teardownChannelId,
+    '--discipline',
+    JSON.stringify({ soakSecs: 0, attestationThreshold: 0, canaryOrder: [] }),
+  ]);
+  assert.equal(
+    created.status,
+    0,
+    `teardown channel create failed: ${created.stderr || created.stdout}`
+  );
+
+  const repPeer = group.peers[0];
+  const repPeerUrl = resolveUrl(repPeer);
+  const packaged = runDriver(
+    'scripts/epr-release-package.ts',
+    [
+      '--artifact',
+      BASELINE_HAPP,
+      '--artifact-class',
+      'coordinator-bundle',
+      '--channel-id',
+      teardownChannelId,
+      '--applies-to-from',
+      repPeerUrl,
+      '--soak-secs',
+      '0',
+      '--attestation-threshold',
+      '0',
+      '--peer',
+      repPeerUrl,
+      '--notes',
+      `${phase}-run convergence: teardown to baseline N before run ${RUN_STAMP} ` +
+        `(was ${group.hashValues.join(',')})`,
+      '--out',
+      teardownManifestPath,
+    ],
+    60_000
+  );
+  assert.equal(
+    packaged.status,
+    0,
+    `teardown package (peers ${group.peers.join('+')}) failed: ${packaged.stderr || packaged.stdout}`
+  );
+  assert.ok(
+    existsSync(teardownManifestPath),
+    `teardown manifest was not written to ${teardownManifestPath}`
+  );
+
+  const baselineBytes = readFileSync(BASELINE_HAPP);
+  const baselineSha256 = createHash('sha256').update(baselineBytes).digest('hex');
+  for (const peer of group.peers.filter(name => name !== repPeer)) {
+    const putStatus = await putBlobRaw(resolveUrl(peer), baselineSha256, baselineBytes);
+    assert.ok(
+      putStatus === 200 || putStatus === 201,
+      `PUT teardown-target blob to ${peer} returned ${putStatus}`
+    );
+  }
+
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', teardownManifestPath]);
+  assert.equal(
+    published.status,
+    0,
+    `teardown publish failed: ${published.stderr || published.stdout}`
+  );
+  const publishedParsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(
+    publishedParsed.releaseCid,
+    `teardown publish missing releaseCid: ${JSON.stringify(publishedParsed)}`
+  );
+
+  for (const peer of group.peers) {
+    runOwnedChannels[peer].set(teardownChannelId, 'apply');
+    await applyRunOwnedChannels(peer);
+  }
+
+  const promoted = runDriver(RELEASE_CEREMONY_SCRIPT, [
+    'promote',
+    teardownChannelId,
+    publishedParsed.releaseCid,
+  ]);
+  assert.equal(
+    promoted.status,
+    0,
+    `teardown promote failed: ${promoted.stderr || promoted.stdout}`
+  );
+  const promotedParsed = extractJson<PromoteResult>(promoted.stdout);
+  assert.equal(
+    promotedParsed.tier,
+    'earned',
+    `teardown promote did not declare earned: ${JSON.stringify(promotedParsed)}`
+  );
+
+  for (const peer of group.peers) {
+    const { observed, elapsedMs } = await pollLamadWasmHashMatchAt(
+      resolveUrl(peer),
+      peer,
+      { baseline: BASELINE_COORDINATOR_WASM_HASH },
+      TEARDOWN_POLL_TIMEOUT_MS
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[${phase}-run-convergence] teardown ${index}: ${peer} converged on baseline ` +
+        `${JSON.stringify(observed)} after ${elapsedMs}ms`
+    );
+  }
+
+  for (const peer of group.peers) {
+    runOwnedChannels[peer].delete(teardownChannelId);
+    await applyRunOwnedChannels(peer);
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[${phase}-run-convergence] teardown ${index} done in ${Date.now() - start}ms — ` +
+      `${group.peers.join('+')} dropped from ${teardownChannelId}'s follow set`
+  );
+}
+
+/** Reads every peer's live lamad hash and tears down every distinct non-baseline group, in order. */
+async function convergeAllToBaseline(
+  resolveUrl: PeerUrlResolver,
+  phase: 'pre' | 'post'
+): Promise<void> {
+  const readings = await readAllPeerLamadHashValues(resolveUrl);
+  const groups = groupNonBaselinePeers(readings);
+  // eslint-disable-next-line no-console
+  console.log(
+    `[${phase}-run-convergence] observed lamad coordinatorWasmHashes: ${JSON.stringify(readings)} — ` +
+      `${groups.length} distinct non-baseline group(s) need teardown`
+  );
+  assert.ok(
+    groups.length <= MAX_TEARDOWN_GROUPS,
+    `${phase}-run convergence found ${groups.length} distinct non-baseline coordinator hashes across ` +
+      `only ${PEER_NAMES.length} peers — impossible unless the grouping logic double-counted`
+  );
+  for (const [index, group] of groups.entries()) {
+    await runOneTeardown(resolveUrl, phase, group, index);
+  }
+
+  if (groups.length > 0) {
+    // 2026-09-02 r6 diagnosis: a teardown's own poll confirms the peer's REAL
+    // `/version` passport landed on baseline, but the release-adoption
+    // controller's `installed_reality()` cache (the SAME
+    // `INSTALLED_REALITY_TTL_SECS` cache `ensureReverted`/station 6 already
+    // waits out — see that constant's own doc) is a SEPARATE, unrelated read
+    // that does not invalidate just because the wasm hot-swapped. r6 measured
+    // this directly: teardown 1 confirmed james's live passport on baseline
+    // at T+126s, then station 3 — only ~45s later, nowhere near the 300s TTL
+    // — was refused `coordinator_lineage_mismatch` citing james still
+    // "running" his PRE-teardown hash, a stale controller-cache read, not a
+    // real one. Wait out the same TTL (once, after every teardown this pass
+    // ran) before returning, so whichever station verifies against any
+    // torn-down peer next reads a cache that has actually refreshed.
+    const ttlWaitMs = (INSTALLED_REALITY_TTL_SECS + INSTALLED_REALITY_TTL_BUFFER_SECS) * 1000;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[${phase}-run-convergence] waiting ${ttlWaitMs}ms for the release-adoption controller's ` +
+        `installed-reality cache (TTL ${INSTALLED_REALITY_TTL_SECS}s) to age out on every torn-down ` +
+        'peer before any station verifies a release against it'
+    );
+    await new Promise<void>(resolve => setTimeout(resolve, ttlWaitMs));
+  }
+}
+
+let preRunConvergenceDone = false;
+
+/** Called once, from `ensureCeremonyBaseline`, before this run's own station 1 packages anything. */
+async function ensurePreRunConvergedToBaseline(world: E2EWorld): Promise<void> {
+  if (preRunConvergenceDone) return;
+  await convergeAllToBaseline(peer => peerUrl(world, peer), 'pre');
+  preRunConvergenceDone = true;
+}
+
+// ---------------------------------------------------------------------------
 // Ensure-chain: each function performs its station's REAL action exactly
 // once per process (memoized on `ceremony()` state) and walks back through
 // its own dependencies first, so any station can also run standalone.
@@ -920,6 +1257,10 @@ async function ensureCeremonyBaseline(world: E2EWorld): Promise<void> {
   // cucumber `Before` hook — establishes the run-owned follow set first,
   // idempotently, exactly like every other `ensure*` in this chain.
   await ensureRunOwnedFollowSet();
+  // Converge every peer onto the SAME baseline hash before this run's own
+  // station 1 packages anything — see the "Pre/post-run convergence to
+  // baseline N" section above for the r5 diagnosis this closes.
+  await ensurePreRunConvergedToBaseline(world);
   for (const peer of PEER_NAMES) {
     await setPeerMode(world, peer, 'observe');
   }
@@ -1559,7 +1900,12 @@ function buildObservedMatrix(): MatrixRow[] {
 
 Given(
   "the household's runtime follows release channel {string}",
-  { timeout: 120_000 },
+  // Bumped from 120_000: `ensureCeremonyBaseline` now runs the pre-run
+  // convergence-to-baseline pass first (up to `MAX_TEARDOWN_GROUPS` teardown
+  // ceremonies, each with a `TEARDOWN_POLL_TIMEOUT_MS` poll) before it even
+  // gets to setting every peer's mode to `observe` — see the "Pre/post-run
+  // convergence to baseline N" section.
+  { timeout: 900_000 },
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
@@ -1578,7 +1924,11 @@ Given("james is designated the canary on that channel's staging tier", function 
 
 Given(
   "james's runtime additionally follows his own personal channel {string}",
-  { timeout: 200_000 },
+  // Bumped from 200_000 for the same reason as the previous Given — if this
+  // station ever runs standalone (its own `ensureCeremonyBaseline` call is
+  // the first one in the process), it inherits the full pre-run
+  // convergence-to-baseline budget too.
+  { timeout: 900_000 },
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
