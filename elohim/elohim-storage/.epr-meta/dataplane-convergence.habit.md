@@ -12,6 +12,7 @@ checks:
   - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
   - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
   - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
+  - "a2o @concern:trust-priced-sync (genesis/a2o/features/dataplane/trust-priced-sync.feature) — RED-FIRST 2026-09-01: a household peer prices its household edges `trusted` and no edge `public` on a pure-household mesh; the trust handshake is a stub that prices every edge `public`, so this check is born red and runnable on existing steps"
 guard: >
   Regression risk = the fleet-safety invariants in sync/projector.rs
   (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -69,6 +70,21 @@ retire-when: >
   never: convergence is the protocol's constitutive promise. A p2p substrate that stops
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
+---
+DELTA 2026-09-01 (trust-priced sync edge design; NO status flip): the design gate
+for ratchet move M3 landed as spec 2026-09-01-trust-priced-sync-edge-design.md
+(refines trust-as-efficiency-signal; composes the trust/ pricer seam, never a second
+pricer). Grounded: the trust handshake is a stub end to end (sender presents empty
+credential vectors, both receiver arms and the iroh TrustService hard-code
+reach_ceiling=public; verify_trust_context has zero callers), so every edge on every
+mesh is asserted verified-public — a C4 violation, now a named red: new check
+@concern:trust-priced-sync scenario 1 fails on existing steps (trusted absent, public
+~48 on the household mesh). Every catch-up knob is global or failure-keyed (window 32,
+timeout 30 s, backoff 60 s→15 min, round-robin providers). Design: one derived
+EdgeClass per edge (the existing reach-ceiling vocabulary + commitments), one pure
+EdgeBudget predicate keying window/patience/backoff/admission/reverify with liveness
+and authority floors (trust widens, never gates; no budget moves a head). First slice
+named, not coded: the honest handshake (station 1). Stays red.
 ---
 DELTA 2026-09-01 (iroh observed-version receipt; NO status flip): `/p2p/status` now projects the live peer book as nullable `irohPeers`, and `version-matrix.ts --observed` read a green three-peer dual household matrix: every observer reported both remote NodeIds as `elohim-storage/0.1.0`, with no divergent column. Fleet confirmation remains the integrator's post-roll watch, so this habit stays red.
 ---
