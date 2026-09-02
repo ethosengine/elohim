@@ -182,3 +182,38 @@ stranger, the operator's query lists the incident on the peer and on a custodian
 attestation appears on the DHT after the peer recovers — as an a2o scenario in
 `features/recovery/` tagged `@concern:death-witness`, bound to a habit under
 `elohim/elohim-storage/.epr-meta/`.
+
+## Design canonized (2026-09-02) — corrections to the gate above
+
+The witness is the first output of the compute envelope; the sealed design is
+`genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md` (§6 the path, §7 the
+re-run gate, §16 the review disposition). The grounding and three adversarial reviews overturned
+five claims in this atom's own gate; the spec carries the corrected answers:
+
+1. **"a new `contentType` `runtime:death-witness` … DNA-hash-NEUTRAL" is wrong.** `Content::validate`
+   refuses any type not in `ALL_CONTENT_TYPES` (integrity zome): a new content type MOVES the DNA
+   hash. The witness rides `issue-report` + `metadata_json.kind: death-witness`; the passport rides
+   `node-context`. First-class types are batched into the constitutional DNA change.
+2. **"custody commitments already name who replicates a node's atoms" is wrong.** They are per exact
+   blob hash; a fresh witness has no custodian. The spec adds a standing `custody-spool` commitment
+   (coordinator-only action; DNA-hash-neutral, verified) that becomes binding only when a custodian
+   outside the node's control counter-signs it (`attestation:custodian-commitment`, its first
+   producer) — the capture guard against a steward naming its own second box.
+3. **Classification: not B2 — Notarized (A) at INCIDENT grain.** A `Content` entry is a public notary
+   record and every pantry file is advertised, so there is no private-chain raw to attest from. The
+   incident is one content row whose head moves as deaths are appended; verdicts, tails, snapshots,
+   and passports-at-death are bytes inside the incident blob; the custodied copy is a redacted
+   summary; the raw stays local behind a per-incident grant.
+4. **Attestation deferred.** `attestation:death-witness` is absent from `ATTESTATION_KINDS`;
+   `attestation:device-health` has a closed schema already ridden by release attestations. Green =
+   the anchored witness row; the incident attestation waits for the constitutional batch.
+5. **Done-when named the wrong drill.** `just mesh recovery cold <peer>` kills STORAGE and never a
+   conductor; `features/recovery/` does not exist and collides with key recovery. Home:
+   `features/resilience/death-witness.feature` (four @wip stations, written 2026-09-02); habit
+   `runtime-death-witnessed` (born unwired — nothing is provable until the mesh launches conductors
+   under the envelope).
+
+Also: the ring is 200 lines (this atom said 400); the give-up path still carries no tail; the
+node-local authoring identity is the transport keypair (amber, `private`, `unbound` until its
+`AgentPeerBinding` resolves) with the agent key at green; readers are the custody-spool set, and no
+reach tier is canonized while the vocabulary is in declared drift.

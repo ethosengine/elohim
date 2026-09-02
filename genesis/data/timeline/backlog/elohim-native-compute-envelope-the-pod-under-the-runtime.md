@@ -7,7 +7,7 @@ title: "The elohim-native compute envelope — one primitive under the runtime t
 slug: "elohim-native-compute-envelope-the-pod-under-the-runtime"
 written: "2026-09-02"
 author: "shift 2026-09-02T02-20-land-rung5-batch (operator-directed)"
-status: "envisioned"
+status: "refined"
 priority: "high"
 domain: "D-runtime-operations"
 roadmap_rung: "seam map 3.2 OS/packaging + 3.3 runtime/footprint — the primitive both seams assume and neither owns; generational shift (device spectrum smartwatch → rack)"
@@ -93,3 +93,35 @@ The household mesh's three peers run under the envelope (no `hc-mesh.sh` process
 verdicts, a forced conductor death produces a death witness through the envelope, and the same
 binary boots as PID 1 inside the alpha edgenode pod — measured by an a2o scenario in
 `features/recovery/` and a habit under the runtime seam.
+
+## Design canonized (2026-09-02) — see the spec
+
+`genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md` seals the primitive
+(decision register §12, adversarial-review disposition §16). Corrections to this atom, from the
+grounding (21 briefs, adversarially verified) and three reviews:
+
+- **Name:** `elohim-pod` retired — `pod` already names `steward/node/src/pod`, the cluster
+  *operator* (the opposite layer). The runtime is **tevah**; the declaration is a **`RuntimeSeed`**.
+- **The "three partial envelopes" table is wrong in every row but one.** `process_manager`'s
+  try_wait + tail DID land (`264ce8ce4`, `dcf9a16c3`) — the ring is 200 lines, the give-up path
+  carries no tail, nobody `try_wait`s after readiness, and the tail is logged, never persisted.
+  `lvi` has zero `.rs` files (spec-only; its "hard cgroup quota" is podman flags in a doc).
+  `steward/node::pod` supervises nothing (service health is a constant, consensus a simulation,
+  `RestartService` fabricates success, `compute_rea.rs` is an inference-token record with random ids
+  that is minted and dropped). The conductor's k8s envelope is `_edgenode-conductor.template.yaml`
+  (rung 2), where the storage image runs in embedded mode with every feature off — that pod IS the
+  envelope in disguise and the cheapest extraction path.
+- **Accounting shape:** not `compute_rea.rs`; the ledger is `economic_events.bounded_by` ↔
+  `mishpat_commitments.cid` with `substrate_signal`, which exists with no producer. Interval samples
+  stay Category-C in a separate table; breach events and daily composites are the heads.
+- **Sequencing changed:** S0 is the envelope as its own launchable unit on the household mesh
+  (`hc-mesh.sh` direct mode → `tevah run`), NOT a witness grown inside `process_manager` — the only
+  pipe-owning supervisor ships in one alpha container behind a frozen image tag, so growing it there
+  ships the witness only where `kubectl logs --previous` already exists. Alpha confirms by shipping
+  tevah inside the storage image with a deliberate conductor roll.
+- **Done-when corrected:** `GET /epr/{pod-cid}` resolves by `Content.id` = the atom CID; the habit is
+  `runtime-death-witnessed` (born unwired in `elohim/elohim-storage/.epr-meta/`) with the envelope's
+  own habit born in `elohim/tevah/.epr-meta/` when the crate exists; the scenario lives in
+  `features/resilience/death-witness.feature`, not `features/recovery/`.
+
+Status: envisioned → **refined** (the timeline vocabulary has no "designed"; refined = a sealed spec exists and the atom is its provenance).
