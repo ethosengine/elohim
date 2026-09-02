@@ -165,23 +165,113 @@ fn envelope_kind_tag(metadata_json: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Decide the prior-RELEASE lineage evidence from what the head's declaration
-/// supersedes.
+/// The pieces of a resolved content-version record that lineage needs — the
+/// envelope `kind` tag ([`envelope_kind_tag`]) and the record's own `id`.
+/// Reading the superseded record only ever needed the kind; reading a
+/// declared parent ALSO needs the id, because "the declared parent exists as
+/// a release on THIS channel" checks the record's own channel id, not merely
+/// "is it a release somewhere" — see [`AdoptionController::resolve_record_summary`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RecordSummary {
+    kind: Option<String>,
+    id: String,
+}
+
+/// The two-phase lineage-evidence decision [`lineage_evidence_from`] returns.
+///
+/// `Evidence` is a settled answer — no further conductor call is needed.
+/// `NeedDeclaredLookup` means the chain is a STAR (the superseded record is
+/// not itself a release) and the manifest declares a parent: evidence cannot
+/// be settled without reading that declared cid's own record, so the caller
+/// reads it (the same way it read the superseded record) and calls
+/// [`lineage_evidence_from`] again with the result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LineageDecision {
+    /// The lineage evidence, settled.
+    Evidence(Option<String>),
+    /// Settling requires reading the declared parent through the conductor.
+    NeedDeclaredLookup,
+}
+
+/// Decide the prior-RELEASE lineage evidence from what the head's
+/// declaration supersedes, in at most two calls.
 ///
 /// `superseded` is `None` when the head supersedes nothing at all (the head
 /// IS the channel root). `Some((cid, kind))` pairs the superseded record's
 /// action-hash cid with its envelope `kind` tag ([`envelope_kind_tag`]).
+/// `declared` is the manifest's own `envelope.lineageParentCid`.
+/// `declared_summary` is `None` on the first call (nothing read yet) and
+/// `Some((kind, id))` on the second, once the caller has resolved `declared`
+/// the same way it resolved `superseded`.
 ///
-/// Only a superseded record whose kind is [`RELEASE_MANIFEST_KIND`] is a
-/// prior release — a channel ROOT supersedes nothing releases-wise even
-/// though the head's declaration structurally supersedes the root's create
-/// action. This is the fix for the first-release defect: a fresh channel's
-/// first release has `head.supersedes = Some(<root action hash>)`, and
-/// without this filter that root cid was reported as a prior release no
-/// manifest could ever agree with.
-fn prior_release_from(superseded: Option<(String, Option<&str>)>) -> Option<String> {
-    let (cid, kind) = superseded?;
-    (kind == Some(RELEASE_MANIFEST_KIND)).then_some(cid)
+/// T2's `update_content` targets the channel's first `IdToContent` link (the
+/// root) for **every** version, first release or fifth — the L2 chain is a
+/// STAR around the root, never release→release. So a superseded record whose
+/// kind is [`RELEASE_MANIFEST_KIND`] is the one case the chain itself proves
+/// order for:
+///
+/// - **(a)** the chain carries a release → `Evidence(Some(that cid))`,
+///   regardless of what the body declares — the chain outranks the hint.
+///
+/// Every other shape (the root, or an ordinary content version) is a star,
+/// and the chain alone settles nothing about release order:
+///
+/// - **(b)** star, no declared parent → a first release: `Evidence(None)`.
+/// - star, a declared parent → the strongest check the substrate offers is
+///   EXISTENCE: does the declared cid resolve to a `release-manifest` whose
+///   own `id` is THIS channel? That needs a second conductor read, so the
+///   first call returns [`LineageDecision::NeedDeclaredLookup`]; once the
+///   caller supplies `declared_summary`:
+///   - **(c)** a release on this channel → `Evidence(Some(declared cid))`.
+///   - **(d)** a release on ANOTHER channel → `Evidence(None)`.
+///   - **(e)** not a release at all → `Evidence(None)`.
+///
+/// Never guesses: a read that cannot be performed (Absent/Unreachable) is the
+/// caller's job to propagate honestly, never folded into this function as
+/// either agreement or disagreement.
+/// Borrow a resolved `(cid, kind)` pair for [`lineage_evidence_from`] without
+/// consuming it — the pair is read twice when a declared-parent lookup is
+/// needed (once to learn that, once to settle after the lookup).
+fn superseded_as_ref(pair: &Option<(String, Option<String>)>) -> Option<(String, Option<&str>)> {
+    pair.as_ref()
+        .map(|(cid, kind)| (cid.clone(), kind.as_deref()))
+}
+
+fn lineage_evidence_from(
+    superseded: Option<(String, Option<&str>)>,
+    declared: Option<&str>,
+    declared_summary: Option<(Option<&str>, Option<&str>)>,
+    channel_id: &str,
+) -> LineageDecision {
+    // (a) The L2 chain itself names a prior RELEASE — order is proven by the
+    // chain, and what the body declares plays no part in this arm.
+    if let Some((cid, kind)) = &superseded {
+        if *kind == Some(RELEASE_MANIFEST_KIND) {
+            return LineageDecision::Evidence(Some(cid.clone()));
+        }
+    }
+    // The chain is a STAR from here on: `superseded` is `None` (the head IS
+    // the channel root) or names a record that is not itself a release.
+    // Neither carries release order, so the declared parent's EXISTENCE as a
+    // release on THIS channel is the strongest check available.
+    let Some(declared_cid) = declared else {
+        // (b) no declared parent on a star chain — a first release.
+        return LineageDecision::Evidence(None);
+    };
+    let Some((kind, id)) = declared_summary else {
+        // Settling this needs the declared cid's own record — ask the caller
+        // to read it before calling again.
+        return LineageDecision::NeedDeclaredLookup;
+    };
+    if kind == Some(RELEASE_MANIFEST_KIND) && id == Some(channel_id) {
+        // (c) the declared parent EXISTS as a release on this channel.
+        LineageDecision::Evidence(Some(declared_cid.to_string()))
+    } else {
+        // (d) a release, but on ANOTHER channel — or (e) not a release at
+        // all. Either way the declared parent does not check out;
+        // `verify_lineage` is what turns this into `lineage_parent_mismatch`.
+        LineageDecision::Evidence(None)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -496,17 +586,21 @@ impl AdoptionController {
         }
     }
 
-    /// Resolve the envelope `kind` tag of ONE specific content version
-    /// (`action_hash_b64`) through THIS node's conductor — the same
-    /// `content_store`/`HcClient` path [`Self::resolve_head`] uses, aimed at a
-    /// historical action instead of the live head.
+    /// Resolve the [`RecordSummary`] (envelope `kind` tag + record `id`) of
+    /// ONE specific content version (`action_hash_b64`) through THIS node's
+    /// conductor — the same `content_store`/`HcClient` path
+    /// [`Self::resolve_head`] uses, aimed at a historical action instead of
+    /// the live head.
     ///
-    /// This is the read the lineage fix needs: `head.supersedes` names an
-    /// ACTION, not necessarily a RELEASE — on a fresh channel's first release
-    /// it names the channel root. Deciding "is a prior release" requires
-    /// looking at what that action actually carries, never guessing from the
-    /// action hash alone.
-    async fn resolve_superseded_kind(&self, action_hash_b64: &str) -> Answer<Option<String>> {
+    /// This is the read the lineage star-chain fix needs, at BOTH call sites:
+    /// `head.supersedes` names an ACTION, not necessarily a RELEASE — every
+    /// non-first `update_content` on a channel targets the channel ROOT, so
+    /// the L2 chain is a star, never release→release — and the manifest's
+    /// declared parent is just as much an unverified cid until read the same
+    /// way. Deciding either "is a prior release" or "does the declared parent
+    /// exist as a release on this channel" requires looking at what that
+    /// action actually carries, never guessing from the action hash alone.
+    async fn resolve_record_summary(&self, action_hash_b64: &str) -> Answer<RecordSummary> {
         let Some(hc) = self.hc.as_ref() else {
             return Answer::Unreachable;
         };
@@ -541,8 +635,7 @@ impl AdoptionController {
                 tracing::debug!(
                     action_hash = %action_hash_b64,
                     error = %e,
-                    "release-adoption: superseded-version resolve failed — unreachable, never \
-                     absence"
+                    "release-adoption: record resolve failed — unreachable, never absence"
                 );
                 return Answer::Unreachable;
             }
@@ -550,16 +643,17 @@ impl AdoptionController {
         match rmp_serde::from_slice::<Option<lamad_types::ContentOutput>>(&bytes) {
             // The conductor answered and holds no record for this action —
             // honest absence (gossip-missing), not a verdict about lineage.
-            // A retrieved record with no `kind` tag at all (`Present(None)`)
-            // is equally honest: it is simply not a release.
-            Ok(out) => {
-                Answer::observed_absence(out.map(|o| envelope_kind_tag(&o.content.metadata_json)))
-            }
+            // A retrieved record with no `kind` tag at all is equally
+            // honest: it is simply not a release.
+            Ok(out) => Answer::observed_absence(out.map(|o| RecordSummary {
+                kind: envelope_kind_tag(&o.content.metadata_json),
+                id: o.content.id,
+            })),
             Err(e) => {
                 tracing::warn!(
                     action_hash = %action_hash_b64,
                     error = %e,
-                    "release-adoption: could not decode ContentOutput for the superseded version"
+                    "release-adoption: could not decode ContentOutput for the resolved record"
                 );
                 Answer::Unreachable
             }
@@ -817,20 +911,73 @@ impl AdoptionController {
         let installed = self.installed_reality(now).await;
 
         // The head's `supersedes` names an ACTION, not necessarily a RELEASE:
-        // on a fresh channel's first release it names the channel root. Read
-        // what that action actually carries before reporting it as prior
-        // lineage — the fix for the first-release defect (a root mistaken for
-        // a prior release refused every first publish on every channel).
-        let lineage = match head.supersedes.as_ref() {
-            None => Answer::Present(LineageEvidence { supersedes: None }),
+        // on a fresh channel's first release — and on EVERY non-first release,
+        // since `update_content` always targets the channel root — it names
+        // the channel root, never a prior release. Read what that action
+        // actually carries before reporting it as prior lineage (the fix for
+        // the first-release defect), and when it does NOT carry a prior
+        // release, fall back to checking the manifest's declared parent for
+        // EXISTENCE as a release on this channel — the strongest check a star
+        // chain leaves available ([`lineage_evidence_from`]).
+        let superseded: Answer<Option<(String, Option<String>)>> = match head.supersedes.as_ref() {
+            None => Answer::Present(None),
             Some(superseded_action_hash) => {
                 let superseded_cid = superseded_action_hash.0.clone();
-                match self.resolve_superseded_kind(&superseded_cid).await {
-                    Answer::Present(kind) => Answer::Present(LineageEvidence {
-                        supersedes: prior_release_from(Some((superseded_cid, kind.as_deref()))),
-                    }),
+                match self.resolve_record_summary(&superseded_cid).await {
+                    Answer::Present(summary) => {
+                        Answer::Present(Some((superseded_cid, summary.kind)))
+                    }
                     Answer::Absent => Answer::Absent,
                     Answer::Unreachable => Answer::Unreachable,
+                }
+            }
+        };
+
+        let declared_parent = manifest.envelope.lineage_parent_cid.as_deref();
+
+        let lineage = match superseded {
+            Answer::Absent => Answer::Absent,
+            Answer::Unreachable => Answer::Unreachable,
+            Answer::Present(superseded_pair) => {
+                match lineage_evidence_from(
+                    superseded_as_ref(&superseded_pair),
+                    declared_parent,
+                    None,
+                    &channel.channel_id,
+                ) {
+                    LineageDecision::Evidence(supersedes) => {
+                        Answer::Present(LineageEvidence { supersedes })
+                    }
+                    LineageDecision::NeedDeclaredLookup => {
+                        // Only reachable when `declared_parent` is `Some` —
+                        // `lineage_evidence_from` returns `Evidence(None)`
+                        // for a `None` declared parent instead.
+                        let declared_cid = declared_parent.expect(
+                            "NeedDeclaredLookup is returned only when a parent is declared",
+                        );
+                        match self.resolve_record_summary(declared_cid).await {
+                            Answer::Present(summary) => {
+                                let declared_summary =
+                                    Some((summary.kind.as_deref(), Some(summary.id.as_str())));
+                                match lineage_evidence_from(
+                                    superseded_as_ref(&superseded_pair),
+                                    declared_parent,
+                                    declared_summary,
+                                    &channel.channel_id,
+                                ) {
+                                    LineageDecision::Evidence(supersedes) => {
+                                        Answer::Present(LineageEvidence { supersedes })
+                                    }
+                                    LineageDecision::NeedDeclaredLookup => unreachable!(
+                                        "declared_summary is populated on this call; \
+                                         lineage_evidence_from must settle"
+                                    ),
+                                }
+                            }
+                            Answer::Absent => Answer::Absent,
+                            Answer::Unreachable => Answer::Unreachable,
+                        }
+                    }
                 }
             }
         };
@@ -1298,35 +1445,107 @@ mod tests {
         );
     }
 
-    /// The first-release defect, isolated to the pure decision: a channel
-    /// ROOT is never a prior release, no matter that the head's declaration
-    /// structurally supersedes its create action.
+    /// **The star-chain lineage table.** Every case from the design, in the
+    /// order they're numbered there:
+    /// (a) chain carries a release → `Some(that cid)` regardless of
+    ///     declared; (b) star + declared `None` → `None`; (c) star +
+    ///     declared `Some`, lookup = release on this channel →
+    ///     `Some(declared)`; (d) star + declared `Some`, lookup = release on
+    ///     ANOTHER channel → `None`; (e) star + declared `Some`, lookup =
+    ///     non-release → `None`. Plus the two `NeedDeclaredLookup` cases,
+    ///     proving the loop asks for a lookup exactly when — and only when —
+    ///     one is actually needed.
     #[test]
-    fn a_superseded_channel_root_yields_no_prior_release() {
-        assert_eq!(
-            prior_release_from(Some(("uhCkkROOT".to_string(), Some("release-channel")))),
-            None
-        );
-    }
+    fn lineage_evidence_from_settles_every_star_chain_case() {
+        const CHANNEL: &str = "runtime:coordinators:elohim:receipt";
 
-    /// A superseded record that IS a release is reported as the prior
-    /// release, by its own cid.
-    #[test]
-    fn a_superseded_release_manifest_yields_that_prior_release_cid() {
+        // (a) The chain carries a release — the declared hint plays no part,
+        // proven by disagreeing with it here.
         assert_eq!(
-            prior_release_from(Some((
-                "uhCkkPRIOR".to_string(),
-                Some(RELEASE_MANIFEST_KIND)
-            ))),
-            Some("uhCkkPRIOR".to_string())
+            lineage_evidence_from(
+                Some(("uhCkkPRIOR".to_string(), Some(RELEASE_MANIFEST_KIND))),
+                Some("uhCkkSomethingElseEntirely"),
+                None,
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(Some("uhCkkPRIOR".to_string())),
         );
-    }
+        // Also true with no declared hint at all.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkPRIOR".to_string(), Some(RELEASE_MANIFEST_KIND))),
+                None,
+                None,
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(Some("uhCkkPRIOR".to_string())),
+        );
 
-    /// The head supersedes nothing at all (it IS the channel root) — the
-    /// honest floor, and not merely the root-kind case above.
-    #[test]
-    fn nothing_superseded_yields_no_prior_release() {
-        assert_eq!(prior_release_from(None), None);
+        // (b) A star chain (the channel root) with no declared parent — a
+        // first release, settled without any lookup.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkROOT".to_string(), Some("release-channel"))),
+                None,
+                None,
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(None),
+        );
+        // The `superseded: None` shape (the head IS the root) is the same
+        // star, not a distinct case.
+        assert_eq!(
+            lineage_evidence_from(None, None, None, CHANNEL),
+            LineageDecision::Evidence(None),
+        );
+
+        // A star chain WITH a declared parent cannot be settled on the first
+        // call — the lookup has not happened yet.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkROOT".to_string(), Some("release-channel"))),
+                Some("uhCkkDeclaredParent"),
+                None,
+                CHANNEL,
+            ),
+            LineageDecision::NeedDeclaredLookup,
+        );
+
+        // (c) The declared parent EXISTS as a release on this channel.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkROOT".to_string(), Some("release-channel"))),
+                Some("uhCkkDeclaredParent"),
+                Some((Some(RELEASE_MANIFEST_KIND), Some(CHANNEL))),
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(Some("uhCkkDeclaredParent".to_string())),
+        );
+
+        // (d) A release, but on ANOTHER channel — does not check out.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkROOT".to_string(), Some("release-channel"))),
+                Some("uhCkkDeclaredParent"),
+                Some((
+                    Some(RELEASE_MANIFEST_KIND),
+                    Some("runtime:coordinators:elohim:other")
+                )),
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(None),
+        );
+
+        // (e) Not a release at all — does not check out.
+        assert_eq!(
+            lineage_evidence_from(
+                Some(("uhCkkROOT".to_string(), Some("release-channel"))),
+                Some("uhCkkDeclaredParent"),
+                Some((Some("release-channel"), Some(CHANNEL))),
+                CHANNEL,
+            ),
+            LineageDecision::Evidence(None),
+        );
     }
 
     #[test]

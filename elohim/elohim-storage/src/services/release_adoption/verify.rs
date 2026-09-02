@@ -134,11 +134,15 @@ impl InstalledReality {
 /// The channel's L2 version chain, as far as the resolve could see it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LineageEvidence {
-    /// The cid of the prior RELEASE on this channel, from the L2 chain — not
-    /// the manifest's self-report. `None` for a channel's first release: the
-    /// head's declaration may still structurally supersede an EARLIER action
-    /// (the channel root, or an ordinary content version), but the root is
-    /// not itself a release, so it is never reported here as one.
+    /// The prior RELEASE the chain proves — never the manifest's own
+    /// self-report. Proven by ORDER when the superseded record is itself a
+    /// release (release→release); proven by EXISTENCE on this channel when
+    /// it is not (a star chain around the channel root, which is what
+    /// `update_content` targets for every non-first version). `None` for a
+    /// channel's first release: the head's declaration may still
+    /// structurally supersede an EARLIER action (the channel root, or an
+    /// ordinary content version), but that action is not itself a release,
+    /// so it is never reported here as one.
     pub supersedes: Option<String>,
 }
 
@@ -537,7 +541,9 @@ pub fn verify_lineage(
             format!(
                 "envelope.lineageParentCid declares {declared:?} but the channel's release \
                  chain supersedes {actual:?} — the body field is a hint that MUST match the L2 \
-                 chain"
+                 chain; when the channel's version chain does not order releases (a star chain \
+                 around the root, which `update_content` targets for every non-first version), \
+                 the declared parent must exist as a release on this channel"
             ),
         ));
     }
