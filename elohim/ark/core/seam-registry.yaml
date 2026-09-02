@@ -1,0 +1,206 @@
+# elohim/ark/core/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. FIRST row-bearing
+# registry for this crate, created under the birth rule stated by the seam-contracts exemplar:
+# a genuinely new CROSS-CUTTING decision predicate minted here gets its own registry; a per-seam
+# instantiation of a shape defined elsewhere registers in the consuming crate instead.
+#
+# These three predicates are ark-core's first decision surface: readiness classification,
+# same-cause normalization, and the restart governor's authority-bearing verdict. Every symbol and
+# cited test below was grepped and read at authoring time (2026-09-02).
+
+seamRegistryVersion: 1
+crate: elohim-ark-core
+crateRoot: elohim/ark/core
+seamLocus: >
+  The pure runtime-envelope decision surface in ark-core: classifying readiness polling outcomes,
+  normalizing repeated child-death causes, and governing whether a dead child restarts, stops, or
+  gives up under manifest or commitment authority. The crate owns policy and typed outcomes only;
+  process I/O, persistence, witness custody, and peer advertisement live in consuming seams.
+
+decisionPoints:
+  - name: classify_readiness_outcome
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/exit.rs
+      modulePath: ark_core::exit::classify_readiness_outcome
+      line: 21
+    summary: >
+      Chooses ChildExited, Retry, or GiveUp for one readiness poll, with observed child death taking
+      precedence over the remaining attempt budget.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          The table test pins every legal move this predicate exposes: a live child retries while
+          budget remains, a live child gives up at the boundary, and a dead child stops immediately
+          even on the first attempt. There is no undecided or unbounded branch.
+      - id: C4
+        status: answered
+        justification: >
+          Observed absence is represented honestly as ChildExited and can never be mislabeled Retry
+          or GiveUp merely because an attempt budget remains; the test pins that precedence at the
+          beginning, middle, and end of the budget.
+      - id: C6a
+        status: answered
+        justification: >
+          Readiness polling has an explicit max_retries bound, and the table test pins Retry below
+          that bound, GiveUp exactly at it, and immediate termination of polling after child death.
+      - id: C7
+        status: partial
+        justification: >
+          This predicate supplies the typed readiness answer that a consumer can use to gate an
+          inventory offer, and its unit test pins the classification. It does not advertise or
+          serve anything itself, so no cited test proves the downstream advertise/serve symmetry.
+    contractTests:
+      - path: elohim/ark/core/src/exit.rs
+        testName: readiness_outcome_prefers_child_death_over_attempt_budget
+        kind: unit
+
+  - name: same_cause_key
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/tally.rs
+      modulePath: ark_core::tally::same_cause_key
+      line: 77
+    summary: >
+      Builds the stable class, first-stderr-line, and fast-death key used to coalesce consecutive
+      child deaths before the restart governor applies its same-cause ceiling.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          The tally test proves independently observed OOM deaths coalesce to one oom-prefixed key,
+          and the governor test proves three identical fast-death keys trip the declared
+          same_cause_limit and produce GiveUp instead of another restart.
+      - id: C8
+        status: partial
+        justification: >
+          The key is carried into GiveUpReason::SameCause and the governor test pins that observable
+          path, but the expected key in that test is computed by this same helper and the tally test
+          pins only the oom prefix. No independent literal vocabulary or ReasonLabel conformance test
+          yet proves stability for every key component.
+    contractTests:
+      - path: elohim/ark/core/src/tally.rs
+        testName: oom_killed_deaths_share_the_same_cause_key
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/ark/core/src/verdict.rs
+        testName: three_identical_fast_deaths_give_up_by_same_cause
+        kind: unit
+        mirrorRisk: true
+
+  - name: verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/verdict.rs
+      modulePath: ark_core::verdict::RestartGovernor::verdict
+      line: 133
+    summary: >
+      Applies restart authorization, same-cause and intensity gates, clean-exit policy, and capped
+      backoff to return a typed Restart, Stop, or GiveUp verdict plus any matching refusal.
+    concernIds:
+      - id: C0
+        status: partial
+        justification: >
+          The decision is correctly located in the runtime envelope's pure core and names no head,
+          reach, or custody operation. The cited unit tests exercise only this runtime plane; they do
+          not prove the planned bridge through storage to the p2p truth and projection planes.
+      - id: C1
+        status: partial
+        justification: >
+          The predicate has no head candidate, author identity, or election input and therefore adds
+          no self-election path. The tests pin restart policy only, not the envelope's obligation to
+          obey the channel's external head election.
+      - id: C2
+        status: partial
+        justification: >
+          GiveUp is a typed terminal verdict and the tests pin the policy and limit transitions into
+          it, including Operator and Commitment owners. The named re-arm transition and the complete
+          authority order described by the design are outside this predicate and are not tested here.
+      - id: C3
+        status: answered
+        justification: >
+          The tests pin a legal outcome across the governor's operative branches: immediate restart,
+          capped delayed restart, clean stop, policy give-up, same-cause give-up, and intensity
+          give-up. Every path returns synchronously with no undecided state.
+      - id: C4
+        status: partial
+        justification: >
+          Stop and GiveUp honestly state that no restart will occur, and each tested refusal carries
+          a typed reason. The Lost record, custodian gap, and witness-spool absence required by the
+          whole-envelope design are not inputs or outputs of this predicate.
+      - id: C5
+        status: partial
+        justification: >
+          The governor preserves the supplied authority distinction in its refusal, but it receives
+          RestartGrant as already-established evidence and cannot re-derive or verify a commitment
+          CID. Evidence verification remains a consuming-seam obligation.
+      - id: C6a
+        status: answered
+        justification: >
+          Exact tests pin both work ceilings and the delay ceiling: the same-cause limit gives up at
+          three, an over-budget intensity window gives up with its count, and exponential backoff
+          saturates at max_s rather than growing without bound.
+      - id: C6b
+        status: partial
+        justification: >
+          The verdict function is pure over immutable request, grant, and context values, so repeated
+          evaluation cannot itself duplicate an effect. No cited governor test exercises recover()
+          or proves restart idempotence across a persisted supervisor transition.
+      - id: C8
+        status: answered
+        justification: >
+          The governor tests pin the decision record at each refusal boundary: typed GiveUpReason,
+          exact RefusalCode, same-cause or intensity counts, and the Operator versus Commitment
+          LimitOwner. Successful Restart and Stop outcomes are pinned as typed verdicts as well.
+      - id: C11
+        status: answered
+        justification: >
+          Backpressure is explicit in the decision: restart delay doubles and caps, while intensity
+          and same-cause excess stop further restart work. The governor tests pin all three controls
+          against literal delays, counts, and refusal codes.
+      - id: C12
+        status: partial
+        justification: >
+          A commitment-bounded grant can refuse a restart and the tests prove that its refusal names
+          LimitOwner::Commitment, while Temporary policy acts as a tested pause. Counter-signature,
+          self-grant scoping, guest consent, and the update lock are not enforced by this predicate.
+      - id: C13
+        status: partial
+        justification: >
+          Refusals preserve a tested authority distinction between Operator manifest policy and a
+          Commitment. The design's full SelfLimit, Commitment, Operator, and Faith graduation is not
+          represented by BoundedBy or covered by these tests.
+      - id: C14
+        status: partial
+        justification: >
+          Same-cause and intensity GiveUp verdicts retain the causal key, count, and window, and the
+          tests pin those residual values. The incident root, restart count across recovery, and
+          custodian receipts required by the design are written outside this pure predicate.
+    contractTests:
+      - path: elohim/ark/core/src/verdict.rs
+        testName: three_identical_fast_deaths_give_up_by_same_cause
+        kind: unit
+        mirrorRisk: true
+      - path: elohim/ark/core/src/verdict.rs
+        testName: intensity_excess_gives_up_with_exact_refusal
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: backoff_doubles_and_caps
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: transient_clean_exit_stops_without_restart
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: temporary_never_restarts
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: commitment_bounded_refusal_names_commitment_owner
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: transient_clean_exit_still_obeys_commitment_same_cause_gate
+        kind: unit
+      - path: elohim/ark/core/src/verdict.rs
+        testName: single_death_tally_restarts_immediately
+        kind: unit
