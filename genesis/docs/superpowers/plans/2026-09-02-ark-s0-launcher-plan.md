@@ -572,6 +572,35 @@ pub trait WitnessSink {
 - [ ] **Step 2–4:** compile-fail → implement → PASS + clippy.
 - [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): DeathWitness/Incident/Passport/Intent records with content-derived CIDs; WitnessSink and Clock traits"`.
 
+
+### Task 5R: Task 5 + 4R review follow-ups (orchestrator-queued)
+
+**Executor:** Codex. **Reviewer:** Opus. Witness identity round-trip test, closed-incident wire shape, `MemorySink` two-write contract, `PASSPORT_KIND`, `pub use elohim_compute::{LimitOwner, Refusal}`, governor reasons from the producer (no `unreachable!`), `single_death_tally_restarts_immediately`. Files: `elohim/ark/core/src/{witness,sink,passport,verdict,lib}.rs`.
+
+### Task 5I: Inherit the substrate ontology (audit amendment, 2026-09-02)
+
+**Executor:** Opus (rust-architect). **Reviewer:** Codex. **Runs after Task 5R; before Task 6 and before Task 8 freezes on-disk formats.**
+
+**Why (operator direction, recorded in memory `feedback_inherit_substrate_ontology`):** Meadows, Beer, Ashby, and ValueFlows REA are already spoken by the substrate — `elohim-epr-rea` (VF `Intent`/`Commitment`/`FlowEvent`/`Process`, `Bound`/`Sense`/`LimitSource`, `Stock`/`Window`, `FlowStore`/`SidecarFlowStore`), `elohim-epr` (`AlgedonicEvidence`, `ReaVerb`, `Quantity`/`MeasureKind`), `elohim-compute` (`Governor`). The read-only audit (this session) classified every ark-core type; the verdicts below are binding. **No new `ReaVerb`, no new `EprKind`, no `REA_ACTIONS` member**: lifecycle actions ride the six existing verbs plus the substrate's two-slot `classified_as` convention (`["runtime:<action>", <process>]`).
+
+**Files:** `elohim/ark/core/Cargo.toml`, `elohim/ark/core/src/{lib,manifest,verdict,witness,intent,tally,sample}.rs`, **new** `elohim/ark/core/src/rea.rs`; substrate addition M1: `elohim/epr-rea/Cargo.toml` + `src/{lib,store,actor}.rs` (a `sidecar` cargo feature, default ON, gating `SidecarFlowStore`/`SidecarActorStore`; `epr-cli` keeps defaults; ark-core depends with `default-features = false`).
+
+**Verdict table (binding):** INHERIT — `RestartGovernor: elohim_compute::Governor` (done). SPECIALIZE (project, don't replace) — `Intent` → `epr_rea::model::Intent` via `as_rea_intent()` (verbs: Spawn/Restart→`Produce`, Stop/Kill→`Consume`, GiveUp→`Dismiss`; tag `runtime:<action>`); `DeathWitness` → `epr_rea::model::FlowEvent` via `as_flow_event()` (`Consume`, resource = witness CID, `Count{uptime_ms, "process-ms"}`, `fulfills:[self_contract]`, tag `runtime:death`); `Incident` → `epr_rea::model::Process` via `as_rea_process()` (deaths = inputs, restarts = outputs; `IncidentClose` rides as an output event tagged `runtime:incident-closed`); `Intensity` → `epr_rea::model::Bound{limit: max_deaths, unit: "deaths", sense: Ceiling, threshold_pct}` via `ChildPolicy::intensity_bound(threshold_pct)`; `DeathTally` → `Window` via `as_window()` (the tally stays the no-I/O hot-path projection); `GiveUpReason::{IntensityExceeded,SameCause}` → `AlgedonicEvidence::Breach{bound_ref: commitment cid}` via `as_algedonic()` — `Some` ONLY under `BoundedBy::Commitment` (honest absence under manifest policy); `ProcessSample::as_quantities()` → `Quantity{MeasureKind::Level}` at the boundary only (raw struct stays on the wire; `Confidence` cost); `ProcessSpec` → **renamed `ChildSpec`** (collides with `epr_rea::model::ProcessSpec`; serde key `processes` unchanged, manifest CID unmoved). KEEP (justified in doc comments) — `RuntimeManifest`, `ArtifactRef` (content digest ≠ `PinnedRef` id@version), `ChildPolicy`/`Backoff`/`Probe`/`Listen`, `ExitClass`, `RingBuffer`, `Passport`/`EffectiveTier`, `Clock`, `lifecycle`.
+
+- [ ] A0 — `ark-core` depends on `elohim-epr-rea` (`default-features = false` once M1 lands; zero new external crates); add `boundary::no_fs_in_pure_core` (grep `src/**` for `std::fs`, `File::`, `SidecarFlowStore`, `SidecarActorStore` → refuse); `no_runtime_or_io_deps` unchanged.
+- [ ] M1 — `epr-rea` `sidecar` feature (default on): `SidecarFlowStore`, `SidecarActorStore`, and their `std::fs` use behind `#[cfg(feature = "sidecar")]`; `epr-cli` unchanged; `cargo test -p elohim-epr-rea` green with and without the feature.
+- [ ] A1 — `ProcessSpec` → `ChildSpec` across ark-core; the plan's later Interfaces blocks read `ChildSpec`.
+- [ ] A2 — new `rea.rs`: `RUNTIME_TAG_*` consts (`runtime:spawn|restart|stop|kill|give-up|death|incident-closed`), `UNIT_PROCESS_MS`, `UNIT_DEATHS`, `RuntimeScope { scope: Cid, node: Option<AgentRef>, bounded_by: Option<Cid> }`, and the projection impls named in the verdict table, each with a test that the projection carries the tag, the verb, the scope, and (where applicable) the `fulfills` edge.
+- [ ] A3 — `RestartGrant` gains `bound: Option<epr_rea::model::Bound>` (derived from `ChildPolicy::intensity_bound` by the supervisor); `GiveUpReason::as_algedonic(&self, bound_ref: &str) -> Option<AlgedonicEvidence>`.
+- [ ] A4 — `DeathWitness` gains `#[serde(default, skip_serializing_if = "Option::is_none")] bounded_by: Option<String>` and `pain: Option<AlgedonicEvidence>` (additive discipline: S1 filling them must not re-address S0 witnesses; a test proves a witness with both `None` has the same CID before and after this change).
+- [ ] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core -p elohim-epr-rea` green; commit path-limited `git add elohim/ark/core elohim/epr-rea elohim/Cargo.lock` — `feat(ark-core): inherit the substrate ontology — VF intent/event/process projections, Bound on the self-contract, algedonic breach, ChildSpec; epr-rea sidecar feature`.
+
+**Task 8 amendment (A5):** `Spool { root, flows: epr_rea::store::SidecarFlowStore, scope: RuntimeScope }` opened at `<data_root>/ark` writing `<data_root>/ark/.eprfs/status/flows.jsonl`; `WitnessSink::intent` also appends `FlowRecord::Intent`, `witness` also `FlowRecord::Event`, `incident` also `FlowRecord::Process`. The supervisor crate is the ONLY construction site of `SidecarFlowStore`. The runtime's records are valueflow records by construction — the same mechanism `epr flow` reads.
+
+**Task 9 amendment (A6):** build `RuntimeScope` once from `berth.manifest` + `berth.node`; thread it into the sink; new assertion in `supervise_death.rs`: after the flapper's third death, `epr_rea::fold::resource_state` over `flows.jsonl` shows three `Consume` events in `process-ms`, and `FlowStore::open_pain()` is empty under `ManifestPolicy` (honest absence, not a zero).
+
+**Missing nodes minted for the substrate, not built in S0** (story-maintainer shape — chain / between / assertion / probe): M2 `runtime:` `classified_as` prefix registered beside the resource-classification vocabulary — between "REA vocabulary" and "runtime flows" — assertion: a lifecycle flow is fully expressible with the six verbs + tag — probe: `epr flow` folds ark's sidecar to a non-empty `resource_state` in `process-ms`. M3 compute `ResourceSpecification` units (`cpu-seconds`, `byte-seconds`, `bytes-egress`, `process-ms`) in `elohim/sdk/schemas/v1/` as app-manifest vocabulary (never `_dna`) — probe: schema-contract test. M4 `MeasureKind::Duration { per }` in `elohim/epr/src/measure.rs` (spec Q15) — probe: `divide` tests extended. M5 `custody-spool` arm in the mishpat coordinator's action match (spec §7) — probe: sweettest `create_commitment{action:"custody-spool"}` Ok.
+
 ---
 
 ### Task 6: `lifecycle.rs` — the pure state machine
@@ -606,7 +635,7 @@ Transition table (every row is a test): Idle+SpawnRequested → Spawning, [Recor
 **Files:** `elohim/ark/supervisor/src/{driver,native,reaper}.rs`, `elohim/ark/supervisor/tests/native_reap.rs`.
 
 **Interfaces:**
-- Consumes: `ProcessSpec`, `Berth`, `ArtifactRef`, `StdinSource`, `PassphraseSource`, `ExitClass`, `ProcessSample`.
+- Consumes: `ChildSpec` (né `ProcessSpec`, Task 5I), `Berth`, `ArtifactRef`, `StdinSource`, `PassphraseSource`, `ExitClass`, `ProcessSample`.
 - Produces:
 
 ```rust
@@ -614,7 +643,7 @@ pub struct Fingerprint { pub hostname: String, pub kernel: String, pub cgroup_v2
 pub struct Started { pub pid: u32, pub stdout: std::process::ChildStdout, pub stderr: std::process::ChildStderr, pub artifact_sha256: String, pub artifact_path: PathBuf, pub started_at_epoch_ms: u64 }
 pub trait Driver {
     fn fingerprint(&self) -> Fingerprint;
-    fn start(&self, spec: &ProcessSpec, berth: &Berth) -> Result<Started, DriverError>;
+    fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError>;
     fn signal(&self, pid: u32, signal: i32) -> Result<(), DriverError>;
     fn stats(&self, pid: u32) -> Option<ProcessSample>;           // /proc/<pid>/{status,io,fd}
 }
@@ -659,7 +688,7 @@ fn sigkilled_child_is_witnessed_as_signaled_9_with_rusage() {
 #[test] fn channel_artifact_is_refused_in_s0_by_name() { /* Err(DriverError::ChannelUnresolvedInS0{channel_id}) */ }
 ```
 
-(`ProcessSpec: Default` and `Berth: Default` are added in this task if Task 3 did not derive them.)
+(`ChildSpec: Default` and `Berth: Default` exist since Tasks 3/5I.)
 
 - [ ] **Step 2: Run** → compile failure. **Step 3: Implement** with `nix::sys::wait::waitid(Id::Pid, WEXITED|WNOWAIT|WNOHANG)`, `nix::sys::signal::kill`, `libc::wait4`, `libc::prctl`. **Step 4: Run** → PASS; clippy clean (`unsafe` blocks carry a `// SAFETY:` line each).
 - [ ] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): Native driver (std::process, env scrub, passport-grade artifact hash) and the reaper — waitid(WNOWAIT) then wait4 rusage; subreaper"`.
