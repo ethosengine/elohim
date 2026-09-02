@@ -45,17 +45,26 @@
  * variant release (station 7) and is never expected to converge with commons
  * at all; nobody promotes it and nobody forces james off it.
  *
- * ## Fresh channel per run
+ * ## Fresh channel per run — and the run OWNS the follow set
  *
  * `CHANNEL_ID` (and `PERSONAL_CHANNEL_ID`) are minted once at module load
  * from a run stamp (`A2O_RELEASE_RUN_STAMP` env override, else the process
  * start time) so a repeat run never collides with a channel a prior run left
- * mid-backoff-ladder, and so this run's own writes to
- * `ELOHIM_RELEASE_CHANNELS` never disturb whatever OTHER channel(s) a
- * concurrent shift/session has that peer following — `withChannelMode` below
- * only ever touches the entry for the channel id it was asked to set,
- * appending/replacing it in the comma-separated list and leaving every other
- * entry (including james's personal-channel entry) byte-identical.
+ * mid-backoff-ladder.
+ *
+ * A 2026-09-01 05:0xZ run measured that fresh-channel-ids alone are not
+ * enough: Station 6 (revert) refused `coordinator_lineage_mismatch` because
+ * a LEFTOVER channel line from an EARLIER ceremony was still on matthew's
+ * disk, competing with this run's own channel in the controller's follow
+ * set — a hazard the previous read-merge-write helper (`withChannelMode`)
+ * could not close, because it deliberately preserved every pre-existing
+ * entry. The fix: this run keeps its OWN in-memory channel->mode map per
+ * peer (`runOwnedChannels`, in the "runtime-config.toml follow/mode
+ * switching" section below) and every write derives the file's entire
+ * content from that map alone — never a merge with whatever an earlier
+ * ceremony left on disk. The true pre-run bytes are captured once and
+ * restored byte-for-byte in `AfterAll`, so a leftover from THIS run can
+ * never become the next run's hazard either.
  *
  * ## Cross-scenario state
  *
@@ -82,11 +91,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { Given, When, Then, Before, AfterAll } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
+
+import { mintCoordinatorCandidate } from './coordinator-candidate.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -100,19 +111,18 @@ const A2O_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /** genesis/a2o/steps/delivery -> repo root (4 levels up). */
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
-/** The r2 receipt's marker-only coordinator rebuild (integrity bytes == installed). */
-const CANDIDATE_HAPP = fileURLToPath(
-  new URL('../../reports/release-ceremony/2026-09-01/elohim-P.happ', import.meta.url)
-);
-
 /**
  * Station 6's revert target: the DNA workdir bundle — pre-fix bytes distinct
- * from `CANDIDATE_HAPP`, already on disk, never written by this ceremony
- * (coordinator hot-swap patches a running conductor; it never touches this
- * file). Same role the r2 receipt's "N" bundle played
- * (`elohim/holochain/local-dev/…` was that receipt's "O" — a THIRD distinct
- * bundle used there for an unrelated already-installed check; this file only
- * needs ONE bundle that differs from the fix).
+ * from this run's freshly-minted candidate (see `candidateHapp` below),
+ * already on disk, never written by this ceremony (coordinator hot-swap
+ * patches a running conductor; it never touches this file). Same role the
+ * r2 receipt's "N" bundle played (`elohim/holochain/local-dev/…` was that
+ * receipt's "O" — a THIRD distinct bundle used there for an unrelated
+ * already-installed check; this file only needs ONE bundle that differs
+ * from the fix). It also doubles as `candidateHapp`'s own source of
+ * currently-installed integrity+coordinator bytes — see
+ * `coordinator-candidate.ts`'s module doc for why that beats reading the
+ * cargo target dir directly.
  */
 const BASELINE_HAPP = path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
 
@@ -134,6 +144,20 @@ const PERSONAL_MANIFEST_PATH = path.join(
   REPORT_DIR,
   `a2o-runtime-upgrade-${RUN_STAMP}-personal.json`
 );
+
+/**
+ * This run's freshly-minted coordinator-only candidate — replaces the
+ * PREVIOUS fixed-bundle fixture (`reports/release-ceremony/2026-09-01/elohim-P.happ`),
+ * which was whatever the household had already converged on by the time a
+ * later run started, making Station 3's apply `already_current` (no
+ * observable coordinator effect) and cascading `threshold_unmet` refusals
+ * through Stations 6-8. Minted once per process and reused by every station
+ * (commons channel AND james's personal channel both publish this same
+ * candidate — see `coordinator-candidate.ts`).
+ */
+function candidateHapp(): string {
+  return mintCoordinatorCandidate(BASELINE_HAPP, REPORT_DIR, RUN_STAMP, CHANNEL_ID).happPath;
+}
 
 const SOAK_SECS = 30;
 const ATTESTATION_THRESHOLD = 1;
@@ -444,6 +468,29 @@ async function putBlobRaw(baseUrl: string, sha256: string, bytes: Buffer): Promi
 
 // ---------------------------------------------------------------------------
 // runtime-config.toml follow/mode switching (rung-4: no restart)
+//
+// ## The run OWNS the follow set — measured hazard, 2026-09-01 05:0xZ run
+//
+// Stations 1-5 passed with the per-run candidate; Station 6 (revert) refused
+// `coordinator_lineage_mismatch` because a LEFTOVER channel line from an
+// EARLIER ceremony (`receipt-20260901-r2=apply`) was still present in
+// matthew's on-disk `runtime-config.toml`, competing with this run's own
+// channel in the controller's follow set. Live inspection of the household
+// mesh on 2026-09-02 confirmed the shape of the hazard beyond that one line:
+// every peer's file had accreted FOUR to SIX comma-joined entries from
+// earlier a2o runs and manual ceremonies, all still `=observe` today only
+// because an operator hand-flipped them after the fact — hygiene this run
+// must never depend on.
+//
+// The fix: for the run's own channel(s), this file never reads the
+// pre-existing `ELOHIM_RELEASE_CHANNELS` value and merges into it. It keeps
+// an in-memory map of channel -> mode PER PEER (`runOwnedChannels`) and
+// every write derives the file's entire content from that map alone —
+// `applyRunOwnedChannels` is the ONE helper every follow/mode-switch in this
+// file goes through; nothing else ever touches the file. The true
+// pre-existing bytes are captured once (`ensureRunOwnedFollowSet`, driven by
+// the `Before` hook below) and restored byte-for-byte in the `AfterAll`
+// below — a leftover from THIS run can never become the next run's hazard.
 // ---------------------------------------------------------------------------
 
 function runtimeConfigPath(peer: PeerName): string {
@@ -461,71 +508,245 @@ function readChannelsValue(peer: PeerName): string {
   return match ? match[1] : '';
 }
 
-/** Replace (or append) only OUR channel's entry — every other entry is left untouched. */
-function withChannelMode(existingValue: string, mode: string): string {
-  const entries = existingValue
-    .split(/[,;\n]/)
-    .map(entry => entry.trim())
-    .filter(Boolean)
-    .filter(entry => entry.split('=')[0].trim() !== CHANNEL_ID);
-  entries.push(`${CHANNEL_ID}=${mode}`);
-  return entries.join(',');
-}
-
-const RELEASE_CHANNELS_LINE_RE = /ELOHIM_RELEASE_CHANNELS\s*=.*/m;
-
-/** Replace the key's line in place, or append it (with a separating newline if needed). */
-function withChannelsLine(content: string, line: string): string {
-  if (RELEASE_CHANNELS_LINE_RE.test(content)) {
-    return content.replace(RELEASE_CHANNELS_LINE_RE, line);
-  }
-  const needsSeparator = content.length > 0 && !content.endsWith('\n');
-  const separator = needsSeparator ? '\n' : '';
-  return `${content}${separator}${line}\n`;
-}
-
-function writeChannelsValue(peer: PeerName, value: string): void {
-  const filePath = runtimeConfigPath(peer);
-  let content = '';
-  try {
-    content = readFileSync(filePath, 'utf8');
-  } catch {
-    content = '';
-  }
-  const line = `ELOHIM_RELEASE_CHANNELS = "${value}"`;
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, withChannelsLine(content, line), 'utf8');
-}
-
 /**
- * The full `ELOHIM_RELEASE_CHANNELS` value a peer should carry for
- * `CHANNEL_ID` in the given mode, preserving every OTHER entry already on
- * disk untouched — for james that is `PERSONAL_CHANNEL_ID`'s own entry, set
- * once by `ensurePersonalChannelFollowed` and never disturbed by any later
- * mode switch, because `withChannelMode` only ever replaces `CHANNEL_ID`'s
- * own entry by construction.
+ * This run's OWN follow set, per peer — the only source of truth for what
+ * gets written to disk. Never populated from a disk read; only ever
+ * mutated by this run's own stations via `applyRunOwnedChannels`.
  */
-function channelsLineFor(peer: PeerName, mode: string): string {
-  return withChannelMode(readChannelsValue(peer), mode);
+const runOwnedChannels: Record<PeerName, Map<string, string>> = {
+  matthew: new Map<string, string>(),
+  jessica: new Map<string, string>(),
+  james: new Map<string, string>(),
+};
+
+/** Renders `runOwnedChannels[peer]` as the `channelId=mode,channelId=mode` value the conductor parses. */
+function ownedChannelsValue(peer: PeerName): string {
+  return [...runOwnedChannels[peer].entries()].map(([id, mode]) => `${id}=${mode}`).join(',');
 }
 
 /**
- * Counts every `setPeerMode` call this process makes. Station 6's "nothing
+ * Writes the run-owned value as the file's ENTIRE content — never a
+ * read-merge-write against whatever else is on disk. Every peer's real
+ * runtime-config.toml carries only this one key (verified live on the
+ * household mesh 2026-09-02), so this is the byte-for-byte "a file that
+ * contains ONLY this run's channel lines" the fix calls for, not a
+ * simplification that happens to work today.
+ */
+function writeOwnedChannelsFile(peer: PeerName): void {
+  const filePath = runtimeConfigPath(peer);
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `ELOHIM_RELEASE_CHANNELS = "${ownedChannelsValue(peer)}"\n`, 'utf8');
+}
+
+/**
+ * Counts every mode-switch call this process makes. Station 6's "nothing
  * outside the ceremony itself was needed" Then reads this to prove revert
  * converged through the controller sweep alone — no operator runtime-config
  * lever pulled after promotion.
  */
 let setPeerModeCallCount = 0;
 
-async function setPeerMode(world: E2EWorld, peer: PeerName, mode: string): Promise<void> {
-  setPeerModeCallCount += 1;
-  writeChannelsValue(peer, channelsLineFor(peer, mode));
-  const { status } = await postRaw(`${peerUrl(world, peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
+/**
+ * THE one helper every follow/mode-switch in this file goes through.
+ * Rewrites the WHOLE `ELOHIM_RELEASE_CHANNELS` value from `runOwnedChannels`
+ * — never appends to, or preserves, whatever a prior ceremony left on disk.
+ *
+ * Resolves the peer's URL directly from `E2E_STORAGE_<PEER>` (`directPeerUrl`,
+ * defined below) rather than through `world.getDoorway`/`peerUrl` — this is
+ * called from the `Before` hook (see `ensureRunOwnedFollowSet`), which runs
+ * BEFORE the Background's own `Given peer "<peer>" at "E2E_STORAGE_<PEER>"`
+ * step has registered any doorway on `world`, so `peerUrl(world, peer)`
+ * would throw `Unknown doorway` at exactly that call.
+ */
+async function applyRunOwnedChannels(peer: PeerName): Promise<void> {
+  writeOwnedChannelsFile(peer);
+  const { status } = await postRaw(`${directPeerUrl(peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
   assert.ok(
     status >= 200 && status < 300,
-    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} for mode "${mode}"`
+    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while reloading its run-owned channel set`
   );
 }
+
+async function setPeerMode(_world: E2EWorld, peer: PeerName, mode: string): Promise<void> {
+  setPeerModeCallCount += 1;
+  runOwnedChannels[peer].set(CHANNEL_ID, mode);
+  await applyRunOwnedChannels(peer);
+}
+
+// ---------------------------------------------------------------------------
+// Run-owned follow set: established before Station 1 even runs (`Before`,
+// tag-scoped to this feature's own `@runtime-upgrade`) and restored
+// byte-for-byte no matter how the run ends (`AfterAll`). See the module doc
+// above this section for the hazard this closes.
+// ---------------------------------------------------------------------------
+
+/** True once the true on-disk bytes have been captured and the run-owned file written for every peer. */
+let runOwnedFollowSetEstablished = false;
+/** True once `AfterAll` has restored every peer — guards against a double-restore. */
+let runOwnedFollowSetRestored = false;
+/** The TRUE pre-run bytes, per peer — restored byte-for-byte in `AfterAll`, never mutated after capture. */
+const originalRuntimeConfigBytes: Partial<Record<PeerName, Buffer>> = {};
+
+/**
+ * `E2E_STORAGE_<PEER>` — the exact env var the Background's own
+ * `Given peer "<peer>" at "E2E_STORAGE_<PEER>"` step resolves
+ * `peerUrl`/`world.getDoorway(peer).url` from (`steps/dataplane.steps.ts`'s
+ * `resolvePeerUrl`). Read directly here because `AfterAll` runs with no
+ * `World` (no scenario, no doorway registry) to read `peerUrl` from.
+ */
+function directPeerUrl(peer: PeerName): string {
+  const envVar = `E2E_STORAGE_${peer.toUpperCase()}`;
+  const url = process.env[envVar];
+  assert.ok(url, `${envVar} is not set — cannot reach ${peer} to restore its runtime-config`);
+  return url.replace(/\/$/, '');
+}
+
+/**
+ * Logs (never fails on) any leftover non-run channel already sitting in
+ * `apply`/`canary` in a peer's TRUE original bytes — a receipt for the next
+ * operator, not a gate for this run.
+ */
+function logLeftoverChannels(peer: PeerName, originalBytes: Buffer): void {
+  const originalValue = extractChannelsValueFromToml(originalBytes.toString('utf8'));
+  for (const entry of originalValue
+    .split(/[,;\n]/)
+    .map(e => e.trim())
+    .filter(Boolean)) {
+    const [entryId, entryMode] = entry.split('=').map(part => part.trim());
+    if (
+      entryId &&
+      entryId !== CHANNEL_ID &&
+      entryId !== PERSONAL_CHANNEL_ID &&
+      (entryMode === 'apply' || entryMode === 'canary')
+    ) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ⚠️  leftover channel on ${peer} in mode "${String(entryMode)}": ${entryId} — ` +
+          "an operator-hygiene leftover from an earlier ceremony, not this run's concern; " +
+          'this run owns its own follow set and does not depend on it being cleaned up.'
+      );
+    }
+  }
+}
+
+/**
+ * Captures one peer's TRUE on-disk bytes exactly ONCE — idempotent across
+ * retries. This matters because `ensureRunOwnedFollowSet`'s loop can be
+ * re-entered by a LATER scenario's `Before` hook after an EARLIER scenario's
+ * attempt already ran (and possibly already overwrote peer N's own file)
+ * but then threw on peer N+1, leaving `runOwnedFollowSetEstablished` false.
+ * Without this per-peer guard, that retry would snapshot peer N's ALREADY
+ * run-owned bytes as if they were the true original — the exact
+ * self-referential corruption a 2026-09-02 dry run of this file measured.
+ */
+function captureOriginalBytesOnce(peer: PeerName): void {
+  if (peer in originalRuntimeConfigBytes) return;
+  let originalBytes: Buffer;
+  try {
+    originalBytes = readFileSync(runtimeConfigPath(peer));
+  } catch {
+    originalBytes = Buffer.from('', 'utf8');
+  }
+  originalRuntimeConfigBytes[peer] = originalBytes;
+  writeFileSync(path.join(REPORT_DIR, `runtime-config.${peer}.orig.toml`), originalBytes);
+  logLeftoverChannels(peer, originalBytes);
+}
+
+/**
+ * Captures each peer's TRUE on-disk bytes (once — see `captureOriginalBytesOnce`),
+ * then overwrites the file with a run-owned set containing only
+ * `CHANNEL_ID=observe` — the run's baseline before any station acts.
+ */
+async function ensureRunOwnedFollowSet(): Promise<void> {
+  if (runOwnedFollowSetEstablished) return;
+  mkdirSync(REPORT_DIR, { recursive: true });
+
+  for (const peer of PEER_NAMES) {
+    captureOriginalBytesOnce(peer);
+    runOwnedChannels[peer] = new Map([[CHANNEL_ID, 'observe']]);
+    await applyRunOwnedChannels(peer);
+  }
+  runOwnedFollowSetEstablished = true;
+}
+
+/** Same extraction `readChannelsValue` does, but from bytes already in hand (no re-read from disk). */
+function extractChannelsValueFromToml(content: string): string {
+  const match = /ELOHIM_RELEASE_CHANNELS\s*=\s*"([^"]*)"/.exec(content);
+  return match ? match[1] : '';
+}
+
+/** Byte-restores one peer's runtime-config.toml and reloads it — best-effort on the reload. */
+async function restoreOnePeerRuntimeConfig(peer: PeerName, originalBytes: Buffer): Promise<void> {
+  writeFileSync(runtimeConfigPath(peer), originalBytes);
+  try {
+    const { status } = await postRaw(`${directPeerUrl(peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
+    if (status < 200 || status >= 300) {
+      // eslint-disable-next-line no-console
+      console.log(`  ⚠️  restore reload on ${peer} returned ${status}`);
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log(`  ⚠️  restore reload on ${peer} failed: ${String(error)}`);
+  }
+}
+
+/**
+ * Receipt-only confirmation that no run-created channel remains in
+ * apply/canary on one peer after the byte-restore above — the byte-restore
+ * is the authority; this never retries or fails the run, it only names what
+ * it sees.
+ */
+async function confirmOnePeerRestored(peer: PeerName): Promise<void> {
+  try {
+    const { status, text } = await getRaw(`${directPeerUrl(peer)}${ADOPTION_PATH}`, {
+      timeoutMs: 10_000,
+    });
+    if (status !== 200) return;
+    const report = JSON.parse(text) as AdoptionReport;
+    for (const channelId of [CHANNEL_ID, PERSONAL_CHANNEL_ID]) {
+      const row = report.channels.find(r => r.channelId === channelId);
+      if (row && (row.mode === 'apply' || row.mode === 'canary')) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `  ⚠️  ${peer} still reports ${channelId} in mode "${row.mode}" after byte-restore`
+        );
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log(`  ✅  ${peer}'s runtime-config.toml byte-restored to its pre-run bytes.`);
+  } catch {
+    // Best-effort confirmation only — the byte-restore already happened above.
+  }
+}
+
+AfterAll(async function () {
+  // Restore whenever ANY peer was snapshotted — not gated on full
+  // establishment completing, so a mid-loop throw (a station/env failure
+  // partway through `ensureRunOwnedFollowSet`) still restores whatever
+  // peers it already touched, rather than leaving them run-owned forever.
+  if (Object.keys(originalRuntimeConfigBytes).length === 0 || runOwnedFollowSetRestored) return;
+  runOwnedFollowSetRestored = true;
+
+  for (const peer of PEER_NAMES) {
+    const originalBytes = originalRuntimeConfigBytes[peer];
+    if (originalBytes === undefined) continue;
+    await restoreOnePeerRuntimeConfig(peer, originalBytes);
+  }
+
+  for (const peer of PEER_NAMES) {
+    await confirmOnePeerRestored(peer);
+  }
+});
+
+/**
+ * Tag-scoped to this feature's own `@runtime-upgrade` so no other suite's
+ * runtime-config is ever touched. Fires before Station 1's own Given/When
+ * steps, establishing the run-owned follow set the whole ceremony depends
+ * on — see the module doc above `runOwnedChannels`.
+ */
+Before({ tags: '@runtime-upgrade', timeout: 60_000 }, async function (this: E2EWorld) {
+  await ensureRunOwnedFollowSet();
+});
 
 // ---------------------------------------------------------------------------
 // Driver composition (T1/T2 — shell out, never re-implement)
@@ -581,6 +802,10 @@ function extractLastJson<T>(stdout: string): T {
 async function ensureCeremonyBaseline(world: E2EWorld): Promise<void> {
   const c = ceremony();
   if (c.baselineEstablished) return;
+  // Self-contained even if a station runs standalone outside the normal
+  // cucumber `Before` hook — establishes the run-owned follow set first,
+  // idempotently, exactly like every other `ensure*` in this chain.
+  await ensureRunOwnedFollowSet();
   for (const peer of PEER_NAMES) {
     await setPeerMode(world, peer, 'observe');
   }
@@ -595,8 +820,9 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
   await ensureCeremonyBaseline(world);
   if (c.releaseCid) return;
 
-  assert.ok(existsSync(CANDIDATE_HAPP), `candidate bundle missing: ${CANDIDATE_HAPP}`);
-  c.candidateBytes = readFileSync(CANDIDATE_HAPP);
+  const candidatePath = candidateHapp();
+  assert.ok(existsSync(candidatePath), `candidate bundle missing: ${candidatePath}`);
+  c.candidateBytes = readFileSync(candidatePath);
   c.candidateSha256 = createHash('sha256').update(c.candidateBytes).digest('hex');
   mkdirSync(REPORT_DIR, { recursive: true });
 
@@ -605,7 +831,7 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
     'scripts/epr-release-package.ts',
     [
       '--artifact',
-      CANDIDATE_HAPP,
+      candidatePath,
       '--artifact-class',
       'coordinator-bundle',
       '--channel-id',
@@ -959,17 +1185,15 @@ async function ensurePersonalChannelFollowed(world: E2EWorld): Promise<void> {
     c.personalChannelCreated = true;
   }
 
-  // james's CURRENT commons mode at the time this Background step first
-  // runs (Background fires before Station 1, so this is `observe`) plus his
-  // personal channel in `canary` — the format `state.rs::parse_followed_channels`
-  // reads: `channelId=mode,channelId=mode`.
-  const combinedValue = `${channelsLineFor('james', currentModeFor('james'))},${PERSONAL_CHANNEL_ID}=canary`;
-  writeChannelsValue('james', combinedValue);
-  const { status } = await postRaw(`${peerUrl(world, 'james')}${RUNTIME_CONFIG_RELOAD_PATH}`);
-  assert.ok(
-    status >= 200 && status < 300,
-    `james's ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while adding the personal channel`
-  );
+  // james's run-owned commons mode is whatever it already is in the map
+  // (Background fires after the `Before` hook establishes it, so this is
+  // `observe` at this point) — `runOwnedChannels['james']` already carries
+  // that entry, so this only ADDS the personal channel to the same map;
+  // `applyRunOwnedChannels` renders both in the
+  // `channelId=mode,channelId=mode` format `state.rs::parse_followed_channels`
+  // reads.
+  runOwnedChannels.james.set(PERSONAL_CHANNEL_ID, 'canary');
+  await applyRunOwnedChannels('james');
   c.personalChannelFollowed = true;
 }
 
@@ -982,13 +1206,14 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
   // own release, published from Background so it is already diverging
   // before Station 1's own publish ever runs (never a dependency on
   // `ensureStaged`, which is CHANNEL_ID's act, not this one's).
-  assert.ok(existsSync(CANDIDATE_HAPP), `personal-channel artifact missing: ${CANDIDATE_HAPP}`);
+  const candidatePath = candidateHapp();
+  assert.ok(existsSync(candidatePath), `personal-channel artifact missing: ${candidatePath}`);
   const matthewUrl = peerUrl(world, 'matthew');
   const packaged = runDriver(
     'scripts/epr-release-package.ts',
     [
       '--artifact',
-      CANDIDATE_HAPP,
+      candidatePath,
       '--artifact-class',
       'coordinator-bundle',
       '--channel-id',
@@ -1031,19 +1256,6 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
     `personal-channel publish missing releaseCid: ${JSON.stringify(parsed)}`
   );
   c.personalReleaseCid = parsed.releaseCid;
-}
-
-/** james's CURRENT declared mode for CHANNEL_ID (never PERSONAL_CHANNEL_ID's), read off disk. */
-function currentModeFor(peer: PeerName): string {
-  const entries = readChannelsValue(peer)
-    .split(/[,;\n]/)
-    .map(entry => entry.trim())
-    .filter(Boolean);
-  for (const entry of entries) {
-    const [id, mode] = entry.split('=');
-    if (id.trim() === CHANNEL_ID) return (mode ?? 'observe').trim();
-  }
-  return 'observe';
 }
 
 async function readJamesChannelRows(world: E2EWorld): Promise<JamesChannelRows> {
@@ -1161,11 +1373,10 @@ Given(
 
 Given(
   "matthew has built a coordinator fix — new behavior, no change to the household's DNA lineage",
+  { timeout: 60_000 },
   function () {
-    assert.ok(
-      existsSync(CANDIDATE_HAPP),
-      `candidate coordinator bundle missing: ${CANDIDATE_HAPP}`
-    );
+    const candidatePath = candidateHapp();
+    assert.ok(existsSync(candidatePath), `candidate coordinator bundle missing: ${candidatePath}`);
   }
 );
 
