@@ -793,15 +793,21 @@ storage_transport_for() { # <peer-name> <http-port>
 storage_spool_path_for() { # <peer-name> <http-port>
   local name="$1" port="$2" pid path=""
   pid="$(storage_pid_for_port "$port")"
-  if [ -n "$pid" ] && [ -r "/proc/$pid/environ" ]; then
-    path="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
-      | sed -n 's/^ELOHIM_ARK_SPOOL_PATH=//p' | head -1)"
-  fi
-  if [ -n "$path" ]; then
-    echo "$path"
+  if [ -n "$pid" ]; then
+    if [ -r "/proc/$pid/environ" ]; then
+      path="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+        | grep '^ELOHIM_ARK_SPOOL_PATH=' | head -1)"
+      if [ -n "$path" ]; then
+        echo "${path#ELOHIM_ARK_SPOOL_PATH=}"
+      else
+        echo off
+      fi
+    else
+      echo unreadable
+    fi
   elif [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] \
     || [ -f "$LOCAL_DEV_DIR/$name/ark/passport.json" ]; then
-    echo "$LOCAL_DEV_DIR/$name/ark"
+    echo "next-launch:$LOCAL_DEV_DIR/$name/ark"
   else
     echo off
   fi
@@ -1661,6 +1667,14 @@ os.execve(binpath, [binpath, "--http-port", port], env)
   fi
 }
 
+storage_ark_env() { # <peer-name>
+  [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] || return 0
+  printf '%s\n' \
+    "ELOHIM_ARK_SPOOL_PATH=$LOCAL_DEV_DIR/$1/ark" \
+    "CUSTODY_SWEEP_SECONDS=${CUSTODY_SWEEP_SECONDS:-15}" \
+    "INVENTORY_BROADCAST_SECONDS=${INVENTORY_BROADCAST_SECONDS:-15}"
+}
+
 # Env keys layered over a restarted peer's captured environment, one K=V per
 # line. Empty by default — the capture is the truth except for the explicit
 # per-peer transport launch knob. Two further opt-ins:
@@ -1680,6 +1694,7 @@ restart_env_overlay() { # <captured-environ> <peer-name>
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
     printf '%s\n' "ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT"
   fi
+  storage_ark_env "$2"
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
       "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \
@@ -2104,19 +2119,16 @@ start_storage_peer() { # <peer-name> <peer-index>
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
     doorway_env=("ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT")
   fi
-  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
-    ark_env=(
-      "ELOHIM_ARK_SPOOL_PATH=$LOCAL_DEV_DIR/$name/ark"
-      "CUSTODY_SWEEP_SECONDS=${CUSTODY_SWEEP_SECONDS:-15}"
-      "INVENTORY_BROADCAST_SECONDS=${INVENTORY_BROADCAST_SECONDS:-15}"
-    )
-  fi
+  mapfile -t ark_env < <(storage_ark_env "$name")
   if ! curl -s -m 2 "http://localhost:$(http_port "$i")/health" >/dev/null; then
     local agent
     agent=$(hc sandbox call --running "$(admin_port "$i")" list-apps 2>/dev/null \
       | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
     mkdir -p "$MESH_DIR/$name"
-    env "${doorway_env[@]}" "${ark_env[@]}" \
+    env -u ELOHIM_ARK_SPOOL_PATH \
+    -u CUSTODY_SWEEP_SECONDS \
+    -u INVENTORY_BROADCAST_SECONDS \
+    "${doorway_env[@]}" "${ark_env[@]}" \
     HOLOCHAIN_ADMIN_URL="ws://localhost:$(admin_port "$i")" \
     HOLOCHAIN_APP_URL="ws://localhost:$(app_port "$i")" \
     STORAGE_DIR="$MESH_DIR/$name" \
