@@ -89,6 +89,40 @@ pub const MAX_ARTIFACT_BYTES_PER_SWEEP: u64 = 192 * 1024 * 1024;
 /// discipline declares.
 pub const INSTALLED_REALITY_TTL_SECS: i64 = 300;
 
+/// How stale a cached installed-reality snapshot must be before a
+/// `*_lineage_mismatch` refusal earns exactly one bypass-TTL re-read before
+/// it is emitted. Not "any staleness": a snapshot taken moments ago (the
+/// common case — a fresh read, or a cache hit seconds old) is almost
+/// certainly still the truth, and re-reading on every mismatch would spend an
+/// admin round trip on every legitimately-refused release too. A few seconds
+/// is enough headroom for this node's OWN apply — which invalidates the
+/// cache outright (see `installed_reality_invalidate`) — while still
+/// catching a passport change this controller did not itself cause.
+pub const REREAD_STALE_THRESHOLD_SECS: i64 = 5;
+
+/// **Pure.** Should a `*_lineage_mismatch` refusal, produced from a cached
+/// installed-reality snapshot of the given age, earn one bypass-TTL re-read
+/// before the controller emits it? Isolated from the async re-read itself so
+/// the policy is a table a test can walk without a conductor:
+///
+/// - a mismatch reason + a stale cache → re-read (this is the whole point:
+///   the cache might be pre-dating a passport change).
+/// - a mismatch reason + a fresh cache → no re-read (the snapshot is already
+///   current; re-reading would only spend a round trip to learn nothing new).
+/// - any other refusal reason, at any age → no re-read (only the two lineage
+///   mismatches are shaped like "we asked before our own apply landed").
+///
+/// The fourth row — a mismatch that survives the re-read — is not a distinct
+/// state of this function: the caller re-runs `verify::verify_envelope`
+/// against the refreshed value and simply falls through to the ordinary
+/// `Refused` arm when it still fails, exactly as if no re-read had happened.
+pub fn should_reread_on_mismatch(reason: RefusalReason, cache_age_secs: i64) -> bool {
+    matches!(
+        reason,
+        RefusalReason::CoordinatorLineageMismatch | RefusalReason::DnaLineageMismatch
+    ) && cache_age_secs >= REREAD_STALE_THRESHOLD_SECS
+}
+
 // ---------------------------------------------------------------------------
 // Metrics (C8)
 // ---------------------------------------------------------------------------
@@ -513,19 +547,52 @@ impl AdoptionController {
         self
     }
 
-    async fn installed_reality(&self, now: i64) -> Answer<InstalledReality> {
+    /// Read installed reality, honoring the TTL cache. Returns the value
+    /// alongside the age (seconds) of the snapshot that produced it — `0` for
+    /// a snapshot just taken by this very call, so a caller deciding whether
+    /// a refusal is worth a bypass-TTL re-read never has to guess whether the
+    /// value it already has is fresh.
+    async fn installed_reality(&self, now: i64) -> (Answer<InstalledReality>, i64) {
         let Some(source) = self.installed.as_ref() else {
-            return Answer::Unreachable;
+            return (Answer::Unreachable, 0);
         };
         let mut cached = self.cached_reality.lock().await;
         if let Some((read_at, value)) = cached.as_ref() {
-            if now - read_at < INSTALLED_REALITY_TTL_SECS {
-                return value.clone();
+            let age = now - read_at;
+            if age < INSTALLED_REALITY_TTL_SECS {
+                return (value.clone(), age);
             }
         }
         let fresh = source.read().await;
         *cached = Some((now, fresh.clone()));
+        (fresh, 0)
+    }
+
+    /// Force a fresh passport read, bypassing the TTL entirely, and cache the
+    /// result. Used exactly once per stale-cache lineage-mismatch refusal —
+    /// never in a loop — to give this node's OWN just-applied hot-swap a
+    /// chance to be seen before the refusal is emitted.
+    async fn installed_reality_refresh(&self, now: i64) -> Answer<InstalledReality> {
+        let Some(source) = self.installed.as_ref() else {
+            return Answer::Unreachable;
+        };
+        let fresh = source.read().await;
+        *self.cached_reality.lock().await = Some((now, fresh.clone()));
         fresh
+    }
+
+    /// Invalidate the installed-reality cache outright. Called after ANY
+    /// successful apply on this node — a coordinator-bundle hot-swap, a
+    /// binary install, or a config-epr apply may each change the runtime
+    /// passport this cache is a snapshot of — so the very next check re-reads
+    /// it instead of serving a pre-apply snapshot for up to
+    /// [`INSTALLED_REALITY_TTL_SECS`]. This is what closes the
+    /// `coordinator_lineage_mismatch` false-refusal this controller produced
+    /// against itself right after applying (measured 2026-09-02 on james and
+    /// matthew): without it, the controller compares the NEXT release against
+    /// the PRE-apply hashes for up to five minutes.
+    async fn installed_reality_invalidate(&self) {
+        *self.cached_reality.lock().await = None;
     }
 
     /// Resolve one channel's canonical head through THIS node's conductor —
@@ -740,6 +807,14 @@ impl AdoptionController {
         let soak_secs = verified.manifest.adoption_discipline.soak_secs;
         match registry.apply(&verified).await {
             Ok(receipt) => {
+                // Invalidate FIRST, before anything else about this apply is
+                // recorded: any vehicle — coordinator-bundle hot-swap, binary
+                // install, or config-epr — may have just changed what this
+                // node's own passport reports, and the next channel this
+                // sweep (or the next sweep entirely) checks must not judge
+                // itself against a snapshot this apply has already made
+                // stale.
+                self.installed_reality_invalidate().await;
                 let pending_restart = receipt
                     .detail
                     .get("pendingRestart")
@@ -908,7 +983,7 @@ impl AdoptionController {
             return CheckOutcome::Skipped;
         }
 
-        let installed = self.installed_reality(now).await;
+        let (mut installed, installed_age_secs) = self.installed_reality(now).await;
 
         // The head's `supersedes` names an ACTION, not necessarily a RELEASE:
         // on a fresh channel's first release — and on EVERY non-first release,
@@ -986,11 +1061,47 @@ impl AdoptionController {
         // of staging: an envelope that cannot match will not match after we pay
         // for evidence.
         if let Err(refusal) = verify::verify_envelope(&manifest, &installed) {
-            return CheckOutcome::Checked {
-                head: Some(resolved),
-                verdict: Verdict::Refused { refusal },
-                attestations: None,
-            };
+            // **Defensive re-read.** A `*_lineage_mismatch` is exactly the
+            // shape this controller's own just-applied hot-swap produces
+            // against a cache it has not yet been told to drop (belt: the
+            // invalidation in `apply_verified` above is the suspenders-free
+            // fix; this is the suspenders, for a passport change that landed
+            // by some path OTHER than this controller's own apply — an
+            // operator-driven install, or a peer sharing the node). Bounded
+            // to exactly one bypass-TTL re-read, decided by a pure table
+            // (`should_reread_on_mismatch`) so it can never loop and never
+            // fires on a snapshot that was already fresh.
+            if should_reread_on_mismatch(refusal.reason_code(), installed_age_secs) {
+                let refreshed = self.installed_reality_refresh(now).await;
+                match verify::verify_envelope(&manifest, &refreshed) {
+                    Ok(()) => {
+                        tracing::info!(
+                            channel = %channel.channel_id,
+                            reason = %refusal.reason,
+                            cache_age_secs = installed_age_secs,
+                            "release-adoption: bypass-TTL re-read of installed reality reversed \
+                             a lineage-mismatch refusal — the cached snapshot pre-dated a \
+                             passport change"
+                        );
+                        installed = refreshed;
+                    }
+                    Err(fresh_refusal) => {
+                        return CheckOutcome::Checked {
+                            head: Some(resolved),
+                            verdict: Verdict::Refused {
+                                refusal: fresh_refusal,
+                            },
+                            attestations: None,
+                        };
+                    }
+                }
+            } else {
+                return CheckOutcome::Checked {
+                    head: Some(resolved),
+                    verdict: Verdict::Refused { refusal },
+                    attestations: None,
+                };
+            }
         }
         if let Err(refusal) = verify::verify_lineage(&manifest, &lineage) {
             return CheckOutcome::Checked {
@@ -1590,6 +1701,132 @@ mod tests {
             // A TTL shorter than the sweep would re-read the hApp inventory
             // every tick, which is the cost the cache exists to remove.
             assert!(INSTALLED_REALITY_TTL_SECS > SWEEP_INTERVAL_SECS as i64);
+            assert!(REREAD_STALE_THRESHOLD_SECS > 0);
+            // The re-read threshold exists to skip re-reading a snapshot this
+            // node's own `installed_reality_invalidate()` already made fresh
+            // — it must never approach the TTL it is carved out of.
+            assert!(REREAD_STALE_THRESHOLD_SECS < INSTALLED_REALITY_TTL_SECS);
+        }
+    }
+
+    /// A source that counts how many times it was actually asked, so a test
+    /// can tell a cache hit from a cache miss without a conductor.
+    struct CountingInstalledReality {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl InstalledRealitySource for CountingInstalledReality {
+        async fn read(&self) -> Answer<InstalledReality> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Answer::Present(InstalledReality::default())
+        }
+    }
+
+    /// **The fix, in its most direct form.** After ANY successful apply, the
+    /// very next `installed_reality()` call must miss the cache — even
+    /// called at the exact same instant, well inside the TTL — because
+    /// `installed_reality_invalidate` is what closes the
+    /// `coordinator_lineage_mismatch` false-refusal this controller produced
+    /// against itself (measured on james and matthew, 2026-09-02).
+    #[tokio::test]
+    async fn installed_reality_invalidate_forces_the_next_read_to_miss_the_cache() {
+        use std::sync::atomic::Ordering;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = Arc::new(CountingInstalledReality {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let controller = AdoptionController::new(dir.path()).with_installed_reality(source.clone());
+
+        let (_, age) = controller.installed_reality(1_000).await;
+        assert_eq!(age, 0, "the very first read is always a fresh snapshot");
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+
+        // Same instant, well inside the TTL: a plain cache hit. This is the
+        // defect surface without invalidation — a check running seconds
+        // after this node's own apply would be judged against the PRE-apply
+        // snapshot for up to INSTALLED_REALITY_TTL_SECS.
+        let (_, age) = controller.installed_reality(1_000).await;
+        assert_eq!(age, 0);
+        assert_eq!(
+            source.calls.load(Ordering::SeqCst),
+            1,
+            "well within the TTL, a second read at the same instant must NOT touch the source"
+        );
+
+        controller.installed_reality_invalidate().await;
+
+        let (_, age) = controller.installed_reality(1_000).await;
+        assert_eq!(
+            age, 0,
+            "a post-invalidate read is a fresh snapshot again, not a stale cache hit"
+        );
+        assert_eq!(
+            source.calls.load(Ordering::SeqCst),
+            2,
+            "invalidate must force the very next installed_reality() call to miss the cache, \
+             even though it is still well within the TTL"
+        );
+    }
+
+    /// **The re-read-once decision, as a pure table.** Only a lineage
+    /// mismatch earns a bypass-TTL re-read, and only when the cache that
+    /// produced it is stale enough that it could plausibly pre-date a
+    /// passport change this node did not itself just invalidate for. A
+    /// mismatch that survives the re-read is not a distinct row here — the
+    /// caller re-runs `verify::verify_envelope` against the refreshed value
+    /// and falls through to the ordinary `Refused` arm exactly as if no
+    /// re-read had happened.
+    #[test]
+    fn should_reread_on_mismatch_gates_on_reason_and_staleness() {
+        let cases: &[(RefusalReason, i64, bool)] = &[
+            // Stale cache + a lineage mismatch -> re-read.
+            (
+                RefusalReason::CoordinatorLineageMismatch,
+                REREAD_STALE_THRESHOLD_SECS,
+                true,
+            ),
+            (
+                RefusalReason::CoordinatorLineageMismatch,
+                REREAD_STALE_THRESHOLD_SECS + 100,
+                true,
+            ),
+            (
+                RefusalReason::DnaLineageMismatch,
+                REREAD_STALE_THRESHOLD_SECS,
+                true,
+            ),
+            // Fresh cache + a lineage mismatch -> no re-read: the snapshot is
+            // already current, so re-reading would only spend a round trip to
+            // learn nothing new.
+            (RefusalReason::CoordinatorLineageMismatch, 0, false),
+            (
+                RefusalReason::CoordinatorLineageMismatch,
+                REREAD_STALE_THRESHOLD_SECS - 1,
+                false,
+            ),
+            (RefusalReason::DnaLineageMismatch, 0, false),
+            // Any other refusal reason, at any age -> no re-read: only the
+            // two lineage mismatches are shaped like "we asked before our own
+            // apply landed".
+            (
+                RefusalReason::ArtifactUnavailable,
+                REREAD_STALE_THRESHOLD_SECS + 100,
+                false,
+            ),
+            (
+                RefusalReason::ConductorUnavailable,
+                REREAD_STALE_THRESHOLD_SECS + 100,
+                false,
+            ),
+        ];
+        for (reason, age, expected) in cases.iter().copied() {
+            assert_eq!(
+                should_reread_on_mismatch(reason, age),
+                expected,
+                "reason={reason:?} age={age}"
+            );
         }
     }
 
