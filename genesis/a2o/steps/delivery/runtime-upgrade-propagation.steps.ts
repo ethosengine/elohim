@@ -19,35 +19,43 @@
  * off `/admin/adoption`'s own `attestations` block, exactly as the r2
  * transcript's "Station 5 (r2) — verdicts" did.
  *
- * ## The single-channel simplification
+ * ## One channel, two tiers — plus a genuine second channel
  *
- * The feature's Background narrates TWO channels — the shared soak channel
- * `runtime:coordinators:elohim:canary-a` and the constitutional promotion
- * target `runtime:coordinators:elohim:commons`. The ceremony driver has no
+ * The feature's Background narrates what this file actually mints:
+ * `runtime:coordinators:elohim:commons` (`CHANNEL_ID` below, freshly minted
+ * per run) is ONE technical channel whose single head carries two tiers —
+ * `staging` while it is a resolving-but-unproven candidate, `earned` once
+ * the promotion ceremony declares it so. The ceremony driver has no
  * "promote from channel A onto channel B" verb: a release manifest carries
  * ONE `channelId`, and `publish`/`promote` move that ONE channel's tier from
  * `staging` to `earned` in place (release-ceremony.ts's own module doc: "stage
- * → promote → revert-by-re-election" on a single channel). The 2026-09-01
- * receipt ran the whole chain this way — one channel, two tiers — and that is
- * the runnable reality this file composes against, not a two-channel model
- * that does not exist yet. So: ONE technical channel (`CHANNEL_ID`, freshly
- * minted per run) stands in for both story names. "Not visible on commons"
- * (station 1) reads as "no peer reports this channel's tier as `earned`
- * yet"; "the release becomes the earned head of channel commons" (station 4)
- * reads as "this channel's tier becomes `earned`". A future two-channel
- * ceremony driver would let these steps bind to two real channel ids without
- * changing the Gherkin at all.
+ * → promote → revert-by-re-election" on a single channel). The household's
+ * SOAK is that head's staging tier, not a separate channel to reconcile
+ * against commons: every peer resolves the staged candidate through its own
+ * conductor, but only the canary (james) is expected to actually apply and
+ * attest it before the household trusts it enough to promote. "Not visible
+ * as the earned head" (station 1) reads as "no peer reports this channel's
+ * tier as `earned` yet"; "the release becomes the earned head of channel
+ * commons" (station 4) reads as "this channel's tier becomes `earned`".
+ *
+ * `runtime:coordinators:elohim:canary-james` (`PERSONAL_CHANNEL_ID` below,
+ * likewise minted per run with a `-personal` suffix, per the same collision
+ * rationale as `CHANNEL_ID`) IS a real second channel — james's own personal
+ * experiment channel, a separate content identity that carries a compatible
+ * variant release (station 7) and is never expected to converge with commons
+ * at all; nobody promotes it and nobody forces james off it.
  *
  * ## Fresh channel per run
  *
- * `CHANNEL_ID` is minted once at module load from a run stamp
- * (`A2O_RELEASE_RUN_STAMP` env override, else the process start time) so a
- * repeat run never collides with a channel a prior run left mid-backoff-ladder,
- * and so this run's own writes to `ELOHIM_RELEASE_CHANNELS` never disturb
- * whatever OTHER channel(s) a concurrent shift/session has that peer
- * following — `withChannelMode` below only ever touches the entry for
- * `CHANNEL_ID`, appending/replacing it in the comma-separated list and
- * leaving every other entry byte-identical.
+ * `CHANNEL_ID` (and `PERSONAL_CHANNEL_ID`) are minted once at module load
+ * from a run stamp (`A2O_RELEASE_RUN_STAMP` env override, else the process
+ * start time) so a repeat run never collides with a channel a prior run left
+ * mid-backoff-ladder, and so this run's own writes to
+ * `ELOHIM_RELEASE_CHANNELS` never disturb whatever OTHER channel(s) a
+ * concurrent shift/session has that peer following — `withChannelMode` below
+ * only ever touches the entry for the channel id it was asked to set,
+ * appending/replacing it in the comma-separated list and leaving every other
+ * entry (including james's personal-channel entry) byte-identical.
  *
  * ## Cross-scenario state
  *
@@ -89,14 +97,30 @@ import type { E2EWorld } from '../../src/framework/world.js';
 /** genesis/a2o/steps/delivery -> genesis/a2o (2 levels up). */
 const A2O_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
+/** genesis/a2o/steps/delivery -> repo root (4 levels up). */
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
 /** The r2 receipt's marker-only coordinator rebuild (integrity bytes == installed). */
 const CANDIDATE_HAPP = fileURLToPath(
   new URL('../../reports/release-ceremony/2026-09-01/elohim-P.happ', import.meta.url)
 );
 
+/**
+ * Station 6's revert target: the DNA workdir bundle — pre-fix bytes distinct
+ * from `CANDIDATE_HAPP`, already on disk, never written by this ceremony
+ * (coordinator hot-swap patches a running conductor; it never touches this
+ * file). Same role the r2 receipt's "N" bundle played
+ * (`elohim/holochain/local-dev/…` was that receipt's "O" — a THIRD distinct
+ * bundle used there for an unrelated already-installed check; this file only
+ * needs ONE bundle that differs from the fix).
+ */
+const BASELINE_HAPP = path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
+
 const RUN_STAMP =
   process.env['A2O_RELEASE_RUN_STAMP'] ?? new Date().toISOString().replace(/\D/g, '').slice(0, 14);
 const CHANNEL_ID = `runtime:coordinators:elohim:a2o-${RUN_STAMP}`;
+/** James's personal experiment channel — a genuine SECOND channel (station 7). */
+const PERSONAL_CHANNEL_ID = `runtime:coordinators:elohim:a2o-${RUN_STAMP}-personal`;
 
 const REPORT_DIR = path.join(
   A2O_ROOT,
@@ -105,6 +129,11 @@ const REPORT_DIR = path.join(
   new Date().toISOString().slice(0, 10)
 );
 const MANIFEST_PATH = path.join(REPORT_DIR, `a2o-runtime-upgrade-${RUN_STAMP}.json`);
+const REVERT_MANIFEST_PATH = path.join(REPORT_DIR, `a2o-runtime-upgrade-${RUN_STAMP}-revert.json`);
+const PERSONAL_MANIFEST_PATH = path.join(
+  REPORT_DIR,
+  `a2o-runtime-upgrade-${RUN_STAMP}-personal.json`
+);
 
 const SOAK_SECS = 30;
 const ATTESTATION_THRESHOLD = 1;
@@ -114,7 +143,10 @@ const PEER_NAMES: readonly PeerName[] = ['matthew', 'jessica', 'james'];
 const CANARY_PEER: PeerName = 'james';
 
 const STORY_COMMONS_CHANNEL_NAME = 'runtime:coordinators:elohim:commons';
-const STORY_SOAK_CHANNEL_NAME = 'runtime:coordinators:elohim:canary-a';
+const STORY_PERSONAL_CHANNEL_NAME = 'runtime:coordinators:elohim:canary-james';
+
+/** T2 ceremony driver, relative to `A2O_ROOT` (`runDriver`'s `cwd`). */
+const RELEASE_CEREMONY_SCRIPT = 'scripts/release-ceremony.ts';
 
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
@@ -204,6 +236,29 @@ interface StatusReport {
   peers: StatusPeerRow[];
 }
 
+/**
+ * `release-ceremony.ts revert <channel> <manifest.json>` prints TWO
+ * pretty-printed JSON objects (the freshly-authored version, then the
+ * declare-earned result) — this is the shape of the LAST one, read via
+ * `extractLastJson`.
+ */
+interface RevertResult {
+  tier: string;
+  releaseCid: string;
+  canonical?: boolean;
+  secondPeerVerification?: unknown;
+}
+
+/** One cell of the station 8 observed matrix — always a RECORDED read, never a fresh one. */
+interface MatrixRow {
+  peer: PeerName;
+  station: 'staging' | 'earned' | 'reverted' | 'personal';
+  releaseCid: string | undefined;
+  tier: string | undefined;
+  readAt: number | null;
+  route: string;
+}
+
 // ---------------------------------------------------------------------------
 // Cross-scenario ceremony state (module-level — see file doc)
 // ---------------------------------------------------------------------------
@@ -219,6 +274,13 @@ interface FleetPeerResult {
   pidAfter: string;
   healthBefore: number;
   healthAfter: number;
+}
+
+type PersonalStation = 'staging' | 'promotion' | 'revert';
+
+interface JamesChannelRows {
+  commons?: AdoptionChannelRow;
+  personal?: AdoptionChannelRow;
 }
 
 // Every "not yet computed" field is an optional (`undefined`) rather than
@@ -245,6 +307,29 @@ interface CeremonyState {
   promotedAt?: number;
   fleetRows: Partial<Record<PeerName, FleetPeerResult>>;
   fleetConvergeMs?: number;
+  /** Snapshot of `setPeerModeCallCount` right after station 5's own mode
+   * switches — station 6's "nothing outside the ceremony" Then compares
+   * against this to prove revert touched no runtime-config lever at all. */
+  setPeerModeCallsAfterPromotion?: number;
+
+  // Station 6 — revert by re-election.
+  preRevertRows: Partial<Record<PeerName, AdoptionChannelRow>>;
+  priorManifestPath?: string;
+  priorReleaseCid?: string;
+  revertResult?: RevertResult;
+  revertedAt?: number;
+  postRevertRows: Partial<Record<PeerName, FleetPeerResult>>;
+  revertConvergeMs?: number;
+
+  // Station 7 — james's personal channel.
+  personalChannelCreated: boolean;
+  personalChannelFollowed: boolean;
+  personalReleaseCid?: string;
+  personalRowsByStation: Partial<Record<PersonalStation, JamesChannelRows>>;
+  lastPersonalStation?: PersonalStation;
+
+  // Station 8 — the observed matrix, assembled only from recorded reads.
+  observedMatrix?: MatrixRow[];
 }
 
 let state: CeremonyState | undefined;
@@ -256,6 +341,11 @@ function ceremony(): CeremonyState {
     candidateSha256: '',
     stagingConvergedRows: {},
     fleetRows: {},
+    preRevertRows: {},
+    postRevertRows: {},
+    personalChannelCreated: false,
+    personalChannelFollowed: false,
+    personalRowsByStation: {},
   };
   return state;
 }
@@ -407,8 +497,29 @@ function writeChannelsValue(peer: PeerName, value: string): void {
   writeFileSync(filePath, withChannelsLine(content, line), 'utf8');
 }
 
+/**
+ * The full `ELOHIM_RELEASE_CHANNELS` value a peer should carry for
+ * `CHANNEL_ID` in the given mode, preserving every OTHER entry already on
+ * disk untouched — for james that is `PERSONAL_CHANNEL_ID`'s own entry, set
+ * once by `ensurePersonalChannelFollowed` and never disturbed by any later
+ * mode switch, because `withChannelMode` only ever replaces `CHANNEL_ID`'s
+ * own entry by construction.
+ */
+function channelsLineFor(peer: PeerName, mode: string): string {
+  return withChannelMode(readChannelsValue(peer), mode);
+}
+
+/**
+ * Counts every `setPeerMode` call this process makes. Station 6's "nothing
+ * outside the ceremony itself was needed" Then reads this to prove revert
+ * converged through the controller sweep alone — no operator runtime-config
+ * lever pulled after promotion.
+ */
+let setPeerModeCallCount = 0;
+
 async function setPeerMode(world: E2EWorld, peer: PeerName, mode: string): Promise<void> {
-  writeChannelsValue(peer, withChannelMode(readChannelsValue(peer), mode));
+  setPeerModeCallCount += 1;
+  writeChannelsValue(peer, channelsLineFor(peer, mode));
   const { status } = await postRaw(`${peerUrl(world, peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
   assert.ok(
     status >= 200 && status < 300,
@@ -443,6 +554,21 @@ function runDriver(scriptRelPath: string, args: string[], timeoutMs = 60_000): D
 function extractJson<T>(stdout: string): T {
   const start = stdout.indexOf('{');
   assert.ok(start >= 0, `no JSON object in driver output: ${stdout.slice(0, 400)}`);
+  return JSON.parse(stdout.slice(start)) as T;
+}
+
+/**
+ * `revert <channel> <manifest.json>` is the one verb that prints TWO
+ * pretty-printed JSON objects (`authorVersionFromManifest`'s "publish"-shaped
+ * echo, then `declareEarned`'s own result) — `extractJson` would slice from
+ * the FIRST `{` and hand `JSON.parse` two concatenated objects, which throws.
+ * Each `JSON.stringify(obj, null, 2)` block starts with a bare `{` at column
+ * 0, so the LAST such line is the start of the real (declare-earned) result.
+ */
+function extractLastJson<T>(stdout: string): T {
+  const starts = [...stdout.matchAll(/^\{$/gm)].map(match => match.index ?? -1).filter(i => i >= 0);
+  assert.ok(starts.length > 0, `no JSON object in driver output: ${stdout.slice(0, 400)}`);
+  const start = starts.at(-1) ?? 0;
   return JSON.parse(stdout.slice(start)) as T;
 }
 
@@ -519,7 +645,7 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
       attestationThreshold: ATTESTATION_THRESHOLD,
       canaryOrder: [CANARY_PEER],
     });
-    const created = runDriver('scripts/release-ceremony.ts', [
+    const created = runDriver(RELEASE_CEREMONY_SCRIPT, [
       'channel',
       'create',
       CHANNEL_ID,
@@ -530,7 +656,7 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
     c.channelCreated = true;
   }
 
-  const published = runDriver('scripts/release-ceremony.ts', ['publish', MANIFEST_PATH]);
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', MANIFEST_PATH]);
   assert.equal(published.status, 0, `publish failed: ${published.stderr || published.stdout}`);
   const parsed = extractJson<PublishResult>(published.stdout);
   assert.ok(parsed.releaseCid, `publish output missing releaseCid: ${JSON.stringify(parsed)}`);
@@ -553,6 +679,14 @@ async function ensureStagingConvergedAll(world: E2EWorld): Promise<void> {
     c.stagingConvergedRows[peer] = row;
   }
   c.stagingConvergeMs = Date.now() - start;
+
+  // Station 7's "as they happened" recording: james's personal-channel row
+  // AT THIS MOMENT — never re-read later, once the ceremony has moved past
+  // staging (a later station's live read would show reverted/earned, not
+  // staging).
+  if (c.personalReleaseCid && !c.personalRowsByStation.staging) {
+    c.personalRowsByStation.staging = await readJamesChannelRows(world);
+  }
 }
 
 async function ensureResolvedOnJames(world: E2EWorld): Promise<void> {
@@ -621,7 +755,7 @@ async function ensurePromoted(world: E2EWorld): Promise<void> {
   if (c.promotedAt !== undefined) return;
   assert.ok(c.releaseCid, 'no releaseCid to promote');
   const promoted = runDriver(
-    'scripts/release-ceremony.ts',
+    RELEASE_CEREMONY_SCRIPT,
     ['promote', CHANNEL_ID, c.releaseCid],
     60_000
   );
@@ -646,6 +780,9 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
   for (const peer of ['matthew', 'jessica'] as PeerName[]) {
     await setPeerMode(world, peer, 'apply');
   }
+  // The last runtime-config lever this ceremony ever pulls for CHANNEL_ID —
+  // station 6's "nothing outside the ceremony" Then proves revert pulls none.
+  c.setPeerModeCallsAfterPromotion = setPeerModeCallCount;
   for (const peer of PEER_NAMES) {
     const { row } = await pollAdoption(
       world,
@@ -664,6 +801,315 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
     };
   }
   c.fleetConvergeMs = Date.now() - start;
+
+  // Station 7's "as they happened" recording — see the identical comment in
+  // `ensureStagingConvergedAll`.
+  if (c.personalReleaseCid && !c.personalRowsByStation.promotion) {
+    c.personalRowsByStation.promotion = await readJamesChannelRows(world);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Station 6 — revert by re-election. The prior release is packaged from
+// BASELINE_HAPP (pre-fix bytes, already on disk — see the constant's doc)
+// bound to the CURRENT fleet reality (a peer already running the fix), per
+// the r2 receipt's Station 8 finding: "a revert target is a NEW manifest for
+// OLD bytes… `revert <priorReleaseCid>` must take a manifest bound to the
+// current fleet reality," not the reality that held before the fix shipped.
+// ---------------------------------------------------------------------------
+
+async function ensureReverted(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensurePromoted(world);
+  if (c.revertConvergeMs !== undefined) return;
+
+  // Honest before-state, read the same way every other station reads it —
+  // never asserted from the ceremony's own intent.
+  for (const peer of PEER_NAMES) {
+    const report = await getAdoptionReport(world, peer);
+    const row = findChannelRow(report, CHANNEL_ID);
+    if (row) c.preRevertRows[peer] = row;
+  }
+
+  if (!c.priorReleaseCid) {
+    assert.ok(
+      existsSync(BASELINE_HAPP),
+      `revert-target (pre-fix) bundle missing: ${BASELINE_HAPP}`
+    );
+    const matthewUrl = peerUrl(world, 'matthew');
+    const packaged = runDriver(
+      'scripts/epr-release-package.ts',
+      [
+        '--artifact',
+        BASELINE_HAPP,
+        '--artifact-class',
+        'coordinator-bundle',
+        '--channel-id',
+        CHANNEL_ID,
+        '--applies-to-from',
+        matthewUrl,
+        '--soak-secs',
+        String(SOAK_SECS),
+        '--attestation-threshold',
+        String(ATTESTATION_THRESHOLD),
+        '--canary',
+        CANARY_PEER,
+        '--peer',
+        matthewUrl,
+        '--notes',
+        'a2o station 6: revert target — pre-fix baseline coordinator bundle',
+        '--out',
+        REVERT_MANIFEST_PATH,
+      ],
+      60_000
+    );
+    assert.equal(
+      packaged.status,
+      0,
+      `epr-release-package.ts (revert target) failed: ${packaged.stderr || packaged.stdout}`
+    );
+    assert.ok(
+      existsSync(REVERT_MANIFEST_PATH),
+      `revert manifest was not written to ${REVERT_MANIFEST_PATH}`
+    );
+
+    const baselineBytes = readFileSync(BASELINE_HAPP);
+    const baselineSha256 = createHash('sha256').update(baselineBytes).digest('hex');
+    for (const peer of PEER_NAMES.filter(name => name !== 'matthew')) {
+      const putStatus = await putBlobRaw(peerUrl(world, peer), baselineSha256, baselineBytes);
+      assert.ok(
+        putStatus === 200 || putStatus === 201,
+        `PUT revert-target blob to ${peer} returned ${putStatus}`
+      );
+    }
+    c.priorManifestPath = REVERT_MANIFEST_PATH;
+  }
+
+  assert.ok(c.priorManifestPath, 'no revert-target manifest path recorded');
+  const reverted = runDriver(
+    RELEASE_CEREMONY_SCRIPT,
+    ['revert', CHANNEL_ID, c.priorManifestPath],
+    90_000
+  );
+  assert.equal(reverted.status, 0, `revert failed: ${reverted.stderr || reverted.stdout}`);
+  const parsed = extractLastJson<RevertResult>(reverted.stdout);
+  assert.equal(parsed.tier, 'earned', `revert did not declare earned: ${JSON.stringify(parsed)}`);
+  assert.ok(parsed.releaseCid, `revert result missing releaseCid: ${JSON.stringify(parsed)}`);
+  c.revertResult = parsed;
+  c.priorReleaseCid = parsed.releaseCid;
+
+  const start = Date.now();
+  for (const peer of PEER_NAMES) {
+    const beforeSnap = c.fleetRows[peer];
+    assert.ok(beforeSnap, `no fleet-convergence snapshot for ${peer} — run station 5 first`);
+    const { row } = await pollAdoption(
+      world,
+      peer,
+      240_000,
+      r => r.appliedRelease?.cid === c.priorReleaseCid
+    );
+    c.postRevertRows[peer] = {
+      row,
+      pidBefore: beforeSnap.pidAfter,
+      pidAfter: readPid(peer),
+      healthBefore: beforeSnap.healthAfter,
+      healthAfter: await readBlobTotal(world, peer),
+    };
+  }
+  c.revertConvergeMs = Date.now() - start;
+  c.revertedAt = Date.now();
+
+  // Station 7/8's "as they happened" recording — see the identical comment
+  // in `ensureStagingConvergedAll`. Also the row station 8 builds its
+  // "personal channel ran alongside the entire time" matrix cell from.
+  if (c.personalReleaseCid && !c.personalRowsByStation.revert) {
+    c.personalRowsByStation.revert = await readJamesChannelRows(world);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Station 7 — james's own personal channel: a genuine second channel he
+// follows alongside commons, carrying a compatible variant nobody promotes
+// and nobody forces him off.
+// ---------------------------------------------------------------------------
+
+async function ensurePersonalChannelFollowed(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureCeremonyBaseline(world);
+  if (c.personalChannelFollowed) return;
+
+  if (!c.personalChannelCreated) {
+    const discipline = JSON.stringify({
+      soakSecs: SOAK_SECS,
+      attestationThreshold: ATTESTATION_THRESHOLD,
+      canaryOrder: [],
+    });
+    const created = runDriver(RELEASE_CEREMONY_SCRIPT, [
+      'channel',
+      'create',
+      PERSONAL_CHANNEL_ID,
+      '--discipline',
+      discipline,
+    ]);
+    assert.equal(
+      created.status,
+      0,
+      `personal channel create failed: ${created.stderr || created.stdout}`
+    );
+    c.personalChannelCreated = true;
+  }
+
+  // james's CURRENT commons mode at the time this Background step first
+  // runs (Background fires before Station 1, so this is `observe`) plus his
+  // personal channel in `canary` — the format `state.rs::parse_followed_channels`
+  // reads: `channelId=mode,channelId=mode`.
+  const combinedValue = `${channelsLineFor('james', currentModeFor('james'))},${PERSONAL_CHANNEL_ID}=canary`;
+  writeChannelsValue('james', combinedValue);
+  const { status } = await postRaw(`${peerUrl(world, 'james')}${RUNTIME_CONFIG_RELOAD_PATH}`);
+  assert.ok(
+    status >= 200 && status < 300,
+    `james's ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while adding the personal channel`
+  );
+  c.personalChannelFollowed = true;
+}
+
+async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensurePersonalChannelFollowed(world);
+  if (c.personalReleaseCid) return;
+
+  // Independent of CHANNEL_ID's own fix — the personal channel carries its
+  // own release, published from Background so it is already diverging
+  // before Station 1's own publish ever runs (never a dependency on
+  // `ensureStaged`, which is CHANNEL_ID's act, not this one's).
+  assert.ok(existsSync(CANDIDATE_HAPP), `personal-channel artifact missing: ${CANDIDATE_HAPP}`);
+  const matthewUrl = peerUrl(world, 'matthew');
+  const packaged = runDriver(
+    'scripts/epr-release-package.ts',
+    [
+      '--artifact',
+      CANDIDATE_HAPP,
+      '--artifact-class',
+      'coordinator-bundle',
+      '--channel-id',
+      PERSONAL_CHANNEL_ID,
+      '--applies-to-from',
+      matthewUrl,
+      '--wire-epoch',
+      '0',
+      '--additive-only',
+      'true',
+      '--soak-secs',
+      String(SOAK_SECS),
+      '--attestation-threshold',
+      String(ATTESTATION_THRESHOLD),
+      '--peer',
+      matthewUrl,
+      '--notes',
+      "a2o station 7: james's personal channel — compatible variant, never promoted",
+      '--out',
+      PERSONAL_MANIFEST_PATH,
+    ],
+    60_000
+  );
+  assert.equal(
+    packaged.status,
+    0,
+    `personal-channel package failed: ${packaged.stderr || packaged.stdout}`
+  );
+  assert.ok(existsSync(PERSONAL_MANIFEST_PATH), `personal-channel manifest was not written`);
+
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', PERSONAL_MANIFEST_PATH]);
+  assert.equal(
+    published.status,
+    0,
+    `personal-channel publish failed: ${published.stderr || published.stdout}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(
+    parsed.releaseCid,
+    `personal-channel publish missing releaseCid: ${JSON.stringify(parsed)}`
+  );
+  c.personalReleaseCid = parsed.releaseCid;
+}
+
+/** james's CURRENT declared mode for CHANNEL_ID (never PERSONAL_CHANNEL_ID's), read off disk. */
+function currentModeFor(peer: PeerName): string {
+  const entries = readChannelsValue(peer)
+    .split(/[,;\n]/)
+    .map(entry => entry.trim())
+    .filter(Boolean);
+  for (const entry of entries) {
+    const [id, mode] = entry.split('=');
+    if (id.trim() === CHANNEL_ID) return (mode ?? 'observe').trim();
+  }
+  return 'observe';
+}
+
+async function readJamesChannelRows(world: E2EWorld): Promise<JamesChannelRows> {
+  const report = await getAdoptionReport(world, 'james');
+  return {
+    commons: findChannelRow(report, CHANNEL_ID),
+    personal: findChannelRow(report, PERSONAL_CHANNEL_ID),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Station 8 — the observed version matrix, assembled ONLY from the RECORDED
+// `/admin/adoption` reads earlier stations already took (never a fresh read
+// taken here, and never asserted from the ceremony's own intent).
+// ---------------------------------------------------------------------------
+
+function buildObservedMatrix(): MatrixRow[] {
+  const c = ceremony();
+  const rows: MatrixRow[] = [];
+  for (const peer of PEER_NAMES) {
+    const staging = c.stagingConvergedRows[peer];
+    if (staging) {
+      rows.push({
+        peer,
+        station: 'staging',
+        releaseCid: staging.resolvedHead?.cid,
+        tier: staging.resolvedHead?.tier,
+        readAt: staging.lastCheckedAt,
+        route: ADOPTION_PATH,
+      });
+    }
+    const earned = c.fleetRows[peer];
+    if (earned) {
+      rows.push({
+        peer,
+        station: 'earned',
+        releaseCid: earned.row.appliedRelease?.cid,
+        tier: earned.row.resolvedHead?.tier,
+        readAt: earned.row.lastCheckedAt,
+        route: ADOPTION_PATH,
+      });
+    }
+    const reverted = c.postRevertRows[peer];
+    if (reverted) {
+      rows.push({
+        peer,
+        station: 'reverted',
+        releaseCid: reverted.row.appliedRelease?.cid,
+        tier: reverted.row.resolvedHead?.tier,
+        readAt: reverted.row.lastCheckedAt,
+        route: ADOPTION_PATH,
+      });
+    }
+  }
+  const jamesPersonal = c.personalRowsByStation.revert?.personal;
+  if (jamesPersonal) {
+    rows.push({
+      peer: 'james',
+      station: 'personal',
+      releaseCid: jamesPersonal.resolvedHead?.cid,
+      tier: jamesPersonal.resolvedHead?.tier,
+      readAt: jamesPersonal.lastCheckedAt,
+      route: ADOPTION_PATH,
+    });
+  }
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -684,20 +1130,7 @@ Given(
   }
 );
 
-Given(
-  "the household's runtime also follows its shared soak channel {string}",
-  { timeout: 120_000 },
-  async function (this: E2EWorld, channelName: string) {
-    assert.equal(
-      channelName,
-      STORY_SOAK_CHANNEL_NAME,
-      `unexpected soak channel name: ${channelName}`
-    );
-    await ensureCeremonyBaseline(this);
-  }
-);
-
-Given('james is designated the canary on that soak channel', function () {
+Given("james is designated the canary on that channel's staging tier", function () {
   // Documentary: the packaged manifest's canaryOrder (set in ensureStaged) is
   // where this becomes real, exactly like `--canary james` in the receipt.
   assert.equal(CANARY_PEER, 'james');
@@ -705,14 +1138,25 @@ Given('james is designated the canary on that soak channel', function () {
 
 Given(
   "james's runtime additionally follows his own personal channel {string}",
-  function (_channelName: string) {
-    // Documentary only — james's personal experiment channel is station 7
-    // territory (out of this file's scope; see the pending stub below).
+  { timeout: 200_000 },
+  async function (this: E2EWorld, channelName: string) {
+    assert.equal(
+      channelName,
+      STORY_PERSONAL_CHANNEL_NAME,
+      `unexpected personal channel name: ${channelName}`
+    );
+    await ensurePersonalChannelFollowed(this);
+    // Published from the Background — before Station 1 even runs — so the
+    // compatible variant is already diverging "all story long" and every
+    // later station's own convergence (staging, promotion, revert) can
+    // record james's personal-channel row AS IT HAPPENED, never a re-read
+    // after the ceremony has already moved past that moment.
+    await ensurePersonalVariantPublished(this);
   }
 );
 
 // ---------------------------------------------------------------------------
-// Station 1 — publish to the soak channel, never straight to commons.
+// Station 1 — publish as a staging candidate, never straight to earned.
 // ---------------------------------------------------------------------------
 
 Given(
@@ -726,13 +1170,13 @@ Given(
 );
 
 When(
-  'matthew publishes it as a release manifest on the soak channel {string}',
+  'matthew publishes it as a release manifest on the channel {string}',
   { timeout: 90_000 },
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
-      STORY_SOAK_CHANNEL_NAME,
-      `unexpected soak channel name: ${channelName}`
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
     );
     await ensureStaged(this);
   }
@@ -745,17 +1189,17 @@ Then('the release is declared staging, not earned', function () {
 });
 
 Then(
-  'the release is not visible as a candidate on the commons channel',
+  'the release is not visible as the earned head of the commons channel',
   { timeout: 30_000 },
   function () {
-    const result = runDriver('scripts/release-ceremony.ts', ['status', CHANNEL_ID], 20_000);
+    const result = runDriver(RELEASE_CEREMONY_SCRIPT, ['status', CHANNEL_ID], 20_000);
     const report = extractJson<StatusReport>(result.stdout);
     const earnedRows = report.peers.filter(row => row.tier === 'earned');
     assert.equal(
       earnedRows.length,
       0,
-      `release already reads as earned (commons) on: ${JSON.stringify(earnedRows)} — a soak publish ` +
-        'must never be visible as an earned candidate before promotion.'
+      `release already reads as earned (commons) on: ${JSON.stringify(earnedRows)} — a staging publish ` +
+        'must never be visible as the earned head before promotion.'
     );
   }
 );
@@ -770,8 +1214,8 @@ Given(
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
-      STORY_SOAK_CHANNEL_NAME,
-      `unexpected soak channel name: ${channelName}`
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
     );
     await ensureStaged(this);
     assert.equal(ceremony().publishTier, 'staging');
@@ -838,8 +1282,8 @@ Given(
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
-      STORY_SOAK_CHANNEL_NAME,
-      `unexpected soak channel name: ${channelName}`
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
     );
     await ensureResolvedOnJames(this);
   }
@@ -933,13 +1377,13 @@ Then(
 // ---------------------------------------------------------------------------
 
 Given(
-  "james's soak attestation for the release on channel {string} is recorded",
+  "james's staging attestation for the release on channel {string} is recorded",
   { timeout: 400_000 },
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
-      STORY_SOAK_CHANNEL_NAME,
-      `unexpected soak channel name: ${channelName}`
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
     );
     await ensureAttested(this);
   }
@@ -1079,108 +1523,392 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
-// Stations 6-8 and the two constitutional scenarios — pending.
-//
-// These name contracts the r2 receipt did NOT prove by hand-composed drivers
-// yet (revert-by-re-election needs a fresh manifest per station 8's design
-// note; the observed version matrix has no reader surface; james's personal
-// channel and the DNA-lineage refusal are untouched by stations 1-5's setup).
-// Per the task scope, these stay `pending` — never faked — and stay reachable
-// under the scenario-level `@wip` tag the feature file carries for them.
+// Station 6 — revert by re-election: the household finds it wanting.
 // ---------------------------------------------------------------------------
 
 Given(
   'the household has converged on the promoted release and now judges it a regression',
-  function () {
-    return 'pending';
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    // The judgment ("wanting") is the ceremony's own act — the revert declare
+    // itself, in the When step below. This Given's only real precondition is
+    // the convergence revert acts on.
+    await ensureFleetConverged(this);
   }
 );
 
 When(
   'matthew runs the revert ceremony, re-declaring the prior release the earned head of channel {string}',
-  function (_channelName: string) {
-    return 'pending';
+  { timeout: 400_000 },
+  async function (this: E2EWorld, channelName: string) {
+    assert.equal(
+      channelName,
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
+    );
+    await ensureReverted(this);
   }
 );
 
 Then(
   "matthew's, jessica's, and james's runtimes all return to the prior coordinator behavior, converging backward through the identical loop they used to converge forward",
   function () {
-    return 'pending';
+    const c = ceremony();
+    for (const peer of PEER_NAMES) {
+      const result = c.postRevertRows[peer];
+      assert.ok(result, `no post-revert row captured for ${peer}`);
+      assert.equal(
+        result.row.appliedRelease?.cid,
+        c.priorReleaseCid,
+        `${peer} has not converged back to the prior release: ${JSON.stringify(result.row)}`
+      );
+      assert.ok(
+        result.pidAfter.length > 0,
+        `${peer}'s conductor PID could not be read after the revert`
+      );
+      assert.equal(
+        result.pidAfter,
+        result.pidBefore,
+        `${peer}'s conductor PID changed on revert (${result.pidBefore} -> ${result.pidAfter}) — ` +
+          'revert must converge through the SAME hot-swap loop as promotion, never a restart'
+      );
+    }
   }
 );
 
 Then(
   'nothing outside the ceremony itself was needed to get there — no operator flag, no re-key, no DHT reset',
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = ceremony();
+    assert.ok(c.revertResult, 'no revert result captured — run the revert step first');
+    assert.ok(
+      c.revertResult.secondPeerVerification,
+      'the revert result carries no secondPeerVerification — the earned declaration was never checked from a second peer'
+    );
+    assert.ok(
+      c.setPeerModeCallsAfterPromotion !== undefined,
+      'no post-promotion runtime-config baseline recorded — run station 5 first'
+    );
+    assert.equal(
+      setPeerModeCallCount,
+      c.setPeerModeCallsAfterPromotion,
+      'a runtime-config mode switch happened during/after the revert — revert must converge through ' +
+        'the controller sweep alone, no operator lever'
+    );
+    // No restart (already proven above) means no re-key. The DNA-lineage
+    // validation identity is the other half of "nothing outside the
+    // ceremony" — a coordinator-only round trip must never move it, on any
+    // peer, checked against the pre-fix baseline station 3 captured.
+    assert.ok(c.jamesBefore, 'no pre-fix passport baseline captured — run station 3 first');
+    for (const peer of PEER_NAMES) {
+      const roles = await readRoles(this, peer);
+      for (const baselineRole of c.jamesBefore.roles) {
+        const role = roles.find(r => r.role === baselineRole.role);
+        assert.ok(
+          role,
+          `role "${baselineRole.role}" missing from ${peer}'s passport after the revert`
+        );
+        assert.equal(
+          role.dnaHash,
+          baselineRole.dnaHash,
+          `${peer}'s ${baselineRole.role} dnaHash changed across the round trip — a coordinator-only ` +
+            'revert must never move the DNA lineage'
+        );
+      }
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Station 7 — throughout: james's personal channel rides alongside,
+// compatible and never forced to converge.
+// ---------------------------------------------------------------------------
+
+Given(
+  'matthew has run the ceremony that staged, promoted, and reverted a release on the commons channel',
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    await ensureReverted(this);
   }
 );
 
 Given(
-  'matthew has run the ceremony that staged, promoted, and reverted a release on the commons channel',
-  function () {
-    return 'pending';
+  "james's runtime reported on both of its channels at each of those three moments, as they happened",
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    // Every real recording already happened INSIDE `ensureStagingConvergedAll`
+    // / `ensureFleetConverged` / `ensureReverted`, at the moment each station
+    // actually converged — never re-derived here after the fact, because by
+    // now the household has already moved past staging/earned into the
+    // reverted state and a fresh live read could no longer see them. This
+    // step asserts the three recordings exist; it takes none itself.
+    await ensureReverted(this);
+    const c = ceremony();
+    for (const station of ['staging', 'promotion', 'revert'] as const) {
+      assert.ok(
+        c.personalRowsByStation[station],
+        `james's personal-channel report for station "${station}" was never recorded — ` +
+          'the household ceremony must run stations 1, 5, and 6 (in order) first'
+      );
+    }
   }
 );
 
 When(
-  /^james's runtime is asked (?:what his personal channel is doing|the same question) (after staging|after promotion|after the revert)$/,
-  function (_when: string) {
-    return 'pending';
+  /^the report james's runtime gave after (staging|promotion|the revert) is read back$/,
+  function (this: E2EWorld, when: string) {
+    const c = ceremony();
+    const station: PersonalStation =
+      when === 'the revert' ? 'revert' : (when as 'staging' | 'promotion');
+    assert.ok(
+      c.personalRowsByStation[station],
+      `no recorded report for station "${station}" — run the household ceremony first`
+    );
+    c.lastPersonalStation = station;
+  }
+);
+
+function assertPersonalDiverging(): void {
+  const c = ceremony();
+  const station = c.lastPersonalStation;
+  assert.ok(
+    station,
+    'no station recorded for the personal-channel question — run the When step first'
+  );
+  const rows = c.personalRowsByStation[station];
+  assert.ok(rows?.personal, `no personal-channel row captured for james at station "${station}"`);
+  assert.ok(c.personalReleaseCid, 'no personal-channel release published yet');
+  assert.equal(
+    rows.personal.resolvedHead?.cid,
+    c.personalReleaseCid,
+    `james's personal-channel resolved head is ${JSON.stringify(rows.personal.resolvedHead)}, not the compatible variant`
+  );
+  assert.notEqual(
+    rows.personal.resolvedHead?.cid,
+    rows.commons?.resolvedHead?.cid,
+    "james's personal channel resolved the SAME head as commons — it should diverge"
+  );
+  assert.notEqual(
+    rows.personal.verdict?.state,
+    'refused',
+    `james's personal-channel verdict is a refusal — outside the compatibility envelope: ${JSON.stringify(rows.personal.verdict)}`
+  );
+}
+
+Then(
+  'his personal channel was diverging from commons, inside the same compatibility envelope',
+  assertPersonalDiverging
+);
+
+Then(
+  'his personal channel was still diverging from commons, inside the same compatibility envelope',
+  assertPersonalDiverging
+);
+
+Then(
+  "james's runtime was converged on commons at that moment, exactly like matthew's and jessica's",
+  function () {
+    const c = ceremony();
+    const station = c.lastPersonalStation;
+    assert.ok(station, 'no station recorded — run the When step first');
+    const jamesCommons = c.personalRowsByStation[station]?.commons;
+    assert.ok(jamesCommons, `no commons-channel row captured for james at station "${station}"`);
+
+    if (station === 'staging') {
+      for (const peer of PEER_NAMES) {
+        const row = c.stagingConvergedRows[peer];
+        assert.ok(row, `no staging row for ${peer}`);
+        assert.equal(
+          row.resolvedHead?.cid,
+          jamesCommons.resolvedHead?.cid,
+          `${peer} and james diverge on the commons staged head`
+        );
+      }
+    } else if (station === 'promotion') {
+      for (const peer of PEER_NAMES) {
+        const result = c.fleetRows[peer];
+        assert.ok(result, `no fleet row for ${peer}`);
+        assert.equal(
+          result.row.appliedRelease?.cid,
+          jamesCommons.appliedRelease?.cid,
+          `${peer} and james diverge on the applied commons release`
+        );
+      }
+    } else {
+      for (const peer of PEER_NAMES) {
+        const result = c.postRevertRows[peer];
+        assert.ok(result, `no post-revert row for ${peer}`);
+        assert.equal(
+          result.row.appliedRelease?.cid,
+          jamesCommons.appliedRelease?.cid,
+          `${peer} and james diverge on the reverted commons release`
+        );
+      }
+    }
   }
 );
 
 Then(
-  'his personal channel is diverging from commons, inside the same compatibility envelope',
+  "nobody promotes james's channel to commons and nobody forces james off it",
+  { timeout: 30_000 },
   function () {
-    return 'pending';
+    const c = ceremony();
+    assert.ok(c.personalChannelFollowed, 'personal channel was never established');
+    const result = runDriver(RELEASE_CEREMONY_SCRIPT, ['status', PERSONAL_CHANNEL_ID], 20_000);
+    const report = extractJson<StatusReport>(result.stdout);
+    const earnedRows = report.peers.filter(row => row.tier === 'earned');
+    assert.equal(
+      earnedRows.length,
+      0,
+      `personal channel already reads earned on: ${JSON.stringify(earnedRows)}`
+    );
+    const channelsValue = readChannelsValue('james');
+    assert.ok(
+      channelsValue
+        .split(',')
+        .some(entry => entry.trim().split('=')[0].trim() === PERSONAL_CHANNEL_ID),
+      `james's runtime-config no longer lists the personal channel: ${channelsValue}`
+    );
   }
 );
 
-Then(
-  'his personal channel is still diverging from commons, inside the same compatibility envelope',
-  function () {
-    return 'pending';
+// ---------------------------------------------------------------------------
+// Station 8 — the observed proof, read back honestly, not asserted from intent.
+// ---------------------------------------------------------------------------
+
+Given(
+  "james's personal channel ran alongside that ceremony the entire time",
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    // Recorded already, inside `ensureStagingConvergedAll` / `ensureFleetConverged`
+    // / `ensureReverted` — the personal channel was published from Background,
+    // before Station 1 even ran, so it rode alongside every station.
+    await ensurePersonalVariantPublished(this);
+    await ensureReverted(this);
+    const c = ceremony();
+    assert.ok(
+      c.personalRowsByStation.staging &&
+        c.personalRowsByStation.promotion &&
+        c.personalRowsByStation.revert,
+      "james's personal channel was not recorded at every station — the ceremony must run in order"
+    );
   }
 );
-
-Then(
-  "james's runtime is converged on commons at that point, exactly like matthew's and jessica's",
-  function () {
-    return 'pending';
-  }
-);
-
-Then("nobody promotes james's channel to commons and nobody forces james off it", function () {
-  return 'pending';
-});
-
-Given("james's personal channel ran alongside that ceremony the entire time", function () {
-  return 'pending';
-});
 
 When("an operator reads the household's observed version matrix", function () {
-  return 'pending';
+  const c = ceremony();
+  c.observedMatrix = buildObservedMatrix();
+  // A receipt of the matrix, in the cucumber report — not the assertion itself.
+  // eslint-disable-next-line no-console
+  console.log(`\nObserved version matrix for channel ${CHANNEL_ID}:`);
+  for (const row of c.observedMatrix) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ${row.peer.padEnd(9)} ${row.station.padEnd(9)} tier=${String(row.tier).padEnd(8)} ` +
+        `cid=${String(row.releaseCid).slice(0, 24)} readAt=${String(row.readAt)} route=${row.route}`
+    );
+  }
 });
 
 Then(
   "the matrix shows matthew's, jessica's, and james's runtimes moving staging, then earned, then back, in that order",
   function () {
-    return 'pending';
+    const c = ceremony();
+    assert.ok(c.observedMatrix, 'no observed matrix — run the When step first');
+    const matrix: MatrixRow[] = c.observedMatrix;
+    const order: MatrixRow['station'][] = ['staging', 'earned', 'reverted'];
+    for (const peer of PEER_NAMES) {
+      const peerRows: MatrixRow[] = matrix.filter(
+        row => row.peer === peer && row.station !== 'personal'
+      );
+      const stationsSeen: MatrixRow['station'][] = order.filter(station =>
+        peerRows.some(row => row.station === station)
+      );
+      assert.deepEqual(
+        stationsSeen,
+        order,
+        `${peer}'s matrix rows do not show staging -> earned -> reverted, in order: ${JSON.stringify(peerRows)}`
+      );
+      const staging = peerRows.find(row => row.station === 'staging');
+      const earned = peerRows.find(row => row.station === 'earned');
+      const reverted = peerRows.find(row => row.station === 'reverted');
+      assert.equal(
+        staging?.releaseCid,
+        c.releaseCid,
+        `${peer}'s staging cell is not the fix release`
+      );
+      assert.equal(
+        earned?.releaseCid,
+        c.releaseCid,
+        `${peer}'s earned cell is not the fix release`
+      );
+      assert.equal(
+        reverted?.releaseCid,
+        c.priorReleaseCid,
+        `${peer}'s reverted cell is not the prior release`
+      );
+      assert.ok(
+        staging &&
+          earned &&
+          reverted &&
+          (staging.readAt ?? 0) <= (earned.readAt ?? 0) &&
+          (earned.readAt ?? 0) <= (reverted.readAt ?? 0),
+        `${peer}'s matrix timestamps are not monotonically ordered staging -> earned -> reverted`
+      );
+    }
   }
 );
 
 Then("the matrix shows james's personal channel diverging compatibly the whole time", function () {
-  return 'pending';
+  const c = ceremony();
+  assert.ok(c.observedMatrix, 'no observed matrix — run the When step first');
+  const personalRow = c.observedMatrix.find(
+    row => row.peer === 'james' && row.station === 'personal'
+  );
+  assert.ok(personalRow, 'no personal-channel row in the matrix for james');
+  assert.equal(
+    personalRow.releaseCid,
+    c.personalReleaseCid,
+    "james's personal-channel matrix cell is not the compatible variant"
+  );
+  const jamesReverted = c.observedMatrix.find(
+    row => row.peer === 'james' && row.station === 'reverted'
+  );
+  assert.ok(jamesReverted, 'no reverted commons row for james in the matrix');
+  assert.notEqual(
+    personalRow.releaseCid,
+    jamesReverted.releaseCid,
+    "james's personal channel matches commons in the matrix — it should still diverge"
+  );
 });
 
 Then(
   "every row in the matrix is read from what each runtime itself reports, never asserted from the ceremony's own intent",
   function () {
-    return 'pending';
+    const c = ceremony();
+    assert.ok(
+      c.observedMatrix && c.observedMatrix.length > 0,
+      'no observed matrix — run the When step first'
+    );
+    for (const row of c.observedMatrix) {
+      assert.equal(
+        row.route,
+        ADOPTION_PATH,
+        `matrix row for ${row.peer}/${row.station} carries no source route`
+      );
+      assert.ok(
+        typeof row.readAt === 'number' && row.readAt > 0,
+        `matrix row for ${row.peer}/${row.station} carries no readAt — cannot have been read from the runtime`
+      );
+    }
   }
 );
+
+// ---------------------------------------------------------------------------
+// The two constitutional scenarios (jessica's no-opt-out; DNA-lineage
+// refusal) — pending. Untouched by stations 1-8's setup; never faked.
+// ---------------------------------------------------------------------------
 
 Given("jessica's runtime is following release channel {string}", function (_channelName: string) {
   return 'pending';
@@ -1202,14 +1930,14 @@ Then(
 );
 
 Then(
-  "jessica can still read the release's own explanation of what changed and why, and can reach escalation if her intimate context was mishandled",
+  "jessica can still read the release's own explanation of what changed and why, and can raise it to the steward if her stored content, her recorded agreements, or her identity were mishandled by it — and the revert ceremony is the household's remedy",
   function () {
     return 'pending';
   }
 );
 
 Given(
-  /^a release manifest was built for a different DNA lineage than the one the household actually runs \(its declared per-role hashes do not match\)$/,
+  'a release manifest was built against a different validation-rule identity than the one the household actually runs',
   function () {
     return 'pending';
   }
