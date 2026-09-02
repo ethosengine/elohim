@@ -15,6 +15,9 @@ pub enum ReadinessOutcome {
 
 /// Chooses the next readiness action, preferring observed child death over
 /// the remaining attempt budget.
+///
+/// Lifted from elohim-storage `process_manager.rs` (264ce8ce4); storage
+/// delegates here in S1.
 pub fn classify_readiness_outcome(
     child_exited: bool,
     attempt: u32,
