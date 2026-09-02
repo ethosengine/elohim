@@ -401,6 +401,9 @@ _gate-elohim-compute:
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea --all-targets
 
+_gate-elohim-ark:
+    cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
+
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package
 # that cannot be imported proves the tests, not the package.

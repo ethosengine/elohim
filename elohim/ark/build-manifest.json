@@ -1,0 +1,24 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-ark",
+  "description": "ark — the elohim compute envelope (tevah): core + supervisor + binary",
+  "steps": {
+    "gate-ark": {
+      "description": "fmt + clippy -D warnings + tests for the three ark crates",
+      "inputs": { "sources": ["elohim/ark/**", "elohim/Cargo.toml", "elohim/Cargo.lock"], "buildProcess": [] },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Gate Ark", "function": null }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-ark": {
+        "dir": "elohim/ark",
+        "steps": ["gate-ark"],
+        "run": { "kind": "root-just", "recipe": "_gate-elohim-ark", "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" } }
+      }
+    }
+  },
+  "deployment": {}
+}

@@ -1,0 +1,17 @@
+[package]
+name = "elohim-ark"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+description = "ark — the launchable unit of the elohim compute envelope (tevah): run a RuntimeManifest in a Berth, describe the passport, list and show death witnesses."
+
+[[bin]]
+name = "ark"
+path = "src/main.rs"
+
+[dependencies]
+elohim-ark-core = { path = "../core" }
+elohim-ark-supervisor = { path = "../supervisor" }
+clap = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,27 @@
+[package]
+name = "elohim-ark-supervisor"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+description = "ark-supervisor — the I/O half of the elohim compute envelope (tevah): drivers, the reaper, pipe readers, the amber-local spool, and the supervision loop. No network."
+
+[lib]
+name = "ark_supervisor"
+path = "src/lib.rs"
+
+[dependencies]
+elohim-ark-core = { path = "../core" }
+elohim-epr = { path = "../../epr" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+nix = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

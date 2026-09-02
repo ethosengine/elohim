@@ -1,0 +1,25 @@
+[package]
+name = "elohim-ark-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+description = "ark-core — the pure half of the elohim compute envelope (tevah): RuntimeManifest/Berth, exit classes, the death tally, the restart governor, the witness/passport/intent records, and the lifecycle state machine. No I/O, no runtime — the dependency graph is the purity boundary."
+
+[lib]
+name = "ark_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Pure only. Adding tokio/nix/libc/diesel here fails `boundary::no_runtime_or_io_deps`.
+elohim-epr = { path = "../../epr" }
+elohim-compute = { path = "../../elohim-compute" }
+elohim-seam-contracts = { path = "../../../crates/seam-contracts" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+cid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
