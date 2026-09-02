@@ -17,7 +17,11 @@ export function doorwayToAppUrl(doorwayUrl: string): string {
   // local-dev shape (`ng serve` beside a doorway), which is a different thing
   // and must stay the default for that workflow.
   const override = process.env['E2E_APP_URL'];
-  if (override) return override.replace(/\/+$/, '');
+  if (override) {
+    let o = override;
+    while (o.endsWith('/')) o = o.slice(0, -1);
+    return o;
+  }
   if (doorwayUrl.includes('localhost:8888')) return 'http://localhost:4200';
   return doorwayUrl
     .replace('doorway-alpha.', 'alpha.')

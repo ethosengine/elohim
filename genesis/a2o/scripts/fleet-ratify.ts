@@ -38,8 +38,15 @@ async function connect(adminUrl: string, appPort: number, key?: string) {
   await admin.authorizeSigningCredentials(lamad);
   const au = new URL(adminUrl);
   const loop = au.hostname === '127.0.0.1' || au.hostname === 'localhost';
-  const appUrl = loop ? new URL(`ws://${au.hostname}:${appPort}`) : new URL(`${au.protocol}//${au.host}/hc/app/${appPort}`);
-  const appWs = await AppWebsocket.connect({ url: appUrl, token: (await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id })).token, wsClientOptions: wsOpts });
+  const appUrl = loop
+    ? new URL(`ws://${au.hostname}:${appPort}`)
+    : new URL(`${au.protocol}//${au.host}/hc/app/${appPort}`);
+  const appWs = await AppWebsocket.connect({
+    url: appUrl,
+    token: (await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id }))
+      .token,
+    wsClientOptions: wsOpts,
+  });
   return { admin, appWs, lamad, agent: encodeHashToBase64(lamad[1]) };
 }
 
@@ -48,10 +55,15 @@ async function main() {
   const ws = await connect(WS_ADMIN, WS_APP);
   console.log('workspace W2:', ws.agent);
   const carried: any = await ws.appWs.callZome({
-    cell_id: ws.lamad, zome_name: 'content_store', fn_name: 'get_record_for_action',
+    cell_id: ws.lamad,
+    zome_name: 'content_store',
+    fn_name: 'get_record_for_action',
     payload: { action_hash: W2_ACTION },
   });
-  if (!carried?.record) throw new Error(`workspace could not serve record for ${W2_ACTION}: ${JSON.stringify(carried).slice(0,150)}`);
+  if (!carried?.record)
+    throw new Error(
+      `workspace could not serve record for ${W2_ACTION}: ${JSON.stringify(carried).slice(0, 150)}`
+    );
   const recordBytes: Uint8Array = carried.record;
   console.log('carried record bytes:', recordBytes.length);
 
@@ -59,12 +71,28 @@ async function main() {
   const fleet = await connect(FLEET_ADMIN, FLEET_APP, KEY);
   console.log('fleet grantor (manifesto root author):', fleet.agent);
   const out: any = await fleet.appWs.callZome({
-    cell_id: fleet.lamad, zome_name: 'content_store', fn_name: 'declare_earned_canonical_head',
-    payload: { id: ID, head_action_hash: W2_ACTION, carried_record: recordBytes, adopt_before_author: true, delegation: null },
+    cell_id: fleet.lamad,
+    zome_name: 'content_store',
+    fn_name: 'declare_earned_canonical_head',
+    payload: {
+      id: ID,
+      head_action_hash: W2_ACTION,
+      carried_record: recordBytes,
+      adopt_before_author: true,
+      delegation: null,
+    },
   });
-  console.log('FLEET EARNED canonical declared:', JSON.stringify({
-    head: encodeHashToBase64(out.head_action_hash), author: encodeHashToBase64(out.author), canonical: out.canonical,
-  }));
+  console.log(
+    'FLEET EARNED canonical declared:',
+    JSON.stringify({
+      head: encodeHashToBase64(out.head_action_hash),
+      author: encodeHashToBase64(out.author),
+      canonical: out.canonical,
+    })
+  );
   process.exit(0);
 }
-main().catch(e => { console.error(String(e).slice(0, 500)); process.exit(1); });
+main().catch(e => {
+  console.error(String(e).slice(0, 500));
+  process.exit(1);
+});

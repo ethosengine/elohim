@@ -13,7 +13,7 @@
  * If step 3 returns 200 with trust:notarized, the primitive is proven live; the
  * only thing the matthew→W ceremony adds is a different grantor key.
  */
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
+import { AdminWebsocket, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
 
 const ADMIN = 'ws://127.0.0.1:42665';
 const APP_ID = 'elohim';
@@ -21,7 +21,10 @@ const ID = 'gate-reading-manifesto-20260830T131032Z';
 const STORAGE = 'http://localhost:8090';
 
 async function main() {
-  const admin = await AdminWebsocket.connect({ url: new URL(ADMIN), wsClientOptions: { origin: 'elohim' } });
+  const admin = await AdminWebsocket.connect({
+    url: new URL(ADMIN),
+    wsClientOptions: { origin: 'elohim' },
+  });
   const apps = await admin.listApps({});
   const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
   const cells = new Map<string, any>();
@@ -42,10 +45,16 @@ async function main() {
   await admin.authorizeSigningCredentials(lamad);
   // 2. grant via the app interface
   const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
-  const appWs = await AppWebsocket.connect({ url: new URL(ADMIN.replace('42665','4485')), token: token.token, wsClientOptions: { origin: 'elohim' } });
+  const appWs = await AppWebsocket.connect({
+    url: new URL(ADMIN.replace('42665', '4485')),
+    token: token.token,
+    wsClientOptions: { origin: 'elohim' },
+  });
   const validUntil = (Date.now() + 24 * 3600 * 1000) * 1000;
   const delegation: any = await appWs.callZome({
-    cell_id: lamad, zome_name: 'content_store', fn_name: 'grant_head_delegation',
+    cell_id: lamad,
+    zome_name: 'content_store',
+    fn_name: 'grant_head_delegation',
     payload: { delegate: D, scope: '*', valid_until: validUntil },
   });
   const json = {
@@ -55,11 +64,16 @@ async function main() {
     validUntil: Number(delegation.payload.valid_until),
     signature: Buffer.from(delegation.signature).toString('base64'),
   };
-  console.log('delegation minted: grantor', json.grantor.slice(0, 12), 'delegate', json.delegate.slice(0, 12));
+  console.log(
+    'delegation minted: grantor',
+    json.grantor.slice(0, 12),
+    'delegate',
+    json.delegate.slice(0, 12)
+  );
 
   // 3. read current head target, then declare it as D under the delegation
   const cur = await (await fetch(`${STORAGE}/db/content/${ID}/head`)).json().catch(() => ({}));
-  const target = (cur as any).headActionHash ?? (cur as any).dhtAnchorHash;
+  const target = cur.headActionHash ?? cur.dhtAnchorHash;
   console.log('current head target:', String(target).slice(0, 20));
   const head = await fetch(`${STORAGE}/db/content/${ID}/head`, {
     method: 'POST',
@@ -70,4 +84,7 @@ async function main() {
   console.log(`DELEGATED DECLARE as D: ${head.status} ${body.slice(0, 300)}`);
   process.exit(head.ok ? 0 : 1);
 }
-main().catch(e => { console.error(String(e).slice(0, 400)); process.exit(1); });
+main().catch(e => {
+  console.error(String(e).slice(0, 400));
+  process.exit(1);
+});

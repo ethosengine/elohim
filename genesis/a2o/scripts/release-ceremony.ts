@@ -87,8 +87,14 @@
  * tier: "none"` (conductor answered, no election exists yet) — unreachable
  * is never read as absent.
  */
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 import { readFileSync, statSync } from 'node:fs';
+
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  encodeHashToBase64,
+  decodeHashFromBase64,
+} from '@holochain/client';
 
 const APP_ID = 'elohim';
 const ROLE = 'lamad'; // the role name carrying the content_store cell — same as the oracle
@@ -134,9 +140,7 @@ interface PeerConfig {
   app: number;
 }
 
-interface Flags {
-  [key: string]: string;
-}
+type Flags = Record<string, string>;
 
 function parseFlags(argv: string[]): { positionals: string[]; flags: Flags } {
   const positionals: string[] = [];
@@ -146,6 +150,10 @@ function parseFlags(argv: string[]): { positionals: string[]; flags: Flags } {
     if (a.startsWith('--')) {
       const key = a.slice(2);
       const next = argv[i + 1];
+      // Real runtime guard: argv[i+1] can be out-of-bounds undefined at runtime even
+      // though TS types it as `string` here (no noUncheckedIndexedAccess) — not a
+      // type-shaped bug.
+      // eslint-disable-next-line sonarjs/different-types-comparison
       if (next !== undefined && !next.startsWith('--')) {
         flags[key] = next;
         i++;
@@ -162,9 +170,9 @@ function parseFlags(argv: string[]): { positionals: string[]; flags: Flags } {
 function parseConductors(csv: string): PeerConfig[] {
   return csv
     .split(',')
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean)
-    .map((entry) => {
+    .map(entry => {
       const [name, ports] = entry.split('=');
       const [adminStr, appStr] = (ports ?? '').split(':');
       const admin = Number(adminStr);
@@ -178,10 +186,10 @@ function parseConductors(csv: string): PeerConfig[] {
 
 function resolveActingPeer(flags: Flags, peers: PeerConfig[]): PeerConfig {
   const name = flags.as ?? peers[0]?.name;
-  const peer = peers.find((p) => p.name === name);
+  const peer = peers.find(p => p.name === name);
   if (!peer) {
     throw new Error(
-      `--as ${name}: no such configured peer (have: ${peers.map((p) => p.name).join(', ')})`,
+      `--as ${name}: no such configured peer (have: ${peers.map(p => p.name).join(', ')})`
     );
   }
   return peer;
@@ -191,14 +199,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms);
     p.then(
-      (v) => {
+      v => {
         clearTimeout(t);
         resolve(v);
       },
-      (e) => {
+      e => {
         clearTimeout(t);
         reject(e);
-      },
+      }
     );
   });
 }
@@ -213,15 +221,18 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 async function conductor(name: string, adminPort: number, appPort: number, timeoutMs: number) {
   const wsOpts: any = { origin: APP_ID };
   const admin = await withTimeout(
-    AdminWebsocket.connect({ url: new URL(`ws://127.0.0.1:${adminPort}`), wsClientOptions: wsOpts }),
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${adminPort}`),
+      wsClientOptions: wsOpts,
+    }),
     timeoutMs,
-    `admin connect ${name}:${adminPort}`,
+    `admin connect ${name}:${adminPort}`
   );
   const apps = await admin.listApps({});
   const app = apps.find((a: any) => a.installed_app_id === APP_ID) ?? apps[0];
   if (!app) {
     throw new Error(
-      `${name}: no installed app on adminPort=${adminPort} (saw: ${apps.map((a: any) => a.installed_app_id).join(',')})`,
+      `${name}: no installed app on adminPort=${adminPort} (saw: ${apps.map((a: any) => a.installed_app_id).join(',')})`
     );
   }
   const cells = new Map<string, any>();
@@ -232,7 +243,9 @@ async function conductor(name: string, adminPort: number, appPort: number, timeo
   }
   const lamad = cells.get(ROLE);
   if (!lamad) {
-    throw new Error(`${name}: no '${ROLE}' cell provisioned (roles: ${[...cells.keys()].join(',')})`);
+    throw new Error(
+      `${name}: no '${ROLE}' cell provisioned (roles: ${[...cells.keys()].join(',')})`
+    );
   }
   await admin.authorizeSigningCredentials(lamad);
   const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
@@ -243,11 +256,11 @@ async function conductor(name: string, adminPort: number, appPort: number, timeo
       wsClientOptions: wsOpts,
     }),
     timeoutMs,
-    `app connect ${name}:${appPort}`,
+    `app connect ${name}:${appPort}`
   );
   const call = (fn_name: string, payload: any) =>
     appWs.callZome({ cell_id: lamad, zome_name: ZOME, fn_name, payload });
-  return { name, admin, appWs, call, agent: encodeHashToBase64(lamad[1]) as string };
+  return { name, admin, appWs, call, agent: encodeHashToBase64(lamad[1]) };
 }
 
 function toB64(v: unknown): string {
@@ -283,7 +296,7 @@ function warnUnlessChannelIdConvention(channelId: string) {
   if (!/^runtime:[^:]+:[^:]+:[^:]+$/.test(channelId)) {
     console.error(
       `warning: channelId '${channelId}' does not match the spec §3 convention ` +
-        `runtime:<artifact-class>:<network>:<channel-name>`,
+        `runtime:<artifact-class>:<network>:<channel-name>`
     );
   }
 }
@@ -298,7 +311,9 @@ function parseJsonArg(value: string | undefined): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(value, 'utf8'));
   } catch (e) {
-    throw new Error(`--discipline: not valid inline JSON nor a readable JSON file: ${value} (${e})`);
+    throw new Error(
+      `--discipline: not valid inline JSON nor a readable JSON file: ${value} (${e})`
+    );
   }
 }
 
@@ -358,7 +373,7 @@ async function cmdChannelCreate(
   channelId: string,
   flags: Flags,
   peers: PeerConfig[],
-  timeoutMs: number,
+  timeoutMs: number
 ) {
   warnUnlessChannelIdConvention(channelId);
   const reach = flags.reach ?? 'commons';
@@ -394,7 +409,7 @@ async function cmdChannelCreate(
     created = await conn.call('create_content', payload);
   } catch (e) {
     throw new Error(
-      `channel create '${channelId}' failed on ${actingPeer.name}: ${String(e).slice(0, 400)}`,
+      `channel create '${channelId}' failed on ${actingPeer.name}: ${String(e).slice(0, 400)}`
     );
   }
   const result = {
@@ -433,7 +448,7 @@ async function authorVersionFromManifest(
   flags: Flags,
   peers: PeerConfig[],
   timeoutMs: number,
-  refuseIfEarned: boolean,
+  refuseIfEarned: boolean
 ): Promise<AuthoredVersion> {
   const label = refuseIfEarned ? 'publish' : 'revert';
   const manifestRaw = readFileSync(manifestPath, 'utf8');
@@ -444,7 +459,7 @@ async function authorVersionFromManifest(
       `${label}: manifest at ${manifestPath} has no string 'channelId' field. ` +
         `NOTE: task-release-manifest-schema-packager (T1) had not landed a schema/packager ` +
         `as of this driver's authoring, so this manifest is read duck-typed (channelId + ` +
-        `whatever else it carries), not schema-validated — see the atom's Implementation notes.`,
+        `whatever else it carries), not schema-validated — see the atom's Implementation notes.`
     );
   }
 
@@ -461,12 +476,12 @@ async function authorVersionFromManifest(
           `(${toB64(currentElection.winner_target)}). Publishing a fresh staging candidate over ` +
           `an earned head would crown this peer's own commit without adopting the standing ` +
           `authority declaration — promote/revert are the earned-tier verbs; adopt/resolve first ` +
-          `if this peer genuinely intends to supersede it.`,
+          `if this peer genuinely intends to supersede it.`
       );
     }
     console.error(
       `revert: re-electing over earned head ${toB64(currentElection.winner_target)} — this ` +
-        `declarer is the authority moving the earned head, not a staging candidate`,
+        `declarer is the authority moving the earned head, not a staging candidate`
     );
   }
 
@@ -490,7 +505,7 @@ async function authorVersionFromManifest(
     if (msg.includes('no Content entry found for id')) {
       throw new Error(
         `${label}: channel '${channelId}' not found on ${actingPeer.name} — run ` +
-          `'channel create ${channelId}' first. (${msg.slice(0, 200)})`,
+          `'channel create ${channelId}' first. (${msg.slice(0, 200)})`
       );
     }
     throw new Error(`${label}: update_content failed on ${actingPeer.name}: ${msg.slice(0, 400)}`);
@@ -499,13 +514,18 @@ async function authorVersionFromManifest(
   return { conn, channelId, releaseCid, actingPeer };
 }
 
-async function cmdPublish(manifestPath: string, flags: Flags, peers: PeerConfig[], timeoutMs: number) {
+async function cmdPublish(
+  manifestPath: string,
+  flags: Flags,
+  peers: PeerConfig[],
+  timeoutMs: number
+) {
   const { conn, channelId, releaseCid, actingPeer } = await authorVersionFromManifest(
     manifestPath,
     flags,
     peers,
     timeoutMs,
-    true,
+    true
   );
 
   const declarePayload = {
@@ -536,7 +556,7 @@ async function declareEarned(
   releaseCid: string,
   flags: Flags,
   peers: PeerConfig[],
-  timeoutMs: number,
+  timeoutMs: number
 ) {
   const actingPeer = resolveActingPeer(flags, peers);
   const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
@@ -569,8 +589,8 @@ async function declareEarned(
           error: String(e).slice(0, 500),
         },
         null,
-        2,
-      ),
+        2
+      )
     );
     process.exit(1);
   }
@@ -591,13 +611,15 @@ async function declareEarned(
   // cost). Gossip propagation is the ~2 min class (spec §10) — the second
   // peer may legitimately still show the prior state; report what it says,
   // do not poll-until-match and call that "proof."
-  const secondPeer = peers.find((p) => p.name !== actingPeer.name);
+  const secondPeer = peers.find(p => p.name !== actingPeer.name);
   if (secondPeer) {
     const secondAnswer = await resolveElectionOnPeer(secondPeer, channelId, timeoutMs);
     result.secondPeerVerification = secondAnswer;
   } else {
     result.secondPeerVerification = null;
-    console.error('warning: only one peer configured — cannot verify convergence from a second peer');
+    console.error(
+      'warning: only one peer configured — cannot verify convergence from a second peer'
+    );
   }
 
   console.log(JSON.stringify(result, null, 2));
@@ -627,7 +649,7 @@ async function cmdRevert(
   priorReleaseCidOrManifest: string,
   flags: Flags,
   peers: PeerConfig[],
-  timeoutMs: number,
+  timeoutMs: number
 ) {
   if (!isManifestFile(priorReleaseCidOrManifest)) {
     await declareEarned('revert', channelId, priorReleaseCidOrManifest, flags, peers, timeoutMs);
@@ -639,7 +661,7 @@ async function cmdRevert(
   if (authored.channelId !== channelId) {
     throw new Error(
       `revert: channelId mismatch — command line said '${channelId}' but manifest ` +
-        `'${manifestPath}' declares channelId '${authored.channelId}'`,
+        `'${manifestPath}' declares channelId '${authored.channelId}'`
     );
   }
 
@@ -655,22 +677,22 @@ async function cmdRevert(
         releaseCid: authored.releaseCid,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 
   await declareEarned('revert', channelId, authored.releaseCid, flags, peers, timeoutMs);
 }
 
 async function cmdStatus(channelId: string, _flags: Flags, peers: PeerConfig[], timeoutMs: number) {
-  const rows = await Promise.all(peers.map((p) => resolveElectionOnPeer(p, channelId, timeoutMs)));
+  const rows = await Promise.all(peers.map(p => resolveElectionOnPeer(p, channelId, timeoutMs)));
   const report = {
     channelId,
     checkedAt: new Date().toISOString(),
     peers: rows,
   };
   console.log(JSON.stringify(report, null, 2));
-  const anyReachable = rows.some((r) => r.reachable);
+  const anyReachable = rows.some(r => r.reachable);
   process.exit(anyReachable ? 0 : 3);
 }
 
@@ -700,7 +722,10 @@ async function main() {
 
   if (verb === 'channel' && subverb === 'create') {
     const [channelId] = positionals;
-    if (!channelId) throw new Error('usage: channel create <channelId> [--reach <tier>] [--discipline <json|path>]');
+    if (!channelId)
+      throw new Error(
+        'usage: channel create <channelId> [--reach <tier>] [--discipline <json|path>]'
+      );
     await cmdChannelCreate(channelId, flags, peers, timeoutMs);
   } else if (verb === 'publish') {
     const [manifestPath] = positionals;
@@ -725,7 +750,7 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+main().catch(e => {
   console.error(String(e?.stack ?? e).slice(0, 2000));
   process.exit(1);
 });

@@ -13,8 +13,14 @@
  * The grant phase is the "primary device act": it runs against matthew's own conductor,
  * whose lair signs the delegation. The declare phase is the second device acting under it.
  */
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 import { readFileSync, writeFileSync } from 'node:fs';
+
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  encodeHashToBase64,
+  decodeHashFromBase64,
+} from '@holochain/client';
 
 const W = process.env.DEVICE_AGENT ?? 'uhCAkDRf5_8rAphi2xekEmRCrfw4dIUkKG0B01WiNSdp31LFIwZcX'; // override with DEVICE_AGENT after a conductor re-key
 const SCRATCH = '/tmp/claude-0/-projects-elohim/bd085a03-fcae-4c1c-b245-fda9ca07a257/scratchpad';
@@ -22,31 +28,6 @@ const APP_ID = 'elohim';
 
 function b64FromBytes(u8: Uint8Array): string {
   return Buffer.from(u8).toString('base64');
-}
-
-async function connect(adminUrl: string, origin: string) {
-  const admin = await AdminWebsocket.connect({
-    url: new URL(adminUrl),
-    wsClientOptions: { origin },
-  });
-  const apps = await admin.listApps({});
-  const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
-  if (!app) throw new Error(`no installed app on ${adminUrl} (saw: ${apps.map(a => a.installed_app_id).join(',')})`);
-  const cells = new Map<string, any>();
-  for (const [role, infos] of Object.entries(app.cell_info)) {
-    for (const info of infos as any[]) {
-      if (info.type === 'provisioned' && info.value?.cell_id) cells.set(role, info.value.cell_id);
-    }
-  }
-  const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
-  const port = (await admin.listAppInterfaces()).find(Boolean);
-  if (port === undefined) throw new Error('no app interface attached');
-  const appWs = await AppWebsocket.connect({
-    url: new URL(adminUrl.replace(/^wss:\/\/([^?]+).*/, 'wss://$1').replace(/^ws:\/\/[^:]+:\d+.*/, m => m)),
-    token: token.token,
-    wsClientOptions: { origin },
-  } as any);
-  return { admin, appWs, cells, appId: app.installed_app_id };
 }
 
 async function grant() {
@@ -63,7 +44,10 @@ async function grant() {
   const admin = await AdminWebsocket.connect({ url: new URL(adminUrl), wsClientOptions: wsOpts });
   const apps = await admin.listApps({});
   const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
-  if (!app) throw new Error(`no app on fleet conductor (saw ${apps.map(a => a.installed_app_id).join(',')})`);
+  if (!app)
+    throw new Error(
+      `no app on fleet conductor (saw ${apps.map(a => a.installed_app_id).join(',')})`
+    );
   const cells = new Map<string, any>();
   for (const [role, infos] of Object.entries(app.cell_info)) {
     for (const info of infos as any[]) {
@@ -91,7 +75,11 @@ async function grant() {
   const appUrl = loopback
     ? new URL(`ws://${au.hostname}:${appPort}`)
     : new URL(`${au.protocol}//${au.host}/hc/app/${appPort}`);
-  const appWs = await AppWebsocket.connect({ url: appUrl, token: token.token, wsClientOptions: wsOpts });
+  const appWs = await AppWebsocket.connect({
+    url: appUrl,
+    token: token.token,
+    wsClientOptions: wsOpts,
+  });
 
   const validUntil = (Date.now() + 30 * 24 * 3600 * 1000) * 1000; // 30 days, µs
   const delegation: any = await appWs.callZome({
@@ -127,11 +115,18 @@ async function grant() {
         cell_id: mishpat,
         zome_name: 'mishpat',
         fn_name: 'create_commitment',
-        payload: { action: 'binds-identity', payload_json: JSON.stringify(payload), signed_at: payload.signed_at },
+        payload: {
+          action: 'binds-identity',
+          payload_json: JSON.stringify(payload),
+          signed_at: payload.signed_at,
+        },
       });
       console.log('binds-identity commitment:', JSON.stringify(out).slice(0, 200));
     } catch (e) {
-      console.log('binds-identity commitment failed (non-fatal for the ceremony):', String(e).slice(0, 300));
+      console.log(
+        'binds-identity commitment failed (non-fatal for the ceremony):',
+        String(e).slice(0, 300)
+      );
     }
   }
   process.exit(0);
@@ -139,16 +134,21 @@ async function grant() {
 
 async function declare() {
   const delegation = JSON.parse(readFileSync(`${SCRATCH}/delegation.json`, 'utf8'));
-  const md = readFileSync('/projects/elohim/genesis/docs/content/elohim-protocol/manifesto.md', 'utf8');
+  const md = readFileSync(
+    '/projects/elohim/genesis/docs/content/elohim-protocol/manifesto.md',
+    'utf8'
+  );
   // The seeder strips frontmatter; manifesto.md has none beyond the cites block? Use the
   // CID twin's canonical content so bytes match the fleet's declared blobHash.
-  const twin = JSON.parse(readFileSync('/projects/elohim/genesis/data/lamad/content/manifesto.json', 'utf8'));
+  const twin = JSON.parse(
+    readFileSync('/projects/elohim/genesis/data/lamad/content/manifesto.json', 'utf8')
+  );
   const node = Array.isArray(twin) ? twin[0] : twin;
   const base = 'http://localhost:8090';
 
   // 1. PATCH the workspace's manifesto row to the latest bytes + commons reach
   //    (the workspace has no `manifesto` row yet → create it first via bulk).
-  let r = await fetch(`${base}/db/content/manifesto`, { method: 'GET' });
+  const r = await fetch(`${base}/db/content/manifesto`, { method: 'GET' });
   if (r.status === 404) {
     const bulk = await fetch(`${base}/db/content/bulk`, {
       method: 'POST',
@@ -183,6 +183,17 @@ async function declare() {
 }
 
 const phase = process.argv[2];
-if (phase === 'grant') grant().catch(e => { console.error(e); process.exit(1); });
-else if (phase === 'declare') declare().catch(e => { console.error(e); process.exit(1); });
-else { console.error('usage: device-ceremony.ts grant|declare'); process.exit(2); }
+if (phase === 'grant')
+  grant().catch(e => {
+    console.error(e);
+    process.exit(1);
+  });
+else if (phase === 'declare')
+  declare().catch(e => {
+    console.error(e);
+    process.exit(1);
+  });
+else {
+  console.error('usage: device-ceremony.ts grant|declare');
+  process.exit(2);
+}

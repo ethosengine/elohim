@@ -21,6 +21,10 @@ export default tseslint.config(
       // fixed by rule so the measure it produces stays comparable across shifts; lint is
       // exempted rather than the gate bypassed. Retire this line with the oracle.
       'scripts/dataplane-convergence-measure.ts',
+      // Frozen election oracle (2026-08-31, habit dataplane-convergence): never edited, never
+      // imported — the ceremony drivers copy its SHAPE by rule. Lint-exempt so no formatter
+      // can move a byte of it. Retire this line with the oracle.
+      'scripts/carried-election-mesh-proof.ts',
     ],
   },
   {
@@ -201,6 +205,16 @@ export default tseslint.config(
     files: ['scripts/**/*.ts'],
     rules: {
       'no-console': 'off',
+      // Mesh-proof / ceremony driver scripts copy the frozen oracle's conductor rail
+      // (carried-election-mesh-proof.ts, which is frozen by rule and `any`-shaped).
+      // Typing the rail once as a shared module is backlog work; until then the `any`
+      // family and script-only structure rules are relaxed here, not in src/ or steps/.
+      '@typescript-eslint/no-explicit-any': 'off',
+      'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
+      'sonarjs/cognitive-complexity': 'off',
+      'sonarjs/no-nested-conditional': 'off',
+      'sonarjs/publicly-writable-directories': 'off',
+      'sonarjs/no-alphabetical-sort': 'off',
     },
   },
   {

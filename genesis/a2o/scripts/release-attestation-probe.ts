@@ -66,7 +66,12 @@ const RIDDEN_KIND = 'attestation:device-health';
 /** `metadata_json.proof_evidence.kind` discriminator. */
 const SOAK_DISCRIMINATOR = 'release-soak';
 
-type PeerSpec = { name: string; admin: number; app: number; http: number };
+interface PeerSpec {
+  name: string;
+  admin: number;
+  app: number;
+  http: number;
+}
 
 function peer(envKey: string, fallback: string): PeerSpec {
   const [name, admin, app, http] = (process.env[envKey] ?? fallback).split(':');
@@ -350,7 +355,7 @@ async function main() {
       attestation_kind: 'attestation:release-soak', // a NEW kind — must be refused
     })
   );
-  if (!/unknown_attestation_subtype/.test(floor1))
+  if (!floor1.includes('unknown_attestation_subtype'))
     throw new Error(
       `floor1 refusal did not name unknown_attestation_subtype: ${floor1.slice(0, 300)}`
     );
@@ -369,7 +374,7 @@ async function main() {
     bad.proof_evidence = { ...bad.proof_evidence, class: 'audit' }; // audit w/o merkle_root
     return a.call('issue_attestation', bad);
   });
-  if (!/floor8_failed/.test(floor8))
+  if (!floor8.includes('floor8_failed'))
     throw new Error(`floor8 refusal did not name floor8_failed: ${floor8.slice(0, 300)}`);
   console.log(
     'FLOOR 8 PROVEN: proof_evidence floors are live — the chosen shape passes a real floor'

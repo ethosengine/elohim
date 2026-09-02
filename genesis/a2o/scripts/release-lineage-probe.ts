@@ -60,7 +60,12 @@
  *
  * Optional overrides (positional, in order): channelId, oHash, pHash.
  */
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  encodeHashToBase64,
+  decodeHashFromBase64,
+} from '@holochain/client';
 
 const APP_ID = 'elohim';
 const ROLE = 'lamad';
@@ -86,14 +91,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms);
     p.then(
-      (v) => {
+      v => {
         clearTimeout(t);
         resolve(v);
       },
-      (e) => {
+      e => {
         clearTimeout(t);
         reject(e);
-      },
+      }
     );
   });
 }
@@ -102,15 +107,18 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 async function conductor(name: string, adminPort: number, appPort: number, timeoutMs: number) {
   const wsOpts: any = { origin: APP_ID };
   const admin = await withTimeout(
-    AdminWebsocket.connect({ url: new URL(`ws://127.0.0.1:${adminPort}`), wsClientOptions: wsOpts }),
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${adminPort}`),
+      wsClientOptions: wsOpts,
+    }),
     timeoutMs,
-    `admin connect ${name}:${adminPort}`,
+    `admin connect ${name}:${adminPort}`
   );
   const apps = await admin.listApps({});
   const app = apps.find((a: any) => a.installed_app_id === APP_ID) ?? apps[0];
   if (!app) {
     throw new Error(
-      `${name}: no installed app on adminPort=${adminPort} (saw: ${apps.map((a: any) => a.installed_app_id).join(',')})`,
+      `${name}: no installed app on adminPort=${adminPort} (saw: ${apps.map((a: any) => a.installed_app_id).join(',')})`
     );
   }
   const cells = new Map<string, any>();
@@ -121,7 +129,9 @@ async function conductor(name: string, adminPort: number, appPort: number, timeo
   }
   const lamad = cells.get(ROLE);
   if (!lamad) {
-    throw new Error(`${name}: no '${ROLE}' cell provisioned (roles: ${[...cells.keys()].join(',')})`);
+    throw new Error(
+      `${name}: no '${ROLE}' cell provisioned (roles: ${[...cells.keys()].join(',')})`
+    );
   }
   await admin.authorizeSigningCredentials(lamad);
   const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
@@ -132,11 +142,11 @@ async function conductor(name: string, adminPort: number, appPort: number, timeo
       wsClientOptions: wsOpts,
     }),
     timeoutMs,
-    `app connect ${name}:${appPort}`,
+    `app connect ${name}:${appPort}`
   );
   const call = (fn_name: string, payload: any) =>
     appWs.callZome({ cell_id: lamad, zome_name: ZOME, fn_name, payload });
-  return { name, admin, appWs, call, agent: encodeHashToBase64(lamad[1]) as string };
+  return { name, admin, appWs, call, agent: encodeHashToBase64(lamad[1]) };
 }
 
 /** Deep-walk a decoded zome return value, base64-encoding any Uint8Array
@@ -169,12 +179,20 @@ function safeParseKind(metadataJson: unknown): { kind?: unknown; parseError?: st
   }
 }
 
-async function probeGetContent(call: (fn: string, p: any) => Promise<any>, label: string, hashB64: string) {
+async function probeGetContent(
+  call: (fn: string, p: any) => Promise<any>,
+  label: string,
+  hashB64: string
+) {
   let actionHashBytes: Uint8Array;
   try {
     actionHashBytes = decodeHashFromBase64(hashB64);
   } catch (e) {
-    return { label, hash: hashB64, error: `decodeHashFromBase64 failed: ${String(e).slice(0, 200)}` };
+    return {
+      label,
+      hash: hashB64,
+      error: `decodeHashFromBase64 failed: ${String(e).slice(0, 200)}`,
+    };
   }
   try {
     const result: any = await call('get_content', actionHashBytes);
@@ -220,15 +238,11 @@ async function probePeer(peer: PeerConfig) {
       headError = String(e).slice(0, 500);
     }
     report.resolve_content_head_local =
-      headResult === null
-        ? null
-        : headError
-          ? { error: headError }
-          : b64ify(headResult);
+      headResult === null ? null : headError ? { error: headError } : b64ify(headResult);
     if (headError) report.resolve_content_head_local_error = headError;
 
     const supersedesB64: string | null =
-      headResult && headResult.supersedes !== null && headResult.supersedes !== undefined
+      headResult?.supersedes !== null && headResult?.supersedes !== undefined
         ? (b64ify(headResult.supersedes) as string)
         : null;
 
@@ -272,7 +286,11 @@ async function probePeer(peer: PeerConfig) {
 
     // Bonus context: also print release P's get_content result, since the
     // whole incident is about P being refused.
-    report.get_content_release_P_context = await probeGetContent(conn.call, 'release_P_context', RELEASE_P);
+    report.get_content_release_P_context = await probeGetContent(
+      conn.call,
+      'release_P_context',
+      RELEASE_P
+    );
   } finally {
     try {
       await conn.appWs.client.close();
@@ -295,7 +313,7 @@ async function main() {
   console.error(
     'version-listing extern check: NONE exposed — get_content_by_id returns one current ' +
       'version (not a list); gather_content_chain walks the full chain but is a private fn, ' +
-      'no #[hdk_extern] wrapper (elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs).',
+      'no #[hdk_extern] wrapper (elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs).'
   );
 
   const reports = [];
@@ -318,13 +336,13 @@ async function main() {
         peers: reports,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
   process.exit(0);
 }
 
-main().catch((e) => {
+main().catch(e => {
   console.error(String(e?.stack ?? e).slice(0, 2000));
   process.exit(1);
 });
