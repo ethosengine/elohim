@@ -241,6 +241,19 @@ if [ -z "${ARK_BIN:-}" ]; then
     ARK_BIN="$(command -v ark 2>/dev/null || true)"
   fi
 fi
+# Absolutise whatever we ended up with — including an operator-supplied
+# ARK_BIN, which skips the block above entirely. Every launch site runs inside
+# a subshell that has `cd`'d into $LOCAL_DEV_DIR, so a relative path would name
+# a DIFFERENT file there than the `-x` check answered about here (or nothing at
+# all). Resolve once, at the only point where $PWD is still the caller's.
+absolutise_ark_bin() {
+  [ -n "${ARK_BIN:-}" ] || return 0
+  local resolved
+  resolved="$(readlink -f "$ARK_BIN" 2>/dev/null || true)"
+  [ -n "$resolved" ] && ARK_BIN="$resolved"
+  return 0
+}
+absolutise_ark_bin
 
 # MESH_DOORWAY_GATEWAY_SCOPING — does a mesh doorway name its humans the way a
 # FLEET doorway does? Every deployed doorway runs with DOORWAY_URL set, and
@@ -337,12 +350,39 @@ mesh_conductor_pid() { # <peer-name> -> prints the conductor child pid, or retur
 }
 
 assert_ark_binary() {
+  # Re-absolutise first: ARK_BIN can be set (or re-set) after this file is
+  # sourced, and the -x answer has to be about the same bytes the launch site
+  # will exec from another directory.
+  absolutise_ark_bin
   [ -n "${ARK_BIN:-}" ] && [ -x "$ARK_BIN" ] && return 0
   echo "MESH_CONDUCTOR_LAUNCH=ark: no executable ark binary (ARK_BIN='${ARK_BIN:-}')" >&2
   echo "  build it:" >&2
   echo "    cd '$REPO_ROOT/elohim' && CARGO_TARGET_DIR='$POOL/elohim/dev' RUSTFLAGS=\"\" cargo build -p elohim-ark" >&2
   echo "  or point ARK_BIN at one; refusing to fall back to another launch mode." >&2
   return 1
+}
+
+# What a launch mode must be able to do BEFORE anything is generated.
+#
+# `hc` (and `direct`, unchanged) demand toolchain parity because `hc sandbox`
+# rewrites conductor-config.yaml in the CLI's own schema. `ark` never launches
+# through the CLI — exactly as `direct` doesn't, which is why
+# conductors_restart already skips the parity check for both — so that refusal
+# is not the one that protects an ark run. What DOES protect it is the pair
+# write_ark_declarations cannot work without: the ark binary (it hashes the
+# conductor and mints the manifest CID) and jq (it writes both declarations).
+# Both are asked for here, at the top, rather than after three sandboxes have
+# been generated and the mesh is already half-built.
+assert_launch_prerequisites() {
+  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
+    assert_ark_binary || return 1
+    command -v jq >/dev/null 2>&1 || {
+      echo "MESH_CONDUCTOR_LAUNCH=ark: jq is required to write each peer's manifest.json and berth.json" >&2
+      return 1
+    }
+    return 0
+  fi
+  assert_toolchain_parity
 }
 
 # The conductor binary an ark will pin, hash and execute. Identical selection to
@@ -423,10 +463,29 @@ write_ark_declarations() { # <peer-name> <peer-index>
   # Incarnation is monotone across restarts and `ark run` bumps whatever it
   # finds, so a berth rewritten on every launch must carry the last passport's
   # value forward instead of resetting the count to zero.
+  #
+  # Fail CLOSED. A passport that exists but cannot be read for a nonnegative
+  # integer incarnation is evidence about a data root that has already been
+  # run — silently substituting 0 would rewrite the berth with a count LOWER
+  # than the one the spool remembers, which is exactly the monotonicity this
+  # value exists to keep. Refuse this peer's launch instead and say why.
   incarnation=0
   if [ -f "$ark_dir/passport.json" ]; then
-    incarnation="$(jq -r '.incarnation // 0' "$ark_dir/passport.json" 2>/dev/null)"
-    [[ "$incarnation" =~ ^[0-9]+$ ]] || incarnation=0
+    incarnation="$(jq -e -r '
+      if (.incarnation | type) == "number"
+         and .incarnation >= 0
+         and (.incarnation | floor) == .incarnation
+      then .incarnation else empty end
+    ' "$ark_dir/passport.json" 2>/dev/null)" || {
+      echo "ark: $name's passport.json carries no readable incarnation — refusing to reset it to 0" >&2
+      echo "  read it yourself: $ark_dir/passport.json" >&2
+      echo "  (remove the passport only if this data root is being deliberately re-seeded)" >&2
+      return 1
+    }
+    [[ "$incarnation" =~ ^[0-9]+$ ]] || {
+      echo "ark: $name's passport.json incarnation is not a nonnegative integer: '$incarnation'" >&2
+      return 1
+    }
   fi
 
   # "test" is the same passphrase the `hc` and `direct` branches pipe in, and
@@ -637,6 +696,34 @@ guard_conductor_data_roots() { # <verb>
   echo "REFUSING $verb: state=orphaned-data-root" >&2
   echo "  remediation: ./hc-mesh.sh stop && ./hc-mesh.sh start" >&2
   echo "  stop kills the surviving conductor; start then regenerates its sandbox." >&2
+  return 1
+}
+
+# Is ANY peer's data root still held by a live process? `start` decides whether
+# to regenerate from ONE observation — peer 0's admin port being silent — and
+# then removes every peer directory. That port is silent while an ark is
+# between incarnations, and it says nothing at all about peers 1..n, so the
+# regenerate branch can reach a `rm -rf` of a data root that a running ark or a
+# running conductor is writing to (deleted-inode sandbox, orphaned ark, lost
+# spool). Ask every peer directly instead, with the two pid facts this script
+# already trusts: the recorded ark pid (validated against its start ticks) and
+# the conductor pid that owns the peer's admin port.
+assert_no_live_peer_processes() { # <verb> — 0 only when every peer is idle
+  local verb="$1" i=0 name pid survivors=""
+  for name in "${PEERS[@]}"; do
+    if pid="$(live_recorded_pid ark "$name")"; then
+      survivors+="  $name: ark pid $pid"$'\n'
+    fi
+    if pid="$(conductor_pid_for_index "$name" "$i")" && [ -n "$pid" ]; then
+      survivors+="  $name: conductor pid $pid"$'\n'
+    fi
+    i=$((i + 1))
+  done
+  [ -z "$survivors" ] && return 0
+  echo "REFUSING $verb: a live process still owns a peer data root under $LOCAL_DEV_DIR" >&2
+  printf '%s' "$survivors" >&2
+  echo "  regenerating would delete those sandboxes out from under running processes." >&2
+  echo "  remediation: ./hc-mesh.sh stop, then start again." >&2
   return 1
 }
 
@@ -2095,7 +2182,9 @@ join_peer() { # <fresh-peer-name>
     fi
   done
 
-  assert_toolchain_parity
+  # Whatever this launch mode needs, asked for before the sandbox is generated:
+  # toolchain parity under `hc`/`direct`, the ark binary and jq under `ark`.
+  assert_launch_prerequisites || return 1
   [ -x "$STORAGE_BIN" ] || {
     echo "join-peer: storage binary is not executable: $STORAGE_BIN" >&2
     return 1
@@ -2137,7 +2226,9 @@ join_peer() { # <fresh-peer-name>
   local conductor_log="$LOCAL_DEV_DIR/.sandbox_run_log.$name"
   echo "starting late-join conductor $name: admin=$(admin_port "$index") app=$(app_port "$index")"
   if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
-    assert_ark_binary || return 1
+    # assert_ark_binary already ran in assert_launch_prerequisites above, before
+    # this peer's sandbox was generated — asking again here would only be able
+    # to refuse a mesh that has already grown a data root.
     launch_ark_conductor "$name" "$index" || return 1
   elif [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
     local conductor_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
@@ -2211,8 +2302,10 @@ join_peer() { # <fresh-peer-name>
 start_all() {
   guard_conductor_data_roots start || return 1
   # The CLI writes the config the conductor must parse — refuse a mismatched
-  # pair before anything is generated, not after three conductors panic.
-  assert_toolchain_parity
+  # pair before anything is generated, not after three conductors panic. Under
+  # `ark` the refusal that matters is a different one (the ark binary and jq),
+  # and it is made in the same place, for the same reason.
+  assert_launch_prerequisites || return 1
   mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR" "$PID_DIR"
 
   # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
@@ -2425,6 +2518,10 @@ EOF
   #    the conductor must not boot until the patch has landed, or its first
   #    kitsune2 gossip round starts at prod cadence.
   if [ "$(ss -tln | grep -cE "127.0.0.1:$(admin_port 0) ")" -eq 0 ]; then
+    # Peer 0's silent admin port is not evidence that peers 1..n are idle, nor
+    # that an ark is not alive between incarnations — and the next line removes
+    # every peer's data root. Ask each peer before destroying anything.
+    assert_no_live_peer_processes start || return 1
     cd "$LOCAL_DEV_DIR" || exit 2
     rm -rf .hc .sandbox_log .sandbox_run_log "${PEERS[@]}"
     local fports="" rports=""
