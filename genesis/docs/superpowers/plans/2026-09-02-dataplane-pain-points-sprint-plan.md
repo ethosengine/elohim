@@ -151,7 +151,7 @@ elif [ "$rc" -eq 4 ]; then
 
 - [x] **Step 7: atom + delta.** Set the backlog atom's `status:` to `"in-tree"` and append one dated line naming the two edits. Put this in the commit message: `HABIT-DELTA: quiesce leg bounded (55 min, warn-only on deploy, strict on validate-only) + COORDSWAP deferred verdict — fleet-unproven until the next edge build shows UNSTABLE-not-ABORTED`.
 
-- [ ] **Step 8: commit** (path-limited): the Jenkinsfile, the two scripts, the atom.
+- [x] **Step 8: commit** (path-limited): the Jenkinsfile, the two scripts, the atom.
 
 **Evidence that closes it (integrator, after push):** the next edge build's log shows the stage-scoped `Timeout has been exceeded` if any, final result UNSTABLE not ABORTED, and `Deploy Edge Node - Staging` runs after it; a `[edge:validate-only]` run propagates FAILURE.
 
