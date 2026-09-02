@@ -2460,6 +2460,22 @@ habits:
       81 s), no refusals; scoped via a one-feature cucumber config + `--name '^Station [1-5]'`. Seam captured: the
       story's two-channel model (shared soak channel + commons) is stood in by ONE channel moving staging→earned
       because the driver moves a head in place — a missing node between story and driver, not a fake.
+
+      DELTA 2026-09-02 09:1xZ (r9, `genesis/a2o/reports/release-ceremony/2026-09-02/cucumber-stations-1-8-r9.{log,json}`):
+      Stations 1–6 AND 8 pass as cucumber steps — 7/8 scenarios, 97/100 steps, 29m — the first run to reach a REAL
+      revert-apply (3/3 restored to baseline by re-election) and to assemble the observed version matrix. Three
+      defects fell to get here, each measured before fixed: (1) the fixture left the fleet heterogeneous between
+      runs → every run now converges every peer to the baseline before and after (8181d60a8); (2) a revert
+      packaged at the forward attestation threshold is refused `threshold_unmet` forever — nobody attests a release
+      the fleet is asked to leave — so a revert manifest declares threshold 0 (fc090d901); (3) the controller kept
+      serving a node's PRE-apply installed reality for INSTALLED_REALITY_TTL_SECS after ITS OWN apply, refusing the
+      next release on that node `coordinator_lineage_mismatch` into the backoff ladder — apply now invalidates the
+      snapshot and a stale-cache mismatch re-reads once (6ae703bd2; on origin/dev, mesh binary rebuilt this shift).
+      Station 7 (personal channel alongside commons) is the remaining red: a personal variant bound to the baseline
+      stops matching once james runs the commons candidate — a node runs ONE coordinator per role, so a personal
+      channel must REBASE when commons moves (its appliesTo is what it supersedes); fixture rebase in flight.
+      Race learned: james following the personal channel in `canary` mode applied it before the commons canary
+      reached him (r8) — the story wants it heard (`apply` mode → `waiting`), never applied (b2e69d2d3).
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
