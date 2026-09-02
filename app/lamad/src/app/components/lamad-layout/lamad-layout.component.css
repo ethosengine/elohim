@@ -53,6 +53,15 @@
   max-width: 100%;
 }
 
+/* The step player owns the full viewport width (rails at both edges) and
+   scrolls the document, so it must not sit inside a clipped 1400px box —
+   overflow: hidden here would also defeat its sticky rails. */
+.lamad-main:has(app-path-navigator) {
+  padding: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
 /* Footer */
 .lamad-footer {
   background: var(--lamad-surface);

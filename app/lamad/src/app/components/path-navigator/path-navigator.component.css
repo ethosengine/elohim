@@ -1,125 +1,116 @@
 /* =============================================================================
-   Path Navigator Styles
-   =============================================================================
+   PathNavigator — the step-by-step learning player
 
-   VISUAL HIERARCHY - Separation of Concerns:
+   Visual hierarchy (three surfaces):
+     1. PATH TOOLING (--lamad-bg-secondary)  the lesson rail, the breadcrumb bar,
+        the step-context strip, the mastery/navigation footer
+     2. CONTENT (--lamad-bg-primary)         the resource itself, set to a
+        reading measure (--reading-measure)
+     3. EXPLORE RAIL                          the concept neighbourhood, hosted
+        here as a page column so it sits at the viewport edge
 
-   1. PATH TOOLING (--lamad-bg-secondary: gray)
-      These elements provide navigation and context for the learning path:
-      - .path-sidebar         : Left sidebar with chapter/step navigation
-      - .breadcrumbs          : Location breadcrumbs
-      - .content-header       : Step title, narrative, metadata
-      - .content-footer       : Mastery tracking, prev/next navigation
+   Scroll model: the DOCUMENT scrolls at every width (mobile already did; the
+   old desktop-only inner scroller pinned the player to a hard-coded header
+   height and put the footer below the fold). Rails are sticky. Focused view
+   is the one exception — it pins the player to the viewport so iframes can
+   measure it (see "Focused View").
 
-   2. CONTENT (--lamad-bg-primary: white)
-      The actual territory content being learned:
-      - .content-body         : Rendered content from RendererRegistryService
-
-   This visual distinction helps users understand what is path-specific
-   context (Journey layer) vs the underlying content resource (Territory layer).
-
-   ============================================================================= */
-
-/* =============================================================================
-   Layout Container
+   Width budget at 1920px: lesson rail 280 · reading track 1320 · explore rail 320.
+   Inside the track the prose keeps a ~80-character measure; on very wide
+   screens (>= 1800px) a gutter opens to the left of the measure and the
+   markdown renderer parks its Contents list there (see --markdown-toc-gutter).
    ============================================================================= */
 
 .path-player-container {
-  display: flex; /* Adjust based on global header height */
-  height: calc(100dvh - 64px); /* Dynamic viewport height for mobile browsers */
+  --reading-measure: 46rem;
+  --rail-width: 280px;
+  --explore-width: 320px;
+  --content-gutter: clamp(1rem, 3vw, 3rem);
+
+  display: flex;
+  align-items: flex-start;
+  min-height: 60vh;
   background-color: var(--lamad-bg-primary, #fff);
-  overflow: hidden;
   position: relative;
 }
 
 /* =============================================================================
-   Focused View Toggle & Mode
+   Focused View — pin the player to the viewport; only the content scrolls
    ============================================================================= */
 
-/* Toggle button is now inside breadcrumbs - no absolute positioning needed */
-
-/* Focused view mode overrides */
 .path-player-container.focused-view-active {
   height: 100dvh;
+  overflow: hidden;
 }
 
-/* Hide sidebar and tooling in focused view */
 .path-player-container.focused-view-active .path-sidebar,
 .path-player-container.focused-view-active .sidebar-toggle,
 .path-player-container.focused-view-active .sidebar-expand-btn,
-.path-player-container.focused-view-active .sidebar-backdrop {
-  display: none !important;
-}
-
-/* Hide path tooling elements in focused view */
+.path-player-container.focused-view-active .sidebar-backdrop,
+.path-player-container.focused-view-active .explore-rail,
+.path-player-container.focused-view-active .explore-reopen,
 .path-player-container.focused-view-active .path-content-header,
 .path-player-container.focused-view-active .path-content-footer,
 .path-player-container.focused-view-active .learning-objectives,
-.path-player-container.focused-view-active .reflection-prompts {
+.path-player-container.focused-view-active .reflection-prompts,
+.path-player-container.focused-view-active .breadcrumb-trail {
   display: none !important;
 }
 
-/* Hide breadcrumb trail text but keep toolbar visible in focused view */
-.path-player-container.focused-view-active .breadcrumb-trail {
-  display: none;
-}
-
-/* Main content takes full width in focused view */
 .path-player-container.focused-view-active .main-content {
-  padding: 0 !important;
+  height: 100%;
+  overflow: hidden;
 }
 
-/* Content fills viewport in focused view */
+.path-player-container.focused-view-active .breadcrumbs {
+  position: static;
+  justify-content: flex-end;
+}
+
 .path-player-container.focused-view-active .content-scroll-container {
-  max-width: 100%;
-  width: 100%;
-  height: 100%;
-  margin: 0;
+  display: block;
+  height: calc(100% - 3rem);
+  overflow-y: auto;
   padding: 0;
 }
 
+.path-player-container.focused-view-active .reading-column,
 .path-player-container.focused-view-active .content {
+  height: 100%;
   padding: 0;
   margin: 0;
 }
 
 .path-player-container.focused-view-active .content-inner {
+  --markdown-toc-gutter: 0px;
+
   max-width: 100%;
   width: 100%;
-  height: calc(100vh - 3rem); /* Account for breadcrumbs toolbar */
-  min-height: calc(100vh - 3rem);
+  height: 100%;
   padding: 0;
   margin: 0;
 }
 
-/* LessonView fills available space in focused mode */
 .path-player-container.focused-view-active app-lesson-view {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.path-player-container.focused-view-active .lesson-view {
-  height: 100% !important;
-}
-
-.path-player-container.focused-view-active .lesson-main {
-  height: 100% !important;
-  padding: 1rem !important;
-}
-
 /* =============================================================================
-   PATH TOOLING: Sidebar
-   Left sidebar with path navigation, chapters, and progress
+   PATH TOOLING: Lesson rail (left)
    ============================================================================= */
 
 .path-sidebar {
-  width: 320px;
-  background-color: var(--lamad-bg-secondary, #f8f9fa);
-  border-right: 1px solid var(--lamad-border, #e5e7eb);
+  width: var(--rail-width);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  background-color: var(--lamad-bg-secondary, #f8f9fa);
+  border-right: 1px solid var(--lamad-border, #e5e7eb);
   transition:
     width 0.3s ease,
     transform 0.3s ease;
@@ -127,7 +118,7 @@
 }
 
 .sidebar-header {
-  padding: 1.5rem;
+  padding: 1.25rem 1.25rem 1rem;
   border-bottom: 1px solid var(--lamad-border, #e5e7eb);
 }
 
@@ -135,7 +126,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--lamad-text-secondary, #6b7280);
   text-decoration: none;
   margin-bottom: 1rem;
@@ -154,7 +145,7 @@
 }
 
 .path-title {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--lamad-text-primary, #111827);
   margin: 0;
@@ -168,138 +159,36 @@
   white-space: nowrap;
 }
 
-/* Sidebar Navigation List */
-.sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem 0;
-}
-
-.chapter-item {
-  margin-bottom: 0.5rem;
-}
-
-.chapter-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  color: var(--lamad-text-primary, #374151);
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.chapter-header:hover {
-  background-color: var(--lamad-bg-secondary, #f3f4f6);
-}
-
-.step-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.step-item a {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 1.5rem 0.75rem 2.5rem; /* Indented for steps */
-  text-decoration: none;
-  color: var(--lamad-text-secondary, #4b5563);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  border-left: 3px solid transparent;
-}
-
-/* Flat list doesn't need extra indent */
-.step-list.flat .step-item a {
-  padding-left: 1.5rem;
-}
-
-.step-item:hover a {
-  background-color: var(--lamad-bg-secondary, #f3f4f6);
-  color: var(--lamad-text-primary, #111827);
-}
-
-.step-item.current a {
-  background-color: rgb(99 102 241 / 8%);
-  color: var(--lamad-accent-primary, #4f46e5);
-  font-weight: 600;
-  border-left-color: var(--lamad-accent-primary, #4f46e5);
-}
-
-.step-item.locked a {
-  cursor: not-allowed;
-  opacity: 60%;
-}
-
-/* Status Icons */
-.status-icon {
-  flex-shrink: 0;
-  width: 1.25rem;
-  display: flex;
-  justify-content: center;
-}
-
-.content-icon {
-  flex-shrink: 0;
-  width: 1.25rem;
-  display: flex;
-  justify-content: center;
-  font-size: 0.9rem;
-  margin-right: 0.25rem;
-}
-
-.checkmark {
-  color: var(--lamad-success, #10b981);
-  font-weight: bold;
-}
-
-.checkmark.global {
-  color: var(--lamad-success, #10b981);
-  opacity: 70%; /* Distinguish mastered-elsewhere */
-}
-
-/* =============================================================================
-   Lesson-Focused Sidebar Styles
-   Shows current lesson context and concepts within the section
-   ============================================================================= */
-
 .lesson-title-wrapper {
   margin-bottom: 1rem;
 }
 
 .lesson-context {
   display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.6875rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--lamad-text-tertiary, #9ca3af);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.375rem;
 }
 
 .lesson-title {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   color: var(--lamad-text-primary, #111827);
   margin: 0 0 0.25rem;
   line-height: 1.3;
+  text-wrap: balance;
 }
 
 .lesson-section {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--lamad-text-secondary, #6b7280);
+  line-height: 1.4;
 }
 
-/* Lesson Progress Bar */
 .lesson-progress {
   display: flex;
   align-items: center;
@@ -308,7 +197,7 @@
 
 .lesson-progress-bar {
   flex: 1;
-  height: 6px;
+  height: 5px;
   background: var(--lamad-bg-tertiary, #e5e7eb);
   border-radius: 99px;
   overflow: hidden;
@@ -322,14 +211,20 @@
 }
 
 .lesson-progress-text {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--lamad-text-secondary, #6b7280);
-  font-family: monospace;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* Concept List in Sidebar */
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.75rem 0;
+}
+
 .concept-list {
   list-style: none;
   padding: 0;
@@ -344,18 +239,20 @@
   text-align: left;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.5rem;
+  gap: 0.625rem;
+  padding: 0.625rem 1.25rem 0.625rem calc(1.25rem - 3px);
   text-decoration: none;
   color: var(--lamad-text-secondary, #4b5563);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
   border-left: 3px solid transparent;
 }
 
 .concept-item:hover .concept-link {
-  background-color: var(--lamad-bg-secondary, #f3f4f6);
+  background-color: var(--lamad-surface-hover, #f3f4f6);
   color: var(--lamad-text-primary, #111827);
 }
 
@@ -374,6 +271,13 @@
   color: var(--lamad-accent-primary, #4f46e5);
 }
 
+.status-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  display: flex;
+  justify-content: center;
+}
+
 .concept-icon {
   flex-shrink: 0;
   width: 1.25rem;
@@ -385,16 +289,20 @@
 .concept-label {
   flex: 1;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.checkmark {
+  color: var(--lamad-success, #10b981);
+  font-weight: bold;
 }
 
 .current-indicator {
   color: var(--lamad-accent-primary, #6366f1);
   font-size: 0.8rem;
-}
-
-.lock {
-  font-size: 0.8rem;
-  color: var(--lamad-text-muted, #6b7280);
 }
 
 .circle {
@@ -403,25 +311,124 @@
   color: var(--lamad-text-muted, #9ca3af);
 }
 
-/* Main Content Area */
+/* Desktop collapse button (inside the rail) */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.625rem;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--lamad-border, #e5e7eb);
+  cursor: pointer;
+  color: var(--lamad-text-secondary, #6b7280);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.sidebar-collapse-btn:hover {
+  background-color: var(--lamad-bg-tertiary, #f3f4f6);
+  color: var(--lamad-text-primary, #374151);
+}
+
+.collapse-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Desktop expand button (shown when the rail is collapsed) */
+.sidebar-expand-btn {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 25;
+  padding: 1rem 0.5rem;
+  background: var(--lamad-bg-secondary, #f8f9fa);
+  border: 1px solid var(--lamad-border, #e5e7eb);
+  border-left: none;
+  border-radius: 0 0.375rem 0.375rem 0;
+  cursor: pointer;
+  color: var(--lamad-text-secondary, #6b7280);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.sidebar-expand-btn:hover {
+  background-color: var(--lamad-surface, #fff);
+  color: var(--lamad-text-primary, #374151);
+}
+
+.sidebar-expand-btn .expand-icon {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.path-player-container.sidebar-collapsed .path-sidebar {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+.path-player-container.sidebar-collapsed .sidebar-expand-btn {
+  display: flex;
+}
+
+/* Mobile-only controls (hidden on desktop) */
+.sidebar-toggle {
+  display: none;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--lamad-surface, #fff);
+  border: 1px solid var(--lamad-border, #e5e7eb);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  color: var(--lamad-text-primary, #374151);
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 30%);
+  z-index: 15;
+  cursor: pointer;
+}
+
+/* =============================================================================
+   Main column
+   ============================================================================= */
+
 .main-content {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Scroll handles internally */
   position: relative;
 }
 
-/* Breadcrumbs */
+/* Breadcrumb bar — sticky so context and the Focus toggle ride along */
 .breadcrumbs {
-  padding: 0.75rem 2rem;
-  background-color: var(--lamad-surface, #fff);
-  border-bottom: 1px solid var(--lamad-border, #f3f4f6);
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.875rem;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.5rem var(--content-gutter);
+  background-color: var(--lamad-surface, #fff);
+  border-bottom: 1px solid var(--lamad-border, #f3f4f6);
+  font-size: 0.8125rem;
   color: var(--lamad-text-secondary, #6b7280);
 }
 
@@ -430,27 +437,16 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
-  min-width: 0; /* Allow truncation */
+  min-width: 0;
+  white-space: nowrap;
 }
 
-/* Breadcrumb Visibility logic */
-.sidebar-breadcrumbs {
-  display: none;
-}
-
-@media (width <= 768px) {
-  .main-breadcrumbs {
-    display: none;
-  }
-
-  .sidebar-breadcrumbs {
-    display: flex;
-    margin-top: 1rem;
-    padding: 0 !important; /* Override general breadcrumb mobile padding */
-    border: none;
-    background: transparent;
-    font-size: 0.75rem;
-  }
+.breadcrumb-trail > a,
+.breadcrumb-trail > .crumb {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .breadcrumbs a {
@@ -464,72 +460,120 @@
 }
 
 .breadcrumbs .separator {
+  flex-shrink: 0;
   color: var(--lamad-text-muted, #9ca3af);
 }
 
 .breadcrumbs .current {
   color: var(--lamad-text-primary, #111827);
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 300px;
+  flex: 1 1 auto;
 }
 
-/* Scroll Container */
+.breadcrumb-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Reopen the explore rail once it has been closed on desktop */
+.explore-reopen {
+  display: none;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--lamad-surface, #fff);
+  border: 1px solid var(--lamad-border, #e5e7eb);
+  border-radius: 8px;
+  color: var(--lamad-text-secondary, #334155);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.explore-reopen:hover {
+  border-color: var(--lamad-accent-primary, #6366f1);
+  color: var(--lamad-accent-primary, #6366f1);
+}
+
+/* Reading track + explore rail */
 .content-scroll-container {
+  display: flex;
+  align-items: flex-start;
   flex: 1;
-  overflow-y: auto;
+}
+
+.reading-column {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
+/* The explore rail is hosted by <app-exploration-sidebar> (display: contents);
+   its <aside> becomes the flex child. Below 1024px it is off-canvas. */
+.explore-rail {
+  display: contents;
+}
+
 /* =============================================================================
-   PATH TOOLING: Content Header
-   Step context from the Journey - full width gray background
+   PATH TOOLING: Step context strip
+   One quiet line: where this step sits, and the way out to the resource itself.
+   The resource's own title/description render once, in the lesson header.
    ============================================================================= */
 
 .path-content-header {
-  background-color: var(--lamad-bg-secondary, #f8f9fa);
-  border-bottom: 1px solid var(--lamad-border, #e5e7eb);
-  padding: 1.25rem 2rem;
+  padding: 1rem var(--content-gutter) 0;
 }
 
 .path-content-header-inner {
-  max-width: 900px;
+  max-width: var(--reading-measure);
   margin: 0 auto;
+  padding: 0 1.5rem;
 }
 
 .content-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.content-type-badge {
-  display: inline-block;
+.step-position {
   font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.25rem 0.5rem;
-  background: var(--lamad-bg-tertiary, #e5e7eb);
-  color: var(--lamad-text-primary, #374151);
-  border-radius: 4px;
+  letter-spacing: 0.06em;
+  color: var(--lamad-text-tertiary, #9ca3af);
+  font-variant-numeric: tabular-nums;
 }
 
-.content-title {
-  font-size: 1.75rem;
+.step-position .step-lesson {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--lamad-text-secondary, #6b7280);
+}
+
+.step-kicker {
+  margin: 0.5rem 0 0;
+  font-size: 0.9375rem;
   font-weight: 600;
-  margin: 0 0 0.5rem;
   color: var(--lamad-text-primary, #111827);
 }
 
 .step-narrative {
-  font-size: 1.125rem;
-  line-height: 1.7;
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  line-height: 1.6;
   color: var(--lamad-text-secondary, #4b5563);
-  margin: 0;
 }
 
 .view-resource-link {
@@ -540,8 +584,11 @@
   color: var(--lamad-accent-primary, #6366f1);
   text-decoration: none;
   padding: 0.25rem 0.5rem;
+  margin-right: -0.5rem;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    text-decoration-color 0.2s;
 }
 
 .view-resource-link:hover {
@@ -555,25 +602,24 @@
 }
 
 /* =============================================================================
-   CONTENT: The actual resource content
-   White background distinguishes from path-* tooling
+   CONTENT: the resource itself
    ============================================================================= */
 
 .content {
   flex: 1;
-  padding: 2rem;
+  padding: 0.5rem var(--content-gutter) 2.5rem;
   background: var(--lamad-bg-primary, #fff);
 }
 
 .content-inner {
-  max-width: 900px;
+  max-width: var(--reading-measure);
   margin: 0 auto;
   line-height: 1.7;
   color: var(--lamad-text-secondary, #374151);
 }
 
-/* Nested Path Card */
 .nested-path-card {
+  margin: 1.5rem;
   background-color: var(--lamad-bg-secondary, #f9fafb);
   border: 1px solid var(--lamad-border, #e5e7eb);
   border-radius: 0.5rem;
@@ -594,7 +640,7 @@
 }
 
 .nested-path-meta .badge {
-  background-color: white;
+  background-color: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #d1d5db);
   padding: 0.25rem 0.75rem;
   border-radius: 99px;
@@ -602,64 +648,68 @@
   color: var(--lamad-text-secondary, #4b5563);
 }
 
-/* Learning Objectives */
-.learning-objectives {
+/* Objectives + reflection share the lesson's inner 1.5rem inset so they align
+   with the lesson header and prose rendered by <app-lesson-view>. */
+.learning-objectives,
+.reflection-prompts {
+  margin: 2rem 1.5rem 0;
   background-color: var(--lamad-bg-secondary, #f9fafb);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  margin-top: 2rem;
   border: 1px solid var(--lamad-border, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 1.25rem 1.5rem;
 }
 
-.learning-objectives h3 {
-  font-size: 0.875rem;
+.learning-objectives h3,
+.reflection-prompts h3 {
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--lamad-text-primary, #374151);
-  margin-bottom: 0.75rem;
+  margin: 0 0 0.75rem;
 }
 
-.learning-objectives ul {
+.learning-objectives ul,
+.reflection-prompts ul {
   padding-left: 1.25rem;
   margin: 0;
   color: var(--lamad-text-primary, #374151);
 }
 
-.learning-objectives li {
+.learning-objectives li,
+.reflection-prompts li {
   margin-bottom: 0.5rem;
 }
 
 /* =============================================================================
-   PATH TOOLING: Content Footer
-   Mastery tracking and navigation - full width gray background
+   PATH TOOLING: Footer — mastery in the middle, previous/next at the edges
    ============================================================================= */
 
 .path-content-footer {
   background-color: var(--lamad-bg-secondary, #f8f9fa);
   border-top: 1px solid var(--lamad-border, #e5e7eb);
-  padding: 1.25rem 2rem;
+  padding: 1.25rem var(--content-gutter);
 }
 
 .path-content-footer-inner {
-  max-width: 900px;
+  max-width: var(--reading-measure);
   margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.step-navigation {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
 }
 
 .step-actions {
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem;
-}
-
-/* Step Navigation */
-.step-navigation {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 .btn-nav {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
@@ -668,7 +718,19 @@
   border-radius: 0.375rem;
   color: var(--lamad-text-primary, #374151);
   font-weight: 500;
-  transition: all 0.2s;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.btn-prev {
+  justify-self: start;
+}
+
+.btn-next {
+  justify-self: end;
 }
 
 .btn-nav:hover:not(:disabled) {
@@ -682,54 +744,14 @@
   cursor: not-allowed;
 }
 
-/* Completed Badge */
-.completed-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background-color: rgb(16 185 129 / 10%);
-  color: var(--lamad-success, #059669);
-  border-radius: 99px;
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-/* Loading & Error States */
-.loading-state,
-.error-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--lamad-border, #e5e7eb);
-  border-top-color: var(--lamad-accent-primary, #6366f1);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Bloom Toggle Button */
+/* Bloom (mastery) button */
 .btn-bloom {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem 2rem;
-  min-width: 250px;
+  padding: 0.75rem 1.75rem;
+  min-width: 220px;
   border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
@@ -742,26 +764,25 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.125rem;
 }
 
 .bloom-icon {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
 }
 
 .bloom-text {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 500;
 }
 
 .bloom-hint {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   opacity: 80%;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* Level Styles */
 .bloom-not_started {
   background: var(--lamad-bg-secondary, #f3f4f6);
   color: var(--lamad-text-secondary, #4b5563);
@@ -806,195 +827,152 @@
 }
 
 /* =============================================================================
-   Sidebar Toggle Controls
+   Loading & error
    ============================================================================= */
 
-/* Mobile toggle (hamburger menu) */
-.sidebar-toggle {
-  display: none;
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 50;
-  padding: 0.5rem;
-  background: var(--lamad-surface, #fff);
-  border: 1px solid var(--lamad-border, #e5e7eb);
-  border-radius: 0.375rem;
-  cursor: pointer;
-  color: var(--lamad-text-primary, #374151);
-}
-
-/* Mobile sidebar backdrop - click to dismiss */
-.sidebar-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 30%);
-  z-index: 15;
-  cursor: pointer;
-}
-
-/* Desktop collapse button (inside sidebar) */
-.sidebar-collapse-btn {
+.loading-state,
+.error-state {
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 0.75rem;
-  background: transparent;
-  border: none;
-  border-top: 1px solid var(--lamad-border, #e5e7eb);
-  cursor: pointer;
-  color: var(--lamad-text-secondary, #6b7280);
-  transition:
-    background-color 0.2s,
-    color 0.2s;
+  padding: 4rem 2rem;
 }
 
-.sidebar-collapse-btn:hover {
-  background-color: var(--lamad-bg-tertiary, #f3f4f6);
-  color: var(--lamad-text-primary, #374151);
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--lamad-border, #e5e7eb);
+  border-top-color: var(--lamad-accent-primary, #6366f1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
 }
 
-.collapse-icon {
-  font-size: 1.25rem;
-  font-weight: bold;
-}
-
-/* Desktop expand button (shown when sidebar collapsed) */
-.sidebar-expand-btn {
-  display: none;
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 25;
-  padding: 1rem 0.5rem;
-  background: var(--lamad-bg-secondary, #f8f9fa);
-  border: 1px solid var(--lamad-border, #e5e7eb);
-  border-left: none;
-  border-radius: 0 0.375rem 0.375rem 0;
-  cursor: pointer;
-  color: var(--lamad-text-secondary, #6b7280);
-  transition:
-    background-color 0.2s,
-    color 0.2s;
-}
-
-.sidebar-expand-btn:hover {
-  background-color: var(--lamad-surface, #fff);
-  color: var(--lamad-text-primary, #374151);
-}
-
-.expand-icon {
-  font-size: 0.75rem;
-  color: var(--lamad-text-secondary, #6b7280);
-  width: 1rem;
-}
-
-.sidebar-expand-btn .expand-icon {
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-/* Desktop collapsed state */
-.path-player-container.sidebar-collapsed .path-sidebar {
-  width: 0;
-  padding: 0;
-  overflow: hidden;
-  border-right: none;
-}
-
-.path-player-container.sidebar-collapsed .sidebar-expand-btn {
-  display: flex;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* =============================================================================
-   Responsive - Tablet & Mobile
+   Wide desktop (>= 1800px): open a gutter left of the measure for the
+   markdown Contents list. --markdown-toc-gutter is the contract the renderer
+   reads (it parks .toc-sidebar in the gutter with a matching negative margin).
    ============================================================================= */
 
-@media (width <= 1024px) {
-  /* Hide desktop collapse button on tablet/mobile */
-  .sidebar-collapse-btn {
-    display: none;
+@media (width >= 1800px) {
+  .path-player-container {
+    --markdown-toc-gutter: 14rem;
   }
 
+  .content-inner,
+  .path-content-header-inner,
+  .path-content-footer-inner {
+    max-width: calc(var(--reading-measure) + var(--markdown-toc-gutter));
+    padding-left: var(--markdown-toc-gutter);
+  }
+
+  .path-content-header-inner,
+  .path-content-footer-inner {
+    padding-left: calc(var(--markdown-toc-gutter) + 1.5rem);
+  }
+}
+
+/* =============================================================================
+   Desktop-only chrome
+   ============================================================================= */
+
+@media (width >= 1024px) {
+  .path-player-container.explore-closed .explore-reopen {
+    display: inline-flex;
+  }
+}
+
+/* =============================================================================
+   Tablet & mobile (< 1024px): lesson rail goes off-canvas, hamburger in the bar
+   ============================================================================= */
+
+@media (width <= 1023px) {
+  .sidebar-collapse-btn,
   .sidebar-expand-btn {
     display: none !important;
   }
 
-  /* Use mobile toggle instead */
   .sidebar-toggle {
     display: flex;
   }
 
-  /* Show backdrop when sidebar is open on mobile/tablet */
   .sidebar-backdrop {
     display: block;
   }
 
-  .path-player-container.sidebar-collapsed .path-sidebar {
-    transform: translateX(-100%);
-    position: absolute;
-    width: 320px;
-    height: 100%;
-    padding: 0;
-    overflow: visible;
+  .path-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: min(320px, 85vw);
+    z-index: 100;
+    box-shadow: 4px 0 24px rgb(0 0 0 / 15%);
   }
 
-  .path-player-container:not(.sidebar-collapsed) .path-sidebar {
-    width: 320px;
+  .path-player-container.sidebar-collapsed .path-sidebar {
+    transform: translateX(-100%);
+    width: min(320px, 85vw);
     padding: 0;
+    overflow: visible;
+    border-right: 1px solid var(--lamad-border, #e5e7eb);
+    box-shadow: none;
+  }
+
+  /* Mobile crumb: keep the path link and the current step, drop the middle */
+  .breadcrumb-trail > .crumb:not(.current),
+  .breadcrumb-trail > .separator.mid {
+    display: none;
+  }
+
+  .breadcrumb-trail > a:first-of-type {
+    display: none;
+  }
+
+  .breadcrumb-trail > a:first-of-type + .separator {
+    display: none;
   }
 }
 
 @media (width <= 768px) {
-  /* Allow normal document flow on mobile so footer appears at bottom of content */
   .path-player-container {
-    height: auto;
-    min-height: auto;
-    overflow: visible;
-  }
-
-  .path-sidebar {
-    position: absolute;
-    height: 100vh;
-    width: 100%; /* Full width on mobile */
-    transform: translateX(0);
-    top: 0;
-    left: 0;
-    z-index: 100;
-  }
-
-  .path-player-container.sidebar-collapsed .path-sidebar {
-    transform: translateX(-100%);
-  }
-
-  .main-content {
-    width: 100%;
-    overflow: visible;
+    --content-gutter: 1rem;
   }
 
   .breadcrumbs {
-    padding: 0.75rem 1rem 0.75rem 3.5rem; /* Make space for toggle */
     font-size: 0.75rem;
   }
 
-  .path-content-header,
-  .path-content-footer {
-    padding: 1rem;
+  .path-content-header-inner,
+  .path-content-footer-inner {
+    padding: 0;
   }
 
-  .content {
-    padding: 1rem;
-  }
-
-  .content-title {
-    font-size: 1.5rem;
+  .learning-objectives,
+  .reflection-prompts {
+    margin-left: 0;
+    margin-right: 0;
   }
 
   .step-navigation {
-    flex-direction: column;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .step-actions {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .btn-bloom {
+    width: 100%;
   }
 
   .btn-nav {

@@ -41,6 +41,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
 import { PathContextService } from '../../services/path-context.service';
 import { PathService } from '../../services/path.service';
 import { getIconForContent, inferContentTypeFromId } from '../../utils/content-icons';
+import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { LessonViewComponent } from '../lesson-view/lesson-view.component';
 
@@ -102,7 +103,13 @@ const NAV_FAILED_MSG = 'Navigation failed:';
 @Component({
   selector: 'app-path-navigator',
   standalone: true,
-  imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
+  imports: [
+    CommonModule,
+    RouterModule,
+    LessonViewComponent,
+    FocusedViewToggleComponent,
+    ExplorationSidebarComponent,
+  ],
   templateUrl: './path-navigator.component.html',
   styleUrls: ['./path-navigator.component.css'],
   // OnPush-unsafe: ngOnInit subscribe mutation + setTimeout — see backlog-onpush-eager-debt-inventory
@@ -136,7 +143,18 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   // UI state
   isLoading = true;
   error: string | null = null;
-  sidebarOpen = true; // Default open, click backdrop to dismiss on mobile
+  /**
+   * Lesson rail state. Desktop (>= 1024px — the rail's CSS breakpoint) starts
+   * OPEN as an in-flow sticky column; below that it is off-canvas and starts
+   * CLOSED so it never covers the reading column on first paint.
+   */
+  sidebarOpen = typeof window === 'undefined' || window.innerWidth >= 1024;
+
+  /**
+   * Explore rail state (concept neighbourhood). Same rule: in-flow and open on
+   * desktop, off-canvas and closed on mobile (opened via the Explore tab).
+   */
+  explorationOpen = typeof window === 'undefined' || window.innerWidth >= 1024;
 
   // Focused view (immersive mode) state
   isFocusedView = false;
@@ -843,6 +861,77 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   // =========================================================================
   // Path Context & Exploration Methods
   // =========================================================================
+
+  /**
+   * Breadcrumb context between the path and the current step: chapter →
+   * module → section, with consecutive duplicates collapsed (the sections
+   * format has two levels, so module and section often share a title) and
+   * anything that merely repeats the step title dropped.
+   */
+  contextCrumbs(): string[] {
+    if (!this.lessonContext) return [];
+    const current = this.normalize(this.stepView?.step.stepTitle);
+    const crumbs: string[] = [];
+    for (const title of [
+      this.lessonContext.chapter.title,
+      this.lessonContext.module.title,
+      this.lessonContext.section.title,
+    ]) {
+      const key = this.normalize(title);
+      if (!key || key === current) continue;
+      if (crumbs.length && this.normalize(crumbs[crumbs.length - 1]) === key) continue;
+      crumbs.push(title);
+    }
+    return crumbs;
+  }
+
+  /**
+   * Sidebar heading: chapter / module / section with consecutive duplicates
+   * collapsed. Two-level paths hand the same title down twice; a reader should
+   * see each name once — kicker, title, and (when distinct) the sub-line.
+   */
+  sidebarHeading(): { kicker?: string; title: string; sub?: string } {
+    const titles: string[] = [];
+    for (const title of [
+      this.lessonContext?.chapter.title,
+      this.lessonContext?.module.title,
+      this.lessonContext?.section.title,
+    ]) {
+      if (!title) continue;
+      if (titles.length && this.normalize(titles[titles.length - 1]) === this.normalize(title)) {
+        continue;
+      }
+      titles.push(title);
+    }
+    if (titles.length === 0) return { title: this.path?.title ?? '' };
+    if (titles.length === 1) return { title: titles[0] };
+    if (titles.length === 2) return { kicker: titles[0], title: titles[1] };
+    return { kicker: titles[0], title: titles[1], sub: titles[2] };
+  }
+
+  /** "2 of 4" within the current lesson, falling back to the whole path. */
+  stepPositionLabel(): string {
+    if (this.lessonContext && this.lessonContext.concepts.length > 0) {
+      return `${this.lessonContext.currentConceptIndex + 1} of ${this.lessonContext.concepts.length}`;
+    }
+    return `${this.stepIndex + 1} of ${this.getTotalSteps()}`;
+  }
+
+  /** The step title earns its own line only when it differs from the resource title. */
+  showStepKicker(): boolean {
+    const step = this.normalize(this.stepView?.step.stepTitle);
+    return !!step && step !== this.normalize(this.stepView?.content?.title);
+  }
+
+  /** The path author's narrative shows only when it is not just the resource description. */
+  showStepNarrative(): boolean {
+    const narrative = this.normalize(this.stepView?.step.stepNarrative);
+    return !!narrative && narrative !== this.normalize(this.stepView?.content?.description);
+  }
+
+  private normalize(value: string | undefined | null): string {
+    return (value ?? '').replaceAll(/\s+/g, ' ').trim().toLowerCase();
+  }
 
   /**
    * Build path context for LessonView and exploration tracking.

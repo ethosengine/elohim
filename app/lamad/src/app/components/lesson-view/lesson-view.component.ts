@@ -7,6 +7,7 @@ import {
   EventEmitter,
   OnChanges,
   OnDestroy,
+  SecurityContext,
   SimpleChanges,
   ViewChild,
   ViewContainerRef,
@@ -15,6 +16,7 @@ import {
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
@@ -24,6 +26,8 @@ import { takeUntil } from 'rxjs/operators';
 import { Subject, Subscription } from 'rxjs';
 
 import 'elohim-core/register';
+
+import { marked } from 'marked';
 
 import {
   LAMAD_EPR_RESOLVER,
@@ -91,6 +95,7 @@ interface InlineQuizCompletionEvent {
       class="lesson-view"
       [class.has-path-context]="pathContext"
       [class.standalone]="explorationMode === 'standalone'"
+      [class.flow]="layout === 'flow'"
     >
       <!-- Main content area -->
       <div class="lesson-main">
@@ -142,8 +147,8 @@ interface InlineQuizCompletionEvent {
               {{ getResilienceIcon() }}
             </span>
           </h1>
-          @if (content.description) {
-            <p class="lesson-description">{{ content.description }}</p>
+          @if (descriptionHtml) {
+            <p class="lesson-description" [innerHTML]="descriptionHtml"></p>
           }
         </header>
 
@@ -252,8 +257,8 @@ interface InlineQuizCompletionEvent {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.03em;
-        background: var(--primary-surface, #e8f0fe);
-        color: var(--primary-text, #174ea6);
+        background: rgb(99 102 241 / 12%);
+        color: var(--lamad-accent-primary, #4f46e5);
         border-radius: var(--radius-sm, 4px);
       }
 
@@ -265,8 +270,8 @@ interface InlineQuizCompletionEvent {
       .tag {
         padding: 0.125rem 0.5rem;
         font-size: 0.6875rem;
-        background: var(--surface-tertiary, #e8eaed);
-        color: var(--text-secondary, #5f6368);
+        background: var(--lamad-bg-tertiary, #e8eaed);
+        color: var(--lamad-text-secondary, #5f6368);
         border-radius: var(--radius-sm, 4px);
       }
 
@@ -274,8 +279,9 @@ interface InlineQuizCompletionEvent {
         margin: 0 0 0.5rem;
         font-size: 1.5rem;
         font-weight: 600;
-        color: var(--text-primary, #202124);
+        color: var(--lamad-text-primary, #202124);
         line-height: 1.3;
+        text-wrap: balance;
       }
 
       .reach-badge,
@@ -340,7 +346,7 @@ interface InlineQuizCompletionEvent {
       .lesson-description {
         margin: 0;
         font-size: 1rem;
-        color: var(--text-secondary, #5f6368);
+        color: var(--lamad-text-secondary, #5f6368);
         line-height: 1.5;
       }
 
@@ -360,11 +366,24 @@ interface InlineQuizCompletionEvent {
       .raw-content {
         font-family: monospace;
         font-size: 0.875rem;
-        background: var(--surface-secondary, #f8f9fa);
+        background: var(--lamad-bg-secondary, #f8f9fa);
         padding: 1rem;
         border-radius: var(--radius-md, 8px);
         overflow-x: auto;
         white-space: pre-wrap;
+      }
+
+      /* Flow layout: the host scrolls the document, so this view must not be
+         a scroll box of its own — an inner overflow would clip anything the
+         renderer parks outside the column (the wide-screen Contents gutter)
+         and would defeat sticky positioning inside it. */
+      .lesson-view.flow {
+        height: auto;
+        overflow: visible;
+      }
+
+      .lesson-view.flow .lesson-main {
+        overflow: visible;
       }
 
       /* The exploration sidebar's chrome (toggle/panel/backdrop/responsive
@@ -393,6 +412,13 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   /** Exploration mode - affects layout */
   @Input() explorationMode: 'path' | 'standalone' = 'path';
 
+  /**
+   * Scroll model. 'fill' (default) makes this view a fixed-height box whose
+   * main column scrolls internally (content-viewer, focused view). 'flow' lets
+   * the document scroll and keeps the view free of inner overflow.
+   */
+  @Input() layout: 'fill' | 'flow' = 'fill';
+
   /** Human ID for quiz tracking (required for inline quiz) */
   @Input() humanId?: string;
 
@@ -401,6 +427,13 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   /** Refresh key - when changed, triggers content reload (for focused view) */
   @Input() refreshKey?: number;
+
+  /**
+   * The host reserves a left gutter (--markdown-toc-gutter) on wide screens;
+   * renderers that carry a table of contents park it there instead of in an
+   * overlay. Forwarded to the renderer when it declares the input.
+   */
+  @Input() tocGutter = false;
 
   /** Emitted when user clicks on related content to explore */
   @Output() exploreContent = new EventEmitter<string>();
@@ -442,6 +475,18 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
 
   eprRelationships: EprRelationship[] = [];
+
+  private readonly sanitizer = inject(DomSanitizer);
+  private descriptionCache: { source: string; html: string | null } | null = null;
+
+  /** Description with inline markdown (links, emphasis) rendered and sanitized. */
+  get descriptionHtml(): string | null {
+    const source = this.content?.description ?? '';
+    if (!this.descriptionCache || this.descriptionCache.source !== source) {
+      this.descriptionCache = { source, html: this.renderDescription(source) };
+    }
+    return this.descriptionCache.html;
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['content'] && this.content) {
@@ -607,6 +652,17 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   }
 
   /**
+   * Content descriptions are authored as markdown (seed data carries
+   * `[label](url)` links); render the inline subset and sanitize the result.
+   */
+  private renderDescription(description: string | undefined): string | null {
+    const text = (description ?? '').trim();
+    if (!text) return null;
+    const html = marked.parseInline(text, { async: false });
+    return this.sanitizer.sanitize(SecurityContext.HTML, html) || null;
+  }
+
+  /**
    * Load the appropriate renderer for the content.
    */
   private loadRenderer(): void {
@@ -638,6 +694,9 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
     // Set embedded mode if supported
     if ('embedded' in this.rendererRef.instance) {
       this.rendererRef.setInput('embedded', true);
+    }
+    if ('tocGutter' in this.rendererRef.instance) {
+      this.rendererRef.setInput('tocGutter', this.tocGutter);
     }
 
     // Subscribe to completion events if interactive

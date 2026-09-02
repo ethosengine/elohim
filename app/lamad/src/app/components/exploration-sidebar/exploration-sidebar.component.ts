@@ -64,6 +64,7 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
       [class.collapsible]="collapsible"
       [class.pinned]="!collapsible"
       [class.collapsed]="collapsible && !open"
+      [class.sticky]="sticky"
       data-testid="exploration-sidebar"
     >
       <div class="panel-header">
@@ -82,18 +83,6 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
       </div>
 
       <div class="panel-content">
-        <!-- Mini Graph -->
-        <section class="panel-section graph-section">
-          <h3 class="section-title">Concept Map</h3>
-          <app-mini-graph
-            [focusNodeId]="contentId"
-            [depth]="graphDepth"
-            [height]="graphHeight"
-            (nodeSelected)="onChildExplore($event)"
-            (exploreRequested)="exploreInGraph.emit()"
-          ></app-mini-graph>
-        </section>
-
         <!-- Related Concepts -->
         <section class="panel-section related-section">
           <h3 class="section-title">Related Concepts</h3>
@@ -104,6 +93,18 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
             [limit]="relatedLimit"
             (navigate)="exploreContent.emit($event)"
           ></app-related-concepts-panel>
+        </section>
+
+        <!-- Mini Graph -->
+        <section class="panel-section graph-section">
+          <h3 class="section-title">Concept Map</h3>
+          <app-mini-graph
+            [focusNodeId]="contentId"
+            [depth]="graphDepth"
+            [height]="graphHeight"
+            (nodeSelected)="onChildExplore($event)"
+            (exploreRequested)="exploreInGraph.emit()"
+          ></app-mini-graph>
         </section>
 
         <!-- Explore in Full Graph button -->
@@ -307,6 +308,17 @@ import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related
           flex-shrink: 0;
         }
 
+        /* Sticky rail: for hosts that scroll the document (the path player)
+           rather than an inner box — rides along at the viewport edge. */
+        .exploration-panel.sticky {
+          position: sticky;
+          top: 0;
+          align-self: flex-start;
+          height: auto;
+          max-height: 100dvh;
+          min-height: 60vh;
+        }
+
         .exploration-panel.collapsible.collapsed {
           display: none;
         }
@@ -348,6 +360,9 @@ export class ExplorationSidebarComponent {
    * suppressed.
    */
   @Input() collapsible = true;
+
+  /** Pin the rail to the viewport while the DOCUMENT scrolls (desktop only). */
+  @Input() sticky = false;
 
   /** Panel open state (collapsible mode only). Supports `[(open)]`. */
   @Input() open = false;

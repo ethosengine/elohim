@@ -200,7 +200,6 @@
 
   /* Text Wrapping */
   overflow-wrap: break-word;
-  word-break: break-word;
 }
 
 /* =============================================================================
@@ -727,5 +726,71 @@
   :host ::ng-deep .markdown-content td {
     padding: 4px 8px;
     font-size: 0.875rem;
+  }
+}
+
+/* =============================================================================
+   Embedded reading size — fluid between phone and wide desktop
+   ============================================================================= */
+
+.markdown-wrapper.embedded .markdown-content {
+  font-size: clamp(1rem, 0.94rem + 0.2vw, 1.1rem);
+  line-height: 1.65;
+}
+
+/* =============================================================================
+   Wide desktop Contents column (>= 1800px)
+   The host reserves --markdown-toc-gutter to the left of the reading measure
+   (path-navigator does at this width); with .toc-gutter set, the TOC parks in
+   that gutter as a sticky in-flow column and the floating toggle goes away.
+   ============================================================================= */
+
+@media (width >= 1800px) {
+  .markdown-wrapper.embedded.toc-gutter {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .markdown-wrapper.embedded.toc-gutter .toc-toggle,
+  .markdown-wrapper.embedded.toc-gutter .toc-close,
+  .markdown-wrapper.embedded.toc-gutter .toc-backdrop {
+    display: none !important;
+  }
+
+  .markdown-wrapper.embedded.toc-gutter .toc-sidebar {
+    position: sticky !important;
+    top: 4rem;
+    right: auto;
+    order: -1;
+    flex: 0 0 calc(var(--markdown-toc-gutter, 14rem) - 1.5rem);
+    width: calc(var(--markdown-toc-gutter, 14rem) - 1.5rem);
+    margin-left: calc(-1 * var(--markdown-toc-gutter, 14rem));
+    margin-right: 1.5rem;
+    height: auto;
+    max-height: calc(100vh - 5rem);
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    z-index: auto;
+    transition: none;
+  }
+
+  .markdown-wrapper.embedded.toc-gutter .toc-header {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--lamad-text-tertiary, #80868b);
+  }
+
+  .markdown-wrapper.embedded.toc-gutter .toc-list a {
+    font-size: 0.8125rem;
+  }
+
+  .markdown-wrapper.embedded.toc-gutter .markdown-content {
+    flex: 1;
+    min-width: 0;
   }
 }

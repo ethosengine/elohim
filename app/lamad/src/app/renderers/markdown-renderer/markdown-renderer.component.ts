@@ -61,7 +61,7 @@ const EPR_ANCHOR_SELECTOR = 'a[data-epr]';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="markdown-wrapper" [class.embedded]="embedded">
+    <div class="markdown-wrapper" [class.embedded]="embedded" [class.toc-gutter]="tocGutter">
       <!-- TOC Toggle Button (for mobile/compact view) - visible in embedded mode too -->
       <button
         *ngIf="tocEntries.length > 0"
@@ -127,6 +127,13 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   @Input() node!: ContentNode;
   /** When true, renderer adapts to fit within parent container without TOC/back-to-top */
   @Input() embedded = false;
+
+  /**
+   * Wide-screen Contents placement. When the host reserves a left gutter
+   * (--markdown-toc-gutter on an ancestor) the TOC parks there as a sticky
+   * in-flow column instead of the floating toggle + overlay.
+   */
+  @Input() tocGutter = false;
   /** Path steps for context-aware EPR link resolution (provided by path step view) */
   @Input() pathSteps: LamadStepRef[] = [];
   @Output() tocGenerated = new EventEmitter<TocEntry[]>();
@@ -310,7 +317,12 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     html = this.transformHtmlImageUrls(html);
 
     // Extract TOC and add heading IDs
-    const { processedHtml, toc } = this.processHeadings(html);
+    const headed = this.processHeadings(html);
+    // Embedded in a lesson, the host already shows the title once; a leading
+    // H1 that merely repeats it is dropped so the title is not read twice.
+    const { processedHtml, toc } = this.embedded
+      ? this.dropLeadingTitleHeading(headed.processedHtml, headed.toc)
+      : headed;
 
     this.tocEntries = toc;
     // Security: HTML is generated from trusted markdown content stored in backend
@@ -323,6 +335,46 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Prefetch cross-path data for EPR links found in the markdown
     this.prefetchCrossPathData(this.node.content);
+  }
+
+  /**
+   * Drop a leading <h1> whose text is the node title (whitespace/case-folded),
+   * and — when the H1 went — a directly following <p> that merely repeats the
+   * node description. Both already render once in the host's lesson header.
+   * Returns the input unchanged when the first heading is anything else.
+   */
+  private dropLeadingTitleHeading(
+    processedHtml: string,
+    toc: TocEntry[]
+  ): { processedHtml: string; toc: TocEntry[] } {
+    const match = /^\s*<h1\b[^>]*>([\s\S]*?)<\/h1>\s*/i.exec(processedHtml);
+    if (!match) return { processedHtml, toc };
+    const heading = this.foldText(match[1].replaceAll(/<a\b[^>]*class="anchor-link"[^>]*>[\s\S]*?<\/a>/gi, ''));
+    const title = this.foldText(this.node?.title ?? '');
+    if (!heading || heading !== title) return { processedHtml, toc };
+    const idMatch = /\bid="([^"]+)"/.exec(match[0]);
+    const droppedId = idMatch?.[1];
+    let rest = processedHtml.slice(match[0].length);
+
+    const paragraph = /^\s*<p\b[^>]*>([\s\S]*?)<\/p>\s*/i.exec(rest);
+    // The description is markdown source; reduce `[label](url)` to its label so
+    // it compares against the rendered paragraph's text.
+    const description = this.foldText(
+      (this.node?.description ?? '').replaceAll(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    );
+    if (paragraph && description && this.foldText(paragraph[1]) === description) {
+      rest = rest.slice(paragraph[0].length);
+    }
+
+    return {
+      processedHtml: rest,
+      toc: droppedId ? toc.filter(entry => entry.id !== droppedId) : toc,
+    };
+  }
+
+  /** Tag-stripped, whitespace-collapsed, case-folded text for equality checks. */
+  private foldText(html: string): string {
+    return this.stripHtmlTags(html).replaceAll(/\s+/g, ' ').trim().toLowerCase();
   }
 
   /**
