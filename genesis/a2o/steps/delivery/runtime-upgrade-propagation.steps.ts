@@ -1767,7 +1767,17 @@ async function ensurePersonalChannelFollowed(world: E2EWorld): Promise<void> {
   // `applyRunOwnedChannels` renders both in the
   // `channelId=mode,channelId=mode` format `state.rs::parse_followed_channels`
   // reads.
-  runOwnedChannels.james.set(PERSONAL_CHANNEL_ID, 'canary');
+  // `apply`, NOT `canary`: the personal variant is only ever published to the
+  // staging tier and never promoted, and james's runtime must stay converged
+  // on commons at every station (the story's own assertion). In `apply` mode a
+  // staging head resolves (diverging, heard) and verdicts `waiting` — never
+  // applied, never refused. r8 (2026-09-02) had `canary` here: james applied
+  // the personal variant the moment it was published, so his coordinator slot
+  // no longer matched the commons candidate's envelope and Station 3 refused
+  // `coordinator_lineage_mismatch` — a race r7 happened to win the other way.
+  // A node runs ONE coordinator per role; two channels whose releases both
+  // supersede the same base cannot both be applied on it.
+  runOwnedChannels.james.set(PERSONAL_CHANNEL_ID, 'apply');
   await applyRunOwnedChannels('james');
   c.personalChannelFollowed = true;
 }
