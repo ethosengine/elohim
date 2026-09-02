@@ -109,7 +109,11 @@ function q(fixture: ComponentFixture<EprHomeComponent>, id: string): Element | n
 describe('EprHomeComponent', () => {
   let fixture: ComponentFixture<EprHomeComponent>;
   let storage: { getContent: ReturnType<typeof vi.fn> };
-  let navStack: { previous: ReturnType<typeof vi.fn>; record: ReturnType<typeof vi.fn> };
+  let navStack: {
+    previous: ReturnType<typeof vi.fn>;
+    record: ReturnType<typeof vi.fn>;
+    entries: ReturnType<typeof vi.fn>;
+  };
   let auth: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let affinity: {
     getAffinity: ReturnType<typeof vi.fn>;
@@ -165,7 +169,11 @@ describe('EprHomeComponent', () => {
 
   beforeEach(() => {
     storage = { getContent: vi.fn().mockReturnValue(of(rawSimulation)) };
-    navStack = { previous: vi.fn().mockReturnValue(null), record: vi.fn() };
+    navStack = {
+      previous: vi.fn().mockReturnValue(null),
+      record: vi.fn(),
+      entries: vi.fn().mockReturnValue([]),
+    };
     auth = { isAuthenticated: signal(false) };
     affinity = {
       getAffinity: vi.fn().mockReturnValue(0.2),
@@ -313,13 +321,18 @@ describe('EprHomeComponent', () => {
   });
 
   it('the gate names the referring resource when there is one', async () => {
+    // The gate never records itself (spec §12.2 — unreachable isn't a place
+    // to come back to), so it reads the top of the stack directly, not
+    // previous() — the entry the atom you came FROM recorded for itself.
     storage.getContent.mockReturnValue(of(null));
-    navStack.previous.mockReturnValue({
-      url: '/epr/evolution-of-trust',
-      cid: '',
-      label: 'The Evolution of Trust | Elohim Protocol',
-      ts: 1,
-    });
+    navStack.entries.mockReturnValue([
+      {
+        url: '/epr/evolution-of-trust',
+        cid: '',
+        label: 'The Evolution of Trust | Elohim Protocol',
+        ts: 1,
+      },
+    ]);
     await mount('concept-bidirectional-trust');
     expect(q(fixture, 'epr-home-gate')?.textContent).toContain('The Evolution of Trust');
     expect(q(fixture, 'epr-home-gate-back')?.getAttribute('href')).toBe('/epr/evolution-of-trust');

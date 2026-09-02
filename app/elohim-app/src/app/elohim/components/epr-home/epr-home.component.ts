@@ -215,9 +215,20 @@ export class EprHomeComponent {
     return a ? openInBundle(a.contentType, a.id) : null;
   });
 
-  /** Where you actually came from — the previous stop on the session nav stack, or nothing. */
+  /**
+   * Where you actually came from — the previous stop on the session nav
+   * stack, or nothing. A loaded atom records ITSELF on load, so its own
+   * entry is now the top of the stack and `previous()` (second-to-last)
+   * correctly names the prior stop. The gate never records itself (an
+   * unreachable id isn't a place to come back to — spec §12.2), so nothing
+   * pushed a "self" entry for it to skip past: the top of the stack IS the
+   * prior stop, read directly.
+   */
   readonly arrival = computed(() => {
-    const prev = this.navStack.previous();
+    const prev =
+      this.status() === 'not-found'
+        ? (this.navStack.entries().at(-1) ?? null)
+        : this.navStack.previous();
     if (!prev) return null;
     const label = (prev.label ?? prev.url).replace(/ \| Elohim Protocol$/, '').trim();
     return { href: prev.url, label: label || prev.url };
