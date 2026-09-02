@@ -58,7 +58,7 @@ elohim/ark/core/src/exit.rs             ExitClass, ReadinessOutcome, classify_re
 elohim/ark/core/src/manifest.rs         RuntimeManifest, ProcessSpec, ArtifactRef, ChildPolicy, Probe, …, manifest_cid()
 elohim/ark/core/src/berth.rs            Berth, Template resolution, PassphraseSource
 elohim/ark/core/src/tally.rs            DeathRecord, DeathTally, same_cause_key
-elohim/ark/core/src/verdict.rs          Verdict, GiveUpReason, RestartGovernor: Governor
+elohim/ark/core/src/verdict.rs          RestartVerdict, GiveUpReason, RestartGovernor: Governor
 elohim/ark/core/src/sample.rs           ProcessSample
 elohim/ark/core/src/witness.rs          DeathWitness, Incident, witness_cid()
 elohim/ark/core/src/passport.rs         Passport, ProcessPassport, EffectiveTier
@@ -174,7 +174,7 @@ pub use ring::RingBuffer;
 pub use sample::ProcessSample;
 pub use sink::{Clock, WitnessSink};
 pub use tally::{DeathRecord, DeathTally};
-pub use verdict::{GiveUpReason, RestartGovernor, Verdict};
+pub use verdict::{GiveUpReason, RestartGovernor, RestartVerdict};
 pub use witness::{DeathWitness, Incident};
 
 #[cfg(test)]
@@ -468,7 +468,7 @@ impl DeathTally {
 }
 pub fn same_cause_key(d: &DeathRecord) -> String;                 // "<class token>|<first structured stderr line or ''>|<fast:bool uptime<5000ms>"
 
-pub enum Verdict { Restart { after_s: u64, attempt: u32 }, GiveUp { reason: GiveUpReason }, Stop }
+pub enum RestartVerdict { Restart { after_s: u64, attempt: u32 }, GiveUp { reason: GiveUpReason }, Stop }
 pub enum GiveUpReason { SameCause { key: String, count: u32 }, IntensityExceeded { deaths: u32, window_s: u64 }, PolicyTemporary, TransientCleanExit }
 pub struct RestartRequest { pub process: String, pub death: DeathRecord }
 pub struct RestartGrant { pub bounded_by: BoundedBy, pub policy: ChildPolicy }
@@ -476,7 +476,7 @@ pub enum BoundedBy { ManifestPolicy, Commitment { cid: String } }   // S0 always
 pub struct RestartContext { pub now_epoch_s: u64, pub tally: DeathTally }
 pub struct RestartGovernor;
 impl Governor for RestartGovernor {
-    type Request = RestartRequest; type Grant = RestartGrant; type Context = RestartContext; type Effect = Verdict;
+    type Request = RestartRequest; type Grant = RestartGrant; type Context = RestartContext; type Effect = RestartVerdict;
     // authorize: Restart::Temporary → Refusal::gate(owner, "policy-temporary", …); Transient + clean exit → Ok but render yields Stop
     // gate: same_cause_run(after this death) >= same_cause_limit → Refusal::gate(owner, "same-cause", elevate text naming key+count)
     //       deaths_within(window) > max_deaths → Refusal::gate(owner, "intensity", …)
@@ -484,7 +484,7 @@ impl Governor for RestartGovernor {
 }
 impl RestartGovernor {
     /// The whole decision as a Verdict — a Refusal becomes GiveUp (the witness carries both).
-    pub fn verdict(&self, req: &RestartRequest, grant: &RestartGrant, ctx: &RestartContext) -> (Verdict, Option<Refusal>);
+    pub fn verdict(&self, req: &RestartRequest, grant: &RestartGrant, ctx: &RestartContext) -> (RestartVerdict, Option<Refusal>);
 }
 ```
 
@@ -493,6 +493,26 @@ impl RestartGovernor {
 - [ ] **Step 1: Failing tests.** `three_identical_fast_deaths_give_up_by_same_cause` (three `Signaled{9}` at uptime 1000 ms → third verdict `GiveUp{SameCause{count:3}}` and the refusal's `code == RefusalCode::GateRefused("same-cause".into())`, `limit_owner == Operator`); `intensity_window_counts_only_recent_deaths_and_readiness_resets_it` (6 deaths spread over 600 s with window 300 → only those within 300 count; after `reset_on_ready` → 0); `backoff_doubles_and_caps` (attempts 0..8 with min 1, max 60, steps 6 → 1,2,4,8,16,32,60,60,60); `transient_clean_exit_stops_without_restart`; `temporary_never_restarts`; `commitment_bounded_refusal_names_commitment_owner`.
 - [ ] **Step 2: Run** → compile failure. **Step 3: Implement.** **Step 4: Run** → PASS, clippy clean.
 - [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): death tally, same-cause rule, and RestartGovernor as an elohim_compute::Governor — verdicts refuse-and-elevate"`.
+
+
+### Task 4R: Task 4 revision (from review) — the governor's contract, and `RestartVerdict`
+
+**Executor:** Codex. **Reviewer:** Opus. **Runs after Task 5 lands** (the rename touches Task 5's files).
+
+**Files:** `elohim/ark/core/src/{verdict,tally,witness,passport,lib}.rs` and any other ark-core file naming the type.
+
+**Plan amendment (orchestrator, 2026-09-02):** ark-core's restart verdict type is `RestartVerdict`, never bare `Verdict` — `elohim_epr::Verdict` (the gradient-axis verdict) is already a dependency's crate-root export and both records will sit in the same witness payload under a `"verdict"` key. The Interfaces blocks above are amended accordingly (module stays `verdict`; the JSON field in `DeathWitness`/`Passport` stays `verdict`).
+
+- [ ] Rename `Verdict` → `RestartVerdict` in verdict.rs, lib.rs re-export, witness.rs, passport.rs; the serde field names stay `verdict`/`last_verdict`.
+- [ ] `RestartContext.tally` MUST already contain `req.death` (the supervisor records before deciding); delete the by-value dedupe in `tally_after_death`; use `ctx.tally` directly; `empty_tally_is_safe` records the death in its fixture; document the contract on the field.
+- [ ] Remove the `Transient` + clean-exit early return in `decide` — authorize → gate → render, with render yielding `Stop` (the gate still applies).
+- [ ] `Governor::gate`/`render` doc comments: they evaluate the manifest-default policy under `LimitOwner::Operator` because the trait signature carries no grant; `decide`/`verdict` is the only correct entry point. Add a test that a same-cause GATE refusal under `BoundedBy::Commitment` names `LimitOwner::Commitment`.
+- [ ] The residual refusal arm: `GiveUpReason::PolicyTemporary` only when `grant.policy.restart == Restart::Temporary`; comment the S0 invariant on the residual (a new refusal code needs a new `GiveUpReason` variant = plan amendment).
+- [ ] `DeathTally::record` bounded to the most recent 256; documented as exceeding any expressible window/same-cause limit.
+- [ ] `GiveUpReason::TransientCleanExit`: doc line declaring it reserved (constructed by nothing in S0) — or removed; choose removal unless a constructor site exists.
+- [ ] `backoff_doubles_and_caps` additionally drives 0..6 in-window deaths through `RestartGovernor::verdict` and asserts the `after_s` sequence 1,2,4,8,16,32,60.
+- [ ] `DeathWitness` gains `refusal: Option<elohim_compute::Refusal>` next to `verdict` (the `limit_owner` is capture-resistance evidence); Task 9 fills both.
+- [ ] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core` green; commit path-limited `git add elohim/ark/core` — `fix(ark-core): RestartVerdict; the governor's tally contract, gate ordering, owner honesty, bounded tally (Task 4 review)`.
 
 ---
 
@@ -504,7 +524,7 @@ impl RestartGovernor {
 - Modify: those five modules, `lib.rs`
 
 **Interfaces:**
-- Consumes: `ExitClass`, `Verdict`, `DeathRecord` (Tasks 2, 4).
+- Consumes: `ExitClass`, `RestartVerdict`, `DeathRecord` (Tasks 2, 4).
 - Produces:
 
 ```rust
@@ -525,7 +545,7 @@ pub struct DeathWitness {
     pub sample: Option<ProcessSample>,
     pub last_intent: Option<Intent>,                         // the envelope's own last decision about this child
     pub passport: Passport,                                  // as it stood at the moment of death
-    pub verdict: Option<Verdict>,                            // filled AFTER the write-ahead witness is on disk (a second write, same incident)
+    pub verdict: Option<RestartVerdict>,                            // filled AFTER the write-ahead witness is on disk (a second write, same incident)
 }
 impl DeathWitness { pub fn canonical_bytes(&self) -> Result<Vec<u8>, WitnessError>; pub fn cid(&self) -> Result<String, WitnessError>; }
 pub struct Incident { pub id: String, pub process: String, pub opened_at_epoch_ms: u64, pub incarnation_at_open: u64, pub witnesses: Vec<String>, pub closed: Option<IncidentClose> }
@@ -534,7 +554,7 @@ impl Incident { pub fn open(process: &str, at_epoch_ms: u64, incarnation: u64) -
 
 pub enum EffectiveTier { Enforced, Bounded, Delegated, Intrinsic, None }
 pub struct ProcessPassport { pub name: String, pub artifact_sha256: String, pub artifact_path: String, pub pid: Option<u32>, pub started_at_epoch_ms: Option<u64>, pub ready: bool, pub effective_tier: EffectiveTier, pub deaths_in_window: u32 }
-pub struct Passport { pub schema: u32, pub kind: String /* "runtime-passport" */, pub manifest: String, pub node: Option<String>, pub incarnation: u64, pub ark_version: String, pub processes: Vec<ProcessPassport>, pub last_verdict: Option<Verdict>, pub updated_at_epoch_ms: u64 }
+pub struct Passport { pub schema: u32, pub kind: String /* "runtime-passport" */, pub manifest: String, pub node: Option<String>, pub incarnation: u64, pub ark_version: String, pub processes: Vec<ProcessPassport>, pub last_verdict: Option<RestartVerdict>, pub updated_at_epoch_ms: u64 }
 
 pub trait Clock { fn now_epoch_ms(&self) -> u64; }
 pub trait WitnessSink {
@@ -565,7 +585,7 @@ pub trait WitnessSink {
 
 ```rust
 pub enum ChildState { Idle, Spawning { attempt: u32 }, Booting { pid: u32, rung: usize }, Live { pid: u32 }, Dying { pid: u32, since_epoch_ms: u64 }, Dead, GaveUp }
-pub enum Event { SpawnRequested, Spawned { pid: u32 }, RungPassed { rung: usize, of: usize }, RungTimedOut { rung: usize }, Died { class: ExitClass }, StopRequested, GraceExpired, VerdictReached { verdict: Verdict } }
+pub enum Event { SpawnRequested, Spawned { pid: u32 }, RungPassed { rung: usize, of: usize }, RungTimedOut { rung: usize }, Died { class: ExitClass }, StopRequested, GraceExpired, VerdictReached { verdict: RestartVerdict } }
 pub enum Action { RecordIntent(IntentAction), Spawn, OpenIncident, WriteWitness, Decide, SleepThen(u64 /* seconds */), SendSignal(i32), Kill, CloseIncident(IncidentCloseKind), MarkReady, Exit }
 pub enum IncidentCloseKind { ReadyAgain, GaveUp, Stopped }
 pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>);
@@ -669,7 +689,7 @@ impl Spool {
     pub fn read_witness(&self, cid: &str) -> Result<DeathWitness, SpoolError>;
     pub fn list_incidents(&self) -> Result<Vec<Incident>, SpoolError>;
 }
-pub struct WitnessSummary { pub cid: String, pub incident: String, pub process: String, pub died_at_epoch_ms: u64, pub exit: ExitClass, pub verdict: Option<Verdict> }
+pub struct WitnessSummary { pub cid: String, pub incident: String, pub process: String, pub died_at_epoch_ms: u64, pub exit: ExitClass, pub verdict: Option<RestartVerdict> }
 impl WitnessSink for Spool { /* intent → append line to intents.log (O_APPEND, fsync); witness → canonical dag-cbor to witnesses/<cid>.cbor + json sidecar, tmp+fsync+rename; incident/passport/tally → json tmp+rename */ }
 ```
 
