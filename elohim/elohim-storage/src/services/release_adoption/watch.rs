@@ -193,6 +193,14 @@ enum LineageDecision {
     NeedDeclaredLookup,
 }
 
+/// Borrow a resolved `(cid, kind)` pair for [`lineage_evidence_from`] without
+/// consuming it — the pair is read twice when a declared-parent lookup is
+/// needed (once to learn that, once to settle after the lookup).
+fn superseded_as_ref(pair: &Option<(String, Option<String>)>) -> Option<(String, Option<&str>)> {
+    pair.as_ref()
+        .map(|(cid, kind)| (cid.clone(), kind.as_deref()))
+}
+
 /// Decide the prior-RELEASE lineage evidence from what the head's
 /// declaration supersedes, in at most two calls.
 ///
@@ -229,14 +237,6 @@ enum LineageDecision {
 /// Never guesses: a read that cannot be performed (Absent/Unreachable) is the
 /// caller's job to propagate honestly, never folded into this function as
 /// either agreement or disagreement.
-/// Borrow a resolved `(cid, kind)` pair for [`lineage_evidence_from`] without
-/// consuming it — the pair is read twice when a declared-parent lookup is
-/// needed (once to learn that, once to settle after the lookup).
-fn superseded_as_ref(pair: &Option<(String, Option<String>)>) -> Option<(String, Option<&str>)> {
-    pair.as_ref()
-        .map(|(cid, kind)| (cid.clone(), kind.as_deref()))
-}
-
 fn lineage_evidence_from(
     superseded: Option<(String, Option<&str>)>,
     declared: Option<&str>,
