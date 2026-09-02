@@ -35,3 +35,8 @@ edit and deleted A's `__tests__/` dir before A could commit — A's `git add` th
 (read-set ∩ write-set = ∅), and commit each landed piece immediately rather than batching — untracked work in a
 shared worktree has no owner. Ceding to the sounder cure (B read the doorway's own answer back; A derived it) is the
 coherent move; correct your backlog row so it doesn't claim the superseded variant.
+
+**2026-09-02 — shared-index race.** With two sessions in one worktree, `git add <paths> && git commit`
+swept another session's STAGED files into my commit (13f075b5f carried four of elohim-4a's a2o
+files). **How to apply:** commit with an explicit pathspec — `git commit -m … -- <paths>` — which
+commits only those paths regardless of what the index holds; never rely on `git add` scoping.
