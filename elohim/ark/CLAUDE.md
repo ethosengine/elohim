@@ -14,11 +14,10 @@ Tevah in prose, `ark` in code. No crate, type, module, or path here may contain
 | `cli/` | `elohim-ark` (bin `ark`) | core + supervisor + `clap` |
 
 `ark-core`'s dependency graph **is** the purity boundary: `boundary::no_runtime_or_io_deps`
-(in `core/src/lib.rs`) reads the crate's own `Cargo.toml` and refuses `tokio`, `nix`,
-`libc`, `diesel`, `rusqlite`, `libp2p`, `iroh`, `reqwest`, `hyper`, `axum`, `hdk`,
-`hdi`. A pure decision must never be able to do I/O. Identity math is never
-re-derived: CIDs come from `elohim_epr::cid::compute_cid` over
-`serde_ipld_dagcbor::to_vec` — no local sha-to-cid code.
+(in `core/src/lib.rs`) reads the crate's own `Cargo.toml` and refuses `tokio`, `nix`, `libc`,
+`diesel`, `rusqlite`, `libp2p`, `iroh`, `reqwest`, `hyper`, `axum`, `hdk`, `hdi` — a pure decision
+must never be able to do I/O. Identity math is never re-derived: CIDs come from
+`elohim_epr::cid::compute_cid` over `serde_ipld_dagcbor::to_vec`, never local sha-to-cid code.
 
 ## Declared S0 simplifications
 
