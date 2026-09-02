@@ -49,6 +49,7 @@ export interface PWPage {
   ): Promise<void>;
   getByText(text: string, options?: Record<string, unknown>): PWLocator;
   getByRole(role: string, options?: Record<string, unknown>): PWLocator;
+  getByTestId(testId: string): PWLocator;
   locator(selector: string): PWLocator;
   reload(options?: Record<string, unknown>): Promise<unknown>;
   on(event: string, handler: (...args: unknown[]) => void): void;
