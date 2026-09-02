@@ -9,7 +9,7 @@ invariant: >
 status: green
 active: false
 checks:
-  - "a2o @concern:runtime-upgrade-propagation (genesis/a2o/features/delivery/runtime-upgrade-propagation.feature — Stations 1-5 RUNNABLE: steps/delivery/runtime-upgrade-propagation.steps.ts composes the three drivers against the household mesh; Stations 6-8 + the two constitutional scenarios stay scenario-level @wip / pending)"
+  - "a2o @concern:runtime-upgrade-propagation (genesis/a2o/features/delivery/runtime-upgrade-propagation.feature — Stations 1-8 RUNNABLE (r12 2026-09-02, 8/8): steps/delivery/runtime-upgrade-propagation.steps.ts composes the three drivers against the household mesh; the two constitutional scenarios stay scenario-level @wip / pending)"
   - "manual chain (mesh): genesis/a2o/scripts/epr-release-package.ts (T1) → release-ceremony.ts channel create / publish / promote / revert <manifest> (T2) → GET /admin/adoption on every peer (T3/T4) → release-attestation-probe.ts EXIT=0 (T5)"
 refs:
   - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
@@ -57,3 +57,17 @@ stops matching once james runs the commons candidate — a node runs ONE coordin
 channel must REBASE when commons moves (its appliesTo is what it supersedes); fixture rebase in flight.
 Race learned: james following the personal channel in `canary` mode applied it before the commons canary
 reached him (r8) — the story wants it heard (`apply` mode → `waiting`), never applied (b2e69d2d3).
+
+DELTA 2026-09-02 11:53Z (r12, `…/2026-09-02/cucumber-stations-1-8-r12.{log,json}`): **Stations 1–8 PASS —
+8/8 scenarios, 100/100 steps** — the whole rung-5 story runner-observable on the household mesh with both
+controller cures live in the mesh binary: a node's own apply invalidates its installed-reality snapshot
+(6ae703bd2) and a channel's backoff is keyed by the resolved head, so a rebased head is checked on the next
+tick (e193ac272; measured: james resolved each rebased personal head in ~40 s where r10 waited 30 min).
+Station 7 is honest now: the personal channel rebases when commons moves (118688cf2), its per-station
+expected head is recorded (a8e233e35), and james's runtime is converged on commons at every moment while his
+channel diverges compatibly. The fixture still waits out INSTALLED_REALITY_TTL_SECS at Station 6 — no longer
+needed with 6ae703bd2 live; removing it is the next measured step. The checks line above still says
+"Stations 1-5 RUNNABLE"; it now reads Stations 1–8 (this delta is the evidence for that flip).
+Fleet caveat, same day: the alpha conductors are not reachable (source chains torn by a drift-reinstall
+under a standing ALLOW_DNA_REINSTALL=true after an unintended integrity-hash move — see the escalation
+atom), so this proof is household-only until the fleet is re-genesised on the pinned hashes.
