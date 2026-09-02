@@ -936,6 +936,39 @@ def nonProdTrueGate(String env) {
     return (env == 'prod') ? 'false' : 'true'
 }
 
+
+/**
+ * Per-human runtime-config body (rung 4 canary knob). `deployments.json`
+ * `runtimeConfig` is a map KEY -> string rendered as TOML `KEY = "value"` lines
+ * into the human's <prefix>-runtime-config ConfigMap, which the node's
+ * runtime-config watcher applies WITHOUT a restart (ELOHIM_RUNTIME_CONFIG_PATH).
+ * Absent or empty -> the placeholder LINE is deleted so the ConfigMap renders
+ * byte-identical to the comment-only body. One sed expression either way; the
+ * caller wraps it in single quotes, so `'` is refused along with the sed
+ * delimiter, `&`, `\` and newlines. Keys are env-var shaped. A bad entry
+ * fails the render loudly rather than shipping a mangled TOML line.
+ * Pinned by genesis/orchestrator/runtime-config-render.test.mjs.
+ */
+def runtimeConfigSedExpr(Map humanConfig) {
+    def cfg = humanConfig.runtimeConfig
+    if (!(cfg instanceof Map) || cfg.isEmpty()) {
+        return '/RUNTIME_CONFIG_BODY_PLACEHOLDER/d'
+    }
+    def lines = cfg.collect { k, v ->
+        if (!(k ==~ /[A-Z][A-Z0-9_]*/)) {
+            error "Human ${humanConfig.name}: runtimeConfig key '${k}' is not env-var shaped ([A-Z][A-Z0-9_]*)"
+        }
+        def value = v == null ? '' : v.toString()
+        if (value =~ /[|&\\'"\r\n]/) {
+            error "Human ${humanConfig.name}: runtimeConfig value for '${k}' contains a forbidden character (one of | & \\ ' \" newline)"
+        }
+        "${k} = \"${value}\""
+    }
+    // Lines are joined with a literal `\n` + the ConfigMap body indent; GNU sed
+    // expands `\n` in the replacement, so the TOML lands as real lines.
+    return "s|RUNTIME_CONFIG_BODY_PLACEHOLDER|${lines.join('\\n    ')}|"
+}
+
 /**
  * Build the sed argument list (one -e expression per placeholder, shell-quoted)
  * for rendering a human manifest. Extracted from deployHumanManifest to keep
@@ -1034,6 +1067,8 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         // SQLite pool size (consolidated template only). Defaults to '10' (the
         // code default) so an unset node never leaves an unresolved placeholder.
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
+        // Per-human runtime-config body (canary knob) — see runtimeConfigSedExpr.
+        runtimeConfigSedExpr(humanConfig),
         // k2Gossip round-timeout / accepted-rounds (consolidated template only).
         // Defaults 60000/4 preserve the household slow-WAN profile baked into
         // the template for every human that doesn't override — an unset node

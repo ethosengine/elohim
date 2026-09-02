@@ -7,7 +7,7 @@ title: "Fleet cannot express a canary: the per-human runtime-config ConfigMap is
 slug: "fleet-per-human-runtime-config-follow-channels"
 written: "2026-09-02"
 author: "shift-2026-09-02T02-20-land-rung5-batch"
-status: "open"
+status: "in-tree"
 priority: "high"
 jobs: [elohim-orchestrator, elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -44,3 +44,21 @@ lands on RUNNING pods with no restart once rendered (mesh receipt: 35 s to 3/3 o
 Render for james shows the canary line; a `kubectl`-free read via Prometheus
 (`elohim_release_adoption_decisions_total` on james's pod gains the channel's series) or the
 node-local `/admin/adoption` (operator) shows `mode: canary`.
+
+## Landed in-tree (2026-09-02)
+
+1. `deployments.json` per-human `runtimeConfig` (map KEY -> string), documented under
+   `$runtimeConfigComment`; NO value set — the channel id is the ceremony's to mint.
+2. `RUNTIME_CONFIG_BODY_PLACEHOLDER` line inside `runtime-config.toml: |` in both the
+   consolidated template and `adam-firstman.yaml`; `elohim/holochain/Jenkinsfile`
+   `runtimeConfigSedExpr(humanConfig)` (top-level def, pipeline{} block unchanged at 62328 B)
+   emits either `/RUNTIME_CONFIG_BODY_PLACEHOLDER/d` (absent/empty → byte-identical to today) or
+   one `s|…|K = "v"\n    K2 = "v2"|` substitution; keys env-var shaped, values refuse `| & \ ' "`
+   and newlines, a bad entry fails the render loudly.
+3. `genesis/orchestrator/runtime-config-render.test.mjs` (in `pnpm test`, suite 107/107): static
+   pin of both arms + the sed-list call; the real template and adam manifest rendered with the
+   real `sed`: absent → only the placeholder line gone, no blank line; present → each key an
+   indented TOML line and everything else untouched; every declared `runtimeConfig` renderable.
+
+Fleet-unproven until a human carries the field and the next edge deploy renders it; the DoD's
+Prometheus / `/admin/adoption` read is the integrator's post-roll watch.

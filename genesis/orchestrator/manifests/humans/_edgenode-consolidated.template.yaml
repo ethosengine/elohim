@@ -80,6 +80,12 @@ data:
     # Removing a key restores the boot value. GET /admin/runtime-config on the
     # node shows effective values + provenance. Example:
     #   ELOHIM_OBEY_CARRIED_ELECTION = "true"
+    # Per-human overrides render from deployments.json `runtimeConfig` (a map of
+    # KEY -> string) as TOML lines on the next line; a human without the field
+    # renders this ConfigMap byte-identical to the comment-only body (the line
+    # is deleted, not blanked). This is the fleet's canary knob: e.g.
+    #   "runtimeConfig": { "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:<channel>=canary" }
+    RUNTIME_CONFIG_BODY_PLACEHOLDER
 ---
 apiVersion: v1
 kind: ConfigMap
