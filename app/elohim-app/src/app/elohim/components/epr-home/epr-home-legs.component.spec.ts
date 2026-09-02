@@ -124,7 +124,7 @@ describe('EprHomeLegsComponent', () => {
     fixture.componentRef.setInput('atom', atom);
   });
 
-  it('Who holds it: the felt headline, the floor, the households, the action', () => {
+  it('Who holds it: the felt headline, the floor, the households, the action as plain text (not a button)', () => {
     fixture.componentRef.setInput('snapshot', snapshot);
     fixture.componentRef.setInput('peersHolding', 5);
     fixture.detectChanges();
@@ -135,19 +135,32 @@ describe('EprHomeLegsComponent', () => {
     expect(leg.textContent).toContain('5 peers keep a copy');
     expect(leg.textContent).toContain('Invite a household to help hold these');
     expect(leg.textContent).not.toMatch(/\d+%/);
+    const invite = q(fixture, 'epr-home-invite-household')!;
+    expect(invite.tagName).toBe('P');
   });
 
-  it('Who holds it: collapses to one line when nothing is known', () => {
+  it('Who holds it: shows the checking line and no pips before a snapshot has been asked for', () => {
+    // snapshot input left at its default (undefined) — not yet asked.
     fixture.detectChanges();
-    expect(q(fixture, 'epr-home-leg-holds')?.textContent).toContain(
-      "We can't confirm this is backed up anywhere yet."
-    );
+    const leg = q(fixture, 'epr-home-leg-holds')!;
+    expect(leg.textContent).toContain('Checking who holds this…');
+    expect(leg.querySelectorAll('.pip').length).toBe(0);
+    expect(q(fixture, 'epr-home-invite-household')).toBeNull();
   });
 
-  it('Where this lives: names related ids and tags unreachable ones', () => {
+  it('Who holds it: collapses to one line when asked and nothing is found', () => {
+    fixture.componentRef.setInput('snapshot', null);
+    fixture.detectChanges();
+    const leg = q(fixture, 'epr-home-leg-holds')!;
+    expect(leg.textContent).toContain("We can't confirm this is backed up anywhere yet.");
+    expect(leg.querySelectorAll('.pip').length).toBe(3);
+  });
+
+  it('Where this lives: names related ids and tags them as not checked from here', () => {
     fixture.detectChanges();
     const leg = q(fixture, 'epr-home-leg-lives')!;
     expect(leg.textContent).toContain('Bidirectional trust');
+    expect(leg.textContent).toContain('not checked from here');
     expect(leg.querySelector('a[href="/epr/concept-bidirectional-trust"]')).not.toBeNull();
   });
 
@@ -195,6 +208,13 @@ describe('EprHomeLegsComponent', () => {
     ]);
     fixture.detectChanges();
     expect(q(fixture, 'epr-home-leg-governed')?.textContent).toContain('outdated_information');
+  });
+
+  it("How it's governed: Raise a concern is a link to the legacy viewer's governance surface, not a dead button", () => {
+    fixture.detectChanges();
+    const raise = q(fixture, 'epr-home-raise-concern')!;
+    expect(raise.tagName).toBe('A');
+    expect(raise.getAttribute('href')).toBe('/resource/evolution-of-trust#governance');
   });
 
   it('Who holds it: the peers row is absent when nothing is measured (0 or null)', () => {

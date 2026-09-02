@@ -12,23 +12,23 @@
     @if (holding().households.length > 0) {
       <p class="leg__line leg__line--quiet">{{ holding().headline }}</p>
     }
-    <div class="leg__row">
-      <span class="pips" aria-hidden="true">
-        @for (on of pips(); track $index) {
-          <span class="pip" [class.pip--on]="on"></span>
-        }
-      </span>
-      <span class="leg__ui" [class.leg__ui--warm]="holding().warm">
-        {{ holding().has }} of {{ holding().wants }} households this should live in
-      </span>
-    </div>
+    @if (holding().state === 'known') {
+      <div class="leg__row">
+        <span class="pips" aria-hidden="true">
+          @for (on of pips(); track $index) {
+            <span class="pip" [class.pip--on]="on"></span>
+          }
+        </span>
+        <span class="leg__ui" [class.leg__ui--warm]="holding().warm">
+          {{ holding().has }} of {{ holding().wants }} households this should live in
+        </span>
+      </div>
+    }
     @if (peersHolding(); as peers) {
       <div class="leg__row leg__row--muted">{{ peers }} peers keep a copy</div>
     }
-    @if (holding().action) {
-      <button type="button" class="leg__btn" data-testid="epr-home-invite-household">
-        {{ holding().action }}
-      </button>
+    @if (holding().state === 'known' && holding().action) {
+      <p class="leg__line" data-testid="epr-home-invite-household">{{ holding().action }}</p>
     }
   </section>
 
@@ -50,7 +50,7 @@
       @for (r of related(); track r.id) {
         <a class="leg__row leg__row--link" [href]="r.href" [attr.data-related-id]="r.id">
           <span>{{ r.label }}</span>
-          <span class="pill">not held on this doorway</span>
+          <span class="pill">not checked from here</span>
         </a>
       }
     }
@@ -70,9 +70,14 @@
       }
     }
     <div class="leg__actions">
-      <button type="button" class="leg__btn leg__btn--quiet" data-testid="epr-home-raise-concern">
+      <a
+        class="leg__link"
+        [routerLink]="['/resource', atom().id]"
+        fragment="governance"
+        data-testid="epr-home-raise-concern"
+      >
         Raise a concern
-      </button>
+      </a>
     </div>
   </section>
 

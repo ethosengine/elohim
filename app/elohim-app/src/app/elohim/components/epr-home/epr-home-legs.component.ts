@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterModule } from '@angular/router';
 
 import { eprToUniversalHref } from '@elohim/service';
 
@@ -27,14 +28,15 @@ export function humanizeSlug(slug: string): string {
 @Component({
   selector: 'app-epr-home-legs',
   standalone: true,
-  imports: [CommonModule, EprRelationshipsPanelComponent],
+  imports: [CommonModule, RouterModule, EprRelationshipsPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './epr-home-legs.component.html',
   styleUrl: './epr-home-legs.component.css',
 })
 export class EprHomeLegsComponent {
   readonly atom = input.required<EprHomeAtom>();
-  readonly snapshot = input<ResilienceSnapshotView | null>(null);
+  /** `undefined` = not yet asked; `null` = asked, nothing found (spec F5). */
+  readonly snapshot = input<ResilienceSnapshotView | null | undefined>(undefined);
   readonly stewards = input<StewardRow[]>([]);
   readonly relationships = input<EprRelationship[]>([]);
   readonly challenges = input<ChallengeView[]>([]);

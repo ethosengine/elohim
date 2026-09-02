@@ -105,13 +105,19 @@ export class EprHomeComponent {
     distinctUntilChanged()
   );
 
-  readonly snapshot = toSignal<ResilienceSnapshotView | null>(
+  /**
+   * `undefined` until the first snapshot request for the current atom
+   * resolves (or errors) — distinguishes "not yet asked" from "asked,
+   * nothing found" (spec F5). Leg loaders map a failure to `null`, which is
+   * itself a resolved (known) answer.
+   */
+  readonly snapshot = toSignal<ResilienceSnapshotView | null | undefined>(
     this.atomId$.pipe(
       switchMap(id =>
         id ? this.resilience.getSnapshot(id).pipe(catchError(() => of(null))) : of(null)
       )
     ),
-    { initialValue: null }
+    { initialValue: undefined }
   );
 
   readonly peersHolding = toSignal<number | null>(
@@ -225,10 +231,17 @@ export class EprHomeComponent {
    * prior stop, read directly.
    */
   readonly arrival = computed(() => {
-    const prev =
+    let prev =
       this.status() === 'not-found'
         ? (this.navStack.entries().at(-1) ?? null)
         : this.navStack.previous();
+    // An atom that was viewed, recorded, then became unreachable (or a race
+    // that records this very gate) would otherwise have the top-of-stack
+    // entry point right back at the gate's own address. The gate must never
+    // name itself as its own arrival.
+    if (prev && this.status() === 'not-found' && prev.url === this.address()) {
+      prev = null;
+    }
     if (!prev) return null;
     const label = (prev.label ?? prev.url).replace(/ \| Elohim Protocol$/, '').trim();
     return { href: prev.url, label: label || prev.url };

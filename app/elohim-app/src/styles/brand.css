@@ -57,3 +57,25 @@
   --el-on-action: var(--el-cream);
   --el-warm: #8f4a36; /* terracotta deepened for linen ground */
 }
+
+/* ThemeService defaults to data-theme="device": no explicit theme choice yet.
+   A device with a light preference must still get linen, not the dark
+   default above — mirrors styles.css's `@media (prefers-color-scheme: light)
+   { :root {...} }` pattern for --lamad-*. Guarded against [data-theme='dark']
+   so an explicit dark choice always wins over the device preference. Tokens
+   are byte-identical to the block above — duplicated on purpose, not
+   extracted, so each block reads complete on its own. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --el-ground: var(--el-cream);
+    --el-surface: var(--el-starlight);
+    --el-surface-2: rgba(107, 97, 87, 0.08);
+    --el-border: rgba(107, 97, 87, 0.18);
+    --el-text: var(--el-stone);
+    --el-text-strong: var(--el-ink);
+    --el-text-muted: var(--el-stone);
+    --el-action: var(--el-green-deep);
+    --el-on-action: var(--el-cream);
+    --el-warm: #8f4a36; /* terracotta deepened for linen ground */
+  }
+}

@@ -73,9 +73,24 @@ describe('epr-home.model', () => {
     } as never);
     expect(words.has).toBe(1);
     expect(words.warm).toBe(true);
+    expect(words.state).toBe('known');
     expect(words.households).toEqual(['Dowell Household · 2 peers']);
     expect(heldChip(words)).toBe('Held by 1 of 3 households');
     expect(heldChip(holdingWords(null))).toBe('Not yet held by any household');
+  });
+
+  it('distinguishes "not yet asked" (undefined) from "asked, nothing found" (null)', () => {
+    const notYetAsked = holdingWords(undefined);
+    expect(notYetAsked.state).toBe('unknown');
+    expect(notYetAsked.headline).toBe('Checking who holds this…');
+    expect(notYetAsked.has).toBe(0);
+    expect(notYetAsked.action).toBe('');
+    expect(heldChip(notYetAsked)).toBe('Checking who holds this…');
+
+    const askedNothingFound = holdingWords(null);
+    expect(askedNothingFound.state).toBe('known');
+    expect(askedNothingFound.headline).toBe("We can't confirm this is backed up anywhere yet.");
+    expect(heldChip(askedNothingFound)).toBe('Not yet held by any household');
   });
 });
 
@@ -240,6 +255,69 @@ describe('EprHomeComponent', () => {
     }
   });
 
+  it('shows the checking line before the resilience snapshot resolves, then the held chip after', async () => {
+    const snapshot$ = new Subject<unknown>();
+    await TestBed.configureTestingModule({
+      imports: [EprHomeComponent],
+      providers: [
+        provideRouter([]),
+        { provide: StorageClientService, useValue: storage },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ resourceId: 'evolution-of-trust' })) },
+        },
+        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(snapshot$) } },
+        {
+          provide: DistributionService,
+          useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },
+        },
+        {
+          provide: StorageApiService,
+          useValue: { getStewardshipAllocations: vi.fn().mockReturnValue(of([])) },
+        },
+        {
+          provide: EprResolverService,
+          useValue: { resolveEprHead: vi.fn().mockReturnValue(of(null)) },
+        },
+        {
+          provide: GovernanceApiService,
+          useValue: { getChallengesForEntity: vi.fn().mockResolvedValue([]) },
+        },
+        { provide: SessionNavStackService, useValue: navStack },
+        { provide: AuthService, useValue: auth },
+        { provide: AffinityTrackingService, useValue: affinity },
+        { provide: SeoService, useValue: seo },
+      ],
+    })
+      .overrideComponent(EprHomeComponent, {
+        remove: { imports: [EprFocalComponent] },
+        add: { imports: [EprFocalStub] },
+      })
+      .compileComponents();
+    fixture = TestBed.createComponent(EprHomeComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(q(fixture, 'epr-home-chip-held')?.textContent).toContain('Checking who holds this…');
+
+    snapshot$.next({
+      contentId: 'evolution-of-trust',
+      feltStatus: {
+        headline: 'Held by only 1 household — invite another to help hold these',
+        reassurance: 'needs-help',
+        heldBy: [{ id: 'household-dowell', kind: 'household', label: 'Dowell Household' }],
+        floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 1 },
+        suggestedAction: 'Invite a household to help hold these',
+      },
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(q(fixture, 'epr-home-chip-held')?.textContent).toContain('Held by 1 of 3 households');
+  });
+
   it('resets to loading between two atoms on the same component instance', async () => {
     const paramMap$ = new BehaviorSubject(convertToParamMap({ resourceId: 'evolution-of-trust' }));
     const second$ = new Subject<unknown>();
@@ -336,6 +414,24 @@ describe('EprHomeComponent', () => {
     await mount('concept-bidirectional-trust');
     expect(q(fixture, 'epr-home-gate')?.textContent).toContain('The Evolution of Trust');
     expect(q(fixture, 'epr-home-gate-back')?.getAttribute('href')).toBe('/epr/evolution-of-trust');
+  });
+
+  it('the gate never names itself when the top of the stack is its own address', async () => {
+    // An atom viewed, recorded, then found unreachable on a later load: the
+    // top of the nav stack is now the gate's own address. The gate must not
+    // read that back as "what we do know" / "Back to <itself>".
+    storage.getContent.mockReturnValue(of(null));
+    navStack.entries.mockReturnValue([
+      {
+        url: '/epr/concept-bidirectional-trust',
+        cid: '',
+        label: 'Bidirectional trust | Elohim Protocol',
+        ts: 1,
+      },
+    ]);
+    await mount('concept-bidirectional-trust');
+    expect(q(fixture, 'epr-home-arrival')).toBeNull();
+    expect(q(fixture, 'epr-home-gate-back')).toBeNull();
   });
 
   it('shows Your mark only when signed in, as one row without a percentage badge', async () => {

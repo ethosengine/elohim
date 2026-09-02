@@ -114,6 +114,9 @@ export interface StewardRow {
 }
 
 export interface HoldingWords {
+  /** 'unknown' = not yet asked (no snapshot request has resolved). 'known' =
+   * asked, whether that turned up a felt status or came back empty. */
+  state: 'unknown' | 'known';
   headline: string;
   has: number;
   wants: number;
@@ -123,10 +126,22 @@ export interface HoldingWords {
 }
 
 /** The ONE holding verdict on the page, in household words (spec §2.2). */
-export function holdingWords(snapshot: ResilienceSnapshotView | null): HoldingWords {
+export function holdingWords(snapshot: ResilienceSnapshotView | null | undefined): HoldingWords {
+  if (snapshot === undefined) {
+    return {
+      state: 'unknown',
+      headline: 'Checking who holds this…',
+      has: 0,
+      wants: 3,
+      warm: false,
+      households: [],
+      action: '',
+    };
+  }
   const felt = snapshot?.feltStatus;
   if (!felt) {
     return {
+      state: 'known',
       headline: "We can't confirm this is backed up anywhere yet.",
       has: 0,
       wants: 3,
@@ -136,6 +151,7 @@ export function holdingWords(snapshot: ResilienceSnapshotView | null): HoldingWo
     };
   }
   return {
+    state: 'known',
     headline: felt.headline,
     has: felt.floor.hasHouseholds,
     wants: felt.floor.wantsHouseholds,
@@ -148,6 +164,7 @@ export function holdingWords(snapshot: ResilienceSnapshotView | null): HoldingWo
 }
 
 export function heldChip(words: HoldingWords): string {
+  if (words.state === 'unknown') return 'Checking who holds this…';
   return words.has === 0
     ? 'Not yet held by any household'
     : `Held by ${words.has} of ${words.wants} households`;

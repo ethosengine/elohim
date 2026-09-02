@@ -87,26 +87,6 @@
   text-decoration: underline;
 }
 
-.leg__btn {
-  align-self: flex-start;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid var(--el-border);
-  background: transparent;
-  color: var(--el-text-strong);
-  font-family: var(--el-font-ui);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.leg__btn--quiet {
-  border-color: transparent;
-  padding: 0 8px;
-  color: var(--el-text-muted);
-}
-
 .leg__actions {
   display: flex;
   gap: 8px;
