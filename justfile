@@ -204,6 +204,7 @@ dev action="status" profile="isolated" seed="false" build="false":
         # The T3 hybrid rung: `just dev conductor profile=alpha` = a workspace conductor joined to
         # alpha's network (sovereign peer). The profile mapping is the same as `start` — before
         # 2026-08-28 this arm ignored `profile`, so profile=alpha silently started an isolated node.
+        # Usage: just dev conductor alpha [CONDUCTOR_RELEASE_CHANNELS=<channel>=observe]
         case "{{ profile }}" in
           isolated) export NETWORK_PROFILE=isolated ;;
           alpha) export NETWORK_PROFILE=join-alpha ;;

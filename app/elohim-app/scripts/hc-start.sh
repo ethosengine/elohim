@@ -37,6 +37,12 @@
 #                      keyless- native local-first; no account store, no JWT secret
 #   MONGOD_BIN/MONGO_PORT    Account + projection store for the secure posture
 #                            (defaults: first mongod on PATH / 27017)
+#   CONDUCTOR_RELEASE_CHANNELS  join-alpha only: passed through as
+#                            ELOHIM_RELEASE_CHANNELS into ONLY the storage
+#                            process's environment (format: channelId or
+#                            channelId=observe|apply|canary). Unset = this
+#                            peer follows no release channel. See GET
+#                            /admin/adoption on the storage peer.
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -203,6 +209,36 @@ for _d in "${_fork_dirs[@]}"; do
     [ -f "$_d" ] && _d="$(dirname "$_d")"
     if [ -x "$_d/holochain" ] && [ -x "$_d/hc" ]; then FORK_BIN_DIR="$_d"; break; fi
 done
+if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+    echo ""
+    echo "   ── device-peer preflight ───────────────────────────────────────"
+    if [ -n "$FORK_BIN_DIR" ]; then
+        echo "   ✓ fork holochain+hc pair: $FORK_BIN_DIR"
+    else
+        echo "   ✗ fork holochain+hc pair: none found (refused below unless ALLOW_STOCK_JOIN=1)"
+    fi
+    echo "   ✓ CONDUCTOR_APP_PORT=$CONDUCTOR_APP_PORT (default 4485; household mesh owns 4445/4455/4465)"
+    echo "   ✓ CONDUCTOR_ARC_FACTOR=$CONDUCTOR_ARC_FACTOR"
+    if [ "${FORCE_LOCAL_HAPP:-0}" = "1" ]; then
+        echo "   ✓ hApp source: local build (FORCE_LOCAL_HAPP=1)"
+    else
+        echo "   ✓ hApp source: fetched deployed bundle (scripts/fetch-deployed-dna.sh)"
+    fi
+    if [ "$DOORWAY_AUTH" = "secure" ] && { [ -z "$MONGOD_BIN" ] || [ ! -x "$MONGOD_BIN" ]; }; then
+        echo "   ✗ DOORWAY_AUTH=secure but no mongod found (set MONGOD_BIN)"
+    elif [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+        echo "   ✓ DOORWAY_AUTH=$DOORWAY_AUTH (mongod resolves: $MONGOD_BIN)"
+    else
+        echo "   ✓ DOORWAY_AUTH=$DOORWAY_AUTH (no mongod found — will run keyless)"
+    fi
+    if [ -n "${CONDUCTOR_RELEASE_CHANNELS:-}" ]; then
+        echo "   ✓ CONDUCTOR_RELEASE_CHANNELS=$CONDUCTOR_RELEASE_CHANNELS"
+    else
+        echo "   ✗ CONDUCTOR_RELEASE_CHANNELS unset (not following any release channel)"
+    fi
+    echo "   ─────────────────────────────────────────────────────────────"
+fi
+
 if [ -n "$FORK_BIN_DIR" ]; then
     export HC_HOLOCHAIN_PATH="$FORK_BIN_DIR/holochain"
     export PATH="$FORK_BIN_DIR:$PATH"
@@ -489,7 +525,21 @@ else
     # NOTE: the binary ignores the HTTP_PORT env var — the port must be the
     # --http-port flag (verified 2026-08-16; the old export was a silent no-op
     # that only worked because 8090 is also the binary's default).
-    "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
+    #
+    # Release-channel passthrough (T3 device-peer rung): CONDUCTOR_RELEASE_CHANNELS
+    # is the operator-facing knob (matches the CONDUCTOR_* naming of the rest of
+    # this join-alpha section); elohim-storage's runtime-config reads
+    # ELOHIM_RELEASE_CHANNELS (services/release_adoption/state.rs). The rename
+    # rides a command prefix, not `export`, so it lands ONLY in the storage
+    # process's environment — never globally in this shell (the doorway launch
+    # below must not inherit it).
+    if [ -n "${CONDUCTOR_RELEASE_CHANNELS:-}" ]; then
+        echo "   following: $CONDUCTOR_RELEASE_CHANNELS"
+        ELOHIM_RELEASE_CHANNELS="$CONDUCTOR_RELEASE_CHANNELS" "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
+    else
+        echo "   following: (none — set CONDUCTOR_RELEASE_CHANNELS=<channel>=observe to ride a release channel)"
+        "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
+    fi
 
     echo -n "   ⏳ Waiting for storage"
     for i in {1..15}; do
