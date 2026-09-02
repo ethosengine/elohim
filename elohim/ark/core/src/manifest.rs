@@ -11,6 +11,10 @@ pub const MANIFEST_SCHEMA: u32 = 1;
 pub const MANIFEST_KIND: &str = "runtime-manifest";
 
 /// A content-addressed declaration of the processes occupying one berth.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::ProcessSpec`]: that is the VF
+/// *knowledge-level* recipe — stages and conversion edges, reusable across runs — while this
+/// declares which artifacts occupy one berth on one host. Same word, different level.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "snake_case")]
 pub struct RuntimeManifest {
@@ -28,7 +32,7 @@ pub struct RuntimeManifest {
     pub reach: String,
     /// Processes declared in this runtime.
     #[serde(default)]
-    pub processes: Vec<ProcessSpec>,
+    pub processes: Vec<ChildSpec>,
 }
 
 impl Default for RuntimeManifest {
@@ -44,9 +48,15 @@ impl Default for RuntimeManifest {
 }
 
 /// Declaration of one child process.
+///
+/// Named `ChildSpec` rather than `ProcessSpec` because the substrate already owns that word:
+/// [`elohim_epr_rea::model::ProcessSpec`] is the VF *knowledge-level* recipe (stages and
+/// conversion edges), a different thing at a different level from this berth-local child
+/// declaration. The serde key on [`RuntimeManifest`] stays `processes`, so no manifest's CID
+/// moves — pinned by `manifest_cid_is_unmoved_by_the_child_spec_rename`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "snake_case")]
-pub struct ProcessSpec {
+pub struct ChildSpec {
     /// Stable process name within the manifest.
     #[serde(default)]
     pub name: String,
@@ -79,7 +89,7 @@ pub struct ProcessSpec {
     pub listen: Listen,
 }
 
-impl Default for ProcessSpec {
+impl Default for ChildSpec {
     fn default() -> Self {
         Self {
             name: String::new(),
@@ -112,6 +122,11 @@ pub enum ProcessKind {
 }
 
 /// Artifact identity and resolution declaration.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::PinnedRef`]: a `PinnedRef` pins
+/// `id@version` (a declared dependency, resolved by a registry), whereas an artifact is pinned
+/// by content digest — a strictly stronger and differently-checkable claim, verified against
+/// the bytes on disk before spawn.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactRef {
@@ -155,6 +170,10 @@ pub enum StdinSource {
 }
 
 /// One rung of the readiness ladder.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::ValidatorRef`]: a validator names
+/// a conformance mechanism already enforcing a recipe edge elsewhere, while a probe is a local
+/// wait with a patience budget that decides nothing about conformance.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Probe {
@@ -175,6 +194,11 @@ pub enum Probe {
 }
 
 /// Restart, shutdown, intensity, and backoff policy for a child.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::Commitment`]: a commitment is a
+/// promise between two agents, while this is a local supervision rule nobody promised anyone.
+/// Its one genuinely economic part — the intensity ceiling — DOES project, via
+/// [`ChildPolicy::intensity_bound`] onto [`elohim_epr_rea::model::Bound`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "snake_case")]
 pub struct ChildPolicy {
@@ -263,6 +287,11 @@ impl Default for Intensity {
 }
 
 /// Restart delay progression.
+///
+/// KEPT with no substrate counterpart checked and rejected: the substrate models a limit
+/// ([`elohim_epr_rea::model::Bound`]) and an observation span
+/// ([`elohim_epr_rea::stock::Window`]); a delay schedule is neither, and inventing an atom for
+/// it would mint vocabulary for a number that never leaves this host.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "snake_case")]
 pub struct Backoff {
@@ -288,6 +317,10 @@ impl Default for Backoff {
 }
 
 /// In-memory output retention settings.
+///
+/// KEPT with no substrate counterpart: [`elohim_epr_rea::stock::Stock`] is the nearest shape
+/// and models a measured level with inflow and outflow, whereas this only says how many lines
+/// of text to keep in RAM.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "snake_case")]
 pub struct Listen {
@@ -348,7 +381,7 @@ impl RuntimeManifest {
     }
 
     /// Finds a declared process by name.
-    pub fn process(&self, name: &str) -> Option<&ProcessSpec> {
+    pub fn process(&self, name: &str) -> Option<&ChildSpec> {
         self.processes.iter().find(|process| process.name == name)
     }
 
@@ -470,6 +503,12 @@ mod tests {
 
     const SHA256: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+    /// The CID of `minimal_manifest_json` as it stood at commit 0200ff77c, when the child
+    /// declaration was still called `ProcessSpec`. A Rust type name is not on the wire — the
+    /// serde key stays `processes` — so the rename must leave this literal untouched, or every
+    /// berth's declared manifest is silently re-addressed.
+    const S0_MANIFEST_CID: &str = "bafyreighn7z4ph4u2j7jhoat7lvxoxyj2yeudoax4lvhcy7ewwqq4aeqtu";
+
     fn minimal_manifest_json() -> String {
         format!(
             r#"{{
@@ -512,6 +551,18 @@ mod tests {
 
         assert_eq!(compact_cid, spaced_cid);
         assert!(compact_cid.starts_with("bafy"));
+    }
+
+    #[test]
+    fn manifest_cid_is_unmoved_by_the_child_spec_rename() {
+        let manifest = RuntimeManifest::from_json(&minimal_manifest_json()).unwrap();
+
+        assert_eq!(manifest.cid().unwrap(), S0_MANIFEST_CID);
+        assert_eq!(
+            serde_json::to_value(&manifest).unwrap()["processes"][0]["name"],
+            "conductor",
+            "the wire key is `processes`; only the Rust type was renamed"
+        );
     }
 
     #[test]

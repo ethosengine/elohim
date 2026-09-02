@@ -50,6 +50,15 @@ pub struct RestartGrant {
     pub bounded_by: BoundedBy,
     /// Manifest child policy being granted.
     pub policy: ChildPolicy,
+    /// The declared ceiling this grant promises to stay the safe side of, derived by the
+    /// supervisor from [`ChildPolicy::intensity_bound`].
+    ///
+    /// `None` is an **unbounded grant** — the same honest absence
+    /// [`elohim_epr_rea::model::Commitment::bound`] carries, and the reason
+    /// [`RestartGrant::pain`] can report nothing rather than a zero. Skipped when absent so a
+    /// grant that declares no bound encodes exactly as it did before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bound: Option<elohim_epr_rea::model::Bound>,
 }
 
 /// Authority bounding a restart grant.
@@ -107,6 +116,7 @@ impl Governor for RestartGovernor {
         Ok(render_with_policy(req, &ChildPolicy::default(), ctx))
     }
 
+    /// The decision clock is [`RestartContext::now_epoch_s`]; the trait's `now_epoch_s` is unused.
     fn decide(
         &self,
         req: &Self::Request,
@@ -284,6 +294,7 @@ mod tests {
         RestartGrant {
             bounded_by: BoundedBy::ManifestPolicy,
             policy,
+            bound: None,
         }
     }
 
@@ -462,6 +473,7 @@ mod tests {
                 cid: "bafy-commitment".to_string(),
             },
             policy: temporary,
+            bound: None,
         };
 
         let (_, refusal) = RestartGovernor.verdict(&req, &grant, &ctx);
@@ -495,6 +507,7 @@ mod tests {
                 cid: "bafy-commitment".to_string(),
             },
             policy: transient,
+            bound: None,
         };
 
         let (verdict, refusal) = RestartGovernor.verdict(&req, &grant, &ctx);

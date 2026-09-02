@@ -1129,6 +1129,7 @@ dependencies = [
  "cid",
  "elohim-compute",
  "elohim-epr",
+ "elohim-epr-rea",
  "elohim-seam-contracts",
  "hex",
  "serde",

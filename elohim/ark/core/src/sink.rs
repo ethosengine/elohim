@@ -3,6 +3,10 @@
 use crate::{DeathTally, DeathWitness, Incident, Intent, Passport, WitnessError};
 
 /// Time source supplied by the I/O supervisor.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::stock::Window`]: a window is a declared
+/// claim about what counts as "now" and rides inside the records, whereas this is the I/O seam
+/// that reads the host's clock — a boundary, not a claim.
 pub trait Clock {
     /// Returns Unix time in milliseconds.
     fn now_epoch_ms(&self) -> u64;
@@ -160,6 +164,8 @@ mod tests {
             passport: passport(2_000),
             verdict: None,
             refusal: None,
+            bounded_by: None,
+            pain: None,
         }
     }
 

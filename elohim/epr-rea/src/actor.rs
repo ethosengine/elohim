@@ -26,8 +26,11 @@
 //! against; deciding what that means is the caller's job, and refusing when there is no such
 //! tree is the caller's refusal to make.
 
+#[cfg(feature = "sidecar")]
 use std::fs;
+#[cfg(feature = "sidecar")]
 use std::io::Write as _;
+#[cfg(feature = "sidecar")]
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
@@ -303,11 +306,15 @@ impl ActorStore for MemoryActorStore {
 ///
 /// Each line carries the record and its dag-cbor atom CID; CIDs are re-verified on read (a
 /// tampered line is an integrity error, not silent drift).
+///
+/// Behind the default-on `sidecar` feature — see [`crate::store::SidecarFlowStore`].
+#[cfg(feature = "sidecar")]
 #[derive(Debug)]
 pub struct SidecarActorStore {
     log_path: PathBuf,
 }
 
+#[cfg(feature = "sidecar")]
 impl SidecarActorStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
     pub fn open(root: &Path) -> Result<Self> {
@@ -325,12 +332,14 @@ impl SidecarActorStore {
     }
 }
 
+#[cfg(feature = "sidecar")]
 #[derive(Serialize, Deserialize)]
 struct SidecarLine {
     cid: String,
     record: ActorRecord,
 }
 
+#[cfg(feature = "sidecar")]
 impl ActorStore for SidecarActorStore {
     fn append(&mut self, record: ActorRecord) -> Result<Cid> {
         let cid = record.cid()?;
@@ -524,6 +533,7 @@ mod tests {
 
     // ── round trip + integrity ──────────────────────────────────────────────────────────
 
+    #[cfg(feature = "sidecar")]
     #[test]
     fn a_claim_round_trips_through_both_stores_with_the_same_cid() {
         let dir = tempfile::TempDir::new().unwrap();
@@ -560,6 +570,7 @@ mod tests {
         assert!(json.contains("claimedAt"), "camelCase on the wire: {json}");
     }
 
+    #[cfg(feature = "sidecar")]
     #[test]
     fn a_tampered_sidecar_line_is_an_integrity_error_not_silent_drift() {
         let dir = tempfile::TempDir::new().unwrap();

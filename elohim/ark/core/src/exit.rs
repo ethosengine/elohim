@@ -34,6 +34,10 @@ pub fn classify_readiness_outcome(
 }
 
 /// A process's normalized termination cause.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::Magnitude::Classification`]: that is a
+/// frame-ref into a *governed* classification atom, subject to judgement, while a termination
+/// cause is a kernel fact with a closed set of shapes that no one may reclassify.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "kebab-case", tag = "class")]
 pub enum ExitClass {

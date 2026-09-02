@@ -45,6 +45,16 @@
 //! a fourth REA action enum (reconciliation with the protocol schema enum is tracked in
 //! the spec §8).
 
+//! # Features
+//!
+//! `sidecar` (**default on**) — the `.eprfs/status/` append-only JSONL floor
+//! ([`store::SidecarFlowStore`], [`actor::SidecarActorStore`]) and the crate's only `std::fs`
+//! surface. Everything else here — the model atoms, the folds, the stock dynamics, the walk —
+//! is pure. A consumer whose purity boundary is enforced by a test over its own dependency
+//! graph (`elohim-ark-core`) takes this crate `default-features = false` and still speaks the
+//! whole vocabulary; the crate that owns the I/O (`elohim-ark-supervisor`) turns the feature
+//! back on and is the only construction site of a sidecar store.
+
 pub mod actor;
 pub mod epistemic;
 pub mod error;
@@ -55,9 +65,9 @@ pub mod stock;
 pub mod store;
 pub mod walk;
 
-pub use actor::{
-    parse_agent_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore, SidecarActorStore,
-};
+#[cfg(feature = "sidecar")]
+pub use actor::SidecarActorStore;
+pub use actor::{parse_agent_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore};
 pub use epistemic::{
     cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,
     EpistemicThresholds, ReviewEvent,
@@ -74,7 +84,9 @@ pub use stock::{
     respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
     Within,
 };
-pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
+#[cfg(feature = "sidecar")]
+pub use store::SidecarFlowStore;
+pub use store::{FlowRecord, FlowStore, MemoryFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};
 
 // Re-export the shared vocabulary so consumers need no direct elohim-epr dep for it.

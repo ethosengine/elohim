@@ -16,6 +16,13 @@ publish = ["elohim"]
 # in the dep graph and reuses the one canonical sha2-256 primitive for edge_fp — a plain
 # string hash deliberately NOT routed through atom_cid/dag-cbor (that mints a content
 # address; edge_fp is only an index/dedup key over a path pair, never an address).
+# `sidecar` carries the `.eprfs/status/` JSONL floor and, with it, every `std::fs` call in this
+# crate. Default-on so `epr-cli` and every existing consumer are unchanged; a consumer that must
+# stay filesystem-free (`elohim-ark-core`, whose purity boundary is a test) opts out.
+[features]
+default = ["sidecar"]
+sidecar = []
+
 [dependencies]
 elohim-epr = { path = "../epr" }
 cid = { version = "0.11", features = ["serde-codec"] }
@@ -27,3 +34,10 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
+
+# The integration suite exercises the sidecar floor directly, so it is a `sidecar` target rather
+# than a set of per-test cfgs; `--no-default-features` skips it and still runs every unit test.
+[[test]]
+name = "fabric"
+path = "tests/fabric.rs"
+required-features = ["sidecar"]

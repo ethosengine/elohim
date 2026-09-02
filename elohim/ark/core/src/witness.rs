@@ -1,6 +1,7 @@
 //! Content-addressed child-death witnesses and their incidents.
 
 use elohim_compute::Refusal;
+use elohim_epr_rea::AlgedonicEvidence;
 use serde::{Deserialize, Serialize};
 
 use crate::{exit::ExitClass, GiveUpReason, Intent, Passport, ProcessSample, RestartVerdict};
@@ -50,6 +51,21 @@ pub struct DeathWitness {
     pub verdict: Option<RestartVerdict>,
     /// Refusal paired with a give-up verdict, including the honored limit owner.
     pub refusal: Option<Refusal>,
+    /// CID string of the commitment bounding this runtime, once one is minted (S1).
+    ///
+    /// Additive by construction: absent under S0 manifest policy, and skipped when absent, so
+    /// every witness this crate has ever addressed keeps its CID. S1 filling it mints a
+    /// different address for a strictly larger claim, which is what an address is for —
+    /// pinned by `an_s0_witness_keeps_its_pre_bounded_by_cid`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounded_by: Option<String>,
+    /// Algedonic breach evidence, when this death crossed a bound a commitment declared.
+    ///
+    /// `None` under manifest policy — a manifest default is the operator's line, not a promise,
+    /// so there is nothing for pain to be evidence against ([`crate::rea::RestartGrant::pain`]).
+    /// Honest absence, never a zero. Same additive discipline as [`Self::bounded_by`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pain: Option<AlgedonicEvidence>,
 }
 
 /// Encoding failure while deriving a witness's canonical identity.
@@ -136,6 +152,7 @@ mod tests {
         RestartVerdict, PASSPORT_KIND,
     };
     use elohim_compute::{LimitOwner, Refusal};
+    use elohim_epr_rea::AlgedonicEvidence;
 
     fn passport() -> Passport {
         Passport {
@@ -207,8 +224,16 @@ mod tests {
                 "same-cause",
                 "commitment restart limit reached",
             )),
+            bounded_by: None,
+            pain: None,
         }
     }
+
+    /// The CID of [`witness`] as it stood at commit 0200ff77c, BEFORE `bounded_by` and `pain`
+    /// existed. A witness that declares neither must still address to this exact string:
+    /// S1 filling the fields may mint new addresses, but it must not RE-address the S0
+    /// witnesses already written to peers' spools.
+    const S0_WITNESS_CID: &str = "bafyreicfzyknnynxmbuarajrdrpjhe6chhjt6yi2suewf54b7n2d5u32mq";
 
     #[test]
     fn witness_cid_changes_when_any_field_changes_and_is_stable_otherwise() {
@@ -255,6 +280,60 @@ mod tests {
         assert_field_changes_cid!(passport, changed_passport);
         assert_field_changes_cid!(verdict, None);
         assert_field_changes_cid!(refusal, None);
+        assert_field_changes_cid!(bounded_by, Some("bafy-commitment".to_string()));
+        assert_field_changes_cid!(
+            pain,
+            Some(AlgedonicEvidence::Breach {
+                stock: 3.0,
+                limit: 3.0,
+                bound_ref: "bafy-commitment".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn an_s0_witness_keeps_its_pre_bounded_by_cid() {
+        let witness = witness();
+
+        assert_eq!(witness.bounded_by, None);
+        assert_eq!(witness.pain, None);
+        assert_eq!(
+            witness.cid().unwrap(),
+            S0_WITNESS_CID,
+            "adding two skipped optionals must not re-address a single S0 witness"
+        );
+
+        // Skipped means the keys are not on the wire at all — a present-but-null field would
+        // encode differently and move the address.
+        let json = serde_json::to_value(&witness).unwrap();
+        assert!(json.get("bounded_by").is_none());
+        assert!(json.get("pain").is_none());
+
+        // And the write-ahead shape (no verdict, no refusal) decodes back through dag-cbor.
+        let decoded: DeathWitness =
+            serde_ipld_dagcbor::from_slice(&witness.canonical_bytes().unwrap()).unwrap();
+        assert_eq!(decoded, witness);
+    }
+
+    #[test]
+    fn a_bounded_witness_round_trips_its_pain_through_dag_cbor() {
+        let mut bounded = witness();
+        bounded.bounded_by = Some("bafy-commitment".to_string());
+        bounded.pain = Some(AlgedonicEvidence::Breach {
+            stock: 6.0,
+            limit: 5.0,
+            bound_ref: "bafy-commitment".to_string(),
+        });
+
+        let decoded: DeathWitness =
+            serde_ipld_dagcbor::from_slice(&bounded.canonical_bytes().unwrap()).unwrap();
+
+        assert_eq!(decoded, bounded);
+        assert_ne!(decoded.cid().unwrap(), S0_WITNESS_CID);
+
+        let json = serde_json::to_value(&bounded).unwrap();
+        assert_eq!(json["bounded_by"], "bafy-commitment");
+        assert_eq!(json["pain"]["bound_ref"], "bafy-commitment");
     }
 
     #[test]

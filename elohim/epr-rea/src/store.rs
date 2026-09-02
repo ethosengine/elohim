@@ -3,15 +3,20 @@
 //! DHT rails (implemented in their own crates against this trait).
 
 use std::collections::HashSet;
+#[cfg(feature = "sidecar")]
 use std::fs;
+#[cfg(feature = "sidecar")]
 use std::io::Write as _;
+#[cfg(feature = "sidecar")]
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr::algedonic::AlgedonicEvidence;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{FabricError, Result};
+#[cfg(feature = "sidecar")]
+use crate::error::FabricError;
+use crate::error::Result;
 use crate::fold::fulfillment;
 use crate::model::{
     atom_cid, edge_fp, Commitment, CommitmentState, DepEdge, FlowEvent, Intent, Process,
@@ -193,11 +198,18 @@ impl FlowStore for MemoryFlowStore {
 /// The offline floor: an append-only JSONL log under `<root>/.eprfs/status/flows.jsonl`.
 /// Each line carries the record and its dag-cbor atom CID; CIDs are re-verified on read
 /// (a tampered line is an integrity error, not silent drift).
+///
+/// Behind the default-on `sidecar` feature, which is the crate's ONLY `std::fs` surface.
+/// A consumer that must stay filesystem-free — `elohim-ark-core`, whose purity boundary is a
+/// test over its own dependency graph — takes this crate with `default-features = false` and
+/// keeps the model, fold, and stock layers.
+#[cfg(feature = "sidecar")]
 #[derive(Debug)]
 pub struct SidecarFlowStore {
     log_path: PathBuf,
 }
 
+#[cfg(feature = "sidecar")]
 impl SidecarFlowStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
     pub fn open(root: &Path) -> Result<Self> {
@@ -215,12 +227,14 @@ impl SidecarFlowStore {
     }
 }
 
+#[cfg(feature = "sidecar")]
 #[derive(Serialize, Deserialize)]
 struct SidecarLine {
     cid: String,
     record: FlowRecord,
 }
 
+#[cfg(feature = "sidecar")]
 impl FlowStore for SidecarFlowStore {
     fn append(&mut self, record: FlowRecord) -> Result<Cid> {
         let cid = record.cid()?;

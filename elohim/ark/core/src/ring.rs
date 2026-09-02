@@ -4,6 +4,10 @@ use std::collections::VecDeque;
 
 /// Bounded FIFO of output lines, lifted from elohim-storage
 /// process_manager.rs 264ce8ce4; storage delegates here in S1.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::stock::Stock`]: a stock is a measured
+/// level with an inflow and an outflow and refuses dimensionally incoherent arithmetic; this
+/// is a fixed-capacity queue of text that is never measured against anything.
 #[derive(Debug)]
 pub struct RingBuffer {
     capacity: usize,

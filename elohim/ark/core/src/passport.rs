@@ -8,6 +8,10 @@ use crate::RestartVerdict;
 pub const PASSPORT_KIND: &str = "runtime-passport";
 
 /// Effective enforcement tier observed for a process.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::LimitSource`]: that says where a
+/// limit's NUMBER came from (declared at this scope, or folded from the parts), while this says
+/// who is actually ENFORCING it — orthogonal questions that would silently merge if shared.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectiveTier {
@@ -47,6 +51,10 @@ pub struct ProcessPassport {
 }
 
 /// Current live projection of one berth and all of its processes.
+///
+/// KEPT rather than projected onto [`elohim_epr_rea::model::Process`]: a VF process groups
+/// events by a conversion it ran, while a passport says what is true *now* and is overwritten
+/// in place. Projecting it would mint one atom per refresh, all addressing the same fact.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct Passport {
@@ -89,6 +97,9 @@ mod tests {
         };
 
         let json = serde_json::to_value(passport).unwrap();
-        assert_eq!(json["kind"], PASSPORT_KIND);
+        // The LITERAL, not the const: the wire string is the contract, and asserting the const
+        // against itself would let a rename of `PASSPORT_KIND`'s value pass silently.
+        assert_eq!(json["kind"], "runtime-passport");
+        assert_eq!(PASSPORT_KIND, "runtime-passport");
     }
 }

@@ -16,6 +16,10 @@ testing = []
 [dependencies]
 # Pure only. Adding tokio/nix/libc/diesel here fails `boundary::no_runtime_or_io_deps`.
 elohim-epr = { path = "../../epr" }
+# The REA/ValueFlows vocabulary the runtime's records project INTO. `default-features = false`
+# drops the crate's `sidecar` feature, which is its only filesystem surface — the pure core
+# speaks the model, never opens a store (`boundary::no_fs_in_pure_core`).
+elohim-epr-rea = { path = "../../epr-rea", default-features = false }
 elohim-compute = { path = "../../elohim-compute" }
 elohim-seam-contracts = { path = "../../../crates/seam-contracts" }
 serde = { workspace = true }
