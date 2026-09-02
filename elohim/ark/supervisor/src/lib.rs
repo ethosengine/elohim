@@ -19,3 +19,4 @@ pub use reaper::{
     become_subreaper, proc_status_sample, reap_with_rusage, wait_nowait, ReapError, WaitEvent,
 };
 pub use spool::{Spool, SpoolError, WitnessSummary};
+pub use supervisor::{RunOutcome, Supervisor, SupervisorError, SystemClock};
