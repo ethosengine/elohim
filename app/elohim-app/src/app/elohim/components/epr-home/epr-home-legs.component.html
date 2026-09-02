@@ -22,12 +22,14 @@
         {{ holding().has }} of {{ holding().wants }} households this should live in
       </span>
     </div>
-    @if (peersHolding() !== null) {
-      <div class="leg__row leg__row--muted">{{ peersHolding() }} peers keep a copy</div>
+    @if (peersHolding(); as peers) {
+      <div class="leg__row leg__row--muted">{{ peers }} peers keep a copy</div>
     }
-    <button type="button" class="leg__btn" data-testid="epr-home-invite-household">
-      {{ holding().action }}
-    </button>
+    @if (holding().action) {
+      <button type="button" class="leg__btn" data-testid="epr-home-invite-household">
+        {{ holding().action }}
+      </button>
+    }
   </section>
 
   <!-- Where this lives (knowledge) -->

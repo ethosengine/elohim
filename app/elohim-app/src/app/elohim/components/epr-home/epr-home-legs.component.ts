@@ -51,7 +51,9 @@ export class EprHomeLegsComponent {
       href: eprToUniversalHref({ id, tier: 'head' }),
     }))
   );
-  readonly openChallenges = computed(() => this.challenges().filter(c => c.state !== 'resolved'));
+  readonly openChallenges = computed(() =>
+    this.challenges().filter(c => c.state !== 'responded' && !c.respondedAt && !c.resolvedAt)
+  );
   readonly anchorShort = computed(() => {
     const h = this.atom().dhtAnchorHash;
     return h ? shortAnchor(h) : null;

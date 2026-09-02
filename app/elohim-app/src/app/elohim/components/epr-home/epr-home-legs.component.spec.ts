@@ -9,6 +9,8 @@ import type { EprRelationship } from '../../models/epr-head.model';
 import { EprRelationshipsPanelComponent } from '../epr-relationships-panel/epr-relationships-panel.component';
 import { toAtom } from './epr-home.model';
 
+import type { ChallengeView } from '@elohim/storage-client/generated';
+
 /**
  * Stubs the relationships panel — its own DI tree (ambient EPR resolution +
  * lamad's ResilienceService) is that component's concern, not this frame's.
@@ -44,6 +46,62 @@ const snapshot = {
     suggestedAction: 'Invite a household to help hold these',
   },
 };
+
+const protectedSnapshot = {
+  contentId: 'evolution-of-trust',
+  feltStatus: {
+    headline: 'Held by 3 households — this is well protected',
+    reassurance: 'protected',
+    heldBy: [
+      { id: 'household-a', kind: 'household', label: 'Household A' },
+      { id: 'household-b', kind: 'household', label: 'Household B' },
+      { id: 'household-c', kind: 'household', label: 'Household C' },
+    ],
+    floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 3 },
+    // suggestedAction intentionally absent — nothing to invite anyone to do.
+  },
+};
+
+/** Fills every ChallengeView field with an inert default so tests only spell out what they assert. */
+function makeChallenge(overrides: Partial<ChallengeView>): ChallengeView {
+  return {
+    id: 'chal-1',
+    entityType: 'content',
+    entityId: 'evolution-of-trust',
+    challengerId: 'presence-someone',
+    standingBasis: 'steward',
+    groundsPrimary: 'factual_error',
+    groundsSecondary: null,
+    evidence: null,
+    requestedOutcome: null,
+    state: 'pending',
+    responseOutcome: null,
+    responseReasoning: null,
+    responseActions: null,
+    responseBy: null,
+    setsPrecedent: false,
+    filedAt: '2026-08-01 00:00:00',
+    acknowledgedAt: null,
+    responseDeadline: '2026-08-08 00:00:00',
+    respondedAt: null,
+    resolvedAt: null,
+    createdAt: '2026-08-01 00:00:00',
+    slaStatus: 'on_track',
+    dhtAnchorHash: null,
+    challengerName: null,
+    challengerStanding: null,
+    grounds: null,
+    description: null,
+    status: null,
+    priority: null,
+    slaDeadline: null,
+    assignedElohim: null,
+    resolution: null,
+    updatedAt: null,
+    metadata: null,
+    ...overrides,
+  };
+}
 
 function q(fixture: ComponentFixture<EprHomeLegsComponent>, id: string): Element | null {
   return fixture.nativeElement.querySelector(`[data-testid="${id}"]`);
@@ -119,5 +177,39 @@ describe('EprHomeLegsComponent', () => {
     expect(leg.textContent).toContain('not yet verified on this doorway');
     expect(leg.textContent).toContain('May 27, 2026');
     expect(leg.querySelector('a[href="/epr/evolution-of-trust/raw"]')).not.toBeNull();
+  });
+
+  it("How it's governed: a responded challenge is not open — backend never writes state:'resolved'", () => {
+    fixture.componentRef.setInput('challenges', [
+      makeChallenge({ id: 'chal-responded', state: 'responded', respondedAt: '2026-08-05 00:00:00' }),
+    ]);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-leg-governed')?.textContent).toContain(
+      'No challenges, no labels. Nothing is in question.'
+    );
+  });
+
+  it("How it's governed: a pending challenge renders its grounds", () => {
+    fixture.componentRef.setInput('challenges', [
+      makeChallenge({ id: 'chal-pending', state: 'pending', groundsPrimary: 'outdated_information' }),
+    ]);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-leg-governed')?.textContent).toContain('outdated_information');
+  });
+
+  it('Who holds it: the peers row is absent when nothing is measured (0 or null)', () => {
+    fixture.componentRef.setInput('peersHolding', 0);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-leg-holds')?.textContent).not.toContain('peers keep a copy');
+
+    fixture.componentRef.setInput('peersHolding', null);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-leg-holds')?.textContent).not.toContain('peers keep a copy');
+  });
+
+  it('Who holds it: no blank invite button when a protected atom has no suggested action', () => {
+    fixture.componentRef.setInput('snapshot', protectedSnapshot);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-invite-household')).toBeNull();
   });
 });
