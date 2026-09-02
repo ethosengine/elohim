@@ -51,3 +51,7 @@ operator-runtime-surface (green, wired). Branding split: tevah in prose, `ark` i
 shape; the epr-pvc bridge is the unminted guide-star at the end of this chain. S0 is built through the
 update-propagation loop's shape: seed artifact refs are closure-CID/channel-head from the first commit,
 resolved pinned-local in S0, channel-head in S1. Next measured step: station 1 on the household mesh.
+
+DELTA 2026-09-02 (clarification thread): units renamed `RuntimeManifest` / `Berth`; the passport this
+habit's witness carries is the BERTH's (blade-scoped), and the household footprint is a tier above it —
+station 1's "Jessica's passport" reads as Jessica's berth passport. Spec §3.1, register 25–29.

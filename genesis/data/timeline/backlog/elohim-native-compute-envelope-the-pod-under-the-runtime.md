@@ -101,7 +101,7 @@ binary boots as PID 1 inside the alpha edgenode pod — measured by an a2o scena
 grounding (21 briefs, adversarially verified) and three reviews:
 
 - **Name:** `elohim-pod` retired — `pod` already names `steward/node/src/pod`, the cluster
-  *operator* (the opposite layer). The runtime is **tevah**; the declaration is a **`RuntimeSeed`**.
+  *operator* (the opposite layer). The runtime is **tevah**; the declaration is a **`RuntimeManifest`**.
 - **The "three partial envelopes" table is wrong in every row but one.** `process_manager`'s
   try_wait + tail DID land (`264ce8ce4`, `dcf9a16c3`) — the ring is 200 lines, the give-up path
   carries no tail, nobody `try_wait`s after readiness, and the tail is logged, never persisted.
@@ -132,7 +132,21 @@ Status: envisioned → **refined** (the timeline vocabulary has no "designed"; r
   `ark-core`, `ark-supervisor`, the `ark` binary). A branding split, respected on both sides.
 - The `epr-pvc` bridge — the network of peers offering external actors a collective agreement for
   persistent volumes backed by this runtime — is the **guide-star at the end of this valueflow
-  chain**: floated, not minted; `RuntimeInstance.data_root` reserved so nothing precludes it.
+  chain**: floated, not minted; `Berth.data_root` reserved so nothing precludes it.
 - WIP-fence slot moves to `runtime-death-witnessed`; the constitutional DNA batch waits for S1's
   measured shape; S0 is built in the update-propagation loop's shape (closure-CID/channel-head
   refs, pinned-local resolver) so the envelope is delivered by the loop it applies.
+
+## Clarification thread (2026-09-02, spec §3.1 + register 25–29)
+
+- The declaration is a **`RuntimeManifest`** (Manifest-kind EPR, `runtime-manifest`); the per-blade
+  half is a **`Berth`**. A manifest may include a manifest (guests).
+- **Hardware is cattle; the household is the pet.** The ark is the blade's parent and dies with
+  it; the passport is the berth's; the footprint lives across berths under commitments (N−1, not
+  gone). Slotting a blade in publishes a **berth offer** (REA intent) that renegotiates every
+  under-held standing commitment — the missing node between blade-boot and commitments-rebalanced.
+- Loss recurses (blade → household → neighbourhood → commons): witnessed by absence, healed by the
+  same intent–match–commit flow; people recovered by the social-recovery quorum; re-held, never
+  restored.
+- Container power split: closure = hermetic FS; isolation = floor, commitment + reach = ceiling;
+  composability = manifest recursion. Named gap: content bundles are served, not sandboxed.

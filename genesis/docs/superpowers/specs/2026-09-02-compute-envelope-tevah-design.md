@@ -8,7 +8,7 @@ steward: rust-architect
 graduation-trigger: the household mesh runs its conductors under the envelope binary AND a forced conductor death on the mesh produces a death witness whose CID is held by every custodian inside the declared reach, rendered at /epr/{cid} for a household member and refused to a stranger (the @concern:death-witness receipt), AND the operator records acceptance of §12's decision register (a signed-off edit or an epr flow note on this spec)
 created: 2026-09-02
 domain: D-runtime-operations × seam atlas 3.2 OS/packaging · 3.3 runtime/footprint · 3.15 resource governance — the primitive both 3.2 and 3.3 assume and neither owns
-topic: [compute-envelope, tevah, supervisor, death-witness, runtime-seed, passport, cgroup, quota, compute-rea, kubelet-parity, device-spectrum, generational-shift, self-healing, upgrade-propagation, lvi, steward-node]
+topic: [compute-envelope, tevah, supervisor, death-witness, runtime-manifest, berth, passport, cgroup, quota, compute-rea, kubelet-parity, device-spectrum, generational-shift, self-healing, upgrade-propagation, lvi, steward-node]
 informed-by:
   - genesis/data/timeline/backlog/elohim-native-compute-envelope-the-pod-under-the-runtime.md (the envisioned primitive this spec canonizes)
   - genesis/data/timeline/backlog/death-witness-runtime-harvests-a-dying-conductors-last-words.md (the first output; its P2P design gate is re-run and corrected in §7)
@@ -57,9 +57,11 @@ already names `steward/node/src/pod`, the cluster *operator* (the agent-pod sens
 opposite layer; the atlas's thesis is that misrouting is the dominant failure, and a primitive
 named for the layer it is not invites it twice (k8s pod = packaging, seam 3.2). Following the house
 precedent (brit · rakia · lvi · eae), the runtime is **tevah**, the plain alias is *the envelope*,
-and "epr-pod" survives only as the operator's gloss. The declaration follows the `*Seed` convention
-(`NodeSeed`, `DevspaceSeed`) and is a **`RuntimeSeed`**. Overriding the name is the operator's call
-and changes nothing below.
+and "epr-pod" survives only as the operator's gloss. The declaration is a **`RuntimeManifest`** — a
+Manifest-kind EPR (`EprKind::Manifest`, schema key `runtime-manifest`, the sibling of
+`app-manifest`): the manifest of claims about what runs, notarized like every other manifest.
+`*Seed` was rejected 2026-09-02 — "seed" already means content seeding in this repo. The per-blade
+half is a **`Berth`**: what one blade offers and what it currently holds (register 25).
 
 ## 0. The north star this is read through
 
@@ -148,7 +150,7 @@ the virtual-peer contract's inversion, now a per-child field rather than a heuri
 
 | Envelope verb | Grammar verb | The instance |
 |---|---|---|
-| lifecycle | `runGovernor` | `RestartGovernor: elohim_compute::Governor` — Request = spawn child N again; Grant = the seed's restart budget + quota (a self-contract for own children, `delegates-compute` for guests); Context = the incident state; Effect = a spawn plan; every give-up a `Refusal` naming its `LimitOwner` |
+| lifecycle | `runGovernor` | `RestartGovernor: elohim_compute::Governor` — Request = spawn child N again; Grant = the manifest's restart budget + quota (a self-contract for own children, `delegates-compute` for guests); Context = the incident state; Effect = a spawn plan; every give-up a `Refusal` naming its `LimitOwner` |
 | quota | `bindCapability` · `commit(face)` | bounds ride the commitment's `bounds` (extra keys, `additionalProperties: true`) — `Operator` for own children, `Commitment` for guests |
 | accounting | `authorAtom` → `rollupCoverage` | `economic_events` rows `bounded_by` the commitment, `substrate_signal ∈ compute·storage·bandwidth·energy·time`, rolled up over the recursion seam |
 | listening → witness | `authorAtom` | the reach-declared atom the witness gate already chose |
@@ -163,21 +165,21 @@ commitment the runtime mints for itself at first readiness (today only an admin 
 one), emit-then-act, `bounded_by` it. The witness atom *is* the verdict's payload. A restart the
 node gives itself is then auditable by a custodian exactly like a restart the operator gave it.
 
-## 3. The declaration — `RuntimeSeed` and `RuntimeInstance`
+## 3. The declaration — `RuntimeManifest` and `Berth`
 
-Nix's derivation/instantiation split, applied: the **seed** is input-addressed and *shared* (peers
-on one declaration share one seed CID — a family's three boxes, a fleet's seven humans); the
-**instance** is agent-scoped and per node (ports, data dir, agent key, effective quota). Guix's
-"declared OS → generated supervisor" is copied as *the seed generates the supervision*; its
+Nix's derivation/instantiation split, applied: the **manifest** is input-addressed and *shared* (peers
+on one declaration share one manifest CID — a family's three boxes, a fleet's seven humans); the
+**berth** is per blade (ports, data dir, the agent placed there, effective quota). Guix's
+"declared OS → generated supervisor" is copied as *the manifest generates the supervision*; its
 Scheme, its global store, and "upgrade next time it stops" are rejected.
 
 ```
-RuntimeSeed {                                   // content-addressed, DAG-CBOR (bafyrei…); kind "runtime-seed"
+RuntimeManifest {                                   // content-addressed, DAG-CBOR (bafyrei…); kind "runtime-manifest"
   schema:        1,
-  supersedes:    Option<Cid>,                   // the lineage — a seed is the sixth declared-head-over-lineage instance
+  supersedes:    Option<Cid>,                   // the lineage — a manifest is the sixth declared-head-over-lineage instance
   reach:         Reach,                         // household tier (vocabulary: unresolved — declared drift; §7)
-  archetype:     DeviceArchetype,               // the budget floor this seed is sized for (archetype-resource-budgets.json)
-  envelope: {                                   // the six-field virtual-peer contract, made a per-seed value
+  archetype:     DeviceArchetype,               // the budget floor this manifest is sized for (archetype-resource-budgets.json)
+  envelope: {                                   // the six-field virtual-peer contract, made a per-manifest value
     bound:       ResourceQuota { memory_bytes, cpu_millis, pids, disk_bytes },
     measure:     Committed,                     // committed-not-gross (anon+kernel+shmem+unevictable; page cache never counts)
     protected:   [ProcessName],                 // never shed
@@ -191,7 +193,7 @@ RuntimeSeed {                                   // content-addressed, DAG-CBOR (
     artifact:    ArtifactRef::Channel{channel_id} | ArtifactRef::Pinned{cid, bytes, sha256},
                                                 // Channel = auto-adoption by election (runtime-artifacts §4); Pinned = a lockfile
     closure:     [Cid],                         // the runtime closure — declared, never scan-discovered (eprfs materializes, verifies by hash)
-    argv:        [Template], env: [Template],   // templates resolve against the RuntimeInstance, never against ambient env
+    argv:        [Template], env: [Template],   // templates resolve against the Berth, never against ambient env
     env_scrub:   true,                          // the child inherits nothing it was not given
     imports:     [ Import ],                    // wasmCloud links as capability grants: {kind: AdminWs|DataDir|Socket|Fd, from, to}
     readiness:   [ Probe ],                     // a LADDER: NotifyFd(sd_notify) → StdoutLine("Conductor ready.") → AdminWs(port) → AppInstalled → CellsGenesised; per-rung patience
@@ -217,15 +219,15 @@ RuntimeSeed {                                   // content-addressed, DAG-CBOR (
   },
 }
 
-RuntimeInstance {                               // agent-scoped composite (node agent × seed cid); kind "runtime-instance"
-  seed:          Cid,
+Berth {                               // agent-scoped composite (blade agent × manifest cid); kind "berth"
+  manifest:      Cid,
   node:          AgentCid,                      // uhCAk… — the canonical join key; transport ids resolve TO it
   self_contract: Cid,                           // the delegates-compute commitment the verdicts are bounded_by
   custody_spool: Cid,                           // the standing commitment naming who custodies this node's witnesses (§6)
   data_root:     { path, passphrase_source: Empty | Piped | Keystore },   // the passphrase seals lair AND db.key; alpha's is empty
   ports:         { admin_ws, app_ws, http, … },
   effective:     [ EffectiveQuota { process, tier: Enforced(cgroup) | Bounded(rlimit+nice) | Delegated(k8s) | Intrinsic(wasm) | None } ],
-  applied:       { seed_cid, passport_cid, at },   // balena "applied": passport hashes == seed closure hashes
+  applied:       { manifest_cid, passport_cid, at },   // balena "applied": passport hashes == manifest closure hashes
 }
 ```
 
@@ -237,19 +239,67 @@ storage attests; the `pendingRestart` the storage-binary vehicle leaves today fi
 consumer). Consent is a **pause, not a veto**: a child holds an update lock for a bounded, declared
 reason (a quiesce in flight, a chain write) — never an operator flag standing forever, which is
 exactly what `ALLOW_DNA_REINSTALL=true` on fourteen StatefulSets was. At the DNA line only a per-roll
-`DNA_MIGRATION_INTENT` naming every drifted role's bundle hash may move the seed (a new seed with
+`DNA_MIGRATION_INTENT` naming every drifted role's bundle hash may move the manifest (a new manifest with
 `supersedes`). Re-key is the node's own policy, gated on a genuine child death, once. The passport
 names which gate last acted and on what evidence.
 
-**Composition with what is wired.** The seed is the *target state*; the passport (§5.5) is the
+**Composition with what is wired.** The manifest is the *target state*; the passport (§5.5) is the
 *current state*; the envelope is the diff-and-apply loop with `applied` as its exit condition. The
 release-adoption controller (`services/release_adoption/{watch,verify,state,apply}.rs`, 7.4 k lines,
 mesh-proven) keeps its role — resolve the channel head through this node's own conductor, fetch,
 verify locally, hand a `VerifiedRelease` to a vehicle — and the envelope becomes the vehicle for the
-binary class. The seed cannot be *read* from the DHT at boot (the conductor that serves the DHT is
+binary class. The manifest cannot be *read* from the DHT at boot (the conductor that serves the DHT is
 itself a child): it is pinned on the node's disk, content-addressed, and the DHT is where the *next*
-seed is discovered and the *applied* fact is attested — the witness's amber→green rule applied to
+manifest is discovered and the *applied* fact is attested — the witness's amber→green rule applied to
 the declaration side.
+
+### 3.1 The tiers — hardware is cattle, the household is the pet (2026-09-02 thread)
+
+"Cattle, not pets" is violated on purpose at exactly one tier and honored at the others.
+
+| Tier | What it is | Replaceable? | Its witness | Its record |
+|---|---|---|---|---|
+| **Hardware + kernel** | a blade, its PSU / SSD / RAM / GPU / fan; one kernel | **cattle** — slot one in, pull one out | the kernel's own, read **once** by the ark at fingerprint time and on a probe cadence (dmesg, SMART, sensors, the OOM killer); nothing above the ark re-reads it | `attestation:device-health` |
+| **Berth + ark** | one blade's runtime: the ark is the blade's parent process; the berth is what the blade offers and holds | dies with the blade, and that is fine — the ark has no identity beyond its blade | the ark, for its children | the **berth passport** (`kind: runtime-passport`) — the passport is the berth's, never "the node's" |
+| **Household footprint** | agent keys, source chains, cells, custody, the standing commitments that say what must be held by how many | **the pet** — lives across berths, never on one; at N−1 when a blade dies, not gone | absence: declared heads stop moving, presence lapses, custody goes unmet at its next check — the gap record at household scale | the commitments themselves |
+| **Network** | households under reach-scoped commitments with each other | a household is a pet to its people and cattle to the network | the same absence, one grain up | quilt RS(N,K) + social-recovery quorum |
+
+**Slotting a blade in is a negotiation.** The new blade boots, the ark fingerprints it, and the
+berth publishes a **berth offer** — a REA *intent* carrying the fingerprint and the effective quota
+tier, never a registration. The household hub matches it against every standing commitment that is
+under-held (custody at N−1, `delegates-compute` waiting for a berth, a guest refused elsewhere for
+lack of an `Enforced` leaf); new commitments are counter-signed; a new balance holds. Reach decides
+how far the offer is visible, so the rebalance may cross households. No scheduler: every party to
+the rebalance is a party to a commitment. *Missing node, minted here:* chain blade-boot →
+commitments-rebalanced / node **berth-offer** / probe: a new blade's offer appears in the hub's
+ledger within N seconds and at least one under-held custody commitment is re-signed against it.
+
+**Loss recurses.** A whole house can be wiped out. Nobody held its pipes, so no death witness is
+written; the network witnesses by absence, the under-held commitments rebalance onto neighbours'
+berth offers, the people are recovered by the social-recovery quorum (the only step with no
+hardware analog), and when the household re-berths the footprint flows back from custodians —
+re-held, never restored from a backup. Blade → household → neighbourhood → commons is one
+intent–match–commit flow at whichever grain the wound is: the VSM recursion the Weave epic asks
+for, and the three test acts read as one healing story.
+
+**Maintenance sits on tier one.** An elohim reads the blade's device-health record and the berth
+passport, reaches a verdict ("NVMe wear 94 %, replace within a week"), and mints a work commitment
+for the human; whole-blade replacement is the same flow with the footprint re-berthed first. The
+human's act is physical; everything before and after it is witnessed.
+
+**What a container's power becomes here.** Hermetic filesystem → the closure (have). Security
+boundary → split: isolation is the *floor*, graded per driver and reported honestly; the *ceiling*
+is a `delegates-compute` commitment (what it may do) plus reach (what it may read), both revocable
+on chain — isolation enforces, the commitment authorizes. Composability → **a manifest may include
+a manifest**: a guest is a sub-manifest by CID with its own berth, commitment, quota leaf, and
+witness (lvi's `{quota, ttl, bounded_by}` triple). Three classes of "application on the dataplane":
+peer-native processes (conductor, storage, doorway — process specs); applications that ride the
+dataplane as *content* (elohim-app, lamad, sophia, storybook — elected bundles served by the
+doorway's EPR router, composed by an `app-manifest`, the Moss "Tool" analog, and where local-first
+lives); and developer/operator tooling (jenkins, grafana, sonarqube, mempalace, MCP servers — guests
+under lvi, today operator infra out of seam). **Named gap:** bundles are served, not sandboxed —
+Moss's iframe + capability-scoped runtime API has no counterpart yet; the `app-manifest` is where
+that capability contract belongs.
 
 ## 4. Delivery across the device spectrum
 
@@ -261,7 +311,7 @@ Nomad's task driver and cut to five methods:
 ```
 trait Driver {
   fn fingerprint(&self) -> Fingerprint;                          // isolation tier, quota tier, signals, arch — a PASSPORT attribute, not a scheduler input
-  fn start(&mut self, spec: &ProcessSpec, inst: &RuntimeInstance) -> Result<Handle>;   // Handle is serializable (Nomad TaskHandle)
+  fn start(&mut self, spec: &ProcessSpec, inst: &Berth) -> Result<Handle>;   // Handle is serializable (Nomad TaskHandle)
   fn recover(&mut self, handle: &Handle) -> Result<()>;          // re-attach after the ENVELOPE restarts — children survive it
   async fn wait(&mut self, id) -> ExitResult { code, signal, core_dumped, oom_killed: Evidence, rusage };
   async fn stop(&mut self, id, signal, grace) -> Result<()>;     // SIGINT, then SIGKILL at grace
@@ -274,7 +324,7 @@ trait Driver {
 |---|---|---|---|---|---|
 | **k8s pod (alpha)** | replaces the conductor container's entrypoint (the storage-in-embedded-mode pod *is* the envelope today) | tevah is PID 1: subreaper, SIGTERM→per-child SIGINT with grace inside `terminationGracePeriodSeconds`, `/dev/termination-log` ≤4 KiB with witness CID + exit class, `FallbackToLogsOnError` | Delegated (kubelet owns the container cgroup) | `Delegated`; per-child leaves only if `cgroup.subtree_control` is delegated (uid 1000, root-owned cgroup: **not today**) → `Bounded` (rlimit + nice) | an OOM of the container kills PID 1 with the child (`oom.group=1`); the witness for that class is the gap record (§6) until the pod topology gives the conductor its own leaf |
 | **household Linux box** | `systemctl --user` unit with `Delegate=yes`, lingering; or plain shell | tevah under systemd (systemd is its heart; `ExecStopPost` files the parent's verdict) | Native | `Enforced` for `memory`+`pids` without root; `cpu`/`io` after a one-time root drop-in (`user@.service.d/delegate.conf`) | the only rung where the quota verb is drawable at all; **guests are refused (fail-closed) on any rung below `Enforced`** — `RLIMIT_NPROC`/`NOFILE` are per-uid, so a same-uid guest under `Bounded` exhausts the parent's own fork and fd budget |
-| **household mesh (a2o)** | `hc-mesh.sh` execs `ark run <seed>` per peer instead of `setsid nohup hc sandbox run` | tevah, subreaper; the mesh's pid registry records the envelope, not the children | Native | `Bounded` inside the dev pod (root-owned cgroup) | the flip authority for every household-lane scenario |
+| **household mesh (a2o)** | `hc-mesh.sh` execs `ark run <manifest>` per peer instead of `setsid nohup hc sandbox run` | tevah, subreaper; the mesh's pid registry records the envelope, not the children | Native | `Bounded` inside the dev pod (root-owned cgroup) | the flip authority for every household-lane scenario |
 | **Tauri desktop** | the sidecar *is* the envelope: storage becomes its child; the conductor is `InProcess` (tauri_plugin_holochain) | the app | InProcess + Native | `Bounded` on Linux; `None` on macOS/Windows (declared `unwired`, never pretended) | `InProcess` children get the same verdict + witness shape with no pipes: a supervised task with a readiness event and a panic hook |
 | **Tauri desktop, macOS / Windows** | the sidecar is the envelope | the app | Native (macOS: `kqueue NOTE_EXIT` + `libproc`; Windows: job objects + `TerminateProcess`, no signals) | `None`, declared `unwired` per verb | no `/proc`, no pidfd, no prctl on macOS; the SIGINT-then-SIGKILL contract is Linux/macOS only and Windows needs a job-object stop; launchd and the Service Control Manager are outer supervisors with no `$SERVICE_RESULT` analog — their verdict is `Lost` |
 | **phone (Android)** | in-app | the app | InProcess (+ Wasm for guests) | `None` (app-controllable cgroups unverified) | the OS keeps the death record: `ApplicationExitInfo` (`REASON_*`) read at next launch is the parent-verdict source, and the ≤128-byte `setProcessStateSummary` carries the intent-log pointer pre-death |
@@ -301,7 +351,7 @@ socket bound (before cells exist — which is why a genesis-less cell "briefly r
 → `Conductor ready.` on stdout and `sd_notify(READY=1)`, one rung, emitted at the same instant
 after cells are created (strictly better than the admin socket; ignored by everyone today; the
 conductor speaks nothing else of the sd_notify vocabulary) → app installed → cells genesised → gossip joined. The
-seed declares the rungs and their patience (a **declared cold-compile budget** for the
+manifest declares the rungs and their patience (a **declared cold-compile budget** for the
 single-threaded wasm compile replaces the fixed 60 × 2 s; the conductor cannot ask for more, since it
 speaks only `READY=1`); the envelope exposes the **sd_notify wire protocol** on a **per-child**
 `NOTIFY_SOCKET` (`READY=1 STATUS= EXTEND_TIMEOUT_USEC= WATCHDOG=1 STOPPING=1`) with `SO_PASSCRED`
@@ -334,7 +384,7 @@ restarted and cannot say — honest absence, filed by the next boot from the tal
 
 **Three records, never one** (the OTP/systemd separation that today's code collapses into a log line
 and a `return Err`): the *fact* (`ExitClass` + `rusage` at reap + the pre-death `/proc` sample), the
-*policy* (`ChildPolicy` in the seed), and the *verdict* — one atom per death, chained by `cause` into
+*policy* (`ChildPolicy` in the manifest), and the *verdict* — one atom per death, chained by `cause` into
 an incident root: `{incident, child, death_n, exit, uptime, readiness_attempts, first_structured_line,
 resource_snapshot, passport_cid, preceding_verdict_cids, tally_window, decision: Restart{after} |
 GiveUp{rearm: PassportChange | RepairAction | WindowExpiry | OperatorReset} | KeepWaiting | Escalate,
@@ -378,13 +428,13 @@ best-effort `nice`, disabled on alpha. The verb is built in this order:
    *delegated* cgroup-v2 subtree without root; declares `unwired` honestly where there is no cgroup.
    Leaves only help when a **leaf** limit binds first: the kernel walks victim → oom domain, so an
    ancestor breach under kubelet's `oom.group=1` still group-kills the envelope. Hence the invariant
-   **Σ child `memory.max` + envelope headroom < root limit**, a seed violating it is refused, and the
+   **Σ child `memory.max` + envelope headroom < root limit**, a manifest violating it is refused, and the
    OOM class is declared `unwitnessable` where the root's `oom.group` is not writable (alpha today).
    Above `high`, escalation reads PSI dwell time, not just bytes, and `io.max` is assigned where the
    controller is delegated — parking a guest at `memory.high` burns uncharged reclaim otherwise.
 2. **ram-guard's shape, lifted**: committed-not-gross, protected set, typed tier ladder,
    never-shed-unknown, re-measure between kills, ≤ N kills per tick, **one witnessed event per kill**
-   in the reciprocity ledger — with the process-name heuristics replaced by the seed's `protected` and
+   in the reciprocity ledger — with the process-name heuristics replaced by the manifest's `protected` and
    `shed_order`. Its own `RETIRE_WHEN` names this verb as the platform that retires it.
 3. **CPU throttle is a lifecycle signal**, not a passive cap: a CFS-throttled conductor converts
    scheduling delay into `DatabaseError(Timeout)` — the mechanism that tore the uninstall. The
@@ -402,13 +452,13 @@ The ledger already exists with every column and no producer: `economic_events.bo
 `compute·storage·bandwidth·energy·time`, the 60-minute rate window live in `bounds_validator`. What
 the envelope emits, per child, in the shape IPVM's receipt and Golem's debit note agree on:
 
-- **Commitment (before)** — the seed is the `ran` target; the self-contract (own children) or the
+- **Commitment (before)** — the manifest is the `ran` target; the self-contract (own children) or the
   guest's `delegates-compute` is what every row is `bounded_by`. `action ∈ REA_ACTIONS` (`use` for own
   consumption; `produce`/`transfer` for capacity lent) — never the ad-hoc `compute-fulfilled`, which
   is outside the integrity list and forgeable by its own documentation.
 - **Interval rows (during)** — per process, per interval, **cumulative monotone counters since spawn**
   (cpu-seconds, byte-seconds, bytes-egress, restarts, readiness attempts), `provider` = the node's
-  `agent_cid`, `receiver` = the child's owning agent, `in_scope_of` = the seed CID. Golem's trick: a
+  `agent_cid`, `receiver` = the child's owning agent, `in_scope_of` = the manifest CID. Golem's trick: a
   lost interval loses nothing; the next row still totals. **Category-C amber rows** (`dht_anchor_hash`
   NULL, exactly as both existing writers) — the head-plane forbids notarizing ~500 k rows/node/year.
 - **Breach events + a period composite (attested)** — a shed is a row `bounded_by` the guest's
@@ -425,7 +475,7 @@ applies verbatim to any economic consequence of a guest's rows.
 ### 5.4 Listening
 
 Two rings per child (200 lines), a 40-line stderr-first tail in the summary, and structured parsers
-declared per process — for the conductor: `Database read connection is saturated` (INFO; the seed
+declared per process — for the conductor: `Database read connection is saturated` (INFO; the manifest
 pins the `RUST_LOG` filter so it cannot be silenced), `FATAL PANIC:` / `Payload:` / `Location:`,
 `Failed to claim a thread … out of threads`, `Admin listener finished` (the socket died while the
 process lives), the `Conductor startup:` milestones, `Conductor ready.`. Children's stdio is still
@@ -434,7 +484,7 @@ copy. `InProcess` children feed the same ring through a tracing layer.
 
 ### 5.5 Describe — the passport, by content, persisted
 
-`RuntimePassport` (`GET /version`) is the seed of this verb and stays the live projection. The
+`RuntimePassport` (`GET /version`) is the origin of this verb and stays the live projection. The
 passport becomes an **atom** (kind `runtime-passport`, riding `node-context`), re-minted on every
 spawn/apply/restart, and its rule is: **it describes only processes the envelope supervises, from
 artifacts it hashed itself** — sha256 of `/proc/<pid>/exe` at spawn, never `CONDUCTOR_IMAGE_TAG` (a
@@ -448,7 +498,7 @@ disk vs installed (both computed in `happ_manager`, today only in logs). Plus: t
 (the compatibility envelope's missing passport side), followed channels with mode / `appliedRelease`
 / `pendingRestart`, the data-root hash with its `passphrase_source`, and which of the three
 authorities last acted. The passport is the **declared-vs-observed(-vs-attested) diff** over the
-seed's closure CIDs; "conductor and node containers on different builds" becomes a sentence it
+manifest's closure CIDs; "conductor and node containers on different builds" becomes a sentence it
 writes. Until the envelope is PID 1 everywhere, a node passport must *read* the attached conductor's
 own `/version` rather than echo its own pin.
 
@@ -475,7 +525,7 @@ own `/version` rather than echo its own pin.
    canonical hash excludes the proof), verified by a custodian against the node's transport half of
    its `AgentPeerBinding` (`peer_identity_bindings`) — the one place a transport key is already bound
    to an agent, so this is the two-stage identity the gate allows, never a raw cross-namespace
-   compare. Namespace discipline, from review: `author_id` is always the **agent** (`RuntimeInstance.
+   compare. Namespace discipline, from review: `author_id` is always the **agent** (`Berth.
    node`, known from the last passport); the proof carries `key_namespace: transport`, the transport
    id, and the `AgentPeerBinding` CID as its link; a witness whose binding cannot be resolved is
    minted **`unbound`** and is never promoted to green — storage verifies the transport signature and
@@ -541,10 +591,10 @@ own `/version` rather than echo its own pin.
 
 ## 7. P2P design gate
 
-**Entity: RuntimeSeed** — Notarized (A), reusing the `Content` entry type with `metadata_json.kind =
-runtime-seed` riding `node-context`; DNA-hash-NEUTRAL (a first-class type is hash-moving; batched).
-Head-plane: one declared head per seed lineage; a handful per household, tens per fleet; versions
-under it. Address: content-derived CID (`bafyrei…`), input-addressed and shared; **which seed applies
+**Entity: RuntimeManifest** — Notarized (A), reusing the `Content` entry type with `metadata_json.kind =
+runtime-manifest` riding `node-context`; DNA-hash-NEUTRAL (a first-class type is hash-moving; batched).
+Head-plane: one declared head per manifest lineage; a handful per household, tens per fleet; versions
+under it. Address: content-derived CID (`bafyrei…`), input-addressed and shared; **which manifest applies
 is a declared head, never recency** — the instance pins it like a lockfile. Stakes: all four; artifact
 verification floor-protected (never stage-priced). Integrity zome `content_store_integrity` (packed
 from `dna/elohim/`), untouched. Coordinator: existing `content_store::create_content` +
@@ -552,10 +602,10 @@ from `dna/elohim/`), untouched. Coordinator: existing `content_store::create_con
 Projections: `content` row (anchor yes); Automerge: no (below broadcast). Route: none new — `/epr/{cid}`;
 the envelope's own admin surface (`ark describe`, a node-local socket) is excluded from
 `build_manifest()` exactly as `POST /admin/coordinators/sync` is. Anti-patterns: not modeled in the
-k8s plane (the pod spec is one *packaging* of the seed); no random ids; no "latest".
+k8s plane (the pod spec is one *packaging* of the manifest); no random ids; no "latest".
 
-**Entity: RuntimeInstance** — Private (B) with an attested effect: agent-scoped composite (node
-agent × seed cid); the *applied* fact is what peers need to verify → the passport atom carries it.
+**Entity: Berth** — Private (B) with an attested effect: agent-scoped composite (node
+agent × manifest cid); the *applied* fact is what peers need to verify → the passport atom carries it.
 Private source chain / local disk; no shared table; no route.
 
 **Entity: Incident / DeathWitness** — **Notarized (A) at incident grain** (the design-gate review
@@ -575,9 +625,9 @@ custody-spool set. The custodied copy is a **redacted summary** (typed class, co
 argv/env hashed; fds classed, not pathed); the raw ≤ 96 KiB stays local behind a per-incident grant.
 
 **Entity: RuntimePassport** — Ephemeral (C) as the live `/version` projection, plus **one Notarized
-(A) atom per *applied* transition** (a seed applied, a release adopted, a re-key) riding
+(A) atom per *applied* transition** (a manifest applied, a release adopted, a re-key) riding
 `node-context` + `kind: runtime-passport` — never per spawn or per restart (that would be a head per
-restart). Its effect — "node X runs closure Y, applied seed Z at T" — is what the adoption controller,
+restart). Its effect — "node X runs closure Y, applied manifest Z at T" — is what the adoption controller,
 Station 8's matrix, and custodians diffing peers need. The passport-at-death rides inside the incident
 blob. It carries a monotone **`incarnation`** counter so a custodian can detect an absent death record
 (a node reappearing at incarnation n+1 with no incident for n is a gap, never healthy).
@@ -606,7 +656,7 @@ does. **Two corrections from review:** (a) the self-contract is minted at first 
 motivating death happened 2.3 s into boot — pre-readiness verdicts are `bounded_by:
 SeedPolicy(seed_cid)`, and a re-key re-mints both commitments and revokes the old (the old provider
 is the old agent); (b) a self-authored grant (`provider == recipient`) passes integrity and must be
-**enumerated as such** with `epr_scope` scoped to `runtime:<seed cid>` so the operation-authorization
+**enumerated as such** with `epr_scope` scoped to `runtime:<manifest cid>` so the operation-authorization
 path never reads it as a content-op grant. The **custody-spool** commitment is the node's *offer*,
 not the custodian's *consent*: it becomes binding only when a custodian outside the node's control
 counter-signs it (`attestation:custodian-commitment` exists with zero producers — this is its first),
@@ -631,16 +681,16 @@ under `recover()` — answered. C7 advertise/serve symmetry: readiness gates adv
 A-record analog is the inventory offer) — answered. C8 observability-per-decision: the verdict *is*
 the record; every refusal carries `LimitOwner` + `ReasonLabel` — answered. C9 identity lineage: re-key
 only on `Reseedable`, once, witnessed; the passport carries the agent key — answered. C10 contract
-evolution: the seed's `supersedes` + wire epochs in the passport — answered. C11 backpressure: CPU
+evolution: the manifest's `supersedes` + wire epochs in the passport — answered. C11 backpressure: CPU
 throttle is a read signal; the harvest adds no load to a dying child — answered. C12 consent: the
 self-contract, the guest commitment, the update lock as a pause — answered. C13 graduated authority:
 `LimitOwner ∈ SelfLimit·Commitment·Operator·Faith` on every refusal — answered. C14 witnessed residual:
 the incident root carries the restart count and the custodians' receipts — answered. Registration: a
 `seam-registry.yaml` in the new crate at birth (§8).
 
-**Back-fill check.** (1) The coordinator returns the seed's / witness's EntryHash; `/epr/{cid}`
+**Back-fill check.** (1) The coordinator returns the manifest's / witness's EntryHash; `/epr/{cid}`
 accepts exactly that. (2) `content_store_integrity`, untouched — DNA-hash-NEUTRAL by riding existing
-types; the first-class types are declared hash-moving and batched. (3) At one year: seeds — tens;
+types; the first-class types are declared hash-moving and batched. (3) At one year: manifests — tens;
 incidents — < 100; composites — ~ 1 per node-period; no measurable quiesce delta.
 
 ## 8. Crate boundaries
@@ -651,9 +701,9 @@ storage consumes shared crates as path deps — `elohim_compute` is the preceden
 
 | Crate | Owns | Depends on | Purity |
 |---|---|---|---|
-| **`ark-core`** | `RuntimeSeed`, `RuntimeInstance`, `ProcessSpec`, `ChildPolicy`, `ExitClass`, `Verdict`, `Witness`, `Passport`, `ProcessSample` (a NEW per-process cpu/mem/fds/io type — `elohim_compute::ResourceSnapshot` is request-level and serialized to live consumers; it is not extended), the lifecycle state machine (spawn → ready → live → dying → dead), the intensity/same-cause rules, `RestartGovernor: Governor`, the tally | `epr` (codec + CID — never re-derived; the `elohim/.epr-meta` interface-first rule), `elohim-compute` (`Governor`/`Refusal`/`LimitOwner`, `BuildInfo`), `seam-contracts` (`Answer<T>`, `ReasonLabel` — a path dep; no `elohim/` workspace member consumes it yet, so tevah is the precedent) | the peer-fabric shape: no tokio, no diesel, no libp2p/iroh; `Clock`, `ProcessHandle`, `ResourceProbe`, `WitnessSink` traits; a boundary test asserts the dependency tree |
+| **`ark-core`** | `RuntimeManifest`, `Berth`, `ProcessSpec`, `ChildPolicy`, `ExitClass`, `Verdict`, `Witness`, `Passport`, `ProcessSample` (a NEW per-process cpu/mem/fds/io type — `elohim_compute::ResourceSnapshot` is request-level and serialized to live consumers; it is not extended), the lifecycle state machine (spawn → ready → live → dying → dead), the intensity/same-cause rules, `RestartGovernor: Governor`, the tally | `epr` (codec + CID — never re-derived; the `elohim/.epr-meta` interface-first rule), `elohim-compute` (`Governor`/`Refusal`/`LimitOwner`, `BuildInfo`), `seam-contracts` (`Answer<T>`, `ReasonLabel` — a path dep; no `elohim/` workspace member consumes it yet, so tevah is the precedent) | the peer-fabric shape: no tokio, no diesel, no libp2p/iroh; `Clock`, `ProcessHandle`, `ResourceProbe`, `WitnessSink` traits; a boundary test asserts the dependency tree |
 | **`ark-supervisor`** | tokio: spawn, pipes, rings, parsers, `pidfd`/`waitid` reaper, `rusage`, `/proc` + cgroup readers (lifted from `system_metrics.rs`), the intent log, the spool writer, the `Driver` trait + `Native` and `InProcess` drivers; `Cgroup` and `Sandbox` drivers behind features; `Wasm` driver deferred | `ark-core`, `nix`, `procfs` | I/O, no network |
-| **`ark`** (binary) | `run <seed>` (PID-1 mode: subreaper, signal forwarding, termination-log), `describe`, `witness ls|show`, `notify` (the sd_notify socket) | the two above | the launchable unit every context execs |
+| **`ark`** (binary) | `run <manifest>` (PID-1 mode: subreaper, signal forwarding, termination-log), `describe`, `witness ls|show`, `notify` (the sd_notify socket) | the two above | the launchable unit every context execs |
 
 **Consumers and what changes.** `elohim-storage`: `process_manager.rs` becomes a thin consumer of
 `ark-supervisor` (readiness returns a *verdict*; the `AdminWebsocket` is constructed by storage
@@ -666,7 +716,7 @@ a consumer of verdicts, never a second supervisor. `hc-mesh.sh`: `direct` mode b
 The conductor template: the `elohim-conductor` container's entrypoint becomes `ark`. Tauri: the
 sidecar becomes `ark` with storage as its child. **Deleted or demoted:** `steward/node/src/update/`
 (superseded by the exec floor), `compute_rea.rs` (wrong grain, random ids — subsumed by §5.3),
-`GENESIS_SELF_HEAL_IDENTITY` / `ALLOW_DNA_REINSTALL` as *behaviour* (they become seed fields;
+`GENESIS_SELF_HEAL_IDENTITY` / `ALLOW_DNA_REINSTALL` as *behaviour* (they become manifest fields;
 `DNA_MIGRATION_INTENT` stays as the per-roll intent input), ram-guard's process-name heuristics.
 
 Each crate carries its own `.epr-meta/` (the habit home, §10) and `seam-registry.yaml` (the birth
@@ -680,10 +730,10 @@ Docker is three things, and the envelope's relationship to each is different:
 |---|---|---|
 | **Images / pull / registry** | content-addressed manifests + layers, digest-verified fetch, overlay unpack | **Already replaced.** eprfs `ProjectionManifest` + `LocalMaterializer` ("mount, don't ship"); artifacts by CID on the blob plane; the release manifest is the executable-artifact manifest. The envelope grows no pull path. |
 | **Isolation** | namespaces, seccomp, capabilities, cgroup *limits* | **Consumed, never written.** cgroup-v2 subtree writes (~200 lines) where delegated; bubblewrap for unprivileged namespaces (isolation, zero quota; its `--json-status-fd` is a ready-made witness channel); youki's `libcontainer` only if a full OCI bundle is ever needed for a guest (Linux-only, expects systemd, fail-closed on controllers); wasmtime for guest components. An OCI-compliant runtime is a second project — years, four crates, 14 % documented — and buys nothing for the peer's own trusted children. |
-| **Supervision** | spawn, reap, restart, logs, exit status, describe | **Ours, and new.** Nobody has a p2p-native, REA-accounted, witness-first, reach-declared supervisor whose parent role is sufficient without an outside. This is the wheel worth re-inventing, and it is small: the POSIX core `process_manager.rs` already seeds. |
+| **Supervision** | spawn, reap, restart, logs, exit status, describe | **Ours, and new.** Nobody has a p2p-native, REA-accounted, witness-first, reach-declared supervisor whose parent role is sufficient without an outside. This is the wheel worth re-inventing, and it is small: the POSIX core `process_manager.rs` already manifests. |
 
 An OCI `config.json` is kept as a **derived, host-local driver input for guests** (typed for free
-via `oci-spec`; `annotations` carry the seed and process CIDs; one projection reaches crun, youki,
+via `oci-spec`; `annotations` carry the manifest and process CIDs; one projection reaches crun, youki,
 runwasi) — never as the declaration (it carries host paths, has no restart policy, no readiness, no
 log ownership, no passport, and is fail-closed where the envelope needs declared-vs-effective).
 
@@ -723,7 +773,7 @@ envelope, every household-lane assertion is vacuous by construction.
   hc/conductor pair. Witness to spool (`amber-local`); the intent log; `ExitClass` + tally +
   same-cause `GiveUp`. Receipt: station 1 of the scenario on the household mesh; the ring, the
   classifier, and their two tests (`264ce8ce4`) lift from `process_manager.rs` into `ark-core`.
-  The seed's artifact reference is born in the closure-CID / channel-head shape with a
+  The manifest's artifact reference is born in the closure-CID / channel-head shape with a
   pinned-local-path resolver only (register 24) — S0 never touches the network.
 - **S1 — storage consumes; custody and attestation.** `process_manager` delegates to the library;
   the self-contract and custody-spool commitments minted at first readiness; the custody-scoped read
@@ -756,7 +806,7 @@ envelope, every household-lane assertion is vacuous by construction.
 1. **The envelope is its own crate family and launchable unit, below storage** — never a feature of
    `elohim-storage`'s binary, never grown out of `steward/node::pod`, never `eae`. *Rejected:* growing
    the witness inside `process_manager` (ships only where `kubectl logs --previous` already exists).
-2. **Name: tevah; declaration: `RuntimeSeed`; "pod" retired for the runtime.** *Rejected:*
+2. **Name: tevah; declaration: `RuntimeManifest`; "pod" retired for the runtime.** *Rejected:*
    `elohim-pod` (live collision with the operator module; k8s-plane connotation). Refined by 20.
 3. **The parent role is sufficient.** Supervision and listening require no privilege; isolation and
    quota are drivers with a witnessed effective tier. *Rejected:* an OCI runtime; podman/docker as the
@@ -766,7 +816,7 @@ envelope, every household-lane assertion is vacuous by construction.
    code; delegating restart policy to kubelet/systemd.
 5. **Liveness is the envelope's own reaper**, never a probe on a sibling's `/health`.
 6. **Topology before thresholds**: the supervisor never shares an OOM group with a witnessed child.
-7. **The seed names artifacts by content** (closure CIDs; channel heads for auto-adoption; pinned
+7. **The manifest names artifacts by content** (closure CIDs; channel heads for auto-adoption; pinned
    CIDs as a lockfile); the passport hashes what it runs. *Rejected:* `CONDUCTOR_IMAGE_TAG`-class
    names; standing env flags as behaviour.
 8. **Three authorities, three gates** (election above the DNA line — the envelope is the apply
@@ -801,7 +851,7 @@ envelope, every household-lane assertion is vacuous by construction.
 21. **The `epr-pvc` bridge is the guide-star at the end of the valueflow chain, not a slice**
     (operator, 2026-09-02). A bridge-seam crate through which the network of peers offers external
     actors a collective agreement for persistent volumes that are actually backed by this runtime.
-    Nothing is minted; `RuntimeInstance.data_root` is reserved as a volume head with no semantics
+    Nothing is minted; `Berth.data_root` is reserved as a volume head with no semantics
     in v1; each slice is checked against one question — *does this preclude the guide-star?*
 22. **WIP fence: `runtime-death-witnessed` takes `operator-runtime-surface`'s slot.** The surface
     habit is green with wired checks; a green habit holds no attention. Actives are
@@ -810,12 +860,29 @@ envelope, every household-lane assertion is vacuous by construction.
     and `attestation:death-witness` are scheduled only after a witness has been anchored on
     existing content types on the mesh; moving the DNA hash for an unmeasured shape is the wrong
     order (smallest slice that flips a named red).
-24. **The update-propagation loop is trusted enough to dogfood from S0's shape.** The seed's
+24. **The update-propagation loop is trusted enough to dogfood from S0's shape.** The manifest's
     artifact reference takes the runtime-artifacts closure-CID / channel-head form from the first
     commit; S0 resolves it with a pinned-local-path resolver (no network); S1's first station
     resolves a channel head through the adoption path `runtime-upgrade-propagation` already
     proves (stations 1–8 on the household mesh). The envelope is delivered by the loop it applies:
     accelerate the cycle → new habit → dogfood/refine → master → new habit.
+25. **`RuntimeManifest`, not `RuntimeSeed`; `Berth`, not `RuntimeInstance`** (operator, 2026-09-02
+    thread). The declaration is a Manifest-kind EPR (`runtime-manifest`, sibling of `app-manifest`);
+    "seed" is content seeding here. The berth is per blade. **A manifest may include a manifest**
+    (guest recursion, §3.1).
+26. **Hardware is cattle; the household is the pet** (§3.1). The ark is the blade's parent and dies
+    with it; the passport is the berth's; the household footprint lives across berths under
+    commitments and is at N−1, not gone, when a blade dies. *Corrects* this spec's earlier "the
+    passport is the node's" reading.
+27. **A berth offer is a REA intent, and slotting a blade is a negotiation** across every under-held
+    standing commitment; reach bounds how far it travels; no scheduler. Missing node minted:
+    blade-boot → **berth-offer** → commitments-rebalanced.
+28. **Loss is witnessed by absence and healed by the same flow at every grain** — blade, household,
+    neighbourhood, commons; the social-recovery quorum is the only step with no hardware analog;
+    re-held, never restored.
+29. **Container power, split**: closure = hermetic FS; isolation = floor, commitment + reach =
+    ceiling; composability = manifest recursion. Named gap: content bundles are served, not
+    sandboxed (Moss iframe + capability API); the `app-manifest` owns that contract when it comes.
 
 ## 13. What was rejected, per external model
 
@@ -869,6 +936,8 @@ per-epoch version stamp, the bounded snapshot; not the unbounded log. IPVM — t
    of this valueflow chain, unminted (register 21).
 5. Delivery: working code first; the envelope is built and shipped through the update-propagation
    loop it applies (register 24).
+6. Names refined in the 2026-09-02 clarification thread: `RuntimeManifest` / `Berth`; tiers,
+   berth offer, loss recursion, and the container split captured in §3.1 (register 25–29).
 
 ## 16. Adversarial review disposition (2026-09-02)
 
@@ -909,7 +978,7 @@ changes.
   subreaper + exclusive data-root lock.
 - Red-team 3 — `tokio::process` consumes the reap → Driver contract: `std::process::Command` +
   `waitid(WNOWAIT)` → `/proc` → `wait4`.
-- Red-team 4 — ancestor OOM still group-kills the envelope → the Σ-children invariant, seed refusal,
+- Red-team 4 — ancestor OOM still group-kills the envelope → the Σ-children invariant, manifest refusal,
   and `unwitnessable` where the root's `oom.group` is not writable.
 - Red-team 5, 20 — revert-by-re-election is not a safety brake when storage is the child being
   replaced → `RevertToPreviousClosure` with a pinned previous closure and a soak window; the
