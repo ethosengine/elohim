@@ -1,6 +1,6 @@
 ---
 id: ark-s0-launcher-plan
-status: active
+status: landed
 cites:
   - "compute-envelope-tevah | Tevah | sha256:25153362aae54306 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
 ---
@@ -102,7 +102,7 @@ genesis/manifests/habits.yaml           re-projected (Task 13)
 **Interfaces:**
 - Produces: three compiling crates; `just gate elohim-ark` runs; `ark_core::boundary` test module.
 
-- [ ] **Step 1: Workspace membership and shared deps.** In `elohim/Cargo.toml` add to `members`: `"ark/core"`, `"ark/supervisor"`, `"ark/cli"`. Add to `[workspace.dependencies]`:
+- [x] **Step 1: Workspace membership and shared deps.** In `elohim/Cargo.toml` add to `members`: `"ark/core"`, `"ark/supervisor"`, `"ark/cli"`. Add to `[workspace.dependencies]`:
 
 ```toml
 # ark — the compute envelope (tevah). Pure core / I/O supervisor / binary.
@@ -114,7 +114,7 @@ cid = { version = "0.11", features = ["serde-codec"] }
 tempfile = "3"
 ```
 
-- [ ] **Step 2: `elohim/ark/core/Cargo.toml`.**
+- [x] **Step 2: `elohim/ark/core/Cargo.toml`.**
 
 ```toml
 [package]
@@ -144,7 +144,7 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 ```
 
-- [ ] **Step 3: `elohim/ark/core/src/lib.rs`** with the module tree (modules are created empty-but-compiling here and filled by Tasks 2–6) and the boundary test:
+- [x] **Step 3: `elohim/ark/core/src/lib.rs`** with the module tree (modules are created empty-but-compiling here and filled by Tasks 2–6) and the boundary test:
 
 ```rust
 //! ark-core — the pure half of the elohim compute envelope (tevah).
@@ -212,7 +212,7 @@ mod boundary {
 
 Each module file for this task is a one-line `//! filled by Task N` stub so the crate compiles; the `pub use` lines are added in the task that creates each type (leave `lib.rs` re-exports commented with `// Task N` markers until then, so the scaffold compiles).
 
-- [ ] **Step 4: `elohim/ark/supervisor/Cargo.toml` and `lib.rs`.**
+- [x] **Step 4: `elohim/ark/supervisor/Cargo.toml` and `lib.rs`.**
 
 ```toml
 [package]
@@ -246,7 +246,7 @@ tempfile = { workspace = true }
 
 `lib.rs`: `pub mod driver; pub mod native; pub mod pipes; pub mod reaper; pub mod spool; pub mod supervisor;` with stub files.
 
-- [ ] **Step 5: `elohim/ark/cli/Cargo.toml` and `main.rs`.**
+- [x] **Step 5: `elohim/ark/cli/Cargo.toml` and `main.rs`.**
 
 ```toml
 [package]
@@ -270,7 +270,7 @@ serde_json = { workspace = true }
 
 `main.rs` for this task: a clap `Cli` with the four subcommands declared (`Run { manifest: PathBuf, berth: PathBuf }`, `Describe { berth: PathBuf }`, `Witness { #[command(subcommand)] cmd: WitnessCmd }` with `Ls { berth }` / `Show { berth, cid: String }`, `Hash { file: PathBuf }`) each returning exit 64 with "not yet wired (Task 10)" on stderr.
 
-- [ ] **Step 6: Gate.** `elohim/ark/build-manifest.json`:
+- [x] **Step 6: Gate.** `elohim/ark/build-manifest.json`:
 
 ```json
 {
@@ -306,11 +306,11 @@ _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
 ```
 
-- [ ] **Step 7: `elohim/ark/CLAUDE.md`** (≤ 40 lines): the three crates and their purity rule; the S0 simplifications (CIDs as strings; threads not tokio; Native driver only, effective tier `None`); the build line from Global Constraints; the mesh line `MESH_CONDUCTOR_LAUNCH=ark ARK_BIN=… just mesh start`; the spec path; "tevah in prose, ark in code".
+- [x] **Step 7: `elohim/ark/CLAUDE.md`** (≤ 40 lines): the three crates and their purity rule; the S0 simplifications (CIDs as strings; threads not tokio; Native driver only, effective tier `None`); the build line from Global Constraints; the mesh line `MESH_CONDUCTOR_LAUNCH=ark ARK_BIN=… just mesh start`; the spec path; "tevah in prose, ark in code".
 
-- [ ] **Step 8: Verify.** `cd elohim && CARGO_TARGET_DIR=… RUSTFLAGS="" cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark; echo EXIT=$?` → EXIT=0 with `boundary::no_runtime_or_io_deps` passing; `just gate elohim-ark; echo EXIT=$?` → EXIT=0. `python3 genesis/orchestrator/gate-runner.mjs --list 2>/dev/null | grep elohim-ark` or `just gate elohim-ark` resolving proves discovery.
+- [x] **Step 8: Verify.** `cd elohim && CARGO_TARGET_DIR=… RUSTFLAGS="" cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark; echo EXIT=$?` → EXIT=0 with `boundary::no_runtime_or_io_deps` passing; `just gate elohim-ark; echo EXIT=$?` → EXIT=0. `python3 genesis/orchestrator/gate-runner.mjs --list 2>/dev/null | grep elohim-ark` or `just gate elohim-ark` resolving proves discovery.
 
-- [ ] **Step 9: Commit** — `git add elohim/Cargo.toml elohim/Cargo.lock elohim/ark justfile && git commit -m "feat(ark): scaffold the compute-envelope crate family — ark-core (pure), ark-supervisor (I/O), ark (binary); gate wired; purity boundary test"`.
+- [x] **Step 9: Commit** — `git add elohim/Cargo.toml elohim/Cargo.lock elohim/ark justfile && git commit -m "feat(ark): scaffold the compute-envelope crate family — ark-core (pure), ark-supervisor (I/O), ark (binary); gate wired; purity boundary test"`.
 
 ---
 
@@ -325,7 +325,7 @@ _gate-elohim-ark:
 **Interfaces:**
 - Produces: `pub struct RingBuffer { pub fn new(capacity: usize) -> Self; pub fn push(&mut self, line: String); pub fn last_n(&self, n: usize) -> Vec<String>; pub fn len(&self) -> usize; pub fn is_empty(&self) -> bool }`; `pub enum ReadinessOutcome { ChildExited, Retry, GiveUp }`; `pub fn classify_readiness_outcome(child_exited: bool, attempt: u32, max_retries: u32) -> ReadinessOutcome`; `pub enum ExitClass { Exited { code: i32 }, Signaled { signal: i32, core_dumped: bool }, OomKilled, Unknown }` with `Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug`, `#[serde(rename_all = "kebab-case", tag = "class")]`; `impl ExitClass { pub fn from_raw_wait_status(status: i32) -> Self; pub fn is_clean(&self) -> bool /* Exited{0} */; pub fn same_cause_token(&self) -> String /* "exited:1" | "signaled:9" | "oom" | "unknown" */ }`.
 
-- [ ] **Step 1: Write failing tests** in `ring.rs` (`#[cfg(test)] mod tests`): copy `ring_buffer_keeps_the_last_n_and_drops_the_oldest` from `process_manager.rs:901` verbatim against `RingBuffer::new(3)`. In `exit.rs`: copy `readiness_outcome_prefers_child_death_over_attempt_budget` from `:925` with `Option<()>` replaced by `bool`; add
+- [x] **Step 1: Write failing tests** in `ring.rs` (`#[cfg(test)] mod tests`): copy `ring_buffer_keeps_the_last_n_and_drops_the_oldest` from `process_manager.rs:901` verbatim against `RingBuffer::new(3)`. In `exit.rs`: copy `readiness_outcome_prefers_child_death_over_attempt_budget` from `:925` with `Option<()>` replaced by `bool`; add
 
 ```rust
 #[test]
@@ -348,10 +348,10 @@ fn exit_class_serde_is_tagged_kebab() {
 }
 ```
 
-- [ ] **Step 2: Run** `cargo test -p elohim-ark-core; echo EXIT=$?` → fails to compile (types missing).
-- [ ] **Step 3: Implement** `RingBuffer` (lift the `VecDeque` implementation verbatim, make it `pub`, add `len`/`is_empty`, doc-comment "lifted from elohim-storage process_manager.rs 264ce8ce4; storage delegates here in S1"), `ReadinessOutcome` + `classify_readiness_outcome` (lifted, `bool` instead of `Option<()>`), `ExitClass` with `from_raw_wait_status` decoding `WIFEXITED`/`WEXITSTATUS`/`WTERMSIG`/`WCOREDUMP` by hand (bit ops, no libc), `OomKilled` is never produced by the decoder (the supervisor promotes `Signaled{9}` to `OomKilled` when `/proc` or the cgroup says so — S3).
-- [ ] **Step 4: Run** tests → PASS; `cargo clippy -p elohim-ark-core -- -D warnings; echo EXIT=$?` → 0.
-- [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): RingBuffer + readiness classifier lifted from process_manager; ExitClass decodes POSIX wait status"`.
+- [x] **Step 2: Run** `cargo test -p elohim-ark-core; echo EXIT=$?` → fails to compile (types missing).
+- [x] **Step 3: Implement** `RingBuffer` (lift the `VecDeque` implementation verbatim, make it `pub`, add `len`/`is_empty`, doc-comment "lifted from elohim-storage process_manager.rs 264ce8ce4; storage delegates here in S1"), `ReadinessOutcome` + `classify_readiness_outcome` (lifted, `bool` instead of `Option<()>`), `ExitClass` with `from_raw_wait_status` decoding `WIFEXITED`/`WEXITSTATUS`/`WTERMSIG`/`WCOREDUMP` by hand (bit ops, no libc), `OomKilled` is never produced by the decoder (the supervisor promotes `Signaled{9}` to `OomKilled` when `/proc` or the cgroup says so — S3).
+- [x] **Step 4: Run** tests → PASS; `cargo clippy -p elohim-ark-core -- -D warnings; echo EXIT=$?` → 0.
+- [x] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): RingBuffer + readiness classifier lifted from process_manager; ExitClass decodes POSIX wait status"`.
 
 ---
 
@@ -440,9 +440,9 @@ impl Berth {
 }
 ```
 
-- [ ] **Step 1: Failing tests** (in each module): `manifest_json_round_trips_and_defaults_apply` (a minimal JSON with one process, only `name`, `artifact`, `argv` set → `policy == ChildPolicy::default()`, `env_scrub == true`, `listen.ring_lines == 200`); `manifest_cid_is_stable_and_order_insensitive_to_json_whitespace` (two JSON strings differing only in whitespace → same `cid()` string starting with `bafy`); `manifest_refuses_wrong_kind_duplicate_names_and_bad_sha` (three JSONs → `Err(ManifestError::Kind(_))`, `Err(Invalid(_))`, `Err(Invalid(_))`); `berth_resolves_templates_and_names_unknown_keys` (`{data_root}/{name}/conductor-config.yaml` resolves; `{port.admin_ws}` resolves to "4444"; `{port.nope}` → `Err(BerthError::UnknownTemplate("port.nope"))`).
-- [ ] **Step 2: Run** → compile failure. **Step 3: Implement.** **Step 4: Run** → PASS, clippy clean.
-- [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): RuntimeManifest (kind runtime-manifest, dag-cbor CID) and Berth with template resolution and the pinned-local resolver map"`.
+- [x] **Step 1: Failing tests** (in each module): `manifest_json_round_trips_and_defaults_apply` (a minimal JSON with one process, only `name`, `artifact`, `argv` set → `policy == ChildPolicy::default()`, `env_scrub == true`, `listen.ring_lines == 200`); `manifest_cid_is_stable_and_order_insensitive_to_json_whitespace` (two JSON strings differing only in whitespace → same `cid()` string starting with `bafy`); `manifest_refuses_wrong_kind_duplicate_names_and_bad_sha` (three JSONs → `Err(ManifestError::Kind(_))`, `Err(Invalid(_))`, `Err(Invalid(_))`); `berth_resolves_templates_and_names_unknown_keys` (`{data_root}/{name}/conductor-config.yaml` resolves; `{port.admin_ws}` resolves to "4444"; `{port.nope}` → `Err(BerthError::UnknownTemplate("port.nope"))`).
+- [x] **Step 2: Run** → compile failure. **Step 3: Implement.** **Step 4: Run** → PASS, clippy clean.
+- [x] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): RuntimeManifest (kind runtime-manifest, dag-cbor CID) and Berth with template resolution and the pinned-local resolver map"`.
 
 ---
 
@@ -490,9 +490,9 @@ impl RestartGovernor {
 
 `LimitOwner` mapping: `BoundedBy::ManifestPolicy → LimitOwner::Operator`, `BoundedBy::Commitment → LimitOwner::Commitment`.
 
-- [ ] **Step 1: Failing tests.** `three_identical_fast_deaths_give_up_by_same_cause` (three `Signaled{9}` at uptime 1000 ms → third verdict `GiveUp{SameCause{count:3}}` and the refusal's `code == RefusalCode::GateRefused("same-cause".into())`, `limit_owner == Operator`); `intensity_window_counts_only_recent_deaths_and_readiness_resets_it` (6 deaths spread over 600 s with window 300 → only those within 300 count; after `reset_on_ready` → 0); `backoff_doubles_and_caps` (attempts 0..8 with min 1, max 60, steps 6 → 1,2,4,8,16,32,60,60,60); `transient_clean_exit_stops_without_restart`; `temporary_never_restarts`; `commitment_bounded_refusal_names_commitment_owner`.
-- [ ] **Step 2: Run** → compile failure. **Step 3: Implement.** **Step 4: Run** → PASS, clippy clean.
-- [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): death tally, same-cause rule, and RestartGovernor as an elohim_compute::Governor — verdicts refuse-and-elevate"`.
+- [x] **Step 1: Failing tests.** `three_identical_fast_deaths_give_up_by_same_cause` (three `Signaled{9}` at uptime 1000 ms → third verdict `GiveUp{SameCause{count:3}}` and the refusal's `code == RefusalCode::GateRefused("same-cause".into())`, `limit_owner == Operator`); `intensity_window_counts_only_recent_deaths_and_readiness_resets_it` (6 deaths spread over 600 s with window 300 → only those within 300 count; after `reset_on_ready` → 0); `backoff_doubles_and_caps` (attempts 0..8 with min 1, max 60, steps 6 → 1,2,4,8,16,32,60,60,60); `transient_clean_exit_stops_without_restart`; `temporary_never_restarts`; `commitment_bounded_refusal_names_commitment_owner`.
+- [x] **Step 2: Run** → compile failure. **Step 3: Implement.** **Step 4: Run** → PASS, clippy clean.
+- [x] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): death tally, same-cause rule, and RestartGovernor as an elohim_compute::Governor — verdicts refuse-and-elevate"`.
 
 
 ### Task 4R: Task 4 revision (from review) — the governor's contract, and `RestartVerdict`
@@ -503,16 +503,16 @@ impl RestartGovernor {
 
 **Plan amendment (orchestrator, 2026-09-02):** ark-core's restart verdict type is `RestartVerdict`, never bare `Verdict` — `elohim_epr::Verdict` (the gradient-axis verdict) is already a dependency's crate-root export and both records will sit in the same witness payload under a `"verdict"` key. The Interfaces blocks above are amended accordingly (module stays `verdict`; the JSON field in `DeathWitness`/`Passport` stays `verdict`).
 
-- [ ] Rename `Verdict` → `RestartVerdict` in verdict.rs, lib.rs re-export, witness.rs, passport.rs; the serde field names stay `verdict`/`last_verdict`.
-- [ ] `RestartContext.tally` MUST already contain `req.death` (the supervisor records before deciding); delete the by-value dedupe in `tally_after_death`; use `ctx.tally` directly; `empty_tally_is_safe` records the death in its fixture; document the contract on the field.
-- [ ] Remove the `Transient` + clean-exit early return in `decide` — authorize → gate → render, with render yielding `Stop` (the gate still applies).
-- [ ] `Governor::gate`/`render` doc comments: they evaluate the manifest-default policy under `LimitOwner::Operator` because the trait signature carries no grant; `decide`/`verdict` is the only correct entry point. Add a test that a same-cause GATE refusal under `BoundedBy::Commitment` names `LimitOwner::Commitment`.
-- [ ] The residual refusal arm: `GiveUpReason::PolicyTemporary` only when `grant.policy.restart == Restart::Temporary`; comment the S0 invariant on the residual (a new refusal code needs a new `GiveUpReason` variant = plan amendment).
-- [ ] `DeathTally::record` bounded to the most recent 256; documented as exceeding any expressible window/same-cause limit.
-- [ ] `GiveUpReason::TransientCleanExit`: doc line declaring it reserved (constructed by nothing in S0) — or removed; choose removal unless a constructor site exists.
-- [ ] `backoff_doubles_and_caps` additionally drives 0..6 in-window deaths through `RestartGovernor::verdict` and asserts the `after_s` sequence 1,2,4,8,16,32,60.
-- [ ] `DeathWitness` gains `refusal: Option<elohim_compute::Refusal>` next to `verdict` (the `limit_owner` is capture-resistance evidence); Task 9 fills both.
-- [ ] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core` green; commit path-limited `git add elohim/ark/core` — `fix(ark-core): RestartVerdict; the governor's tally contract, gate ordering, owner honesty, bounded tally (Task 4 review)`.
+- [x] Rename `Verdict` → `RestartVerdict` in verdict.rs, lib.rs re-export, witness.rs, passport.rs; the serde field names stay `verdict`/`last_verdict`.
+- [x] `RestartContext.tally` MUST already contain `req.death` (the supervisor records before deciding); delete the by-value dedupe in `tally_after_death`; use `ctx.tally` directly; `empty_tally_is_safe` records the death in its fixture; document the contract on the field.
+- [x] Remove the `Transient` + clean-exit early return in `decide` — authorize → gate → render, with render yielding `Stop` (the gate still applies).
+- [x] `Governor::gate`/`render` doc comments: they evaluate the manifest-default policy under `LimitOwner::Operator` because the trait signature carries no grant; `decide`/`verdict` is the only correct entry point. Add a test that a same-cause GATE refusal under `BoundedBy::Commitment` names `LimitOwner::Commitment`.
+- [x] The residual refusal arm: `GiveUpReason::PolicyTemporary` only when `grant.policy.restart == Restart::Temporary`; comment the S0 invariant on the residual (a new refusal code needs a new `GiveUpReason` variant = plan amendment).
+- [x] `DeathTally::record` bounded to the most recent 256; documented as exceeding any expressible window/same-cause limit.
+- [x] `GiveUpReason::TransientCleanExit`: doc line declaring it reserved (constructed by nothing in S0) — or removed; choose removal unless a constructor site exists.
+- [x] `backoff_doubles_and_caps` additionally drives 0..6 in-window deaths through `RestartGovernor::verdict` and asserts the `after_s` sequence 1,2,4,8,16,32,60.
+- [x] `DeathWitness` gains `refusal: Option<elohim_compute::Refusal>` next to `verdict` (the `limit_owner` is capture-resistance evidence); Task 9 fills both.
+- [x] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core` green; commit path-limited `git add elohim/ark/core` — `fix(ark-core): RestartVerdict; the governor's tally contract, gate ordering, owner honesty, bounded tally (Task 4 review)`.
 
 ---
 
@@ -568,9 +568,9 @@ pub trait WitnessSink {
 }
 ```
 
-- [ ] **Step 1: Failing tests.** `witness_cid_changes_when_any_field_changes_and_is_stable_otherwise`; `witness_json_carries_kind_death_witness_and_tagged_exit` (assert the JSON has `"kind":"death-witness"` and `"exit":{"class":"signaled",…}`); `incident_id_is_content_derived`; `passport_json_kind_is_runtime_passport`. Add an in-memory `struct MemorySink` under `#[cfg(test)]` in `sink.rs` implementing the trait (Vec-backed) — Task 9's supervisor tests reuse it via `pub mod testing` behind `#[cfg(any(test, feature = "testing"))]`.
-- [ ] **Step 2–4:** compile-fail → implement → PASS + clippy.
-- [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): DeathWitness/Incident/Passport/Intent records with content-derived CIDs; WitnessSink and Clock traits"`.
+- [x] **Step 1: Failing tests.** `witness_cid_changes_when_any_field_changes_and_is_stable_otherwise`; `witness_json_carries_kind_death_witness_and_tagged_exit` (assert the JSON has `"kind":"death-witness"` and `"exit":{"class":"signaled",…}`); `incident_id_is_content_derived`; `passport_json_kind_is_runtime_passport`. Add an in-memory `struct MemorySink` under `#[cfg(test)]` in `sink.rs` implementing the trait (Vec-backed) — Task 9's supervisor tests reuse it via `pub mod testing` behind `#[cfg(any(test, feature = "testing"))]`.
+- [x] **Step 2–4:** compile-fail → implement → PASS + clippy.
+- [x] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): DeathWitness/Incident/Passport/Intent records with content-derived CIDs; WitnessSink and Clock traits"`.
 
 
 ### Task 5R: Task 5 + 4R review follow-ups (orchestrator-queued)
@@ -587,13 +587,13 @@ pub trait WitnessSink {
 
 **Verdict table (binding):** INHERIT — `RestartGovernor: elohim_compute::Governor` (done). SPECIALIZE (project, don't replace) — `Intent` → `epr_rea::model::Intent` via `as_rea_intent()` (verbs: Spawn/Restart→`Produce`, Stop/Kill→`Consume`, GiveUp→`Dismiss`; tag `runtime:<action>`); `DeathWitness` → `epr_rea::model::FlowEvent` via `as_flow_event()` (`Consume`, resource = witness CID, `Count{uptime_ms, "process-ms"}`, `fulfills:[self_contract]`, tag `runtime:death`); `Incident` → `epr_rea::model::Process` via `as_rea_process()` (deaths = inputs, restarts = outputs; `IncidentClose` rides as an output event tagged `runtime:incident-closed`); `Intensity` → `epr_rea::model::Bound{limit: max_deaths, unit: "deaths", sense: Ceiling, threshold_pct}` via `ChildPolicy::intensity_bound(threshold_pct)`; `DeathTally` → `Window` via `as_window()` (the tally stays the no-I/O hot-path projection); `GiveUpReason::{IntensityExceeded,SameCause}` → `AlgedonicEvidence::Breach{bound_ref: commitment cid}` via `as_algedonic()` — `Some` ONLY under `BoundedBy::Commitment` (honest absence under manifest policy); `ProcessSample::as_quantities()` → `Quantity{MeasureKind::Level}` at the boundary only (raw struct stays on the wire; `Confidence` cost); `ProcessSpec` → **renamed `ChildSpec`** (collides with `epr_rea::model::ProcessSpec`; serde key `processes` unchanged, manifest CID unmoved). KEEP (justified in doc comments) — `RuntimeManifest`, `ArtifactRef` (content digest ≠ `PinnedRef` id@version), `ChildPolicy`/`Backoff`/`Probe`/`Listen`, `ExitClass`, `RingBuffer`, `Passport`/`EffectiveTier`, `Clock`, `lifecycle`.
 
-- [ ] A0 — `ark-core` depends on `elohim-epr-rea` (`default-features = false` once M1 lands; zero new external crates); add `boundary::no_fs_in_pure_core` (grep `src/**` for `std::fs`, `File::`, `SidecarFlowStore`, `SidecarActorStore` → refuse); `no_runtime_or_io_deps` unchanged.
-- [ ] M1 — `epr-rea` `sidecar` feature (default on): `SidecarFlowStore`, `SidecarActorStore`, and their `std::fs` use behind `#[cfg(feature = "sidecar")]`; `epr-cli` unchanged; `cargo test -p elohim-epr-rea` green with and without the feature.
-- [ ] A1 — `ProcessSpec` → `ChildSpec` across ark-core; the plan's later Interfaces blocks read `ChildSpec`.
-- [ ] A2 — new `rea.rs`: `RUNTIME_TAG_*` consts (`runtime:spawn|restart|stop|kill|give-up|death|incident-closed`), `UNIT_PROCESS_MS`, `UNIT_DEATHS`, `RuntimeScope { scope: Cid, node: Option<AgentRef>, bounded_by: Option<Cid> }`, and the projection impls named in the verdict table, each with a test that the projection carries the tag, the verb, the scope, and (where applicable) the `fulfills` edge.
-- [ ] A3 — `RestartGrant` gains `bound: Option<epr_rea::model::Bound>` (derived from `ChildPolicy::intensity_bound` by the supervisor); `GiveUpReason::as_algedonic(&self, bound_ref: &str) -> Option<AlgedonicEvidence>`.
-- [ ] A4 — `DeathWitness` gains `#[serde(default, skip_serializing_if = "Option::is_none")] bounded_by: Option<String>` and `pain: Option<AlgedonicEvidence>` (additive discipline: S1 filling them must not re-address S0 witnesses; a test proves a witness with both `None` has the same CID before and after this change).
-- [ ] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core -p elohim-epr-rea` green; commit path-limited `git add elohim/ark/core elohim/epr-rea elohim/Cargo.lock` — `feat(ark-core): inherit the substrate ontology — VF intent/event/process projections, Bound on the self-contract, algedonic breach, ChildSpec; epr-rea sidecar feature`.
+- [x] A0 — `ark-core` depends on `elohim-epr-rea` (`default-features = false` once M1 lands; zero new external crates); add `boundary::no_fs_in_pure_core` (grep `src/**` for `std::fs`, `File::`, `SidecarFlowStore`, `SidecarActorStore` → refuse); `no_runtime_or_io_deps` unchanged.
+- [x] M1 — `epr-rea` `sidecar` feature (default on): `SidecarFlowStore`, `SidecarActorStore`, and their `std::fs` use behind `#[cfg(feature = "sidecar")]`; `epr-cli` unchanged; `cargo test -p elohim-epr-rea` green with and without the feature.
+- [x] A1 — `ProcessSpec` → `ChildSpec` across ark-core; the plan's later Interfaces blocks read `ChildSpec`.
+- [x] A2 — new `rea.rs`: `RUNTIME_TAG_*` consts (`runtime:spawn|restart|stop|kill|give-up|death|incident-closed`), `UNIT_PROCESS_MS`, `UNIT_DEATHS`, `RuntimeScope { scope: Cid, node: Option<AgentRef>, bounded_by: Option<Cid> }`, and the projection impls named in the verdict table, each with a test that the projection carries the tag, the verb, the scope, and (where applicable) the `fulfills` edge.
+- [x] A3 — `RestartGrant` gains `bound: Option<epr_rea::model::Bound>` (derived from `ChildPolicy::intensity_bound` by the supervisor); `GiveUpReason::as_algedonic(&self, bound_ref: &str) -> Option<AlgedonicEvidence>`.
+- [x] A4 — `DeathWitness` gains `#[serde(default, skip_serializing_if = "Option::is_none")] bounded_by: Option<String>` and `pain: Option<AlgedonicEvidence>` (additive discipline: S1 filling them must not re-address S0 witnesses; a test proves a witness with both `None` has the same CID before and after this change).
+- [x] fmt, clippy `-D warnings`, `cargo test -p elohim-ark-core -p elohim-epr-rea` green; commit path-limited `git add elohim/ark/core elohim/epr-rea elohim/Cargo.lock` — `feat(ark-core): inherit the substrate ontology — VF intent/event/process projections, Bound on the self-contract, algedonic breach, ChildSpec; epr-rea sidecar feature`.
 
 **Task 8 amendment (A5):** `Spool { root, flows: epr_rea::store::SidecarFlowStore, scope: RuntimeScope }` opened at `<data_root>/ark` writing `<data_root>/ark/.eprfs/status/flows.jsonl`; `WitnessSink::intent` also appends `FlowRecord::Intent`, `witness` also `FlowRecord::Event`, `incident` also `FlowRecord::Process`. The supervisor crate is the ONLY construction site of `SidecarFlowStore`. The runtime's records are valueflow records by construction — the same mechanism `epr flow` reads.
 
@@ -622,9 +622,9 @@ pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>);
 
 Transition table (every row is a test): Idle+SpawnRequested → Spawning, [RecordIntent(Spawn), Spawn]. Spawning+Spawned → Booting{rung 0}, []. Booting+RungPassed{rung, of} → Booting{rung+1} or (last) Live, [MarkReady, CloseIncident(ReadyAgain)]. Booting+RungTimedOut → Dying, [RecordIntent(Kill), Kill]. Booting|Live+Died → Dead, [OpenIncident (only if none open — the supervisor filters), WriteWitness, Decide]. Dead+VerdictReached{Restart{after_s,attempt}} → Spawning{attempt}, [RecordIntent(Restart), SleepThen(after_s), Spawn]. Dead+VerdictReached{GiveUp} → GaveUp, [RecordIntent(GiveUp), CloseIncident(GaveUp)]. Dead+VerdictReached{Stop} → Idle, [CloseIncident(Stopped)]. Live|Booting+StopRequested → Dying, [RecordIntent(Stop), SendSignal(policy signal — carried in the event by the supervisor as `StopRequested`; `step` emits `SendSignal(0)` placeholder? NO — make it `StopRequested { signal: i32 }`)]. Dying+Died → Idle, [CloseIncident(Stopped), Exit]. Dying+GraceExpired → Dying, [Kill]. Any illegal pair → unchanged state, `[]` (and a test proves `Idle+Died` is a no-op).
 
-- [ ] **Step 1:** write one test per row (`#[test] fn idle_spawn_requested_records_intent_then_spawns()` …) plus `illegal_transitions_are_no_ops`.
-- [ ] **Step 2–4:** compile-fail → implement `step` as one `match (state, event)` → PASS + clippy.
-- [ ] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): lifecycle state machine — spawn → boot ladder → live → dying → dead, verdict-driven, as a pure step function"`.
+- [x] **Step 1:** write one test per row (`#[test] fn idle_spawn_requested_records_intent_then_spawns()` …) plus `illegal_transitions_are_no_ops`.
+- [x] **Step 2–4:** compile-fail → implement `step` as one `match (state, event)` → PASS + clippy.
+- [x] **Step 5: Commit** — `git add elohim/ark/core && git commit -m "feat(ark-core): lifecycle state machine — spawn → boot ladder → live → dying → dead, verdict-driven, as a pure step function"`.
 
 ---
 
@@ -660,7 +660,7 @@ pub fn become_subreaper() -> Result<(), ReapError>;               // prctl(PR_SE
 
 `NativeDriver::start`: refuse `kind != Native`; refuse `ArtifactRef::Channel` with `ChannelUnresolvedInS0`; resolve path = `berth.artifacts[spec.name]` else `ArtifactMissing`; sha256 the file (streamed, 1 MiB chunks), compare to `Pinned.sha256` (lowercase hex) else `ArtifactHashMismatch`; build `Command` with resolved argv/env templates, `env_clear()` when `env_scrub`, always pass `PATH` and `HOME` through if present in the parent (documented), `stdin` = piped (write passphrase + `\n`, then drop) or null, `stdout`/`stderr` piped, `current_dir(berth.data_root)`; `pre_exec` sets nothing (no PDEATHSIG).
 
-- [ ] **Step 1: Failing integration test** `tests/native_reap.rs`:
+- [x] **Step 1: Failing integration test** `tests/native_reap.rs`:
 
 ```rust
 // A real child: /bin/sh is the artifact (its sha256 computed in the test), argv echoes then sleeps.
@@ -690,8 +690,8 @@ fn sigkilled_child_is_witnessed_as_signaled_9_with_rusage() {
 
 (`ChildSpec: Default` and `Berth: Default` exist since Tasks 3/5I.)
 
-- [ ] **Step 2: Run** → compile failure. **Step 3: Implement** with `nix::sys::wait::waitid(Id::Pid, WEXITED|WNOWAIT|WNOHANG)`, `nix::sys::signal::kill`, `libc::wait4`, `libc::prctl`. **Step 4: Run** → PASS; clippy clean (`unsafe` blocks carry a `// SAFETY:` line each).
-- [ ] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): Native driver (std::process, env scrub, passport-grade artifact hash) and the reaper — waitid(WNOWAIT) then wait4 rusage; subreaper"`.
+- [x] **Step 2: Run** → compile failure. **Step 3: Implement** with `nix::sys::wait::waitid(Id::Pid, WEXITED|WNOWAIT|WNOHANG)`, `nix::sys::signal::kill`, `libc::wait4`, `libc::prctl`. **Step 4: Run** → PASS; clippy clean (`unsafe` blocks carry a `// SAFETY:` line each).
+- [x] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): Native driver (std::process, env scrub, passport-grade artifact hash) and the reaper — waitid(WNOWAIT) then wait4 rusage; subreaper"`.
 
 ---
 
@@ -722,9 +722,9 @@ pub struct WitnessSummary { pub cid: String, pub incident: String, pub process: 
 impl WitnessSink for Spool { /* intent → append line to intents.log (O_APPEND, fsync); witness → canonical dag-cbor to witnesses/<cid>.cbor + json sidecar, tmp+fsync+rename; incident/passport/tally → json tmp+rename */ }
 ```
 
-- [ ] **Step 1: Failing tests.** `line_reader_fills_ring_and_matches_needle` (feed `"a\nConductor ready.\nb\n"` through an `io::Cursor`, join thread → ring `last_n(10)` = 3 lines, `matched == ["Conductor ready."]`); `spool_writes_witness_row_before_blob_and_lists_newest_first` (two witnesses with different `died_at` → `list_witnesses()[0]` is the later one; `witnesses/<cid>.cbor` bytes == `w.canonical_bytes()`; no `*.tmp` remains); `spool_intent_log_is_append_only_json_lines`; `spool_refuses_unwritable_root` (chmod 0500 tempdir → `Err(SpoolError::Unwritable)`; skipped when running as root).
-- [ ] **Step 2–4:** compile-fail → implement → PASS + clippy.
-- [ ] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): pipe line readers with readiness needles; the amber-local spool as a WitnessSink (row-before-blob, 0700)"`.
+- [x] **Step 1: Failing tests.** `line_reader_fills_ring_and_matches_needle` (feed `"a\nConductor ready.\nb\n"` through an `io::Cursor`, join thread → ring `last_n(10)` = 3 lines, `matched == ["Conductor ready."]`); `spool_writes_witness_row_before_blob_and_lists_newest_first` (two witnesses with different `died_at` → `list_witnesses()[0]` is the later one; `witnesses/<cid>.cbor` bytes == `w.canonical_bytes()`; no `*.tmp` remains); `spool_intent_log_is_append_only_json_lines`; `spool_refuses_unwritable_root` (chmod 0500 tempdir → `Err(SpoolError::Unwritable)`; skipped when running as root).
+- [x] **Step 2–4:** compile-fail → implement → PASS + clippy.
+- [x] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): pipe line readers with readiness needles; the amber-local spool as a WitnessSink (row-before-blob, 0700)"`.
 
 ---
 
@@ -750,7 +750,7 @@ impl Supervisor {
 
 Behaviour (one thread per process, each driving `ark_core::lifecycle::step`; the main thread joins them and polls `shutdown`): on start `become_subreaper()`, bump `berth.incarnation` (load passport → +1), write passport. Per process: `Action::Spawn` → `driver.start` → `spawn_line_reader` ×2 (log files `<data_root>/ark/logs/<name>.{stdout,stderr}.log`, needles from `Probe::StdoutLine`) → boot ladder: for each rung poll every 100 ms up to `patience_ms` (`StdoutLine` → `matched` contains; `TcpListen` → `std::net::TcpStream::connect_timeout(127.0.0.1:port, 200ms)` succeeds) while also `wait_nowait` each poll (a dead child during boot is `Event::Died`, never a rung timeout — the classifier's rule). Live: poll `wait_nowait` every 250 ms. On `Died`: `proc_status_sample` → `reap_with_rusage` → build `DeathWitness` (rings' `last_n(tail_lines)`, `last_intent` = the last intent this process recorded, passport as it stands) → `sink.witness` FIRST → `RestartGovernor.verdict` (grant `BoundedBy::ManifestPolicy`) → write the witness a second time with `verdict` filled (same incident; the first CID is the write-ahead record) → `sink.incident` → `Event::VerdictReached`. `SleepThen(s)` honours `shutdown` (wake early). `StopRequested{signal}` on shutdown: `driver.signal(pid, policy.shutdown.signal)`, wait `grace_ms` polling `wait_nowait`, then `Kill`. All processes `GaveUp` → `exit_code 3`; clean shutdown → 0. Passport rewritten on every state change.
 
-- [ ] **Step 1: Failing integration test** `tests/supervise_death.rs` using `/bin/sh` as in Task 7, `Spool` on a tempdir, a real clock:
+- [x] **Step 1: Failing integration test** `tests/supervise_death.rs` using `/bin/sh` as in Task 7, `Spool` on a tempdir, a real clock:
 
 ```rust
 #[test]
@@ -770,8 +770,8 @@ fn a_sigkilled_child_leaves_a_witness_then_restarts_then_gives_up_on_same_cause(
 fn shutdown_sends_policy_signal_then_kills_after_grace() { /* child traps INT and sleeps: sh -c 'trap "" INT; echo booted; sleep 300'; grace_ms 300 → after shutdown the child is gone within 1 s and intents.log ends with Stop then Kill */ }
 ```
 
-- [ ] **Step 2–4:** compile-fail → implement → PASS + clippy. Both tests must run under `cargo test -p elohim-ark-supervisor --all-targets` in < 15 s.
-- [ ] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): the supervision loop — boot ladder, witness-before-verdict, RestartGovernor, incidents, the SIGINT-then-SIGKILL stop contract"`.
+- [x] **Step 2–4:** compile-fail → implement → PASS + clippy. Both tests must run under `cargo test -p elohim-ark-supervisor --all-targets` in < 15 s.
+- [x] **Step 5: Commit** — `git add elohim/ark/supervisor && git commit -m "feat(ark-supervisor): the supervision loop — boot ladder, witness-before-verdict, RestartGovernor, incidents, the SIGINT-then-SIGKILL stop contract"`.
 
 ---
 
@@ -788,9 +788,9 @@ fn shutdown_sends_policy_signal_then_kills_after_grace() { /* child traps INT an
 - `ark hash <file>` → lowercase sha256 hex on stdout (the mesh script pins with it).
 - `ark manifest cid --manifest <path>` → the CID string (the mesh script writes it into the berth).
 
-- [ ] **Step 1: Failing test** `cli_smoke.rs` using `env!("CARGO_BIN_EXE_ark")`: `hash_matches_sha256sum` (write a tempfile, compare against `sha2` computed in-test); `run_refuses_mismatched_berth_manifest_with_65`; `witness_ls_on_empty_spool_prints_empty_array`; `run_then_kill_child_then_witness_ls_shows_one` (spawn `ark run` as a child process with the Task 9 manifest, read passport for the pid, `kill -9`, poll `ark witness ls` ≤ 5 s → one entry, then SIGTERM the ark process → exit 0).
-- [ ] **Step 2–4:** compile-fail → implement → PASS + clippy.
-- [ ] **Step 5: Commit** — `git add elohim/ark/cli && git commit -m "feat(ark): the binary — run/describe/witness ls|show/hash/manifest cid; signal handlers hand the supervisor its stop contract"`.
+- [x] **Step 1: Failing test** `cli_smoke.rs` using `env!("CARGO_BIN_EXE_ark")`: `hash_matches_sha256sum` (write a tempfile, compare against `sha2` computed in-test); `run_refuses_mismatched_berth_manifest_with_65`; `witness_ls_on_empty_spool_prints_empty_array`; `run_then_kill_child_then_witness_ls_shows_one` (spawn `ark run` as a child process with the Task 9 manifest, read passport for the pid, `kill -9`, poll `ark witness ls` ≤ 5 s → one entry, then SIGTERM the ark process → exit 0).
+- [x] **Step 2–4:** compile-fail → implement → PASS + clippy.
+- [x] **Step 5: Commit** — `git add elohim/ark/cli && git commit -m "feat(ark): the binary — run/describe/witness ls|show/hash/manifest cid; signal handlers hand the supervisor its stop contract"`.
 
 
 ### Task 10L: log verbosity dials (operator steering note, 2026-09-02)
@@ -831,10 +831,10 @@ and `berth.json` = `{ "manifest": "<$ARK_BIN manifest cid --manifest …>", "dat
 - `mesh_conductor_pid <name>` → `jq -r '.processes[] | select(.name=="conductor") | .pid' "$LOCAL_DEV_DIR/$name/ark/passport.json"`; `status` shows `conductor(ark) $name pid=<child> incarnation=<n> ready=<bool>`; `stop_all` needs no change (it terminates recorded pids; ark's SIGTERM handler stops its child with SIGINT + grace).
 - The per-conductor log line the spin detector greps (`holochain --piped` in `ps`) is unchanged because the child's argv is the same.
 
-- [ ] **Step 1:** implement the script changes; `bash -n app/elohim-app/scripts/hc-mesh.sh; echo EXIT=$?` → 0; `shellcheck -S warning app/elohim-app/scripts/hc-mesh.sh` no NEW findings versus `git stash`-free baseline (compare counts).
-- [ ] **Step 2 (orchestrator, foreground):** build `ark` (`cd elohim && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev RUSTFLAGS="" cargo build -p elohim-ark; echo EXIT=$?`), then `just mesh stop; MESH_CONDUCTOR_LAUNCH=ark just mesh start` and confirm: `just mesh status` lists three `conductor(ark)` rows; `ss -tln` shows the three admin ports; `just mesh prologue` still passes.
-- [ ] **Step 3 (orchestrator):** `kill -9 "$(mesh_conductor_pid jessica)"` (source the script for the helper), then within 10 s `"$ARK_BIN" witness ls --berth elohim/holochain/local-dev/jessica/ark/berth.json` shows one witness with `"signaled",9`; `ark describe` shows `incarnation` unchanged (the ark did not die) and the conductor `ready: true` again after the restart.
-- [ ] **Step 4: Commit** — `git add app/elohim-app/scripts/hc-mesh.sh && git commit -m "feat(mesh): MESH_CONDUCTOR_LAUNCH=ark — each household conductor runs as the child of an ark; manifest+berth written per peer; mesh_conductor_pid reads the passport"`.
+- [x] **Step 1:** implement the script changes; `bash -n app/elohim-app/scripts/hc-mesh.sh; echo EXIT=$?` → 0; `shellcheck -S warning app/elohim-app/scripts/hc-mesh.sh` no NEW findings versus `git stash`-free baseline (compare counts).
+- [x] **Step 2 (orchestrator, foreground):** build `ark` (`cd elohim && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev RUSTFLAGS="" cargo build -p elohim-ark; echo EXIT=$?`), then `just mesh stop; MESH_CONDUCTOR_LAUNCH=ark just mesh start` and confirm: `just mesh status` lists three `conductor(ark)` rows; `ss -tln` shows the three admin ports; `just mesh prologue` still passes.
+- [x] **Step 3 (orchestrator):** `kill -9 "$(mesh_conductor_pid jessica)"` (source the script for the helper), then within 10 s `"$ARK_BIN" witness ls --berth elohim/holochain/local-dev/jessica/ark/berth.json` shows one witness with `"signaled",9`; `ark describe` shows `incarnation` unchanged (the ark did not die) and the conductor `ready: true` again after the restart.
+- [x] **Step 4: Commit** — `git add app/elohim-app/scripts/hc-mesh.sh && git commit -m "feat(mesh): MESH_CONDUCTOR_LAUNCH=ark — each household conductor runs as the child of an ark; manifest+berth written per peer; mesh_conductor_pid reads the passport"`.
 
 ---
 
@@ -857,9 +857,9 @@ and `berth.json` = `{ "manifest": "<$ARK_BIN manifest cid --manifest …>", "dat
 - `And the witness names the hash of the conductor program the envelope actually started` — `artifact_sha256` equals `ark hash <artifact_path>`.
 - `And the witness carries Jessica's passport as it stood at the moment of death` — `passport.processes[0].pid === killedPid`.
 
-- [ ] **Step 1:** write the steps; `cd genesis/a2o && pnpm exec tsc --noEmit -p .; echo EXIT=$?` → 0.
-- [ ] **Step 2 (orchestrator):** `cd genesis/a2o && npx cucumber-js --config /dev/null --tags '@concern:death-witness and @station-1' features/resilience/death-witness.feature` (the profile-merge trap: never `-p local` with a positional) with the act1-household lane env (`owned-substrate: true` — `cluster-state.act1-household.yaml`) → 1 scenario passed. Stations 2–4 stay `@wip` and are not run.
-- [ ] **Step 3: Commit** — `git add genesis/a2o/steps/mesh/death-witness.steps.ts genesis/a2o/features/resilience/death-witness.feature && git commit -m "test(a2o): death-witness station 1 — the envelope that held the pipes witnesses the death (household lane, ark-launched mesh)"`.
+- [x] **Step 1:** write the steps; `cd genesis/a2o && pnpm exec tsc --noEmit -p .; echo EXIT=$?` → 0.
+- [x] **Step 2 (orchestrator):** `cd genesis/a2o && npx cucumber-js --config /dev/null --tags '@concern:death-witness and @station-1' features/resilience/death-witness.feature` (the profile-merge trap: never `-p local` with a positional) with the act1-household lane env (`owned-substrate: true` — `cluster-state.act1-household.yaml`) → 1 scenario passed. Stations 2–4 stay `@wip` and are not run.
+- [x] **Step 3: Commit** — `git add genesis/a2o/steps/mesh/death-witness.steps.ts genesis/a2o/features/resilience/death-witness.feature && git commit -m "test(a2o): death-witness station 1 — the envelope that held the pipes witnesses the death (household lane, ark-launched mesh)"`.
 
 ---
 
@@ -867,9 +867,9 @@ and `berth.json` = `{ "manifest": "<$ARK_BIN manifest cid --manifest …>", "dat
 
 **Files:** `elohim/ark/core/seam-registry.yaml` (create), `elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md` (DELTA), `genesis/manifests/habits.yaml` (re-project), this plan (checkboxes).
 
-- [ ] **Step 1:** `seam-registry.yaml` conforming to `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json` (copy the header shape from `crates/seam-contracts/seam-registry.yaml`), registering three decision points with their test names: `classify_readiness_outcome` (exit.rs), `same_cause_key` (tally.rs), `RestartGovernor::verdict` (verdict.rs). Validate with the schema tool the seam-contracts registry uses (`grep -rn seam-registry .claude/scripts | head` names it).
-- [ ] **Step 2:** habit DELTA line: `DELTA <date>: station 1 GREEN on the household mesh (ark-launched, MESH_CONDUCTOR_LAUNCH=ark) — <run id / scenario output line>; stations 2–4 remain @wip; status stays red until station 4.` Then `python3 .claude/scripts/habits-project.py` and `--check`.
-- [ ] **Step 3: Commit** — `git add elohim/ark/core/seam-registry.yaml elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md genesis/manifests/habits.yaml genesis/docs/superpowers/plans/2026-09-02-ark-s0-launcher-plan.md && git commit -m "chore(habits): runtime-death-witnessed — station 1 green on the ark-launched household mesh; ark-core seam registry born"`.
+- [x] **Step 1:** `seam-registry.yaml` conforming to `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json` (copy the header shape from `crates/seam-contracts/seam-registry.yaml`), registering three decision points with their test names: `classify_readiness_outcome` (exit.rs), `same_cause_key` (tally.rs), `RestartGovernor::verdict` (verdict.rs). Validate with the schema tool the seam-contracts registry uses (`grep -rn seam-registry .claude/scripts | head` names it).
+- [x] **Step 2:** habit DELTA line: `DELTA <date>: station 1 GREEN on the household mesh (ark-launched, MESH_CONDUCTOR_LAUNCH=ark) — <run id / scenario output line>; stations 2–4 remain @wip; status stays red until station 4.` Then `python3 .claude/scripts/habits-project.py` and `--check`.
+- [x] **Step 3: Commit** — `git add elohim/ark/core/seam-registry.yaml elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md genesis/manifests/habits.yaml genesis/docs/superpowers/plans/2026-09-02-ark-s0-launcher-plan.md && git commit -m "chore(habits): runtime-death-witnessed — station 1 green on the ark-launched household mesh; ark-core seam registry born"`.
 
 ---
 
@@ -880,3 +880,15 @@ and `berth.json` = `{ "manifest": "<$ARK_BIN manifest cid --manifest …>", "dat
 - **§12 items:** 1 (own crate family) ✓, 5 (liveness = own reaper) ✓, 7 (passport hashes what it runs) ✓ Task 7, 15 ✓, 18 (ark's own binary pinned-only — `ARK_BIN` is a path, no channel) ✓, 19 (no tokio::process; no PDEATHSIG) ✓, 20 (names) ✓, 24 (update-loop shape) ✓.
 - **Gaps deliberately left for S1** and stated in `CLAUDE.md`: no custody, no attestation, no `node` identity in the berth, no self-contract commitment (`BoundedBy::ManifestPolicy` only), CIDs as strings, effective tier `None`, storage's `process_manager` untouched (duplicate ring for one slice).
 - **Type consistency check:** `ExitClass::from_raw_wait_status` (Task 2) is what `reap_with_rusage` (Task 7) calls; `Probe::StdoutLine{contains}` (Task 3) is what `spawn_line_reader` needles (Task 8) and the ladder (Task 9) read; `WitnessSink::witness → cid` (Task 5) is what `Spool` (Task 8) and the supervisor (Task 9) use; `Berth.artifacts` (Task 3) is what `NativeDriver::start` (Task 7) resolves; `Passport.processes[].pid` (Task 5) is what `mesh_conductor_pid` (Task 11) and the steps (Task 12) read.
+
+## Landing record (2026-09-02)
+
+- **Receipt:** `just test mesh '@concern:death-witness and @station-1'` → 1 scenario, 8/8 steps passed on the ark-launched household mesh; `genesis/a2o/reports/sprint-report-household-20260902T205500Z-da6968f4.{json,md}`. Gate `just gate elohim-ark` green (60 + 37 + 7 tests).
+- **Commits (all unpushed at landing, dev):** scaffold 6eb479480 · core 0e9494dc3, 134fd9f30, c7776cba7, c4f7ea2e3, 419bdb2f2, 0200ff77c, df61d7a06 (5I inheritance), a02f6d80c, 1e7e821a4 · supervisor 42a226bba, a6275d6e1, 982742a14, 5ced8906d, 607744eaa, 5569dc680, 8c522e336 · binary d784559eb, 54217e1eb · mesh 39299469e, da6968f44 · a2o fc7c44e0b · plus review-fix and doc commits.
+- **Semantic calls made by executors and accepted:** `ark run` exits 3 when ANY declared process gave up; a child with no readiness probe never becomes Live (so the death window never resets for it); tokio is absent from S0 (threads); `Supervisor::new` returns `Result` and `scope_for` is the one home of the berth refusals; `Fingerprint` has no `Eq`.
+- **Defect found only on the mesh:** the witness's passport snapshot lacked the pid (captured after the `Died` transition) — fixed 8c522e336. Lifecycle-as-fixture found it; no unit test had.
+- **Traps recorded:** the mesh refuses to start when the storage pool binary lacks the `p2p-iroh` marker (rebuild the storage slot with `--features "p2p p2p-iroh"`); `just mesh start` can hold the caller's pipe past its own completion (check `just mesh status` before assuming failure); after rolling the arks, `just mesh storage-restart <peer>` for any peer flagged with a stale app-interface token.
+- **S1 gaps named by reviews, not built:** orphan reaper filtered by supervised pids; `ExitClass::SpawnFailed`; cancel a pending spawn on shutdown-during-backoff (a `step` transition); `data_root` exclusive lock; the child's `RUST_LOG` env block in the mesh manifest (env is scrubbed; `{log_level}` now resolves).
+
+- M6 (substrate, epr-rea/src/store.rs): `SidecarFlowStore::append` does not fsync and `records()` hard-errors on a torn last line of flows.jsonl, poisoning every events()/processes() read. Missing node between 'append' and 'read': a tolerant reader (skip a torn trailing line, report it) + fsync-per-append option. Probe: truncate the last line of a flows.jsonl and `records()` still returns the earlier records.
+- Task 10L: Berth.log_level + ARK_LOG + --log-level (ark-core berth.rs + cli) — fold into the Task 10 follow-up.

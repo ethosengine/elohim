@@ -2477,6 +2477,21 @@ habits:
       DELTA 2026-09-02 (clarification thread): units renamed `RuntimeManifest` / `Berth`; the passport this
       habit's witness carries is the BERTH's (blade-scoped), and the household footprint is a tier above it —
       station 1's "Jessica's passport" reads as Jessica's berth passport. Spec §3.1, register 25–29.
+
+      DELTA 2026-09-02 (S0 landed — station 1 GREEN on the household mesh): the ark crate family
+      (elohim/ark: ark-core pure, ark-supervisor I/O, ark binary — commits 6eb479480..8c522e336, gate
+      `just gate elohim-ark` green: 60 + 37 + 7 tests) launches the three household conductors
+      (`MESH_CONDUCTOR_LAUNCH=ark just mesh start`, commit 39299469e + da6968f44). `just test mesh
+      '@concern:death-witness and @station-1'` → 1 scenario, 8/8 steps PASSED; receipt
+      genesis/a2o/reports/sprint-report-household-20260902T205500Z-da6968f4.{json,md}. By hand: a SIGKILLed
+      conductor's witness was listable from the peer's own spool 520 ms after the kill (signal 9, uptime,
+      40 stderr lines, artifact sha == the file on disk, verdict restart; conductor back and ready with the
+      ark's incarnation unchanged; flows.jsonl carries the VF event/process projections). One defect found
+      and fixed on the mesh: the witness's passport snapshot lacked the pid (captured after the Died
+      transition) — 8c522e336. Status stays RED: stations 2–4 (custody, atom-home render, stranger refused,
+      anchored incident) remain @wip and are S1. NEXT: S1 — storage consumes ark-supervisor, custody-spool
+      commitment, amber-offered → green, passport atom; the `epr-rea` torn-line reader (M6) and the S1 gaps
+      the reviews named (orphan reaper, SpawnFailed class, shutdown-during-backoff) are in the plan.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md (the primitive, the decision register §12, the corrections to the two atoms §1)"
       - "atoms: genesis/data/timeline/backlog/death-witness-runtime-harvests-a-dying-conductors-last-words.md · genesis/data/timeline/backlog/elohim-native-compute-envelope-the-pod-under-the-runtime.md"

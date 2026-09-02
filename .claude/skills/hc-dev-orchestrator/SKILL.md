@@ -520,3 +520,22 @@ pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
 | `genesis/orchestrator/gate-runner.mjs` | manifest gate selection/execution |
 | `genesis/agentic/bin/pool-lib.sh` | cargo-pool family and slot authority |
 | `elohim/holochain/local-dev/.hc_ports` | local conductor ports |
+
+## Ark launch mode (`MESH_CONDUCTOR_LAUNCH=ark`, 2026-09-02)
+
+Each household conductor runs as the child of an `ark` (the tevah compute envelope; `ARK_BIN`
+defaults to `/projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark`, else `command -v ark`;
+build with `cd elohim && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev RUSTFLAGS="" cargo build -p elohim-ark`).
+The script writes `<peer>/ark/manifest.json` + `berth.json` per peer, records `pids/ark-<peer>`, and
+`mesh_conductor_pid <peer>` reads the child pid from `<peer>/ark/passport.json`; `just mesh status`
+shows `conductor(ark) <peer> pid= incarnation= ready=` rows. Two refusals are new in this mode:
+`start_all` refuses to wipe a data root while an ark or conductor pid survives, and a peer's
+`incarnation` read-back from an existing passport is fail-closed (malformed passport → that peer's
+launch aborts). Toolchain parity is skipped in ark mode (like `direct`); `jq` is required.
+Death drill: `kill -9 $(mesh_conductor_pid jessica)` then
+`$ARK_BIN witness ls --berth elohim/holochain/local-dev/jessica/ark/berth.json` (witness within ~1 s;
+the ark restarts the conductor; the ark's incarnation is unchanged). Rolling the arks onto a new binary:
+SIGTERM the `ark-*` pids (each stops its conductor with SIGINT + grace), then
+`MESH_CONDUCTOR_LAUNCH=ark just mesh conductors-restart`; afterwards `just mesh storage-restart <peer>`
+for any storage peer the restart flags with a stale app-interface token.
+
