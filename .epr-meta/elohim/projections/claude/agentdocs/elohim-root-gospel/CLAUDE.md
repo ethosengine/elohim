@@ -34,6 +34,7 @@ just mesh status              # local multi-peer mesh
 just mesh storage-restart <peer…> | conductors-restart   # restart arms (export MESH_TRANSPORT_BACKEND for the run; MESH_HAPP_PATH installs the deployed bundle)
 just mesh join-peer <fresh-name>  # stage an organic late joiner on the RUNNING mesh (no incumbent restart; receipt: genesis/a2o/scripts/late-joiner-receipt.ts)
 MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
+MESH_CONDUCTOR_LAUNCH=ark just mesh start  # conductors run as children of an `ark` (tevah envelope; ARK_BIN = the elohim pool debug slot) — a SIGKILLed conductor leaves a death witness in <peer>/ark/ (ark witness ls --berth <peer>/ark/berth.json)
 MESH_PORTAL=0 just mesh start  # skip the doorway sign-in portal (default: served on THRESHOLD_PORT 8081)
 just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)
 just mesh recovery <warm|cold> <peer> [--label k=v]  # single warm/cold recovery run (hc-mesh-recovery.sh)
