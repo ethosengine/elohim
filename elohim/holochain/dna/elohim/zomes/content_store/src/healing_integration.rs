@@ -63,7 +63,8 @@ fn get_content_by_id_v2(id: &str) -> ExternResult<Option<Content>> {
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if let Some(link) = links.first() {
+    // Newest version by (timestamp, create-link hash) — never per-peer link order.
+    if let Some(link) = crate::latest_id_to_content_link(links) {
         let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
             wasm_error!(WasmErrorInner::Guest(
                 "Invalid action hash in link".to_string()
@@ -185,7 +186,8 @@ fn get_path_by_id_v2(id: &str) -> ExternResult<Option<LearningPath>> {
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if let Some(link) = links.first() {
+    // Newest version by (timestamp, create-link hash) — never per-peer link order.
+    if let Some(link) = crate::latest_id_to_content_link(links) {
         let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
             wasm_error!(WasmErrorInner::Guest(
                 "Invalid action hash in link".to_string()
@@ -262,7 +264,8 @@ fn get_step_by_id_v2(id: &str) -> ExternResult<Option<PathStep>> {
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToStep)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if let Some(link) = links.first() {
+    // Newest version by (timestamp, create-link hash) — never per-peer link order.
+    if let Some(link) = crate::latest_id_to_content_link(links) {
         let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
             wasm_error!(WasmErrorInner::Guest(
                 "Invalid action hash in link".to_string()
@@ -339,7 +342,8 @@ fn get_mastery_by_id_v2(id: &str) -> ExternResult<Option<ContentMastery>> {
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToMastery)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if let Some(link) = links.first() {
+    // Newest version by (timestamp, create-link hash) — never per-peer link order.
+    if let Some(link) = crate::latest_id_to_content_link(links) {
         let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
             wasm_error!(WasmErrorInner::Guest(
                 "Invalid action hash in link".to_string()

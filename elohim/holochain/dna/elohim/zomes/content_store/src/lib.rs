@@ -2459,7 +2459,7 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
 /// release lineage could never be proven from chain order. Selecting the
 /// newest link makes each update supersede the previous version, so the chain
 /// carries order. Coordinator-only; DNA-hash-neutral.
-fn latest_id_to_content_link(mut links: Vec<Link>) -> Option<Link> {
+pub(crate) fn latest_id_to_content_link(mut links: Vec<Link>) -> Option<Link> {
     links.sort_by(|a, b| {
         a.timestamp
             .cmp(&b.timestamp)
