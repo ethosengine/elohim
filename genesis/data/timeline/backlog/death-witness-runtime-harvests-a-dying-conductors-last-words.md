@@ -3,7 +3,7 @@ id: "backlog-death-witness-runtime-harvests-a-dying-conductors-last-words"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Death witness — the peer runtime's supervisor harvests a dying conductor's last words (ring-buffered log tail, exit status, resource + DB-pool snapshot, readiness attempts) into a content-addressed report on its own disk, mirrors it to a declared care partner over the p2p plane before it exits, and attests it when a conductor is next available — so a crash that today only a k8s admin can read is visible to the household operator and the recovery partner"
+title: "Death witness — the peer runtime's supervisor harvests a dying conductor's last words (ring-buffered log tail, exit status, resource + DB-pool snapshot, readiness attempts) into an EPR atom with a declared reach, written to its own disk and offered along its custody plane before it exits, attested when a conductor is next available — so a crash that today only a k8s admin can read is readable by exactly whom the node's reach admits: the household operator, its recovery partners, and nobody else"
 slug: "death-witness-runtime-harvests-a-dying-conductors-last-words"
 written: "2026-09-02"
 author: "shift 2026-09-02T02-20-land-rung5-batch (operator-directed)"
@@ -51,42 +51,51 @@ for itself still has a witness.
 - **Content Address Strategy**: Content-Derived — the report is canonical DAG-CBOR
   (`bafyrei…`); the attestation is Agent-Scoped Composite (node agent key, report CID,
   kind=death-witness). The applicable head is declared by the incident root, never "latest".
-- **Transport Affinity**: `auto` — the report bytes ride the existing blob/inventory plane to
-  the partner; a dying node must use whichever swarm is up. **This path must not touch the
-  conductor**: the conductor is the thing that died. libp2p/iroh only.
+- **Transport Affinity**: `auto` — the report bytes ride the existing blob/inventory + custody
+  plane like any other atom the node authors; a dying node must use whichever swarm is up.
+  **This path must not touch the conductor**: the conductor is the thing that died. libp2p/iroh
+  only.
 - **Source of Truth**: the report bytes on the node's own disk (PVC / data dir) are truth at
-  birth; the partner's mirror is a replica; the attestation on the DHT is the public proof,
+  birth; every custodian's copy is a replica; the attestation on the DHT is the public proof,
   written **later** (amber → green) when a conductor is next available. A report with no
   attestation is honest absence, not corruption.
-- **Integrity Zome + DNA-hash class**: none new — DNA-hash-NEUTRAL. The attestation rides the
+- **Who reads it — the reach, not an enumerated pair.** The atom is authored with a declared
+  reach at the node's local-relationship / household tier (name `unresolved — reach vocabulary
+  in declared drift`; the intent is "the people already standing in relationship to this node",
+  never commons). `LocalRelationship` reach is **floor-protected** — it never cheapens or
+  filters at any stage — which is exactly the property a node's own failure evidence needs.
+  Whoever that reach admits can read it at the universal address `/epr/{cid}` (the atom home
+  that landed 2026-09-02) on any peer or doorway that holds a copy; the household operator's
+  view is a query (witnesses by subject agent), not a privileged surface. Replication needs no
+  new binding: the custodians the node already has (custody commitments in
+  `reconcile/custody.rs`) custody its witnesses the way they custody its blobs — a recovery
+  partner is simply a custodian inside the reach. An operator who wants a specific always-on
+  witness (matthew ↔ adam) declares it as an ordinary custody commitment; nothing in the
+  witness itself knows about pairs. (The "two readers" pair was the MVP framing; this is the
+  native one.)
+- **Integrity Zome + DNA-hash class**: none new — DNA-hash-NEUTRAL. The witness is an ordinary
+  EPR content atom (a new `contentType` in the app manifest, e.g. `runtime:death-witness`, with
+  its three-leg coupling declared like every other type); the attestation rides the
   consolidated attestation content type on the elohim DNA (`content_store_integrity`;
-  `attestation:*` content-typed entries), kind `death-witness`. The care-partner binding is an
-  attribute of an existing `Mishpat::Commitment` (custody commitment, `reconcile/custody.rs`)
-  with kind `witness-mirror` — Linked (A2), no new entry type.
-- **Coordinator Zome**: `content_store::create_content` (attestation content) → EntryHash, via
-  the existing attestation authoring path; care-partner binding via the existing commitment
-  authoring (`salvage_commitment_author` shape) → the commitment's EntryHash + a link.
-- **Projections**: SQLite `death_witnesses` (per node: incident_id, report_cid, died_at,
-  exit_class, restart_n, attestation_anchor NULL until witnessed — source of truth: local
-  operational for the raw report, DHT for the attestation); Automerge sync: no (raw is private;
-  the mirror is a blob, not a doc); reach for the attestation: `unresolved — reach vocabulary in
-  declared drift` (intent: the household/care-circle tier, never commons).
-- **HTTP Route** (declared in elohim-storage `build_manifest()`): `GET /admin/witness/deaths`
-  (own, incident-rooted list + `?incident=<cid>` for the report body) and
-  `GET /admin/witness/deaths?of=<agent_cid>` on a partner (mirrored). The doorway projects the
-  household's list into the operator view; it authors nothing.
-- **Anti-Pattern Check**: not modeled in the k8s plane (the k8s pod restart is one *observer*
-  of the same event, not its home); no UUID (incident + report are CIDs); no conductor call on
-  the death path (the uncancellable-call trap); no per-host authoring of the attestation (one
-  node attests its own death, the partner attests *receipt*, both agent-scoped).
-
-### Entity: CarePartnerBinding (who receives my witnesses)
-- **Classification**: Linked (A2) — an attribute of an existing custody commitment between two
-  agents; kind `witness-mirror`. Consent is explicit (C12): a partner is declared, never
-  inferred from replication topology.
-- **Address**: Agent-Scoped Composite (self, partner, kind). **Source of truth**: DHT (the
-  commitment), projected locally so the supervisor can read the partner list without a
-  conductor. DNA-hash-NEUTRAL.
+  `attestation:*` content-typed entries), kind `death-witness`. No binding entity exists:
+  custody commitments already name who replicates a node's atoms.
+- **Coordinator Zome**: `content_store::create_content` for the witness atom (when a conductor
+  is available; before that it is a disk-resident, custody-offered atom in the amber window)
+  and for the attestation → EntryHash, via the existing authoring paths.
+- **Projections**: SQLite: the ordinary content projection row for the atom (source of truth:
+  local operational until anchored, DHT once witnessed — the standard amber/green derivation
+  from `dht_anchor_hash`, nothing bespoke) plus an incident index (incident root cid,
+  restart_n, exit_class) for the operator query; Automerge sync: no (the atom is
+  reach-gated below broadcast); reach: `unresolved — reach vocabulary in declared drift`.
+- **HTTP Route**: none new. The witness is reachable at the universal `/epr/{cid}` (reach
+  gate applies); the operator's list is the existing content query by type + subject agent,
+  declared in elohim-storage `build_manifest()` if a dedicated filter is needed. The doorway
+  projects it like any atom; it authors nothing.
+- **Anti-Pattern Check**: not modeled in the k8s plane (the pod restart is one *observer* of
+  the same event, not its home); no UUID (incident + report are CIDs); no conductor call on the
+  death path (the uncancellable-call trap); no per-host authoring of the attestation (one node
+  attests its own death, a custodian attests *receipt*, both agent-scoped); no enumerated
+  reader list (readers are the reach).
 
 ### Concern canon (Step 4)
 C0 plane: runtime/footprint seam (supervisor) + bridge to the p2p plane — answered. C3 liveness:
@@ -111,9 +120,10 @@ Registration: a row in `elohim/elohim-storage/seam-registry.yaml` at implementat
    last DB-pool saturation samples, `/proc/<pid>` snapshot (rss, threads, fds, nice) taken on
    the last poll before death, the runtime passport (image, happ hashes) — serialised as
    DAG-CBOR, CID-named, written to `<data_dir>/witness/deaths/<incident>/<cid>.cbor`;
-3. an offer of the report CID + bytes to each declared care partner over the p2p plane
-   (bounded, best-effort, before exit);
-4. on the next successful readiness: attest the incident (own death + partner receipts).
+3. an offer of the atom (CID + bytes) along the node's existing custody plane — the same
+   inventory/blob offer any authored atom gets, bounded and best-effort, before exit;
+4. on the next successful readiness: author the atom through the conductor (amber → green)
+   and attest the incident (own death + custodians' receipts).
 
 This also replaces the "give up after 120 s and exit" behaviour with a witnessed decision: if
 the child is still alive at the readiness ceiling, keep waiting and say so in the witness; if
@@ -122,7 +132,9 @@ it died, say how. (Companion fix on the crash-loop escalation atom, §1.)
 ## Done when
 
 A conductor killed on the household mesh (`just mesh recovery cold <peer>` or a forced OOM)
-produces a death witness on the peer's disk, the same CID on the declared partner within the
-bounded budget, `GET /admin/witness/deaths` lists the incident on both, and the attestation
-appears on the DHT after the peer recovers — as an a2o scenario in `features/recovery/`
-tagged `@concern:death-witness`, bound to a habit under `elohim/elohim-storage/.epr-meta/`.
+produces a death witness on the peer's disk, the same CID on every custodian inside its reach
+within the bounded budget, `/epr/{cid}` renders it for a household member and refuses a
+stranger, the operator's query lists the incident on the peer and on a custodian, and the
+attestation appears on the DHT after the peer recovers — as an a2o scenario in
+`features/recovery/` tagged `@concern:death-witness`, bound to a habit under
+`elohim/elohim-storage/.epr-meta/`.
