@@ -482,6 +482,13 @@ process lives), the `Conductor startup:` milestones, `Conductor ready.`. Childre
 teed to the envelope's fd 1/2 so `kubectl logs` and Loki keep working; the ring is the envelope's
 copy. `InProcess` children feed the same ring through a tracing layer.
 
+**Verbosity is a berth dial, not a manifest value** (operator, 2026-09-02): the ark's own log level
+lives on the `Berth` (per blade; `ARK_LOG` and `--log-level` override it), the child's level rides
+`ChildSpec.env` as a `{log_level}` template resolved from the berth, and a runtime re-dial without
+restart (SIGUSR1/SIGUSR2, then the admin socket) arrives in S2. Debugging one box never moves the
+shared manifest's CID; the witness's evidence volume (`ring_lines`/`tail_lines`) is a manifest value
+because it is the size of a death's evidence, not chatter.
+
 ### 5.5 Describe — the passport, by content, persisted
 
 `RuntimePassport` (`GET /version`) is the origin of this verb and stays the live projection. The

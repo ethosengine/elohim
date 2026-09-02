@@ -792,6 +792,16 @@ fn shutdown_sends_policy_signal_then_kills_after_grace() { /* child traps INT an
 - [ ] **Step 2–4:** compile-fail → implement → PASS + clippy.
 - [ ] **Step 5: Commit** — `git add elohim/ark/cli && git commit -m "feat(ark): the binary — run/describe/witness ls|show/hash/manifest cid; signal handlers hand the supervisor its stop contract"`.
 
+
+### Task 10L: log verbosity dials (operator steering note, 2026-09-02)
+
+**Executor:** Codex (folded into Task 10's review follow-up). Verbosity is a **berth** setting — per blade, never on the manifest (shared, content-addressed): debugging one box must not move the manifest CID. Three dials, lowest first:
+
+- `Berth.log_level: LogLevel { Error | Warn | Info | Debug | Trace }` (default `Info`, `#[serde(default)]`, additive — an existing berth JSON without it parses unchanged); `ARK_LOG=<level>` env overrides the berth; `ark run --log-level <level>` overrides both. Governs the ark's OWN stderr (state-change JSON lines are `Info`; per-poll/ladder/reap detail is `Debug`; every syscall result is `Trace`).
+- The child's verbosity is the child's business and already declarative: `ChildSpec.env` carries `RUST_LOG` as a template (`{log_level}` resolves from the berth), so a household dials a conductor up by editing the berth and restarting that child, not by editing the shared manifest.
+- Runtime re-dial without restart (`SIGUSR1` = raise one level, `SIGUSR2` = back to the configured level) lands with the admin socket in S2; named here so nothing in S0 precludes it.
+- The witness evidence volume (`Listen.ring_lines`/`tail_lines`) is NOT a log level — it is the size of the death's evidence and stays a manifest value.
+
 ---
 
 ### Task 11: `hc-mesh.sh` — `MESH_CONDUCTOR_LAUNCH=ark`
