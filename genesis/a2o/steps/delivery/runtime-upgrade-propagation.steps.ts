@@ -124,7 +124,20 @@ const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
  * `coordinator-candidate.ts`'s module doc for why that beats reading the
  * cargo target dir directly.
  */
-const BASELINE_HAPP = path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
+// The "installed baseline" is the bundle the mesh conductors were INSTALLED from, which is
+// not necessarily the workdir's current pack: `just pack` in dna/elohim rewrites
+// workdir/elohim.happ whenever a zome changes (2026-09-02, mid-ceremony). Resolution order:
+// an explicit pin, a preserved copy of the installed bytes, then the workdir as last resort.
+const BASELINE_HAPP = (() => {
+  const pinned = process.env['E2E_BASELINE_HAPP'];
+  if (pinned) return path.resolve(pinned);
+  const preserved = path.join(
+    REPO_ROOT,
+    'genesis/a2o/reports/release-ceremony/2026-09-02/baseline-N/elohim.happ'
+  );
+  if (fs.existsSync(preserved)) return preserved;
+  return path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
+})();
 
 const RUN_STAMP =
   process.env['A2O_RELEASE_RUN_STAMP'] ?? new Date().toISOString().replace(/\D/g, '').slice(0, 14);
