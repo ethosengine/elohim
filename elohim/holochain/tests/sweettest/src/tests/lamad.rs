@@ -2476,3 +2476,93 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
 
     Ok(())
 }
+
+/// Version chain is a CHAIN, not a star (2026-09-02, backlog
+/// `content-store-update-content-targets-root-not-latest-version`).
+///
+/// `update_content` used to take the FIRST `IdToContent` link — `get_links`
+/// arrival order, which kept answering the root create — so every update
+/// targeted the root and `supersedes` named the root on every version. The
+/// coordinator now selects the NEWEST link by (timestamp, create-link hash).
+///
+/// Proves on one conductor: create → update₁ → update₂ yields
+///   head == update₂, head.supersedes == update₁ (not the create), and
+///   get_content_by_id serves update₂'s title. Coordinator-only, no DNA-hash move.
+#[tokio::test(flavor = "multi_thread")]
+async fn update_of_update_supersedes_previous_version_not_root() -> Result<()> {
+    let [(mut c1, a1), (_c2, _a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+
+    // unique_id: a fixed id self-poisons a nextest retry (shared mem-bootstrap
+    // DHT residue → create_content "already exists"; dna #1357).
+    let id = unique_id("chain-not-star");
+    let id = id.as_str();
+    let created: ContentOutput = c1.call(&zome1, "create_content", test_content(id)).await;
+    let create_action = created.action_hash.clone();
+
+    let first: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: id.to_string(),
+                title: Some("version 1".to_string()),
+            },
+        )
+        .await;
+    let update1_action = first.action_hash.clone();
+    assert_ne!(update1_action, create_action);
+
+    let second: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: id.to_string(),
+                title: Some("version 2".to_string()),
+            },
+        )
+        .await;
+    let update2_action = second.action_hash.clone();
+    assert_ne!(update2_action, update1_action);
+
+    let head: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", id.to_string())
+        .await;
+    let head = head.expect("resolve_content_head returned None on the author conductor");
+    assert_eq!(
+        head.head_action_hash, update2_action,
+        "head is the second update"
+    );
+    assert_eq!(
+        head.supersedes,
+        Some(update1_action.clone()),
+        "the second update supersedes the FIRST update, not the root create (star → chain)"
+    );
+    assert_ne!(
+        head.supersedes,
+        Some(create_action),
+        "a version chain never re-parents onto the root"
+    );
+
+    let served: Option<ContentOutput> = c1
+        .call(
+            &zome1,
+            "get_content_by_id",
+            QueryByIdInput { id: id.to_string() },
+        )
+        .await;
+    let served = served.expect("get_content_by_id returned None");
+    assert_eq!(
+        served.content.title, "version 2",
+        "readers select the newest version"
+    );
+
+    Ok(())
+}

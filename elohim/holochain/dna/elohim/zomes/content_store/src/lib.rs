@@ -2445,6 +2445,29 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
     })
 }
 
+/// The LATEST `IdToContent` link for a content id — the newest version's
+/// action — in the same deterministic order `newest_canonical_link` uses:
+/// (link timestamp, create-link action hash), so every peer picks the same
+/// link from an identical set.
+///
+/// Why this exists (2026-09-02, `release-lineage-probe.ts`): `update_content`
+/// step 6 ADDS a fresh id→action link on every update and never removes the
+/// old ones, and `get_links` returns them in per-peer arrival order — so
+/// `links.first()` kept answering the ROOT create. Every update then targeted
+/// the root, `supersedes` named the root on every version, and a content id's
+/// version chain was a star (every version a sibling child of the root) —
+/// release lineage could never be proven from chain order. Selecting the
+/// newest link makes each update supersede the previous version, so the chain
+/// carries order. Coordinator-only; DNA-hash-neutral.
+fn latest_id_to_content_link(mut links: Vec<Link>) -> Option<Link> {
+    links.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| a.create_link_hash.cmp(&b.create_link_hash))
+    });
+    links.pop()
+}
+
 /// Update an existing content entry (PATCH semantics).
 ///
 /// Substrate-correct PATCH path for `/db/content/{id}` per
@@ -2474,7 +2497,7 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
     let links = get_links(query, GetStrategy::default())?;
-    let link = links.first().ok_or_else(|| {
+    let link = latest_id_to_content_link(links).ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
             "update_content: no Content entry found for id '{}'. Call create_content first \
              (or, from the storage service layer, lazy-bootstrap via call_create_content using \
@@ -2547,10 +2570,10 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     let new_action_hash = update_entry(prev_action_hash, &EntryTypes::Content(content.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
 
-    // 6. Refresh the id_anchor → action link so subsequent get_content_by_id
-    //    + future update_content calls find the new ActionHash. (Old links
-    //    remain on the DHT but won't be returned first; see ordering note
-    //    in update_rea_commitment_state for the same pattern.)
+    // 6. Add the id_anchor → action link for the new version. Old links
+    //    remain on the DHT; readers select the NEWEST by (timestamp,
+    //    create-link hash) via `latest_id_to_content_link` — `get_links`
+    //    order is per-peer arrival order and must never be relied on.
     create_id_to_content_link(&content.id, &new_action_hash)?;
 
     Ok(ContentOutput {
@@ -6639,7 +6662,7 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
             let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
             let links = get_links(query, GetStrategy::default())?;
 
-            let action_hash = if let Some(link) = links.first() {
+            let action_hash = if let Some(link) = latest_id_to_content_link(links) {
                 ActionHash::try_from(link.target.clone()).map_err(|_| {
                     wasm_error!(WasmErrorInner::Guest(
                         "Invalid action hash in link".to_string()
@@ -7047,12 +7070,12 @@ pub fn get_blobs_by_content_id(
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    if links.is_empty() {
+    let Some(latest) = latest_id_to_content_link(links) else {
         return Ok(Vec::new());
-    }
+    };
 
-    // Get the content record
-    let action_hash = ActionHash::try_from(links[0].target.clone()).map_err(|_| {
+    // Get the content record (newest version, not per-peer link order)
+    let action_hash = ActionHash::try_from(latest.target.clone()).map_err(|_| {
         wasm_error!(WasmErrorInner::Guest(
             "Invalid action hash in link".to_string()
         ))
@@ -7070,7 +7093,7 @@ pub fn get_blobs_by_content_id(
             "Could not deserialize content".to_string()
         )))?;
 
-    let content_hash = links[0].target.clone();
+    let content_hash = latest.target.clone();
 
     // Query ContentToBlobs links from this content
     let query = LinkQuery::try_new(content_hash, LinkTypes::ContentToBlobs)?;

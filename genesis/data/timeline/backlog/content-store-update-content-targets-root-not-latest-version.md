@@ -7,7 +7,7 @@ title: "content_store::update_content targets the FIRST IdToContent link (the ro
 slug: "content-store-update-content-targets-root-not-latest-version"
 written: "2026-09-02"
 author: "session-2026-09-01-adoption-ceremony"
-status: "open"
+status: "in-tree"
 priority: "high"
 jobs: [elohim-holochain, elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
@@ -49,3 +49,19 @@ DNA workspace build (see the hc-rna cdylib atom).
 Publish two releases on a fresh channel; `resolve_content_head_local` reports
 `supersedes == <first release cid>`; the controller verifies the second with the chain arm (no
 existence fallback); sweettest covers update-of-update ordering.
+
+## Fix landed in-tree (2026-09-02)
+
+`content_store::latest_id_to_content_link(links)` selects the newest `IdToContent` link by
+(timestamp, create-link action hash) — the same deterministic order `newest_canonical_link`
+already uses — and replaces `links.first()` / `links[0]` in `update_content`,
+`get_content_by_id` and `get_blobs_by_content_id`. Old links are left on the DHT (no
+delete-link write on the update path; readers never rely on `get_links` order again).
+Coordinator-only: `content_store_integrity.wasm` byte-identical before/after
+(`d1c4e709…`), `content_store.wasm` moved. Sweettest added:
+`update_of_update_supersedes_previous_version_not_root` (create → update₁ → update₂ ⇒ head =
+update₂, `supersedes` = update₁, `get_content_by_id` serves update₂). NOT run locally (the
+sweettest slot is cold and the resident mesh holds the RAM budget); it runs in the DNA
+pipeline (`--run-ignored all`) and in the pre-push `sweettest-check` on a `dev` push. Do not
+push mid-wave: a same-wave dispatch bakes the previous happ. This is the first genuine
+coordinator-only release candidate for the rung-5 election on alpha.
