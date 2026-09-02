@@ -212,6 +212,21 @@ const STORY_PERSONAL_CHANNEL_NAME = 'runtime:coordinators:elohim:canary-james';
 /** T2 ceremony driver, relative to `A2O_ROOT` (`runDriver`'s `cwd`). */
 const RELEASE_CEREMONY_SCRIPT = 'scripts/release-ceremony.ts';
 
+/** T1 packaging driver, relative to `A2O_ROOT` — every packaging call site in this file
+ * (station 1, station 6's revert target, station 7's Background publish AND its two
+ * `republishPersonalVariant` rebases, plus the pre/post-run teardown packager) shares this
+ * script and the same `epr-release-package.ts` CLI flag literals below, hence these constants:
+ * five call sites made the raw string literals cross this file's `sonarjs/no-duplicate-string`
+ * (threshold 5) gate. */
+const EPR_RELEASE_PACKAGE_SCRIPT = 'scripts/epr-release-package.ts';
+const FLAG_ARTIFACT = '--artifact';
+const FLAG_ARTIFACT_CLASS = '--artifact-class';
+const ARTIFACT_CLASS_COORDINATOR_BUNDLE = 'coordinator-bundle';
+const FLAG_CHANNEL_ID = '--channel-id';
+const FLAG_APPLIES_TO_FROM = '--applies-to-from';
+const FLAG_SOAK_SECS = '--soak-secs';
+const FLAG_ATTESTATION_THRESHOLD = '--attestation-threshold';
+
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
 const VERSION_PATH = '/version';
@@ -400,6 +415,17 @@ interface CeremonyState {
   personalChannelCreated: boolean;
   personalChannelFollowed: boolean;
   personalReleaseCid?: string;
+  /**
+   * The personal channel's expected cid PER STATION — a personal channel
+   * rebases when commons moves: its appliesTo is what it supersedes, and a
+   * node runs one coordinator per role. The Background's own publish (bound
+   * to matthew's pre-ceremony baseline reality) covers "staging"; the
+   * "promotion" and "revert" entries are set by `republishPersonalVariant`
+   * once james's live reality has moved past that envelope. Compared against
+   * in `assertPersonalDiverging`, falling back to `personalReleaseCid` (the
+   * latest) when a given station was never republished.
+   */
+  personalReleaseCidByStation: Partial<Record<PersonalStation, string>>;
   personalRowsByStation: Partial<Record<PersonalStation, JamesChannelRows>>;
   lastPersonalStation?: PersonalStation;
 
@@ -420,6 +446,7 @@ function ceremony(): CeremonyState {
     postRevertRows: {},
     personalChannelCreated: false,
     personalChannelFollowed: false,
+    personalReleaseCidByStation: {},
     personalRowsByStation: {},
   };
   return state;
@@ -456,6 +483,7 @@ async function pollAdoption(
   peer: PeerName,
   timeoutMs: number,
   predicate: (row: AdoptionChannelRow) => boolean,
+  channelId: string = CHANNEL_ID,
   intervalMs = 10_000
 ): Promise<{ row: AdoptionChannelRow; elapsedMs: number }> {
   const start = Date.now();
@@ -465,7 +493,7 @@ async function pollAdoption(
     try {
       const report = await getAdoptionReport(world, peer);
       everReachable = true;
-      const row = findChannelRow(report, CHANNEL_ID);
+      const row = findChannelRow(report, channelId);
       lastRow = row;
       if (row && predicate(row)) {
         return { row, elapsedMs: Date.now() - start };
@@ -476,7 +504,7 @@ async function pollAdoption(
     await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
   }
   assert.fail(
-    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${CHANNEL_ID}] ` +
+    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${channelId}] ` +
       `(peer was ${everReachable ? 'reachable' : 'never reachable'} during the poll); ` +
       `last row: ${JSON.stringify(lastRow)}`
   );
@@ -1085,19 +1113,19 @@ async function runOneTeardown(
   const repPeer = group.peers[0];
   const repPeerUrl = resolveUrl(repPeer);
   const packaged = runDriver(
-    'scripts/epr-release-package.ts',
+    EPR_RELEASE_PACKAGE_SCRIPT,
     [
-      '--artifact',
+      FLAG_ARTIFACT,
       BASELINE_HAPP,
-      '--artifact-class',
-      'coordinator-bundle',
-      '--channel-id',
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_CHANNEL_ID,
       teardownChannelId,
-      '--applies-to-from',
+      FLAG_APPLIES_TO_FROM,
       repPeerUrl,
-      '--soak-secs',
+      FLAG_SOAK_SECS,
       '0',
-      '--attestation-threshold',
+      FLAG_ATTESTATION_THRESHOLD,
       '0',
       '--peer',
       repPeerUrl,
@@ -1283,19 +1311,19 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
 
   const matthewUrl = peerUrl(world, 'matthew');
   const packaged = runDriver(
-    'scripts/epr-release-package.ts',
+    EPR_RELEASE_PACKAGE_SCRIPT,
     [
-      '--artifact',
+      FLAG_ARTIFACT,
       candidatePath,
-      '--artifact-class',
-      'coordinator-bundle',
-      '--channel-id',
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_CHANNEL_ID,
       CHANNEL_ID,
-      '--applies-to-from',
+      FLAG_APPLIES_TO_FROM,
       matthewUrl,
-      '--soak-secs',
+      FLAG_SOAK_SECS,
       String(SOAK_SECS),
-      '--attestation-threshold',
+      FLAG_ATTESTATION_THRESHOLD,
       String(ATTESTATION_THRESHOLD),
       '--canary',
       CANARY_PEER,
@@ -1422,6 +1450,13 @@ async function ensureCanaryApplied(world: E2EWorld): Promise<void> {
     `james's /version passport reports no lamad coordinatorWasmHashes after the canary apply — ` +
       `nothing to compare later stations' convergence against`
   );
+
+  // james's own reality just moved onto the commons candidate — his personal
+  // channel's envelope (packaged in the Background against matthew's
+  // pre-ceremony baseline) no longer names what he runs. Rebase it now,
+  // before any later station reads his personal-channel row. See
+  // `republishPersonalVariant`'s own doc for the rule this is an instance of.
+  await republishPersonalVariant(world, 'promotion');
 }
 
 async function ensureAttested(world: E2EWorld): Promise<void> {
@@ -1720,6 +1755,13 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
   c.revertConvergeMs = Date.now() - start;
   c.revertedAt = Date.now();
 
+  // james's own reality just moved back onto baseline — the personal
+  // channel's envelope from the "promotion" republish (bound to james
+  // running the commons candidate) no longer names what he runs either.
+  // Rebase it again, before recording the "revert" moment's row below. See
+  // `republishPersonalVariant`'s own doc for the rule this is an instance of.
+  await republishPersonalVariant(world, 'revert');
+
   // Station 7/8's "as they happened" recording — see the identical comment
   // in `ensureStagingConvergedAll`. Also the row station 8 builds its
   // "personal channel ran alongside the entire time" matrix cell from.
@@ -1841,6 +1883,118 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
     `personal-channel publish missing releaseCid: ${JSON.stringify(parsed)}`
   );
   c.personalReleaseCid = parsed.releaseCid;
+}
+
+/**
+ * A personal channel rebases when commons moves: its appliesTo is what it
+ * supersedes, and a node runs one coordinator per role. `ensurePersonalVariantPublished`
+ * packages the personal variant ONCE in the Background, bound to matthew's
+ * pre-ceremony baseline reality (`--applies-to-from matthew`) — that envelope
+ * is only honest as long as james's own runtime is still on baseline. Once
+ * james applies the commons candidate (station 3) his live reality moves,
+ * and the Background's envelope no longer names what he runs; the same
+ * happens again in reverse once the commons revert (station 6) lands him
+ * back on baseline. This republishes the SAME artifact on `PERSONAL_CHANNEL_ID`
+ * bound to james's OWN live passport at the moment it is called — never
+ * matthew's — so the personal channel's envelope always matches the reality
+ * it is layered on top of, for exactly the two stations where that reality
+ * changed. Station "staging" needs no republish: the Background's own
+ * baseline-bound publish already matches, because nothing has moved james
+ * yet.
+ *
+ * Idempotent per station (guarded on `personalReleaseCidByStation[station]`)
+ * and a no-op if the personal channel was never established — every real
+ * scenario in this feature establishes it from the Background before this
+ * can be reached, but the guard keeps this function safe to call from any
+ * ensure-chain entry point standalone, matching the file's own convention.
+ *
+ * Blocks until james's own `/admin/adoption` row for `PERSONAL_CHANNEL_ID`
+ * resolves the new cid before returning, so callers can capture
+ * `personalRowsByStation[station]` immediately afterward with no separate
+ * poll of their own.
+ */
+async function republishPersonalVariant(
+  world: E2EWorld,
+  station: Exclude<PersonalStation, 'staging'>
+): Promise<void> {
+  const c = ceremony();
+  if (c.personalReleaseCidByStation[station]) return;
+  if (!c.personalChannelFollowed || !c.personalReleaseCid) return;
+
+  const candidatePath = candidateHapp();
+  assert.ok(existsSync(candidatePath), `personal-channel artifact missing: ${candidatePath}`);
+  const jamesUrl = peerUrl(world, 'james');
+  const matthewUrl = peerUrl(world, 'matthew');
+  const republishManifestPath = path.join(
+    REPORT_DIR,
+    `a2o-runtime-upgrade-${RUN_STAMP}-personal-${station}.json`
+  );
+  const packaged = runDriver(
+    'scripts/epr-release-package.ts',
+    [
+      '--artifact',
+      candidatePath,
+      '--artifact-class',
+      'coordinator-bundle',
+      '--channel-id',
+      PERSONAL_CHANNEL_ID,
+      '--applies-to-from',
+      jamesUrl,
+      '--wire-epoch',
+      '0',
+      '--additive-only',
+      'true',
+      '--soak-secs',
+      String(SOAK_SECS),
+      '--attestation-threshold',
+      String(ATTESTATION_THRESHOLD),
+      '--peer',
+      matthewUrl,
+      '--notes',
+      `a2o station 7: james's personal channel rebased to his live reality after ${station} — ` +
+        'a personal channel rebases when commons moves: its appliesTo is what it supersedes, ' +
+        'and a node runs one coordinator per role',
+      '--out',
+      republishManifestPath,
+    ],
+    60_000
+  );
+  assert.equal(
+    packaged.status,
+    0,
+    `personal-channel republish package (${station}) failed: ${packaged.stderr || packaged.stdout}`
+  );
+  assert.ok(
+    existsSync(republishManifestPath),
+    `personal-channel republish manifest (${station}) was not written to ${republishManifestPath}`
+  );
+
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', republishManifestPath]);
+  assert.equal(
+    published.status,
+    0,
+    `personal-channel republish publish (${station}) failed: ${published.stderr || published.stdout}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(
+    parsed.releaseCid,
+    `personal-channel republish (${station}) missing releaseCid: ${JSON.stringify(parsed)}`
+  );
+  c.personalReleaseCidByStation[station] = parsed.releaseCid;
+  c.personalReleaseCid = parsed.releaseCid;
+
+  const { elapsedMs } = await pollAdoption(
+    world,
+    'james',
+    120_000,
+    r => r.resolvedHead?.cid === parsed.releaseCid,
+    PERSONAL_CHANNEL_ID
+  );
+  // eslint-disable-next-line no-console
+  console.log(
+    `[station7] personal channel republished after ${station}: james resolved ${parsed.releaseCid} ` +
+      `after ${elapsedMs}ms (rebased to his own live reality via --applies-to-from ${jamesUrl})`
+  );
 }
 
 async function readJamesChannelRows(world: E2EWorld): Promise<JamesChannelRows> {
@@ -2495,11 +2649,20 @@ function assertPersonalDiverging(): void {
   );
   const rows = c.personalRowsByStation[station];
   assert.ok(rows?.personal, `no personal-channel row captured for james at station "${station}"`);
-  assert.ok(c.personalReleaseCid, 'no personal-channel release published yet');
+  // The expected cid is PER STATION: "promotion" and "revert" are rebased by
+  // `republishPersonalVariant` once james's own reality moved past the
+  // Background's baseline-bound envelope — see that function's doc. Falls
+  // back to the latest `personalReleaseCid` for "staging" (never rebased)
+  // or if a station's republish somehow never ran.
+  const expectedCid = c.personalReleaseCidByStation[station] ?? c.personalReleaseCid;
+  assert.ok(expectedCid, `no personal-channel release cid recorded for station "${station}" yet`);
   assert.equal(
     rows.personal.resolvedHead?.cid,
-    c.personalReleaseCid,
-    `james's personal-channel resolved head is ${JSON.stringify(rows.personal.resolvedHead)}, not the compatible variant`
+    expectedCid,
+    `james's personal-channel resolved head at station "${station}" is ` +
+      `${JSON.stringify(rows.personal.resolvedHead)}, not the expected compatible variant ` +
+      `${expectedCid} (personalReleaseCidByStation=${JSON.stringify(c.personalReleaseCidByStation)}, ` +
+      `latest personalReleaseCid=${String(c.personalReleaseCid)})`
   );
   assert.notEqual(
     rows.personal.resolvedHead?.cid,
