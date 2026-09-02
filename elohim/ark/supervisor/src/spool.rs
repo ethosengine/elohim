@@ -2,7 +2,7 @@
 
 use std::{
     ffi::OsString,
-    fs::{self, DirBuilder, OpenOptions},
+    fs::{self, DirBuilder, File, OpenOptions},
     io::Write,
     os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
@@ -125,6 +125,13 @@ impl Spool {
 
     /// Reads one witness from its JSON sidecar.
     pub fn read_witness(&self, cid: &str) -> Result<DeathWitness, SpoolError> {
+        if cid.is_empty()
+            || cid
+                .chars()
+                .any(|character| matches!(character, '/' | '\\' | '.'))
+        {
+            return Err(SpoolError::Data(format!("invalid witness cid: {cid}")));
+        }
         read_json(&self.root.join("witnesses").join(format!("{cid}.json")))
     }
 
@@ -150,6 +157,7 @@ impl Spool {
 
     fn append_intent(&self, intent: &Intent) -> Result<(), SpoolError> {
         let path = self.root.join("intents.log");
+        let created = !path.exists();
         let mut bytes =
             serde_json::to_vec(intent).map_err(|error| SpoolError::Encode(error.to_string()))?;
         bytes.push(b'\n');
@@ -161,7 +169,11 @@ impl Spool {
             .map_err(|error| io_error(&path, error))?;
         file.write_all(&bytes)
             .map_err(|error| io_error(&path, error))?;
-        file.sync_all().map_err(|error| io_error(&path, error))
+        file.sync_all().map_err(|error| io_error(&path, error))?;
+        if created {
+            fsync_dir(&self.root)?;
+        }
+        Ok(())
     }
 }
 
@@ -199,24 +211,28 @@ impl WitnessSink for Spool {
     }
 
     fn incident(&mut self, incident: &Incident) -> Result<(), SinkError> {
-        // The caller invokes this after every `witnesses` append. Replacing this projection
-        // atomically is what keeps both witness CIDs reachable after a crash.
-        atomic_json(
-            &self
-                .root
-                .join("incidents")
-                .join(format!("{}.json", incident.id)),
-            incident,
-        )
-        .map_err(sink_error)?;
+        // Contract: call at most once after the incident is closed. Each call appends a fresh
+        // Process snapshot; readers take the newest per Incident.id.
+        let path = self
+            .root
+            .join("incidents")
+            .join(format!("{}.json", incident.id));
+        let already_closed = read_optional_json::<Incident>(&path)
+            .map_err(sink_error)?
+            .is_some_and(|stored| stored.closed.is_some());
 
-        if let Some(close) = incident
-            .as_close_event(&self.scope)
-            .map_err(|error| SinkError::Encode(error.to_string()))?
-        {
-            self.flows
-                .append(FlowRecord::Event(close))
-                .map_err(|error| sink_error(SpoolError::Flow(error.to_string())))?;
+        // Replacing this projection atomically keeps every witness CID reachable after a crash.
+        atomic_json(&path, incident).map_err(sink_error)?;
+
+        if !already_closed {
+            if let Some(close) = incident
+                .as_close_event(&self.scope)
+                .map_err(|error| SinkError::Encode(error.to_string()))?
+            {
+                self.flows
+                    .append(FlowRecord::Event(close))
+                    .map_err(|error| sink_error(SpoolError::Flow(error.to_string())))?;
+            }
         }
         let process = incident
             .as_rea_process(&self.scope)
@@ -249,6 +265,8 @@ fn create_private_directory(path: &Path) -> Result<(), SpoolError> {
         .recursive(true)
         .mode(DIRECTORY_MODE)
         .create(path)
+        .map_err(|error| io_error(path, error))?;
+    fs::set_permissions(path, fs::Permissions::from_mode(DIRECTORY_MODE))
         .map_err(|error| io_error(path, error))
 }
 
@@ -281,7 +299,16 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), SpoolError> {
         .map_err(|error| io_error(&temporary, error))?;
     file.sync_all()
         .map_err(|error| io_error(&temporary, error))?;
-    fs::rename(&temporary, path).map_err(|error| io_error(path, error))
+    fs::rename(&temporary, path).map_err(|error| io_error(path, error))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| SpoolError::Data(format!("path has no parent: {}", path.display())))?;
+    fsync_dir(parent)
+}
+
+fn fsync_dir(directory: &Path) -> Result<(), SpoolError> {
+    let file = File::open(directory).map_err(|error| io_error(directory, error))?;
+    file.sync_all().map_err(|error| io_error(directory, error))
 }
 
 fn temporary_path(path: &Path) -> PathBuf {
@@ -356,9 +383,9 @@ mod tests {
     };
 
     use ark_core::{
-        DeathTally, DeathWitness, EffectiveTier, ExitClass, Incident, Intent, IntentAction,
-        Passport, ProcessPassport, RestartVerdict, RuntimeScope, WitnessSink, PASSPORT_KIND,
-        WITNESS_KIND,
+        DeathTally, DeathWitness, EffectiveTier, ExitClass, Incident, IncidentClose, Intent,
+        IntentAction, Passport, ProcessPassport, RestartVerdict, RuntimeScope, WitnessSink,
+        PASSPORT_KIND, WITNESS_KIND,
     };
     use elohim_epr_rea::store::{FlowRecord, FlowStore, SidecarFlowStore};
 
@@ -479,6 +506,33 @@ mod tests {
     }
 
     #[test]
+    fn spool_reasserts_private_mode_on_existing_ark_directory() {
+        if nix::unistd::geteuid().is_root() {
+            return;
+        }
+
+        let data_root = tempfile::tempdir().unwrap();
+        let ark = data_root.path().join("ark");
+        fs::create_dir(&ark).unwrap();
+        fs::set_permissions(&ark, fs::Permissions::from_mode(0o755)).unwrap();
+
+        Spool::open(data_root.path(), scope()).unwrap();
+
+        assert_eq!(fs::metadata(ark).unwrap().mode() & 0o777, 0o700);
+    }
+
+    #[test]
+    fn read_witness_rejects_invalid_cid() {
+        let data_root = tempfile::tempdir().unwrap();
+        let spool = Spool::open(data_root.path(), scope()).unwrap();
+
+        assert!(matches!(
+            spool.read_witness("../passport"),
+            Err(SpoolError::Data(_))
+        ));
+    }
+
+    #[test]
     fn spool_intent_log_is_append_only_json_lines() {
         let data_root = tempfile::tempdir().unwrap();
         let mut spool = Spool::open(data_root.path(), scope()).unwrap();
@@ -575,6 +629,31 @@ mod tests {
 
         let flows = SidecarFlowStore::open(&data_root.path().join("ark")).unwrap();
         assert_eq!(flows.processes().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn repeated_closed_incident_appends_one_close_event() {
+        let data_root = tempfile::tempdir().unwrap();
+        let mut spool = Spool::open(data_root.path(), scope()).unwrap();
+        let mut incident = Incident::open("conductor", 1_000, 1);
+        incident.closed = Some(IncidentClose::Stopped { at_epoch_ms: 2_000 });
+
+        spool.incident(&incident).unwrap();
+        spool.incident(&incident).unwrap();
+
+        let flows = SidecarFlowStore::open(&data_root.path().join("ark")).unwrap();
+        let close_events = flows
+            .events()
+            .unwrap()
+            .into_iter()
+            .filter(|(_, event)| {
+                event
+                    .classified_as
+                    .iter()
+                    .any(|tag| tag == "runtime:incident-closed")
+            })
+            .count();
+        assert_eq!(close_events, 1);
     }
 
     #[test]

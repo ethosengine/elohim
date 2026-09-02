@@ -44,10 +44,22 @@ pub fn spawn_line_reader<R: Read + Send + 'static>(
     let thread = thread::Builder::new()
         .name(format!("ark-{name}-reader"))
         .spawn(move || {
-            for line in BufReader::new(reader).lines() {
-                let Ok(line) = line else {
-                    break;
-                };
+            let mut reader = BufReader::new(reader);
+            let mut bytes = Vec::new();
+            loop {
+                bytes.clear();
+                match reader.read_until(b'\n', &mut bytes) {
+                    Ok(0) => break,
+                    Ok(_) => {}
+                    Err(_) => break,
+                }
+                if bytes.last() == Some(&b'\n') {
+                    bytes.pop();
+                    if bytes.last() == Some(&b'\r') {
+                        bytes.pop();
+                    }
+                }
+                let line = String::from_utf8_lossy(&bytes).into_owned();
 
                 thread_ring
                     .lock()
@@ -122,6 +134,32 @@ mod tests {
         assert_eq!(
             fs::read_to_string(log_path).unwrap(),
             "a\nConductor ready.\nb\n"
+        );
+    }
+
+    #[test]
+    fn line_reader_keeps_reading_after_non_utf8_line() {
+        let tap = spawn_line_reader(
+            "stdout",
+            Cursor::new(b"a\n\xff\xfe\nConductor ready.\n"),
+            10,
+            None,
+            vec!["Conductor ready.".to_string()],
+        );
+
+        tap.join().unwrap();
+
+        assert_eq!(
+            tap.ring.lock().unwrap().last_n(10),
+            vec![
+                "a".to_string(),
+                "��".to_string(),
+                "Conductor ready.".to_string(),
+            ]
+        );
+        assert_eq!(
+            *tap.matched.lock().unwrap(),
+            vec!["Conductor ready.".to_string()]
         );
     }
 }
