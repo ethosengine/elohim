@@ -274,7 +274,7 @@ trait Driver {
 |---|---|---|---|---|---|
 | **k8s pod (alpha)** | replaces the conductor container's entrypoint (the storage-in-embedded-mode pod *is* the envelope today) | tevah is PID 1: subreaper, SIGTERM→per-child SIGINT with grace inside `terminationGracePeriodSeconds`, `/dev/termination-log` ≤4 KiB with witness CID + exit class, `FallbackToLogsOnError` | Delegated (kubelet owns the container cgroup) | `Delegated`; per-child leaves only if `cgroup.subtree_control` is delegated (uid 1000, root-owned cgroup: **not today**) → `Bounded` (rlimit + nice) | an OOM of the container kills PID 1 with the child (`oom.group=1`); the witness for that class is the gap record (§6) until the pod topology gives the conductor its own leaf |
 | **household Linux box** | `systemctl --user` unit with `Delegate=yes`, lingering; or plain shell | tevah under systemd (systemd is its heart; `ExecStopPost` files the parent's verdict) | Native | `Enforced` for `memory`+`pids` without root; `cpu`/`io` after a one-time root drop-in (`user@.service.d/delegate.conf`) | the only rung where the quota verb is drawable at all; **guests are refused (fail-closed) on any rung below `Enforced`** — `RLIMIT_NPROC`/`NOFILE` are per-uid, so a same-uid guest under `Bounded` exhausts the parent's own fork and fd budget |
-| **household mesh (a2o)** | `hc-mesh.sh` execs `tevah run <seed>` per peer instead of `setsid nohup hc sandbox run` | tevah, subreaper; the mesh's pid registry records the envelope, not the children | Native | `Bounded` inside the dev pod (root-owned cgroup) | the flip authority for every household-lane scenario |
+| **household mesh (a2o)** | `hc-mesh.sh` execs `ark run <seed>` per peer instead of `setsid nohup hc sandbox run` | tevah, subreaper; the mesh's pid registry records the envelope, not the children | Native | `Bounded` inside the dev pod (root-owned cgroup) | the flip authority for every household-lane scenario |
 | **Tauri desktop** | the sidecar *is* the envelope: storage becomes its child; the conductor is `InProcess` (tauri_plugin_holochain) | the app | InProcess + Native | `Bounded` on Linux; `None` on macOS/Windows (declared `unwired`, never pretended) | `InProcess` children get the same verdict + witness shape with no pipes: a supervised task with a readiness event and a panic hook |
 | **Tauri desktop, macOS / Windows** | the sidecar is the envelope | the app | Native (macOS: `kqueue NOTE_EXIT` + `libproc`; Windows: job objects + `TerminateProcess`, no signals) | `None`, declared `unwired` per verb | no `/proc`, no pidfd, no prctl on macOS; the SIGINT-then-SIGKILL contract is Linux/macOS only and Windows needs a job-object stop; launchd and the Service Control Manager are outer supervisors with no `$SERVICE_RESULT` analog — their verdict is `Lost` |
 | **phone (Android)** | in-app | the app | InProcess (+ Wasm for guests) | `None` (app-controllable cgroups unverified) | the OS keeps the death record: `ApplicationExitInfo` (`REASON_*`) read at next launch is the parent-verdict source, and the ≤128-byte `setProcessStateSummary` carries the intent-log pointer pre-death |
@@ -550,7 +550,7 @@ verification floor-protected (never stage-priced). Integrity zome `content_store
 from `dna/elohim/`), untouched. Coordinator: existing `content_store::create_content` +
 `declare_canonical_content_head` → EntryHash (cid), action hash as `dht_anchor_hash` only.
 Projections: `content` row (anchor yes); Automerge: no (below broadcast). Route: none new — `/epr/{cid}`;
-the envelope's own admin surface (`tevah describe`, a node-local socket) is excluded from
+the envelope's own admin surface (`ark describe`, a node-local socket) is excluded from
 `build_manifest()` exactly as `POST /admin/coordinators/sync` is. Anti-patterns: not modeled in the
 k8s plane (the pod spec is one *packaging* of the seed); no random ids; no "latest".
 
@@ -651,20 +651,20 @@ storage consumes shared crates as path deps — `elohim_compute` is the preceden
 
 | Crate | Owns | Depends on | Purity |
 |---|---|---|---|
-| **`tevah-core`** | `RuntimeSeed`, `RuntimeInstance`, `ProcessSpec`, `ChildPolicy`, `ExitClass`, `Verdict`, `Witness`, `Passport`, `ProcessSample` (a NEW per-process cpu/mem/fds/io type — `elohim_compute::ResourceSnapshot` is request-level and serialized to live consumers; it is not extended), the lifecycle state machine (spawn → ready → live → dying → dead), the intensity/same-cause rules, `RestartGovernor: Governor`, the tally | `epr` (codec + CID — never re-derived; the `elohim/.epr-meta` interface-first rule), `elohim-compute` (`Governor`/`Refusal`/`LimitOwner`, `BuildInfo`), `seam-contracts` (`Answer<T>`, `ReasonLabel` — a path dep; no `elohim/` workspace member consumes it yet, so tevah is the precedent) | the peer-fabric shape: no tokio, no diesel, no libp2p/iroh; `Clock`, `ProcessHandle`, `ResourceProbe`, `WitnessSink` traits; a boundary test asserts the dependency tree |
-| **`tevah-supervisor`** | tokio: spawn, pipes, rings, parsers, `pidfd`/`waitid` reaper, `rusage`, `/proc` + cgroup readers (lifted from `system_metrics.rs`), the intent log, the spool writer, the `Driver` trait + `Native` and `InProcess` drivers; `Cgroup` and `Sandbox` drivers behind features; `Wasm` driver deferred | `tevah-core`, `nix`, `procfs` | I/O, no network |
-| **`tevah`** (binary) | `run <seed>` (PID-1 mode: subreaper, signal forwarding, termination-log), `describe`, `witness ls|show`, `notify` (the sd_notify socket) | the two above | the launchable unit every context execs |
+| **`ark-core`** | `RuntimeSeed`, `RuntimeInstance`, `ProcessSpec`, `ChildPolicy`, `ExitClass`, `Verdict`, `Witness`, `Passport`, `ProcessSample` (a NEW per-process cpu/mem/fds/io type — `elohim_compute::ResourceSnapshot` is request-level and serialized to live consumers; it is not extended), the lifecycle state machine (spawn → ready → live → dying → dead), the intensity/same-cause rules, `RestartGovernor: Governor`, the tally | `epr` (codec + CID — never re-derived; the `elohim/.epr-meta` interface-first rule), `elohim-compute` (`Governor`/`Refusal`/`LimitOwner`, `BuildInfo`), `seam-contracts` (`Answer<T>`, `ReasonLabel` — a path dep; no `elohim/` workspace member consumes it yet, so tevah is the precedent) | the peer-fabric shape: no tokio, no diesel, no libp2p/iroh; `Clock`, `ProcessHandle`, `ResourceProbe`, `WitnessSink` traits; a boundary test asserts the dependency tree |
+| **`ark-supervisor`** | tokio: spawn, pipes, rings, parsers, `pidfd`/`waitid` reaper, `rusage`, `/proc` + cgroup readers (lifted from `system_metrics.rs`), the intent log, the spool writer, the `Driver` trait + `Native` and `InProcess` drivers; `Cgroup` and `Sandbox` drivers behind features; `Wasm` driver deferred | `ark-core`, `nix`, `procfs` | I/O, no network |
+| **`ark`** (binary) | `run <seed>` (PID-1 mode: subreaper, signal forwarding, termination-log), `describe`, `witness ls|show`, `notify` (the sd_notify socket) | the two above | the launchable unit every context execs |
 
 **Consumers and what changes.** `elohim-storage`: `process_manager.rs` becomes a thin consumer of
-`tevah-supervisor` (readiness returns a *verdict*; the `AdminWebsocket` is constructed by storage
+`ark-supervisor` (readiness returns a *verdict*; the `AdminWebsocket` is constructed by storage
 from it; the DB-pool metrics hook becomes a parser callback), then storage itself becomes a child on
 the fleet; storage keeps custody/offer/attest (it owns the swarm and the conductor). `steward/node`:
 the executor's `RestartService` calls the envelope's lifecycle verb; its `ServiceStatus{running,
 healthy, uptime_secs, restart_count}` becomes true; the `pod` module is renamed at the Hub refactor
 (hub-boundaries already plans to fold it into `HouseholdHub`). `lvi-actuator`: a driver profile and
-a consumer of verdicts, never a second supervisor. `hc-mesh.sh`: `direct` mode becomes `tevah run`.
-The conductor template: the `elohim-conductor` container's entrypoint becomes `tevah`. Tauri: the
-sidecar becomes `tevah` with storage as its child. **Deleted or demoted:** `steward/node/src/update/`
+a consumer of verdicts, never a second supervisor. `hc-mesh.sh`: `direct` mode becomes `ark run`.
+The conductor template: the `elohim-conductor` container's entrypoint becomes `ark`. Tauri: the
+sidecar becomes `ark` with storage as its child. **Deleted or demoted:** `steward/node/src/update/`
 (superseded by the exec floor), `compute_rea.rs` (wrong grain, random ids — subsumed by §5.3),
 `GENESIS_SELF_HEAL_IDENTITY` / `ALLOW_DNA_REINSTALL` as *behaviour* (they become seed fields;
 `DNA_MIGRATION_INTENT` stays as the per-roll intent input), ram-guard's process-name heuristics.
@@ -695,7 +695,7 @@ invariant is measured not held), declared where the only supervisor lives today 
 `elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md` — with
 `retire-when: when the supervisor moves into the envelope crate and this atom moves with it, and a
 household operator reads a peer's death from the peer itself with no developer tool in the path`.
-The envelope's own habit (the five verbs) is born in `elohim/tevah/.epr-meta/` when that crate
+The envelope's own habit (the five verbs) is born in `elohim/ark/.epr-meta/` when that crate
 exists; do not pre-declare it in storage. **The WIP fence is the operator's call**: both slots are
 held; `operator-runtime-surface` is green — finished for fence purposes — and the honest move is
 `active: false` there with the slot to the witness. This spec does not flip it.
@@ -715,18 +715,20 @@ envelope, every household-lane assertion is vacuous by construction.
 
 ## 11. Sequencing — slices with receipts
 
-- **S0 — the launcher on the mesh.** `tevah-core` + `tevah-supervisor` (Native driver) + the `tevah`
+- **S0 — the launcher on the mesh.** `ark-core` + `ark-supervisor` (Native driver) + the `ark`
   binary; `hc-mesh.sh`'s `direct` launch mode (`echo test | holochain --piped --structured=Log
-  --config-path …` under `setsid nohup`) becomes `tevah run` — a short argv port, since the direct
+  --config-path …` under `setsid nohup`) becomes `ark run` — a short argv port, since the direct
   parent, the piped passphrase, and per-conductor logs already exist; `hc sandbox generate` keeps
   owning config creation and app install, and `assert_toolchain_parity` still refuses a skewed
   hc/conductor pair. Witness to spool (`amber-local`); the intent log; `ExitClass` + tally +
   same-cause `GiveUp`. Receipt: station 1 of the scenario on the household mesh; the ring, the
-  classifier, and their two tests (`264ce8ce4`) lift from `process_manager.rs` into `tevah-core`.
+  classifier, and their two tests (`264ce8ce4`) lift from `process_manager.rs` into `ark-core`.
+  The seed's artifact reference is born in the closure-CID / channel-head shape with a
+  pinned-local-path resolver only (register 24) — S0 never touches the network.
 - **S1 — storage consumes; custody and attestation.** `process_manager` delegates to the library;
   the self-contract and custody-spool commitments minted at first readiness; the custody-scoped read
   gate; `amber-offered` → `green`; the passport as an atom. Receipt: stations 2–4; `epr-atom-home`
-  renders a witness. Alpha *confirms* by shipping `tevah` **inside the edge storage image** as its
+  renders a witness. Alpha *confirms* by shipping `ark` **inside the edge storage image** as its
   new entrypoint and taking a deliberate `[conductor-roll]` — the conductor container sets no
   `command:` and its image field holds the running image absent a roll, so a template edit alone
   changes nothing (k8s becomes one packaging of the envelope; the split-image drift is a passport
@@ -754,8 +756,8 @@ envelope, every household-lane assertion is vacuous by construction.
 1. **The envelope is its own crate family and launchable unit, below storage** — never a feature of
    `elohim-storage`'s binary, never grown out of `steward/node::pod`, never `eae`. *Rejected:* growing
    the witness inside `process_manager` (ships only where `kubectl logs --previous` already exists).
-2. **Name: `tevah`; declaration: `RuntimeSeed`; "pod" retired for the runtime.** *Rejected:*
-   `elohim-pod` (live collision with the operator module; k8s-plane connotation).
+2. **Name: tevah; declaration: `RuntimeSeed`; "pod" retired for the runtime.** *Rejected:*
+   `elohim-pod` (live collision with the operator module; k8s-plane connotation). Refined by 20.
 3. **The parent role is sufficient.** Supervision and listening require no privilege; isolation and
    quota are drivers with a witnessed effective tier. *Rejected:* an OCI runtime; podman/docker as the
    primitive; "cgroups everywhere" (no watch) and "wasm everywhere" (no witness subject).
@@ -792,6 +794,28 @@ envelope, every household-lane assertion is vacuous by construction.
     *From review.*
 19. **Guests fail closed below `Enforced`**; supervised children are reaped by the envelope's own
     reaper, never `tokio::process`; `PR_SET_PDEATHSIG` is for guest leaves only. *From review.*
+20. **Branding split — tevah is the name, `ark` is the identifier** (operator, 2026-09-02). Prose,
+    titles, the habit ledger, and the story say tevah (the ark, תֵּבָה); crates, binaries, paths,
+    and type prefixes say `ark`: `ark-core`, `ark-supervisor`, the `ark` binary, `elohim/ark/`.
+    One name for people, one for the toolchain — never mixed inside a single surface.
+21. **The `epr-pvc` bridge is the guide-star at the end of the valueflow chain, not a slice**
+    (operator, 2026-09-02). A bridge-seam crate through which the network of peers offers external
+    actors a collective agreement for persistent volumes that are actually backed by this runtime.
+    Nothing is minted; `RuntimeInstance.data_root` is reserved as a volume head with no semantics
+    in v1; each slice is checked against one question — *does this preclude the guide-star?*
+22. **WIP fence: `runtime-death-witnessed` takes `operator-runtime-surface`'s slot.** The surface
+    habit is green with wired checks; a green habit holds no attention. Actives are
+    `dataplane-convergence` and `runtime-death-witnessed`.
+23. **The constitutional DNA batch waits for S1's measured shape.** First-class `runtime-*` types
+    and `attestation:death-witness` are scheduled only after a witness has been anchored on
+    existing content types on the mesh; moving the DNA hash for an unmeasured shape is the wrong
+    order (smallest slice that flips a named red).
+24. **The update-propagation loop is trusted enough to dogfood from S0's shape.** The seed's
+    artifact reference takes the runtime-artifacts closure-CID / channel-head form from the first
+    commit; S0 resolves it with a pinned-local-path resolver (no network); S1's first station
+    resolves a channel head through the adoption path `runtime-upgrade-propagation` already
+    proves (stations 1–8 on the household mesh). The envelope is delivered by the loop it applies:
+    accelerate the cycle → new habit → dogfood/refine → master → new habit.
 
 ## 13. What was rejected, per external model
 
@@ -835,18 +859,16 @@ per-epoch version stamp, the bounded snapshot; not the unbounded log. IPVM — t
   exists to find out whether tevah can template the conductor YAML and own the passphrase source
   before anything is built on the assumption that it can.
 
-## 15. Open questions for the operator
+## 15. Open questions for the operator — resolved 2026-09-02
 
-1. Accept `tevah` / `RuntimeSeed` as names, or override.
-2. The WIP fence: give `operator-runtime-surface`'s slot to `runtime-death-witnessed`, or hold both
-   current actives and run the witness as a non-active red.
-3. Whether the constitutional DNA-change batch (first-class `runtime-*` types, `attestation:death-
-   witness`) is scheduled with runtime-artifacts §11.1 or waits for a second rung-6 driver — until
-   it lands the incident attestation is deferred and green means the anchored witness row.
-4. Whether the `data_root` of a process may name a **volume head** — a declared head over a chunk
-   map on the blob plane — so that a k8s-facing `epr-pvc` StorageClass bridge (a bridge-seam crate,
-   filesystem-shaped over eprfs, snapshots as head declarations) is not precluded; the field is
-   reserved in `RuntimeInstance.data_root` and nothing else in this spec depends on it.
+1. Names: tevah for people, `ark` for code (register 20).
+2. WIP fence: the slot moves from `operator-runtime-surface` to `runtime-death-witnessed`
+   (register 22).
+3. The constitutional DNA batch waits for S1's measured shape (register 23).
+4. `data_root` may name a volume head; the `epr-pvc` bridge stays a floated guide-star, the end
+   of this valueflow chain, unminted (register 21).
+5. Delivery: working code first; the envelope is built and shipped through the update-propagation
+   loop it applies (register 24).
 
 ## 16. Adversarial review disposition (2026-09-02)
 
@@ -914,7 +936,7 @@ changes.
   atom per applied transition.
 - Gate 4 — three address forms → `Content.id` is the atom CID.
 - Gate 5 — C0–C14 cannot be `answered` with no crate and no contract tests → every class is
-  **`partial`** until `tevah-core`'s `seam-registry.yaml` cites its tests (an S0 obligation); C1
+  **`partial`** until `ark-core`'s `seam-registry.yaml` cites its tests (an S0 obligation); C1
   enumerates the self-grant; C7 writes the row before the blob.
 - Gate 7 — `validate_economic_event` never checks `REA_ACTIONS`; `use` over `compute-fulfilled` is
   hygiene, not integrity → wording.

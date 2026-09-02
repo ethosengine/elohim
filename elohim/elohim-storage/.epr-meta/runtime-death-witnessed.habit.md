@@ -9,7 +9,7 @@ invariant: >
   stranger, and attested once per incident when a conductor is next available — so a household
   operator reads why a peer died from the peer itself, with no cluster tool in the path.
 status: red
-active: false
+active: true
 checks:
   - "a2o @concern:death-witness (genesis/a2o/features/resilience/death-witness.feature — four stations in five scenarios (3a custodian render, 3b stranger refused), all @wip until the household mesh launches its conductors under the envelope; runnable then via cd genesis/a2o && npx cucumber-js --tags '@concern:death-witness and not @wip')"
   - "cargo test --lib conductor::process_manager (elohim/elohim-storage — ring_buffer_keeps_the_last_n_and_drops_the_oldest, readiness_outcome_prefers_child_death_over_attempt_budget: the dead-vs-slow classifier and the ring, landed 264ce8ce4; a local leg for the classifier only — nothing yet writes, names, offers, or attests a witness)"
@@ -20,7 +20,7 @@ refs:
   - "supervisor today: elohim/elohim-storage/src/conductor/process_manager.rs (live only under EMBEDDED_CONDUCTOR=true — the alpha conductor pod; never on the mesh)"
   - "sibling habit: operator-runtime-surface (inspect/restart/reseed/reconcile as commitment-gated verbs — the witness makes 'inspect a runtime' true for a dead child)"
 retire-when: >
-  when the supervisor moves into the envelope crate (elohim/tevah) and this atom moves with it,
+  when the supervisor moves into the envelope crate (elohim/ark) and this atom moves with it,
   and a household operator has read a peer's death from the peer itself on a released steward
   build with no developer-shaped tool in the path — the habit then describes the runtime, not a
   storage feature.
@@ -28,7 +28,7 @@ retire-when: >
 DELTA 2026-09-02 (BORN red — design canonized, nothing built; the census refuses `unwired` when a
 runnable check is declared, and two are: the a2o concern is declared with every station @wip, and
 the cargo leg proves only the classifier — so the invariant is measured NOT held, which is red).
-FIRST MOVE: S0 of the tevah spec (genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md §11): the envelope as its own launchable unit — tevah-core + tevah-supervisor + the tevah binary — and hc-mesh.sh launching one, then three, household conductors under it instead of `setsid nohup hc sandbox run`, so that a SIGKILLed conductor leaves a witness in the spool on the mesh. Until then every household-lane assertion is vacuous by construction (the only pipe-owning supervisor ships inside an alpha container behind a frozen image tag): lifecycle-as-fixture precedes lifecycle-as-feature. Station 1 green is the first measured step toward green; stations 2–4 carry it there.
+FIRST MOVE: S0 of the tevah spec (genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md §11): the envelope as its own launchable unit — ark-core + ark-supervisor + the ark binary — and hc-mesh.sh launching one, then three, household conductors under it instead of `setsid nohup hc sandbox run`, so that a SIGKILLed conductor leaves a witness in the spool on the mesh. Until then every household-lane assertion is vacuous by construction (the only pipe-owning supervisor ships inside an alpha container behind a frozen image tag): lifecycle-as-fixture precedes lifecycle-as-feature. Station 1 green is the first measured step toward green; stations 2–4 carry it there.
 
 GROUNDING: the tevah spec sealed the
 primitive and the witness path after 21 adversarially verified grounding briefs. What the
@@ -44,3 +44,10 @@ commitments are per exact blob hash, so a fresh witness has no custodian — the
 standing custody-spool commitment; (6) a new `runtime:*` content type moves the DNA hash — the
 witness rides `issue-report` with a metadata kind. Status is red: the concern is declared and counted, and no station passes until S0's
 launcher exists.
+
+DELTA 2026-09-02 (operator decisions, spec §12 items 20–24): ACTIVE — takes the WIP-fence slot from
+operator-runtime-surface (green, wired). Branding split: tevah in prose, `ark` in code (`elohim/ark/`,
+`ark-core`, `ark-supervisor`, the `ark` binary). The constitutional DNA batch waits for S1's measured
+shape; the epr-pvc bridge is the unminted guide-star at the end of this chain. S0 is built through the
+update-propagation loop's shape: seed artifact refs are closure-CID/channel-head from the first commit,
+resolved pinned-local in S0, channel-head in S1. Next measured step: station 1 on the household mesh.

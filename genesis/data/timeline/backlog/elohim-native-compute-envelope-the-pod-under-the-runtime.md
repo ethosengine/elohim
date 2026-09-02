@@ -115,13 +115,24 @@ grounding (21 briefs, adversarially verified) and three reviews:
   `mishpat_commitments.cid` with `substrate_signal`, which exists with no producer. Interval samples
   stay Category-C in a separate table; breach events and daily composites are the heads.
 - **Sequencing changed:** S0 is the envelope as its own launchable unit on the household mesh
-  (`hc-mesh.sh` direct mode → `tevah run`), NOT a witness grown inside `process_manager` — the only
+  (`hc-mesh.sh` direct mode → `ark run`), NOT a witness grown inside `process_manager` — the only
   pipe-owning supervisor ships in one alpha container behind a frozen image tag, so growing it there
   ships the witness only where `kubectl logs --previous` already exists. Alpha confirms by shipping
   tevah inside the storage image with a deliberate conductor roll.
 - **Done-when corrected:** `GET /epr/{pod-cid}` resolves by `Content.id` = the atom CID; the habit is
   `runtime-death-witnessed` (born unwired in `elohim/elohim-storage/.epr-meta/`) with the envelope's
-  own habit born in `elohim/tevah/.epr-meta/` when the crate exists; the scenario lives in
+  own habit born in `elohim/ark/.epr-meta/` when the crate exists; the scenario lives in
   `features/resilience/death-witness.feature`, not `features/recovery/`.
 
 Status: envisioned → **refined** (the timeline vocabulary has no "designed"; refined = a sealed spec exists and the atom is its provenance).
+
+## Operator decisions (2026-09-02, spec §12 items 20–24)
+
+- **tevah** is the name people use; **`ark`** is the identifier code uses (`elohim/ark/`,
+  `ark-core`, `ark-supervisor`, the `ark` binary). A branding split, respected on both sides.
+- The `epr-pvc` bridge — the network of peers offering external actors a collective agreement for
+  persistent volumes backed by this runtime — is the **guide-star at the end of this valueflow
+  chain**: floated, not minted; `RuntimeInstance.data_root` reserved so nothing precludes it.
+- WIP-fence slot moves to `runtime-death-witnessed`; the constitutional DNA batch waits for S1's
+  measured shape; S0 is built in the update-propagation loop's shape (closure-CID/channel-head
+  refs, pinned-local resolver) so the envelope is delivered by the loop it applies.

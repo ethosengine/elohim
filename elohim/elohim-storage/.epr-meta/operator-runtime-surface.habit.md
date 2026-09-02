@@ -7,7 +7,7 @@ invariant: >
   telemetry served by the peer itself. The dev surface and the operator
   OS-settings surface are the same surface.
 status: green
-active: true
+active: false
 checks:
   - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
   - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
@@ -158,3 +158,7 @@ one reload each, all three controllers following within 35 s, no restart (fix
 bd5d3984b: the controller ticks while idle). Mode flips observe→canary→apply landed
 the same way at stations 6 and 7. No status flip (already green); the surface now
 carries `/admin/adoption` with typed verdicts + attestation summaries.
+
+DELTA 2026-09-02: slot released — green with wired checks, so it holds no attention; the WIP-fence
+slot passes to runtime-death-witnessed (spec 2026-09-02-compute-envelope-tevah-design §12 item 22).
+Status unchanged; the checks still run.
