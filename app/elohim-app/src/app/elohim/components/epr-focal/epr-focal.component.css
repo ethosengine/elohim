@@ -5,7 +5,7 @@
   justify-content: center;
   min-height: 60vh;
   text-align: center;
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary, var(--lamad-text-secondary));
 }
 
 .spinner {
@@ -34,7 +34,7 @@
 }
 
 .fallback-meta {
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary, var(--lamad-text-secondary));
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
 }
