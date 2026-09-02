@@ -429,7 +429,7 @@ run_status_sweep() {
 # Rolling apply: peer by peer, sequential, stop on first failure.
 # ---------------------------------------------------------------------------
 run_rolling_apply() {
-  local updated_count=0 current_count=0
+  local updated_count=0 current_count=0 deferred_count=0
   [ "${JSON_OUT}" -eq 1 ] || { echo "=== fleet-coordswap: rolling apply ==="; echo "happ: ${HAPP_PATH}  app-id: ${APP_ID}"; echo ""; }
 
   local total="${#PEER_URLS[@]}"
@@ -439,6 +439,24 @@ run_rolling_apply() {
 
     # Step 1: dry-run.
     call_sync "${url}" "false"
+    if [ "${LAST_HTTP_CODE}" = "000" ]; then
+      # Connection refused / no route to the peer at all — distinct from a
+      # peer that answered with an error status. An edge roll is plausibly
+      # in flight on this peer (restart churn, cf. the substrate
+      # trust-contract runbook's ~20min window), so this is not a rollout
+      # failure: defer this one peer and keep going, rather than stopping
+      # the whole rolling apply (report_rollout_failure + return 1) on a
+      # peer that is simply mid-restart. `deferred` is the honest verdict —
+      # nothing was applied on this peer and it needs a re-run, but peers
+      # already processed are unaffected.
+      local note
+      note="$(err_message "${LAST_BODY}")"
+      [ -n "${note}" ] || note="connection refused"
+      deferred_count=$((deferred_count + 1))
+      add_report "${name}" "${url}" "deferred" "${LAST_HTTP_CODE}" "?" "?" "${note}"
+      [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "?" "?" "DEFERRED: ${note}"
+      continue
+    fi
     if [ "${LAST_HTTP_CODE}" != "200" ]; then
       local note
       note="$(err_message "${LAST_BODY}")"
@@ -511,8 +529,17 @@ run_rolling_apply() {
   else
     print_final_table
     echo ""
-    echo "ROLLOUT COMPLETE: ${updated_count}/${total} peers updated, ${current_count} already current"
+    if [ "${deferred_count}" -gt 0 ]; then
+      echo "ROLLOUT COMPLETE WITH DEFERRALS: ${updated_count}/${total} peers updated, ${current_count} already current, ${deferred_count} deferred (unreachable — re-run to cover them)"
+    else
+      echo "ROLLOUT COMPLETE: ${updated_count}/${total} peers updated, ${current_count} already current"
+    fi
   fi
+  # Deferred peers are not a failure (nothing was attempted on them, and no
+  # peer that WAS reached failed) — but they are not silent success either:
+  # return 4 so callers (fleet-coordswap-dispatch.sh) can print an honest
+  # DEFERRED verdict rather than reporting a clean rollout.
+  [ "${deferred_count}" -eq 0 ] || return 4
   return 0
 }
 

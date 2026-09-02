@@ -328,6 +328,41 @@ def runMeshQuiesceMeasure() {
 }
 
 /**
+ * Dataplane Validation body. Lives as a top-level def for the same reason
+ * runMeshQuiesceMeasure() does: the pipeline{} block sits at the JVM 64KB CPS
+ * ceiling. Two behaviours ride here:
+ *  - the quiesce leg carries ITS OWN timeout (edge #1406-#1408 rode the
+ *    pipeline-global 120-min option to ABORTED after DEPLOY had completed —
+ *    a healthy deploy read as ABORTED; the stage's catchError cannot catch a
+ *    global interrupt, only a nested one);
+ *  - ordinary deploy builds are warn-only (UNSTABLE, last measurement
+ *    printed); [edge:validate-only] recording runs stay strict (FAILURE),
+ *    because a validate-only run exists to record a verdict and a swallowed
+ *    red there is a lie. Same shape as the T2 receipt leg in
+ *    .husky/pre-push.bash (T2_RECEIPT=strict).
+ */
+def runDataplaneValidation() {
+    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+        sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
+    }
+    // 2700 s gate + cucumber + report must fit inside this bound; 55 min leaves
+    // the pipeline-global 120 min for the deploy stages that follow.
+    def strict = isValidateOnly()
+    def body = {
+        timeout(time: 55, unit: 'MINUTES') {
+            withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host", "QUIESCE_DEADLINE_SECS=2700"]) {
+                sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
+            }
+        }
+    }
+    if (strict) {
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') { body() }
+    } else {
+        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') { body() }
+    }
+}
+
+/**
  * Run P2P simulation test (advisory — failures don't block pipeline).
  * Requires Docker Compose and the elohim-storage Dockerfile.
  */
@@ -2662,29 +2697,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             steps {
                 container('builder') {
-                    // Substrate seam smoke — one named check per communication
-                    // seam (bootstrap-sharing / relay-reachability / peer-store /
-                    // n0-contamination / no-lingering-tx5 / dht-fetch) so a red
-                    // names ITSELF instead of surfacing as
-                    // an unexplained convergence failure. Advisory while
-                    // scenario 2 stabilizes; flip to --gate after green ×2.
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
-                    }
-                    // QUIESCE_DEADLINE_SECS is 2700 on BOTH paths since 2026-08-07.
-                    // The post-deploy path used to get 900 on the theory that only a
-                    // validate-only recording run needs a long bounded wait — but it is
-                    // the post-deploy path that just restarted the whole fleet, and
-                    // conductor restart churn is ~20min (substrate trust-contract
-                    // runbook). 900s therefore expired mid-churn and systematically
-                    // produced DID-NOT-MEASURE exactly where the measurement matters
-                    // most. The gate is bounded and fail-closed either way; a longer
-                    // bound only costs wall-clock on a fleet that is genuinely stuck.
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host", "QUIESCE_DEADLINE_SECS=2700"]) {
-                            sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
-                        }
-                    }
+                    runDataplaneValidation()
                 }
             }
             post {

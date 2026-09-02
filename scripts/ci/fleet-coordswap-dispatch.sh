@@ -96,6 +96,8 @@ bash "$DRIVER" --happ "$HAPP" --peers "$PEERS" --apply --timeout 180 || rc=$?
 
 if [ "$rc" -eq 0 ]; then
   echo "COORDSWAP: SUCCESS — fleet coordinators in sync with this build's bundle"
+elif [ "$rc" -eq 4 ]; then
+  echo "COORDSWAP: DEFERRED — one or more peers refused the connection (an edge roll is likely in flight); nothing applied on those peers, re-run after the roll."
 else
   echo "COORDSWAP: INCOMPLETE (driver rc=$rc) — see the rollout table above."
   echo "COORDSWAP: warn-only by policy; the DNA build is NOT failed by this."
