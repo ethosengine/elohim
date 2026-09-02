@@ -555,6 +555,7 @@ habits:
       - 2026-08-31 18:55Z — carried-election FLEET enactment shift closed at budget (shift 2026-08-31T02-40, 8 iterations, 5 fleet rolls). LANDED live on all 7 pods: the flag (ELOHIM_OBEY_CARRIED_ELECTION=true, boot-warn confirmed 7/7), the iroh/libp2p frame-cap drift cure (iroh reader 256KiB→1MiB, sender clamp under the deployed 256KiB floor — W2's inventory starvation "frame too large: 536378 > 262144" cured, zero recurrences), and the dual-peer-source cure (reconcile stream was libp2p-IF-PRESENT-ELSE-iroh: a dual fleet NEVER polls iroh-only peers by construction — CompositeReconcilePeers unions the planes; the reason no board/book/reboot could make the fleet ask W2). Supplier W2 re-stood on :8093 (fork conductor hot-swapped via admin update_coordinators — no re-key; serves the manifesto's earned election evidence, winner uhCkk1kms…, 499B signed link record). NOT YET OBSERVED at close: first fleet content-inventory poll of W2 → hint → obeyed{path="peer_carried"} → both doorways serving uhCkk1kms…. Watch: `elohim_content_election_obeyed_total{path="peer_carried"}` + `genesis/a2o/scripts/dataplane-convergence-measure.ts` (probe file reports/carried-election-fleet-probe.json). W2 left RUNNING as the standing supplier. New backlog: late-joiner-peer-discovery-boot-only-board · mesh-fixture-fidelity-regimes · upgrade-propagation-p2p-design-arc (operator course-set: the north star). Status stays red pending the observed obey.
       - 2026-09-01 16:01Z — household `peer_carried` sweep receipt STOPPED at the fixture seam: conductor-UP negative control converged with `peer_carried_delta=0`; stopping/pausing the adopter conductor makes the local election answer unreachable/blocked and returns before peer supply, while the successful supply branch still requires that same conductor for `verify_carried_election` + `validate_carried_head_record`. Missing station recorded in `task-peer-carried-sweep-mesh-receipt`: fixture observed-ABSENT without removing the wasm verifier. No receipt and no status flip; fleet watch remains authoritative.
       - 2026-09-01 16:20Z — household GSO burst/disconnect receipt STOPPED at the fixture seam (NO status flip): `gso-burst-receipt.ts` preserved the mixed `matthew=dual` / `jessica=iroh` posture and counted only decoded head-record replies, but a settled-mesh storage restart produced 12 successful exchanges in 360 s versus the required >=200. The fail-closed `no-burst` leg withheld SIGKILL and the receipt. Missing station: fixture-owned stale/full-corpus requester staging between mesh-harness -> burst-regime; parent GSO atom stays wip and this habit stays red.
+      - 2026-09-02 00:43Z — household election-convergence numbers from the adoption ceremony (NO status flip: the a2o concern here is federation-deploy on the fleet): a fresh release channel's staged head reached 3/3 conductors ≤19 s after publish with doorway A (bootstrap/signal) up; the same publish took 20 min 18 s for the iroh peer while doorway A was DOWN (island; conductor log `NoPeersForLocation`) — doorway liveness is a precondition of every election measure, now in the ceremony preflight. Earned-head convergence: 75 s (promote) and 31 s (revert), 3/3.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -1792,6 +1793,13 @@ habits:
       - 2026-08-31 — rung-1 coordinator hot-swap vehicle landed as an operator verb: `POST /admin/coordinators/sync` (dry-run/apply, per-role DNA-lineage guard, embedded+external conductors) + `scripts/ci/fleet-coordswap.sh` rolling driver. Local-mesh proof: upgrade → revert → upgrade, 3 peers, ~40s/peer/pass, conductor PIDs unchanged. Fleet leg = warn-only DNA-pipeline stage; endpoint reaches the fleet on the next edge roll.
 
       - 2026-09-01 — rung-4 operator verbs live: `GET /admin/runtime-config` (effective values + provenance + boot-only reasons) and `POST /admin/runtime-config/reload`; watched-config flip proven on a RUNNING mesh node (same PID, WARN-logged old→new, boot restore on key removal). Fleet wiring: per-human runtime-config ConfigMap → mounted file → watcher.
+
+      DELTA 2026-09-02 (local mesh, adoption ceremony r2): the rung-4 runtime-config surface
+      proved a FIRST follow lands on a RUNNING node — three peers booted following nothing,
+      one reload each, all three controllers following within 35 s, no restart (fix
+      bd5d3984b: the controller ticks while idle). Mode flips observe→canary→apply landed
+      the same way at stations 6 and 7. No status flip (already green); the surface now
+      carries `/admin/adoption` with typed verdicts + attestation summaries.
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
@@ -2376,6 +2384,42 @@ habits:
       when the Python and Rust evaluators are ONE artifact both hosts call, rather than two
       implementations held in correspondence by parity vectors. "Exactly one evaluator" is
       then a fact about the build, not a property under watch.
+
+  - id: runtime-upgrade-propagation
+    invariant: >
+      A runtime release (coordinator bundle first; config, binary, hApp bundle behind it) reaches
+      every peer by ELECTION on its release channel — staged, soaked by a canary, promoted on
+      attested evidence, converged, and revertible by re-election — with conductors never restarted
+      or re-keyed for the coordinator class and mixed-version peers still talking throughout.
+    status: green
+    active: false
+    checks:
+      - "a2o @concern:runtime-upgrade-propagation (genesis/a2o/features/delivery/runtime-upgrade-propagation.feature — @wip: the ten scenarios are written and blind-reader-revised; step definitions must compose the three drivers below before this habit can be observed by a runner)"
+      - "manual chain (mesh): genesis/a2o/scripts/epr-release-package.ts (T1) → release-ceremony.ts channel create / publish / promote / revert <manifest> (T2) → GET /admin/adoption on every peer (T3/T4) → release-attestation-probe.ts EXIT=0 (T5)"
+    evidence: >
+      DELTA 2026-09-02 00:43Z (local mesh receipt, r2 channel; transcript
+      `genesis/a2o/reports/release-ceremony/2026-09-01/transcript.md`): the full §10 chain
+      PASSED by hand-composed drivers — publish→3/3 staged ≤19 s; canary (james, mode
+      `canary`) hot-swapped ~12 s after his first sweep, conductor PID unchanged, wasm hash
+      flipped; soak attestation after 30 s read 1/1 by both observers; promote→3/3 applied
+      in 75 s; revert via `revert <channel> <manifest>`→3/3 restored in 31 s; attestation
+      probe qualifying 2 / builder-excluded 1 / mismatched 0. Five typed refusals became
+      five controller fixes (bd5d3984b 547c28d62 851ab2fae 2b02dd86f + driver revert) and
+      two zome/build atoms (update_content star chain; hc-rna cdylib link). Status GREEN on this measured pass (the hand-composed driver chain is the runnable check;
+      the a2o feature's steps composing the same drivers is the next station).
+      Preconditions learned: doorway A up (bootstrap/signal home) before any election measure;
+      candidate = coordinator-only bytes with byte-identical integrity (COORD_BUILD_MARKER, or a
+      wasm custom section while the DNA workspace build is broken).
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
+      - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
+      - "receipt atom: genesis/data/timeline/backlog/task-runtime-upgrade-a2o-receipt.md"
+      - "controller: elohim/elohim-storage/src/services/release_adoption/{watch,verify,state,apply}.rs"
+    retire-when: >
+      when three consecutive coordinator releases reach the alpha fleet through their release
+      channel with no Jenkins roll and no operator hand on any pod, each with its cycle-time row
+      in the arc doc — the CI roll is then no longer a delivery path for the class and the
+      register describes a product, not a practice.
 
   - id: custodial-authority-answerable
     invariant: >

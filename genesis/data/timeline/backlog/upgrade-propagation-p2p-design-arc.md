@@ -267,6 +267,7 @@ external observer and retires k8s as the operations plane.
 | config flip | 2-4 h | SECONDS on a running node (mesh-proven); fleet ≈ push+apply, no roll |
 | storage/doorway binary | 2-4 h (incl. conductor churn + catch-up) | roll only storage pods — conductors keep arcs (first storage-only roll measuring on edge #1406) |
 | conductor roll | fleet-wide 2.5-3 h churn | staggered per-peer windows, genesis anchor last |
+| coordinator zome — **rung 5, elected (mesh receipt 2026-09-02)** | 2-4 h | publish→3/3 staged ≤19 s · canary hot-swap ~12 s after sweep · soak attest 30 s → observers read 1/1 · promote→3/3 applied 75 s · revert→3/3 restored 31 s; conductor PIDs unchanged end-to-end; five typed refusals became five controller fixes on the way (transcript: `genesis/a2o/reports/release-ceremony/2026-09-01/`) |
 
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the

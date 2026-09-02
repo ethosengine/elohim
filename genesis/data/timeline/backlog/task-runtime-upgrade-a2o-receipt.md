@@ -279,3 +279,40 @@ on that peer; `already_current`→idempotence working). Cross-peer election
 questions → `version-matrix --observed` + `release-ceremony.ts status`
 (unreachable ≠ absent). Harness states (`orphaned-data-root`) refuse loudly
 by design — remediate stop/start, never bypass.
+
+## Receipt — first full pass on the local mesh (2026-09-01 21:15Z → 2026-09-02 00:43Z)
+
+**Transcript (durable, gitignored):** `genesis/a2o/reports/release-ceremony/2026-09-01/transcript.md`
+(+ restart/build logs, both briefs, manifests, `elohim-P.happ`). Channel
+`runtime:coordinators:elohim:receipt-20260901-r2`; O_CID `uhCkkIDNjyHg…`, P_CID `uhCkkeEOIsGK…`,
+NR_CID `uhCkkI8YA9yZ…`.
+
+**Result: the §10 chain PASSED end-to-end** — staged 3/3 ≤19 s · canary hot-swap (PID unchanged,
+wasm hash flipped) · soak attestation read 1/1 by observers · promote → 3/3 in 75 s · revert →
+3/3 restored in 31 s · attestation probe EXIT=0 (qualifying 2, builder-excluded 1, mismatched 0).
+Stations 10 (binary stretch) skipped; the a2o feature stays `@wip` (steps not yet composed) so the
+habit `runtime-upgrade-propagation` is declared `unwired`, not green.
+
+**Five typed refusals → five fixes, on the way (each a story-graph node in the transcript):**
+1. `running:false` after a runtime-config follow → controller ticks while idle (bd5d3984b).
+2. `lineage_parent_mismatch` on a channel's FIRST release (superseded record = channel root) → root
+   is not a release (547c28d62); + controller reads heads with `resolve_content_head_local`.
+3. `threshold_unmet` deadlock (threshold enforced on staging adoption) → `=canary` follow mode;
+   threshold gates the EARNED tier; apply-mode `waiting/awaiting_promotion` never climbs the ladder
+   (851ab2fae).
+4. `lineage_parent_mismatch` on the SECOND release (the zome's `update_content` targets the root:
+   a star, never a chain) → declared parent proven by existence-on-channel when the chain cannot
+   order releases (2b02dd86f); zome fix filed (coordinator-only) in
+   `content-store-update-content-targets-root-not-latest-version.md`.
+5. `publish` refused over an EARNED head, while a revert target is necessarily a NEW manifest →
+   `revert <channel> <manifest.json>` authors + declares earned in one act (driver, this commit);
+   a revert manifest for bytes the fleet already ran declares `attestationThreshold: 0`.
+
+**Runbook corrections (supersede the station list above):** doorway A liveness is station-0
+preflight (its absence islanded the conductors: 20 min 18 s vs ≤19 s); the honest
+no-attestation label is `threshold_unmet` (`threshold_unchecked` = count unreadable); station 6
+flips james to `=canary`, not `=apply`; the candidate must be coordinator-only bytes with
+byte-identical integrity (`COORD_BUILD_MARKER`; the 2026-08-30 deployed bundle is CROSS-lineage
+and the vehicle correctly refused it); the DNA workspace build is currently broken
+(`lamad-dna-workspace-hc-rna-cdylib-link-breaks-coordinator-build.md`) so P was minted with a
+wasm custom-section marker; station 8 = `revert <channel> <fresh manifest>`.
