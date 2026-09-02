@@ -1,0 +1,58 @@
+/* Elohim brand tokens — genesis/graphos/elohim-protocol-design-spec.md §4 Color, §5 Type.
+   SCOPED BY CONSUMPTION: nothing in the shell binds these until a surface opts in by
+   using --el-* (the EPR atom home is the first). The shell's --lamad-* tokens are
+   untouched. Rules carried: no pure black/white; darks carry green/brown undertone;
+   dark mode is constellation mode (starlight on deep sky). */
+
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/fraunces/full-italic.css';
+@import '@fontsource-variable/source-serif-4';
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root {
+  /* Primary palette */
+  --el-cream: #f5f0e8; /* Linen */
+  --el-starlight: #e8e4d9; /* Starlight */
+  --el-stone: #6b6157; /* Hearthstone */
+  --el-ink: #26302a; /* headline dark with a green undertone (never #000) */
+  --el-green-deep: #2d5f3b; /* Vineyard */
+  --el-green-light: #7fb069; /* New Growth */
+  --el-amber: #d4a03e; /* Harvest Gold */
+  --el-clay: #b8664f; /* Terracotta */
+  --el-sky: #7bafcb; /* Morning */
+  --el-plum: #6e4b6b; /* Sabbath */
+  --el-night: #0f1a12; /* Deep Sky */
+  --el-night-alt: #1a1a2e; /* Indigo Night */
+
+  /* Faces (fontsource-variable family names) */
+  --el-font-display: 'Fraunces Variable', Georgia, serif;
+  --el-font-body: 'Source Serif 4 Variable', Georgia, serif;
+  --el-font-ui: 'DM Sans Variable', system-ui, sans-serif;
+  --el-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Semantic — DARK is the shell default (constellation mode) */
+  --el-ground: var(--el-night);
+  --el-surface: var(--el-night-alt);
+  --el-surface-2: rgba(232, 228, 217, 0.08);
+  --el-border: rgba(232, 228, 217, 0.18);
+  --el-text: var(--el-starlight);
+  --el-text-strong: #f3efe6;
+  --el-text-muted: rgba(232, 228, 217, 0.72);
+  --el-action: var(--el-amber);
+  --el-on-action: var(--el-night);
+  --el-warm: #d98a72; /* terracotta lifted for dark ground */
+}
+
+:root[data-theme='light'] {
+  --el-ground: var(--el-cream);
+  --el-surface: var(--el-starlight);
+  --el-surface-2: rgba(107, 97, 87, 0.08);
+  --el-border: rgba(107, 97, 87, 0.18);
+  --el-text: var(--el-stone);
+  --el-text-strong: var(--el-ink);
+  --el-text-muted: var(--el-stone);
+  --el-action: var(--el-green-deep);
+  --el-on-action: var(--el-cream);
+  --el-warm: #8f4a36; /* terracotta deepened for linen ground */
+}
