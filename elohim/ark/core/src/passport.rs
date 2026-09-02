@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::RestartVerdict;
 
+/// Record kind carried by every S0 runtime passport.
+pub const PASSPORT_KIND: &str = "runtime-passport";
+
 /// Effective enforcement tier observed for a process.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -75,7 +78,7 @@ mod tests {
     fn passport_json_kind_is_runtime_passport() {
         let passport = Passport {
             schema: 1,
-            kind: "runtime-passport".to_string(),
+            kind: PASSPORT_KIND.to_string(),
             manifest: "bafy-manifest".to_string(),
             node: None,
             incarnation: 1,
@@ -86,6 +89,6 @@ mod tests {
         };
 
         let json = serde_json::to_value(passport).unwrap();
-        assert_eq!(json["kind"], "runtime-passport");
+        assert_eq!(json["kind"], PASSPORT_KIND);
     }
 }

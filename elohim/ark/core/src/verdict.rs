@@ -1,6 +1,6 @@
 //! Verdicts and the restart governor.
 
-use elohim_compute::{Governor, LimitOwner, Refusal, RefusalCode};
+use elohim_compute::{Governor, LimitOwner, Refusal};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -89,17 +89,7 @@ impl Governor for RestartGovernor {
         grant: &Self::Grant,
         _now_epoch_s: u64,
     ) -> Result<(), Refusal> {
-        if grant.policy.restart == Restart::Temporary {
-            return Err(Refusal::gate(
-                limit_owner(&grant.bounded_by),
-                "policy-temporary",
-                format!(
-                    "restart of {} refused by temporary child policy",
-                    req.process
-                ),
-            ));
-        }
-        Ok(())
+        authorize_with_policy(req, grant).map_err(|(refusal, _)| refusal)
     }
 
     /// Evaluates the manifest-default policy under [`LimitOwner::Operator`]
@@ -107,6 +97,7 @@ impl Governor for RestartGovernor {
     /// or [`RestartGovernor::verdict`] for a real decision.
     fn gate(&self, req: &Self::Request, ctx: &Self::Context) -> Result<(), Refusal> {
         gate_with_policy(req, &ChildPolicy::default(), LimitOwner::Operator, ctx)
+            .map_err(|(refusal, _)| refusal)
     }
 
     /// Renders the manifest-default policy because the trait signature carries
@@ -121,11 +112,9 @@ impl Governor for RestartGovernor {
         req: &Self::Request,
         grant: &Self::Grant,
         ctx: &Self::Context,
-        now_epoch_s: u64,
+        _now_epoch_s: u64,
     ) -> Result<Self::Effect, Refusal> {
-        self.authorize(req, grant, now_epoch_s)?;
-        gate_with_policy(req, &grant.policy, limit_owner(&grant.bounded_by), ctx)?;
-        Ok(render_with_policy(req, &grant.policy, ctx))
+        decision_with_policy(req, grant, ctx).map_err(|(refusal, _)| refusal)
     }
 }
 
@@ -137,14 +126,41 @@ impl RestartGovernor {
         grant: &RestartGrant,
         ctx: &RestartContext,
     ) -> (RestartVerdict, Option<Refusal>) {
-        match self.decide(req, grant, ctx, ctx.now_epoch_s) {
+        match decision_with_policy(req, grant, ctx) {
             Ok(verdict) => (verdict, None),
-            Err(refusal) => {
-                let reason = give_up_reason(req, grant, ctx, &refusal);
-                (RestartVerdict::GiveUp { reason }, Some(refusal))
-            }
+            Err((refusal, reason)) => (RestartVerdict::GiveUp { reason }, Some(refusal)),
         }
     }
+}
+
+fn authorize_with_policy(
+    req: &RestartRequest,
+    grant: &RestartGrant,
+) -> Result<(), (Refusal, GiveUpReason)> {
+    if grant.policy.restart == Restart::Temporary {
+        return Err((
+            Refusal::gate(
+                limit_owner(&grant.bounded_by),
+                "policy-temporary",
+                format!(
+                    "restart of {} refused by temporary child policy",
+                    req.process
+                ),
+            ),
+            GiveUpReason::PolicyTemporary,
+        ));
+    }
+    Ok(())
+}
+
+fn decision_with_policy(
+    req: &RestartRequest,
+    grant: &RestartGrant,
+    ctx: &RestartContext,
+) -> Result<RestartVerdict, (Refusal, GiveUpReason)> {
+    authorize_with_policy(req, grant)?;
+    gate_with_policy(req, &grant.policy, limit_owner(&grant.bounded_by), ctx)?;
+    Ok(render_with_policy(req, &grant.policy, ctx))
 }
 
 fn limit_owner(bounded_by: &BoundedBy) -> LimitOwner {
@@ -159,34 +175,42 @@ fn gate_with_policy(
     policy: &ChildPolicy,
     owner: LimitOwner,
     ctx: &RestartContext,
-) -> Result<(), Refusal> {
+) -> Result<(), (Refusal, GiveUpReason)> {
     let tally = &ctx.tally;
     let same_cause_count = tally.same_cause_run();
     if same_cause_count >= policy.same_cause_limit {
-        let key = tally
-            .deaths
-            .last()
-            .map(same_cause_key)
-            .unwrap_or_else(|| same_cause_key(&req.death));
-        return Err(Refusal::gate(
-            owner,
-            "same-cause",
-            format!(
-                "restart of {} refused: cause {key} repeated {same_cause_count} times",
-                req.process
+        let key = same_cause_key(&req.death);
+        return Err((
+            Refusal::gate(
+                owner,
+                "same-cause",
+                format!(
+                    "restart of {} refused: cause {key} repeated {same_cause_count} times",
+                    req.process
+                ),
             ),
+            GiveUpReason::SameCause {
+                key,
+                count: same_cause_count,
+            },
         ));
     }
 
     let deaths = tally.deaths_within(ctx.now_epoch_s, policy.intensity.window_s);
     if deaths > policy.intensity.max_deaths {
-        return Err(Refusal::gate(
-            owner,
-            "intensity",
-            format!(
-                "restart of {} refused: {deaths} deaths in {} seconds exceeds {}",
-                req.process, policy.intensity.window_s, policy.intensity.max_deaths
+        return Err((
+            Refusal::gate(
+                owner,
+                "intensity",
+                format!(
+                    "restart of {} refused: {deaths} deaths in {} seconds exceeds {}",
+                    req.process, policy.intensity.window_s, policy.intensity.max_deaths
+                ),
             ),
+            GiveUpReason::IntensityExceeded {
+                deaths,
+                window_s: policy.intensity.window_s,
+            },
         ));
     }
 
@@ -216,39 +240,6 @@ fn backoff_delay_s(backoff: &Backoff, attempt: u32) -> u64 {
     let exponent = attempt.min(backoff.steps);
     let factor = 1_u64.checked_shl(exponent).unwrap_or(u64::MAX);
     backoff.min_s.saturating_mul(factor).min(backoff.max_s)
-}
-
-fn give_up_reason(
-    req: &RestartRequest,
-    grant: &RestartGrant,
-    ctx: &RestartContext,
-    refusal: &Refusal,
-) -> GiveUpReason {
-    let tally = &ctx.tally;
-    match &refusal.code {
-        RefusalCode::GateRefused(reason) if reason == "same-cause" => GiveUpReason::SameCause {
-            key: tally
-                .deaths
-                .last()
-                .map(same_cause_key)
-                .unwrap_or_else(|| same_cause_key(&req.death)),
-            count: tally.same_cause_run(),
-        },
-        RefusalCode::GateRefused(reason) if reason == "intensity" => {
-            GiveUpReason::IntensityExceeded {
-                deaths: tally.deaths_within(ctx.now_epoch_s, grant.policy.intensity.window_s),
-                window_s: grant.policy.intensity.window_s,
-            }
-        }
-        RefusalCode::GateRefused(reason)
-            if reason == "policy-temporary" && grant.policy.restart == Restart::Temporary =>
-        {
-            GiveUpReason::PolicyTemporary
-        }
-        // S0 emits only the three refusal codes above. A new refusal code must
-        // gain its own GiveUpReason variant instead of borrowing PolicyTemporary.
-        _ => unreachable!("S0 restart refusal has no matching GiveUpReason: {refusal:?}"),
-    }
 }
 
 #[cfg(test)]
@@ -523,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_tally_is_safe() {
+    fn single_death_tally_restarts_immediately() {
         let current = death(100, ExitClass::Exited { code: 1 });
         let req = request(current.clone());
         let ctx = RestartContext {

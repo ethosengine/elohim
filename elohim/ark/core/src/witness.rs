@@ -133,14 +133,14 @@ mod tests {
     use super::*;
     use crate::{
         EffectiveTier, ExitClass, Intent, IntentAction, Passport, ProcessPassport, ProcessSample,
-        RestartVerdict,
+        RestartVerdict, PASSPORT_KIND,
     };
     use elohim_compute::{LimitOwner, Refusal};
 
     fn passport() -> Passport {
         Passport {
             schema: 1,
-            kind: "runtime-passport".to_string(),
+            kind: PASSPORT_KIND.to_string(),
             manifest: "bafy-manifest".to_string(),
             node: Some("bafy-node".to_string()),
             incarnation: 3,
@@ -214,7 +214,12 @@ mod tests {
     fn witness_cid_changes_when_any_field_changes_and_is_stable_otherwise() {
         let original = witness();
         let original_cid = original.cid().unwrap();
-        assert_eq!(original_cid, original.clone().cid().unwrap());
+        let independently_constructed = witness();
+        assert_eq!(original_cid, independently_constructed.cid().unwrap());
+
+        let decoded: DeathWitness =
+            serde_ipld_dagcbor::from_slice(&original.canonical_bytes().unwrap()).unwrap();
+        assert_eq!(original_cid, decoded.cid().unwrap());
 
         macro_rules! assert_field_changes_cid {
             ($field:ident, $value:expr) => {{
@@ -275,5 +280,18 @@ mod tests {
         assert_ne!(incident.id, Incident::open("conductor", 1_001, 3).id);
         assert_ne!(incident.id, Incident::open("conductor", 1_000, 4).id);
         assert!(incident.is_open());
+    }
+
+    #[test]
+    fn gave_up_incident_is_closed_with_pinned_wire_shape() {
+        let mut closed = Incident::open("conductor", 1_000, 3);
+        closed.closed = Some(IncidentClose::GaveUp {
+            at_epoch_ms: 2_000,
+            reason: GiveUpReason::PolicyTemporary,
+        });
+
+        assert!(!closed.is_open());
+        let json = serde_json::to_value(closed).unwrap();
+        assert!(json["closed"]["gave_up"].is_object());
     }
 }

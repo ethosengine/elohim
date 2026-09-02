@@ -18,10 +18,11 @@ pub mod witness;
 
 // Re-exports are uncommented by the task that creates each type.
 pub use berth::{Berth, PassphraseSource};
+pub use elohim_compute::{LimitOwner, Refusal};
 pub use exit::{classify_readiness_outcome, ExitClass, ReadinessOutcome};
 pub use intent::{Intent, IntentAction};
 pub use manifest::{ArtifactRef, ChildPolicy, Probe, ProcessKind, ProcessSpec, RuntimeManifest};
-pub use passport::{EffectiveTier, Passport, ProcessPassport};
+pub use passport::{EffectiveTier, Passport, ProcessPassport, PASSPORT_KIND};
 pub use ring::RingBuffer;
 pub use sample::ProcessSample;
 pub use sink::{Clock, SinkError, WitnessSink};
