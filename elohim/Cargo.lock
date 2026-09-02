@@ -1146,6 +1146,7 @@ dependencies = [
  "chrono",
  "elohim-ark-core",
  "elohim-epr",
+ "elohim-epr-rea",
  "hex",
  "libc",
  "nix",

@@ -13,6 +13,7 @@ path = "src/lib.rs"
 [dependencies]
 elohim-ark-core = { path = "../core" }
 elohim-epr = { path = "../../epr" }
+elohim-epr-rea = { path = "../../epr-rea" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
@@ -20,7 +21,7 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
-nix = { workspace = true }
+nix = { workspace = true, features = ["user"] }
 libc = { workspace = true }
 
 [dev-dependencies]
