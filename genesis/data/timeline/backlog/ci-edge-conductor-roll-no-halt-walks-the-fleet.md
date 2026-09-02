@@ -152,7 +152,7 @@ storage phase's parallel per-peer posture, or the junit shape.
 
 ## Open, recorded rather than guessed
 
-1. **#1414 archived no `rollout-evidence/**` bundle** — only `build.env` — although its log
+1. **#1414 archived no rollout-evidence bundle at all** — only `build.env` — although its log
    carries both the collector's readiness summary and the `expected artifact:` line, and
    #1413 archived the full set from the same `post { always { archiveArtifacts … } }`. So
    the first-natural-failed-rollout receipt that `task-rollout-evidence-capture.md` is
