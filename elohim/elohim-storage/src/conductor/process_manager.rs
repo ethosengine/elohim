@@ -525,10 +525,7 @@ impl ConductorManager {
                                 "Conductor failed to become ready"
                             );
                             return Err(ConductorError::NotReady {
-                                message: format!(
-                                    "Failed after {} attempts: {}",
-                                    max_retries, e
-                                ),
+                                message: format!("Failed after {} attempts: {}", max_retries, e),
                                 child_alive: true,
                                 last_db_pool_saturation: last_saturation
                                     .map(|s| format!("{}={:.2}", s.kind, s.utilization_ratio)),
