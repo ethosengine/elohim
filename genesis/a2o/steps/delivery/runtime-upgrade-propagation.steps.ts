@@ -135,7 +135,7 @@ const BASELINE_HAPP = (() => {
     REPO_ROOT,
     'genesis/a2o/reports/release-ceremony/2026-09-02/baseline-N/elohim.happ'
   );
-  if (fs.existsSync(preserved)) return preserved;
+  if (existsSync(preserved)) return preserved;
   return path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
 })();
 
