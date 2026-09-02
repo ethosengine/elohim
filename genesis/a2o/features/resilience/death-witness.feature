@@ -76,7 +76,7 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     Given the household mesh is three storage peers: Jessica, Matthew, and James
     And each peer's conductor is running as a child of that peer's envelope
 
-  @wip @station-1
+  @station-1
   Scenario: Station 1 — the envelope that held the pipes witnesses the death
     When Jessica's conductor is killed with SIGKILL
     Then within 10 seconds Jessica's peer lists a death witness for a new incident
