@@ -1624,8 +1624,14 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
         matthewUrl,
         '--soak-secs',
         String(SOAK_SECS),
+        // A revert needs nothing but the ceremony saying so (this station's
+        // title): the manifest's own adoption discipline declares threshold 0,
+        // because nobody attests a release the fleet is being asked to LEAVE —
+        // r7 (2026-09-02) packaged it at the forward threshold (1) and every
+        // peer refused `threshold_unmet` (0 of 1) forever. The lineage
+        // envelope (appliesTo bound to the live passport) is the safety here.
         '--attestation-threshold',
-        String(ATTESTATION_THRESHOLD),
+        '0',
         '--canary',
         CANARY_PEER,
         '--peer',
