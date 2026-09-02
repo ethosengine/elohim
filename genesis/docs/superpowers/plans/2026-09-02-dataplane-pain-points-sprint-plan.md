@@ -293,7 +293,7 @@ for this id they agree and the bytes pointer drifted.
 
 **Captured, not absorbed:** the conductor timeouts themselves (`deadline has elapsed`,
 websocket timeout) are the head-plane program's L1 batched-externs problem, and at probe time
-both doorways' `/db/content/{id}/head-record` answered with an OPEN circuit breaker. T6 makes
+both doorways' `/db/content/{id}/head-record` answered `catching-up` (`cause: upstream`, `errorStreak: 2`, circuit still closed) — the conductor behind each doorway is failing the read. T6 makes
 the election survive that regime; it does not cure it.
 
 ## Decisions that were wrongly listed as the operator's (corrected 2026-09-02)
