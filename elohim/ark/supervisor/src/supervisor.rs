@@ -72,6 +72,12 @@ const TCP_CONNECT_TIMEOUT: Duration = Duration::from_millis(200);
 /// The readers are NOT joined: a child that forked a grandchild holding the write end would
 /// keep the pipe open, and an unbounded join would hang the supervision of a dead process.
 const PIPE_DRAIN_GRACE: Duration = Duration::from_millis(50);
+/// Deadline used where a declared duration is too large for the monotonic clock to hold.
+///
+/// An hour rather than "forever": a manifest that declares an unrepresentable patience or
+/// backoff has declared an error, and the loop's job is to keep supervising rather than to
+/// honour the number or to die on it.
+const OVERFLOW_DEADLINE: Duration = Duration::from_secs(3_600);
 /// Band edge, as a percentage of the intensity ceiling, carried on the declared bound.
 const INTENSITY_THRESHOLD_PCT: f64 = 80.0;
 /// Directory and file modes for everything this loop creates.
@@ -269,6 +275,14 @@ impl Supervisor {
 
     /// Supervises every declared process until each one stops, gives up, or is stopped.
     pub fn run(mut self) -> Result<RunOutcome, SupervisorError> {
+        // Claims this process's orphaned descendants, so a conductor's grandchildren are
+        // re-parented HERE rather than to pid 1 and lost. It does not reap them: an adopted
+        // orphan stays a zombie for the life of the run, because the only thing that would
+        // harvest it is a blind `waitpid(-1)` — and a blind wait would consume a SUPERVISED
+        // child's status ahead of `reap_with_rusage`, destroying the rusage its witness is
+        // made of. The orphan reaper this gap needs filters by supervised pid, so that it can
+        // harvest what nobody is waiting on and touch nothing that is being witnessed; that
+        // is S1 work.
         become_subreaper().map_err(SupervisorError::Subreaper)?;
 
         let incarnation = self.bump_incarnation()?;
@@ -323,11 +337,17 @@ impl Supervisor {
                 thread::Builder::new()
                     .name(format!("ark-{name}"))
                     .spawn(move || {
+                        // Armed for the whole of `supervise`, including the unwind: a thread
+                        // that panics leaves its child's state unknown, and `run` would
+                        // otherwise block forever joining siblings nobody has asked to stop.
+                        let mut guard = PanicGuard::new(shutdown);
                         let outcome = worker.supervise();
-                        if outcome.is_err() {
-                            // One child that cannot be supervised ends the run: the manifest
-                            // is a whole, and half a runtime is not a smaller success.
-                            shutdown.store(true, Ordering::SeqCst);
+                        // One child that cannot be supervised ends the run: the manifest is a
+                        // whole, and half a runtime is not a smaller success. A clean return
+                        // disarms the guard — `GaveUp` is a decision, not a failure, and it
+                        // leaves the siblings running.
+                        if outcome.is_ok() {
+                            guard.disarm();
                         }
                         outcome.map(|()| worker.gave_up)
                     })
@@ -411,6 +431,50 @@ impl Supervisor {
 enum Flow {
     Continue,
     Exit,
+}
+
+/// Raises the shutdown flag unless it is disarmed, including when its thread unwinds.
+///
+/// A supervision thread that panics leaves its child's state unknown, and the manifest is a
+/// whole: siblings still running under an unknown half are worse than a runtime that stopped.
+/// Without this, `run` would block forever joining siblings nobody had asked to stop.
+struct PanicGuard {
+    shutdown: Arc<AtomicBool>,
+    armed: bool,
+}
+
+impl PanicGuard {
+    fn new(shutdown: Arc<AtomicBool>) -> Self {
+        Self {
+            shutdown,
+            armed: true,
+        }
+    }
+
+    /// The clean-exit path: a thread that returned — `GaveUp` included — leaves siblings alone.
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for PanicGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            self.shutdown.store(true, Ordering::SeqCst);
+        }
+    }
+}
+
+/// A deadline `after` from now, clamped rather than panicking.
+///
+/// `Instant + Duration` panics on overflow, and every duration reaching this function is
+/// manifest-declared (`patience_ms`, backoff seconds). A number somebody wrote in a JSON file
+/// must never be able to kill the loop whose whole job is to witness deaths.
+fn deadline_after(after: Duration) -> Instant {
+    let now = Instant::now();
+    now.checked_add(after)
+        .or_else(|| now.checked_add(OVERFLOW_DEADLINE))
+        .unwrap_or(now)
 }
 
 /// A child that is currently running, with the taps reading its output.
@@ -541,13 +605,18 @@ impl Worker {
                 *patience_ms
             }
         });
-        let deadline = Instant::now() + patience;
+        let deadline = deadline_after(patience);
 
         loop {
-            if let Some(event) = self.shutdown_event() {
+            // Death BEFORE shutdown, always. A child that died while this thread slept is
+            // dead however the flag now stands, and reading the flag first would launder that
+            // death into a clean stop: no witness on disk, no verdict, and an incident closed
+            // as if the ark had meant it. A stop we asked for can wait one more poll; a death
+            // nobody witnessed is gone.
+            if let Some(event) = self.check_death(pid)? {
                 return Ok(Some(event));
             }
-            if let Some(event) = self.check_death(pid)? {
+            if let Some(event) = self.shutdown_event() {
                 return Ok(Some(event));
             }
             if self.probe_satisfied(&probe) {
@@ -563,10 +632,12 @@ impl Worker {
     /// Watches a running child for its death or for a shutdown request.
     fn poll_live(&mut self, pid: u32) -> Result<Option<Event>, SupervisorError> {
         loop {
-            if let Some(event) = self.shutdown_event() {
+            // Death before shutdown, for the reason `poll_booting` states: the flag is a
+            // request, the death already happened, and only one of the two can be lost.
+            if let Some(event) = self.check_death(pid)? {
                 return Ok(Some(event));
             }
-            if let Some(event) = self.check_death(pid)? {
+            if let Some(event) = self.shutdown_event() {
                 return Ok(Some(event));
             }
             thread::sleep(LIVE_POLL);
@@ -699,6 +770,8 @@ impl Worker {
         match action {
             Action::RecordIntent(action) => self.record_intent(action)?,
             Action::Spawn => {
+                // A refusal propagates: a child that never started is a supervision failure,
+                // not a death (see `spawn`).
                 let pid = self.spawn()?;
                 events.push_back(Event::Spawned { pid });
             }
@@ -782,6 +855,13 @@ impl Worker {
     }
 
     /// Starts the child, taps its output, and records what was actually executed.
+    ///
+    /// A driver refusal — at the first spawn or at a restart — is a supervision FAILURE and
+    /// leaves as an `Err`, never as a death. Nothing ran, so there is no exit status to
+    /// classify, no rusage to account, and no witness to write; calling it a death would put a
+    /// fabricated exit in the spool. Judging a refusal the way a crash is judged (a restart
+    /// policy that can give up on a child whose artifact has gone missing) needs `ExitClass` to
+    /// grow a never-started `SpawnFailed { errno }` variant, which is S1 work.
     fn spawn(&mut self) -> Result<u32, SupervisorError> {
         let started = self
             .driver
@@ -988,8 +1068,14 @@ impl Worker {
     }
 
     /// Waits out a backoff, waking early when a shutdown is requested.
+    ///
+    /// Waking early does NOT cancel the spawn that follows. `step` emits `SleepThen` and
+    /// `Spawn` as one batch, so a shutdown raised during a backoff spawns the child once and
+    /// then stops it on the next poll — one short-lived child, correctly witnessed, rather than
+    /// a loop that silently drops an action the pure machine already decided. Cancelling a
+    /// batch mid-flight requires the machine to learn a cancellation event, which is S1 work.
     fn sleep_then(&self, seconds: u64) {
-        let deadline = Instant::now() + Duration::from_secs(seconds);
+        let deadline = deadline_after(Duration::from_secs(seconds));
         while Instant::now() < deadline {
             if self.shutdown.load(Ordering::SeqCst) {
                 return;
@@ -1172,6 +1258,64 @@ mod tests {
         assert_eq!(
             merged.io_read_bytes, None,
             "a measurement nobody read stays absent"
+        );
+    }
+
+    #[test]
+    fn a_declared_duration_no_instant_can_hold_is_clamped_rather_than_fatal() {
+        // The shape a manifest can actually produce: a backoff declared as u64::MAX seconds,
+        // which no monotonic `Instant` can name. Before this clamp it panicked the loop whose
+        // whole job is to witness deaths.
+        let before = Instant::now();
+        let clamped = deadline_after(Duration::from_secs(u64::MAX));
+        assert!(clamped > before, "the clamp is still a future deadline");
+        assert!(
+            clamped <= Instant::now() + OVERFLOW_DEADLINE,
+            "an unrepresentable backoff falls back to the hour, not to forever"
+        );
+
+        // `patience_ms` of u64::MAX IS representable (some 584 million years), so it is
+        // honoured rather than clamped: an absurd budget is a rung that never times out, and
+        // the loop still leaves it on the child's death or on a shutdown.
+        assert!(
+            deadline_after(Duration::from_millis(u64::MAX)) > Instant::now() + OVERFLOW_DEADLINE
+        );
+    }
+
+    #[test]
+    fn a_representable_duration_is_honoured_exactly() {
+        let now = Instant::now();
+        let deadline = deadline_after(Duration::from_secs(10));
+        assert!(deadline >= now + Duration::from_secs(10));
+        assert!(
+            deadline < now + OVERFLOW_DEADLINE,
+            "nothing clamps a real budget"
+        );
+    }
+
+    #[test]
+    fn a_panicking_supervision_thread_raises_the_shutdown_flag() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let unwound = Arc::clone(&flag);
+        // A panic on the thread is the only way this guard is ever left armed in production.
+        let _ = thread::spawn(move || {
+            let _guard = PanicGuard::new(unwound);
+            panic!("supervision of a child panicked");
+        })
+        .join();
+        assert!(
+            flag.load(Ordering::SeqCst),
+            "siblings must be asked to stop"
+        );
+
+        let clean = Arc::new(AtomicBool::new(false));
+        {
+            let mut guard = PanicGuard::new(Arc::clone(&clean));
+            guard.disarm();
+        }
+        assert!(
+            !clean.load(Ordering::SeqCst),
+            "a clean return — GaveUp included — leaves the siblings running"
         );
     }
 

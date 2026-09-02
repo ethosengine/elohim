@@ -9,7 +9,11 @@
 //! Timing is deliberate rather than incidental. The flapper's backoff is two seconds so that
 //! its third death — and therefore the run's last verdict — is reliably LATER than the
 //! sigkilled child's single restart verdict, which the test waits for explicitly before it
-//! waits for the give-up. Both tests together stay well inside the plan's fifteen seconds.
+//! waits for the give-up. Every test here stays well inside the plan's fifteen seconds.
+//!
+//! Two of these tests are about what the loop must NOT do: it must not let a shutdown request
+//! swallow a death that already happened, and it must not leave siblings running when the
+//! thread supervising one child stops existing.
 
 use std::{
     collections::BTreeMap,
@@ -26,9 +30,10 @@ use ark_core::{
         RuntimeManifest, Shutdown,
     },
     ExitClass, GiveUpReason, Incident, IncidentClose, Intent, IntentAction, Passport,
-    RestartVerdict, RuntimeScope, WitnessSink, UNIT_PROCESS_MS,
+    ProcessSample, RestartVerdict, RuntimeScope, WitnessSink, UNIT_PROCESS_MS,
 };
 use ark_supervisor::{
+    driver::{Driver, DriverError, Fingerprint, Started},
     native::{sha256_file, NativeDriver},
     reaper::wait_nowait,
     spool::{Spool, WitnessSummary},
@@ -91,16 +96,55 @@ fn berth_for(manifest: &RuntimeManifest, data_root: PathBuf, processes: &[&str])
 }
 
 fn supervisor_for(manifest: &RuntimeManifest, berth: &Berth) -> Supervisor {
+    supervisor_with_driver(manifest, berth, Box::new(NativeDriver))
+}
+
+fn supervisor_with_driver(
+    manifest: &RuntimeManifest,
+    berth: &Berth,
+    driver: Box<dyn Driver>,
+) -> Supervisor {
     let scope = Supervisor::scope_for(manifest, berth).unwrap();
     let spool = Spool::open(&berth.data_root, scope).unwrap();
     Supervisor::new(
         manifest.clone(),
         berth.clone(),
-        Box::new(NativeDriver),
+        driver,
         Box::new(spool),
         Box::new(SystemClock),
     )
     .unwrap()
+}
+
+/// Starts every declared child except one, which it panics on part-way through the run.
+///
+/// The sleep is what makes the failure a panic MID-RUN rather than a race at startup: the
+/// sibling is spawned, ready, and being polled by the time this thread stops existing.
+struct PanickingDriver {
+    inner: NativeDriver,
+    panic_on: String,
+}
+
+impl Driver for PanickingDriver {
+    fn fingerprint(&self) -> Fingerprint {
+        self.inner.fingerprint()
+    }
+
+    fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError> {
+        if spec.name == self.panic_on {
+            thread::sleep(Duration::from_millis(500));
+            panic!("driver panicked starting {}", spec.name);
+        }
+        self.inner.start(spec, berth)
+    }
+
+    fn signal(&self, pid: u32, signal: i32) -> Result<(), DriverError> {
+        self.inner.signal(pid, signal)
+    }
+
+    fn stats(&self, pid: u32) -> Option<ProcessSample> {
+        self.inner.stats(pid)
+    }
 }
 
 /// A second handle on the same spool, for reading what the running supervisor writes.
@@ -385,8 +429,8 @@ fn a_sigkilled_child_leaves_a_witness_then_restarts_then_gives_up_on_same_cause(
         let state = resource_state(&event.resource, &events);
         assert_eq!(state.event_count, 1, "each witness is its own resource");
         assert!(
-            state.total(ReaVerb::Consume, UNIT_PROCESS_MS) >= 0.0,
-            "a death event carries process-ms"
+            state.total(ReaVerb::Consume, UNIT_PROCESS_MS) > 0.0,
+            "a death event carries the process-ms it actually consumed"
         );
         consumed += state.event_count;
     }
@@ -458,6 +502,162 @@ fn shutdown_sends_policy_signal_then_kills_after_grace() {
 
     // A stop is not a death: nothing was witnessed, and the incident closed as stopped.
     assert!(witnesses_of(&spool, "stubborn").is_empty());
+}
+
+#[test]
+fn a_death_during_the_poll_sleep_is_witnessed_and_never_laundered_into_a_stop() {
+    let data_root = tempfile::tempdir().unwrap();
+    // One same-cause death is enough to give up, so the run ends ON the death rather than on a
+    // restart the raised flag would then stop — which would close the incident as `Stopped`
+    // for an honest reason and hide the dishonest one this test is about.
+    let mut policy = policy(0, 300);
+    policy.same_cause_limit = 1;
+    let manifest = RuntimeManifest {
+        processes: vec![child(
+            "child",
+            "echo booted; exec sleep 300",
+            vec![Probe::StdoutLine {
+                contains: "booted".to_string(),
+                patience_ms: 5_000,
+            }],
+            policy,
+        )],
+        ..RuntimeManifest::default()
+    };
+    let berth = berth_for(&manifest, data_root.path().into(), &["child"]);
+    let spool = reader(&berth, &manifest);
+
+    let supervisor = supervisor_for(&manifest, &berth);
+    let shutdown = supervisor.shutdown_flag();
+    let running = thread::spawn(move || supervisor.run());
+
+    let pid = wait_until("the child to become ready", Duration::from_secs(10), || {
+        ready_pid(&spool, "child")
+    });
+
+    // Both happen inside one poll interval, so the loop wakes owing two answers at once: a
+    // child that is already dead, and a flag that says stop. The death is the one that cannot
+    // be recovered later, so the death is the one that must be read first.
+    sigkill(pid);
+    shutdown.store(true, Ordering::SeqCst);
+
+    let outcome = running
+        .join()
+        .expect("the supervisor thread panicked")
+        .expect("the supervisor returned an error");
+
+    let witnesses = witnesses_of(&spool, "child");
+    assert!(
+        !witnesses.is_empty(),
+        "the SIGKILL was laundered into a clean stop: no witness reached the spool"
+    );
+    assert_eq!(
+        witnesses[0].exit,
+        ExitClass::Signaled {
+            signal: 9,
+            core_dumped: false
+        },
+        "the witness records the signal that actually killed the child"
+    );
+
+    let incident = wait_until("the child's incident", Duration::from_secs(5), || {
+        incidents_of(&spool, "child").into_iter().next()
+    });
+    assert!(
+        !matches!(incident.closed, Some(IncidentClose::Stopped { .. })),
+        "a death was closed as if the ark had meant it: {:?}",
+        incident.closed
+    );
+    assert!(
+        matches!(incident.closed, Some(IncidentClose::GaveUp { .. })),
+        "the incident closes on the verdict the death earned: {:?}",
+        incident.closed
+    );
+
+    let actions: Vec<_> = intents_of(data_root.path(), "child")
+        .into_iter()
+        .map(|intent| intent.action)
+        .collect();
+    assert!(
+        !actions
+            .iter()
+            .any(|action| matches!(action, IntentAction::Stop { .. })),
+        "nothing was stopped — the child was already dead: {actions:?}"
+    );
+
+    assert_eq!(
+        outcome.exit_code, 3,
+        "the child was permanently abandoned after its death"
+    );
+    assert!(wait_nowait(pid).is_err(), "pid {pid} was left unreaped");
+}
+
+#[test]
+fn a_panicking_supervision_thread_stops_its_siblings_and_fails_the_run() {
+    let data_root = tempfile::tempdir().unwrap();
+    let manifest = RuntimeManifest {
+        processes: vec![
+            child(
+                "sibling",
+                "echo booted; exec sleep 300",
+                vec![Probe::StdoutLine {
+                    contains: "booted".to_string(),
+                    patience_ms: 5_000,
+                }],
+                policy(0, 300),
+            ),
+            child("exploder", "exec sleep 300", Vec::new(), policy(0, 300)),
+        ],
+        ..RuntimeManifest::default()
+    };
+    let berth = berth_for(&manifest, data_root.path().into(), &["sibling", "exploder"]);
+    let spool = reader(&berth, &manifest);
+
+    let supervisor = supervisor_with_driver(
+        &manifest,
+        &berth,
+        Box::new(PanickingDriver {
+            inner: NativeDriver,
+            panic_on: "exploder".to_string(),
+        }),
+    );
+    let running = thread::spawn(move || supervisor.run());
+
+    let pid = wait_until(
+        "the sibling to become ready",
+        Duration::from_secs(10),
+        || ready_pid(&spool, "sibling"),
+    );
+
+    // Without a guard on the unwind this join never returns: the panicked thread asked for
+    // nothing, and the sibling would go on sleeping for its declared three hundred seconds.
+    let error = running
+        .join()
+        .expect("the test's own thread")
+        .expect_err("a run with an unsupervised child is not a success");
+    assert!(
+        matches!(&error, SupervisorError::Panicked { process } if process == "exploder"),
+        "the run names the thread that stopped existing, got {error:?}"
+    );
+
+    let actions: Vec<_> = intents_of(data_root.path(), "sibling")
+        .into_iter()
+        .map(|intent| intent.action)
+        .collect();
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, IntentAction::Stop { .. })),
+        "the sibling was never asked to stop: {actions:?}"
+    );
+    assert!(
+        witnesses_of(&spool, "sibling").is_empty(),
+        "the sibling was stopped, not killed off — a stop is not a death"
+    );
+    assert!(
+        wait_nowait(pid).is_err(),
+        "the sibling {pid} outlived the run that could no longer supervise it"
+    );
 }
 
 #[test]
