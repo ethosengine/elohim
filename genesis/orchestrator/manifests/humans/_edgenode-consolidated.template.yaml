@@ -344,6 +344,20 @@ spec:
             # when enabled; unset/false is behavior-identical to pre-flag.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
+            # Coordinator hot-swap gate — read by the STORAGE process
+            # (happ_manager::coordinator_update_allowed: ALLOW_COORDINATOR_UPDATE,
+            # falling back to ALLOW_DNA_REINSTALL). Both rung 1 (CI COORDSWAP →
+            # POST /admin/coordinators/sync?apply=true) and rung 5 (the
+            # release-adoption controller's coordinator-bundle vehicle) run
+            # here, in external-conductor mode. The conductor split moved
+            # ALLOW_DNA_REINSTALL to the conductor container, so this guard
+            # fell closed on every storage pod (holochain #1414, 2026-09-02:
+            # adam 403 "coordinator hot-swap is not permitted on this node",
+            # rollout 0/7). Same per-env rendering as ALLOW_DNA_REINSTALL:
+            # true for alpha/staging, false for prod (prod = a governance
+            # decision once rung 5 is the delivery path).
+            - name: ALLOW_COORDINATOR_UPDATE
+              value: "ALLOW_DNA_REINSTALL_PLACEHOLDER"
             # Ghost-declaration decay (head_adoption): lets the witness sweeps
             # author a fresh provable head over a declaration whose evidence is
             # POSITIVELY dead — own conductor observed empty this sweep AND the

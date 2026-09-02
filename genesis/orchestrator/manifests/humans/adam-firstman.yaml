@@ -201,7 +201,8 @@ spec:
             # supervisor, which owns retry/reconnect and token re-minting.
             # CONDUCTOR_CONFIG_PATH / CONDUCTOR_DATA_DIR / HAPP_PATH /
             # HAPP_INSTALL_TIMEOUT_SECS / ALLOW_DNA_REINSTALL moved to
-            # adam-firstman-conductor.yaml (they only read in embedded mode).
+            # adam-firstman-conductor.yaml (install-time knobs). The coordinator
+            # hot-swap gate stays HERE as ALLOW_COORDINATOR_UPDATE (below).
             - name: EMBEDDED_CONDUCTOR
               value: "false"
             # Path to the peer-policy mount. Still required: [pool] /
@@ -226,6 +227,14 @@ spec:
             # template's inline comment; adam is a supplier peer, so the
             # both-sides-missing exit needs him on.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
+              value: "true"
+            # Coordinator hot-swap gate — read by the STORAGE process
+            # (happ_manager::coordinator_update_allowed). The conductor split
+            # moved ALLOW_DNA_REINSTALL to adam-firstman-conductor.yaml, so this
+            # guard fell closed here (holochain #1414, 2026-09-02: adam 403
+            # "coordinator hot-swap is not permitted on this node", rollout 0/7).
+            # alpha is non-prod: true, mirroring the conductor's ALLOW_DNA_REINSTALL.
+            - name: ALLOW_COORDINATOR_UPDATE
               value: "true"
             # Ghost-declaration decay — hand-rendered like the gate above (adam
             # is alpha; see the template's inline comment for the evidence
