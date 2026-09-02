@@ -156,11 +156,38 @@ const PERSONAL_MANIFEST_PATH = path.join(
  * candidate — see `coordinator-candidate.ts`).
  */
 function candidateHapp(): string {
-  return mintCoordinatorCandidate(BASELINE_HAPP, REPORT_DIR, RUN_STAMP, CHANNEL_ID).happPath;
+  const minted = mintCoordinatorCandidate(BASELINE_HAPP, REPORT_DIR, RUN_STAMP, CHANNEL_ID);
+  // Recorded once, for station 3/5/6's ground-truth comparisons below — see
+  // `candidateWasmSha256` on `CeremonyState`.
+  ceremony().candidateWasmSha256 ??= minted.coordinatorWasmSha256;
+  return minted.happPath;
 }
 
 const SOAK_SECS = 30;
 const ATTESTATION_THRESHOLD = 1;
+
+/**
+ * 2026-09-02 diagnosis of station 6's `coordinator_lineage_mismatch`: the
+ * elohim-storage release-adoption controller caches "installed reality"
+ * (its own snapshot of what a peer's runtime would report) for
+ * `INSTALLED_REALITY_TTL_SECS` seconds with NO apply-triggered invalidation
+ * (`elohim/elohim-storage/src/services/release_adoption/watch.rs`,
+ * `installed_reality()` — reads through only when
+ * `now - read_at >= INSTALLED_REALITY_TTL_SECS`). A head verified against
+ * this peer within that window of the cache's last refresh is checked
+ * against WHATEVER installed reality happened to be cached then — which can
+ * predate the fleet's own forward apply. Live evidence: the r4 run's
+ * failure declared the release "supersedes coordinator wasm [[candidate]],
+ * which this peer does not run (running: [pre-apply hash])" under a minute
+ * after this same peer's `appliedRelease.cid` had already flipped to that
+ * candidate — the peer's own live `/version` already reported the
+ * candidate; only the controller's cached view, reused for the revert's
+ * verify check, was stale. This file cannot change the controller (Rust,
+ * out of scope here), so `ensureReverted` waits out the TTL (plus a buffer)
+ * before packaging the revert, forcing a fresh read on account of age alone.
+ */
+const INSTALLED_REALITY_TTL_SECS = 300;
+const INSTALLED_REALITY_TTL_BUFFER_SECS = 15;
 
 type PeerName = 'matthew' | 'jessica' | 'james';
 const PEER_NAMES: readonly PeerName[] = ['matthew', 'jessica', 'james'];
@@ -318,6 +345,17 @@ interface CeremonyState {
   channelCreated: boolean;
   candidateBytes?: Buffer;
   candidateSha256: string;
+  /** Coordinator wasm sha256 (post-marker) from the mint itself — see
+   * `coordinator-candidate.ts`'s `MintedCandidate.coordinatorWasmSha256`. */
+  candidateWasmSha256?: string;
+  /**
+   * The candidate's REAL installed lamad coordinatorWasmHashes, read back
+   * from james's `/version` passport right after station 3's canary apply —
+   * the ground truth every later station's passport reads are compared
+   * against (never `appliedRelease.cid` alone, which names the RELEASE
+   * object, not the coordinator wasm the conductor actually swapped in).
+   */
+  candidateWasmHashes?: Record<string, string>;
   releaseCid?: string;
   publishTier?: string;
   stagingConvergedRows: Partial<Record<PeerName, AdoptionChannelRow>>;
@@ -437,6 +475,69 @@ async function readRoles(world: E2EWorld, peer: PeerName): Promise<VersionRole[]
   assert.equal(status, 200, `GET ${VERSION_PATH} on ${peer} returned ${status}`);
   const body = JSON.parse(text) as VersionResponse;
   return body.passport?.happ?.roles ?? [];
+}
+
+function lamadRole(roles: VersionRole[]): VersionRole | undefined {
+  return roles.find(role => role.role === LAMAD_ROLE);
+}
+
+/**
+ * Sorted, deduped hash VALUES out of a `coordinatorWasmHashes` record — the
+ * same normalization `epr-release-package.ts`'s `roleBindingFrom` applies
+ * before writing a manifest's `appliesTo.roles.<role>.coordinatorWasmHashes`
+ * array, so a passport record and a manifest array compare apples-to-apples
+ * regardless of which zome names are present on each side.
+ */
+function wasmHashValues(record: Record<string, string> | undefined): string[] {
+  return [...new Set(Object.values(record ?? {}))].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Poll one peer's `GET /version` passport until its lamad
+ * `coordinatorWasmHashes` match `expected` (compared as sorted, deduped
+ * VALUES via `wasmHashValues` — see that helper's own doc).
+ *
+ * 2026-09-02 diagnosis: `/admin/adoption`'s `appliedRelease.cid` can flip to
+ * the new release's cid BEFORE the conductor's own coordinator hot-swap has
+ * actually landed — an async propagation lag between "the controller decided
+ * to apply" and "the wasm is really running." A single snapshot read taken
+ * right after an `appliedRelease.cid` match can race that lag and observe
+ * the OLD hash, which is exactly what produced station 6's confusing
+ * `coordinator_lineage_mismatch` on matthew: station 5 declared convergence
+ * off `appliedRelease.cid` alone, station 6 packaged (and matthew's own live
+ * read still showed the candidate) but the conductor's REAL installed wasm
+ * had not caught up yet by the time the revert's own verify-time check ran.
+ * Polling — the same "unreachable ≠ absent, keep retrying" discipline as
+ * `pollAdoption` — gives the real swap the time it needs while still failing
+ * loudly (with the last observed value) if it never lands.
+ */
+async function pollLamadWasmHashMatch(
+  world: E2EWorld,
+  peer: PeerName,
+  expected: Record<string, string> | undefined,
+  timeoutMs: number,
+  intervalMs = 5_000
+): Promise<{ observed: Record<string, string> | undefined; elapsedMs: number }> {
+  const start = Date.now();
+  const expectedValues = wasmHashValues(expected);
+  let lastObserved: Record<string, string> | undefined;
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const roles = await readRoles(world, peer);
+      lastObserved = lamadRole(roles)?.coordinatorWasmHashes;
+      if (JSON.stringify(wasmHashValues(lastObserved)) === JSON.stringify(expectedValues)) {
+        return { observed: lastObserved, elapsedMs: Date.now() - start };
+      }
+    } catch {
+      // Transient unreachability — retry, never conclude mismatch from it.
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+  }
+  assert.fail(
+    `${peer}'s /version passport never converged on the expected lamad coordinatorWasmHashes within ` +
+      `${timeoutMs}ms (expected ${JSON.stringify(expected)}, last observed ${JSON.stringify(lastObserved)})`
+  );
+  throw new Error('unreachable');
 }
 
 async function readBlobTotal(world: E2EWorld, peer: PeerName): Promise<number> {
@@ -949,6 +1050,24 @@ async function ensureCanaryApplied(world: E2EWorld): Promise<void> {
   );
   c.canaryAppliedMs = Date.now() - start;
   c.jamesAfter = { pid: readPid('james'), roles: await readRoles(world, 'james') };
+
+  // Ground truth for every later station's convergence check: james's own
+  // `/version` passport, read immediately after his controller reported
+  // `appliedRelease.cid === c.releaseCid` — never `appliedRelease.cid` alone,
+  // which names the RELEASE object, not the coordinator wasm the conductor
+  // actually swapped in.
+  c.candidateWasmHashes = lamadRole(c.jamesAfter.roles)?.coordinatorWasmHashes;
+  // eslint-disable-next-line no-console
+  console.log(
+    `[station3] james applied release ${c.releaseCid}: lamad coordinatorWasmHashes=` +
+      `${JSON.stringify(c.candidateWasmHashes)} (mint sha256: happ=${c.candidateSha256}, ` +
+      `coordinator-wasm=${c.candidateWasmSha256})`
+  );
+  assert.ok(
+    c.candidateWasmHashes && Object.keys(c.candidateWasmHashes).length > 0,
+    `james's /version passport reports no lamad coordinatorWasmHashes after the canary apply — ` +
+      `nothing to compare later stations' convergence against`
+  );
 }
 
 async function ensureAttested(world: E2EWorld): Promise<void> {
@@ -1018,6 +1137,30 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
     );
     const snapshot = before.get(peer);
     assert.ok(snapshot, `no before-snapshot captured for ${peer}`);
+
+    // STRENGTHENED convergence check (2026-09-02 diagnosis): `appliedRelease.cid`
+    // names the RELEASE object this peer's controller believes it applied —
+    // it does NOT, by itself, prove the conductor's coordinator wasm actually
+    // hot-swapped, and the two can be observed apart (an async propagation
+    // lag — see `pollLamadWasmHashMatch`'s own doc). POLL the peer's own
+    // `/version` passport (bounded, not a single racy snapshot) until it
+    // matches the ground truth station 3 established from james's
+    // post-apply passport — never compare against `c.releaseCid`, a
+    // different namespace (a release object's cid) entirely.
+    const { observed: observedHashes, elapsedMs: wasmConvergeMs } = await pollLamadWasmHashMatch(
+      world,
+      peer,
+      c.candidateWasmHashes,
+      120_000
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station5] ${peer}: appliedRelease.cid=${row.appliedRelease?.cid} lamad ` +
+        `coordinatorWasmHashes=${JSON.stringify(observedHashes)} (candidate: ` +
+        `${JSON.stringify(c.candidateWasmHashes)}) — matched after ${wasmConvergeMs}ms of ` +
+        `passport polling past the appliedRelease.cid match`
+    );
+
     c.fleetRows[peer] = {
       row,
       pidBefore: snapshot.pid,
@@ -1044,9 +1187,23 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
 // current fleet reality," not the reality that held before the fix shipped.
 // ---------------------------------------------------------------------------
 
+/** The one field of a release manifest this file reads back for verification. */
+interface RevertManifestRoleBinding {
+  coordinatorWasmHashes?: string[];
+}
+interface RevertManifestFile {
+  appliesTo?: { roles?: Record<string, RevertManifestRoleBinding> };
+}
+
 async function ensureReverted(world: E2EWorld): Promise<void> {
   const c = ceremony();
-  await ensurePromoted(world);
+  // Depend on the FULL station-5 chain (fleet convergence), not just
+  // promotion (station 4) — 2026-09-02 diagnosis: this used to call only
+  // `ensurePromoted`, so a standalone run of this station (or any future
+  // reordering) could package the revert target BEFORE the fleet's
+  // controllers had actually converged their conductors onto the candidate,
+  // authoring a revert manifest whose "supersedes" hash no peer runs yet.
+  await ensureFleetConverged(world);
   if (c.revertConvergeMs !== undefined) return;
 
   // Honest before-state, read the same way every other station reads it —
@@ -1058,11 +1215,48 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
   }
 
   if (!c.priorReleaseCid) {
+    // Wait out the release-adoption controller's installed-reality cache TTL
+    // (see the `INSTALLED_REALITY_TTL_SECS` doc above) BEFORE packaging or
+    // publishing the revert — every peer's fleet-convergence apply just
+    // completed, and that same event is what the controller's cache may
+    // still be stale about for up to `INSTALLED_REALITY_TTL_SECS` more
+    // seconds. This is the actual fix for the 2026-09-02 diagnosis: without
+    // it, the revert's verify check can run inside that window and see
+    // pre-apply "installed reality" even though every peer's live /version
+    // (confirmed by the polls above and below) already shows the candidate.
+    const ttlWaitMs = (INSTALLED_REALITY_TTL_SECS + INSTALLED_REALITY_TTL_BUFFER_SECS) * 1000;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station6] waiting ${ttlWaitMs}ms for the release-adoption controller's installed-reality ` +
+        `cache (TTL ${INSTALLED_REALITY_TTL_SECS}s) to age out before packaging/publishing the revert`
+    );
+    await new Promise<void>(resolve => setTimeout(resolve, ttlWaitMs));
+
     assert.ok(
       existsSync(BASELINE_HAPP),
       `revert-target (pre-fix) bundle missing: ${BASELINE_HAPP}`
     );
     const matthewUrl = peerUrl(world, 'matthew');
+
+    // Confirm (poll, not a single racy snapshot — station 5's own
+    // convergence check can pass while the real hot-swap is still landing;
+    // see `pollLamadWasmHashMatch`'s doc) matthew's LIVE lamad
+    // coordinatorWasmHashes immediately before packaging — `--applies-to-from`
+    // below reads the identical `GET /version` endpoint inside
+    // epr-release-package.ts, so this (a) proves what ground truth was
+    // available AT THAT MOMENT and (b) fails fast, with a clear message,
+    // instead of a confusing multi-minute `coordinator_lineage_mismatch`
+    // timeout later if matthew never actually lands on the candidate.
+    const { observed: matthewLamadBeforePackaging, elapsedMs: matthewWasmConvergeMs } =
+      await pollLamadWasmHashMatch(world, 'matthew', c.candidateWasmHashes, 60_000);
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station6] matthew's live lamad coordinatorWasmHashes read immediately before packaging the ` +
+        `revert manifest: ${JSON.stringify(matthewLamadBeforePackaging)} (candidate established in ` +
+        `station 3/5: ${JSON.stringify(c.candidateWasmHashes)}; matched after an additional ` +
+        `${matthewWasmConvergeMs}ms of polling)`
+    );
+
     const packaged = runDriver(
       'scripts/epr-release-package.ts',
       [
@@ -1097,6 +1291,27 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
     assert.ok(
       existsSync(REVERT_MANIFEST_PATH),
       `revert manifest was not written to ${REVERT_MANIFEST_PATH}`
+    );
+
+    // Read the manifest back and compare against both reads above — proves
+    // (or disproves) that `--applies-to-from` captured the SAME ground truth
+    // this function just observed matthew running, one call earlier.
+    const revertManifest = JSON.parse(
+      readFileSync(REVERT_MANIFEST_PATH, 'utf8')
+    ) as RevertManifestFile;
+    const manifestLamadHashes =
+      revertManifest.appliesTo?.roles?.[LAMAD_ROLE]?.coordinatorWasmHashes;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station6] revert manifest ${REVERT_MANIFEST_PATH} appliesTo.roles.${LAMAD_ROLE}.` +
+        `coordinatorWasmHashes=${JSON.stringify(manifestLamadHashes)}`
+    );
+    assert.deepEqual(
+      manifestLamadHashes ? [...manifestLamadHashes].sort((a, b) => a.localeCompare(b)) : [],
+      wasmHashValues(c.candidateWasmHashes),
+      `revert manifest declares supersedes=${JSON.stringify(manifestLamadHashes)}, which does not match ` +
+        `the candidate hash established in station 3/5 (${JSON.stringify(c.candidateWasmHashes)}) — ` +
+        `packaging did not capture the same ground truth this function just read from matthew`
     );
 
     const baselineBytes = readFileSync(BASELINE_HAPP);
@@ -1667,7 +1882,11 @@ Given(
 
 When(
   "each household peer's runtime next resolves the commons channel",
-  { timeout: 260_000 },
+  // 400_000 (was 260_000): the 2026-09-02 strengthened check adds a bounded
+  // `pollLamadWasmHashMatch` per peer on top of the existing `pollAdoption`
+  // poll — more real work per peer, so more ceiling, even though the
+  // success-path duration is typically far below either ceiling.
+  { timeout: 400_000 },
   async function (this: E2EWorld) {
     await ensureFleetConverged(this);
   }
@@ -1750,7 +1969,13 @@ Given(
 
 When(
   'matthew runs the revert ceremony, re-declaring the prior release the earned head of channel {string}',
-  { timeout: 400_000 },
+  // 600_000 (was 400_000): `ensureReverted` now deliberately waits out the
+  // release-adoption controller's installed-reality cache TTL
+  // (`INSTALLED_REALITY_TTL_SECS` = 300s + a 15s buffer) before packaging
+  // the revert — see that constant's doc — on top of the packaging, the
+  // revert driver call, and the post-revert convergence poll this step
+  // already budgeted for.
+  { timeout: 600_000 },
   async function (this: E2EWorld, channelName: string) {
     assert.equal(
       channelName,
@@ -1838,7 +2063,9 @@ Then(
 
 Given(
   'matthew has run the ceremony that staged, promoted, and reverted a release on the commons channel',
-  { timeout: 400_000 },
+  // 600_000: matches station 6's own "When" — this is `ensureReverted`'s
+  // first call if station 6's scenario did not already run it.
+  { timeout: 600_000 },
   async function (this: E2EWorld) {
     await ensureReverted(this);
   }
@@ -1846,7 +2073,7 @@ Given(
 
 Given(
   "james's runtime reported on both of its channels at each of those three moments, as they happened",
-  { timeout: 400_000 },
+  { timeout: 600_000 },
   async function (this: E2EWorld) {
     // Every real recording already happened INSIDE `ensureStagingConvergedAll`
     // / `ensureFleetConverged` / `ensureReverted`, at the moment each station
@@ -1990,7 +2217,7 @@ Then(
 
 Given(
   "james's personal channel ran alongside that ceremony the entire time",
-  { timeout: 400_000 },
+  { timeout: 600_000 },
   async function (this: E2EWorld) {
     // Recorded already, inside `ensureStagingConvergedAll` / `ensureFleetConverged`
     // / `ensureReverted` — the personal channel was published from Background,

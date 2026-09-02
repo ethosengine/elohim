@@ -75,6 +75,17 @@ export interface MintedCandidate {
   happPath: string;
   /** sha256 (hex) of the packed bundle's bytes — for the blob PUT. */
   sha256: string;
+  /**
+   * sha256 (hex) of the coordinator wasm bytes ALONE (post-marker) — the
+   * piece whose Holochain `WasmHash` (`uhCok…`) the conductor actually
+   * hot-swaps on. This is NOT the same value the conductor reports (Holochain
+   * computes `WasmHash` via its own blake2b + holo-hash encoding, not a bare
+   * sha256), so a caller that needs ground truth for "is the conductor
+   * actually running this candidate" must read it back from a peer's
+   * `GET /version` passport AFTER an apply — this field only proves the
+   * MINT step itself produced fresh, non-cached bytes for this run.
+   */
+  coordinatorWasmSha256: string;
 }
 
 /** Memoized per-process — every scenario in one run shares the same candidate. */
@@ -202,10 +213,23 @@ export function mintCoordinatorCandidate(
   mkdirSync(scratchDir, { recursive: true });
 
   const { integrityWasm, coordinatorWasm } = extractInstalledLamadZomes(baselineHapp, scratchDir);
+  const baseCoordinatorSha256 = createHash('sha256').update(coordinatorWasm).digest('hex');
   const markedCoordinatorWasm = appendCustomSection(
     coordinatorWasm,
     MARKER_SECTION_NAME,
     Buffer.from(markerPayload, 'utf8')
+  );
+  const coordinatorWasmSha256 = createHash('sha256').update(markedCoordinatorWasm).digest('hex');
+  // Evidence for the "two consecutive mints, different channel ids, give
+  // different sha256" check the 2026-09-02 diagnosis asked for — a run's log
+  // alone proves whether THIS run's mint produced fresh bytes; comparing this
+  // line across two runs' logs (or the `candidate-<runStamp>/` scratch dirs
+  // on disk) proves it across runs.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[coordinator-candidate] run ${runStamp}: base coordinator wasm sha256=${baseCoordinatorSha256}, ` +
+      `marker section "${MARKER_SECTION_NAME}" payload="${markerPayload}", ` +
+      `marked coordinator wasm sha256=${coordinatorWasmSha256}`
   );
 
   const happDir = packCandidateLamadDna(scratchDir, integrityWasm, markedCoordinatorWasm);
@@ -216,6 +240,10 @@ export function mintCoordinatorCandidate(
 
   const bytes = readFileSync(candidateHappPath);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  cached = { happPath: candidateHappPath, sha256 };
+  // eslint-disable-next-line no-console
+  console.log(
+    `[coordinator-candidate] run ${runStamp}: packed candidate .happ=${candidateHappPath} sha256=${sha256}`
+  );
+  cached = { happPath: candidateHappPath, sha256, coordinatorWasmSha256 };
   return cached;
 }
