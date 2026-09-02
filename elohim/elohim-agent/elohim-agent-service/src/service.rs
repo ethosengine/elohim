@@ -159,7 +159,10 @@ impl ElohimAgentService {
     }
 
     /// Register capabilities this service can handle.
-    pub async fn register_capabilities(&self, capabilities: impl IntoIterator<Item = ElohimCapability>) {
+    pub async fn register_capabilities(
+        &self,
+        capabilities: impl IntoIterator<Item = ElohimCapability>,
+    ) {
         self.capabilities.register_all(capabilities).await;
     }
 
@@ -295,8 +298,7 @@ impl ElohimAgentService {
                 Ok(Arc::new(backend))
             }
             "openai" => {
-                let backend =
-                    crate::backend::OpenAiBackend::openai("gpt-4o", &creds.api_key);
+                let backend = crate::backend::OpenAiBackend::openai("gpt-4o", &creds.api_key);
                 info!("Created ephemeral OpenAI backend for BYOK request");
                 Ok(Arc::new(backend))
             }
@@ -375,10 +377,7 @@ impl ElohimAgentService {
     fn build_capability_prompt(&self, request: &ElohimRequest) -> String {
         let mut prompt = String::new();
 
-        prompt.push_str(&format!(
-            "Execute capability: {:?}\n\n",
-            request.capability
-        ));
+        prompt.push_str(&format!("Execute capability: {:?}\n\n", request.capability));
         prompt.push_str(&format!(
             "Description: {}\n\n",
             request.capability.description()
@@ -396,7 +395,8 @@ impl ElohimAgentService {
             prompt.push_str(&format!("Query: {}\n\n", query));
         }
 
-        prompt.push_str("Respond with a JSON object containing your analysis and recommendations.\n");
+        prompt
+            .push_str("Respond with a JSON object containing your analysis and recommendations.\n");
 
         prompt
     }
@@ -421,9 +421,7 @@ impl ElohimAgentService {
                 let human_hash = payload
                     .get("humanActionHash")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ServiceError::BadRequest("missing humanActionHash".into())
-                    })?;
+                    .ok_or_else(|| ServiceError::BadRequest("missing humanActionHash".into()))?;
                 let is_defender = self
                     .defender_role_marker
                     .as_ref()
@@ -494,7 +492,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_initialization() {
-        let backend = Arc::new(MockBackend::default().with_response(r#"{"safe": true, "recommendation": "Content is safe"}"#));
+        let backend = Arc::new(
+            MockBackend::default()
+                .with_response(r#"{"safe": true, "recommendation": "Content is safe"}"#),
+        );
         let service = ElohimAgentService::new(vec![backend]);
 
         assert!(!service.is_initialized().await);

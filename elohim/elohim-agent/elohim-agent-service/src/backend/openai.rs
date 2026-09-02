@@ -185,16 +185,17 @@ impl LlmBackend for OpenAiBackend {
             });
         }
 
-        let response_format = request.response_format.as_ref().map(|rf| {
-            ResponseFormatRequest {
+        let response_format = request
+            .response_format
+            .as_ref()
+            .map(|rf| ResponseFormatRequest {
                 format_type: match rf.format_type {
                     ResponseFormatType::Json => "json_object",
                     ResponseFormatType::JsonSchema => "json_object",
                     ResponseFormatType::Text => "text",
                 }
                 .to_string(),
-            }
-        });
+            });
 
         let chat_request = ChatRequest {
             model: self.model.clone(),
@@ -223,7 +224,9 @@ impl LlmBackend for OpenAiBackend {
             let body = response.text().await.unwrap_or_default();
 
             if status.as_u16() == 429 {
-                return Err(LlmError::RateLimited { retry_after_ms: None });
+                return Err(LlmError::RateLimited {
+                    retry_after_ms: None,
+                });
             }
 
             return Err(LlmError::RequestFailed(format!(
@@ -243,10 +246,7 @@ impl LlmBackend for OpenAiBackend {
             .next()
             .ok_or_else(|| LlmError::ParseError("No choices in response".to_string()))?;
 
-        let content = choice
-            .message
-            .content
-            .unwrap_or_default();
+        let content = choice.message.content.unwrap_or_default();
 
         let finish_reason = match choice.finish_reason.as_deref() {
             Some("length") => FinishReason::Length,
@@ -254,10 +254,13 @@ impl LlmBackend for OpenAiBackend {
             _ => FinishReason::Stop,
         };
 
-        let usage = chat_response.usage.map(|u| Usage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-        }).unwrap_or_default();
+        let usage = chat_response
+            .usage
+            .map(|u| Usage {
+                prompt_tokens: u.prompt_tokens,
+                completion_tokens: u.completion_tokens,
+            })
+            .unwrap_or_default();
 
         Ok(CompletionResponse {
             content,

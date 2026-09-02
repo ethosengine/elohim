@@ -118,8 +118,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_backend() {
-        let backend = MockBackend::new("test-model")
-            .with_response("Hello, world!");
+        let backend = MockBackend::new("test-model").with_response("Hello, world!");
 
         assert!(backend.is_available().await);
         assert_eq!(backend.call_count(), 0);

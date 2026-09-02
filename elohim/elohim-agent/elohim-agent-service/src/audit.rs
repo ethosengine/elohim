@@ -197,11 +197,7 @@ impl AuditLog {
             .count();
 
         let avg_duration_ms = if total > 0 {
-            entries
-                .iter()
-                .filter_map(|e| e.duration_ms)
-                .sum::<u64>()
-                / total as u64
+            entries.iter().filter_map(|e| e.duration_ms).sum::<u64>() / total as u64
         } else {
             0
         };

@@ -175,8 +175,12 @@ impl ElohimCapability {
             Self::ExistentialBoundaryEnforcement => "Enforce existential safety boundaries",
             Self::GovernanceRatification => "Process governance decisions requiring ratification",
             Self::PathAnalysis => "Analyze learning path structure and effectiveness",
-            Self::LearningObjectiveValidation => "Validate learning objectives for clarity and achievability",
-            Self::PrerequisiteVerification => "Verify prerequisites are met for learning progression",
+            Self::LearningObjectiveValidation => {
+                "Validate learning objectives for clarity and achievability"
+            }
+            Self::PrerequisiteVerification => {
+                "Verify prerequisites are met for learning progression"
+            }
             Self::MasteryAssessmentDesign => "Design assessments for mastery verification",
             Self::FamilyValueAlignment => "Align recommendations with family-specific values",
             Self::PersonalAgentSupport => "Provide personalized agent support",
@@ -188,7 +192,9 @@ impl ElohimCapability {
             Self::PlaceNamingGovernance => "Govern place naming and identity",
             Self::GeographicReachAssignment => "Assign geographic reach for content or agents",
             Self::BioregionalEnforcement => "Enforce bioregional boundaries and limits",
-            Self::ReachNegotiation => "Negotiate content reach before distribution using constitutional wisdom",
+            Self::ReachNegotiation => {
+                "Negotiate content reach before distribution using constitutional wisdom"
+            }
         }
     }
 

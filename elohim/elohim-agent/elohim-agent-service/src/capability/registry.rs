@@ -50,10 +50,11 @@ impl CapabilityRegistry {
         caps.insert(capability);
 
         let mut meta = self.metadata.write().await;
-        meta.entry(capability).or_insert_with(|| CapabilityMetadata {
-            required_layer: capability.required_layer(),
-            ..Default::default()
-        });
+        meta.entry(capability)
+            .or_insert_with(|| CapabilityMetadata {
+                required_layer: capability.required_layer(),
+                ..Default::default()
+            });
     }
 
     /// Register multiple capabilities.
@@ -143,18 +144,28 @@ mod tests {
         let registry = CapabilityRegistry::new();
 
         registry.register(ElohimCapability::SpiralDetection).await;
-        registry.register(ElohimCapability::ContentSafetyReview).await;
+        registry
+            .register(ElohimCapability::ContentSafetyReview)
+            .await;
 
         assert!(registry.has(ElohimCapability::SpiralDetection).await);
         assert!(!registry.has(ElohimCapability::PathAnalysis).await);
 
-        assert!(registry.is_available(ElohimCapability::SpiralDetection).await);
+        assert!(
+            registry
+                .is_available(ElohimCapability::SpiralDetection)
+                .await
+        );
 
         registry
             .set_enabled(ElohimCapability::SpiralDetection, false)
             .await;
 
         assert!(registry.has(ElohimCapability::SpiralDetection).await);
-        assert!(!registry.is_available(ElohimCapability::SpiralDetection).await);
+        assert!(
+            !registry
+                .is_available(ElohimCapability::SpiralDetection)
+                .await
+        );
     }
 }

@@ -122,15 +122,11 @@ impl AnthropicBackend {
                         Err(_) => continue,
                     };
 
-                    let event_type = value
-                        .get("type")
-                        .and_then(|t| t.as_str())
-                        .unwrap_or("");
+                    let event_type = value.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                     match event_type {
                         "content_block_delta" => {
-                            if let Ok(delta) =
-                                serde_json::from_value::<SseContentBlockDelta>(value)
+                            if let Ok(delta) = serde_json::from_value::<SseContentBlockDelta>(value)
                             {
                                 if delta.delta.delta_type == "text_delta"
                                     && !delta.delta.text.is_empty()
@@ -140,8 +136,7 @@ impl AnthropicBackend {
                             }
                         }
                         "message_delta" => {
-                            if let Ok(msg_delta) =
-                                serde_json::from_value::<SseMessageDelta>(value)
+                            if let Ok(msg_delta) = serde_json::from_value::<SseMessageDelta>(value)
                             {
                                 finish_reason = match msg_delta.delta.stop_reason.as_deref() {
                                     Some("max_tokens") => FinishReason::Length,
@@ -306,13 +301,7 @@ impl LlmBackend for AnthropicBackend {
         let content = data
             .content
             .into_iter()
-            .filter_map(|b| {
-                if b.block_type == "text" {
-                    b.text
-                } else {
-                    None
-                }
-            })
+            .filter_map(|b| if b.block_type == "text" { b.text } else { None })
             .collect::<Vec<_>>()
             .join("");
 

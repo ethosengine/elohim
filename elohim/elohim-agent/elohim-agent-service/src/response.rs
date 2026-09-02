@@ -269,9 +269,7 @@ pub enum ResponsePayload {
     },
 
     /// Generic JSON payload
-    Generic {
-        data: serde_json::Value,
-    },
+    Generic { data: serde_json::Value },
 
     /// Escalated to another layer
     Escalated {
@@ -385,7 +383,8 @@ mod tests {
 
     #[test]
     fn test_declined_response() {
-        let response = ElohimResponse::declined("req-123", "elohim-456", "Capability not available");
+        let response =
+            ElohimResponse::declined("req-123", "elohim-456", "Capability not available");
 
         assert_eq!(response.status, ResponseStatus::Declined);
     }

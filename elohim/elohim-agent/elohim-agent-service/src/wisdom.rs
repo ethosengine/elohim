@@ -109,15 +109,16 @@ pub fn select_env_backend() -> Option<Box<dyn LlmBackend + Send + Sync>> {
     if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
         if !key.trim().is_empty() {
             info!("WisdomInvoke: using Anthropic backend (ANTHROPIC_API_KEY set)");
-            return Some(Box::new(crate::backend::AnthropicBackend::claude_sonnet(key)));
+            return Some(Box::new(crate::backend::AnthropicBackend::claude_sonnet(
+                key,
+            )));
         }
     }
     if let Ok(key) = std::env::var("OPENAI_API_KEY") {
         if !key.trim().is_empty() {
             info!("WisdomInvoke: using OpenAI backend (OPENAI_API_KEY set)");
             return Some(Box::new(crate::backend::OpenAiBackend::openai(
-                "gpt-4o",
-                key,
+                "gpt-4o", key,
             )));
         }
     }
@@ -178,7 +179,10 @@ pub fn parse_llm_wisdom_response(content: &str) -> Option<WisdomInvocationRespon
         "verdict" => WisdomDecision::Verdict,
         "need-deeper" => WisdomDecision::NeedDeeper,
         _ => {
-            warn!("WisdomInvoke: unrecognised decision '{}' from LLM", decision_str);
+            warn!(
+                "WisdomInvoke: unrecognised decision '{}' from LLM",
+                decision_str
+            );
             return None;
         }
     };
@@ -254,33 +258,30 @@ pub async fn invoke_wisdom_with_backend(
     };
 
     if !backend.is_available().await {
-        return stub_response(format!(
-            "Backend '{}' reported unavailable.",
-            backend.id()
-        ));
+        return stub_response(format!("Backend '{}' reported unavailable.", backend.id()));
     }
 
     let request = build_wisdom_prompt(input);
     match backend.complete(request).await {
-        Ok(response) => {
-            match parse_llm_wisdom_response(&response.content) {
-                Some(parsed) => {
-                    info!(
-                        wisdom.decision = ?parsed.decision,
-                        wisdom.confidence = parsed.reasoning.confidence,
-                        "WisdomInvoke: elohim-active response received"
-                    );
-                    parsed
-                }
-                None => {
-                    warn!(
-                        content_preview = &response.content[..response.content.len().min(200)],
-                        "WisdomInvoke: LLM response could not be parsed — falling back to dev-context"
-                    );
-                    stub_response("LLM response received but could not be parsed as WisdomDecision JSON.")
-                }
+        Ok(response) => match parse_llm_wisdom_response(&response.content) {
+            Some(parsed) => {
+                info!(
+                    wisdom.decision = ?parsed.decision,
+                    wisdom.confidence = parsed.reasoning.confidence,
+                    "WisdomInvoke: elohim-active response received"
+                );
+                parsed
             }
-        }
+            None => {
+                warn!(
+                    content_preview = &response.content[..response.content.len().min(200)],
+                    "WisdomInvoke: LLM response could not be parsed — falling back to dev-context"
+                );
+                stub_response(
+                    "LLM response received but could not be parsed as WisdomDecision JSON.",
+                )
+            }
+        },
         Err(err) => {
             warn!(%err, "WisdomInvoke: backend call failed — falling back to dev-context");
             stub_response(format!("Backend call failed: {err}"))
@@ -336,8 +337,8 @@ mod tests {
     async fn mock_backend_returns_allow_dev_context() {
         // MockBackend returns its configured string.
         // The response is NOT valid wisdom JSON, so we fall back to dev-context.
-        let backend = MockBackend::new("mock-model")
-            .with_response("Mock response — not JSON wisdom");
+        let backend =
+            MockBackend::new("mock-model").with_response("Mock response — not JSON wisdom");
 
         let response = invoke_wisdom_with_backend(&test_input(), Some(&backend)).await;
 
@@ -493,8 +494,8 @@ mod tests {
         // An available but response-less backend can simulate parse failure path.
         // We use a valid available backend that returns a non-JSON response
         // to exercise the parse-failure → dev-context branch.
-        let backend = MockBackend::new("error-sim")
-            .with_response("I cannot comply with that request.");
+        let backend =
+            MockBackend::new("error-sim").with_response("I cannot comply with that request.");
 
         let response = invoke_wisdom_with_backend(&test_input(), Some(&backend)).await;
 

@@ -52,10 +52,7 @@ pub struct ElohimRequest {
 
 impl ElohimRequest {
     /// Create a new request.
-    pub fn new(
-        capability: ElohimCapability,
-        requester_id: impl Into<String>,
-    ) -> Self {
+    pub fn new(capability: ElohimCapability, requester_id: impl Into<String>) -> Self {
         Self {
             request_id: uuid::Uuid::new_v4().to_string(),
             target_elohim_id: "auto".to_string(),
@@ -157,7 +154,10 @@ impl RequestParams {
             self.extra = serde_json::json!({});
         }
         if let Some(obj) = self.extra.as_object_mut() {
-            obj.insert(key.to_string(), serde_json::to_value(value).unwrap_or_default());
+            obj.insert(
+                key.to_string(),
+                serde_json::to_value(value).unwrap_or_default(),
+            );
         }
         self
     }

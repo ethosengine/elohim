@@ -73,7 +73,10 @@ impl TokenStream {
         // Spawn task to send the complete response as a single chunk
         tokio::spawn(async move {
             let _ = tx
-                .send(StreamChunk::final_chunk(response.content, response.finish_reason))
+                .send(StreamChunk::final_chunk(
+                    response.content,
+                    response.finish_reason,
+                ))
                 .await;
         });
 
