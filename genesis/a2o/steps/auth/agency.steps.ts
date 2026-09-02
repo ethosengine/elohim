@@ -66,12 +66,12 @@ import {
   type PWLocator,
   type PWRoute,
 } from '../../src/framework/devices/playwright-device.js';
+import { localPart } from '../../src/framework/doorway-identity.js';
 import { getFixture } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { SHELL, ThresholdLoginPage } from '../../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
-import { localPart } from '../../src/framework/doorway-identity.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -79,7 +79,6 @@ import { localPart } from '../../src/framework/doorway-identity.js';
 
 const VISIBLE = 'visible';
 const WAIT_MS = 20_000;
-const LOGIN_PATH = '/identity/login';
 const THRESHOLD_PATH = '/threshold/login';
 /** A route that mounts `app-elohim-navigator`, whose profile tray hosts the badge. */
 const BADGE_HOST_ROUTE = '/community';

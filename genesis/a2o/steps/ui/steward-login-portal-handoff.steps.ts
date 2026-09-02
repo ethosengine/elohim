@@ -55,12 +55,12 @@ import { request } from 'undici';
 import { DoorwayClient } from '../../src/framework/api/doorway-client.js';
 import { BrowserDevice } from '../../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { localPart } from '../../src/framework/doorway-identity.js';
 import { getFixture } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { ThresholdLoginPage } from '../../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
-import { localPart } from '../../src/framework/doorway-identity.js';
 
 // ---------------------------------------------------------------------------
 // contentIds keys — captured login response + registered portal host
