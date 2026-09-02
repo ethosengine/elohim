@@ -10,7 +10,7 @@
 # the release-manifest schema and channel-ceremony driver (T1-T2), the
 # adoption-controller observe surface (T3), and the apply vehicles (T4) — the
 # receipt script and step wiring are a separate, blocked task.
-@e2e @delivery @runtime-upgrade @concern:runtime-upgrade-propagation @requires:household-nodes @wip @act:i
+@e2e @delivery @runtime-upgrade @concern:runtime-upgrade-propagation @requires:household-nodes @act:i
 Feature: The household's runtime stays current the way its content does — by election, not by prompt
 
   This story is rung 5 of the household's upgrade-velocity ladder — the
@@ -149,6 +149,7 @@ Feature: The household's runtime stays current the way its content does — by e
 
   # Station 6: revert by re-election — the household finds it wanting.
 
+  @wip
   Scenario: Station 6 — the household finds the change wanting, and reverting needs nothing but the ceremony saying so
     Given the household has converged on the promoted release and now judges it a regression
     When matthew runs the revert ceremony, re-declaring the prior release the earned head of channel "runtime:coordinators:elohim:commons"
@@ -157,6 +158,7 @@ Feature: The household's runtime stays current the way its content does — by e
 
   # Station 7: throughout — the experiment channel is heard, never outvoted.
 
+  @wip
   Scenario: Station 7 — james's personal channel rides alongside the ceremony, compatible and never forced to converge
     Given matthew has run the ceremony that staged, promoted, and reverted a release on the commons channel
     When james's runtime is asked what his personal channel is doing after staging
@@ -172,6 +174,7 @@ Feature: The household's runtime stays current the way its content does — by e
 
   # Station 8: the observed proof — the whole ceremony, read back honestly, not asserted from intent.
 
+  @wip
   Scenario: Station 8 — the observed version matrix shows every transition the household actually went through
     Given matthew has run the ceremony that staged, promoted, and reverted a release on the commons channel
     And james's personal channel ran alongside that ceremony the entire time
@@ -182,6 +185,7 @@ Feature: The household's runtime stays current the way its content does — by e
 
   # Structural protection, not a veto — the constitutional posture named (spec §4).
 
+  @wip
   Scenario: jessica's runtime has no opt-out control for an individual upgrade, and what she gets instead is named, not abstract
     Given jessica's runtime is following release channel "runtime:coordinators:elohim:commons"
     When that channel's earned head changes
@@ -191,6 +195,7 @@ Feature: The household's runtime stays current the way its content does — by e
 
   # Negative control: the compatibility envelope is floor-protected, not a courtesy.
 
+  @wip
   Scenario: a release that breaks the compatibility envelope is refused by every peer's own verification, not merely discouraged
     Given a release manifest was built for a different DNA lineage than the one the household actually runs (its declared per-role hashes do not match)
     When any household peer's runtime verifies that release locally
