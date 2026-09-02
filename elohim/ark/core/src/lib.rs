@@ -27,7 +27,8 @@ pub use sample::ProcessSample;
 pub use sink::{Clock, SinkError, WitnessSink};
 pub use tally::{DeathRecord, DeathTally};
 pub use verdict::{
-    BoundedBy, GiveUpReason, RestartContext, RestartGovernor, RestartGrant, RestartRequest, Verdict,
+    BoundedBy, GiveUpReason, RestartContext, RestartGovernor, RestartGrant, RestartRequest,
+    RestartVerdict,
 };
 pub use witness::{DeathWitness, Incident, IncidentClose, WitnessError, WITNESS_KIND};
 

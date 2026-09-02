@@ -1,8 +1,9 @@
 //! Content-addressed child-death witnesses and their incidents.
 
+use elohim_compute::Refusal;
 use serde::{Deserialize, Serialize};
 
-use crate::{exit::ExitClass, GiveUpReason, Intent, Passport, ProcessSample, Verdict};
+use crate::{exit::ExitClass, GiveUpReason, Intent, Passport, ProcessSample, RestartVerdict};
 
 /// Record kind carried by every S0 death witness.
 pub const WITNESS_KIND: &str = "death-witness";
@@ -46,7 +47,9 @@ pub struct DeathWitness {
     /// Berth passport as it stood at death.
     pub passport: Passport,
     /// Restart decision, filled after the write-ahead witness is durable.
-    pub verdict: Option<Verdict>,
+    pub verdict: Option<RestartVerdict>,
+    /// Refusal paired with a give-up verdict, including the honored limit owner.
+    pub refusal: Option<Refusal>,
 }
 
 /// Encoding failure while deriving a witness's canonical identity.
@@ -130,8 +133,9 @@ mod tests {
     use super::*;
     use crate::{
         EffectiveTier, ExitClass, Intent, IntentAction, Passport, ProcessPassport, ProcessSample,
-        Verdict,
+        RestartVerdict,
     };
+    use elohim_compute::{LimitOwner, Refusal};
 
     fn passport() -> Passport {
         Passport {
@@ -151,7 +155,7 @@ mod tests {
                 effective_tier: EffectiveTier::None,
                 deaths_in_window: 1,
             }],
-            last_verdict: Some(Verdict::Restart {
+            last_verdict: Some(RestartVerdict::Restart {
                 after_s: 2,
                 attempt: 1,
             }),
@@ -197,7 +201,12 @@ mod tests {
                 reason: "initial start".to_string(),
             }),
             passport: passport(),
-            verdict: Some(Verdict::Stop),
+            verdict: Some(RestartVerdict::Stop),
+            refusal: Some(Refusal::gate(
+                LimitOwner::Commitment,
+                "same-cause",
+                "commitment restart limit reached",
+            )),
         }
     }
 
@@ -240,6 +249,7 @@ mod tests {
         changed_passport.updated_at_epoch_ms += 1;
         assert_field_changes_cid!(passport, changed_passport);
         assert_field_changes_cid!(verdict, None);
+        assert_field_changes_cid!(refusal, None);
     }
 
     #[test]
@@ -250,6 +260,7 @@ mod tests {
         assert_eq!(json["exit"]["class"], "signaled");
         assert_eq!(json["exit"]["signal"], 9);
         assert_eq!(json["exit"]["core_dumped"], false);
+        assert_eq!(json["refusal"]["limit_owner"], "commitment");
     }
 
     #[test]

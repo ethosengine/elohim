@@ -11,7 +11,7 @@ use crate::{
 /// The pure result of applying a restart policy to one child death.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Verdict {
+pub enum RestartVerdict {
     /// Restart after the computed delay.
     Restart { after_s: u64, attempt: u32 },
     /// Permanently stop retrying this child.
@@ -30,8 +30,6 @@ pub enum GiveUpReason {
     IntensityExceeded { deaths: u32, window_s: u64 },
     /// The manifest declares a non-restarting temporary child.
     PolicyTemporary,
-    /// A transient child exited cleanly.
-    TransientCleanExit,
 }
 
 /// Request to consider restarting one process after its observed death.
@@ -70,7 +68,8 @@ pub enum BoundedBy {
 pub struct RestartContext {
     /// Wall-clock time at which the decision is made.
     pub now_epoch_s: u64,
-    /// Persisted tally, including the current death when already recorded.
+    /// Persisted tally, which MUST already contain [`RestartRequest::death`].
+    /// The supervisor records the death before asking the governor to decide.
     pub tally: DeathTally,
 }
 
@@ -82,7 +81,7 @@ impl Governor for RestartGovernor {
     type Request = RestartRequest;
     type Grant = RestartGrant;
     type Context = RestartContext;
-    type Effect = Verdict;
+    type Effect = RestartVerdict;
 
     fn authorize(
         &self,
@@ -103,10 +102,16 @@ impl Governor for RestartGovernor {
         Ok(())
     }
 
+    /// Evaluates the manifest-default policy under [`LimitOwner::Operator`]
+    /// because the trait signature carries no grant. Call [`Governor::decide`]
+    /// or [`RestartGovernor::verdict`] for a real decision.
     fn gate(&self, req: &Self::Request, ctx: &Self::Context) -> Result<(), Refusal> {
         gate_with_policy(req, &ChildPolicy::default(), LimitOwner::Operator, ctx)
     }
 
+    /// Renders the manifest-default policy because the trait signature carries
+    /// no grant. Call [`Governor::decide`] or [`RestartGovernor::verdict`] for a
+    /// real decision.
     fn render(&self, req: &Self::Request, ctx: &Self::Context) -> Result<Self::Effect, Refusal> {
         Ok(render_with_policy(req, &ChildPolicy::default(), ctx))
     }
@@ -119,11 +124,6 @@ impl Governor for RestartGovernor {
         now_epoch_s: u64,
     ) -> Result<Self::Effect, Refusal> {
         self.authorize(req, grant, now_epoch_s)?;
-
-        if grant.policy.restart == Restart::Transient && req.death.class.is_clean() {
-            return Ok(Verdict::Stop);
-        }
-
         gate_with_policy(req, &grant.policy, limit_owner(&grant.bounded_by), ctx)?;
         Ok(render_with_policy(req, &grant.policy, ctx))
     }
@@ -136,12 +136,12 @@ impl RestartGovernor {
         req: &RestartRequest,
         grant: &RestartGrant,
         ctx: &RestartContext,
-    ) -> (Verdict, Option<Refusal>) {
+    ) -> (RestartVerdict, Option<Refusal>) {
         match self.decide(req, grant, ctx, ctx.now_epoch_s) {
             Ok(verdict) => (verdict, None),
             Err(refusal) => {
                 let reason = give_up_reason(req, grant, ctx, &refusal);
-                (Verdict::GiveUp { reason }, Some(refusal))
+                (RestartVerdict::GiveUp { reason }, Some(refusal))
             }
         }
     }
@@ -154,21 +154,13 @@ fn limit_owner(bounded_by: &BoundedBy) -> LimitOwner {
     }
 }
 
-fn tally_after_death(req: &RestartRequest, ctx: &RestartContext) -> DeathTally {
-    let mut tally = ctx.tally.clone();
-    if tally.deaths.last() != Some(&req.death) {
-        tally.record(req.death.clone());
-    }
-    tally
-}
-
 fn gate_with_policy(
     req: &RestartRequest,
     policy: &ChildPolicy,
     owner: LimitOwner,
     ctx: &RestartContext,
 ) -> Result<(), Refusal> {
-    let tally = tally_after_death(req, ctx);
+    let tally = &ctx.tally;
     let same_cause_count = tally.same_cause_run();
     if same_cause_count >= policy.same_cause_limit {
         let key = tally
@@ -201,14 +193,20 @@ fn gate_with_policy(
     Ok(())
 }
 
-fn render_with_policy(req: &RestartRequest, policy: &ChildPolicy, ctx: &RestartContext) -> Verdict {
+fn render_with_policy(
+    req: &RestartRequest,
+    policy: &ChildPolicy,
+    ctx: &RestartContext,
+) -> RestartVerdict {
     if policy.restart == Restart::Transient && req.death.class.is_clean() {
-        return Verdict::Stop;
+        return RestartVerdict::Stop;
     }
 
-    let tally = tally_after_death(req, ctx);
-    let attempt = tally.deaths_within(ctx.now_epoch_s, policy.intensity.window_s);
-    Verdict::Restart {
+    let attempt = ctx
+        .tally
+        .deaths_within(ctx.now_epoch_s, policy.intensity.window_s)
+        .saturating_sub(1);
+    RestartVerdict::Restart {
         after_s: backoff_delay_s(&policy.backoff, attempt),
         attempt,
     }
@@ -226,7 +224,7 @@ fn give_up_reason(
     ctx: &RestartContext,
     refusal: &Refusal,
 ) -> GiveUpReason {
-    let tally = tally_after_death(req, ctx);
+    let tally = &ctx.tally;
     match &refusal.code {
         RefusalCode::GateRefused(reason) if reason == "same-cause" => GiveUpReason::SameCause {
             key: tally
@@ -242,10 +240,14 @@ fn give_up_reason(
                 window_s: grant.policy.intensity.window_s,
             }
         }
-        RefusalCode::GateRefused(reason) if reason == "policy-temporary" => {
+        RefusalCode::GateRefused(reason)
+            if reason == "policy-temporary" && grant.policy.restart == Restart::Temporary =>
+        {
             GiveUpReason::PolicyTemporary
         }
-        _ => GiveUpReason::PolicyTemporary,
+        // S0 emits only the three refusal codes above. A new refusal code must
+        // gain its own GiveUpReason variant instead of borrowing PolicyTemporary.
+        _ => unreachable!("S0 restart refusal has no matching GiveUpReason: {refusal:?}"),
     }
 }
 
@@ -312,7 +314,7 @@ mod tests {
 
         assert_eq!(
             verdict,
-            Verdict::GiveUp {
+            RestartVerdict::GiveUp {
                 reason: GiveUpReason::SameCause { key, count: 3 }
             }
         );
@@ -344,7 +346,7 @@ mod tests {
 
         assert_eq!(
             verdict,
-            Verdict::GiveUp {
+            RestartVerdict::GiveUp {
                 reason: GiveUpReason::IntensityExceeded {
                     deaths: 3,
                     window_s: 300,
@@ -370,6 +372,40 @@ mod tests {
             .collect();
 
         assert_eq!(actual, vec![1, 2, 4, 8, 16, 32, 60, 60, 60]);
+
+        let mut restart_policy = policy();
+        restart_policy.same_cause_limit = 100;
+        restart_policy.intensity.max_deaths = 100;
+        let mut actual_from_governor = Vec::new();
+        for prior_deaths in 0..=6 {
+            let current = death(100, ExitClass::Exited { code: 100 });
+            let mut tally = DeathTally::default();
+            for offset in 0..prior_deaths {
+                tally.record(death(
+                    99 - u64::from(offset),
+                    ExitClass::Exited {
+                        code: i32::try_from(offset).unwrap(),
+                    },
+                ));
+            }
+            tally.record(current.clone());
+            let (verdict, refusal) = RestartGovernor.verdict(
+                &request(current),
+                &grant(restart_policy.clone()),
+                &RestartContext {
+                    now_epoch_s: 100,
+                    tally,
+                },
+            );
+            assert_eq!(refusal, None);
+            let RestartVerdict::Restart { after_s, attempt } = verdict else {
+                panic!("expected restart verdict");
+            };
+            assert_eq!(attempt, prior_deaths);
+            actual_from_governor.push(after_s);
+        }
+
+        assert_eq!(actual_from_governor, vec![1, 2, 4, 8, 16, 32, 60]);
     }
 
     #[test]
@@ -387,7 +423,7 @@ mod tests {
 
         assert_eq!(
             RestartGovernor.verdict(&req, &grant(transient), &ctx),
-            (Verdict::Stop, None)
+            (RestartVerdict::Stop, None)
         );
     }
 
@@ -408,7 +444,7 @@ mod tests {
 
         assert_eq!(
             verdict,
-            Verdict::GiveUp {
+            RestartVerdict::GiveUp {
                 reason: GiveUpReason::PolicyTemporary
             }
         );
@@ -448,19 +484,61 @@ mod tests {
     }
 
     #[test]
-    fn empty_tally_is_safe() {
-        let req = request(death(100, ExitClass::Exited { code: 1 }));
+    fn transient_clean_exit_still_obeys_commitment_same_cause_gate() {
+        let mut transient = policy();
+        transient.restart = Restart::Transient;
+        let current = death(100, ExitClass::Exited { code: 0 });
+        let req = request(current.clone());
         let ctx = RestartContext {
             now_epoch_s: 100,
-            tally: DeathTally::default(),
+            tally: DeathTally {
+                deaths: vec![
+                    death(98, ExitClass::Exited { code: 0 }),
+                    death(99, ExitClass::Exited { code: 0 }),
+                    current,
+                ],
+            },
+        };
+        let grant = RestartGrant {
+            bounded_by: BoundedBy::Commitment {
+                cid: "bafy-commitment".to_string(),
+            },
+            policy: transient,
+        };
+
+        let (verdict, refusal) = RestartGovernor.verdict(&req, &grant, &ctx);
+
+        assert!(matches!(
+            verdict,
+            RestartVerdict::GiveUp {
+                reason: GiveUpReason::SameCause { count: 3, .. }
+            }
+        ));
+        let refusal = refusal.expect("same-cause gate carries its refusal");
+        assert_eq!(
+            refusal.code,
+            RefusalCode::GateRefused("same-cause".to_string())
+        );
+        assert_eq!(refusal.limit_owner, LimitOwner::Commitment);
+    }
+
+    #[test]
+    fn empty_tally_is_safe() {
+        let current = death(100, ExitClass::Exited { code: 1 });
+        let req = request(current.clone());
+        let ctx = RestartContext {
+            now_epoch_s: 100,
+            tally: DeathTally {
+                deaths: vec![current],
+            },
         };
 
         assert_eq!(
             RestartGovernor.verdict(&req, &grant(policy()), &ctx),
             (
-                Verdict::Restart {
-                    after_s: 2,
-                    attempt: 1,
+                RestartVerdict::Restart {
+                    after_s: 1,
+                    attempt: 0,
                 },
                 None,
             )

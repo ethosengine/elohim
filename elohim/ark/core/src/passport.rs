@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::Verdict;
+use crate::RestartVerdict;
 
 /// Effective enforcement tier observed for a process.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -62,7 +62,7 @@ pub struct Passport {
     /// Live process projections.
     pub processes: Vec<ProcessPassport>,
     /// Most recent restart-policy verdict.
-    pub last_verdict: Option<Verdict>,
+    pub last_verdict: Option<RestartVerdict>,
     /// Wall-clock time of the latest update.
     pub updated_at_epoch_ms: u64,
 }

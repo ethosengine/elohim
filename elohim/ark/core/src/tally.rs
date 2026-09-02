@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::ExitClass;
 
+const MAX_RETAINED_DEATHS: usize = 256;
+
 /// One normalized child death retained across ark restarts.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -27,9 +29,16 @@ pub struct DeathTally {
 }
 
 impl DeathTally {
-    /// Appends a newly observed death.
+    /// Appends a newly observed death, retaining only the most recent 256.
+    ///
+    /// This bound exceeds every S0 expressible intensity-window and
+    /// same-cause limit while keeping the persisted projection finite.
     pub fn record(&mut self, d: DeathRecord) {
         self.deaths.push(d);
+        let excess = self.deaths.len().saturating_sub(MAX_RETAINED_DEATHS);
+        if excess > 0 {
+            self.deaths.drain(..excess);
+        }
     }
 
     /// Counts deaths in the inclusive sliding window ending at `now_epoch_s`.
@@ -106,5 +115,17 @@ mod tests {
 
         assert_eq!(same_cause_key(&first), same_cause_key(&second));
         assert!(same_cause_key(&first).starts_with("oom|"));
+    }
+
+    #[test]
+    fn tally_retains_only_the_most_recent_256_deaths() {
+        let mut tally = DeathTally::default();
+        for at_epoch_s in 0..=256 {
+            tally.record(death(at_epoch_s, ExitClass::Exited { code: 1 }));
+        }
+
+        assert_eq!(tally.deaths.len(), 256);
+        assert_eq!(tally.deaths.first().unwrap().at_epoch_s, 1);
+        assert_eq!(tally.deaths.last().unwrap().at_epoch_s, 256);
     }
 }
