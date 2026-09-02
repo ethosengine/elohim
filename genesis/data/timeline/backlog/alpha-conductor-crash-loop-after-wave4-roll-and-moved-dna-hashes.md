@@ -101,7 +101,14 @@ conductor come up with the read storm quenched, or raise its budget), which is c
 4. The DNA-hash move: decide whether the integrity change is intended (then it is a **migration**
    — `ALLOW_DNA_REINSTALL` with lineage, not a blind reinstall) or a build regression (then pin
    the integrity bytes back and add a byte-identity check to the DNA pipeline: the integrity
-   wasm sha256 must not move when only coordinator sources changed).
+   wasm sha256 must not move when only coordinator sources changed). Evidence so far
+   (elohim-4a, 2026-09-02): `content_store_integrity.wasm` was byte-identical (sha256
+   `d1c4e709…`) across the two coordinator-only commits 872bf5789 and 0d572a455, so the move
+   points at the hc-rna cdylib/rlib + `build.rs --import-undefined` commits (03f331f21,
+   d5fd9642b) compiling differently under holonix. The DNA pipeline console prints no DNA
+   hashes (searchBuildLog on #1416 matches nothing), so the which-build question needs the
+   packed artifacts. Low-cost follow-up: have the pack step print `hc dna hash` per packed DNA
+   so a moved integrity hash is readable from the console.
 
 ## Done when
 
