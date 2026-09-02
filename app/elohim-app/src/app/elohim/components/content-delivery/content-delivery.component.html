@@ -7,51 +7,18 @@
     manifest set), so the runtime chrome does not yet cover it — coverage gap.
   -->
 
-  <!-- Loading -->
-  <div *ngIf="isLoading" class="loading-state" data-testid="delivery-loading">
-    <div class="spinner"></div>
-    <p>Loading content from the protocol network...</p>
-  </div>
-
-  <!-- Error -->
-  <div *ngIf="error && !isLoading" class="error-state" data-testid="delivery-error">
+  <div *ngIf="error" class="error-state" data-testid="delivery-error">
     <h1>Content not found</h1>
     <p>{{ error }}</p>
     <a routerLink="/" class="home-link" data-testid="delivery-home-link">Return to protocol home</a>
   </div>
 
-  <!-- Content -->
-  <main *ngIf="node && !isLoading" class="delivery-content" data-testid="delivery-content">
-    <!-- Dynamic renderer host -->
-    <ng-container #rendererHost></ng-container>
-
-    <!-- Fallback: plain text -->
-    <div
-      *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
-      class="plaintext-content"
-    >
-      <pre>{{ getStringContent(node.content) }}</pre>
-    </div>
-
-    <!-- Fallback: HTML -->
-    <div
-      *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
-      class="html-content"
-      [innerHTML]="node.content"
-    ></div>
-
-    <!-- Fallback: unknown format -->
-    <div
-      *ngIf="
-        !hasRegisteredRenderer &&
-        node.contentFormat !== 'plaintext' &&
-        node.contentFormat !== 'html'
-      "
-      class="fallback-content"
-    >
-      <h1>{{ node.title }}</h1>
-      <p class="fallback-meta">{{ node.contentType }} &middot; {{ node.contentFormat }}</p>
-      <pre>{{ getStringContent(node.content) }}</pre>
-    </div>
+  <main *ngIf="slug && !error" class="delivery-content" data-testid="delivery-content">
+    <app-epr-focal
+      [slug]="slug"
+      (nodeLoaded)="onNodeLoaded($event)"
+      (notFound)="onNotFound()"
+      (failed)="onFailed()"
+    ></app-epr-focal>
   </main>
 </div>

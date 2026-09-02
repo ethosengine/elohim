@@ -1,0 +1,25 @@
+<div class="epr-focal" data-testid="epr-focal">
+  @if (isLoading) {
+    <div class="epr-focal__loading" data-testid="epr-focal-loading">
+      <div class="spinner"></div>
+      <p>Loading content from the protocol network...</p>
+    </div>
+  }
+
+  <ng-container #rendererHost></ng-container>
+
+  @if (node && !isLoading && !hasRegisteredRenderer) {
+    @if (node.contentFormat === 'plaintext') {
+      <div class="plaintext-content">
+        <pre>{{ getStringContent(node.content) }}</pre>
+      </div>
+    } @else if (node.contentFormat === 'html') {
+      <div class="html-content" [innerHTML]="node.content"></div>
+    } @else {
+      <div class="fallback-content">
+        <p class="fallback-meta">{{ node.contentType }} &middot; {{ node.contentFormat }}</p>
+        <pre>{{ getStringContent(node.content) }}</pre>
+      </div>
+    }
+  }
+</div>
