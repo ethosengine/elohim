@@ -71,6 +71,24 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-09-02 (dataplane pain-points sprint, wave 1; NO status flip): LIVE PROBE
+2026-09-02 — federation-deploy scenario 2 conditions HOLD on both doorways (GET / 200;
+blobHash non-null: elohim.host sha256-f0f0e637…, doorway-alpha sha256-04ae4310…, same
+dhtAnchor uhCkkvfsT…) — but the two serve DIFFERENT versions (divergence, scenario 4
+@wip) and both read caughtUp=false converged=false (divergentAnchor 2131 / 1011). The
+fleet lane had never measured this concern (0/0/2 pending since 08-22: the feature was
+@act:i and the fleet lane drops Act I) — re-acted to @act:ii (e6dd94c4a) so the next
+Dataplane Validation measures it; D5 atom superseded-in-code (bytes + seed authority +
+declare fan-out all landed). Quiesce leg bounded (5fb684ef6): runDataplaneValidation()
+top-level def, own 55-min timeout, warn-only on deploy, strict on [edge:validate-only];
+COORDSWAP records connect-refused peers as deferred (rc 4) and prints DEFERRED —
+fleet-unproven until the next edge build shows UNSTABLE-not-ABORTED. Device peer
+(50f43d706): join-alpha preflight checklist, CONDUCTOR_RELEASE_CHANNELS →
+ELOHIM_RELEASE_CHANNELS scoped to the storage launch, device-peer-receipt.ts (stations
+2-3 SKIP honestly) — unmeasured against alpha until the operator runs it. Plan:
+2026-09-02-dataplane-pain-points-sprint-plan.md; wave 2 (station 1 handshake,
+--sync-coordinators-once) waits on the storage slot. Stays red.
+---
 DELTA 2026-09-01 (trust-priced sync edge design; NO status flip): the design gate
 for ratchet move M3 landed as spec 2026-09-01-trust-priced-sync-edge-design.md
 (refines trust-as-efficiency-signal; composes the trust/ pricer seam, never a second
