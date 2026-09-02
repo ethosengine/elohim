@@ -2,12 +2,12 @@
 title: DnaSignal as EPR Envelope — T18 Specification
 id: dna-signal-as-epr-envelope
 tier: architecture
-status: accepted — Implemented (back-compat window active)
+status: accepted — Implemented (legacy signal retired, T30)
 created: 2026-05-15
 pillar coupling: elohim (EPR envelope primitive), imagodei (key-revocation producer site)
 informed-by:
   - elohim/sdk/schemas/v1/dna-signals/key-revocation.schema.json (EPR envelope schema)
-  - The existing RecoveryV2Signal::KeyRevocationEffective (legacy signal — deprecated)
+  - RecoveryV2Signal::KeyRevocationEffective (legacy signal this envelope superseded; variant retired T30)
 informs:
   - All future DnaSignal variants that need EPR-shape envelope semantics
   - Any new dna-signal schema declared under elohim/sdk/schemas/v1/dna-signals/
@@ -18,20 +18,24 @@ informs:
 
 **Date:** 2026-05-15  
 **Task:** T18 — DnaSignal::KeyRevocation EPR envelope  
-**Status:** Implemented (back-compat window active)
+**Status:** Implemented; legacy signal retired (T30, same-day follow-up)
 
 ## Summary
 
-T18 introduces a new `DnaSignal::KeyRevocation(KeyRevocationEnvelope)` emitted
-alongside the existing `RecoveryV2Signal::KeyRevocationEffective` at every
-producer site in the imagodei coordinator zome. The new signal frames the
+T18 introduces a new `DnaSignal::KeyRevocation(KeyRevocationEnvelope)`, originally
+emitted alongside the legacy `RecoveryV2Signal::KeyRevocationEffective` at every
+producer site in the imagodei coordinator zome during a back-compat window
+(closed at T30 — see Legacy Deprecation below). The new signal frames the
 wire message as an EPR (Elohim Protocol Record): the authoring elohim's
 attestation over a content-addressed (CID) subject, signed at emit time with
 the calling agent's lair-managed ed25519 key.
 
-The legacy `RecoveryV2Signal::KeyRevocationEffective` is marked
-`#[deprecated]` and will be removed after one release cycle. Both signals emit
-atomically during the back-compat window.
+The legacy `RecoveryV2Signal::KeyRevocationEffective` was marked
+`#[deprecated]` for a one-release back-compat window, then the variant itself
+was deleted from the coordinator zome's `RecoveryV2Signal` enum in the
+same-day T30 follow-up — producers now emit only `KeyRevocationRequested`
+(unchanged) plus the `DnaSignal::KeyRevocation` envelope at all three producer
+sites. See Legacy Deprecation below for current status.
 
 ## EPR Envelope Shape
 
@@ -196,14 +200,23 @@ The `RevocationAttestation` EPR-worker arm (Task 7, `attestation:key-revocation-
 flat signal) is a separate signal class and is NOT migrated here. The flat
 `revocation-attestation.schema.json` stays untouched.
 
-## Legacy Deprecation
+## Legacy Deprecation — CLOSED (T30)
 
-`RecoveryV2Signal::KeyRevocationEffective` is marked:
-```rust
-#[deprecated(
-    note = "T18: superseded by DnaSignal::KeyRevocation envelope; remove after one release cycle"
-)]
-```
+`RecoveryV2Signal::KeyRevocationEffective` was marked `#[deprecated]` at T18
+for a one-release back-compat window, then the variant was **deleted
+entirely** from the coordinator zome's `RecoveryV2Signal` enum in the T30
+follow-up (`elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs`, see the
+comment at the `RecoveryV2Signal` enum definition). All three producer sites
+(`create_self_revocation`, `submit_revocation_vote`,
+`submit_specialist_revocation`) now emit only `KeyRevocationRequested` plus
+`emit_key_revocation_envelope` (the T18 `DnaSignal::KeyRevocation` path) — the
+legacy flat emit is gone, not merely suppressed. There is no
+`#[deprecated]` attribute left anywhere in the imagodei coordinator zome for
+this signal; the back-compat window is closed.
 
-Call sites that emit it use `#[allow(deprecated)]` to suppress warnings during
-the back-compat window. Remove in the release cycle after T18 graduates.
+`elohim-storage/src/signals.rs` still declares a `RecoveryV2Signal::KeyRevocationEffective`
+match arm as an explicit no-op (kept for wire-decode exhaustiveness against
+older DHT history / possible replay); its own doc comment predates T30 and
+should be read as historical, not as evidence the variant is still emitted.
+Removing that dead arm is a separate, low-risk storage-side cleanup, not
+tracked here.
