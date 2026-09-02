@@ -1,4 +1,4 @@
-//! The pure lifecycle state machine — filled by Task 6.
+//! The pure lifecycle state machine: idle → spawning → booting → live → dying → dead.
 //!
 //! KEPT rather than projected onto [`elohim_epr_rea::model::CommitmentState`]: that is the
 //! lifecycle of a PROMISE (proposed → active → fulfilled → revoked), while this is the
@@ -20,6 +20,10 @@ pub enum ChildState {
     /// A child has completed readiness.
     Live { pid: u32 },
     /// A child is expected to terminate.
+    ///
+    /// `since_epoch_ms` is clock-valued and `step` is clockless: it emits `0`; the
+    /// supervisor MUST stamp the real value on the returned state before any grace
+    /// accounting.
     Dying { pid: u32, since_epoch_ms: u64 },
     /// A child died unexpectedly and awaits a restart verdict.
     Dead,
@@ -97,6 +101,7 @@ pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>) {
             (ChildState::Booting { pid, rung: 0 }, vec![])
         }
         (ChildState::Booting { pid, .. }, Event::RungPassed { rung, of }) => {
+            // The event's rung is authoritative; the supervisor must deliver rungs in order.
             let next_rung = rung.saturating_add(1);
             if next_rung < of {
                 (
@@ -172,6 +177,8 @@ pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>) {
             vec![
                 Action::RecordIntent(IntentAction::Stop {
                     signal,
+                    // Placeholder: the event carries only the policy signal. The supervisor
+                    // MUST replace `grace_ms` from `ChildPolicy` before appending the intent.
                     grace_ms: 0,
                 }),
                 Action::SendSignal(signal),
