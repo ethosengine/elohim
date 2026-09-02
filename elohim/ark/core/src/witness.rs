@@ -102,6 +102,9 @@ pub struct Incident {
     pub incarnation_at_open: u64,
     /// Witness CID strings in observation order.
     pub witnesses: Vec<String>,
+    /// CIDs of restart intents or witnesses that re-spawned the child, in append order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub restarts: Vec<String>,
     /// Terminal incident outcome, when closed.
     pub closed: Option<IncidentClose>,
 }
@@ -134,6 +137,7 @@ impl Incident {
             opened_at_epoch_ms: at_epoch_ms,
             incarnation_at_open: incarnation,
             witnesses: Vec::new(),
+            restarts: Vec::new(),
             closed: None,
         }
     }
@@ -353,7 +357,18 @@ mod tests {
         let bytes = serde_ipld_dagcbor::to_vec(&("conductor", 1_000_u64, 3_u64)).unwrap();
         let expected = elohim_epr::cid::compute_cid(&bytes).to_string();
 
+        assert_eq!(
+            incident.id, "bafyreickvkio4hpowc7uf5dcarrknwj5cnz7iz4krhxfdperifgfjhr4pm",
+            "adding skipped incident fields must not move the pre-change identity"
+        );
         assert_eq!(incident.id, expected);
+        assert!(incident.restarts.is_empty());
+        let legacy_shape = serde_json::to_value(&incident).unwrap();
+        assert!(legacy_shape.get("restarts").is_none());
+        assert_eq!(
+            serde_json::from_value::<Incident>(legacy_shape).unwrap(),
+            incident
+        );
         assert_eq!(incident, Incident::open("conductor", 1_000, 3));
         assert_ne!(incident.id, Incident::open("storage", 1_000, 3).id);
         assert_ne!(incident.id, Incident::open("conductor", 1_001, 3).id);

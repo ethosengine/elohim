@@ -220,17 +220,6 @@ impl DeathWitness {
 }
 
 impl IncidentClose {
-    /// The `close:` slot naming which terminal outcome this is.
-    ///
-    /// The third `classified_as` slot, prefixed so a reader can tell it from the leading tag.
-    pub fn close_slot(&self) -> &'static str {
-        match self {
-            Self::ReadyAgain { .. } => "close:ready-again",
-            Self::GaveUp { .. } => "close:gave-up",
-            Self::Stopped { .. } => "close:stopped",
-        }
-    }
-
     /// Wall-clock time of the terminal outcome.
     pub fn at_epoch_ms(&self) -> u64 {
         match self {
@@ -270,25 +259,28 @@ impl Incident {
             classified_as: vec![
                 RUNTIME_TAG_INCIDENT_CLOSED.to_string(),
                 self.process.clone(),
-                close.close_slot().to_string(),
             ],
         }))
     }
 
     /// Projects this incident as the VF [`ReaProcess`] it already is: the deaths it holds are
-    /// its inputs, and its terminal outcome is its one output.
+    /// its inputs, and its restart records followed by its terminal outcome are its outputs.
     pub fn as_rea_process(&self, scope: &RuntimeScope) -> Result<ReaProcess, ReaProjectionError> {
         let inputs = self
             .witnesses
             .iter()
             .map(|witness| parse_cid(witness))
             .collect::<Result<Vec<_>, _>>()?;
-        let outputs =
-            match self.as_close_event(scope)? {
-                Some(event) => vec![atom_cid(&event)
-                    .map_err(|error| ReaProjectionError::Encode(error.to_string()))?],
-                None => Vec::new(),
-            };
+        let mut outputs = self
+            .restarts
+            .iter()
+            .map(|restart| parse_cid(restart))
+            .collect::<Result<Vec<_>, _>>()?;
+        if let Some(event) = self.as_close_event(scope)? {
+            outputs.push(
+                atom_cid(&event).map_err(|error| ReaProjectionError::Encode(error.to_string()))?,
+            );
+        }
         Ok(ReaProcess {
             spec: PinnedRef {
                 id: INCIDENT_SPEC_ID.to_string(),
@@ -444,12 +436,13 @@ impl RestartGrant {
     /// The pain this give-up reports — `Some` only under [`BoundedBy::Commitment`].
     ///
     /// Under manifest policy there is no promise to be in pain about, so this is `None`:
-    /// honest absence, never a zero. When the grant carries its declared [`Bound`], that
-    /// limit replaces the one inferred from the refusal.
+    /// honest absence, never a zero. When an intensity give-up carries its declared [`Bound`],
+    /// that limit replaces the one inferred from the refusal; a same-cause give-up retains its
+    /// own run-length limit.
     pub fn pain(&self, reason: &GiveUpReason) -> Option<AlgedonicEvidence> {
         let bound_ref = self.bounded_by.commitment_cid()?;
         let evidence = reason.as_algedonic(bound_ref)?;
-        let Some(bound) = &self.bound else {
+        let (GiveUpReason::IntensityExceeded { .. }, Some(bound)) = (reason, &self.bound) else {
             return Some(evidence);
         };
         Some(AlgedonicEvidence::Breach {
@@ -750,7 +743,6 @@ mod tests {
             vec![
                 RUNTIME_TAG_INCIDENT_CLOSED.to_string(),
                 "conductor".to_string(),
-                "close:gave-up".to_string(),
             ]
         );
         assert_eq!(event.in_scope_of, scope.scope);
@@ -759,6 +751,18 @@ mod tests {
 
         let projected = incident.as_rea_process(&scope).unwrap();
         assert_eq!(projected.outputs, vec![atom_cid(&event).unwrap()]);
+    }
+
+    #[test]
+    fn an_open_incident_projects_restart_outputs_before_any_close_event() {
+        let scope = bounded_scope();
+        let mut incident = Incident::open("conductor", 1_000, 3);
+        incident.restarts = vec![cid_of("restart-1").to_string()];
+
+        let projected = incident.as_rea_process(&scope).unwrap();
+
+        assert_eq!(projected.outputs, vec![cid_of("restart-1")]);
+        assert_eq!(incident.as_close_event(&scope).unwrap(), None);
     }
 
     #[test]
@@ -918,6 +922,30 @@ mod tests {
             }
             .commitment_cid(),
             Some("bafy-commitment")
+        );
+    }
+
+    #[test]
+    fn a_same_cause_breach_keeps_its_run_length_when_the_intensity_bound_differs() {
+        let grant = RestartGrant {
+            bounded_by: BoundedBy::Commitment {
+                cid: "bafy-commitment".to_string(),
+            },
+            policy: ChildPolicy::default(),
+            bound: Some(Bound::new(5.0, UNIT_DEATHS.to_string(), 80.0).unwrap()),
+        };
+        let reason = GiveUpReason::SameCause {
+            key: "signaled:9||fast:true".to_string(),
+            count: 3,
+        };
+
+        assert_eq!(
+            grant.pain(&reason),
+            Some(AlgedonicEvidence::Breach {
+                stock: 3.0,
+                limit: 3.0,
+                bound_ref: "bafy-commitment".to_string(),
+            })
         );
     }
 }

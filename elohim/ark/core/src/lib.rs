@@ -1,7 +1,8 @@
 //! ark-core — the pure half of the elohim compute envelope (tevah).
 //!
 //! Spec: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md §3, §5.1, §6, §8.
-//! No I/O and no async runtime live here; `ark-supervisor` implements the traits in `sink`.
+//! No I/O and no async runtime live here; `ark-supervisor` implements the traits in `sink` and
+//! is the only ARK construction site for sidecar stores.
 
 pub mod berth;
 pub mod exit;

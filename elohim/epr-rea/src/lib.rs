@@ -53,7 +53,7 @@
 //! is pure. A consumer whose purity boundary is enforced by a test over its own dependency
 //! graph (`elohim-ark-core`) takes this crate `default-features = false` and still speaks the
 //! whole vocabulary; the crate that owns the I/O (`elohim-ark-supervisor`) turns the feature
-//! back on and is the only construction site of a sidecar store.
+//! back on and is the only ARK construction site of a sidecar store.
 
 pub mod actor;
 pub mod epistemic;
