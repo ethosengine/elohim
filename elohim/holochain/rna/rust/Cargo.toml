@@ -9,7 +9,7 @@ keywords = ["holochain", "migration", "dna", "upgrade"]
 categories = ["development-tools"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [[bin]]
 name = "hc-rna-generate"
