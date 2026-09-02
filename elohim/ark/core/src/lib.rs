@@ -17,10 +17,10 @@ pub mod verdict;
 pub mod witness;
 
 // Re-exports are uncommented by the task that creates each type.
-// pub use berth::{Berth, PassphraseSource}; // Task 3
+pub use berth::{Berth, PassphraseSource};
 pub use exit::{classify_readiness_outcome, ExitClass, ReadinessOutcome};
 // pub use intent::{Intent, IntentAction}; // Task 5
-// pub use manifest::{ArtifactRef, ChildPolicy, Probe, ProcessKind, ProcessSpec, RuntimeManifest}; // Task 3
+pub use manifest::{ArtifactRef, ChildPolicy, Probe, ProcessKind, ProcessSpec, RuntimeManifest};
 // pub use passport::{EffectiveTier, Passport, ProcessPassport}; // Task 5
 pub use ring::RingBuffer;
 // pub use sample::ProcessSample; // Task 5
