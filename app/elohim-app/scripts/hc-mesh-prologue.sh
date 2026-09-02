@@ -346,6 +346,8 @@ run_seed_leg "seed-agent-bindings" soft \
   'CONDUCTOR_URLS="$CONDUCTOR_URLS" npx tsx src/seed-agent-bindings.ts'
 run_seed_leg "seed-household-formation" hard \
   'CONDUCTOR_URLS="$CONDUCTOR_URLS" STORAGE_URL="$STORAGE_URL" DOORWAY_URL="$DOORWAY_A_URL" CONTENT_BLOB_HASH="${CONTENT_BLOB_HASH:-}" CONTENT_BLOB_SIZE_BYTES="${CONTENT_BLOB_SIZE_BYTES:-}" npx tsx src/seed-household-formation.ts'
+run_seed_leg "seed-spool-custody" hard \
+  'CONDUCTOR_URLS="$CONDUCTOR_URLS" STORAGE_URL="$STORAGE_URL" DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-spool-custody.ts'
 
 # ---------------------------------------------------------------------------
 # 5b. Stewardship-affinity fixture corpus — a minimal set of category-tagged
