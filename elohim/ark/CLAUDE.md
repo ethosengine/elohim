@@ -16,20 +16,21 @@ Tevah in prose, `ark` in code. No crate, type, module, or path here may contain
 `ark-core`'s dependency graph **is** the purity boundary: `boundary::no_runtime_or_io_deps`
 (in `core/src/lib.rs`) reads the crate's own `Cargo.toml` and refuses `tokio`, `nix`, `libc`,
 `diesel`, `rusqlite`, `libp2p`, `iroh`, `reqwest`, `hyper`, `axum`, `hdk`, `hdi` — a pure decision
-must never be able to do I/O. Identity math is never re-derived: CIDs come from
+must never be able to do I/O; a second guard, `boundary::no_fs_in_pure_core`, greps the crate's own
+sources for `std::fs`/`File::`/`Sidecar*Store` — ark-core takes `elohim-epr-rea` with
+`default-features = false` (the model, never the sidecar store; only the supervisor writes a disk).
+Ontology is INHERITED, never re-minted (`rea.rs`): VF intent/event/process projections, a `Bound`
+on the self-contract, algedonic breach evidence, `Stock`/`Window`. Identity math is never re-derived: CIDs come from
 `elohim_epr::cid::compute_cid` over `serde_ipld_dagcbor::to_vec`, never local sha-to-cid code.
 
 ## Declared S0 simplifications
 
-- **CIDs inside records are strings** (base32 `bafy…`). The manifest becomes an
-  `Epr` payload with real dag-cbor links in S1.
-- **Threads, not tokio** (`std::thread` + `std::sync::mpsc`); tokio arrives with
-  the admin socket in S2. `tokio::process` is refused — children are spawned with
-  `std::process::Command` and reaped by our own reaper.
+- **CIDs inside records are strings** (base32 `bafy…`); the manifest becomes an `Epr` payload in S1.
+- **Threads, not tokio**; tokio arrives with the admin socket in S2. `tokio::process` is refused —
+  children are spawned with `std::process::Command` and reaped by our own reaper.
 - **`Native` driver only**; `effective_tier` is `None` until enforcement lands.
-- **`amber-local` spool only** — witnesses/incidents/intents/tally/passport are a
-  content-addressed LOCAL projection under `<data_root>/ark/`; the DHT anchors
-  those same CIDs in S1. No DHT entry type, route, or diesel table is created.
+- **`amber-local` spool only** — a content-addressed LOCAL projection under `<data_root>/ark/` whose
+  CIDs the DHT anchors in S1; the sidecar `flows.jsonl` is the same valueflow mechanism `epr flow` reads.
 
 ## Running it
 
