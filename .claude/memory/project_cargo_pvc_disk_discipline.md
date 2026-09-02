@@ -75,3 +75,11 @@ build script runs bindgen over C headers (`datachannel-sys` via the sweettest wo
 `export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"` (clang 21's resource dir; re-derive
 with `clang -print-resource-dir` after toolchain bumps). With it, `cargo check --tests` in
 `elohim/holochain/tests/sweettest` passes locally.
+
+
+**2026-09-02 — running ONE sweettest locally beside the mesh (proven recipe).** From `elohim/holochain/tests/sweettest`:
+`BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include" RUSTFLAGS="" CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__holochain__tests__sweettest/dev CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=2 cargo test -p elohim_sweettest --test lamad <test_name> -- --include-ignored`.
+Without BINDGEN_EXTRA_CLANG_ARGS the `datachannel-sys` build dies with `'stdbool.h' file not found` (the Che image sets it for
+login shells only; `LIBCLANG_PATH=/usr/lib64` alone is not enough). Rebuild the DNA the test loads first (`cargo build --release
+--target wasm32-unknown-unknown -p <zome>` in the DNA workspace, then `hc dna pack . -o workdir/lamad.dna`) — never hot-swap it
+onto a running mesh another session is using as a fixture. Judge a test binary's own `test result:` line, not the aggregate exit.
