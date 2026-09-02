@@ -236,11 +236,75 @@ elif [ "$rc" -eq 4 ]; then
 
 ---
 
-## Operator decisions this sprint surfaces (not tasks)
+### Task T6: obey a carried election when the own conductor TIMES OUT, not only when it answers "absent"
 
-1. **Flip `ELOHIM_OBEY_CARRIED_ELECTION` on alpha** (both doorway/storage manifests under `genesis/orchestrator/manifests/`) and record one `[edge:validate-only]` measure. It is the dormant cure for the divergence the probe shows; it moves heads, so it is yours. Evidence it worked: `election_obeyed_total{path="carried"} > 0` and both doorways return the same `blobHash` for `elohim-host-landing`.
-2. **The storage-arc reset on conductor restart** (`storageArc: null` on every alpha agent-info; arcs never re-promote before the next roll) is the deepest constraint under both federation-deploy's divergence and the sovereign-peer reads. It is a conductor-fork / kitsune2 concern, captured in `sovereign-peer-network-read-no-authorities.md`, and it is exactly what the rung-5 no-big-bang-roll work reduces the frequency of. Not absorbed here.
-3. **The ratchet spec's M2 delta claims `QUIESCE_MODE=label` landed; it did not.** One flow-note correction on that spec, then the claim is honest.
+**Tier:** `rust-architect` (Opus). **Reviewer:** `code-reviewer` + the mesh receipt.
+
+**Why (measured 2026-09-02, fleet):** `ELOHIM_OBEY_CARRIED_ELECTION` has been `true` on all
+7 pods since 2026-08-31 (template renders it from the non-prod gate; adam explicit). It is
+inert anyway: `elohim_content_election_obey_probe_total{outcome}` reads adam 235 attempted /
+196 resolve_error / 5 no_election, james 115 / 103 / 2, matthew 136 / 102 / 19, jessica 364 /
+140 / 201, gertrude 27 / 24 / 0, susan 29 / 25 / 0 — and `obeyed{path="carried"}` = 0 on every
+pod, `canonical_answers_total{tier=*}` = 0 on every pod. The error text is the conductor
+saturation class: `Websocket error: Timeout` and `Workspace error: deadline has elapsed`. In
+`try_obey_visible_election` only `Answer::Absent` reaches `try_carried_election_supply`;
+`Answer::Unreachable` / `Err` return first. On a fleet whose conductors time out under
+load, the flag can never fire.
+
+**Files:** `elohim/elohim-storage/src/services/head_adoption.rs` (`try_obey_visible_election`,
+the `Resolved(Answer::Unreachable)` and `Err` arms), `src/metrics.rs` (`ElectionObeyProbe`
+gains `SuppliedOnUnreachable`), tests beside them; the mesh receipt
+`genesis/a2o/scripts/peer-carried-sweep-receipt.ts` (its 2026-09-01 "structural stop" was
+exactly this branch).
+
+- [ ] Failing test first: an `Unreachable` election answer with a peer hint and a fetcher
+  reaches `try_carried_election_supply`; with the flag off, behaviour is byte-identical to today.
+- [ ] `verify_carried_election` is coordinator-only, read-only, commits nothing (zome doc) — it
+  needs the local conductor to run wasm, not to answer a DHT read. Confirm with a test that a
+  conductor whose *election read* times out but whose *zome call* succeeds obeys the carried
+  election; keep every stamp guard (never-move-backwards, tier precedence) untouched.
+- [ ] Receipt: the peer-carried mesh receipt passes with the adopter's election read made to
+  time out (the fixture the 2026-09-01 attempt could not build), `obeyed{path="peer_carried"}`
+  ≥ 1. Fleet confirm: the same counter moves on alpha after the next edge deploy.
+
+### Task T7: two green rows, one head, two blob pointers — heal the pointer from the head record
+
+**Tier:** `rust-architect`. **Reviewer:** `code-reviewer`.
+
+**Why (measured 2026-09-02):** both doorways serve the SAME `headActionHash` for
+`elohim-host-landing` (`uhCkkvfsT…`, `declared:true`, `trust:notarized`) and both hold BOTH
+blobs (`/blob/sha256-f0f0e637…` and `/blob/sha256-04ae4310…` → 200 on each), yet each row's
+`blobHash` names a different one (02:47Z vs 02:53Z on 08-31, two seed legs). The heads are not
+divergent; the projected pointer is, and `reverse_project_content_doc`'s green-inviolable guard
+will never move a notarized row. federation-deploy's final scenario assumes heads disagree;
+for this id they agree and the bytes pointer drifted.
+
+**Files:** `src/sync/projector.rs` (the guard at `:604`), `src/services/head_adoption.rs`
+(the head-record → row patch), tests.
+
+- [ ] Failing test first: two rows, same declared head, different `blob_hash`, head record
+  naming one of them → the other row's pointer moves to the record's blob; a row whose head
+  DIFFERS from the record is untouched (heads move only through the election).
+- [ ] The pointer heal rides the existing amber path with a `reason` label
+  (`elohim_projection_heal_outcomes_total{outcome="pointer_from_head_record"}`); never writes
+  `dht_anchor_hash`; never touches a row whose head is not the record's.
+- [ ] Receipt on the mesh: stage the two-pointer state with the household seed profile, run one
+  sweep, both doorways return the same `blobHash`. Fleet confirm: the live probe.
+
+**Captured, not absorbed:** the conductor timeouts themselves (`deadline has elapsed`,
+websocket timeout) are the head-plane program's L1 batched-externs problem, and at probe time
+both doorways' `/db/content/{id}/head-record` answered with an OPEN circuit breaker. T6 makes
+the election survive that regime; it does not cure it.
+
+## Decisions that were wrongly listed as the operator's (corrected 2026-09-02)
+
+- ~~Flip `ELOHIM_OBEY_CARRIED_ELECTION`~~ — it is already `true` fleet-wide (2026-08-31); the
+  fleet declares itself a fixture, auto-adoption is the default, and the wasm verifier is the
+  guard. What blocks convergence is T6 (the timeout branch) and, for the landing page, T7.
+- The storage-arc reset on conductor restart stays captured in
+  `sovereign-peer-network-read-no-authorities.md`; it is a conductor-fork concern, and the
+  rung-5 no-big-bang-roll work reduces how often it bites.
+- The ratchet spec's M2 claim is corrected in the flow ledger (2026-09-02).
 
 ## Self-review
 
