@@ -12,7 +12,7 @@ priority: "high"
 deprecation_status: blocked
 severity: medium
 fingerprints: []
-evidence_fingerprints: ["fb31d99a0ba8"]
+evidence_fingerprints: ["fb31d99a0ba8", "dc758c9c3d3f", "6ffe65fc044a", "c8babb72ae2c"]
 relatedNodeIds: []
 tags: [deprecation, tooling, deprecation-sentinel, pnpm, fingerprint-stability, automation-cost, epr-meta]
 cites:
@@ -1142,3 +1142,55 @@ finding, and the entire finding was that a lockfile line had moved two rows
 under a jQuery concern already canonicalized and already `blocked`. That is the
 steady-state price of leaving this unlanded — not a one-time diagnosis cost but
 one dispatch per lockfile shift, per workspace, indefinitely.
+
+Fourth footnote, 2026-09-02 — **Class 3 confirmed on a non-lockfile channel, and
+a new sub-class named: the cwd-relative diagnostic path prefix.** One
+TypeScript `TS5107` warning from `@elohim/storage-client`'s `tsc`
+(`deprecation-storage-client-ts-moduleresolution-node10.md`) minted **four**
+fingerprints:
+
+| fp | Variant | Minted by |
+|---|---|---|
+| `9ab4dfa901ea` | `grep -n` prefix `1799:` | the sentinel's own capture command |
+| `dc758c9c3d3f` | `grep -n` prefix `526:` — same file, second hit | the same command, same invocation |
+| `6ffe65fc044a` | **bare text**, no prefix (`sed -n` read of the same log) | **the triage agent, reading its own evidence** |
+| `c8babb72ae2c` | text prefixed `elohim/sdk/storage-client-ts/` | **the triage agent, reproducing the failure** |
+
+The first two are textbook Class 3, and they close the open question the Class-3
+analysis left: the defect is **not lockfile-specific**. Any `grep -n` over any
+multi-hit log re-mints, and here it minted twice inside a *single* command
+because one warning appeared at two offsets in one file. Fix N's prefix strip
+would have collapsed all three of `9ab4dfa901ea` / `dc758c9c3d3f` /
+`6ffe65fc044a` to one row — the bare-text variant `6ffe65fc044a` is precisely
+the `fe896c58f14e`-shaped normalization target Fix N already predicts.
+
+`c8babb72ae2c` is the **new sub-class**, and Fix N does *not* cover it. A
+compiler diagnostic carries a path that is relative to the compiler's invoking
+directory. The identical `tsc` error hashes one way when run from inside
+`elohim/sdk/storage-client-ts` (`tsconfig.json(25,25): error TS5107: …`) and
+another when run from the repo root with `-p` (`elohim/sdk/storage-client-ts/
+tsconfig.json(25,25): error TS5107: …`). Nothing about the finding changed —
+only the cwd of the process that observed it. Every compiler, linter, and test
+runner in the monorepo emits cwd-relative paths, so this class is live on
+`tsc`, `cargo`, `eslint`, and `vitest` channels alike. A candidate normalization
+sits alongside Fix N: strip a leading repo-relative directory prefix from a
+`path(line,col): error CODE:` shaped diagnostic before hashing. It needs the
+same adversarial-negative harness at the Class-5 standard before it lands —
+over-stripping would collapse the *same* diagnostic code from two genuinely
+different files into one row, which is worse than the redundancy it cures.
+
+**The costliest observation is the mechanism, not the count.** Both self-minted
+rows came from the triage agent doing its job correctly: `6ffe65fc044a` from
+*reading the captured evidence*, `c8babb72ae2c` from *reproducing the failure to
+verify a candidate fix*. Those are the two irreducible steps of triage. So the
+defect is not merely "an agent occasionally re-emits a warning" — it is that
+**verifying a deprecation fix mints new deprecation fingerprints by
+construction**, each requesting a fresh background Opus dispatch for the concern
+already under triage. Left unlanded, the automation's cost scales with its own
+diligence. Both directives were declined by hand this run; an unwitting agent
+would have dispatched two redundant Opus runs, and each of those would in turn
+have reproduced and re-minted.
+
+That closes the argument the second footnote opened with a measured price: the
+steady-state cost is not one dispatch per lockfile shift, it is one-to-two
+dispatches per *triage run*, on every channel, indefinitely.
