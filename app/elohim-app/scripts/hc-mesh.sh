@@ -84,6 +84,21 @@
 #                   CLI's — the CLI rewrites the config in its own schema and a
 #                   mismatched conductor then refuses to boot. `direct` also
 #                   gives each conductor its own log file.
+#                   `ark` runs each conductor as the CHILD of an `ark` process
+#                   (elohim/ark — tevah in prose). Same argv as `direct`, so the
+#                   spin detector and every `ps` grep are unchanged; what it adds
+#                   is a parent that reaps the death itself and leaves a death
+#                   witness in that peer's own spool ($LOCAL_DEV_DIR/<peer>/ark/).
+#                   Declarations (manifest.json + berth.json) are rewritten per
+#                   peer on every launch; the same data root is never run twice.
+#
+#   ARK_BIN         The `ark` binary. Default: the cargo-pool dev slot
+#                   /projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark,
+#                   then whatever `ark` is on PATH. MESH_CONDUCTOR_LAUNCH=ark
+#                   REFUSES to launch when neither is executable rather than
+#                   falling back to a different launch mode; build it with
+#                     cd elohim && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev \
+#                       RUSTFLAGS="" cargo build -p elohim-ark
 #
 #   HOLOCHAIN_BIN   A conductor BINARY, or a DIRECTORY holding `holochain` +
 #                   `hc`, to use INSTEAD of what is on PATH (see the block above
@@ -214,6 +229,18 @@ if [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
+# The ark launcher (elohim/ark/cli). Resolved here so `status` and the launch
+# sites name the same binary, but NEVER required at source time: only
+# MESH_CONDUCTOR_LAUNCH=ark needs it, and assert_ark_binary is what refuses.
+# The elohim workspace has ONE pool slot for all its crates, hence dev/debug/ark.
+ARK_BIN_POOL_SLOT="$POOL/elohim/dev/debug/ark"
+if [ -z "${ARK_BIN:-}" ]; then
+  if [ -x "$ARK_BIN_POOL_SLOT" ]; then
+    ARK_BIN="$ARK_BIN_POOL_SLOT"
+  else
+    ARK_BIN="$(command -v ark 2>/dev/null || true)"
+  fi
+fi
 
 # MESH_DOORWAY_GATEWAY_SCOPING — does a mesh doorway name its humans the way a
 # FLEET doorway does? Every deployed doorway runs with DOORWAY_URL set, and
@@ -262,6 +289,224 @@ record_mesh_pid() { # <role> <name> <pid>
   [ -n "$started" ] || return 1
   mkdir -p "$PID_DIR"
   printf '%s %s\n' "$pid" "$started" > "$PID_DIR/$role-$name"
+}
+
+# ---------------------------------------------------------------------------
+# MESH_CONDUCTOR_LAUNCH=ark. Everything below this banner is additive: `hc` and
+# `direct` never call any of it, and a mesh started in those modes writes no
+# ark/ directory, so `status` and `stop` behave exactly as they always have.
+#
+# The shape: one `ark` process per peer, whose ONLY child is that peer's
+# conductor with the argv `direct` would have used. The ark is the parent that
+# reaps the death — so a SIGKILLed conductor leaves a death witness in
+# $LOCAL_DEV_DIR/<peer>/ark/witnesses/ instead of a hole in a log.
+#
+# NOTE on the child's environment: ChildSpec.env_scrub defaults to true and only
+# PATH and HOME survive it, so the conductor child does NOT inherit the
+# RUST_LOG exported for the ark itself. Until the manifest carries an `env`
+# block (the berth log_level dial, spec Task 10L), an ark-launched conductor
+# logs at holochain's default level. Its stdout — including the
+# "Conductor ready." line the readiness ladder needs — is unaffected.
+# ---------------------------------------------------------------------------
+
+# The recorded pid for one role/name, only when it is still the process this
+# mesh launched. Validated against the persisted start-tick exactly as
+# recorded_mesh_pids does: a bare `kill -0` would happily accept a recycled pid
+# and let a second ark be refused (or launched) on the wrong evidence.
+live_recorded_pid() { # <role> <name> -> prints pid, or returns 1
+  local file="$PID_DIR/$1-$2" pid="" started="" current
+  [ -f "$file" ] || return 1
+  read -r pid started < "$file" || true
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  [ -n "$started" ] || return 1
+  current="$(process_start_ticks "$pid")"
+  [ -n "$current" ] && [ "$current" = "$started" ] || return 1
+  echo "$pid"
+}
+
+# The conductor child pid an ark is supervising, read from the passport the ark
+# rewrites on every state change. This is the ONLY correct way to find that pid
+# under ark: $PID_DIR/ark-<peer> names the ARK, and the child is replaced on
+# every restart while the ark keeps its own pid.
+mesh_conductor_pid() { # <peer-name> -> prints the conductor child pid, or returns 1
+  local passport="$LOCAL_DEV_DIR/$1/ark/passport.json" pid
+  [ -f "$passport" ] || return 1
+  pid="$(jq -r '.processes[] | select(.name=="conductor") | .pid // empty' "$passport" 2>/dev/null)"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  echo "$pid"
+}
+
+assert_ark_binary() {
+  [ -n "${ARK_BIN:-}" ] && [ -x "$ARK_BIN" ] && return 0
+  echo "MESH_CONDUCTOR_LAUNCH=ark: no executable ark binary (ARK_BIN='${ARK_BIN:-}')" >&2
+  echo "  build it:" >&2
+  echo "    cd '$REPO_ROOT/elohim' && CARGO_TARGET_DIR='$POOL/elohim/dev' RUSTFLAGS=\"\" cargo build -p elohim-ark" >&2
+  echo "  or point ARK_BIN at one; refusing to fall back to another launch mode." >&2
+  return 1
+}
+
+# The conductor binary an ark will pin, hash and execute. Identical selection to
+# the `direct` branches (HOLOCHAIN_BIN is already normalised to a binary path
+# near detect_fork_bin), but absolutised: the manifest's claim is about BYTES at
+# a path, so a PATH-relative name would let a later PATH change execute
+# different bytes than the passport reports.
+ark_conductor_bin() {
+  local bin="${HOLOCHAIN_BIN:-}"
+  [ -n "$bin" ] || bin="$(command -v holochain 2>/dev/null || true)"
+  case "$bin" in
+    ""|/*) ;;
+    *) bin="$PWD/$bin" ;;
+  esac
+  [ -x "$bin" ] || {
+    echo "ark: conductor binary is not executable: '${bin:-<none on PATH>}'" >&2
+    return 1
+  }
+  echo "$bin"
+}
+
+# Writes <peer>/ark/manifest.json and <peer>/ark/berth.json. Rewritten on every
+# launch, never hand-edited: the manifest pins the digest of the conductor
+# binary about to run, and the berth names that manifest by CID — `ark run`
+# exits 65 when the two disagree and 66 when the bytes on disk are not what was
+# pinned, so both values are DERIVED here rather than remembered.
+write_ark_declarations() { # <peer-name> <peer-index>
+  local name="$1" index="$2"
+  local data_root ark_dir manifest_path berth_path hc_bin sha cid incarnation
+  command -v jq >/dev/null 2>&1 || {
+    echo "ark: jq is required to write $name's declarations" >&2
+    return 1
+  }
+  hc_bin="$(ark_conductor_bin)" || return 1
+  data_root="$LOCAL_DEV_DIR/$name"
+  ark_dir="$data_root/ark"
+  manifest_path="$ark_dir/manifest.json"
+  berth_path="$ark_dir/berth.json"
+  [ -f "$data_root/conductor-config.yaml" ] || {
+    echo "ark: $name has no conductor-config.yaml under $data_root — generate the sandbox first" >&2
+    return 1
+  }
+  mkdir -p "$ark_dir" || return 1
+
+  sha="$("$ARK_BIN" hash "$hc_bin")" || {
+    echo "ark: could not hash the conductor binary $hc_bin" >&2
+    return 1
+  }
+
+  # argv is the `direct` argv with {artifact} and {data_root} left as berth
+  # templates, so the manifest stays content-addressable across peers: three
+  # peers on one conductor binary share ONE manifest CID and differ only in
+  # their berths. `ps` therefore still shows "holochain --piped", which is what
+  # the spin detector and mesh_footprint grep for.
+  jq -n --arg sha "$sha" '{
+    schema: 1,
+    kind: "runtime-manifest",
+    reach: "trusted",
+    processes: [{
+      name: "conductor",
+      kind: "native",
+      artifact: { pinned: { sha256: $sha } },
+      argv: ["{artifact}", "--piped", "--structured=Log", "--config-path", "{data_root}/conductor-config.yaml"],
+      stdin: "passphrase",
+      readiness: [
+        { stdout_line: { contains: "Conductor ready.", patience_ms: 120000 } },
+        { tcp_listen: { port_key: "admin_ws", patience_ms: 30000 } }
+      ],
+      policy: { shutdown: { signal: 2, grace_ms: 20000 } }
+    }]
+  }' > "$manifest_path" || return 1
+
+  cid="$("$ARK_BIN" manifest cid --manifest "$manifest_path")" || {
+    echo "ark: $manifest_path is not a valid runtime manifest" >&2
+    return 1
+  }
+
+  # Incarnation is monotone across restarts and `ark run` bumps whatever it
+  # finds, so a berth rewritten on every launch must carry the last passport's
+  # value forward instead of resetting the count to zero.
+  incarnation=0
+  if [ -f "$ark_dir/passport.json" ]; then
+    incarnation="$(jq -r '.incarnation // 0' "$ark_dir/passport.json" 2>/dev/null)"
+    [[ "$incarnation" =~ ^[0-9]+$ ]] || incarnation=0
+  fi
+
+  # "test" is the same passphrase the `hc` and `direct` branches pipe in, and
+  # admin_ws is what the tcp_listen rung of the readiness ladder resolves.
+  jq -n \
+    --arg manifest "$cid" \
+    --arg data_root "$data_root" \
+    --arg conductor "$hc_bin" \
+    --argjson admin_ws "$(admin_port "$index")" \
+    --argjson incarnation "$incarnation" '{
+    manifest: $manifest,
+    data_root: $data_root,
+    passphrase: { literal: "test" },
+    ports: { admin_ws: $admin_ws },
+    artifacts: { conductor: $conductor },
+    incarnation: $incarnation
+  }' > "$berth_path" || return 1
+}
+
+# One data root, one ark. Two arks over the same spool would interleave their
+# intent logs, both claim the incarnation, and each reap a conductor the other
+# spawned — so the launch sites ASK before launching rather than discovering it
+# afterwards.
+ark_peer_is_running() { # <peer-name> — 0 when an ark already owns this data root
+  local pid
+  if pid="$(live_recorded_pid ark "$1")"; then
+    echo "  $1: an ark already supervises this data root (ark pid $pid) — not launching a second"
+    return 0
+  fi
+  if pid="$(mesh_conductor_pid "$1")" && kill -0 "$pid" 2>/dev/null; then
+    echo "  $1: the passport names a LIVE conductor child (pid $pid) — an ark still owns this data root"
+    return 0
+  fi
+  return 1
+}
+
+launch_ark_conductor() { # <peer-name> <peer-index>
+  local name="$1" index="$2"
+  ark_peer_is_running "$name" && return 0
+  write_ark_declarations "$name" "$index" || return 1
+  # setsid, for the same reason the other launch sites use it: nohup only
+  # ignores SIGHUP and does nothing about a SIGKILL to the process GROUP, which
+  # is how a calling shell reaps its background children when it exits.
+  (
+    export RUST_LOG="$MESH_RUST_LOG"
+    cd "$LOCAL_DEV_DIR" || exit 1
+    setsid nohup "$ARK_BIN" run \
+      --manifest "$LOCAL_DEV_DIR/$name/ark/manifest.json" \
+      --berth "$LOCAL_DEV_DIR/$name/ark/berth.json" \
+      >> "$LOCAL_DEV_DIR/.sandbox_run_log.$name" 2>&1 &
+    record_mesh_pid ark "$name" "$!" || true
+  )
+  echo "  $name: ark launched (admin=$(admin_port "$index"), log $LOCAL_DEV_DIR/.sandbox_run_log.$name)"
+}
+
+launch_ark_conductors() { # one ark per configured peer; live peers are skipped
+  local name i=0 failed=0
+  assert_ark_binary || return 1
+  echo "  launch mode: ark ($ARK_BIN — each conductor is the child of an ark that witnesses its death)"
+  for name in "${PEERS[@]}"; do
+    launch_ark_conductor "$name" "$i" || failed=1
+    i=$((i + 1))
+  done
+  return "$failed"
+}
+
+# Ark rows for `status`. Prints NOTHING when no peer has a passport, so the
+# status output of an `hc` or `direct` mesh is byte-identical to before.
+ark_status_rows() {
+  local name passport pid incarnation ready any=0
+  for name in "${PEERS[@]}"; do
+    passport="$LOCAL_DEV_DIR/$name/ark/passport.json"
+    [ -f "$passport" ] || continue
+    if [ "$any" -eq 0 ]; then echo "arks:"; any=1; fi
+    pid="$(jq -r '.processes[] | select(.name=="conductor") | .pid // "-"' "$passport" 2>/dev/null)"
+    incarnation="$(jq -r '.incarnation // "-"' "$passport" 2>/dev/null)"
+    ready="$(jq -r '.processes[] | select(.name=="conductor") | .ready' "$passport" 2>/dev/null)"
+    printf "  conductor(ark) %-8s pid=%s incarnation=%s ready=%s\n" \
+      "$name" "${pid:--}" "${incarnation:--}" "${ready:-false}"
+  done
 }
 
 listener_pids_for_ports() { # <port>... — TCP and UDP listeners, unique pids
@@ -1010,6 +1255,7 @@ status_all() {
     fi
     i=$((i+1))
   done
+  ark_status_rows
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
     printf "doorway  :%s " "$DOORWAY_PORT"
     curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
@@ -1485,7 +1731,10 @@ restart_conductors() {
   # A restart re-runs `hc sandbox run`, which rewrites conductor-config.yaml in
   # the CLI's schema before the conductor reads it — so the pair must agree here
   # too, not only at generate time.
-  [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ] || assert_toolchain_parity
+  # `ark` skips the parity check for the same reason `direct` does: neither one
+  # runs the `hc` CLI, so neither can rewrite a config in the CLI's schema.
+  [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ] || \
+    [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] || assert_toolchain_parity
 
   # Exact pids only. Every lookup below matches an argv substring unique to the
   # target process AND excludes this shell — `pkill -f holochain` would match
@@ -1607,7 +1856,13 @@ CFGEOF
   #
   # Ports come from each conductor-config.yaml, which already carries the pinned
   # admin port, so nothing needs -f.
-  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
+  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
+    # Nothing to relaunch for a peer whose ark is alive: killing the child above
+    # IS the restart request, and its ark reaps the death, writes the witness and
+    # spawns the replacement itself. launch_ark_conductors covers the other case
+    # — an ark that is gone — and skips the peers it must not double-run.
+    launch_ark_conductors || return 1
+  elif [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
     local hc_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
     [ -x "$hc_bin" ] || { echo "no conductor binary: $hc_bin" >&2; return 1; }
     echo "  launch mode: direct (per-conductor logs, no hc CLI rewrite)"
@@ -1821,7 +2076,7 @@ join_peer() { # <fresh-peer-name>
   local sandbox="$LOCAL_DEV_DIR/$name"
   if [ -e "$sandbox" ] || grep -Fxq "$sandbox" "$LOCAL_DEV_DIR/.hc" 2>/dev/null || \
      [ -e "$PID_DIR/storage-$name" ] || [ -e "$PID_DIR/conductor-$name" ] || \
-     [ -e "$PID_DIR/conductor-supervisor-$name" ]; then
+     [ -e "$PID_DIR/conductor-supervisor-$name" ] || [ -e "$PID_DIR/ark-$name" ]; then
     echo "join-peer: peer '$name' was already staged; refusing a duplicate" >&2
     return 2
   fi
@@ -1881,7 +2136,10 @@ join_peer() { # <fresh-peer-name>
 
   local conductor_log="$LOCAL_DEV_DIR/.sandbox_run_log.$name"
   echo "starting late-join conductor $name: admin=$(admin_port "$index") app=$(app_port "$index")"
-  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
+  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
+    assert_ark_binary || return 1
+    launch_ark_conductor "$name" "$index" || return 1
+  elif [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
     local conductor_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
     [ -x "$conductor_bin" ] || {
       echo "join-peer: conductor binary is not executable: $conductor_bin" >&2
@@ -2215,16 +2473,28 @@ EOF
     done
     echo "dev-tier gossip config patched into ${#PEERS[@]} conductor-config.yaml (k2Gossip initiate=1000ms)"
 
-    (
-      export RUST_LOG="$MESH_RUST_LOG"
-      holochain_bin_export
-      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
-      record_mesh_pid conductor-supervisor mesh "$!" || true
-    )
+    if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
+      # No -p here, and none is needed: elohim-storage attaches its own app
+      # interface over the admin websocket at startup (hc_client.rs /
+      # signing.rs attach_app_interface), so the app ports come up with the
+      # storage peers rather than with the conductor launcher.
+      launch_ark_conductors || exit 1
+    else
+      (
+        export RUST_LOG="$MESH_RUST_LOG"
+        holochain_bin_export
+        setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
+        record_mesh_pid conductor-supervisor mesh "$!" || true
+      )
+    fi
     echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
       [ "$(ss -tln | grep -cE "127.0.0.1:($(echo "$fports" | tr ',' '|')) ")" -ge ${#PEERS[@]} ] && break
-      grep -qa "Payload: Could not" .sandbox_run_log && { echo; echo "conductor run failed — see $LOCAL_DEV_DIR/.sandbox_run_log"; exit 1; }
+      # 2>/dev/null: ark mode writes per-peer logs and never creates the
+      # multiplexed .sandbox_run_log, so this probe must be silent about its
+      # absence rather than printing a grep error every three seconds. In `hc`
+      # mode the file exists and the behaviour is unchanged.
+      grep -qa "Payload: Could not" .sandbox_run_log 2>/dev/null && { echo; echo "conductor run failed — see $LOCAL_DEV_DIR/.sandbox_run_log"; exit 1; }
       printf "."; sleep 3
     done
     echo " up"
