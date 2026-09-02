@@ -89,6 +89,8 @@ export interface PWLocator {
   nth(index: number): PWLocator;
   waitFor(options?: Record<string, unknown>): Promise<void>;
   textContent(): Promise<string | null>;
+  /** Visible text only — unlike textContent(), skips hidden nodes (e.g. transfer-state <script> tags). */
+  innerText(): Promise<string>;
   fill(value: string): Promise<void>;
   getByText(text: string, options?: Record<string, unknown>): PWLocator;
   hover(options?: Record<string, unknown>): Promise<void>;

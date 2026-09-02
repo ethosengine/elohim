@@ -64,20 +64,13 @@ Given(
 When(
   '{word} follows a link to the atom home for {string}',
   async function (this: E2EWorld, humanName: string, id: string) {
-    // Walks through the protocol (records the handoff) rather than a cold goto.
-    const device = requirePwDevice(this, humanName);
-    const appUrl = doorwayToAppUrl(device.client.url);
-    await device.page.evaluate(
-      ([href, label]) => {
-        const key = 'elohim.session-nav-stack.v1';
-        const stack = JSON.parse(sessionStorage.getItem(key) ?? '[]') as unknown[];
-        stack.push({ url: location.pathname, cid: '', label: document.title, ts: Date.now() });
-        stack.push({ url: href, cid: '', label, ts: Date.now() + 1 });
-        sessionStorage.setItem(key, JSON.stringify(stack));
-      },
-      [`/epr/${id}`, id]
-    );
-    await new EprHomePage(device.page).goto(appUrl, id);
+    // The atom home now records itself on the session nav stack when it
+    // loads (spec §12.2 — a real navigation, cold or in-app, builds real
+    // history), so no synthetic sessionStorage seeding is needed here
+    // anymore: the PRIOR page already recorded itself for real when it
+    // loaded, and this navigation's destination will too.
+    const { page, appUrl } = home(this, humanName);
+    await page.goto(appUrl, id);
   }
 );
 

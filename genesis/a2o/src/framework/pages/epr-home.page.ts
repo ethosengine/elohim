@@ -80,7 +80,11 @@ export class EprHomePage extends BasePage {
   }
 
   async bodyText(): Promise<string> {
-    return (await this.locate('body').textContent()) ?? '';
+    // innerText, not textContent — the latter includes hidden nodes (e.g. the
+    // Angular transfer-state <script> carrying serialized JSON with fields
+    // like "replicaCount", which false-matched a "the shard map and replica
+    // counts stay behind a link" assertion that only means VISIBLE text).
+    return this.locate('body').innerText();
   }
 
   async arrivalText(): Promise<string | null> {
@@ -93,6 +97,12 @@ export class EprHomePage extends BasePage {
       `[data-testid="${EPR_HOME.LEG('lives')}"] a[data-related-id="${resourceId}"]`
     ).click();
     await this.testId(EPR_HOME.GATE).waitFor({ state: 'visible', timeout: 20_000 });
+    // The related link is a plain <a href> (a full browser navigation, not
+    // an SPA transition — see epr-home-legs.component.html), so the gate's
+    // OWN referrer content (arrival/gate-back, sourced from the session nav
+    // stack the prior atom recorded) can still be settling in the same
+    // change-detection pass that made the container itself visible.
+    await this.page.waitForLoadState('networkidle');
   }
 
   async clickOpenInBundle(): Promise<void> {
