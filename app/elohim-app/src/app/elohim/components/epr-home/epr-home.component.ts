@@ -118,51 +118,53 @@ export class EprHomeComponent {
     { initialValue: null }
   );
 
-  readonly stewards = toSignal<StewardRow[]>(
+  readonly stewards = toSignal(
     this.atomId$.pipe(
       switchMap(id =>
         id
           ? this.storageApi.getStewardshipAllocations({ contentId: id, activeOnly: true }).pipe(
               map(rows =>
-                rows.map(r => ({
-                  stewardPresenceId: r.stewardPresenceId,
-                  contributionType: r.contributionType,
-                  effectiveFrom: r.effectiveFrom,
-                }))
+                rows.map(
+                  (r): StewardRow => ({
+                    stewardPresenceId: r.stewardPresenceId,
+                    contributionType: r.contributionType,
+                    effectiveFrom: r.effectiveFrom,
+                  })
+                )
               ),
-              catchError(() => of([]))
+              catchError(() => of<StewardRow[]>([]))
             )
-          : of([])
+          : of<StewardRow[]>([])
       )
     ),
-    { initialValue: [] }
+    { initialValue: [] as StewardRow[] }
   );
 
-  readonly relationships = toSignal<EprRelationship[]>(
+  readonly relationships = toSignal(
     this.atomId$.pipe(
       switchMap(id =>
         id
           ? this.eprResolver.resolveEprHead(id).pipe(
-              map(head => head?.relationships ?? []),
-              catchError(() => of([]))
+              map((head): EprRelationship[] => head?.relationships ?? []),
+              catchError(() => of<EprRelationship[]>([]))
             )
-          : of([])
+          : of<EprRelationship[]>([])
       )
     ),
-    { initialValue: [] }
+    { initialValue: [] as EprRelationship[] }
   );
 
-  readonly challenges = toSignal<ChallengeView[]>(
+  readonly challenges = toSignal(
     this.atomId$.pipe(
       switchMap(id =>
         id
           ? from(this.governance.getChallengesForEntity('content', id)).pipe(
-              catchError(() => of([]))
+              catchError(() => of<ChallengeView[]>([]))
             )
-          : of([])
+          : of<ChallengeView[]>([])
       )
     ),
-    { initialValue: [] }
+    { initialValue: [] as ChallengeView[] }
   );
 
   readonly heldChipLabel = computed(() => heldChip(holdingWords(this.snapshot())));
