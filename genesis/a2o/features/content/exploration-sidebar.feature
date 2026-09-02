@@ -28,9 +28,14 @@ Feature: Shared exploration sidebar surfaces authored and discovered neighbors
 
   @browser-only
   Scenario: Standalone viewer shows the See-also sidebar with both edge kinds
-    # The standalone /epr/{id} content-viewer renders the shared sidebar as a
-    # pinned rail. Authored edges fill the See-also sections; the resolver's
-    # computed tag edges fill the "Discovered — you might also explore" section.
+    # Runs against the legacy standalone /resource/{id} viewer (lamad's
+    # ContentViewerComponent) — the shared exploration sidebar is a lamad
+    # component and cannot cross into the shell-owned atom home at /epr/{id}
+    # (spec: 2026-09-02-epr-atom-home-shell-component-design.md §4.2); a
+    # standalone see-also affordance ON the atom home is filed against the
+    # commons plan (spec §8), not built here.
+    # Authored edges fill the See-also sections; the resolver's computed tag
+    # edges fill the "Discovered — you might also explore" section.
     When the learner opens the EPR address for "confession"
     Then the exploration sidebar is visible
     And it lists "constitution", "manifesto" and "theology" as authored related concepts
@@ -59,6 +64,11 @@ Feature: Shared exploration sidebar surfaces authored and discovered neighbors
 
   @browser-only
   Scenario: Doctrinal markdown renders independently of the path keystone
+    # Runs against the legacy standalone /resource/{id} viewer — the shared
+    # exploration sidebar is a lamad component and cannot cross into the
+    # shell-owned atom home at /epr/{id} (spec: 2026-09-02-epr-atom-home-
+    # shell-component-design.md §4.2); a standalone see-also affordance ON
+    # the atom home is filed against the commons plan (spec §8).
     # "theology" is a commons markdown EPR node. Its body renders via the markdown
     # renderer with no dependency on the epr-composite / PathViewer keystone, and
     # the shared sidebar populates beside it — the doctrinal reading experience

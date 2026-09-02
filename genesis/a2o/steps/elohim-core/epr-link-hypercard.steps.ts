@@ -26,12 +26,8 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
-import {
-  CONTENT_VIEWER,
-  CONTEXT_MENU,
-  EPR_LINK,
-  MARKDOWN,
-} from '../../src/framework/pages/selectors.js';
+import { EPR_HOME } from '../../src/framework/pages/epr-home.page.js';
+import { CONTEXT_MENU, EPR_LINK, MARKDOWN } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -261,22 +257,25 @@ Then('the universal address {string} is showing', async function (this: E2EWorld
 Then("the resolved EPR's body is rendered, not a loading state", async function (this: E2EWorld) {
   const device = pwDevice(this);
   if (!device) return 'pending';
-  const viewer = device.page.locator(`[data-testid="${CONTENT_VIEWER.ROOT}"]`).first();
-  await viewer.waitFor({ state: 'attached', timeout: 15_000 });
-  // The loaded node's body (.content-body on the standalone /epr/{id} viewer).
-  // This is the assertion that catches the change-detection freeze: the node
-  // arrives, `isLoading` flips, and nothing re-renders — the body never mounts.
+  // /epr/{id} is the shell-owned atom home (spec: 2026-09-02-epr-atom-home-
+  // shell-component-design.md) — no longer lamad's ContentViewerComponent.
+  const home = device.page.locator(`[data-testid="${EPR_HOME.ROOT}"]`).first();
+  await home.waitFor({ state: 'attached', timeout: 15_000 });
+  // The atom home's own top-level loading gate must be gone.
+  const loading = await device.page.locator(`[data-testid="${EPR_HOME.LOADING}"]`).count();
+  assert.equal(loading, 0, 'Expected the atom home to leave its loading state');
+  // The manifesto fixture is markdown — the focal slot hosts lamad's
+  // markdown renderer via the shell's EprFocalComponent, so the loaded
+  // node's actual body (.markdown-content) proves the change-detection
+  // freeze this scenario guards did not recur: the node arrives, loading
+  // flips, and the body actually mounts (not just the frame around it).
   await device.page
     .locator(MARKDOWN.CONTENT)
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
-  // The viewer's own top-level loading gate must be gone (tab-level loading
-  // states inside the rendered content are a different, narrower gate).
-  const topLevelSpinners = await viewer.locator('> .loading-state').count();
-  assert.equal(topLevelSpinners, 0, 'Expected the content viewer to leave its loading state');
-  const text = (await viewer.textContent()) ?? '';
+  const text = (await home.textContent()) ?? '';
   assert.ok(
-    !text.includes('Loading content...'),
+    !text.includes('Loading content...') && !text.includes('Reaching for this…'),
     'Expected the loading placeholder to be replaced by content'
   );
   return undefined;

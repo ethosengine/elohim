@@ -186,15 +186,21 @@ Given(
 
 /**
  * "When the learner opens the EPR address for {string}" — the visitor navigates
- * cold to the universal /epr/{id} standalone address, where the content-viewer
- * renders the focal markdown AND the shared exploration sidebar (pinned rail).
+ * cold to the legacy standalone /resource/{id} viewer, where lamad's
+ * ContentViewerComponent renders the focal markdown AND the shared exploration
+ * sidebar (pinned rail). NOT the universal /epr/{id} address: that route is
+ * now the shell-owned atom home (spec: 2026-09-02-epr-atom-home-shell-
+ * component-design.md), which does not (and per §4.2 cannot without a new
+ * cross-workspace edge) mount lamad's exploration sidebar. The standalone
+ * see-also affordance on the atom home itself is filed against the commons
+ * plan (spec §8), not built here.
  */
 When('the learner opens the EPR address for {string}', async function (this: E2EWorld, id: string) {
   const device = await ensureVisitor(this);
   if (!device) {
     return PENDING;
   }
-  await device.navigate(`/epr/${id}`);
+  await device.navigate(`/resource/${id}`);
 });
 
 /**

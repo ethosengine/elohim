@@ -39,9 +39,8 @@ import { request } from 'undici';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
 import { EprContentPage } from '../../src/framework/pages/epr-content.page.js';
+import { EPR_HOME } from '../../src/framework/pages/epr-home.page.js';
 import {
-  CONTENT_VIEWER,
-  LENS_VIEWER,
   NOT_FOUND,
   PATH_NAV,
   PATH_OVERVIEW,
@@ -313,9 +312,13 @@ Given('a learner opens the deep link {string}', async function (this: E2EWorld, 
 });
 
 /**
- * "Then the cross-pillar resource viewer renders" — the universal /epr/{id}
- * address resolved and the shell's epr/:resourceId route rendered the
- * cross-pillar resource viewer. Render-verified by the viewer's root testid.
+ * "Then the cross-pillar resource viewer renders" — the atom home renders.
+ * `/epr/:resourceId` no longer mounts lamad's ContentViewerComponent; the
+ * shell-owned EprHomeComponent (spec: 2026-09-02-epr-atom-home-shell-
+ * component-design.md) is the current cross-pillar viewer of the resource —
+ * the universal address's one stable frame for every atom, still owned by
+ * the shell rather than any pillar. Render-verified by the atom home's root
+ * testid.
  *
  * Example: Then the cross-pillar resource viewer renders
  */
@@ -324,10 +327,10 @@ Then('the cross-pillar resource viewer renders', async function (this: E2EWorld)
   if (!device) {
     return PENDING;
   }
-  const rendered = await rootRendered(device, CONTENT_VIEWER.ROOT);
+  const rendered = await rootRendered(device, EPR_HOME.ROOT);
   assert.ok(
     rendered,
-    `Expected the cross-pillar resource viewer to render (data-testid="${CONTENT_VIEWER.ROOT}"); ` +
+    `Expected the atom home to render (data-testid="${EPR_HOME.ROOT}"); ` +
       `URL is "${device.page.url()}"`
   );
 });
@@ -361,10 +364,12 @@ Then(
 
 /**
  * "Then the lamad composite outline renders" — a claimed epr-composite (a path)
- * at the bare universal /epr/{id} now serves the lens-complete shell viewer (the
- * claims-302 is demoted, EPR Slice 1), and the focal lens renders the path AS its
- * composite outline (PathViewerComponent), NOT a 302 to the pillar mount.
- * Render-verified by the outline's root testid.
+ * at the bare universal /epr/{id} now renders the shell-owned atom home (spec:
+ * 2026-09-02-epr-atom-home-shell-component-design.md), and the focal slot
+ * renders the claimed-type card (the outline of the thing lamad teaches),
+ * NOT a 302 to the pillar mount and NOT the pillar's own composite renderer —
+ * per §4.2 the shell owns the frame and never mounts a lamad component
+ * directly. Render-verified by the claimed-card testid.
  *
  * Example: Then the lamad composite outline renders
  */
@@ -373,18 +378,20 @@ Then('the lamad composite outline renders', async function (this: E2EWorld) {
   if (!device) {
     return PENDING;
   }
-  const rendered = await rootRendered(device, LENS_VIEWER.COMPOSITE_OUTLINE);
+  const rendered = await rootRendered(device, EPR_HOME.FOCAL_CLAIMED);
   assert.ok(
     rendered,
-    `Expected the focal epr-composite outline to render (data-testid="${LENS_VIEWER.COMPOSITE_OUTLINE}"); ` +
+    `Expected the focal claimed-type card to render (data-testid="${EPR_HOME.FOCAL_CLAIMED}"); ` +
       `URL is "${device.page.url()}"`
   );
 });
 
 /**
- * "Then the Open in pillar lens is offered" — the lens-complete viewer offers the
- * pillar deep-dive as ONE lens (the "Open in {pillar}" affordance) for a claimed
- * type, instead of force-302-ing to it. Render-verified by the affordance testid.
+ * "Then the Open in pillar lens is offered" — the atom home offers the
+ * pillar deep-dive as ONE lens (the "Open in {pillar}" affordance, minted
+ * from the generated all-bundle route claims — spec §4.3) for a claimed
+ * type, instead of force-302-ing to it. Render-verified by the affordance
+ * testid and its "Open in Lamad" wording.
  *
  * Example: And the Open in pillar lens is offered
  */
@@ -393,11 +400,20 @@ Then('the Open in pillar lens is offered', async function (this: E2EWorld) {
   if (!device) {
     return PENDING;
   }
-  const offered = await rootRendered(device, LENS_VIEWER.OPEN_IN_PILLAR);
+  const offered = await rootRendered(device, EPR_HOME.OPEN_IN_BUNDLE);
   assert.ok(
     offered,
-    `Expected the "Open in pillar" lens affordance (data-testid="${LENS_VIEWER.OPEN_IN_PILLAR}"); ` +
+    `Expected the "Open in <bundle>" lens affordance (data-testid="${EPR_HOME.OPEN_IN_BUNDLE}"); ` +
       `URL is "${device.page.url()}"`
+  );
+  const text =
+    (await device.page
+      .locator(`[data-testid="${EPR_HOME.OPEN_IN_BUNDLE}"]`)
+      .first()
+      .textContent()) ?? '';
+  assert.ok(
+    text.includes('Open in Lamad'),
+    `Expected the lens affordance to read "Open in Lamad"; got "${text.trim()}"`
   );
 });
 

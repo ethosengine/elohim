@@ -15,6 +15,7 @@ export type EprHomeLeg = 'holds' | 'lives' | 'governed' | 'from';
 /** Selectors for the shell-owned EPR atom home (/epr/{id}) — data-testid contract from the spec §6. */
 export const EPR_HOME = {
   ROOT: 'epr-home',
+  LOADING: 'epr-home-loading',
   GATE: 'epr-home-gate',
   GATE_BACK: 'epr-home-gate-back',
   ARRIVAL: 'epr-home-arrival',
@@ -24,6 +25,7 @@ export const EPR_HOME = {
   CHIP_HELD: 'epr-home-chip-held',
   OPEN_IN_BUNDLE: 'epr-home-open-in-bundle',
   FOCAL: 'epr-home-focal',
+  FOCAL_CLAIMED: 'epr-home-focal-claimed',
   YOUR_MARK: 'epr-home-your-mark',
   ADDRESS: 'epr-home-address',
   LEG: (leg: EprHomeLeg) => `epr-home-leg-${leg}`,
@@ -69,7 +71,10 @@ export class EprHomePage extends BasePage {
     const focal = await this.testId(EPR_HOME.FOCAL).boundingBox();
     const legs = await this.testId(EPR_HOME.LEG('holds')).boundingBox();
     if (!focal || !legs) return false;
-    return legs.x > focal.x + focal.width - 1 && legs.y < focal.y + focal.height;
+    // The rail must start level with the TOP of the reading column, not just
+    // anywhere alongside it (a rail that starts mid-column would still pass
+    // the old "y < focal bottom" check).
+    return legs.y <= focal.y + 8 && legs.x > focal.x + focal.width - 1;
   }
 
   async focalFullWidth(): Promise<boolean> {
