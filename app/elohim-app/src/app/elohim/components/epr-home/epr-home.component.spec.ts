@@ -11,6 +11,7 @@ import { DistributionService, ResilienceService } from '@elohim/service/public-a
 import { EprHomeComponent } from './epr-home.component';
 import { EprFocalComponent } from '../epr-focal/epr-focal.component';
 import { AuthService } from '../../../imagodei/services/auth.service';
+import { SeoService } from '../../../services/seo.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { EprResolverService } from '../../services/epr-resolver.service';
 import { SessionNavStackService } from '../../services/session-nav-stack.service';
@@ -108,7 +109,7 @@ function q(fixture: ComponentFixture<EprHomeComponent>, id: string): Element | n
 describe('EprHomeComponent', () => {
   let fixture: ComponentFixture<EprHomeComponent>;
   let storage: { getContent: ReturnType<typeof vi.fn> };
-  let navStack: { previous: ReturnType<typeof vi.fn> };
+  let navStack: { previous: ReturnType<typeof vi.fn>; record: ReturnType<typeof vi.fn> };
   let auth: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let affinity: {
     getAffinity: ReturnType<typeof vi.fn>;
@@ -116,6 +117,7 @@ describe('EprHomeComponent', () => {
     trackView: ReturnType<typeof vi.fn>;
     affinity$: ReturnType<typeof of>;
   };
+  let seo: { updateForContent: ReturnType<typeof vi.fn>; setTitle: ReturnType<typeof vi.fn> };
 
   async function mount(resourceId: string): Promise<void> {
     await TestBed.configureTestingModule({
@@ -147,6 +149,7 @@ describe('EprHomeComponent', () => {
         { provide: SessionNavStackService, useValue: navStack },
         { provide: AuthService, useValue: auth },
         { provide: AffinityTrackingService, useValue: affinity },
+        { provide: SeoService, useValue: seo },
       ],
     })
       .overrideComponent(EprHomeComponent, {
@@ -162,7 +165,7 @@ describe('EprHomeComponent', () => {
 
   beforeEach(() => {
     storage = { getContent: vi.fn().mockReturnValue(of(rawSimulation)) };
-    navStack = { previous: vi.fn().mockReturnValue(null) };
+    navStack = { previous: vi.fn().mockReturnValue(null), record: vi.fn() };
     auth = { isAuthenticated: signal(false) };
     affinity = {
       getAffinity: vi.fn().mockReturnValue(0.2),
@@ -170,6 +173,7 @@ describe('EprHomeComponent', () => {
       trackView: vi.fn(),
       affinity$: of({}),
     };
+    seo = { updateForContent: vi.fn(), setTitle: vi.fn() };
   });
 
   it('renders the frame with identity and chips for a reachable atom', async () => {
@@ -262,6 +266,7 @@ describe('EprHomeComponent', () => {
         { provide: SessionNavStackService, useValue: navStack },
         { provide: AuthService, useValue: auth },
         { provide: AffinityTrackingService, useValue: affinity },
+        { provide: SeoService, useValue: seo },
       ],
     })
       .overrideComponent(EprHomeComponent, {
@@ -341,5 +346,51 @@ describe('EprHomeComponent', () => {
   it('offers no "Open in <bundle>" lens for an unclaimed contentType', async () => {
     await mount('evolution-of-trust');
     expect(q(fixture, 'epr-home-open-in-bundle')).toBeNull();
+  });
+
+  it('records the loaded atom on the session nav stack so a walk inside the shell has a prior stop', async () => {
+    await mount('evolution-of-trust');
+    expect(navStack.record).toHaveBeenCalledWith({
+      url: '/epr/evolution-of-trust',
+      cid: 'uhCkk_D-fLh9hgcSAk4ZE6375dJuKrzf4Y9CDEOoX4e9fKujiEm8f',
+      label: 'The Evolution of Trust',
+    });
+  });
+
+  it('does not record the gate on the nav stack — an unreachable id is not a place to come back to', async () => {
+    storage.getContent.mockReturnValue(of(null));
+    await mount('concept-bidirectional-trust');
+    expect(navStack.record).not.toHaveBeenCalled();
+  });
+
+  it('sets the tab title from the loaded atom', async () => {
+    await mount('evolution-of-trust');
+    expect(seo.updateForContent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'evolution-of-trust', title: 'The Evolution of Trust' })
+    );
+  });
+
+  it('sets the tab title to "Out of reach" on the gate', async () => {
+    storage.getContent.mockReturnValue(of(null));
+    await mount('concept-bidirectional-trust');
+    expect(seo.setTitle).toHaveBeenCalledWith('Out of reach');
+  });
+
+  it('renders a claimed card instead of the focal renderer for a claimed contentType', async () => {
+    storage.getContent.mockReturnValue(
+      of({ ...rawSimulation, id: 'foundations-christian-technology', contentType: 'path' })
+    );
+    await mount('foundations-christian-technology');
+    expect(q(fixture, 'epr-home-focal-claimed')?.textContent).toContain(
+      'A path the Lamad app teaches'
+    );
+    expect(q(fixture, 'epr-home-focal-claimed')?.querySelector('.focal-stub')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.focal-stub')).toBeNull();
+  });
+
+  it('renders the focal stub and no claimed card for an unclaimed contentType', async () => {
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-focal-claimed')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.focal-stub')).not.toBeNull();
   });
 });

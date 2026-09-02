@@ -10,6 +10,7 @@ import { AuthService } from '@app/imagodei/services/auth.service';
 import { GovernanceApiService, eprToUniversalHref } from '@elohim/service';
 import { DistributionService, ResilienceService } from '@elohim/service/public-api';
 
+import { SeoService } from '../../../services/seo.service';
 import { EprRelationship } from '../../models/epr-head.model';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { EprNavService } from '../../services/epr-nav.service';
@@ -69,6 +70,7 @@ export class EprHomeComponent {
   private readonly eprNav = inject(EprNavService);
   private readonly auth = inject(AuthService);
   private readonly affinityService = inject(AffinityTrackingService);
+  private readonly seoService = inject(SeoService);
 
   private readonly state = toSignal(
     this.route.paramMap.pipe(
@@ -241,6 +243,32 @@ export class EprHomeComponent {
     effect(() => {
       const a = this.atom();
       if (a) this.affinityService.trackView(a.id);
+    });
+
+    // The tab title and the session nav stack are both keyed off the load
+    // state: a loaded atom names itself (SEO + this doorway's own history —
+    // §12.2, so the arrival chip / gate referrer downstream have a prior
+    // stop to name), the gate names itself "Out of reach" and records
+    // nothing (an unreachable id isn't a place to come back to).
+    effect(() => {
+      const s = this.state();
+      if (s.status === 'loaded') {
+        this.seoService.updateForContent({
+          id: s.atom.id,
+          title: s.atom.title,
+          summary: s.atom.description,
+          contentType: s.atom.contentType,
+          createdAt: s.atom.createdAt,
+          updatedAt: s.atom.updatedAt,
+        });
+        this.navStack.record({
+          url: this.address(),
+          cid: s.atom.dhtAnchorHash ?? '',
+          label: s.atom.title,
+        });
+      } else if (s.status === 'not-found') {
+        this.seoService.setTitle('Out of reach');
+      }
     });
   }
 

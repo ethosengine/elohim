@@ -110,6 +110,14 @@
   max-width: 72ch;
 }
 
+.epr-home__focal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 32px;
+}
+
 .epr-home__body {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);

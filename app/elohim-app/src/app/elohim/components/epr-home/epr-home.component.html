@@ -112,7 +112,22 @@
 
         @if (a.shape === 'immersive') {
           <section class="epr-home__focal epr-home__focal--immersive" data-testid="epr-home-focal">
-            <app-epr-focal [slug]="a.id"></app-epr-focal>
+            @if (lens(); as l) {
+              <div class="epr-home__focal-card" data-testid="epr-home-focal-claimed">
+                <p class="epr-home__eyebrow">
+                  A {{ a.contentType }} the {{ l.bundleName }} app teaches
+                </p>
+                <a
+                  class="epr-home__btn epr-home__btn--primary"
+                  [href]="l.href"
+                  data-testid="epr-home-focal-open"
+                >
+                  Open in {{ l.bundleName }} ↗
+                </a>
+              </div>
+            } @else {
+              <app-epr-focal [slug]="a.id"></app-epr-focal>
+            }
           </section>
         }
 
@@ -157,7 +172,22 @@
                 class="epr-home__focal epr-home__focal--reading"
                 data-testid="epr-home-focal"
               >
-                <app-epr-focal [slug]="a.id"></app-epr-focal>
+                @if (lens(); as l) {
+                  <div class="epr-home__focal-card" data-testid="epr-home-focal-claimed">
+                    <p class="epr-home__eyebrow">
+                      A {{ a.contentType }} the {{ l.bundleName }} app teaches
+                    </p>
+                    <a
+                      class="epr-home__btn epr-home__btn--primary"
+                      [href]="l.href"
+                      data-testid="epr-home-focal-open"
+                    >
+                      Open in {{ l.bundleName }} ↗
+                    </a>
+                  </div>
+                } @else {
+                  <app-epr-focal [slug]="a.id"></app-epr-focal>
+                }
               </section>
             }
           </div>
