@@ -25,8 +25,10 @@ pub use manifest::{ArtifactRef, ChildPolicy, Probe, ProcessKind, ProcessSpec, Ru
 pub use ring::RingBuffer;
 // pub use sample::ProcessSample; // Task 5
 // pub use sink::{Clock, WitnessSink}; // Task 5
-// pub use tally::{DeathRecord, DeathTally}; // Task 4
-// pub use verdict::{GiveUpReason, RestartGovernor, Verdict}; // Task 4
+pub use tally::{DeathRecord, DeathTally};
+pub use verdict::{
+    BoundedBy, GiveUpReason, RestartContext, RestartGovernor, RestartGrant, RestartRequest, Verdict,
+};
 // pub use witness::{DeathWitness, Incident}; // Task 5
 
 #[cfg(test)]
