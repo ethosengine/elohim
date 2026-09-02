@@ -8,14 +8,26 @@
 //! spawns and manages it as a child process.
 
 use holochain_client::{AdminWebsocket, WebsocketConfig};
+use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
 const DB_POOL_SATURATION_MARKER: &str = "Database read connection is saturated. Util ";
+
+/// Lines kept per forwarded output stream (stdout / stderr) so a dead child's
+/// last words survive past the moment they scrolled off the parent's own
+/// stdout/stderr — the death-witness evidence `wait_for_ready` attaches to a
+/// `ConductorError::Exited`.
+const OUTPUT_RING_CAPACITY: usize = 200;
+
+/// How many trailing lines of stderr-then-stdout ride along on a death-witness
+/// error. Bounded independently of the ring capacity so the log line and the
+/// error payload stay a manageable size even when the ring itself is fuller.
+const DEATH_WITNESS_TAIL_LINES: usize = 40;
 
 /// Default CPU niceness for the spawned conductor child.
 ///
@@ -54,7 +66,7 @@ fn read_proc_nice(pid: u32) -> Option<i32> {
     after_comm.split_whitespace().nth(16)?.parse().ok()
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct DbPoolSaturation {
     kind: &'static str,
     utilization_ratio: f64,
@@ -100,12 +112,86 @@ fn parse_db_pool_saturation(line: &str) -> Option<DbPoolSaturation> {
     })
 }
 
+/// Bounded FIFO of the most recently forwarded lines from one conductor
+/// output stream. Pure ring-buffer semantics (push evicts the oldest line
+/// once at capacity) so the death-witness eviction rule is unit-testable
+/// without a real child process.
+#[derive(Debug)]
+struct RingBuffer {
+    capacity: usize,
+    lines: VecDeque<String>,
+}
+
+impl RingBuffer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            lines: VecDeque::with_capacity(capacity),
+        }
+    }
+
+    fn push(&mut self, line: String) {
+        if self.lines.len() >= self.capacity {
+            self.lines.pop_front();
+        }
+        self.lines.push_back(line);
+    }
+
+    /// The last `n` lines, oldest first. Fewer than `n` when the buffer has
+    /// not yet filled.
+    fn last_n(&self, n: usize) -> Vec<String> {
+        let skip = self.lines.len().saturating_sub(n);
+        self.lines.iter().skip(skip).cloned().collect()
+    }
+}
+
+impl Default for RingBuffer {
+    fn default() -> Self {
+        Self::new(OUTPUT_RING_CAPACITY)
+    }
+}
+
+/// Shared, mutex-guarded state fed by `forward_conductor_output` and read by
+/// `wait_for_ready` — the bridge that lets the readiness probe see what the
+/// child has been saying on its own output pipes without disturbing the
+/// existing byte-for-byte forwarding to the parent's stdout/stderr.
+#[derive(Debug, Default)]
+struct ConductorOutputState {
+    stdout: Mutex<RingBuffer>,
+    stderr: Mutex<RingBuffer>,
+    last_db_pool_saturation: Mutex<Option<DbPoolSaturation>>,
+}
+
+impl ConductorOutputState {
+    /// Last `n` lines of stderr followed by the last `n` lines of stdout —
+    /// stderr first because that is where a Rust panic (and Holochain's own
+    /// FATAL PANIC banner) lands.
+    fn last_lines(&self, n: usize) -> Vec<String> {
+        let mut lines = self
+            .stderr
+            .lock()
+            .expect("stderr ring buffer mutex poisoned")
+            .last_n(n);
+        lines.extend(
+            self.stdout
+                .lock()
+                .expect("stdout ring buffer mutex poisoned")
+                .last_n(n),
+        );
+        lines
+    }
+}
+
 /// Drain one conductor output pipe, preserving its bytes on the parent output
 /// while projecting the existing saturation event into Prometheus. A broken
 /// parent output must not stop draining the child pipe (which would deadlock a
 /// log-heavy conductor), so forwarding errors are warned once and then ignored.
-async fn forward_conductor_output<R, W>(reader: R, mut writer: W, stream: &'static str)
-where
+async fn forward_conductor_output<R, W>(
+    reader: R,
+    mut writer: W,
+    stream: &'static str,
+    output_state: Arc<ConductorOutputState>,
+) where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
@@ -126,7 +212,18 @@ where
                         sample.kind,
                         sample.utilization_ratio,
                     );
+                    *output_state
+                        .last_db_pool_saturation
+                        .lock()
+                        .expect("db-pool-saturation mutex poisoned") = Some(sample);
                 }
+                let ring = match stream {
+                    "stderr" => &output_state.stderr,
+                    _ => &output_state.stdout,
+                };
+                ring.lock()
+                    .expect("output ring buffer mutex poisoned")
+                    .push(line.trim_end_matches(['\n', '\r']).to_string());
                 if !write_failed {
                     if let Err(err) = writer.write_all(&bytes).await {
                         write_failed = true;
@@ -139,6 +236,45 @@ where
                 break;
             }
         }
+    }
+}
+
+/// Stand-in for a child's exit status in the readiness decision below — only
+/// whether the child has exited matters to the decision, never the status's
+/// platform-specific bits, so tests can drive `classify_readiness_outcome`
+/// without spawning a real process (there is no public constructor for
+/// `std::process::ExitStatus`).
+type ExitStatusLike = ();
+
+/// Outcome of one `wait_for_ready` polling attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReadinessOutcome {
+    /// The child has already exited — stop polling immediately, regardless
+    /// of how many attempts remain.
+    ChildExited,
+    /// The child is alive and attempts remain — sleep and retry.
+    Retry,
+    /// The child is alive but attempts are exhausted — give up as NotReady.
+    GiveUp,
+}
+
+/// Pure decision: given whether the child has exited and how many attempts
+/// remain, what should `wait_for_ready` do next? A dead child always wins
+/// immediately — a slow child and a dead child must never be conflated by
+/// burning the rest of the retry budget on a process that is no longer
+/// running.
+fn classify_readiness_outcome(
+    child_exited: Option<ExitStatusLike>,
+    attempt: u32,
+    max_retries: u32,
+) -> ReadinessOutcome {
+    if child_exited.is_some() {
+        return ReadinessOutcome::ChildExited;
+    }
+    if attempt < max_retries {
+        ReadinessOutcome::Retry
+    } else {
+        ReadinessOutcome::GiveUp
     }
 }
 
@@ -156,6 +292,10 @@ pub struct ConductorManager {
     /// exceeds holochain_client's 60s default. See `HAPP_INSTALL_TIMEOUT_SECS`.
     admin_request_timeout: Duration,
     child: Option<Child>,
+    /// Ring-buffered tail of the child's forwarded stdout/stderr plus the
+    /// last-seen DB-pool-saturation sample — the death-witness evidence
+    /// `wait_for_ready` attaches to a `ConductorError::Exited`/`NotReady`.
+    output_state: Arc<ConductorOutputState>,
 }
 
 impl ConductorManager {
@@ -176,6 +316,7 @@ impl ConductorManager {
             admin_port,
             admin_request_timeout,
             child: None,
+            output_state: Arc::new(ConductorOutputState::default()),
         }
     }
 
@@ -222,11 +363,17 @@ impl ConductorManager {
             .spawn()
             .map_err(|e| ConductorError::SpawnFailed(e.to_string()))?;
 
+        // Fresh output state per spawned child — a restart must not let a
+        // prior life's tail lines bleed into this child's death-witness
+        // evidence.
+        self.output_state = Arc::new(ConductorOutputState::default());
+
         if let Some(stdout) = child.stdout.take() {
             tokio::spawn(forward_conductor_output(
                 stdout,
                 tokio::io::stdout(),
                 "stdout",
+                Arc::clone(&self.output_state),
             ));
         }
         if let Some(stderr) = child.stderr.take() {
@@ -234,6 +381,7 @@ impl ConductorManager {
                 stderr,
                 tokio::io::stderr(),
                 "stderr",
+                Arc::clone(&self.output_state),
             ));
         }
 
@@ -276,8 +424,20 @@ impl ConductorManager {
     ///
     /// Retries up to `max_retries` times with a 2-second delay between attempts.
     /// Returns the connected AdminWebsocket on success.
-    pub async fn wait_for_ready(&self, max_retries: u32) -> Result<AdminWebsocket, ConductorError> {
+    ///
+    /// Every attempt `try_wait()`s the child BEFORE touching the websocket at
+    /// all: a child that panicked seconds after spawn and a child that is
+    /// merely slow to bind its admin socket both present as connection
+    /// refused, so without consulting the child directly this loop would
+    /// spend the full `max_retries * 2s` window logging "not ready yet"
+    /// against a process that was never coming back — the 2026-09-02 alpha
+    /// incident this method now closes.
+    pub async fn wait_for_ready(
+        &mut self,
+        max_retries: u32,
+    ) -> Result<AdminWebsocket, ConductorError> {
         let addr = format!("localhost:{}", self.admin_port);
+        let started_at = std::time::Instant::now();
         info!(
             addr = %addr,
             max_retries = max_retries,
@@ -298,6 +458,36 @@ impl ConductorManager {
         };
 
         for attempt in 1..=max_retries {
+            let exit_status = match self.child.as_mut() {
+                Some(child) => child.try_wait().ok().flatten(),
+                None => None,
+            };
+
+            if classify_readiness_outcome(exit_status.as_ref().map(|_| ()), attempt, max_retries)
+                == ReadinessOutcome::ChildExited
+            {
+                let status = exit_status
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "unknown (status unavailable)".to_string());
+                let uptime_secs = started_at.elapsed().as_secs();
+                let last_lines = self.last_lines(DEATH_WITNESS_TAIL_LINES);
+                error!(
+                    status = %status,
+                    uptime_secs = uptime_secs,
+                    attempt = attempt,
+                    "Conductor child exited before becoming ready — stopping the readiness \
+                     poll immediately instead of burning the remaining retry window"
+                );
+                for line in &last_lines {
+                    error!("conductor[stderr]: {line}");
+                }
+                return Err(ConductorError::Exited {
+                    status,
+                    uptime_secs,
+                    last_lines,
+                });
+            }
+
             match AdminWebsocket::connect_with_config(&addr, ws_config.clone(), None).await {
                 Ok(ws) => {
                     info!(
@@ -307,24 +497,43 @@ impl ConductorManager {
                     return Ok(ws);
                 }
                 Err(e) => {
-                    if attempt < max_retries {
-                        warn!(
-                            attempt = attempt,
-                            max_retries = max_retries,
-                            error = %e,
-                            "Conductor not ready yet, retrying in 2s"
-                        );
-                        sleep(Duration::from_secs(2)).await;
-                    } else {
-                        error!(
-                            attempts = max_retries,
-                            error = %e,
-                            "Conductor failed to become ready"
-                        );
-                        return Err(ConductorError::NotReady(format!(
-                            "Failed after {} attempts: {}",
-                            max_retries, e
-                        )));
+                    match classify_readiness_outcome(None, attempt, max_retries) {
+                        ReadinessOutcome::Retry => {
+                            warn!(
+                                attempt = attempt,
+                                max_retries = max_retries,
+                                error = %e,
+                                "Conductor not ready yet, retrying in 2s"
+                            );
+                            sleep(Duration::from_secs(2)).await;
+                        }
+                        // GiveUp: attempts exhausted but the child is still alive per
+                        // try_wait above — keep the window as-is, just report honestly
+                        // that this is a slow/stuck conductor, not a dead one.
+                        ReadinessOutcome::GiveUp | ReadinessOutcome::ChildExited => {
+                            let last_saturation = self
+                                .output_state
+                                .last_db_pool_saturation
+                                .lock()
+                                .expect("db-pool-saturation mutex poisoned")
+                                .clone();
+                            error!(
+                                attempts = max_retries,
+                                error = %e,
+                                child_alive = true,
+                                last_db_pool_saturation = ?last_saturation,
+                                "Conductor failed to become ready"
+                            );
+                            return Err(ConductorError::NotReady {
+                                message: format!(
+                                    "Failed after {} attempts: {}",
+                                    max_retries, e
+                                ),
+                                child_alive: true,
+                                last_db_pool_saturation: last_saturation
+                                    .map(|s| format!("{}={:.2}", s.kind, s.utilization_ratio)),
+                            });
+                        }
                     }
                 }
             }
@@ -379,6 +588,14 @@ impl ConductorManager {
     /// Path to the conductor-config the process is (re)spawned with.
     pub fn config_path(&self) -> &std::path::Path {
         &self.config_path
+    }
+
+    /// Last `n` lines of the current child's forwarded stderr, followed by
+    /// the last `n` lines of its forwarded stdout — the death-witness tail
+    /// consumed by the boot-reconcile loop and downstream self-heal work.
+    /// Empty before the first `start()` or once the ring has no history.
+    pub fn last_lines(&self, n: usize) -> Vec<String> {
+        self.output_state.last_lines(n)
     }
 
     /// Restart the conductor: stop, then start again with the (possibly
@@ -472,8 +689,30 @@ pub enum ConductorError {
     #[error("Failed to spawn conductor: {0}")]
     SpawnFailed(String),
 
-    #[error("Conductor not ready: {0}")]
-    NotReady(String),
+    #[error("Conductor not ready: {message}")]
+    NotReady {
+        message: String,
+        /// `try_wait()` confirmed the child was still alive at give-up time —
+        /// distinguishes a slow/stuck conductor from a dead one (that case is
+        /// `Exited` instead, returned immediately rather than waiting out the
+        /// full retry budget).
+        child_alive: bool,
+        /// The most recent DB-read-pool saturation sample seen on the
+        /// child's output, if any — `kind=ratio` (e.g. `dht=2.27`).
+        last_db_pool_saturation: Option<String>,
+    },
+
+    /// The conductor child process exited before the admin websocket ever
+    /// answered. Returned immediately on the first `try_wait()` that
+    /// observes it — never after burning the rest of `max_retries`.
+    #[error("Conductor exited before becoming ready: {status} (alive {uptime_secs}s)")]
+    Exited {
+        status: String,
+        uptime_secs: u64,
+        /// Last ~`DEATH_WITNESS_TAIL_LINES` lines of stderr then stdout from
+        /// the output ring buffer.
+        last_lines: Vec<String>,
+    },
 
     #[error("Failed to stop conductor: {0}")]
     StopFailed(String),
@@ -600,10 +839,12 @@ mod tests {
 
         let (mut child_output, parent_reader) = tokio::io::duplex(1024);
         let (parent_writer, mut captured_output) = tokio::io::duplex(1024);
+        let output_state = Arc::new(ConductorOutputState::default());
         let forward = tokio::spawn(forward_conductor_output(
             parent_reader,
             parent_writer,
-            "test",
+            "stderr",
+            Arc::clone(&output_state),
         ));
         let expected =
             b"kind=Dht Database read connection is saturated. Util 500.00%\nraw-\xff-byte\n";
@@ -615,6 +856,16 @@ mod tests {
         captured_output.read_to_end(&mut actual).await.unwrap();
         forward.await.unwrap();
         assert_eq!(actual, expected);
+
+        // The ring buffer captured both forwarded lines (trailing newline
+        // stripped) alongside the byte-for-byte forward.
+        assert_eq!(
+            output_state.last_lines(10),
+            vec![
+                "kind=Dht Database read connection is saturated. Util 500.00%".to_string(),
+                "raw-\u{fffd}-byte".to_string(),
+            ]
+        );
     }
 
     #[test]
@@ -647,5 +898,58 @@ mod tests {
             "genesis-less stale state cleared"
         );
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn ring_buffer_keeps_the_last_n_and_drops_the_oldest() {
+        let mut ring = RingBuffer::new(3);
+        assert_eq!(ring.last_n(10), Vec::<String>::new(), "empty ring");
+
+        ring.push("a".to_string());
+        ring.push("b".to_string());
+        assert_eq!(ring.last_n(10), vec!["a".to_string(), "b".to_string()]);
+
+        // Pushing past capacity evicts the oldest line first (FIFO), never a
+        // middle or newest one.
+        ring.push("c".to_string());
+        ring.push("d".to_string());
+        assert_eq!(
+            ring.last_n(10),
+            vec!["b".to_string(), "c".to_string(), "d".to_string()],
+            "oldest ('a') dropped once capacity was exceeded"
+        );
+
+        // last_n caps the tail even when the ring holds more.
+        assert_eq!(ring.last_n(2), vec!["c".to_string(), "d".to_string()]);
+        assert_eq!(ring.last_n(0), Vec::<String>::new());
+    }
+
+    #[test]
+    fn readiness_outcome_prefers_child_death_over_attempt_budget() {
+        // Table test: (child_exited, attempt, max_retries) -> expected outcome.
+        // A dead child always wins immediately, even on attempt 1 of a large
+        // budget — that is the entire point of the fix (never wait out a
+        // dead child's retry window).
+        let cases: &[(Option<ExitStatusLike>, u32, u32, ReadinessOutcome)] = &[
+            // Child alive, attempts remain: retry.
+            (None, 1, 60, ReadinessOutcome::Retry),
+            (None, 59, 60, ReadinessOutcome::Retry),
+            // Child alive, attempts exhausted: give up (but child_alive is
+            // reported true by the caller).
+            (None, 60, 60, ReadinessOutcome::GiveUp),
+            // Child exited: stop immediately regardless of how many attempts
+            // remain — including the very first attempt.
+            (Some(()), 1, 60, ReadinessOutcome::ChildExited),
+            (Some(()), 30, 60, ReadinessOutcome::ChildExited),
+            (Some(()), 60, 60, ReadinessOutcome::ChildExited),
+        ];
+
+        for (child_exited, attempt, max_retries, expected) in cases.iter().copied() {
+            assert_eq!(
+                classify_readiness_outcome(child_exited, attempt, max_retries),
+                expected,
+                "child_exited={child_exited:?} attempt={attempt} max_retries={max_retries}"
+            );
+        }
     }
 }
