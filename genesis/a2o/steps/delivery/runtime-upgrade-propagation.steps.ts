@@ -1883,6 +1883,12 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
     `personal-channel publish missing releaseCid: ${JSON.stringify(parsed)}`
   );
   c.personalReleaseCid = parsed.releaseCid;
+  // The Background publish IS the staging-moment head: james is on the
+  // baseline until Station 3, so this cid (bound to the baseline) is what his
+  // personal row must resolve when the after-staging report is read back.
+  // r11 (2026-09-02) left this unset and the assertion fell back to the LATEST
+  // cid (the post-revert rebase) — a bookkeeping miss, not a controller one.
+  c.personalReleaseCidByStation.staging = parsed.releaseCid;
 }
 
 /**
