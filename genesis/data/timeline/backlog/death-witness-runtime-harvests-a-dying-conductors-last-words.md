@@ -32,6 +32,50 @@ runtime capability, not a cluster-admin privilege: visible to the household's el
 and to a high-trust replication/recovery partner (matthew ↔ adam), so a node that cannot speak
 for itself still has a witness.
 
+## The worked example — what the witness would have said, and what it cost not to have it
+
+Keep this with the design; it is why the item exists. On 2026-09-02 seven conductors died the
+same way and the distance between what the peer runtime KNEW and what anyone could SEE was the
+whole incident.
+
+**What the peer runtime had in hand, and threw away.** The supervisor (`process_manager`) spawned
+holochain, held both its output pipes, and polled its admin socket. Two point three seconds
+after spawn the child wrote `FATAL PANIC … Could not initialize Conductor from configuration:
+InternalCellError(CellWithoutGenesis(CellId(DnaHash(uhC0kkLdCTgRoh…), AgentPubKey(uhCAk8Obz…))))`
+to stderr and exited 1. The supervisor kept polling for 120 s, logged sixty `Conductor not ready
+yet … Connection refused` lines, then `Conductor failed to become ready, attempts: 60`, and
+exited — reporting nothing the child had said. The same runtime, on the previous boot, had
+itself logged `DNA content drift vs bundle (ALLOW_DNA_REINSTALL=true) — reinstalling`, then
+`uninstall_app failed: … DatabaseError(Timeout(Elapsed))` — the exact cause, in its own log, one
+boot earlier. Nothing joined the two.
+
+**What it took to see it instead.** From the developer seat, read-only, over two hours:
+Prometheus for `kube_pod_status_ready` (0/7), `kube_pod_container_status_restarts_total` (3–14
+each, 64 in 2 h after 28 h of none), `kube_pod_container_status_last_terminated_reason`
+(`Error`), pod ages and image tags; Loki for the doorway's `DNS resolve … Name or service not
+known` per human, storage's `projection-reconcile: OPENED the unresponsive-conductor circuit`,
+and the conductor's own tail — and that tail still led to the WRONG mechanism (a load storm),
+because the crash line was above the retention window I was reading. The right diagnosis needed
+a cluster admin with `kubectl describe` and `kubectl logs --previous` (the panic, the exit
+code), a shell on the node (`ls -la databases/authored/` → five files of exactly 139264 bytes,
+mtime = first post-restart boot; `dht/` 393–891 MB intact), and cgroup/ulimit reads to rule out
+the load hypothesis. A household has none of those. Its elohim operator would have seen a peer
+that "won't start" and nothing else, forever.
+
+**What the witness makes true.** The same facts, harvested by the process that already owns
+them, at the moment of death, without a conductor: the child's exit status and its last
+stderr lines (the panic and the cell id), the supervisor's own preceding decision (the
+drift-reinstall and the torn uninstall — the previous incident's tail is the current one's
+context), the authored-DB sizes and mtimes it can `stat` itself, the passport (image tags,
+bundle vs installed hashes), the readiness attempts. Content-addressed, on disk, offered to the
+node's custodians before exit, rendered at `/epr/{cid}` for whoever the reach admits. The
+household operator reads: *"conductor died 2.3 s into boot: no genesis for five cells; the
+previous boot deleted the source chains during a reinstall that timed out; DHT data intact;
+recovery: clear conductor state, rejoin as a new agent"* — the sentence the k8s dev produced
+after an hour with root. `kubectl describe` is a capability of the hyperscaler plane
+(seam-map crosswalk); this item is its peer-native equivalent, and the self-healing control
+plane's observe pillar cannot exist without it.
+
 ## P2P Design Gate: Death Witness
 
 ### Entity: DeathWitness (the report)
