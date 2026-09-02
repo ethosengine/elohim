@@ -76,7 +76,51 @@ is why the coordinator zome fix 0d572a455 has NOT reached the fleet by hot-swap.
 is the linker flag or something else in that build is unverified — compare the integrity wasm
 sha256 between holochain #1415 (pre-fix) and #1416 artifacts.
 
-## Why this is the operator's, not the repo's, to act on first
+## CORRECTED DIAGNOSIS (k8s operator, on-cluster, 2026-09-02 ~11:15Z) — supersedes the mechanism above
+
+Not load, not threads, not the 120 s window. Each conductor **panics 2.3 s into startup**:
+`Could not initialize Conductor from configuration: InternalCellError(CellWithoutGenesis(CellId(
+DnaHash(uhC0kkLdCTgRoh…), AgentPubKey(…))))` (`crates/holochain/src/bin/holochain/main.rs:201`),
+identical on all seven. The 120 s is the supervisor's patience on an already-dead child.
+
+What happened, per node, ~10 min apart along the wave-4 roll (jessica 09:28 → james 09:38 →
+gertrude 09:49 → susan 09:59 → eve 10:09 → adam 10:19 → matthew 10:28): first boot after the
+roll, `happ_manager` saw `DNA drift detected for role` (bundle integrity hashes ≠ installed) and,
+because **`ALLOW_DNA_REINSTALL=true` is set on all 14 alpha StatefulSets**, took
+`DNA content drift vs bundle — reinstalling` → `uninstall_app`. Holochain **deleted the five
+authored (source-chain) DBs** and began purging DNAs; the conductor-DB transaction then hit a
+30 s lock timeout under the post-restart read storm (`uninstall_app failed: …
+DatabaseError(Timeout(Elapsed))`). The uninstall is not atomic: files gone, conductor state
+still lists app `elohim` Enabled with five cells → every boot tries to create cells with no
+genesis → panic. On disk: all five authored DBs are exactly 139264 bytes (empty schema), mtime =
+first post-restart boot; `dht/` still holds 393–891 MB per DNA. **The source chains for the old
+agent keys are irrecoverable**; re-genesis under the same key on an empty chain is a fork, so the
+seven rejoin as NEW agents. The SQLite saturation is real but it is what tore the uninstall, not
+what kills the pod. The 120 s readiness window is NOT the fix (the startup probe already allows
+600 s; a longer window only slows the loop).
+
+**Decisions (orchestrator, 2026-09-02 11:2xZ):**
+1. **Pin the integrity hashes back** — the hc-rna `--import-undefined` link flag (03f331f21) is
+   gated to the local toolchain only, and the DNA pipeline prints + guards each DNA hash against
+   a committed baseline (`[dna:migrate]` to move it). The ~2.5 GB/node of DHT data belongs to
+   the old hashes; the reinstall must land on those DNAs.
+2. **`happ_manager` must never treat a standing env flag as migration intent**: drift on a node
+   holding data reinstalls only under an explicit per-roll `DNA_MIGRATION_INTENT=<bundle hashes>`;
+   `uninstall_app` failure is fatal-and-abort for that boot, never retried into a half-state; a
+   saturated conductor DB refuses to begin a non-atomic uninstall.
+3. **The supervisor distinguishes a dead child from a slow one** (`try_wait` each attempt; exit
+   status + last stderr lines reported immediately) — the death-witness MVP core.
+4. **Recovery (operator, destructive, after 1 lands and rolls):** clear `databases/conductor/` per
+   node (keeps DHT + cache, fastest rejoin) — not the full `databases/` tree. Consequence to
+   record: seven new agent keys → every surface that names those agents by key (hosted-agent
+   bindings, custody commitments, fixture humans' `agentPubKey`, attributions) sees a lineage
+   break; the 2026-08-30 native-sync recipe's identity binding (station 3) is the place that
+   should absorb it, and prod would need migration/lineage, not this.
+5. Noted, unintentional: conductor containers run `elohim-storage-iroh:1.0.0-dev-4a81a749` while
+   node containers run `…-7513654f` — the conductor template's image tag is not moved by the edge
+   deploy; the process_manager fix in 3 will not reach the conductor pods until that is.
+
+## Why the operator had to act first (original framing, kept for the trail)
 
 The fleet's conductors are in a restart livelock on a persistent PVC; every edge roll (#1413,
 #1414 in flight) re-enters it. Nothing in the repo manifests changed the conductor pod spec in
