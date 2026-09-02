@@ -1,6 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 
-import { anchorWords, focalShape, reachSubtitle, shortAnchor, toAtom } from './epr-home.model';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { GovernanceApiService } from '@elohim/service';
+import { DistributionService, ResilienceService } from '@elohim/service/public-api';
+
+import { EprHomeComponent } from './epr-home.component';
+import { EprFocalComponent } from '../epr-focal/epr-focal.component';
+import { EprResolverService } from '../../services/epr-resolver.service';
+import { StorageApiService } from '../../services/storage-api.service';
+import { StorageClientService } from '../../services/storage-client.service';
+
+import {
+  anchorWords,
+  focalShape,
+  heldChip,
+  holdingWords,
+  reachSubtitle,
+  shortAnchor,
+  toAtom,
+} from './epr-home.model';
 
 describe('epr-home.model', () => {
   it('shapes the focal slot by contentFormat', () => {
@@ -33,17 +55,25 @@ describe('epr-home.model', () => {
     expect(reachSubtitle(atom.reach)).toBe('anyone can reach this');
     expect(shortAnchor(atom.dhtAnchorHash!)).toBe('uhCkk_D-fLh9…KujiEm8f');
   });
+
+  it('renders the felt status as one verdict in household words', () => {
+    const words = holdingWords({
+      contentId: 'x',
+      feltStatus: {
+        headline: 'Held by only 1 household — invite another to help hold these',
+        reassurance: 'needs-help',
+        heldBy: [{ id: 'household-dowell', kind: 'household', label: 'Dowell Household', intraHubPeers: 2 }],
+        floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 1 },
+        suggestedAction: 'Invite a household to help hold these',
+      },
+    } as never);
+    expect(words.has).toBe(1);
+    expect(words.warm).toBe(true);
+    expect(words.households).toEqual(['Dowell Household · 2 peers']);
+    expect(heldChip(words)).toBe('Held by 1 of 3 households');
+    expect(heldChip(holdingWords(null))).toBe('Not yet held by any household');
+  });
 });
-
-import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { beforeEach, vi } from 'vitest';
-
-import { EprHomeComponent } from './epr-home.component';
-import { EprFocalComponent } from '../epr-focal/epr-focal.component';
-import { StorageClientService } from '../../services/storage-client.service';
 
 @Component({ selector: 'app-epr-focal', standalone: true, template: '<div class="focal-stub"></div>' })
 class EprFocalStub {
@@ -85,6 +115,23 @@ describe('EprHomeComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: { paramMap: of(convertToParamMap({ resourceId })) },
+        },
+        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) } },
+        {
+          provide: DistributionService,
+          useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },
+        },
+        {
+          provide: StorageApiService,
+          useValue: { getStewardshipAllocations: vi.fn().mockReturnValue(of([])) },
+        },
+        {
+          provide: EprResolverService,
+          useValue: { resolveEprHead: vi.fn().mockReturnValue(of(null)) },
+        },
+        {
+          provide: GovernanceApiService,
+          useValue: { getChallengesForEntity: vi.fn().mockResolvedValue([]) },
         },
       ],
     })
@@ -147,5 +194,72 @@ describe('EprHomeComponent', () => {
   it('carries the universal address line', async () => {
     await mount('evolution-of-trust');
     expect(q(fixture, 'epr-home-address')?.textContent).toContain('/epr/evolution-of-trust');
+  });
+
+  it('shows the held-by chip from the snapshot and renders all four legs', async () => {
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-chip-held')?.textContent).toContain(
+      'Not yet held by any household'
+    );
+    for (const leg of ['holds', 'lives', 'governed', 'from']) {
+      expect(q(fixture, `epr-home-leg-${leg}`)).not.toBeNull();
+    }
+  });
+
+  it('resets to loading between two atoms on the same component instance', async () => {
+    const paramMap$ = new BehaviorSubject(convertToParamMap({ resourceId: 'evolution-of-trust' }));
+    const second$ = new Subject<unknown>();
+    storage.getContent = vi
+      .fn()
+      .mockReturnValueOnce(of(rawSimulation))
+      .mockReturnValueOnce(second$);
+
+    await TestBed.configureTestingModule({
+      imports: [EprHomeComponent],
+      providers: [
+        provideRouter([]),
+        { provide: StorageClientService, useValue: storage },
+        { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) } },
+        {
+          provide: DistributionService,
+          useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },
+        },
+        {
+          provide: StorageApiService,
+          useValue: { getStewardshipAllocations: vi.fn().mockReturnValue(of([])) },
+        },
+        {
+          provide: EprResolverService,
+          useValue: { resolveEprHead: vi.fn().mockReturnValue(of(null)) },
+        },
+        {
+          provide: GovernanceApiService,
+          useValue: { getChallengesForEntity: vi.fn().mockResolvedValue([]) },
+        },
+      ],
+    })
+      .overrideComponent(EprHomeComponent, {
+        remove: { imports: [EprFocalComponent] },
+        add: { imports: [EprFocalStub] },
+      })
+      .compileComponents();
+    fixture = TestBed.createComponent(EprHomeComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(q(fixture, 'epr-home-title')?.textContent).toContain('The Evolution of Trust');
+
+    paramMap$.next(convertToParamMap({ resourceId: 'succession' }));
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-loading')).not.toBeNull();
+
+    second$.next({ ...rawSimulation, id: 'succession', title: 'Succession' });
+    second$.complete();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-title')?.textContent).toContain('Succession');
   });
 });

@@ -110,6 +110,25 @@
   max-width: 72ch;
 }
 
+.epr-home__body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+
+.epr-home__body--reading .epr-home__rail {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 900px) {
+  .epr-home__body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
 .epr-home__address {
   display: flex;
   flex-wrap: wrap;

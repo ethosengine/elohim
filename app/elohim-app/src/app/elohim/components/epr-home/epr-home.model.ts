@@ -5,6 +5,8 @@
  * backend-owned and shown verbatim.
  */
 
+import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
+
 export type FocalShape = 'immersive' | 'reading';
 
 const IMMERSIVE_FORMATS = new Set(['html5-app', 'video', 'audio', 'external', 'sophia-quiz-json']);
@@ -103,4 +105,50 @@ export function dayWords(stamp: string): string {
   const d = new Date(stamp.replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return stamp;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export interface StewardRow {
+  stewardPresenceId: string;
+  contributionType: string;
+  effectiveFrom: string;
+}
+
+export interface HoldingWords {
+  headline: string;
+  has: number;
+  wants: number;
+  warm: boolean;
+  households: string[];
+  action: string;
+}
+
+/** The ONE holding verdict on the page, in household words (spec §2.2). */
+export function holdingWords(snapshot: ResilienceSnapshotView | null): HoldingWords {
+  const felt = snapshot?.feltStatus;
+  if (!felt) {
+    return {
+      headline: "We can't confirm this is backed up anywhere yet.",
+      has: 0,
+      wants: 3,
+      warm: true,
+      households: [],
+      action: 'Invite a household to help hold this',
+    };
+  }
+  return {
+    headline: felt.headline,
+    has: felt.floor.hasHouseholds,
+    wants: felt.floor.wantsHouseholds,
+    warm: felt.reassurance === 'needs-help' || felt.reassurance === 'not-yet-seen',
+    households: felt.heldBy.map(h =>
+      h.intraHubPeers ? `${h.label ?? h.id} · ${h.intraHubPeers} peers` : (h.label ?? h.id)
+    ),
+    action: felt.suggestedAction ?? '',
+  };
+}
+
+export function heldChip(words: HoldingWords): string {
+  return words.has === 0
+    ? 'Not yet held by any household'
+    : `Held by ${words.has} of ${words.wants} households`;
 }

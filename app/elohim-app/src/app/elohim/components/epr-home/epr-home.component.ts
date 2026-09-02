@@ -1,23 +1,32 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 
-import { catchError, distinctUntilChanged, map, of, switchMap } from 'rxjs';
+import { catchError, distinctUntilChanged, from, map, of, startWith, switchMap } from 'rxjs';
 
-import { eprToUniversalHref } from '@elohim/service';
+import { GovernanceApiService, eprToUniversalHref } from '@elohim/service';
+import { DistributionService, ResilienceService } from '@elohim/service/public-api';
 
+import { EprRelationship } from '../../models/epr-head.model';
+import { EprResolverService } from '../../services/epr-resolver.service';
+import { StorageApiService } from '../../services/storage-api.service';
 import { StorageClientService } from '../../services/storage-client.service';
 import { EprFocalComponent } from '../epr-focal/epr-focal.component';
 
+import { EprHomeLegsComponent, humanizeSlug } from './epr-home-legs.component';
 import {
   EprHomeAtom,
+  StewardRow,
   anchorWords,
-  dayWords,
+  heldChip,
+  holdingWords,
   reachSubtitle,
-  shortAnchor,
   toAtom,
 } from './epr-home.model';
+
+import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
+import type { ChallengeView } from '@elohim/storage-client/generated';
 
 type LoadState =
   | { status: 'loading'; id: string }
@@ -37,7 +46,7 @@ type LoadState =
 @Component({
   selector: 'app-epr-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, EprFocalComponent],
+  imports: [CommonModule, RouterModule, EprFocalComponent, EprHomeLegsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './epr-home.component.html',
   styleUrl: './epr-home.component.css',
@@ -45,14 +54,11 @@ type LoadState =
 export class EprHomeComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly storage = inject(StorageClientService);
-
-  readonly resourceId = toSignal(
-    this.route.paramMap.pipe(
-      map(p => p.get('resourceId') ?? ''),
-      distinctUntilChanged()
-    ),
-    { initialValue: '' }
-  );
+  private readonly resilience = inject(ResilienceService);
+  private readonly distribution = inject(DistributionService);
+  private readonly storageApi = inject(StorageApiService);
+  private readonly eprResolver = inject(EprResolverService);
+  private readonly governance = inject(GovernanceApiService);
 
   private readonly state = toSignal(
     this.route.paramMap.pipe(
@@ -66,18 +72,101 @@ export class EprHomeComponent {
                 ? { status: 'not-found', id }
                 : { status: 'loaded', id, atom: toAtom(raw as unknown as Record<string, unknown>) }
           ),
-          catchError(() => of<LoadState>({ status: 'error', id }))
+          catchError(() => of<LoadState>({ status: 'error', id })),
+          startWith<LoadState>({ status: 'loading', id })
         )
       )
     ),
     { initialValue: { status: 'loading', id: '' } as LoadState }
   );
 
+  readonly resourceId = computed(() => this.state().id);
   readonly status = computed(() => this.state().status);
   readonly atom = computed<EprHomeAtom | null>(() => {
     const s = this.state();
     return s.status === 'loaded' ? s.atom : null;
   });
+
+  /** The loaded atom's id as a stream — every leg loader keys off it. */
+  private readonly atomId$ = toObservable(this.atom).pipe(
+    map(a => a?.id ?? null),
+    distinctUntilChanged()
+  );
+
+  readonly snapshot = toSignal<ResilienceSnapshotView | null>(
+    this.atomId$.pipe(
+      switchMap(id =>
+        id ? this.resilience.getSnapshot(id).pipe(catchError(() => of(null))) : of(null)
+      )
+    ),
+    { initialValue: null }
+  );
+
+  readonly peersHolding = toSignal<number | null>(
+    toObservable(this.atom).pipe(
+      map(a => a?.blobHash ?? null),
+      distinctUntilChanged(),
+      switchMap(hash =>
+        hash
+          ? from(this.distribution.getDetails(hash)).pipe(
+              map(d => d.summary.replicaCount),
+              catchError(() => of(null))
+            )
+          : of(null)
+      )
+    ),
+    { initialValue: null }
+  );
+
+  readonly stewards = toSignal<StewardRow[]>(
+    this.atomId$.pipe(
+      switchMap(id =>
+        id
+          ? this.storageApi.getStewardshipAllocations({ contentId: id, activeOnly: true }).pipe(
+              map(rows =>
+                rows.map(r => ({
+                  stewardPresenceId: r.stewardPresenceId,
+                  contributionType: r.contributionType,
+                  effectiveFrom: r.effectiveFrom,
+                }))
+              ),
+              catchError(() => of([]))
+            )
+          : of([])
+      )
+    ),
+    { initialValue: [] }
+  );
+
+  readonly relationships = toSignal<EprRelationship[]>(
+    this.atomId$.pipe(
+      switchMap(id =>
+        id
+          ? this.eprResolver.resolveEprHead(id).pipe(
+              map(head => head?.relationships ?? []),
+              catchError(() => of([]))
+            )
+          : of([])
+      )
+    ),
+    { initialValue: [] }
+  );
+
+  readonly challenges = toSignal<ChallengeView[]>(
+    this.atomId$.pipe(
+      switchMap(id =>
+        id
+          ? from(this.governance.getChallengesForEntity('content', id)).pipe(
+              catchError(() => of([]))
+            )
+          : of([])
+      )
+    ),
+    { initialValue: [] }
+  );
+
+  readonly heldChipLabel = computed(() => heldChip(holdingWords(this.snapshot())));
+  readonly heldWarm = computed(() => holdingWords(this.snapshot()).warm);
 
   readonly reachLabel = computed(() => {
     const r = this.atom()?.reach ?? 'commons';
@@ -95,7 +184,7 @@ export class EprHomeComponent {
     const a = this.atom();
     if (!a) return [];
     return [
-      a.category ?? a.contentType,
+      humanizeSlug(a.category ?? a.contentType),
       a.estimatedTime,
       a.author ? `by ${a.author}` : null,
       a.license,
@@ -105,10 +194,4 @@ export class EprHomeComponent {
   readonly rawHref = computed(() =>
     eprToUniversalHref({ id: this.resourceId(), tier: 'head', subview: 'raw' })
   );
-  readonly anchorShort = computed(() => {
-    const h = this.atom()?.dhtAnchorHash;
-    return h ? shortAnchor(h) : null;
-  });
-  readonly addedOn = computed(() => dayWords(this.atom()?.createdAt ?? ''));
-  readonly updatedOn = computed(() => dayWords(this.atom()?.updatedAt ?? ''));
 }

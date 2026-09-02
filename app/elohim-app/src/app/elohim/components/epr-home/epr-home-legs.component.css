@@ -1,0 +1,142 @@
+:host {
+  display: block;
+  font-family: var(--el-font-body);
+  color: var(--el-text);
+}
+
+.leg {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0 24px;
+  border-top: 1px solid var(--el-border);
+}
+
+.leg__title {
+  margin: 0;
+  font-family: var(--el-font-display);
+  font-weight: 500;
+  font-size: 19px;
+  color: var(--el-text-strong);
+}
+
+.leg__line {
+  margin: 0;
+  font-family: var(--el-font-ui);
+  font-size: 14px;
+  color: var(--el-text-strong);
+}
+
+.leg__line--quiet {
+  color: var(--el-text-muted);
+  font-size: 13px;
+}
+
+.leg__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--el-font-ui);
+  font-size: 14px;
+  color: var(--el-text-strong);
+}
+
+.leg__row--muted {
+  color: var(--el-text-muted);
+  font-size: 13px;
+}
+
+.leg__row--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.leg__row--link {
+  justify-content: space-between;
+  text-decoration: none;
+  color: var(--el-text-muted);
+}
+
+.leg__ui {
+  font-family: var(--el-font-ui);
+  font-size: 13px;
+}
+
+.leg__ui--muted {
+  color: var(--el-text-muted);
+}
+
+.leg__ui--warm {
+  color: var(--el-warm);
+}
+
+.leg__mono {
+  font-family: var(--el-font-mono);
+  font-size: 12px;
+  color: var(--el-text-muted);
+}
+
+.leg__link {
+  color: var(--el-action);
+  text-decoration: none;
+}
+
+.leg__link:hover {
+  text-decoration: underline;
+}
+
+.leg__btn {
+  align-self: flex-start;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--el-border);
+  background: transparent;
+  color: var(--el-text-strong);
+  font-family: var(--el-font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.leg__btn--quiet {
+  border-color: transparent;
+  padding: 0 8px;
+  color: var(--el-text-muted);
+}
+
+.leg__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--el-amber);
+}
+
+.pip--on {
+  background: var(--el-amber);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--el-surface-2);
+  font-family: var(--el-font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--el-text-muted);
+}

@@ -53,17 +53,44 @@
               {{ notarizedLabel() }}
               <small>· {{ anchorSub() }}</small>
             </span>
+            <a
+              class="epr-home__chip"
+              [class.epr-home__chip--warm]="heldWarm()"
+              href="#holds"
+              data-testid="epr-home-chip-held"
+            >
+              {{ heldChipLabel() }}
+            </a>
           </div>
         </header>
 
-        <section
-          class="epr-home__focal"
-          [class.epr-home__focal--immersive]="a.shape === 'immersive'"
-          [class.epr-home__focal--reading]="a.shape === 'reading'"
-          data-testid="epr-home-focal"
-        >
-          <app-epr-focal [slug]="a.id"></app-epr-focal>
-        </section>
+        @if (a.shape === 'immersive') {
+          <section class="epr-home__focal epr-home__focal--immersive" data-testid="epr-home-focal">
+            <app-epr-focal [slug]="a.id"></app-epr-focal>
+          </section>
+        }
+
+        <div class="epr-home__body" [class.epr-home__body--reading]="a.shape === 'reading'">
+          <div class="epr-home__main">
+            @if (a.shape === 'reading') {
+              <section
+                class="epr-home__focal epr-home__focal--reading"
+                data-testid="epr-home-focal"
+              >
+                <app-epr-focal [slug]="a.id"></app-epr-focal>
+              </section>
+            }
+          </div>
+          <app-epr-home-legs
+            class="epr-home__rail"
+            [atom]="a"
+            [snapshot]="snapshot()"
+            [peersHolding]="peersHolding()"
+            [stewards]="stewards()"
+            [relationships]="relationships()"
+            [challenges]="challenges()"
+          ></app-epr-home-legs>
+        </div>
 
         <footer class="epr-home__address" data-testid="epr-home-address">
           <span>This address works on any doorway that can reach it</span>

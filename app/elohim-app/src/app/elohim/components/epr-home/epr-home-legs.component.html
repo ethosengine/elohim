@@ -1,0 +1,113 @@
+<aside class="legs">
+  <!-- Who holds it (value) -->
+  <section class="leg" id="holds" data-testid="epr-home-leg-holds">
+    <h3 class="leg__title">Who holds it</h3>
+    @if (holding().households.length > 0) {
+      @for (h of holding().households; track h) {
+        <div class="leg__row">{{ h }}</div>
+      }
+    } @else {
+      <p class="leg__line">{{ holding().headline }}</p>
+    }
+    @if (holding().households.length > 0) {
+      <p class="leg__line leg__line--quiet">{{ holding().headline }}</p>
+    }
+    <div class="leg__row">
+      <span class="pips" aria-hidden="true">
+        @for (on of pips(); track $index) {
+          <span class="pip" [class.pip--on]="on"></span>
+        }
+      </span>
+      <span class="leg__ui" [class.leg__ui--warm]="holding().warm">
+        {{ holding().has }} of {{ holding().wants }} households this should live in
+      </span>
+    </div>
+    @if (peersHolding() !== null) {
+      <div class="leg__row leg__row--muted">{{ peersHolding() }} peers keep a copy</div>
+    }
+    <button type="button" class="leg__btn" data-testid="epr-home-invite-household">
+      {{ holding().action }}
+    </button>
+  </section>
+
+  <!-- Where this lives (knowledge) -->
+  <section class="leg" id="lives" data-testid="epr-home-leg-lives">
+    <h3 class="leg__title">Where this lives</h3>
+    @if (relationships().length === 0 && related().length === 0) {
+      <p class="leg__line">Not on a learning path yet.</p>
+    }
+    @if (relationships().length > 0) {
+      <div data-testid="viewer-relationships-panel" aria-label="Related concepts">
+        <app-epr-relationships-panel
+          [relationships]="relationships()"
+        ></app-epr-relationships-panel>
+      </div>
+    }
+    @if (related().length > 0) {
+      <p class="leg__ui leg__ui--muted">Named as related</p>
+      @for (r of related(); track r.id) {
+        <a class="leg__row leg__row--link" [href]="r.href" [attr.data-related-id]="r.id">
+          <span>{{ r.label }}</span>
+          <span class="pill">not held on this doorway</span>
+        </a>
+      }
+    }
+  </section>
+
+  <!-- How it's governed (governance) -->
+  <section class="leg" id="governed" data-testid="epr-home-leg-governed">
+    <h3 class="leg__title">How it's governed</h3>
+    @if (openChallenges().length === 0) {
+      <p class="leg__line">No challenges, no labels. Nothing is in question.</p>
+    } @else {
+      @for (c of openChallenges(); track c.id) {
+        <div class="leg__row">
+          <span>{{ c.groundsPrimary }}</span>
+          <span class="pill">{{ c.state }}</span>
+        </div>
+      }
+    }
+    <div class="leg__actions">
+      <button type="button" class="leg__btn leg__btn--quiet" data-testid="epr-home-raise-concern">
+        Raise a concern
+      </button>
+    </div>
+  </section>
+
+  <!-- Where it came from (process) -->
+  <section class="leg" id="from" data-testid="epr-home-leg-from">
+    <h3 class="leg__title">Where it came from</h3>
+    @for (s of stewards(); track s.stewardPresenceId) {
+      <div class="leg__row">
+        <span class="leg__ui leg__ui--muted">Steward</span>
+        <span>{{ s.stewardPresenceId }}</span>
+        <span class="pill">{{ contribution(s) }} · since {{ since(s) }}</span>
+      </div>
+    }
+    @if (sourceLabel(); as src) {
+      <div class="leg__row">
+        <span class="leg__ui leg__ui--muted">Source</span>
+        <a class="leg__link" [href]="atom().sourceUrl ?? atom().canonicalUrl" rel="noopener">
+          {{ src }}
+        </a>
+        @if (atom().license) {
+          <span class="leg__ui leg__ui--muted">· {{ atom().license }}</span>
+        }
+      </div>
+    }
+    <div class="leg__row leg__row--stack">
+      <span class="leg__ui leg__ui--muted">Notarized</span>
+      <span>added {{ addedOn() }} · updated {{ updatedOn() }}</span>
+      @if (anchorShort(); as anchor) {
+        <span class="leg__mono">
+          {{ anchor }}
+          <span class="leg__ui leg__ui--muted">
+            ·
+            {{ anchorVerified() ? 'verified on this doorway' : 'not yet verified on this doorway' }}
+          </span>
+        </span>
+      }
+    </div>
+    <a class="leg__link leg__ui" [href]="rawHref()">Raw node ›</a>
+  </section>
+</aside>
