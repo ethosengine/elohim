@@ -755,6 +755,24 @@ mod tests {
         assert_eq!(original_cid.to_string(), reconstructed_cid.to_string());
     }
 
+    #[test]
+    fn witness_cid_and_blob_address_share_one_digest() {
+        let bytes = b"canonical death witness";
+        let witness_cid = Cid::new_v1(0x71, Code::Sha2_256.digest(bytes)).to_string();
+        let blob_cid = Cid::new_v1(0x55, Code::Sha2_256.digest(bytes)).to_string();
+        let hash = BlobStore::compute_hash(bytes);
+        let expected = BlobStore::parse_content_address(&hash).unwrap();
+
+        assert_eq!(
+            BlobStore::parse_content_address(&witness_cid).unwrap(),
+            expected
+        );
+        assert_eq!(
+            BlobStore::parse_content_address(&blob_cid).unwrap(),
+            expected
+        );
+    }
+
     /// T19 Fix #3 regression: zero-byte placeholder files in the blob tree
     /// (a known partial-write failure mode) must NOT be reported as
     /// "we have this hash" by `list_hashes`. Inventory broadcasts derive
