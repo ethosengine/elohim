@@ -257,6 +257,13 @@ gains `SuppliedOnUnreachable`), tests beside them; the mesh receipt
 `genesis/a2o/scripts/peer-carried-sweep-receipt.ts` (its 2026-09-01 "structural stop" was
 exactly this branch).
 
+- [ ] **Floor (from the ceremony session, 2026-09-02):** `conductor-call-is-uncancellable`
+  (`elohim/elohim-storage/src/.epr-meta`). A caller-side timeout abandons a conductor that is
+  still running the zome call and still holding the read permit. Whatever this arm becomes,
+  the carried-supply and verify work is BOUNDED ON THE WASM SIDE before the call (in-wasm
+  deadline, partial results, `unattempted` interpreted) — never a second caller timeout.
+  Rebase the design on the current `services/release_adoption/watch.rs` first: head
+  resolution is already local-strategy and the verify path takes the head tier.
 - [ ] Failing test first: an `Unreachable` election answer with a peer hint and a fetcher
   reaches `try_carried_election_supply`; with the flag off, behaviour is byte-identical to today.
 - [ ] `verify_carried_election` is coordinator-only, read-only, commits nothing (zome doc) — it
@@ -290,6 +297,10 @@ for this id they agree and the bytes pointer drifted.
   `dht_anchor_hash`; never touches a row whose head is not the record's.
 - [ ] Receipt on the mesh: stage the two-pointer state with the household seed profile, run one
   sweep, both doorways return the same `blobHash`. Fleet confirm: the live probe.
+
+**After the push, before anyone declares a channel followed:** read `/admin/adoption` on the
+fleet — the controller's election reads are local-strategy, so a saturated conductor shows
+`resolve failed, unreachable` there, typed and honest, not a stall.
 
 **Captured, not absorbed:** the conductor timeouts themselves (`deadline has elapsed`,
 websocket timeout) are the head-plane program's L1 batched-externs problem, and at probe time

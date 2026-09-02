@@ -81,9 +81,29 @@ function staticStages(text) {
 
   while ((match = matcher.exec(pipeline)) !== null) {
     const openBrace = pipelineStart + match.index + match[0].lastIndexOf("{");
-    stages.set(match[2], balancedBlock(text, openBrace));
+    stages.set(match[2], inlineTopLevelHelpers(text, balancedBlock(text, openBrace)));
   }
   return stages;
+}
+
+// A stage body may be a single call to a top-level `def name()` — the edge
+// Jenkinsfile's pipeline{} block sits at the JVM 64KB CPS ceiling, so stage
+// bodies are hoisted into helpers (runMeshQuiesceMeasure, runDataplaneValidation).
+// The contract these tests pin is the stage's BEHAVIOUR, so a hoisted body is
+// inlined (one level) before the assertions read it; a helper that does not
+// exist is left as the bare call so the assertion fails loudly rather than
+// silently passing on an empty body.
+function inlineTopLevelHelpers(text, body) {
+  const calls = body.matchAll(/^\s*([A-Za-z_]\w*)\(\)\s*$/gm);
+  let out = body;
+  for (const call of calls) {
+    const name = call[1];
+    const def = text.search(new RegExp(`^def\\s+${name}\\s*\\(\\s*\\)\\s*\\{`, "m"));
+    if (def === -1) continue;
+    const openBrace = text.indexOf("{", def);
+    out += `\n// inlined top-level def ${name}()\n` + balancedBlock(text, openBrace);
+  }
+  return out;
 }
 
 function assertEdgeStageContract(text) {

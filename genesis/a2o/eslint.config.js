@@ -13,7 +13,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'reports/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'reports/**',
+      // Frozen shift oracle (2026-08-31 fleet-carried-election-convergence): its bytes are
+      // fixed by rule so the measure it produces stays comparable across shifts; lint is
+      // exempted rather than the gate bypassed. Retire this line with the oracle.
+      'scripts/dataplane-convergence-measure.ts',
+    ],
   },
   {
     files: ['**/*.ts'],
