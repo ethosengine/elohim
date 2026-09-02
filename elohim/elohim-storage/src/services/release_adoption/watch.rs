@@ -771,8 +771,39 @@ impl AdoptionController {
         let mut checked = 0usize;
 
         for channel in followed.channels.iter().take(MAX_CHANNELS_PER_SWEEP) {
-            if state::channel_state(&channel.channel_id).is_some_and(|s| s.is_backing_off(now)) {
-                continue;
+            let existing = state::channel_state(&channel.channel_id);
+            if let Some(existing) = existing.as_ref() {
+                if existing.is_backing_off(now) {
+                    // The backoff on this row was computed for a SPECIFIC
+                    // resolved head (`existing.resolved_head`) — the one a
+                    // refusal was about. A channel's canonical election can
+                    // move to a NEW head (a fresh release published on the
+                    // same channel) while the timer is still running, and a
+                    // refusal about the OLD head carries zero information
+                    // about the new one. Re-resolve cheaply — the same
+                    // `resolve_content_head_local` Background-classed read
+                    // `check_channel` makes, never a network `get` — before
+                    // honouring the timer.
+                    let current_cid = match self.resolve_head(&channel.channel_id).await {
+                        Answer::Present(head) => Some(head.head_action_hash.0.clone()),
+                        // Absent or Unreachable: the election read itself
+                        // gave us nothing new to act on, so this is not the
+                        // "different head" case — honour the backoff exactly
+                        // as before.
+                        Answer::Absent | Answer::Unreachable => None,
+                    };
+                    if existing.should_skip_for_backoff(now, current_cid.as_deref()) {
+                        continue;
+                    }
+                    // The election moved. Treat this tick as a clean start
+                    // against the new head rather than resuming the old
+                    // head's refusal streak — `check_channel` below re-reads
+                    // and records the real verdict; this only clears the
+                    // count so that verdict's backoff rung is computed
+                    // against a streak of ONE, not a streak inherited from a
+                    // head this check is not even about.
+                    state::reset_refusals_for_new_head(&channel.channel_id);
+                }
             }
             let outcome = self
                 .check_channel(channel, now, &mut byte_budget, &mut threshold_reads)

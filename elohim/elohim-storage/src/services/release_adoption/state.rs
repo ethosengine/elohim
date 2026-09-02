@@ -492,6 +492,30 @@ impl ChannelAdoptionState {
             .is_some_and(|not_before| now_unix < not_before)
     }
 
+    /// Whether a sweep should actually honour that backoff, given the cid the
+    /// channel's canonical election resolves to RIGHT NOW (`None` when that
+    /// election read itself failed — unreachable or absent — this tick).
+    ///
+    /// The backoff on this row was computed for a SPECIFIC resolved head —
+    /// `resolved_head`, set by whatever check (a pass or a refusal) last
+    /// advanced the ladder. A different resolved head is new information a
+    /// channel must never sit out mid-backoff: a refusal that says "your OLD
+    /// head doesn't fit my reality" carries zero information about a head
+    /// published afterward. Only an UNCHANGED head — or a failed election
+    /// read, which has nothing new to offer — honours the timer.
+    pub fn should_skip_for_backoff(&self, now_unix: i64, current_head_cid: Option<&str>) -> bool {
+        if !self.is_backing_off(now_unix) {
+            return false;
+        }
+        match current_head_cid {
+            Some(cid) => self
+                .resolved_head
+                .as_ref()
+                .is_some_and(|recorded| recorded.cid == cid),
+            None => true,
+        }
+    }
+
     /// Record a completed check. Owns the backoff ladder so a caller cannot
     /// forget to advance (or to reset) it.
     ///
@@ -614,6 +638,21 @@ pub fn reconcile_followed(followed: &FollowedChannels) {
 /// Snapshot of one channel's state, for a sweep to decide whether to skip it.
 pub fn channel_state(channel_id: &str) -> Option<ChannelAdoptionState> {
     REGISTRY.channels.lock().unwrap().get(channel_id).cloned()
+}
+
+/// Clear a channel's refusal streak because its canonical election moved to a
+/// NEW resolved head while the channel was backing off.
+///
+/// Called only from the sweep gate, immediately before the bypassed
+/// `check_channel` runs and calls [`record_check`]: that call still owns the
+/// backoff/verdict/`resolvedHead` transition (this does not touch them), it
+/// only makes sure the ladder rung `record_check` computes reflects a streak
+/// against the NEW head — one, if it refuses again — rather than a count
+/// inherited from a head this check is not even about.
+pub fn reset_refusals_for_new_head(channel_id: &str) {
+    if let Some(state) = REGISTRY.channels.lock().unwrap().get_mut(channel_id) {
+        state.consecutive_refusals = 0;
+    }
 }
 
 /// Record a completed check for one channel.
@@ -920,6 +959,63 @@ mod tests {
         );
         assert!(state.is_backing_off(1_500));
         assert!(!state.is_backing_off(1_000 + TERMINAL_BACKOFF_SECS as i64));
+    }
+
+    /// The r10 defect this guards: a channel refused non-transiently (a
+    /// `coordinator_lineage_mismatch`, terminal backoff) whose canonical
+    /// election then moves to a NEW release on the SAME channel must not sit
+    /// out the 30-minute timer — the refusal was about the OLD head, and a
+    /// different resolved head is new information regardless of what the
+    /// timer says. `should_skip_for_backoff` is the pure decision the sweep
+    /// gate consults every tick; unlike `is_backing_off` it also takes the
+    /// freshly-resolved head cid so the two concerns (is a timer running? is
+    /// this still the same situation the timer was about?) are each testable
+    /// on their own.
+    #[test]
+    fn backoff_is_bypassed_only_when_the_resolved_head_actually_changed() {
+        let mut state = ChannelAdoptionState::new(&observe("c"));
+        state.record(
+            1_000,
+            Some(ResolvedHead {
+                cid: "uhCkkH1".to_string(),
+                tier: HeadTier::Staging,
+            }),
+            Verdict::Refused {
+                refusal: AdoptionRefusal::new(
+                    RefusalReason::CoordinatorLineageMismatch,
+                    "james's own reality moved out from under H1",
+                ),
+            },
+            None,
+        );
+        assert!(state.is_backing_off(1_100), "terminal backoff is running");
+
+        // (no backoff) -> check: the base case `is_backing_off` already
+        // covers, restated here so the three cases in this test read as one
+        // table.
+        let fresh = ChannelAdoptionState::new(&observe("c"));
+        assert!(!fresh.should_skip_for_backoff(1_100, Some("uhCkkH1")));
+
+        // (backoff active, head unchanged) -> skip: the election still
+        // resolves the same H1 this refusal was about — nothing new to act
+        // on, honour the timer.
+        assert!(state.should_skip_for_backoff(1_100, Some("uhCkkH1")));
+
+        // (backoff active, head changed) -> check: the steward published H2
+        // on the same channel; the election now resolves H2, which this row
+        // has never been judged against. The timer must not apply.
+        assert!(!state.should_skip_for_backoff(1_100, Some("uhCkkH2")));
+
+        // (backoff active, election read failed) -> skip: unreachable/absent
+        // carries no new information, so the existing timer still governs —
+        // no behaviour change on that path.
+        assert!(state.should_skip_for_backoff(1_100, None));
+
+        // Once the backoff window itself has elapsed, the timer no longer
+        // applies regardless of the head — `is_backing_off` alone decides.
+        assert!(
+            !state.should_skip_for_backoff(1_000 + TERMINAL_BACKOFF_SECS as i64, Some("uhCkkH1"))
+        );
     }
 
     /// **C4.** A success or an honest idle clears the ladder entirely — a cured
