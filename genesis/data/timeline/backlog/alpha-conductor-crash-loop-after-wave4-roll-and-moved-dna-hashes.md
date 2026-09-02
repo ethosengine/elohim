@@ -120,6 +120,38 @@ what kills the pod. The 120 s readiness window is NOT the fix (the startup probe
    node containers run `…-7513654f` — the conductor template's image tag is not moved by the edge
    deploy; the process_manager fix in 3 will not reach the conductor pods until that is.
 
+## THE HASH QUESTION, ANSWERED (2026-09-02 16:00Z — archived-artifact walk, `hc dna hash` per build)
+
+| Build | Date | lamad | imagodei | infrastructure | mishpat |
+|---|---|---|---|---|---|
+| 1363–1380 | Jul 18 – Jul 29 | moved | moved | moved | moved |
+| 1390–1414 | Aug 2 – Sep 2 02:17 | moved (`8x1UsBQj`) | moved (`RA0NgxsL`) | **MATCH** | moved (`Rnr6SB8c`) |
+| 1416–1419 | Sep 2 07:47–14:47 | moved (incident) | moved (incident) | moved (incident) | moved (incident) |
+| **1420** | Sep 2 15:20 | = 1414 | = 1414 | **MATCH** | = 1414 |
+
+- The 2 September incident (03f331f21's build scripts) is **bounded and fixed**: #1420 is
+  byte-identical to #1414 on every role (189061c6d removed the build scripts; the local link
+  need rides RUSTFLAGS in the per-DNA justfiles). The guard works.
+- **The fleet's installed lamad / imagodei / mishpat DNAs match NO CI build since at least
+  2026-07-18** (node_registry is unrecoverable before #1419 and moved in both recoverable builds).
+  The fleet has been running pre-July integrity zomes while every CI build since shipped newer
+  ones that never installed — the "DNA changes don't redeploy by default" trap, six weeks deep.
+  What the drift probe saw on the wave-4 roll was not the link-flag move; it was that backlog.
+- **Pin-back is not viable**: it would mean reverting six weeks of integrity work (lamad T1b
+  9b3979d3b, seam-contracts election extraction ffdd7369d, …). The DHT data on the PVCs belongs
+  to DNA hashes the code no longer produces.
+
+**Recommendation to the operator: MIGRATE.** (1) Update `elohim/holochain/dna/dna-hashes.baseline`
+to #1420's five hashes in a commit tagged `[dna:migrate]` (the guard then passes; the baseline
+becomes the fleet contract going forward). (2) Clear the full `databases/` tree per conductor
+(not just `databases/conductor/` — the DHT/cache data is orphaned either way), let the edge roll
+install the current hApp, nodes re-genesis as new agents on the current DNAs. (3) Re-seed alpha
+(genesis pipeline + app bundle stage + `just seed apply`) — the fixture humans' `agentPubKey`
+and every key-named binding are re-minted; record the lineage break. Going forward the guard
+makes a silent integrity move impossible, and `happ_manager` (867e4bf9b) makes a reinstall on a
+node holding data impossible without `DNA_MIGRATION_INTENT` naming these exact hashes — set it
+on the alpha StatefulSets for this one roll, then remove it.
+
 ## Why the operator had to act first (original framing, kept for the trail)
 
 The fleet's conductors are in a restart livelock on a persistent PVC; every edge roll (#1413,
