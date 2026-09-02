@@ -7,9 +7,9 @@ title: "Dataplane: blob byte-replication peer-to-peer + doorway/storage peer-fal
 slug: "dataplane-peer-fallback-and-blob-replication"
 written: "2026-06-29"
 author: "p2p-dataplane validation-suite planning (the gap the suite makes CI-visible)"
-status: "backlog"
+status: "superseded-in-code"
 priority: "high"
-supersession_note: "2026-07-31: items 2 (heal-on-read via race_fetch in the on-demand path — get_blob_or_heal in elohim/elohim-storage/src/http.rs) and 3 (EPR-head-aware syncing status, not hard 404) have LANDED; remaining scope is item 1 (blobHash pointer propagation via content-sync) and item 4 (retire the per-host stageSpaBlob crutch)."
+supersession_note: "2026-07-31: items 2 (heal-on-read via race_fetch in the on-demand path — get_blob_or_heal in elohim/elohim-storage/src/http.rs) and 3 (EPR-head-aware syncing status, not hard 404) have LANDED; remaining scope is item 1 (blobHash pointer propagation via content-sync) and item 4 (retire the per-host stageSpaBlob crutch). 2026-09-02: item 1 (blobHash pointer propagation) has LANDED and is confirmed live — both alpha-A and elohim.host now serve non-null blobHash for elohim-host-landing (sha256-04ae4310… / sha256-f0f0e637…, same dhtAnchorHash uhCkkvfsT…), so the App-not-found gap this atom describes is closed; bytes are seeded once per deploy, authorHeadOnce + DECLARE_ONLY fan-out carries the head, and API_KEY_SEED is deployed on both doorway manifests. Item 4 (retire stageSpaBlob) remains open, now blocked on federation-deploy scenario 3 (staging-authority precondition, @wip) rather than on propagation. The framing this atom was written against — bytes/pointer never arriving — is superseded; the open item is head ELECTION under restart-arc churn (both doorways report caughtUp:false, converged:false, divergentAnchor 2131/1011), tracked in sovereign-peer-network-read-no-authorities.md, not here."
 jobs: [elohim]
 ---
 

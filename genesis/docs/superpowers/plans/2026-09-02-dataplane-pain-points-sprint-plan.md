@@ -168,19 +168,19 @@ elif [ "$rc" -eq 4 ]; then
 - Consumes: LAYERS.md act baselines (Act II = `alpha-cluster-6peer dht-anchored-content … deploy-churn …`, drops `owned-substrate`); the gate warning `MULTIPLE ACT TAGS`.
 - Produces: a federation-deploy feature the fleet lane executes.
 
-- [ ] **Step 1: decide the act per LAYERS.md, not per habit.** federation-deploy asserts that TWO doorways on the alpha fleet agree — Act II ("adam's household federates; doorway B becomes adam's") by definition. Change the feature-level tag line from `@act:i` to `@act:ii`. Every scenario in the file is a two-doorway fleet claim, so no per-scenario act tags are added (two act tags on one scenario is an authoring error).
+- [x] **Step 1: decide the act per LAYERS.md, not per habit.** federation-deploy asserts that TWO doorways on the alpha fleet agree — Act II ("adam's household federates; doorway B becomes adam's") by definition. Change the feature-level tag line from `@act:i` to `@act:ii`. Every scenario in the file is a two-doorway fleet claim, so no per-scenario act tags are added (two act tags on one scenario is an authoring error).
 
-- [ ] **Step 2: update the "Live state observed" block** with the 2026-09-02 probe (both doorways `/` → 200; blobHash `sha256-f0f0e637…` on elohim.host vs `sha256-04ae4310…` on alpha-A; same dhtAnchor) and state plainly: scenario 2's two conditions hold live; the remaining red is version divergence (the final scenario). Do not remove the 2026-06-29 baseline — it is the history.
+- [x] **Step 2: update the "Live state observed" block** with the 2026-09-02 probe (both doorways `/` → 200; blobHash `sha256-f0f0e637…` on elohim.host vs `sha256-04ae4310…` on alpha-A; same dhtAnchor) and state plainly: scenario 2's two conditions hold live; the remaining red is version divergence (the final scenario). Do not remove the 2026-06-29 baseline — it is the history.
 
-- [ ] **Step 3: run the act gate locally.** `cd genesis/a2o && node ./scripts/gherkin-prepush-lint.mjs` (expect `parsed N feature files`, exit 0) and `pnpm scan:coverage` (expect no `MULTIPLE ACT TAGS` warning for this file).
+- [x] **Step 3: run the act gate locally.** `cd genesis/a2o && node ./scripts/gherkin-prepush-lint.mjs` (expect `parsed N feature files`, exit 0) and `pnpm scan:coverage` (expect no `MULTIPLE ACT TAGS` warning for this file).
 
-- [ ] **Step 4: blind-reader loop.** Dispatch a fresh `blind-reader` with only the feature path and profile `a2o-story`; revise; repeat until READY.
+- [x] **Step 4: blind-reader loop.** Dispatch a fresh `blind-reader` with only the feature path and profile `a2o-story`; revise; repeat until READY.
 
-- [ ] **Step 5: supersede D5's framing.** In the D5 atom, set `status:` to `"superseded-in-code"` and append a 2026-09-02 note: bytes are seeded once per deploy, `authorHeadOnce` + `DECLARE_ONLY` carry the head, `API_KEY_SEED` is deployed; the pointer-propagation gap it names is closed, the open item is head *election* under restart arc churn (cite `sovereign-peer-network-read-no-authorities.md`).
+- [x] **Step 5: supersede D5's framing.** In the D5 atom, set `status:` to `"superseded-in-code"` and append a 2026-09-02 note: bytes are seeded once per deploy, `authorHeadOnce` + `DECLARE_ONLY` carry the head, `API_KEY_SEED` is deployed; the pointer-propagation gap it names is closed, the open item is head *election* under restart arc churn (cite `sovereign-peer-network-read-no-authorities.md`).
 
-- [ ] **Step 6: habit delta (commit-message line only).** `HABIT-DELTA: 2026-09-02 live probe — federation-deploy scenario 2 conditions hold on both doorways; the two serve different blobHashes (divergence, scenario 4 `@wip`); feature re-acted to `@act:ii` so the fleet lane measures it for the first time. NO status flip: caughtUp false on both, divergence open.`
+- [x] **Step 6: habit delta (commit-message line only).** `HABIT-DELTA: 2026-09-02 live probe — federation-deploy scenario 2 conditions hold on both doorways; the two serve different blobHashes (divergence, scenario 4 `@wip`); feature re-acted to `@act:ii` so the fleet lane measures it for the first time. NO status flip: caughtUp false on both, divergence open.`
 
-- [ ] **Step 7: commit** the feature and the D5 atom.
+- [x] **Step 7: commit** the feature and the D5 atom.
 
 **Evidence that closes it:** the next Dataplane Validation report shows `federation-deploy` with `passed: 2` (scenarios 1–2) and the divergence scenario counted, not `pending: 2`.
 
