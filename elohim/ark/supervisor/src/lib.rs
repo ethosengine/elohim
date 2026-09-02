@@ -10,3 +10,10 @@ pub mod pipes;
 pub mod reaper;
 pub mod spool;
 pub mod supervisor;
+
+// Re-exports are uncommented by the task that fills each module.
+pub use driver::{Driver, DriverError, Fingerprint, Started};
+pub use native::{sha256_file, NativeDriver};
+pub use reaper::{
+    become_subreaper, proc_status_sample, reap_with_rusage, wait_nowait, ReapError, WaitEvent,
+};
