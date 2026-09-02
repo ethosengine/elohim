@@ -19,17 +19,17 @@ pub mod witness;
 // Re-exports are uncommented by the task that creates each type.
 pub use berth::{Berth, PassphraseSource};
 pub use exit::{classify_readiness_outcome, ExitClass, ReadinessOutcome};
-// pub use intent::{Intent, IntentAction}; // Task 5
+pub use intent::{Intent, IntentAction};
 pub use manifest::{ArtifactRef, ChildPolicy, Probe, ProcessKind, ProcessSpec, RuntimeManifest};
-// pub use passport::{EffectiveTier, Passport, ProcessPassport}; // Task 5
+pub use passport::{EffectiveTier, Passport, ProcessPassport};
 pub use ring::RingBuffer;
-// pub use sample::ProcessSample; // Task 5
-// pub use sink::{Clock, WitnessSink}; // Task 5
+pub use sample::ProcessSample;
+pub use sink::{Clock, SinkError, WitnessSink};
 pub use tally::{DeathRecord, DeathTally};
 pub use verdict::{
     BoundedBy, GiveUpReason, RestartContext, RestartGovernor, RestartGrant, RestartRequest, Verdict,
 };
-// pub use witness::{DeathWitness, Incident}; // Task 5
+pub use witness::{DeathWitness, Incident, IncidentClose, WitnessError, WITNESS_KIND};
 
 #[cfg(test)]
 mod boundary {
