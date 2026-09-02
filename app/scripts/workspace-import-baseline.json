@@ -1,16 +1,16 @@
 {
   "$comment": [
-    "Cross-workspace import ratchet baseline \u2014 enforced by app/scripts/lint-workspace-imports.mjs,",
+    "Cross-workspace import ratchet baseline — enforced by app/scripts/lint-workspace-imports.mjs,",
     "wired into each EPR app's `pnpm run lint`.",
     "",
     "Every directory in app/ that ships to users is an EPR app: an independently built,",
     "content-addressed bundle. That is a DEPLOYMENT boundary. It is not automatically a module",
     "boundary, because each app's tsconfig `paths` maps sibling `@app/<pillar>/*` aliases directly",
-    "at the other workspace's private `src/app/*` tree \u2014 deep paths, both directions, no public API.",
+    "at the other workspace's private `src/app/*` tree — deep paths, both directions, no public API.",
     "",
     "The edges below are therefore DECLARED DEBT, not an approved architecture. The rail fails on a",
     "new specifier or a higher count; shrinking is the only allowed direction. When a direction",
-    "reaches zero, delete its entry \u2014 the seam is then real and cannot silently reopen.",
+    "reaches zero, delete its entry — the seam is then real and cannot silently reopen.",
     "",
     "Standing debt this baseline freezes (arch-frontend-bundle-seams-backlog.md, rows 1-2):",
     "  * The graph is CYCLIC. elohim-app -> lamad and lamad -> elohim-app both carry live edges.",
@@ -24,9 +24,9 @@
   ],
   "apps": {
     "elohim-app": {
-      "note": "Shell -> lamad bundle. Dominated by models/content-node.model (the cross-pillar content substrate) \u2014 see rows 1-2. Ratchet down only.",
+      "note": "Shell -> lamad bundle. Dominated by models/content-node.model (the cross-pillar content substrate) — see rows 1-2. Ratchet down only.",
       "edges": {
-        "@app/lamad/components/content-viewer/content-viewer.component": 2,
+        "@app/lamad/components/content-viewer/content-viewer.component": 1,
         "@app/lamad/content-io/content-io.module": 1,
         "@app/lamad/interfaces/agent.interface": 1,
         "@app/lamad/interfaces/cross-pillar.interface": 1,

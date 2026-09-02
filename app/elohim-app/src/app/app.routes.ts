@@ -64,16 +64,13 @@ export const routes: Routes = [
       ),
     data: { protocolContent: true },
   },
-  // Universal EPR address (§12.1) — durable cross-bundle target. Renders the
-  // cross-pillar resource viewer (reachable-but-unclaimed semantics); the
-  // doorway serves this bundle for any /epr/* path (Slice 2). Param is named
-  // resourceId so ContentViewerComponent + ProtocolRouteContextService work.
+  // Universal EPR address (§12.1) — the atom's own home, shell-owned (spec
+  // 2026-09-02-epr-atom-home-shell-component-design). Reachable-but-unclaimed
+  // atoms render here; the doorway serves this bundle for any /epr/* path.
   {
     path: 'epr/:resourceId',
     loadComponent: async () =>
-      import('@app/lamad/components/content-viewer/content-viewer.component').then(
-        m => m.ContentViewerComponent
-      ),
+      import('./elohim/components/epr-home/epr-home.component').then(m => m.EprHomeComponent),
     data: { protocolContent: true },
   },
   // Raw-node inspector (§12.6 Slice 0) — shows the EPR AS AN ATOM (its own

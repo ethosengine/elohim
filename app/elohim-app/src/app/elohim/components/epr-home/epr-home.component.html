@@ -1,0 +1,84 @@
+@switch (status()) {
+  @case ('loading') {
+    <main class="epr-home" data-testid="epr-home-loading" aria-busy="true">
+      <p class="epr-home__status">Reaching for this…</p>
+    </main>
+  }
+
+  @case ('error') {
+    <main class="epr-home" data-testid="epr-home-error" role="alert">
+      <h1 class="epr-home__title">Something went wrong reaching this</h1>
+      <p class="epr-home__status">
+        <code class="epr-home__mono">{{ resourceId() }}</code>
+      </p>
+    </main>
+  }
+
+  @case ('not-found') {
+    <main class="epr-home epr-home--gate" data-testid="epr-home-gate">
+      <p class="epr-home__eyebrow epr-home__eyebrow--warm">Out of reach from this doorway</p>
+      <h1 class="epr-home__title">We can't reach this one from here</h1>
+      <p class="epr-home__lede">
+        No peer this doorway can ask is holding
+        <code class="epr-home__mono">{{ resourceId() }}</code>
+        . It isn't gone, and it isn't yours to fix; it just hasn't been brought within reach of this
+        doorway yet.
+      </p>
+      <p class="epr-home__address" data-testid="epr-home-address">
+        The same address on another doorway may reach it
+        <code class="epr-home__mono">{{ address() }}</code>
+      </p>
+    </main>
+  }
+
+  @case ('loaded') {
+    @if (atom(); as a) {
+      <main class="epr-home" data-testid="epr-home">
+        <header class="epr-home__identity">
+          <p class="epr-home__eyebrow">
+            @for (part of eyebrow(); track $index) {
+              <span>{{ part }}</span>
+            }
+          </p>
+          <h1 class="epr-home__title" data-testid="epr-home-title">{{ a.title }}</h1>
+          @if (a.description) {
+            <p class="epr-home__lede">{{ a.description }}</p>
+          }
+          <div class="epr-home__chips">
+            <span class="epr-home__chip epr-home__chip--reach" data-testid="epr-home-chip-reach">
+              {{ reachLabel() }}
+              <small>· {{ reachSub() }}</small>
+            </span>
+            <span class="epr-home__chip" data-testid="epr-home-chip-notarized">
+              {{ notarizedLabel() }}
+              <small>· {{ anchorSub() }}</small>
+            </span>
+          </div>
+        </header>
+
+        <section
+          class="epr-home__focal"
+          [class.epr-home__focal--immersive]="a.shape === 'immersive'"
+          [class.epr-home__focal--reading]="a.shape === 'reading'"
+          data-testid="epr-home-focal"
+        >
+          <app-epr-focal [slug]="a.id"></app-epr-focal>
+        </section>
+
+        <footer class="epr-home__address" data-testid="epr-home-address">
+          <span>This address works on any doorway that can reach it</span>
+          <code class="epr-home__mono">{{ address() }}</code>
+          <a
+            class="epr-home__link"
+            [routerLink]="['/resource', a.id]"
+            fragment="network"
+            data-testid="epr-home-network-detail"
+          >
+            Network detail
+          </a>
+          <a class="epr-home__link" [href]="rawHref()">Raw node</a>
+        </footer>
+      </main>
+    }
+  }
+}
