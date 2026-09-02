@@ -165,3 +165,16 @@ matthew/james/jessica; `kitsune2_gossip::timeout … our_arc_set: ArcSet { inner
 only then does a single clean `[build:app]` flip elohim.host 404→200. Repo side is correct
 (blob builds + uploads fine; the repo-fixable lessons above — write-readiness deploy gate +
 the UNSTABLE-swallow + Defect A doorway hygiene — are real but none of them recover writes).
+
+## Delta 2026-09-02 04:4xZ (shift land-rung5-batch, evidence-only — ceiling: no kubectl from here)
+
+Both doorways report `conductor.connected: false, connected_workers: 0/4` on `/health` (live read
+04:44Z: doorway-alpha AND elohim.host). elohim-genesis #1540–#1544 all fail at `Verify Target
+Health` (`verify-doorway-readiness.sh` requires `conductor.connected=true`; the doorway now
+reports honestly per health.rs). Storage pods are healthy (release-adoption series 7/7 after
+edge #1411's storage-only roll; conductors were NOT rolled). So the doorway↔conductor app
+interface is down fleet-wide while storage↔conductor is up — the write path (seed, canonical-head
+declare via doorway) is closed; the p2p dataplane and the election plane are not. Operator
+action: inspect the doorway pods' conductor worker reconnect loop (app-port auth timeout class,
+`app-port-4445-auth-timeout-fleet-wide`) — a doorway pod restart or the token re-mint is the
+likely cure; the readiness script's dead `STORAGE_HEALTHY` variable is a separate cosmetic defect.
