@@ -7,12 +7,66 @@
 //!
 //! 1. Check if the app is already installed via `list_apps`
 //! 2. If installed, verify all expected DNA roles are present and provisioned
-//! 3. If stale (missing roles or empty cells), uninstall and reinstall
+//! 3. If stale (missing roles or empty cells), reinstall — gated, see below
 //! 4. If disabled, enable
 //! 5. If not installed, do a fresh install
 //! 6. Always ensure an app interface is attached on the expected port
+//!
+//! ## Reinstall gates — a standing flag is not migration intent
+//!
+//! A reinstall UNINSTALLS first. Holochain deletes the authored (source-chain)
+//! databases, the following install mints a NEW agent key, and the uninstall is
+//! **not atomic**: it can fail partway (a conductor-DB lock timeout under a
+//! post-restart read storm is enough), leaving the authored DBs gone while
+//! conductor state still lists the app Enabled with its cells — after which the
+//! conductor panics `CellWithoutGenesis` on every subsequent boot and the node's
+//! DHT data is orphaned from chains that cannot be recovered (re-genesis on an
+//! empty chain under the same key is a fork). A reinstall is therefore a
+//! DATA-DESTROYING migration act, never a routine deploy step.
+//!
+//! That is why a standing per-environment env var no longer arms it:
+//!
+//! | Env | Meaning |
+//! |-----|---------|
+//! | `DNA_MIGRATION_INTENT` | Comma-separated **bundle** DNA hashes (`uhC0k…`) this roll is migrating TO. The only thing that authorises reinstalling an app that holds data. The drift branch proceeds only when EVERY drifted role's bundle DNA hash appears in the list, and the staleness branch only when every MISSING role's bundle hash does — a partial list keeps the installed cells and names the roles it did not cover. |
+//! | `ALLOW_DNA_REINSTALL=true` | A standing deploy flag. It permits the strictly-safe coordinator hot-swap ([`coordinator_update_allowed`]) and permits a reinstall ONLY of an app that holds no data. On a node with cells it NO LONGER reinstalls on DNA-content drift. |
+//! | `FORCE_DNA_REINSTALL=true` | Operator hammer: skips the drift probe. On an app that holds data it still REFUSES unless `DNA_MIGRATION_INTENT` is present (and covers any drifted role). |
+//! | `FORCE_DNA_REINSTALL=wipe` | Unconditional. Reinstalls even an app holding data, with no intent. The one spelling that says "I accept losing these chains". |
+//!
+//! "Holds data" is read from `app_info` alone — the app has at least one
+//! provisioned cell and is past `AwaitingMemproofs`, i.e. genesis has run so a
+//! source chain exists on disk. Chain length is never measured. (Note the
+//! deliberate conservatism: a *disabled* app with provisioned cells counts as
+//! holding data — its chains are on disk regardless of run state.)
+//!
+//! When drift is detected without intent the node KEEPS its installed cells and
+//! keeps serving on the OLD DNA, logging at ERROR once per boot. That is the
+//! safe direction: a node alive on an old DNA can still be migrated later; a
+//! node whose chains were deleted cannot be un-deleted. (The coordinator
+//! hot-swap refuses cross-lineage bundles separately — see
+//! [`lineage_mismatch_error`] — so a kept-installed node does not silently take
+//! coordinators compiled against integrity zomes it is not running.)
+//!
+//! Structural staleness (a missing role / a role with no provisioned cell) is a
+//! separate branch, and it is gated the SAME way: the repair is the same
+//! whole-app uninstall, so on an app that holds data it would delete the source
+//! chains of every role that was still healthy in order to fix the one that was
+//! not. Stale + no data reinstalls freely; stale + data needs either a
+//! `DNA_MIGRATION_INTENT` covering the missing roles' bundle DNA hashes or
+//! `FORCE_DNA_REINSTALL=wipe`, and otherwise keeps the installed cells with one
+//! ERROR per boot naming the missing roles and both ways forward.
+//!
+//! A torn uninstall (see [`uninstall_for_reinstall`]) is TERMINAL for this
+//! process on an ordinary node — boot fails with the operator recovery
+//! instruction and nothing is installed over the half-removed app — while a node
+//! whose own policy says it is re-seedable (`GENESIS_SELF_HEAL_IDENTITY`, the
+//! fixture/ephemeral shape) self-heals by clearing its conductor data dir once
+//! and re-genesising under a NEW agent key.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use holochain_client::{AdminWebsocket, AllowedOrigins, CellInfo, InstallAppPayload};
 use holochain_types::app::{
@@ -59,6 +113,442 @@ pub fn coordinator_update_allowed() -> bool {
         .unwrap_or_else(|_| env_flag("ALLOW_DNA_REINSTALL"))
 }
 
+/// How `FORCE_DNA_REINSTALL` was spelled. `true` is the ordinary operator
+/// hammer (still refused on an app holding data without migration intent);
+/// `wipe` is the unconditional one that accepts chain loss.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ForceMode {
+    /// Unset or unrecognised — no forcing.
+    #[default]
+    Off,
+    /// `FORCE_DNA_REINSTALL=true`.
+    On,
+    /// `FORCE_DNA_REINSTALL=wipe`.
+    Wipe,
+}
+
+/// The reinstall gates, lifted out of the environment so the decision itself
+/// ([`decide_drift_action`]) stays pure and table-testable.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReinstallFlags {
+    /// `ALLOW_DNA_REINSTALL=true`. A STANDING deploy flag: it permits the safe
+    /// coordinator hot-swap and permits reinstalling an app that holds no data.
+    /// It does NOT authorise reinstalling an app that holds data — that needs
+    /// `migration_intent`.
+    pub allow_reinstall: bool,
+    /// `FORCE_DNA_REINSTALL`.
+    pub force: ForceMode,
+    /// `DNA_MIGRATION_INTENT` — the set of BUNDLE DNA hashes (`uhC0k…`) this
+    /// roll is migrating TO. Empty = no intent declared for this boot.
+    pub migration_intent: BTreeSet<String>,
+}
+
+impl ReinstallFlags {
+    /// Read the gates from the process environment (the only impure step).
+    pub fn from_env() -> Self {
+        Self {
+            allow_reinstall: env_flag("ALLOW_DNA_REINSTALL"),
+            force: parse_force_mode(std::env::var("FORCE_DNA_REINSTALL").ok().as_deref()),
+            migration_intent: parse_migration_intent(
+                std::env::var("DNA_MIGRATION_INTENT").ok().as_deref(),
+            ),
+        }
+    }
+}
+
+/// `FORCE_DNA_REINSTALL` spelling → [`ForceMode`]. Anything unrecognised is
+/// `Off`: a typo must never arm a destructive path.
+fn parse_force_mode(raw: Option<&str>) -> ForceMode {
+    match raw.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+        Some("wipe") => ForceMode::Wipe,
+        Some("true") => ForceMode::On,
+        _ => ForceMode::Off,
+    }
+}
+
+/// `DNA_MIGRATION_INTENT` → the set of bundle DNA hashes named. Comma
+/// separated, whitespace tolerated, empties dropped.
+fn parse_migration_intent(raw: Option<&str>) -> BTreeSet<String> {
+    raw.map(|v| {
+        v.split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+/// One role whose installed DNA hash differs from the bundle's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DriftedRole {
+    pub role: String,
+    /// The DNA hash of the PROVISIONED cell (`uhC0k…`).
+    pub installed_dna_hash: String,
+    /// The DNA hash this bundle resolves for the role (`uhC0k…`) — the value an
+    /// operator puts in `DNA_MIGRATION_INTENT` to authorise the migration.
+    pub bundle_dna_hash: String,
+}
+
+/// What the installed app's roles look like, reduced to exactly what the
+/// reinstall decision needs — read from `app_info`, never from the filesystem.
+///
+/// `InstalledRoles`, NOT `InstalledApp`: `holochain_types::app::InstalledApp`
+/// is in scope here through the prelude glob, and the collision is a hard
+/// ambiguity error. Do not rename this back.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstalledRoles {
+    /// role → provisioned-cell DNA hash.
+    pub role_dna_hashes: BTreeMap<String, String>,
+    /// Genesis has run for at least one cell, so authored (source-chain) DBs
+    /// exist on disk and an uninstall would destroy them. See the module doc
+    /// for why a disabled app still counts.
+    pub has_data: bool,
+    /// Expected roles that are missing from `cell_info` or have no provisioned
+    /// cell — structural staleness, named rather than a bare bool so the
+    /// refusal can tell an operator WHICH roles are gone and which bundle
+    /// hashes an intent has to cover.
+    pub missing_roles: Vec<String>,
+}
+
+impl InstalledRoles {
+    fn from_app_info(app_info: &holochain_client::AppInfo) -> Self {
+        let role_dna_hashes = provisioned_dna_hashes(app_info);
+        // "Has data" from app_info alone: provisioned cells exist AND the app is
+        // past AwaitingMemproofs (which means genesis has NOT completed, so
+        // there is no chain to lose). Disabled-with-cells counts as data.
+        let genesis_ran = !matches!(app_info.status, AppStatus::AwaitingMemproofs);
+        Self {
+            has_data: genesis_ran && !role_dna_hashes.is_empty(),
+            missing_roles: missing_provisioned_roles(app_info),
+            role_dna_hashes,
+        }
+    }
+}
+
+/// The verdict for this boot. Every variant that reinstalls goes through
+/// [`uninstall_for_reinstall`], which refuses to begin a non-atomic uninstall
+/// against a saturated conductor and never retries a torn one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DriftAction {
+    /// No structural staleness, no content drift — serve the installed app
+    /// (coordinator hot-swap path still runs).
+    NoOp,
+    /// Structural staleness — reinstall. Pre-existing branch, ungated by intent.
+    ReinstallStale,
+    /// `FORCE_DNA_REINSTALL=wipe`, or `=true` on an app holding no data.
+    ReinstallForced,
+    /// Content drift AND an explicit `DNA_MIGRATION_INTENT` naming every
+    /// drifted role's bundle hash — the authorised migration. Mints a new key.
+    ReinstallForMigration { roles: Vec<DriftedRole> },
+    /// Content drift with no (or partial) intent — KEEP the installed cells and
+    /// keep serving the old DNA. `missing_intent` names the roles whose bundle
+    /// hash the operator did not list.
+    KeepInstalled {
+        drifted: Vec<DriftedRole>,
+        missing_intent: Vec<DriftedRole>,
+    },
+    /// `FORCE_DNA_REINSTALL=true` against an app holding data, with neither
+    /// `DNA_MIGRATION_INTENT` nor the `wipe` spelling — refused.
+    RefuseForceWithoutIntent { drifted: Vec<DriftedRole> },
+    /// Structural staleness on an app that HOLDS DATA, with no intent — refused.
+    /// Reinstalling to repair one missing role would delete the source chains of
+    /// every role that was healthy, so the node keeps serving what it has.
+    RefuseStaleWithoutIntent { missing_roles: Vec<String> },
+}
+
+impl DriftAction {
+    /// Whether this verdict destroys the installed app before installing.
+    pub fn reinstalls(&self) -> bool {
+        matches!(
+            self,
+            DriftAction::ReinstallStale
+                | DriftAction::ReinstallForced
+                | DriftAction::ReinstallForMigration { .. }
+        )
+    }
+}
+
+/// The whole reinstall decision, isolated from the conductor, the bundle file
+/// and the environment — pure, so the gate is a table, not a trace.
+///
+/// `installed_roles` is the reduced view of `app_info`; `bundle_roles` maps role
+/// → the DNA hash the bundle on disk resolves; `flags` are the parsed env gates.
+pub fn decide_drift_action(
+    installed_roles: &InstalledRoles,
+    bundle_roles: &BTreeMap<String, String>,
+    flags: &ReinstallFlags,
+) -> DriftAction {
+    let drifted: Vec<DriftedRole> = bundle_roles
+        .iter()
+        .filter_map(|(role, bundle_hash)| {
+            let installed_hash = installed_roles.role_dna_hashes.get(role)?;
+            if installed_hash == bundle_hash {
+                return None;
+            }
+            Some(DriftedRole {
+                role: role.clone(),
+                installed_dna_hash: installed_hash.clone(),
+                bundle_dna_hash: bundle_hash.clone(),
+            })
+        })
+        .collect();
+
+    let missing_intent: Vec<DriftedRole> = drifted
+        .iter()
+        .filter(|d| !flags.migration_intent.contains(&d.bundle_dna_hash))
+        .cloned()
+        .collect();
+    // An intent must be DECLARED (non-empty) and must cover every drifted role.
+    // Empty-intent would satisfy `missing_intent.is_empty()` vacuously when
+    // nothing drifted; requiring non-empty keeps "no intent" from ever reading
+    // as "intent satisfied".
+    let intent_authorises = !flags.migration_intent.is_empty() && missing_intent.is_empty();
+
+    match flags.force {
+        // The unconditional hammer: the operator has said, in the one spelling
+        // that means it, that chain loss is accepted.
+        ForceMode::Wipe => return DriftAction::ReinstallForced,
+        ForceMode::On => {
+            return if !installed_roles.has_data {
+                // Nothing to lose — no cells, or genesis never completed.
+                DriftAction::ReinstallForced
+            } else if intent_authorises {
+                DriftAction::ReinstallForMigration { roles: drifted }
+            } else {
+                DriftAction::RefuseForceWithoutIntent { drifted }
+            };
+        }
+        ForceMode::Off => {}
+    }
+
+    // Structural staleness: a role is missing or has no provisioned cell. The
+    // repair is the SAME destructive uninstall — and it takes down the healthy
+    // roles' source chains with it, so on an app that holds data it needs the
+    // same explicit intent a content migration does. `FORCE_DNA_REINSTALL=wipe`
+    // already returned above; a non-empty `DNA_MIGRATION_INTENT` covering the
+    // missing roles' bundle hashes is the other way through.
+    if !installed_roles.missing_roles.is_empty() {
+        let stale_intent_covers = !flags.migration_intent.is_empty()
+            && installed_roles.missing_roles.iter().all(|role| {
+                bundle_roles
+                    .get(role)
+                    .is_some_and(|h| flags.migration_intent.contains(h))
+            });
+        return if !installed_roles.has_data || stale_intent_covers {
+            DriftAction::ReinstallStale
+        } else {
+            DriftAction::RefuseStaleWithoutIntent {
+                missing_roles: installed_roles.missing_roles.clone(),
+            }
+        };
+    }
+
+    if drifted.is_empty() {
+        return DriftAction::NoOp;
+    }
+
+    if intent_authorises {
+        DriftAction::ReinstallForMigration { roles: drifted }
+    } else if !installed_roles.has_data && flags.allow_reinstall {
+        // No chains at risk: the standing flag is still enough here, which is
+        // the ephemeral re-seeded-env behaviour this gate was written for.
+        DriftAction::ReinstallForced
+    } else {
+        DriftAction::KeepInstalled {
+            drifted,
+            missing_intent,
+        }
+    }
+}
+
+/// Emit the operator-facing narration for a verdict. Kept beside the pure
+/// decision so the decision itself never logs.
+///
+/// The `DNA drift detected for role` and `Stale hApp detected` shapes are
+/// grepped by CI — do not reword them.
+fn log_drift_action(app_id: &str, action: &DriftAction) {
+    // The no-intent refusals are loud but not per-tick: once per process each.
+    static DRIFT_REFUSAL_LOGGED: AtomicBool = AtomicBool::new(false);
+    static STALE_REFUSAL_LOGGED: AtomicBool = AtomicBool::new(false);
+
+    let narrate_drift = |roles: &[DriftedRole]| {
+        for d in roles {
+            warn!(
+                role = d.role.as_str(),
+                installed = d.installed_dna_hash.as_str(),
+                bundle = d.bundle_dna_hash.as_str(),
+                "DNA drift detected for role"
+            );
+        }
+    };
+
+    match action {
+        DriftAction::NoOp => {}
+        DriftAction::ReinstallStale => {
+            warn!(app_id = app_id, "Stale hApp detected — reinstalling");
+        }
+        DriftAction::ReinstallForced => {
+            warn!(
+                app_id = app_id,
+                "FORCE_DNA_REINSTALL — reinstalling unconditionally (a new agent key will be minted)"
+            );
+        }
+        DriftAction::ReinstallForMigration { roles } => {
+            narrate_drift(roles);
+            warn!(
+                app_id = app_id,
+                roles = roles.len(),
+                "DNA content drift vs bundle with DNA_MIGRATION_INTENT covering every drifted role \
+                 — migrating (this mints a new agent key and abandons the current source chains)"
+            );
+        }
+        DriftAction::KeepInstalled {
+            drifted,
+            missing_intent,
+        } => {
+            narrate_drift(drifted);
+            if !DRIFT_REFUSAL_LOGGED.swap(true, Ordering::Relaxed) {
+                for d in missing_intent {
+                    error!(
+                        app_id = app_id,
+                        role = d.role.as_str(),
+                        installed = d.installed_dna_hash.as_str(),
+                        bundle = d.bundle_dna_hash.as_str(),
+                        "DNA drift detected but no migration intent for {}: installed={} bundle={} \
+                         — keeping the installed cells; set DNA_MIGRATION_INTENT={} to migrate \
+                         (this mints a new agent key)",
+                        d.role,
+                        d.installed_dna_hash,
+                        d.bundle_dna_hash,
+                        d.bundle_dna_hash
+                    );
+                }
+            }
+        }
+        DriftAction::RefuseStaleWithoutIntent { missing_roles } => {
+            if !STALE_REFUSAL_LOGGED.swap(true, Ordering::Relaxed) {
+                error!(
+                    app_id = app_id,
+                    missing_roles = missing_roles.join(","),
+                    "Structurally stale hApp but no migration intent: roles [{}] have no provisioned \
+                     cell — NOT reinstalling, because the repair uninstalls the whole app and \
+                     would delete the source chains of every role that is still healthy. Keeping \
+                     the installed cells. Two ways forward: set \
+                     DNA_MIGRATION_INTENT=<bundle DNA hashes of those roles> to repair by \
+                     migration, or FORCE_DNA_REINSTALL=wipe to accept the chain loss (both mint a \
+                     new agent key)",
+                    missing_roles.join(", ")
+                );
+            }
+        }
+        DriftAction::RefuseForceWithoutIntent { drifted } => {
+            narrate_drift(drifted);
+            error!(
+                app_id = app_id,
+                "FORCE_DNA_REINSTALL=true REFUSED — this app holds data (provisioned cells past \
+                 genesis) and an uninstall would delete its source chains irrecoverably; set \
+                 DNA_MIGRATION_INTENT=<bundle DNA hashes> to migrate, or FORCE_DNA_REINSTALL=wipe \
+                 to accept the loss"
+            );
+        }
+    }
+}
+
+/// How long the conductor gets to answer a `list_apps` before we refuse to
+/// begin a non-atomic uninstall. Short on purpose: this is a liveness probe of
+/// the very conductor DB the uninstall transaction needs, not a data fetch.
+const UNINSTALL_PREFLIGHT_BUDGET: Duration = Duration::from_secs(10);
+
+/// Set for the duration of an uninstall and left set if it did not complete.
+/// Process-local: once an uninstall has torn, this process must never begin
+/// another one — a retry against a half-removed app is how a recoverable
+/// timeout becomes a second round of deletions.
+static UNINSTALL_TORN: AtomicBool = AtomicBool::new(false);
+
+/// The recovery instruction that must travel with a torn uninstall — the node
+/// cannot fix this itself, and guessing (re-installing over a half-removed app)
+/// makes it worse.
+fn torn_state_error(app_id: &str, cause: &str) -> anyhow::Error {
+    anyhow::anyhow!(
+        "uninstall of '{app_id}' did not complete ({cause}) — conductor state may be TORN \
+         (authored databases removed while the app still lists its cells; the conductor will \
+         panic CellWithoutGenesis on the next boot). Refusing to install over it. Recovery is \
+         operator-owned: clear `databases/conductor/` in the conductor data dir (the DHT/cache \
+         databases can be kept), then let the node re-install. This process will not retry the \
+         uninstall."
+    )
+}
+
+/// Uninstall as the first half of a reinstall — with the two guards the alpha
+/// 2026-09-02 loss showed were missing.
+///
+/// 1. **Preflight.** `uninstall_app` opens a conductor-DB transaction that a
+///    post-restart read storm can starve into a 30 s lock timeout — after the
+///    authored DBs are already gone. A `list_apps` that cannot answer inside
+///    [`UNINSTALL_PREFLIGHT_BUDGET`] says the DB is already saturated, so we
+///    refuse to start rather than tear.
+/// 2. **No retry into a half-state.** The torn latch is set BEFORE the call and
+///    cleared only on success, so a failure (or a crash mid-call) permanently
+///    disarms further uninstalls in this process.
+async fn uninstall_for_reinstall(admin_ws: &AdminWebsocket, app_id: &str) -> anyhow::Result<()> {
+    if UNINSTALL_TORN.load(Ordering::Acquire) {
+        return Err(torn_state_error(
+            app_id,
+            "a previous uninstall in this process did not complete",
+        ));
+    }
+
+    match tokio::time::timeout(UNINSTALL_PREFLIGHT_BUDGET, admin_ws.list_apps(None)).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => {
+            error!(
+                app_id = app_id,
+                error = %e,
+                budget_secs = UNINSTALL_PREFLIGHT_BUDGET.as_secs(),
+                "conductor DB is saturated — refusing to begin a non-atomic uninstall"
+            );
+            return Err(anyhow::anyhow!(
+                "conductor DB is saturated — refusing to begin a non-atomic uninstall of \
+                 '{app_id}' (preflight list_apps failed: {e})"
+            ));
+        }
+        Err(_elapsed) => {
+            error!(
+                app_id = app_id,
+                budget_secs = UNINSTALL_PREFLIGHT_BUDGET.as_secs(),
+                "conductor DB is saturated — refusing to begin a non-atomic uninstall"
+            );
+            return Err(anyhow::anyhow!(
+                "conductor DB is saturated — refusing to begin a non-atomic uninstall of \
+                 '{app_id}' (preflight list_apps did not answer within {}s)",
+                UNINSTALL_PREFLIGHT_BUDGET.as_secs()
+            ));
+        }
+    }
+
+    UNINSTALL_TORN.store(true, Ordering::Release);
+    let outcome = admin_ws.uninstall_app(app_id.to_string(), false).await;
+    match outcome {
+        Ok(()) => {
+            UNINSTALL_TORN.store(false, Ordering::Release);
+            info!(app_id = app_id, "Old hApp removed");
+            Ok(())
+        }
+        Err(e) => {
+            error!(
+                app_id = app_id,
+                error = %e,
+                "uninstall_app FAILED mid-flight — conductor state may be torn; NOT installing over it"
+            );
+            Err(torn_state_error(
+                app_id,
+                &format!("uninstall_app failed: {e}"),
+            ))
+        }
+    }
+}
+
 /// Ensure the hApp is installed, up-to-date, enabled, and reachable.
 ///
 /// Performs the full lifecycle check:
@@ -90,52 +580,47 @@ pub async fn ensure_happ_installed(
         // already-installed app survives pod restarts AND storage resets (which
         // only wipe content.db, not /var/local/lib/holochain). When the bundled
         // DNA changes but role STRUCTURE stays the same (e.g. an integrity-zome
-        // fix → new DNA hash, same roles), `is_stale` reads "not stale" and the
-        // conductor keeps the OLD DNA forever — exactly how the Gap-F fix sat
-        // built-but-undeployed. Drift detection forces a reinstall in that case.
+        // fix → new DNA hash, same roles), the staleness probe reads "not stale" and the
+        // conductor keeps the OLD DNA forever.
         //
-        // GATED behind ALLOW_DNA_REINSTALL: a reinstall mints a new agent key /
-        // cell — fine for ephemeral re-seeded envs (alpha/dev), NOT the prod
-        // upgrade path (which needs DNA migration/lineage). Prod leaves the flag
-        // unset → no probe runs, no behavior change.
-        let force_reinstall = env_flag("FORCE_DNA_REINSTALL");
-        let allow_reinstall = env_flag("ALLOW_DNA_REINSTALL");
-        // FORCE_DNA_REINSTALL: unconditional reinstall, skipping the drift probe
-        // entirely — the escape hatch for ephemeral envs (or when the probe is
-        // suspect). ALLOW_DNA_REINSTALL: reinstall only when the bundle DNA
-        // actually differs from the installed DNA (no churn). Reading drift from
-        // the local bundle file (has_dna_drift) cannot time out on the conductor.
-        let drifted = if force_reinstall {
-            warn!(
-                app_id = app_id,
-                "FORCE_DNA_REINSTALL=true — reinstalling unconditionally (drift probe skipped)"
-            );
-            true
-        } else if allow_reinstall {
-            has_dna_drift(app_info, happ_path).await
-        } else {
-            false
+        // Healing that drift means UNINSTALLING — deleting the authored source
+        // chains and minting a new agent key — so it is gated on an explicit,
+        // per-roll `DNA_MIGRATION_INTENT` naming the bundle DNA hashes being
+        // migrated TO, never on a standing env flag. See the module doc. The
+        // probe itself is unconditional and cheap (it reads the local bundle
+        // file, so it cannot time out on the conductor): a node that is NOT
+        // authorised to migrate should still say loudly that it has drifted.
+        let flags = ReinstallFlags::from_env();
+        let installed = InstalledRoles::from_app_info(app_info);
+        let bundle = match bundle_dna_hashes(happ_path).await {
+            Ok(h) => h,
+            Err(e) => {
+                error!(
+                    error = %e,
+                    path = %happ_path.display(),
+                    "DNA-drift bundle read FAILED — keeping installed hApp; DNA changes will NOT \
+                     auto-deploy until this is resolved"
+                );
+                // Empty bundle map ⇒ no drifted roles ⇒ the serve path. Worst
+                // case is the prior behaviour: keep the installed hApp.
+                BTreeMap::new()
+            }
         };
 
-        if is_stale(app_info) || drifted {
-            if drifted {
-                warn!(
-                    app_id = app_id,
-                    "DNA content drift vs bundle (ALLOW_DNA_REINSTALL=true) — reinstalling"
-                );
-            } else {
-                warn!(app_id = app_id, "Stale hApp detected — reinstalling");
-            }
-            admin_ws
-                .uninstall_app(app_id.to_string(), false)
-                .await
-                .map_err(|e| anyhow::anyhow!("uninstall_app failed: {e}"))?;
-            info!(app_id = app_id, "Old hApp removed");
+        let action = decide_drift_action(&installed, &bundle, &flags);
+        log_drift_action(app_id, &action);
+
+        if action.reinstalls() {
+            // Guarded: refuses to begin against a saturated conductor DB, and a
+            // torn uninstall is fatal for this boot rather than retried.
+            uninstall_for_reinstall(admin_ws, app_id).await?;
             install_fresh(admin_ws, happ_path, app_id).await?;
         } else {
-            // No integrity-level drift and not structurally stale. A
-            // coordinator-ONLY change is still invisible here: the DNA hash
-            // covers integrity zomes + modifiers only, so has_dna_drift reads
+            // Serving the INSTALLED app: NoOp, KeepInstalled (drift without
+            // intent) and RefuseForceWithoutIntent all land here — the node
+            // stays alive on the DNA it already has. A coordinator-ONLY
+            // change is invisible to the drift probe either way: the DNA hash
+            // covers integrity zomes + modifiers only, so the probe reads
             // "no drift" while the conductor keeps serving OLD coordinator
             // wasm from its PVC (exactly how the 2f02879d attestation fix sat
             // built-but-undelivered). Coordinator drift is healed by the
@@ -175,31 +660,34 @@ pub async fn ensure_happ_installed(
     Ok(())
 }
 
-/// Detect whether an installed hApp is stale.
+/// Which expected roles are structurally stale — missing from `cell_info`, or
+/// present with no provisioned cell. Empty = the app is structurally whole.
 ///
-/// A hApp is stale if:
-/// - Any expected role is missing from `cell_info`
-/// - Any role has zero provisioned cells
-fn is_stale(app_info: &holochain_client::AppInfo) -> bool {
+/// Returns the NAMES (not a bool) because staleness on an app that holds data
+/// no longer auto-reinstalls: the refusal has to name the roles, and the
+/// migration intent has to cover their bundle DNA hashes. Every role is
+/// checked, so a partially-torn app reports all of its gaps at once.
+fn missing_provisioned_roles(app_info: &holochain_client::AppInfo) -> Vec<String> {
     let cell_info = &app_info.cell_info;
+    let mut missing = Vec::new();
 
     for role in EXPECTED_ROLES {
         match cell_info.get(*role) {
             None => {
                 warn!(role = role, "Stale: missing role");
-                return true;
+                missing.push((*role).to_string());
             }
             Some(cells) => {
                 let provisioned = cells.iter().any(|c| matches!(c, CellInfo::Provisioned(_)));
                 if !provisioned {
                     warn!(role = role, "Stale: role has no provisioned cells");
-                    return true;
+                    missing.push((*role).to_string());
                 }
             }
         }
     }
 
-    false
+    missing
 }
 
 /// Map role → DNA hash (as a string) for the provisioned cell of each role in
@@ -217,52 +705,6 @@ fn provisioned_dna_hashes(
         }
     }
     out
-}
-
-/// Detect whether the installed hApp's DNA content has drifted from the bundle
-/// on disk. Reads the bundle's per-role DNA hashes DIRECTLY from the `.happ`
-/// file (`AppBundle::unpack` + `resolve_cells`, which applies the manifest's
-/// baked modifiers exactly as install does) — NO admin-websocket round-trip.
-///
-/// This replaces the original sacrificial-`install_app` probe, whose admin-WS
-/// call timed out against the busy embedded conductor at startup
-/// (`probe install_app failed: Websocket error: Timeout`) → the defensive
-/// no-drift fallback fired silently → the Gap-F DNA never auto-deployed on
-/// alpha (DNA hashes stayed byte-for-byte identical cluster-wide). Reading the
-/// local bundle file cannot time out on the conductor.
-///
-/// On read/decode error: logs ERROR (a real problem — DNA changes will NOT
-/// auto-deploy until fixed) and returns `false` (no-drift) so startup never
-/// blocks — worst case is the prior behavior (keep the installed hApp).
-async fn has_dna_drift(app_info: &holochain_client::AppInfo, happ_path: &Path) -> bool {
-    let installed = provisioned_dna_hashes(app_info);
-    let bundle = match bundle_dna_hashes(happ_path).await {
-        Ok(h) => h,
-        Err(e) => {
-            error!(
-                error = %e,
-                path = %happ_path.display(),
-                "DNA-drift bundle read FAILED — keeping installed hApp; DNA changes will NOT \
-                 auto-deploy until this is resolved (set FORCE_DNA_REINSTALL=true to bypass)"
-            );
-            return false;
-        }
-    };
-
-    for (role, bundle_hash) in &bundle {
-        if let Some(installed_hash) = installed.get(role) {
-            if installed_hash != bundle_hash {
-                warn!(
-                    role = role,
-                    installed = installed_hash,
-                    bundle = bundle_hash,
-                    "DNA drift detected for role"
-                );
-                return true;
-            }
-        }
-    }
-    false
 }
 
 /// Read the bundle's per-role DNA hashes directly from the `.happ` file. Uses
@@ -341,8 +783,9 @@ async fn install_fresh(
 /// This is the drift unit for coordinator-zome changes: the DNA hash covers
 /// ONLY integrity zomes + modifiers, so a coordinator-only change (new
 /// coordinator wasm, same integrity) produces a bundle whose DNA hashes are
-/// byte-identical to the installed app — invisible to [`has_dna_drift`]. The
-/// coordinator wasm hashes are where that change IS visible.
+/// byte-identical to the installed app — invisible to the DNA-hash drift probe
+/// ([`decide_drift_action`]). The coordinator wasm hashes are where that change
+/// IS visible.
 fn coordinator_wasm_hashes(dna_def: &DnaDef) -> std::collections::BTreeMap<String, String> {
     dna_def
         .coordinator_zomes
@@ -482,10 +925,13 @@ fn role_report(
 /// upgrade: an integrity change needs the reinstall/migration path, never a
 /// hot-swap.
 ///
-/// The boot path holds this implicitly — `has_dna_drift` runs first and forces
-/// a reinstall on any DNA-hash difference — so this is a no-op there. The HTTP
-/// vehicle accepts an ARBITRARY posted bundle, so it needs the guard
-/// explicitly. Returns `Some(error)` when the role must be refused.
+/// This guard is LOAD-BEARING on the boot path now that DNA-content drift no
+/// longer forces a reinstall without `DNA_MIGRATION_INTENT` (see the module
+/// doc): a node kept alive on its old DNA reaches the coordinator sweep with a
+/// bundle from a different lineage, and every drifted role must be refused here
+/// rather than hot-swapped. The HTTP vehicle accepts an ARBITRARY posted bundle
+/// and needs the same guard. Returns `Some(error)` when the role must be
+/// refused.
 fn lineage_mismatch_error(installed_dna_hash: &str, bundled_dna_hash: &str) -> Option<String> {
     if installed_dna_hash == bundled_dna_hash {
         return None;
@@ -895,6 +1341,362 @@ mod tests {
         assert!(r["error"].is_null());
         assert!(r.get("installed_coordinators").is_none());
         assert!(r.get("bundled_coordinators").is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // The reinstall gate. `decide_drift_action` is pure, so the whole
+    // data-destroying decision reads as a table rather than a trace. Written
+    // against the alpha 2026-09-02 loss: a STANDING `ALLOW_DNA_REINSTALL=true`
+    // met an unintended integrity-hash change on 7 nodes holding ~2.5 GB each,
+    // took the reinstall branch, and a transient conductor-DB lock timeout
+    // turned a non-atomic uninstall into irrecoverable source-chain loss.
+    // ---------------------------------------------------------------------
+
+    /// Installed roles + whether the app holds data. `stale: false` — the
+    /// structural branch is exercised separately.
+    fn installed_app(roles: &[(&str, &str)], has_data: bool) -> InstalledRoles {
+        InstalledRoles {
+            role_dna_hashes: roles
+                .iter()
+                .map(|(r, h)| (r.to_string(), h.to_string()))
+                .collect(),
+            has_data,
+            missing_roles: Vec::new(),
+        }
+    }
+
+    /// Structurally stale: `role` is expected but has no provisioned cell.
+    fn stale_app(roles: &[(&str, &str)], has_data: bool, missing: &[&str]) -> InstalledRoles {
+        InstalledRoles {
+            missing_roles: missing.iter().map(|r| r.to_string()).collect(),
+            ..installed_app(roles, has_data)
+        }
+    }
+
+    fn bundle_roles(roles: &[(&str, &str)]) -> std::collections::BTreeMap<String, String> {
+        roles
+            .iter()
+            .map(|(r, h)| (r.to_string(), h.to_string()))
+            .collect()
+    }
+
+    fn gates(allow: bool, force: ForceMode, intent: &[&str]) -> ReinstallFlags {
+        ReinstallFlags {
+            allow_reinstall: allow,
+            force,
+            migration_intent: intent.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// THE incident. A standing deploy flag met an unintended integrity-hash
+    /// change on nodes holding data — and must no longer arm the uninstall.
+    #[test]
+    fn drift_without_intent_keeps_installed_cells() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new")]),
+            &gates(true, ForceMode::Off, &[]),
+        );
+        match &action {
+            DriftAction::KeepInstalled {
+                drifted,
+                missing_intent,
+            } => {
+                assert_eq!(drifted.len(), 1);
+                assert_eq!(drifted[0].role, "lamad");
+                assert_eq!(drifted[0].installed_dna_hash, "uhC0k-old");
+                assert_eq!(drifted[0].bundle_dna_hash, "uhC0k-new");
+                assert_eq!(missing_intent, drifted, "no intent ⇒ every role uncovered");
+            }
+            other => panic!("a standing flag must not reinstall a node with data: {other:?}"),
+        }
+        assert!(!action.reinstalls(), "nothing may be uninstalled here");
+    }
+
+    /// Naming every drifted role's BUNDLE hash is the migration authorisation.
+    #[test]
+    fn drift_with_full_intent_migrates() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old"), ("imagodei", "uhC0k-i-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new"), ("imagodei", "uhC0k-i-new")]),
+            &gates(true, ForceMode::Off, &["uhC0k-new", "uhC0k-i-new"]),
+        );
+        match &action {
+            DriftAction::ReinstallForMigration { roles } => {
+                let named: Vec<&str> = roles.iter().map(|r| r.role.as_str()).collect();
+                assert_eq!(
+                    named,
+                    vec!["imagodei", "lamad"],
+                    "both drifted roles carried"
+                );
+            }
+            other => {
+                panic!("intent covering every drifted role authorises the migration: {other:?}")
+            }
+        }
+        assert!(action.reinstalls());
+    }
+
+    /// Intent is all-or-nothing: a partial list is an operator who did not see
+    /// one of the roles move, which is exactly the wave-4 shape.
+    #[test]
+    fn drift_with_partial_intent_keeps_and_names_the_missing_role() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old"), ("mishpat", "uhC0k-m-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new"), ("mishpat", "uhC0k-m-new")]),
+            &gates(true, ForceMode::Off, &["uhC0k-new"]),
+        );
+        match &action {
+            DriftAction::KeepInstalled {
+                drifted,
+                missing_intent,
+            } => {
+                assert_eq!(drifted.len(), 2);
+                assert_eq!(missing_intent.len(), 1);
+                assert_eq!(missing_intent[0].role, "mishpat");
+                assert_eq!(
+                    missing_intent[0].bundle_dna_hash, "uhC0k-m-new",
+                    "the refusal must name the hash the operator has to add"
+                );
+            }
+            other => panic!("a partial intent must not migrate: {other:?}"),
+        }
+    }
+
+    /// `FORCE_DNA_REINSTALL=true` is an operator hammer, not a consent to lose
+    /// chains — on an app holding data it refuses without intent or `wipe`.
+    #[test]
+    fn force_without_intent_or_wipe_refuses_on_an_app_with_data() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new")]),
+            &gates(true, ForceMode::On, &[]),
+        );
+        assert!(
+            matches!(action, DriftAction::RefuseForceWithoutIntent { .. }),
+            "got {action:?}"
+        );
+        assert!(!action.reinstalls());
+    }
+
+    /// …and proceeds once the operator names the target.
+    #[test]
+    fn force_with_intent_migrates_an_app_with_data() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new")]),
+            &gates(false, ForceMode::On, &["uhC0k-new"]),
+        );
+        assert!(
+            matches!(action, DriftAction::ReinstallForMigration { .. }),
+            "got {action:?}"
+        );
+    }
+
+    /// The one spelling that accepts chain loss outright.
+    #[test]
+    fn force_wipe_reinstalls_an_app_with_data() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old")], true),
+            &bundle_roles(&[("lamad", "uhC0k-new")]),
+            &gates(false, ForceMode::Wipe, &[]),
+        );
+        assert_eq!(action, DriftAction::ReinstallForced);
+        assert!(action.reinstalls());
+    }
+
+    /// Nothing to lose (no provisioned cells / genesis never completed) — the
+    /// ephemeral re-seeded-env behaviour the standing flag was written for
+    /// survives untouched.
+    #[test]
+    fn reinstalls_freely_when_the_app_holds_no_data() {
+        let no_data = installed_app(&[("lamad", "uhC0k-old")], false);
+        let bundle = bundle_roles(&[("lamad", "uhC0k-new")]);
+
+        assert_eq!(
+            decide_drift_action(&no_data, &bundle, &gates(true, ForceMode::Off, &[])),
+            DriftAction::ReinstallForced,
+            "ALLOW_DNA_REINSTALL still reinstalls a data-less app on drift"
+        );
+        assert_eq!(
+            decide_drift_action(&no_data, &bundle, &gates(false, ForceMode::On, &[])),
+            DriftAction::ReinstallForced,
+            "FORCE needs no intent when there are no chains to destroy"
+        );
+    }
+
+    /// Without any flag and without intent, a data-less drifted app is still
+    /// left alone — the gate never widens on the way to the safe case.
+    #[test]
+    fn no_flags_keeps_installed_even_without_data() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-old")], false),
+            &bundle_roles(&[("lamad", "uhC0k-new")]),
+            &gates(false, ForceMode::Off, &[]),
+        );
+        assert!(
+            matches!(action, DriftAction::KeepInstalled { .. }),
+            "got {action:?}"
+        );
+    }
+
+    /// No drift: no uninstall, whatever the flags say (short of the hammer).
+    #[test]
+    fn no_drift_is_a_no_op() {
+        let same = &[("lamad", "uhC0k-same"), ("imagodei", "uhC0k-i")];
+        assert_eq!(
+            decide_drift_action(
+                &installed_app(same, true),
+                &bundle_roles(same),
+                &gates(true, ForceMode::Off, &[]),
+            ),
+            DriftAction::NoOp
+        );
+        assert_eq!(
+            decide_drift_action(
+                &installed_app(same, true),
+                &bundle_roles(same),
+                &gates(true, ForceMode::Off, &["uhC0k-same"]),
+            ),
+            DriftAction::NoOp,
+            "a declared intent that changes nothing must not churn the app"
+        );
+    }
+
+    /// A role present in the bundle but absent from the installed app is NOT
+    /// content drift (there is no installed hash to compare) — structural
+    /// staleness owns that case.
+    #[test]
+    fn a_role_missing_from_the_installed_app_is_not_content_drift() {
+        let action = decide_drift_action(
+            &installed_app(&[("lamad", "uhC0k-same")], true),
+            &bundle_roles(&[("lamad", "uhC0k-same"), ("mishpat", "uhC0k-m")]),
+            &gates(true, ForceMode::Off, &[]),
+        );
+        assert_eq!(action, DriftAction::NoOp);
+    }
+
+    /// Structural staleness on an app holding data is NOT a licence to
+    /// uninstall: repairing one missing role would delete the source chains of
+    /// every role that was still healthy.
+    #[test]
+    fn stale_with_data_keeps_installed_without_intent() {
+        let action = decide_drift_action(
+            &stale_app(&[("lamad", "uhC0k-same")], true, &["mishpat"]),
+            &bundle_roles(&[("lamad", "uhC0k-same"), ("mishpat", "uhC0k-m")]),
+            &gates(true, ForceMode::Off, &[]),
+        );
+        match &action {
+            DriftAction::RefuseStaleWithoutIntent { missing_roles } => {
+                assert_eq!(missing_roles, &vec!["mishpat".to_string()]);
+            }
+            other => panic!("stale + data + no intent must keep the installed cells: {other:?}"),
+        }
+        assert!(!action.reinstalls());
+    }
+
+    /// …and an intent naming the missing roles' BUNDLE hashes repairs it. A
+    /// partial intent does not.
+    #[test]
+    fn stale_with_data_reinstalls_under_intent() {
+        let app = stale_app(&[("lamad", "uhC0k-same")], true, &["mishpat", "imagodei"]);
+        let bundle = bundle_roles(&[
+            ("lamad", "uhC0k-same"),
+            ("mishpat", "uhC0k-m"),
+            ("imagodei", "uhC0k-i"),
+        ]);
+
+        assert_eq!(
+            decide_drift_action(
+                &app,
+                &bundle,
+                &gates(false, ForceMode::Off, &["uhC0k-m", "uhC0k-i"]),
+            ),
+            DriftAction::ReinstallStale,
+            "intent covering every missing role authorises the repair"
+        );
+        assert!(
+            matches!(
+                decide_drift_action(&app, &bundle, &gates(false, ForceMode::Off, &["uhC0k-m"])),
+                DriftAction::RefuseStaleWithoutIntent { .. }
+            ),
+            "a partial intent must not uninstall"
+        );
+        assert_eq!(
+            decide_drift_action(&app, &bundle, &gates(false, ForceMode::Wipe, &[])),
+            DriftAction::ReinstallForced,
+            "the wipe hammer is the other way through"
+        );
+    }
+
+    /// No chains at risk — staleness reinstalls as it always did.
+    #[test]
+    fn stale_without_data_reinstalls() {
+        assert_eq!(
+            decide_drift_action(
+                &stale_app(&[], false, &["lamad"]),
+                &bundle_roles(&[("lamad", "uhC0k-l")]),
+                &gates(false, ForceMode::Off, &[]),
+            ),
+            DriftAction::ReinstallStale
+        );
+    }
+
+    /// A missing role whose bundle hash is unknown (absent from the bundle too)
+    /// can never be "covered" — the refusal stands rather than guessing.
+    #[test]
+    fn stale_role_absent_from_the_bundle_is_never_covered_by_intent() {
+        assert!(matches!(
+            decide_drift_action(
+                &stale_app(&[("lamad", "uhC0k-same")], true, &["node_registry"]),
+                &bundle_roles(&[("lamad", "uhC0k-same")]),
+                &gates(true, ForceMode::Off, &["uhC0k-anything"]),
+            ),
+            DriftAction::RefuseStaleWithoutIntent { .. }
+        ));
+    }
+
+    /// A typo must never arm a destructive path.
+    #[test]
+    fn force_mode_parses_only_exact_spellings() {
+        assert_eq!(parse_force_mode(None), ForceMode::Off);
+        assert_eq!(parse_force_mode(Some("")), ForceMode::Off);
+        assert_eq!(parse_force_mode(Some("yes")), ForceMode::Off);
+        assert_eq!(parse_force_mode(Some("1")), ForceMode::Off);
+        assert_eq!(parse_force_mode(Some("WIPE ")), ForceMode::Wipe);
+        assert_eq!(parse_force_mode(Some(" True")), ForceMode::On);
+    }
+
+    #[test]
+    fn migration_intent_parses_comma_separated_hashes() {
+        assert!(parse_migration_intent(None).is_empty());
+        assert!(parse_migration_intent(Some("  ")).is_empty());
+        assert!(parse_migration_intent(Some(",,")).is_empty());
+        let set = parse_migration_intent(Some("uhC0k-a, uhC0k-b ,,uhC0k-c"));
+        assert_eq!(set.len(), 3);
+        assert!(
+            set.contains("uhC0k-b"),
+            "whitespace around a hash is tolerated"
+        );
+    }
+
+    /// Only the three reinstalling verdicts may reach `uninstall_app`.
+    #[test]
+    fn only_reinstalling_verdicts_report_reinstalls() {
+        assert!(DriftAction::ReinstallStale.reinstalls());
+        assert!(DriftAction::ReinstallForced.reinstalls());
+        assert!(DriftAction::ReinstallForMigration { roles: vec![] }.reinstalls());
+        assert!(!DriftAction::NoOp.reinstalls());
+        assert!(!DriftAction::KeepInstalled {
+            drifted: vec![],
+            missing_intent: vec![]
+        }
+        .reinstalls());
+        assert!(!DriftAction::RefuseForceWithoutIntent { drifted: vec![] }.reinstalls());
+        assert!(!DriftAction::RefuseStaleWithoutIntent {
+            missing_roles: vec![]
+        }
+        .reinstalls());
     }
 
     #[tokio::test]
