@@ -142,6 +142,38 @@ pub fn admission_shed_backpressure() -> Response<Full<Bytes>> {
     too_many_requests_with_retry(crate::conductor_admission::SHED_RETRY_AFTER_SECS, available)
 }
 
+/// A conductor-WRITE failure, for a handler that answers its own errors.
+///
+/// The content head routes (`POST /db/content/{id}/head`, `/canonical-head`,
+/// `GET …/head-record`) build their conductor-error responses inline and return
+/// `Ok(...)`, so neither [`error_response`] nor `HttpServer::escaped_error_response`
+/// — the two seams that DO classify a shed — ever sees the error. The shed
+/// contract stopped at the door of the three routes a deploy actually drives.
+///
+/// Measured live on alpha 2026-09-02 (`elohim/dev` #1683): the App deploy's
+/// canonical-head declare read
+/// `HTTP 502: {"error":"Request timeout: conductor admission: shed: no conductor
+/// permit for content_store within 5000ms (class=interactive, capacity=5,
+/// in_flight=5) — nothing was dispatched"}`
+/// and gave up. 502 is a verdict — it tells a caller the upstream answered
+/// badly, so there is nothing to come back for; the truth was that the conductor
+/// was never asked and the call should simply be re-offered.
+///
+/// Shed is classified FIRST and by MARKER, for the same reason [`error_response`]
+/// does it: a shed rides `Timeout`, and every status a `Timeout` would otherwise
+/// earn (502 here, 504 there) asserts the conductor was asked and did not
+/// answer — the exact opposite of what happened. Everything else keeps the
+/// existing 502: this seam gains one classification, not a new status policy.
+pub fn conductor_write_error(error: &StorageError) -> Response<Full<Bytes>> {
+    if crate::conductor_admission::is_admission_shed(error) {
+        return admission_shed_backpressure();
+    }
+    json_response(
+        StatusCode::BAD_GATEWAY,
+        &serde_json::json!({ "error": error.to_string() }),
+    )
+}
+
 /// Convert a StorageError to an appropriate HTTP response
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     // Classified FIRST, and by MARKER rather than variant: a shed rides

@@ -7545,6 +7545,12 @@ impl HttpServer {
         let declared = match declare_result {
             Ok(h) => h,
             Err(e) => {
+                // Shed FIRST: a shed's text carries none of the zome-authored
+                // substrings below, but the ordering is the contract — a
+                // backpressure signal must never fall through to a verdict arm.
+                if crate::conductor_admission::is_admission_shed(&e) {
+                    return Ok(response::conductor_write_error(&e));
+                }
                 let msg = e.to_string();
                 if msg.contains("not the author")
                     || msg.contains("head delegation")
@@ -7554,10 +7560,7 @@ impl HttpServer {
                 } else if msg.contains("not in the version chain") {
                     return Ok(response::bad_request(&msg));
                 } else {
-                    return Ok(response::json_response(
-                        StatusCode::BAD_GATEWAY,
-                        &serde_json::json!({ "error": msg }),
-                    ));
+                    return Ok(response::conductor_write_error(&e));
                 }
             }
         };
@@ -7743,13 +7746,7 @@ impl HttpServer {
         .await
         {
             Ok(h) => h,
-            Err(e) => {
-                let msg = e.to_string();
-                return Ok(response::json_response(
-                    StatusCode::BAD_GATEWAY,
-                    &serde_json::json!({ "error": msg }),
-                ));
-            }
+            Err(e) => return Ok(response::conductor_write_error(&e)),
         };
 
         // Eager-stamp the projection so the local read is coherent immediately
@@ -7919,12 +7916,7 @@ impl HttpServer {
         .await
         {
             Ok(r) => r,
-            Err(e) => {
-                return Ok(response::json_response(
-                    StatusCode::BAD_GATEWAY,
-                    &serde_json::json!({ "error": e.to_string() }),
-                ));
-            }
+            Err(e) => return Ok(response::conductor_write_error(&e)),
         };
 
         match served {
@@ -18977,6 +18969,47 @@ mod admission_egress_tests {
     fn an_escaped_ordinary_error_still_reaches_the_wire_as_500() {
         let resp = HttpServer::escaped_error_response(&StorageError::Internal("boom".into()));
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// The shape a `content_store` shed produces — the one the App deploy met.
+    fn content_store_shed() -> StorageError {
+        StorageError::Timeout(format!(
+            "{ADMISSION_SHED_MARKER}: no conductor permit for content_store within 5000ms \
+             (class=interactive, capacity=5, in_flight=5) — nothing was dispatched"
+        ))
+    }
+
+    /// The content head routes answer their OWN conductor errors inline, so
+    /// they bypass both classifying seams above. Until 2026-09-02 all three
+    /// (`/head` declare, `/canonical-head`, `/head-record`) collapsed every
+    /// conductor error to 502 — so a shed reached the App deploy as a failure
+    /// verdict carrying no Retry-After, and `stage-spa-blob.sh` surrendered on
+    /// the first attempt (elohim/dev #1683, fp f8003a16a985).
+    #[test]
+    fn a_conductor_write_shed_reaches_the_wire_as_backpressure_not_502() {
+        let resp = response::conductor_write_error(&content_store_shed());
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "a shed is backpressure — the conductor never saw the call"
+        );
+        assert_eq!(
+            resp.headers().get(hyper::header::RETRY_AFTER).unwrap(),
+            crate::conductor_admission::SHED_RETRY_AFTER_SECS
+                .to_string()
+                .as_str(),
+            "a shed must tell the deploy when to come back"
+        );
+    }
+
+    /// A conductor that WAS asked and failed keeps its 502 — the classification
+    /// keys on the marker, not on every error that crosses this seam.
+    #[test]
+    fn a_real_conductor_write_failure_still_reaches_the_wire_as_502() {
+        let resp = response::conductor_write_error(&StorageError::Conductor(
+            "Zome call failed: fn declare_canonical_content_head not found".into(),
+        ));
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
     }
 
     /// Both escaped arms must keep `with_cors_headers` parity: without

@@ -87,3 +87,26 @@ A >64MB PUT with correct bytes stores and serves (or answers a real 4xx/5xx
 naming the shard mismatch), the expected-shard-hash source is identified and
 reconciled with the PUT path's chunking, and the prologue stages a fresh
 bundle end-to-end with `forwarded_to_storage:true`.
+
+## Not every `forwarded_to_storage:false` is this concern (2026-09-02)
+
+The mitigation above emits the deploy's refusal line, so every future occurrence
+of it will land here first. Two discriminators, in order:
+
+1. **Size.** This concern is the SHARDED regime (`MAX_INLINE_SIZE` 16MB;
+   observed at 69MB, with 35MB passing). The response body carries `size` — if it
+   is under 16MB, the bytes never touched the shard path and this is not the
+   concern.
+2. **Repeatability.** This concern reproduced deterministically on the same
+   bytes at rest. A hash that FAILS then SUCCEEDS on an identical re-PUT is a
+   load signature, not a durability one.
+
+`elohim/dev` #1683 (fp `5ee767181c07`) matched neither: a 3,081,219-byte
+`lamad-spa` bundle, failing twice and succeeding on the third identical re-PUT,
+on both doorways, while the same fleet was independently proven to be shedding.
+Root cause was a shed on the read-back leg being folded into
+`forwarded_to_storage:false` — see
+`genesis/data/timeline/backlog/ci-deploy-reads-storage-backpressure-as-failure.md`.
+That fix also makes this discriminator cheap: `BlobUploadResponse.error` is now
+populated whenever forwarding fails, so the response names which leg refused
+instead of leaving `forwarded_to_storage:false` as the whole diagnosis.

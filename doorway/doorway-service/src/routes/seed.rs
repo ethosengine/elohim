@@ -269,9 +269,12 @@ pub async fn handle_seed_blob(
                 success: true,
                 hash: expected_hash,
                 already_cached: true,
-                forwarded_to_storage: forwarded,
+                forwarded_to_storage: forwarded.is_ok(),
                 size: cached_size,
-                error: None,
+                // A caller that reads `forwarded_to_storage:false` must not have
+                // to open the doorway's logs to learn WHICH leg refused — the
+                // deploy leg that reds on this field is often the only observer.
+                error: forwarded.err(),
             },
         );
     }
@@ -320,10 +323,13 @@ pub async fn handle_seed_blob(
     // Forward to elohim-storage (authoritative store)
     let forwarded = forward_to_storage(&state, &expected_hash, Some(&body)).await;
 
-    if forwarded {
-        info!(hash = %expected_hash, "Blob forwarded to elohim-storage");
-    } else {
-        warn!(hash = %expected_hash, "Failed to forward blob to elohim-storage (will retry on read)");
+    match &forwarded {
+        Ok(()) => info!(hash = %expected_hash, "Blob forwarded to elohim-storage"),
+        Err(reason) => warn!(
+            hash = %expected_hash,
+            reason = %reason,
+            "Failed to forward blob to elohim-storage (will retry on read)"
+        ),
     }
 
     json_response(
@@ -332,9 +338,9 @@ pub async fn handle_seed_blob(
             success: true,
             hash: expected_hash,
             already_cached: false,
-            forwarded_to_storage: forwarded,
+            forwarded_to_storage: forwarded.is_ok(),
             size: blob_size,
-            error: None,
+            error: forwarded.err(),
         },
     )
 }
@@ -390,15 +396,72 @@ fn seed_forward_timeout_secs(bytes: usize) -> u64 {
     )
 }
 
-/// Forward a blob to elohim-storage
+/// How many times a forward re-offers itself when storage answers BACKPRESSURE.
+///
+/// Not a general retry ladder — `stage-spa-blob.sh` owns that, and this must not
+/// silently stretch a deploy's per-attempt budget. Three offers inside one
+/// `seed_forward_timeout_secs` window is enough to ride out the seconds-long
+/// shed windows measured on alpha, and no more.
+const FORWARD_BACKPRESSURE_ATTEMPTS: u32 = 3;
+
+/// Seconds to wait when storage sheds but names no `Retry-After`.
+const FORWARD_BACKPRESSURE_DEFAULT_WAIT_SECS: u64 = 2;
+
+/// Ceiling on an honoured `Retry-After`, so a storage node advertising its
+/// 30s catching-up window cannot park a deploy leg for half a minute per hop.
+const FORWARD_BACKPRESSURE_MAX_WAIT_SECS: u64 = 5;
+
+/// Is this storage answer "come back" rather than "these bytes are not here"?
+///
+/// Storage sheds at TWO gates and both answer the same way: its own
+/// request-admission ceiling and the conductor-admission gate
+/// (`services::response::admission_shed_backpressure`) each return 503
+/// `{"status":"catching-up","retryAfter":N}` (or 429) with `Retry-After`.
+///
+/// The distinction is load-bearing on the READ-BACK leg below. A shed there
+/// establishes NOTHING about durability — storage declined to answer, it did
+/// not report the blob missing — so folding it into `forwarded_to_storage:false`
+/// tells the deploy its bytes are gone when they are merely unreachable for two
+/// seconds. That is what `elohim/dev` #1683 met: a 3,081,219-byte `lamad-spa`
+/// bundle reported `forwarded_to_storage:false` twice and `true` on the third
+/// identical re-PUT, on BOTH doorways, while the same fleet was demonstrably
+/// shedding (fp f8003a16a985, the conductor-admission shed in the same stage).
+///
+/// Returns the wait to honour, clamped.
+fn backpressure_wait(response: &reqwest::Response) -> Option<std::time::Duration> {
+    let status = response.status();
+    if status.as_u16() != 503 && status.as_u16() != 429 {
+        return None;
+    }
+    let secs = response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(FORWARD_BACKPRESSURE_DEFAULT_WAIT_SECS)
+        .clamp(1, FORWARD_BACKPRESSURE_MAX_WAIT_SECS);
+    Some(std::time::Duration::from_secs(secs))
+}
+
+/// Forward a blob to elohim-storage.
 ///
 /// If body is None, reads from local cache.
-async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) -> bool {
+///
+/// `Ok(())` means storage SERVES the blob (see the read-back below), never
+/// merely that a PUT returned 200. `Err(reason)` carries the sentence the
+/// caller should show: `forwarded_to_storage:false` on its own has twice sent a
+/// human to the doorway's logs to learn WHICH leg refused (2026-08-16 read-back
+/// drop, 2026-09-02 shed), so the reason now rides the response.
+async fn forward_to_storage(
+    state: &AppState,
+    hash: &str,
+    body: Option<&Bytes>,
+) -> Result<(), String> {
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
             debug!("No storage_url configured, skipping forward");
-            return false;
+            return Err("no storage_url is configured on this doorway".to_string());
         }
     };
 
@@ -409,7 +472,7 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
             Some(entry) => entry.data.clone(),
             None => {
                 warn!(hash = %hash, "Blob not in cache, cannot forward");
-                return false;
+                return Err("blob is not in the doorway cache; nothing to forward".to_string());
             }
         },
     };
@@ -428,15 +491,58 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
     // Use reqwest client from state or create one
     let client = reqwest::Client::new();
 
+    let mut attempt = 1u32;
+    loop {
+        match forward_once(&client, &url, &data, timeout_secs, hash).await {
+            Ok(()) => return Ok(()),
+            Err((reason, retry_after)) => match retry_after {
+                Some(wait) if attempt < FORWARD_BACKPRESSURE_ATTEMPTS => {
+                    warn!(
+                        hash = %hash,
+                        attempt,
+                        wait_secs = wait.as_secs(),
+                        reason = %reason,
+                        "storage shed the blob forward — re-offering; a shed says \
+                         nothing about durability"
+                    );
+                    tokio::time::sleep(wait).await;
+                    attempt += 1;
+                }
+                _ => return Err(reason),
+            },
+        }
+    }
+}
+
+/// One PUT + read-back attempt.
+///
+/// `Err((reason, Some(wait)))` is BACKPRESSURE — storage declined to answer and
+/// asked us back; `Err((reason, None))` is a real refusal.
+async fn forward_once(
+    client: &reqwest::Client,
+    url: &str,
+    data: &[u8],
+    timeout_secs: u64,
+    hash: &str,
+) -> Result<(), (String, Option<std::time::Duration>)> {
     match client
-        .put(&url)
+        .put(url)
         .header("Content-Type", "application/octet-stream")
-        .body(data)
+        .body(data.to_vec())
         .timeout(std::time::Duration::from_secs(timeout_secs))
         .send()
         .await
     {
         Ok(response) => {
+            if let Some(wait) = backpressure_wait(&response) {
+                return Err((
+                    format!(
+                        "storage shed the blob PUT ({}) — nothing was stored, come back",
+                        response.status()
+                    ),
+                    Some(wait),
+                ));
+            }
             if response.status().is_success() {
                 // Read-back verification: a 2xx PUT alone has been observed
                 // reporting `forwarded_to_storage: true` while the bytes never
@@ -445,22 +551,50 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
                 // survived; storage accepts the same bytes fine when PUT
                 // directly). Until that class has a root cause, "forwarded"
                 // means storage SERVES the blob, not that a PUT returned 200.
-                let verify_url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
+                //
+                // The read-back is also the leg that MUST separate shed from
+                // absence: the PUT succeeded, so the bytes are as durable as
+                // storage said they were, and a 503 here means only that
+                // storage would not answer a read right now.
                 match client
-                    .get(&verify_url)
+                    .get(url)
                     .timeout(std::time::Duration::from_secs(timeout_secs))
                     .send()
                     .await
                 {
-                    Ok(check) if check.status().is_success() => true,
+                    Ok(check) if check.status().is_success() => Ok(()),
                     Ok(check) => {
+                        if let Some(wait) = backpressure_wait(&check) {
+                            let status = check.status();
+                            warn!(
+                                hash = %hash,
+                                status = %status,
+                                "seed-blob read-back SHED — the PUT succeeded and storage \
+                                 declined to answer a read; this says nothing about \
+                                 durability, so it is not a forward failure yet"
+                            );
+                            return Err((
+                                format!(
+                                    "storage shed the read-back ({status}) after accepting \
+                                     the PUT — durability unknown, come back"
+                                ),
+                                Some(wait),
+                            ));
+                        }
+                        let status = check.status();
                         error!(
                             hash = %hash,
-                            status = %check.status(),
+                            status = %status,
                             "seed-blob forward read-back FAILED — storage accepted the PUT \
                              but does not serve the blob; reporting forwarded=false"
                         );
-                        false
+                        Err((
+                            format!(
+                                "storage accepted the PUT but does not serve the blob \
+                                 (read-back {status})"
+                            ),
+                            None,
+                        ))
                     }
                     Err(e) => {
                         error!(
@@ -468,7 +602,7 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
                             error = %e,
                             "seed-blob forward read-back unreachable — reporting forwarded=false"
                         );
-                        false
+                        Err((format!("read-back to storage was unreachable: {e}"), None))
                     }
                 }
             } else {
@@ -480,12 +614,18 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
                     body = %body,
                     "elohim-storage returned error"
                 );
-                false
+                Err((
+                    format!("storage refused the blob PUT ({status}): {body}"),
+                    None,
+                ))
             }
         }
         Err(e) => {
             error!(hash = %hash, error = %e, "Failed to connect to elohim-storage");
-            false
+            Err((
+                format!("could not reach storage to forward the blob: {e}"),
+                None,
+            ))
         }
     }
 }
@@ -917,7 +1057,7 @@ mod tests {
         // forces forward_to_storage to read the bytes back out of the cache.
         let forwarded = forward_to_storage(&state, hash, None).await;
         assert!(
-            !forwarded,
+            forwarded.is_err(),
             "no storage_url is configured, so the real forward must fail — \
              `already_cached:true` may never be paired with an unverified \
              `forwarded_to_storage:true`"
@@ -931,8 +1071,74 @@ mod tests {
 
         let forwarded = forward_to_storage(&state, "sha256-never-cached", None).await;
         assert!(
-            !forwarded,
+            forwarded.is_err(),
             "a hash with no cache entry and no supplied body has nothing to forward"
         );
+    }
+
+    /// Every refusal names itself. `forwarded_to_storage:false` alone sent two
+    /// separate investigations into the doorway's logs to learn which leg
+    /// refused (2026-08-16 read-back drop, 2026-09-02 shed); the reason now
+    /// rides the response the deploy leg already reads.
+    #[tokio::test]
+    async fn a_refused_forward_names_the_leg_that_refused() {
+        let mut state = test_state(true);
+        state.args.storage_url = None;
+
+        let reason = forward_to_storage(&state, "sha256-anything", None)
+            .await
+            .expect_err("no storage_url must refuse");
+        assert!(
+            !reason.is_empty(),
+            "a refusal with an empty reason is the bare boolean again"
+        );
+        assert!(
+            reason.contains("storage_url"),
+            "the reason must name the leg that refused, got: {reason}"
+        );
+    }
+
+    /// Build a `reqwest::Response` from a raw `http::Response` so the
+    /// classifier can be tested without a live storage node.
+    fn as_reqwest(status: u16, retry_after: Option<&str>) -> reqwest::Response {
+        let mut builder = Response::builder().status(status);
+        if let Some(v) = retry_after {
+            builder = builder.header(hyper::header::RETRY_AFTER, v);
+        }
+        reqwest::Response::from(builder.body(String::new()).unwrap())
+    }
+
+    /// The classification that separates "come back" from "your bytes are
+    /// gone". Both storage gates — its request-admission ceiling and the
+    /// conductor-admission gate — shed as 503/429 with Retry-After.
+    #[test]
+    fn a_shed_is_backpressure_and_a_real_refusal_is_not() {
+        assert!(
+            backpressure_wait(&as_reqwest(503, Some("30"))).is_some(),
+            "503 catching-up is backpressure"
+        );
+        assert!(
+            backpressure_wait(&as_reqwest(429, None)).is_some(),
+            "429 is backpressure even with no Retry-After"
+        );
+        assert!(
+            backpressure_wait(&as_reqwest(404, None)).is_none(),
+            "404 means storage does not serve these bytes — a real refusal"
+        );
+        assert!(
+            backpressure_wait(&as_reqwest(500, None)).is_none(),
+            "500 is a failure, not a request to come back"
+        );
+    }
+
+    /// A storage node advertising its 30s catching-up window must not park a
+    /// deploy leg for 30s per hop — `stage-spa-blob.sh` owns the long ladder.
+    #[test]
+    fn an_advertised_retry_after_is_clamped() {
+        let wait = backpressure_wait(&as_reqwest(503, Some("30"))).unwrap();
+        assert_eq!(wait.as_secs(), FORWARD_BACKPRESSURE_MAX_WAIT_SECS);
+
+        let defaulted = backpressure_wait(&as_reqwest(503, None)).unwrap();
+        assert_eq!(defaulted.as_secs(), FORWARD_BACKPRESSURE_DEFAULT_WAIT_SECS);
     }
 }

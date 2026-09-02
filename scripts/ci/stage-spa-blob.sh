@@ -161,6 +161,23 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
                     sleep 90
                     continue
                 fi
+                # Third retryable class, and the reason it did not ride the
+                # 503|429 arm above: a CONDUCTOR-admission shed on this route
+                # reached the wire as 502 with the marker in the body, so the
+                # ladder that names this exact class in its own comment fell
+                # through to "structural" and stopped (elohim/dev #1683, fp
+                # f8003a16a985 — backlog
+                # ci-canonical-head-declare-shed-laundered-as-502). Storage now
+                # answers a shed as 503 (services/response.rs
+                # `conductor_write_error`) so it lands on the arm above; this
+                # match keeps the ladder correct against any host still running
+                # a pre-fix binary, and costs nothing once none are.
+                if [ "${attempt}" -lt "${max_attempts}" ] && \
+                   printf '%s' "${declare_body}" | grep -q "conductor admission: shed"; then
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shed the call at the conductor-admission gate (HTTP ${declare_status}: ${declare_body}) — nothing was dispatched, retrying in 30s" >&2
+                    sleep 30
+                    continue
+                fi
                 echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} returned HTTP ${declare_status}: ${declare_body} — peer keeps its own head until gossip/heal converges" >&2
                 break
                 ;;
@@ -361,29 +378,68 @@ stage_once() {
             # back as a non-2xx JSON body ({"error": "..."}) that we want to
             # surface verbatim (the hot-swap probe signal) — -f would discard
             # the body and leave only a bare curl exit code.
+            #
+            # BACKPRESSURE IS NOT A VERDICT (added 2026-09-02, elohim/dev #1683,
+            # fp f8003a16a985). A conductor-admission SHED means storage's permit
+            # gate refused to dispatch — "the conductor never saw the call" — so
+            # the honest response is to re-offer it, exactly as
+            # `conductor_admission::is_admission_shed` instructs every caller.
+            # #1683 met `HTTP 502: {"error":"Request timeout: conductor admission:
+            # shed: no conductor permit for content_store within 5000ms
+            # (class=interactive, capacity=5, in_flight=5) — nothing was
+            # dispatched"}` on a SINGLE attempt and surrendered, leaving scenario
+            # 2 red for a gate that was merely busy for five seconds. Note the
+            # capacity: 5 is the admission floor (PERMIT_FLOOR 8 − CONDUCTOR_RESERVE
+            # 3), so an alpha storage pod saturates on very little concurrency and
+            # a deploy landing mid-sweep meets a full gate routinely.
+            #
+            # Storage now answers a shed as 503 + Retry-After (services/response.rs
+            # `conductor_write_error`), but this ladder ALSO matches the shed marker
+            # in the body so it keeps working against a doorway/storage pair that
+            # has not taken that fix yet — which is every fleet host until it rolls.
+            # Still ADVISORY throughout: every arm returns success; this leg never
+            # fails the deploy.
             local canonical_raw canonical_exit canonical_status canonical_body
-            canonical_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
-                -H 'Content-Type: application/json' \
-                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
-                -d "{\"headActionHash\":\"${head_hash}\"}" \
-                "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" \
-                2>&1)
-            canonical_exit=$?
+            local declare_attempt=1
+            local declare_attempts="${CANONICAL_HEAD_ATTEMPTS:-4}"
+            while true; do
+                canonical_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
+                    -H 'Content-Type: application/json' \
+                    -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
+                    -d "{\"headActionHash\":\"${head_hash}\"}" \
+                    "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" \
+                    2>&1)
+                canonical_exit=$?
 
-            if [ "${canonical_exit}" -ne 0 ]; then
-                echo "  ⚠ canonical-head declare FAILED — curl error against POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head (exit ${canonical_exit}): ${canonical_raw} — coordinator may be pre-cure; scenario 2 will stay red" >&2
-            else
+                if [ "${canonical_exit}" -ne 0 ]; then
+                    echo "  ⚠ canonical-head declare FAILED — curl error against POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head (exit ${canonical_exit}): ${canonical_raw} — coordinator may be pre-cure; scenario 2 will stay red" >&2
+                    break
+                fi
+
                 canonical_status="${canonical_raw##*$'\n'}"
                 canonical_body="${canonical_raw%$'\n'*}"
-                case "${canonical_status}" in
-                    2??)
-                        echo "  ✓ canonical head declared: ${head_hash} (staging tier)"
-                        ;;
-                    *)
-                        echo "  ⚠ canonical-head declare FAILED — POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head returned HTTP ${canonical_status}: ${canonical_body} — coordinator may be pre-cure; scenario 2 will stay red" >&2
-                        ;;
-                esac
-            fi
+                if [ "${canonical_status#2}" != "${canonical_status}" ]; then
+                    echo "  ✓ canonical head declared: ${head_hash} (staging tier)"
+                    break
+                fi
+
+                # Backpressure, by either wire shape: the post-fix 503/429
+                # (+Retry-After) or the shed marker carried verbatim in the body
+                # of a pre-fix 502. Anything else is a real answer — surface it.
+                if [ "${declare_attempt}" -lt "${declare_attempts}" ] \
+                    && { [ "${canonical_status}" = "503" ] \
+                        || [ "${canonical_status}" = "429" ] \
+                        || printf '%s' "${canonical_body}" | grep -q 'conductor admission: shed'; }; then
+                    local declare_backoff=$(( declare_attempt * 5 ))
+                    echo "  ⚠ canonical-head declare BACKPRESSURE (HTTP ${canonical_status}) — the conductor was never asked; re-offering in ${declare_backoff}s (attempt ${declare_attempt}/${declare_attempts})" >&2
+                    declare_attempt=$(( declare_attempt + 1 ))
+                    sleep "${declare_backoff}"
+                    continue
+                fi
+
+                echo "  ⚠ canonical-head declare FAILED — POST ${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head returned HTTP ${canonical_status}: ${canonical_body} — coordinator may be pre-cure; scenario 2 will stay red" >&2
+                break
+            done
         fi
     else
         echo "  ⊘ [${SLUG}] byte-seed only (DO_PATCH!=1) — no head PATCH from this call."
