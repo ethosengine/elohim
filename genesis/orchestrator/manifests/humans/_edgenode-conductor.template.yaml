@@ -347,8 +347,18 @@ spec:
             # Rendered per-env by deployHumanManifest: true for alpha/staging
             # (ephemeral, re-seeded), false for prod (DNA upgrades need
             # migration/lineage, not a blind reinstall that mints a new key).
+            # 2026-09-02: pinned to "false" on EVERY env after the alpha incident —
+            # the standing "true" armed a non-atomic uninstall_app on nodes
+            # holding data; an unintended integrity-hash move then tore all
+            # seven source chains. A reinstall on a node holding data now needs
+            # DNA_MIGRATION_INTENT=<bundle DNA hashes> (happ_manager 867e4bf9b);
+            # an app-ABSENT conductor first-installs without any flag; the
+            # coordinator hot-swap is enabled explicitly below. This is the
+            # embedded process, so it is the only place these flags matter.
             - name: ALLOW_DNA_REINSTALL
-              value: "ALLOW_DNA_REINSTALL_PLACEHOLDER"
+              value: "false"
+            - name: ALLOW_COORDINATOR_UPDATE
+              value: "true"
             # Cooperative-cgroup CPU lever, now a no-op: storage and conductor
             # no longer share a container cgroup, so there is no intra-cgroup
             # CPU race for niceness to arbitrate. Explicitly "0" (disabled) so

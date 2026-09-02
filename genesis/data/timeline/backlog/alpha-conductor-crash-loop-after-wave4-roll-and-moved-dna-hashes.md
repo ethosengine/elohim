@@ -152,6 +152,43 @@ makes a silent integrity move impossible, and `happ_manager` (867e4bf9b) makes a
 node holding data impossible without `DNA_MIGRATION_INTENT` naming these exact hashes — set it
 on the alpha StatefulSets for this one roll, then remove it.
 
+## HOLD — preconditions NOT met (k8s dev, on-cluster, 2026-09-02 ~17:50Z; the procedure below stays valid once they are)
+
+The "clear now" of 17:30Z was wrong on three counts, all mine:
+
+1. **The hApp is not baked into the storage image.** Each conductor pod fetches it at start through
+   the `happ-fetcher` init container: `oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION}`
+   with `HAPP_VERSION=dev-latest` (ConfigMap `elohim-<human>-alpha-config`, key `happ-version`, same
+   on all seven). Harbor's newest `elohim-happ` artifact is 2026-09-02T10:30:03Z (`sha256:913278a2…`)
+   — the incident-era build (#1418). #1419/#1420 failed at the guard and #1421 failed in sweettest,
+   so **no build since has published**; `dev-latest` still points at the incident artifact. Hashing
+   that exact blob: lamad `uhC0kFAoUY1ia…`, imagodei `uhC0k-LFGM-1j…`, infrastructure `uhC0kwL7sHOFj…`,
+   node_registry `uhC0kgfm-L3Kh…`, mishpat `uhC0kXasNmtM2…` — **zero of five** equal the
+   `[dna:migrate]` baseline (#1420). A clear now would spend the irreversible destruction to land on
+   five DNAs matching neither the baseline nor the installed set, and need a second full clear.
+2. **The installer is not on the wave-8 image.** `main.rs` gates `ensure_happ_installed` on
+   `EMBEDDED_CONDUCTOR`; the storage pods run `EMBEDDED_CONDUCTOR=false` (clients over the headless
+   service, install nothing). The conductor pods run `EMBEDDED_CONDUCTOR=true` on
+   `elohim-storage-iroh:1.0.0-dev-4a81a749` (2026-09-01) — so the `happ_manager` intent gate and the
+   supervisor fix are on the pods that don't install and absent from the one that does (decision
+   item 5 above, still unfixed: the edge roll never moves the conductor template's image tag).
+3. **`ALLOW_DNA_REINSTALL=true` is still set on all seven conductor StatefulSets** — the flag that
+   drove the destructive uninstall, live and ungated on that old code.
+
+Also noted: the STS pins the mutable tag `dev-latest`, not a digest; the `elohim.host/happ-digest`
+annotation is a record, not an enforcement (`genesis/orchestrator/scripts/resolve-happ-digest.sh`
+exists and is not in this path).
+
+**What must land before the clear is safe (repo side, this shift):**
+(a) a green `elohim-holochain` build publishes #1420's hApp and repoints `dev-latest` (verify by
+re-hashing the pulled blob: all five must equal the baseline); (b) the conductor StatefulSets move
+to the same image tag as storage (`1.0.0-dev-7d909626` or later) so the installing process carries
+the intent gate + supervisor fix; (c) `ALLOW_DNA_REINSTALL` dropped from the conductor template
+(`ALLOW_COORDINATOR_UPDATE=true` set explicitly there instead — the hot-swap also runs in the
+embedded process). With (a)+(b), a cleared conductor presents no app and first-installs — no
+`DNA_MIGRATION_INTENT` needed; if the clear ever has to happen on a drifted node, the intent is the
+baseline five. Then the procedure below, unchanged.
+
 ## RECOVERY PROCEDURE (operator-owned; written 2026-09-02 17:4xZ for the k8s dev; grounded in the manifests)
 
 **Preconditions (met at 17:28Z):** all seven `elohim-<human>-alpha-0` storage pods run

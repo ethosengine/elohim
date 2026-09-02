@@ -379,7 +379,12 @@ spec:
             # Rendered per-env by deployHumanManifest: true for alpha/staging
             # (ephemeral, re-seeded), false for prod (DNA upgrades need
             # migration/lineage, not a blind reinstall that mints a new key).
+            # 2026-09-02: "false" after the alpha incident — see the template's
+            # note; a reinstall on a node holding data needs DNA_MIGRATION_INTENT,
+            # an app-absent conductor first-installs without any flag.
             - name: ALLOW_DNA_REINSTALL
+              value: "false"
+            - name: ALLOW_COORDINATOR_UPDATE
               value: "true"
             # Cooperative-cgroup CPU lever, now a no-op: storage and conductor
             # no longer share a container cgroup, so there is no intra-cgroup
