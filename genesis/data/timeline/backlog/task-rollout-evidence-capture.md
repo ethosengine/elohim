@@ -100,19 +100,23 @@ too — the summary names actual container states, not rollout testcase counts:
 #1413 ended **ABORTED** (superseded) and still archived, which is the stronger
 receipt.
 
-**Do NOT close this atom on #1414.** #1414 (UNSTABLE) logged both the
-collector's readiness summary and the wrapper's `expected artifact:
-rollout-evidence/…` line for `elohim-jessica-alpha-conductor`, yet its build
-page carries **only `build.env`** — no `rollout-evidence/**` at all, from the
-same pipeline-level `post { always { archiveArtifacts artifacts:
-'rollout-evidence/**', allowEmptyArchive: true } }`
-(`elohim/holochain/Jenkinsfile:2945`), where `allowEmptyArchive: true` makes the
-miss silent. There is an unexplained gap between "the collector ran and said so
-in the log" and "the bundle reached the build page" — the residual blindness
-this atom exists to remove. Suggested next read: whether #1414's deploy stage
-and its `post` block shared a workspace, and whether the collector's relative
-`OUTPUT_ROOT` (`scripts/ci/capture-rollout-evidence.sh:19`) resolved to the
-archive glob's base in that run.
+**#1414 is not a counter-example** (correcting an earlier revision of this note,
+same day, before it was acted on). #1414 logged the collector's readiness
+summary and the `expected artifact:` line but its build page carried only
+`build.env` — that is **not** an archive defect: `archiveArtifacts` lives in the
+pipeline-level `post { always { … } }` (`elohim/holochain/Jenkinsfile`), and
+#1414 was still `IN_PROGRESS` inside "Deploy Edge Node - Alpha", so `post` had
+not run. A `/artifact/rollout-evidence/…` URL 404s until the build finishes.
+The `expected artifact:` phrasing in `waitForRolloutWithEvidence` is a
+forward-pointer for a human reading the console, not a claim of publication —
+worth knowing, because it reads like a receipt when it is a promise.
+
+Still true and worth the DoD's attention: the collector **always** exits 0 by
+design (`scripts/ci/capture-rollout-evidence.sh:10-12`), and the archive uses
+`allowEmptyArchive: true`. So a genuine future miss — collector wrote nothing,
+or wrote outside the glob's base — would be silent at both ends. Neither this
+build nor #1413 exhibits one; the pairing is just structurally unobservable, and
+worth a thought before this atom closes.
 
 Both builds' context:
 `genesis/data/timeline/backlog/ci-edge-conductor-roll-no-halt-walks-the-fleet.md`.

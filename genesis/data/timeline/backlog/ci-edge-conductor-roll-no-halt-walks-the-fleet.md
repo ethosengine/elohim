@@ -31,8 +31,10 @@ cites:
 
 ## The failure
 
-Three DEPLOYMENT fingerprints landed from `elohim-edge/dev` #1414 (UNSTABLE, started
-2026-09-02T10:27:44Z), each seen 1×, `first_build == last_build == 1414`:
+Three DEPLOYMENT fingerprints landed from `elohim-edge/dev` #1414 (started
+2026-09-02T10:27:44Z), each seen 1×, `first_build == last_build == 1414`. **#1414 was still
+`IN_PROGRESS` when this entry was written** (verified 12:02Z, ~40.7 min into "Deploy Edge
+Node - Alpha" alone) — its `UNSTABLE` is Jenkins' worst-verdict-so-far, not a final result:
 
 ```
 ca8705d89578  error: timed out waiting for the condition
@@ -87,30 +89,50 @@ it does not hold:
    advanced to the next one faster than a healthy one** — the pacing safety inverted
    exactly when it was needed.
 
-### The proof that this is what happened, not a theory
+### The proof that the loop does not halt
 
 - `ordered` is built non-genesis first, then genesis-non-matthew, then matthew last
   (`Jenkinsfile:758-761`). From `genesis/orchestrator/data/deployments.json` only adam and
   matthew are `genesisPeer: true`, so restricted to the seven live alpha peers `ordered` is
   exactly **jessica, james, gertrude, susan, eve, adam, matthew**.
+- **Direct, in-build proof (#1414).** After jessica's conductor rollout failed, the phase
+  attempted james (failed, `elohim-conductor=false/CrashLoopBackOff`), then gertrude
+  (failed, `elohim-conductor=false/` on node `shem`), then susan — whose
+  `kubectl rollout status` had already printed the same 3× `Waiting for 1 pods to be
+  ready...` pattern that preceded every prior timeout. Four peers attempted, three
+  confirmed failed, in `ordered` sequence, in one build. That settles the defect on its own
+  and is independent of everything below.
+- Artifact-level corroboration (#1413): it archived failed-rollout evidence bundles for
+  four conductors in one run — `rollout-evidence/elohim-alpha--statefulset--elohim-{jessica,
+  gertrude,susan,eve}-alpha-conductor/` — plus `…--deployment--elohim-doorway-alpha-b`.
+  #1413 ended ABORTED (superseded — see
+  `ci-orchestrator-supersede-aborts-in-flight-edge-rolls.md`), which is the only reason it
+  stopped where it did; james/adam/matthew's waits there were cancelled mid-flight, so their
+  #1413 outcomes are inconclusive rather than passing.
+- Onset is bounded by the builds: **#1412 (06:48–08:29Z) had NO conductor rollout failure at
+  all** — every conductor apply reported `configured` and every rollout completed clean;
+  only the two doorway Deployments timed out. #1413 carries the first conductor timeouts.
+  So the conductor fleet went unhealthy between #1412's end and #1413's conductor phase.
 - The escalation atom's independently measured per-node restart sequence (operator,
   on-cluster) is **jessica 09:28 → james 09:38 → gertrude 09:49 → susan 09:59 → eve 10:09
-  → adam 10:19 → matthew 10:28** — the same order, at ~10-minute intervals. The interval
-  is the phase's own `--timeout=600s`, spent once per peer.
-- Artifact-level confirmation: **#1413 archived failed-rollout evidence bundles for four
-  conductors in one run** — `rollout-evidence/elohim-alpha--statefulset--elohim-{jessica,
-  gertrude,susan,eve}-alpha-conductor/` — plus `…--deployment--elohim-doorway-alpha-b`. Four
-  consecutive conductor rollout failures, and the loop kept going every time. #1413 ended
-  ABORTED (superseded — see `ci-orchestrator-supersede-aborts-in-flight-edge-rolls.md`),
-  which is the only reason it stopped where it did.
-- #1414 then re-entered the same loop at jessica (first in `ordered`), found it already
-  CrashLoopBackOff, and produced these three fingerprints. **Every subsequent edge build
-  re-enters the roll** — that is the recurrence shape.
+  → adam 10:19 → matthew 10:28** — the same order as `ordered`, at ~10-minute intervals
+  equal to the phase's own `--timeout=600s`. That correspondence is why this entry exists.
+  See the open question below on how far it can be pushed.
+- **Every subsequent edge build re-enters the loop** — that is the recurrence shape.
 
-So the ~10-minute cadence of the fleet-wide destruction was not ambient; it was this
-pipeline walking its own peer list, paying one rollout timeout per node, rolling six
-healthy conductors into a state whose first instance had already demonstrably crash-looped.
-With a halt, the cost would have been jessica alone.
+### What the loop costs, in both readings
+
+Whether a given build *rolls* the conductors or merely *waits* on already-broken ones, the
+no-halt behaviour costs up to `600s × remaining peers`. #1414 is the pure-witness case and
+had already spent **40.7 minutes** in "Deploy Edge Node - Alpha" without reaching eve, adam
+or matthew. So the halt is worth landing on wall-clock grounds alone, before any
+blast-radius argument.
+
+So the ~10-minute cadence is, at minimum, this pipeline walking its own peer list and paying
+one rollout timeout per node. **How much of the fleet-wide damage the loop caused rather
+than merely witnessed is NOT settled** — see open question 1. The claim this entry stands
+on is the narrow one: the loop does not stop, and with a halt each build's attempt surface
+would have been one peer instead of the whole roster.
 
 ## Current decision
 
@@ -152,18 +174,35 @@ storage phase's parallel per-peer posture, or the junit shape.
 
 ## Open, recorded rather than guessed
 
-1. **#1414 archived no rollout-evidence bundle at all** — only `build.env` — although its log
-   carries both the collector's readiness summary and the `expected artifact:` line, and
-   #1413 archived the full set from the same `post { always { archiveArtifacts … } }`. So
-   the first-natural-failed-rollout receipt that `task-rollout-evidence-capture.md` is
-   waiting on is satisfied by **#1413**, not #1414, and the #1414 gap is unexplained. Do
-   not close that atom's DoD on #1414.
+1. **Did the conductor phase ROLL these pods, or only wait on them?** For **#1414 the answer
+   is: only waited.** Its changeset touches nothing under
+   `genesis/orchestrator/manifests/humans/`, `elohim/holochain/dna/`, `elohim/holochain-conductor`
+   or `elohim/tx5`; the console prints
+   `conductor image …: holding harbor…/elohim-storage-iroh:1.0.0-dev-4a81a749` (only the
+   *storage* image moved, to `…-7513654f`); and `_edgenode-conductor.template.yaml:72-77`
+   deliberately keeps the git-SHA-varying `app.kubernetes.io/version` on OBJECT metadata,
+   never on `.spec.template`, so an ordinary commit yields `configured` with **no new
+   revision and no restart**. #1414 is therefore a witness, not a cause.
+   **#1413 is the open half.** The atom's per-node restart times fall inside #1413's window
+   and match `ordered`, and a moved hApp digest *is* a documented conductor-roll trigger
+   ("hApp bytes must reach the conductors"), which the wave-4 integrity-hash move would have
+   fired — but nobody has read #1413's own `conductor image …:` lines to confirm it rolled
+   rather than waited. Until someone does, treat "the loop caused the fleet-wide tear" as
+   **unproven** and "the loop never halts" as proven. Cheapest next read: grep #1413's
+   console for `conductor image` and for `ROLL requested` / `FIRST ROLLOUT` / `holding`.
 2. `gate-runner.mjs --changed-file-list --names` prints *no* project for
    `elohim/holochain/Jenkinsfile` — this file has no local gate at all, so the CPS lint and
    the orchestrator node tests above are the whole of its pre-push coverage (museum
    #13/#17 family: a gate whose trigger does not cover the file the author edits).
-3. Whether james failed its rollout in #1413 (it is in `ordered` and restarted at 09:38 per
-   the atom, but has no evidence bundle) or briefly reported Ready before crash-looping.
+3. Whether the conductor `previous.log` tails inside #1413's archived bundles carry the
+   `CellWithoutGenesis` panic the atom names. They are fetchable now (#1413 is finished) and
+   would tie the CI evidence to the substrate diagnosis without any cluster access.
+
+**Retracted 2026-09-02, same day, before anyone acted on it:** an earlier revision of this
+entry claimed #1414 archived no `rollout-evidence` bundle and called that an unexplained
+measurement gap. It is not a gap — `archiveArtifacts` lives in the pipeline-level
+`post { always { … } }`, and #1414 had not finished its deploy stage, so `post` had not run.
+The absence was simply a still-running build.
 
 ## Done when
 
