@@ -1,0 +1,114 @@
+/**
+ * EprHomePage — page object for the shell-owned EPR atom home (/epr/{id}).
+ *
+ * The atom home is the universal address for any reachable resource: identity
+ * (title/reach/notarized chips), the content itself (the focal slot), and the
+ * four legs (who holds it, where it lives, how it's governed, where it came
+ * from) — see genesis/a2o/features/content/epr-atom-home.feature.
+ */
+
+import { BasePage } from './base.page.js';
+
+/** The four supporting sections that ground a resource in its network. */
+export type EprHomeLeg = 'holds' | 'lives' | 'governed' | 'from';
+
+/** Selectors for the shell-owned EPR atom home (/epr/{id}) — data-testid contract from the spec §6. */
+export const EPR_HOME = {
+  ROOT: 'epr-home',
+  GATE: 'epr-home-gate',
+  GATE_BACK: 'epr-home-gate-back',
+  ARRIVAL: 'epr-home-arrival',
+  TITLE: 'epr-home-title',
+  CHIP_REACH: 'epr-home-chip-reach',
+  CHIP_NOTARIZED: 'epr-home-chip-notarized',
+  CHIP_HELD: 'epr-home-chip-held',
+  OPEN_IN_BUNDLE: 'epr-home-open-in-bundle',
+  FOCAL: 'epr-home-focal',
+  YOUR_MARK: 'epr-home-your-mark',
+  ADDRESS: 'epr-home-address',
+  LEG: (leg: EprHomeLeg) => `epr-home-leg-${leg}`,
+} as const;
+
+export class EprHomePage extends BasePage {
+  /** Wait until either the frame (ROOT) or the out-of-reach gate (GATE) is visible. */
+  async waitForReady(): Promise<void> {
+    await this.locate(`[data-testid="${EPR_HOME.ROOT}"], [data-testid="${EPR_HOME.GATE}"]`)
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 });
+  }
+
+  async goto(appUrl: string, resourceId: string): Promise<void> {
+    await this.page.goto(`${appUrl}/epr/${resourceId}`, { waitUntil: 'networkidle' });
+    await this.waitForReady();
+  }
+
+  async title(): Promise<string> {
+    return (await this.testId(EPR_HOME.TITLE).textContent())?.trim() ?? '';
+  }
+
+  async chipText(chip: 'reach' | 'notarized' | 'held'): Promise<string> {
+    return (await this.testId(`epr-home-chip-${chip}`).textContent())?.trim() ?? '';
+  }
+
+  async focalShape(): Promise<'immersive' | 'reading' | null> {
+    const cls = (await this.testId(EPR_HOME.FOCAL).getAttribute('class')) ?? '';
+    if (cls.includes('epr-home__focal--immersive')) return 'immersive';
+    if (cls.includes('epr-home__focal--reading')) return 'reading';
+    return null;
+  }
+
+  async legText(leg: EprHomeLeg): Promise<string> {
+    return (await this.testId(EPR_HOME.LEG(leg)).textContent())?.trim() ?? '';
+  }
+
+  async legVisible(leg: EprHomeLeg): Promise<boolean> {
+    return this.testId(EPR_HOME.LEG(leg)).isVisible();
+  }
+
+  async legsBesideContent(): Promise<boolean> {
+    const focal = await this.testId(EPR_HOME.FOCAL).boundingBox();
+    const legs = await this.testId(EPR_HOME.LEG('holds')).boundingBox();
+    if (!focal || !legs) return false;
+    return legs.x > focal.x + focal.width - 1 && legs.y < focal.y + focal.height;
+  }
+
+  async focalFullWidth(): Promise<boolean> {
+    const focal = await this.testId(EPR_HOME.FOCAL).boundingBox();
+    const root = await this.testId(EPR_HOME.ROOT).boundingBox();
+    if (!focal || !root) return false;
+    return focal.width > root.width * 0.9;
+  }
+
+  async bodyText(): Promise<string> {
+    return (await this.locate('body').textContent()) ?? '';
+  }
+
+  async arrivalText(): Promise<string | null> {
+    const chip = this.testId(EPR_HOME.ARRIVAL);
+    return (await chip.count()) > 0 ? ((await chip.textContent())?.trim() ?? '') : null;
+  }
+
+  async clickRelated(resourceId: string): Promise<void> {
+    await this.locate(
+      `[data-testid="${EPR_HOME.LEG('lives')}"] a[data-related-id="${resourceId}"]`
+    ).click();
+    await this.testId(EPR_HOME.GATE).waitFor({ state: 'visible', timeout: 20_000 });
+  }
+
+  async clickOpenInBundle(): Promise<void> {
+    await this.testId(EPR_HOME.OPEN_IN_BUNDLE).click();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async gateText(): Promise<string> {
+    return (await this.testId(EPR_HOME.GATE).textContent())?.trim() ?? '';
+  }
+
+  async gateBackHref(): Promise<string | null> {
+    return this.testId(EPR_HOME.GATE_BACK).getAttribute('href');
+  }
+
+  async has(id: string): Promise<boolean> {
+    return (await this.testId(id).count()) > 0;
+  }
+}

@@ -399,7 +399,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 30%);
+  background: color-mix(in srgb, var(--lamad-text-primary) 30%, transparent);
   z-index: 15;
   cursor: pointer;
 }

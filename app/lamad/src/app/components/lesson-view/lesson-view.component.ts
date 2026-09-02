@@ -257,7 +257,7 @@ interface InlineQuizCompletionEvent {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.03em;
-        background: rgb(99 102 241 / 12%);
+        background: color-mix(in srgb, var(--lamad-accent-primary) 12%, transparent);
         color: var(--lamad-accent-primary, #4f46e5);
         border-radius: var(--radius-sm, 4px);
       }
