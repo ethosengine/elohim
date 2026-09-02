@@ -87,13 +87,13 @@
 }
 
 .epr-home__chip--reach {
-  background: rgba(127, 176, 105, 0.16);
-  border-color: rgba(127, 176, 105, 0.4);
+  background: color-mix(in srgb, var(--el-green-light) 16%, transparent);
+  border-color: color-mix(in srgb, var(--el-green-light) 40%, transparent);
 }
 
 .epr-home__chip--warm {
-  background: rgba(184, 102, 79, 0.12);
-  border-color: rgba(184, 102, 79, 0.45);
+  background: color-mix(in srgb, var(--el-clay) 12%, transparent);
+  border-color: color-mix(in srgb, var(--el-clay) 45%, transparent);
   color: var(--el-warm);
 }
 
