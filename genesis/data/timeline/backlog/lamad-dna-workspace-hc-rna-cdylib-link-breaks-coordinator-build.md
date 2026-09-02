@@ -65,24 +65,23 @@ same way (`__hc__dna_info_2`, `__hc__zome_info_1` from `libhdi`). Root cause is 
 a wasm shared object as imports by default. hc-rna was only the first cdylib the elohim
 workspace links. CI is unaffected because it builds under the holonix pin with `RUSTFLAGS=""`.
 
-**Fix (two changes, both in-tree):**
-1. `hc-rna` is `crate-type = ["rlib"]` — nothing anywhere consumes a cdylib of it (grep for
-   `hc_rna.wasm`/`libhc_rna`: none), and a helper that calls hdk host fns is never a valid zome.
-2. Every zome crate (10, across the five DNA workspaces) gains a `build.rs` that prints
-   `cargo:rustc-link-arg=--import-undefined` **only when `CARGO_CFG_TARGET_ARCH == wasm32`**,
-   so a native `cargo test` of a workspace never hands the flag to a non-wasm linker. A
-   `.cargo/config.toml` `[target.wasm32-unknown-unknown] rustflags` entry was rejected: the dev
-   container exports `RUSTFLAGS` (getrandom backend) and an env `RUSTFLAGS` overrides every
-   config rustflags, so it would have been silently inert exactly where it is needed.
+**Fix (in-tree): one `build.rs` per wasm crate — the 10 zome crates across the five DNA
+workspaces AND hc-rna — printing `cargo:rustc-link-arg=--import-undefined` **only when
+`CARGO_CFG_TARGET_ARCH == wasm32`**, so a native `cargo test` never hands the flag to a
+non-wasm linker. Two alternatives were tried and rejected on evidence: (a) a
+`.cargo/config.toml` `[target.wasm32-unknown-unknown] rustflags` entry is silently inert here
+because the dev container exports `RUSTFLAGS` and an env `RUSTFLAGS` overrides every config
+rustflags; (b) narrowing hc-rna to `crate-type = ["rlib"]` (no consumer of its cdylib exists)
+builds fine but **changes the integrity wasm bytes** (`content_store_integrity.wasm`
+`2549ddbd…` with rlib-only vs `d1c4e709…` with cdylib+rlib, same sources), i.e. it is
+DNA-hash-moving for the integrity zomes that link hc-rna's rlib — the `dna-hash-neutrality`
+validator's class. The link flag is a no-op under CI's holonix linker (which already imports
+undefined symbols), so it leaves CI's integrity bytes — and the fleet DNA hash — untouched.
 
 **Verified:** all five workspaces `cargo build --release --target wasm32-unknown-unknown` →
 `Finished` (elohim 1m19s, imagodei 54s, mishpat 2m06s, node-registry 27s, infrastructure 53s).
 Coordinator-only release property: `COORD_BUILD_MARKER=fixcheck-B` → `fixcheck-C` recompiled
 ONLY `content_store`; `content_store.wasm` moved (`14c7c015…` → new, marker string present) and
 `content_store_integrity.wasm` stayed byte-identical (`2549ddbd…`). Two forced relinks of the
-integrity zome with identical inputs produced identical bytes (deterministic). One caveat
-recorded honestly: the very first build after the build scripts were introduced produced a
-different integrity wasm (`ab658001…`) than every build since; the crate was relinked once more
-on the next build and has been stable at `2549ddbd…` for four builds — treat the first build
-after a build-script change as a warm-up, not a release. Native-target behaviour of the guard is
+integrity zome with identical inputs produced identical bytes (deterministic). Local integrity bytes are NOT the fleet's (CI builds under holonix); what matters locally is that they are stable across coordinator-only rebuilds, which four consecutive builds showed. Native-target behaviour of the guard is
 argued, not exercised (no `cargo test` run in the DNA workspaces beside the resident mesh).
