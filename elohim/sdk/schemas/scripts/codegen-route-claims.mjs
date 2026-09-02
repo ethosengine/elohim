@@ -223,7 +223,10 @@ function generateSeederFile(domains) {
     blocks.push(`/** ${domain.name}'s DECLARED route claims (manifest \`routeClaims\`). */`);
     blocks.push(`export const ${prefix}_ROUTE_CLAIMS: RouteClaimTemplate[] = ${emitClaimsArray(domain.claims)};`);
   }
-  return blocks.join('\n') + '\n';
+  // Exactly one trailing newline: emitClaimsArray blocks already end in '\n', and a
+  // second one is the blank line prettier strips — the one byte that made
+  // `route-claims:codegen:verify` and the app's prettier leg disagree (wave 2e).
+  return blocks.join('\n').replace(/\n+$/, '') + '\n';
 }
 
 // ---------------------------------------------------------------------------
@@ -234,11 +237,15 @@ async function main() {
   const domains = await collectDomains();
   validateCrossDomain(domains);
 
+  // Every output ends in exactly one newline. The universal-owner bundle's tail block
+  // carries its own '\n' and the template adds another; that blank line at EOF is what
+  // prettier strips, so `--verify` and the app's prettier leg disagreed (wave 2e, 2026-09-02).
+  const oneTrailingNewline = (content) => content.replace(/\n+$/, '') + '\n';
   const outputs = new Map(); // repo-relative path -> content
   for (const domain of domains) {
-    outputs.set(BUNDLE_TARGETS[domain.name], generateBundleFile(domain, domains));
+    outputs.set(BUNDLE_TARGETS[domain.name], oneTrailingNewline(generateBundleFile(domain, domains)));
   }
-  outputs.set(SEEDER_TARGET, generateSeederFile(domains));
+  outputs.set(SEEDER_TARGET, oneTrailingNewline(generateSeederFile(domains)));
 
   if (VERIFY) {
     let stale = false;
