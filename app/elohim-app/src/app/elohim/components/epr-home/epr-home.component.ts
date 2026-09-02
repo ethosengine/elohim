@@ -19,6 +19,7 @@ import { StorageApiService } from '../../services/storage-api.service';
 import { StorageClientService } from '../../services/storage-client.service';
 import { EprFocalComponent } from '../epr-focal/epr-focal.component';
 
+import { openInBundle } from './bundle-lens';
 import { EprHomeLegsComponent, humanizeSlug } from './epr-home-legs.component';
 import {
   EprHomeAtom,
@@ -205,6 +206,12 @@ export class EprHomeComponent {
   readonly rawHref = computed(() =>
     eprToUniversalHref({ id: this.resourceId(), tier: 'head', subview: 'raw' })
   );
+
+  /** The cross-bundle "Open in <Bundle>" lens — minted from the generated all-bundle claims. */
+  readonly lens = computed(() => {
+    const a = this.atom();
+    return a ? openInBundle(a.contentType, a.id) : null;
+  });
 
   /** Where you actually came from — the previous stop on the session nav stack, or nothing. */
   readonly arrival = computed(() => {

@@ -327,4 +327,19 @@ describe('EprHomeComponent', () => {
     fixture.detectChanges();
     expect(q(fixture, 'epr-home-your-mark')?.textContent).toContain('Practicing · 20%');
   });
+
+  it('offers "Open in Lamad" for a claimed contentType', async () => {
+    storage.getContent.mockReturnValue(
+      of({ ...rawSimulation, id: 'foundations-christian-technology', contentType: 'path' })
+    );
+    await mount('foundations-christian-technology');
+    const openInBundle = q(fixture, 'epr-home-open-in-bundle');
+    expect(openInBundle?.textContent).toContain('Open in Lamad');
+    expect(openInBundle?.getAttribute('href')).toBe('/lamad/path/foundations-christian-technology');
+  });
+
+  it('offers no "Open in <bundle>" lens for an unclaimed contentType', async () => {
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-open-in-bundle')).toBeNull();
+  });
 });

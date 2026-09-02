@@ -215,6 +215,10 @@
   align-self: flex-start;
 }
 
+.epr-home__open {
+  margin-left: auto;
+}
+
 .epr-home__mark {
   display: flex;
   flex-direction: column;

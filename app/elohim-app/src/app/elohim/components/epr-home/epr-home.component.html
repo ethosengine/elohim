@@ -98,6 +98,15 @@
             >
               {{ heldChipLabel() }}
             </a>
+            @if (lens(); as l) {
+              <a
+                class="epr-home__btn epr-home__btn--primary epr-home__open"
+                [href]="l.href"
+                data-testid="epr-home-open-in-bundle"
+              >
+                Open in {{ l.bundleName }} ↗
+              </a>
+            }
           </div>
         </header>
 
