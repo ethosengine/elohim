@@ -152,6 +152,44 @@ makes a silent integrity move impossible, and `happ_manager` (867e4bf9b) makes a
 node holding data impossible without `DNA_MIGRATION_INTENT` naming these exact hashes — set it
 on the alpha StatefulSets for this one roll, then remove it.
 
+## CORRECTION 2 (k8s dev, on-cluster, 2026-09-02 ~21:45Z) — THERE WAS NO DNA MIGRATION; the "six weeks of drift" was a measurement error
+
+After the clear, all seven conductors are Ready, 0 restarts, 0 panics — and installed lamad is
+`uhC0kkLdCTgRohBd10TDia…`, the hash the fleet has run since July, **not** the baseline's
+`uhC0k8x1UsBQ…`. Reason: `hc dna hash` hashes the packed `.dna`; the conductor's installed
+`DnaHash` folds in the happ.yaml role **modifiers**. Four roles carry
+`properties: {progenitor_pubkey: null}`; infrastructure carries `properties: null` — and
+infrastructure is the only role where packed and installed agree, on every node. That is the
+whole discriminator behind "infrastructure MATCH, four moved". The artifact walk (§ "THE HASH
+QUESTION, ANSWERED") compared packed hashes to installed hashes and so could never match those
+four roles in any build; its conclusion — "the fleet's installed DNAs predate every CI build since
+July 18" — is **retracted**. #1420 == #1414 (packed) and the re-genesised nodes report
+`No coordinator-zome drift` against dev-latest = #1422: the artifact restores the pre-incident
+identity exactly. Pin-back was viable and is in fact what happened.
+
+Consequences, owned by this shift:
+- The `[dna:migrate]` baseline commit (7d9096263) is **correct in content** (the guard's contract is
+  packed-hash byte-identity, and #1420's packed hashes are the pre-incident ones) and **wrong in
+  label** — no migration occurred; the header now says so. The guard stays: packed-vs-packed is the
+  right build-time invariant. It must never be read as "what the conductor reports".
+- The full `databases/` clear (my instruction, on the "orphaned DHT" premise) discarded ~2.5 GB/node
+  of DHT + cache data that belonged to the SAME DNA hashes the nodes rejoined. Clearing
+  `databases/conductor/` (+ `ks/`) alone — the k8s dev's original suggestion — would have kept it.
+  Cost: a full alpha re-seed is now required rather than a catch-up.
+- Two premises in the "clear now" order were wrong: (1) a torn conductor CAN read Ready on the old
+  image — the pre-fix supervisor logs `Embedded conductor ready, hApp installed` over a dead child
+  and the HTTP probe passes (james was 2/2 with a dead holochain; jessica had panicked
+  `CellWithoutGenesis` at 21:05:59 — she was torn, not intact; clearing her was right for the
+  opposite reason); this is precisely the class the supervisor fix (264ce8ce4) and the death
+  witness exist for. (2) "gate (b) did not happen in #1419" — it was in progress: the staggered
+  roll moved james, susan, gertrude, jessica to 13f13378 (flag false) racing the clear; adam,
+  matthew, eve were still on 4a81a749 (flag true — inert while installed == bundle) at 21:45Z.
+- The mechanism stands as corrected before: `DNA content drift vs bundle (ALLOW_DNA_REINSTALL=true)
+  — reinstalling` → `uninstall_app` tore the chains. The drift itself was the 03f331f21 byte move
+  (#1416), bounded and fixed by 189061c6d; the standing flag turned it into data loss.
+- Separate, noted for the morning: `elohim-doorway-alpha-77cbb44b55-jzrnp` CrashLoopBackOff (18
+  restarts) on a new ReplicaSet while the two old doorway pods still serve 3/3.
+
 ## HOLD — preconditions NOT met (k8s dev, on-cluster, 2026-09-02 ~17:50Z; the procedure below stays valid once they are)
 
 The "clear now" of 17:30Z was wrong on three counts, all mine:

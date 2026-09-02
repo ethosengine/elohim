@@ -10,16 +10,21 @@
 # integrity hash orphans the fleet's DHT data and re-keys every node, so it is a
 # declared migration, never a side effect.
 #
-# 2026-09-02 [dna:migrate] — MIGRATION. The previous baseline was the hashes the
-# alpha fleet had installed; the archived-artifact walk (elohim-holochain #1363..#1420,
-# `hc dna hash` per build) showed lamad/imagodei/mishpat matched NO CI build since
-# 2026-07-18 — the fleet ran pre-July integrity zomes for six weeks while every build
-# shipped newer ones that never installed. These are elohim-holochain #1420's hashes
-# (byte-identical to #1414, the last pre-incident build): the operator chose to
-# re-genesis the fleet on the current DNAs rather than revert six weeks of integrity
-# work. Escalation atom:
+# CONTRACT: these are PACKED-DNA hashes (`hc dna hash workdir/<role>.dna`), NOT the
+# hashes a conductor reports as installed. The installed DnaHash folds in the happ.yaml
+# role modifiers (four roles carry `properties: {progenitor_pubkey: null}`; infrastructure
+# carries `properties: null` and is the only role where the two coincide). Never compare
+# this file against `/version`, `app_info`, or storage's "installed" log lines — compare
+# it only against the pipeline's own `DNA-HASH <role> <hash>` lines. The invariant it
+# guards is byte-identity of the integrity zomes between builds.
+#
+# 2026-09-02 — values are elohim-holochain #1420's packed hashes, byte-identical to #1414
+# (the last pre-incident build). The commit that set them (7d9096263) was labelled
+# [dna:migrate] on a MISREADING: the previous baseline held INSTALLED hashes, which can
+# never match packed ones for the four roles with properties, so the guard fired on a
+# comparison that was wrong by construction. No migration occurred — the fleet re-genesised
+# onto the same five DNA hashes it had run since July. Escalation atom (CORRECTION 2):
 #   genesis/data/timeline/backlog/alpha-conductor-crash-loop-after-wave4-roll-and-moved-dna-hashes.md
-# The same five values are the DNA_MIGRATION_INTENT for that one roll.
 lamad=uhC0k8x1UsBQjMyiU-c_rgoi9dF2YnhwAjVqUg_DrVnXitSAQli-E
 imagodei=uhC0kRA0NgxsLmrTNiK8Rm-OhAKHD91jXr_Y8OrEJbNlwyTzCaOGf
 infrastructure=uhC0kq1eGfzYnt6hpAgmNMixaCmiffBlbI4vm9p3EVgnQTfws2tJA
