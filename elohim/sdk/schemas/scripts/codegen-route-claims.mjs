@@ -172,8 +172,30 @@ function bundleHeader(name) {
 // DO NOT EDIT — regenerate with: ${REGEN_CMD}`;
 }
 
-function generateBundleFile(domain) {
+function emitBundleClaimsArray(domains) {
+  const claimBearing = domains.filter((d) => d.claims.length > 0);
+  if (claimBearing.length === 0) return '[]';
+  const bundleLines = claimBearing
+    .map((d) => {
+      const claimsStr = emitClaimsArray(d.claims).replace(/\n/g, '\n    ');
+      return `  {\n    bundle: ${emitString(d.name)},\n    claims: ${claimsStr},\n  }`;
+    })
+    .join(',\n');
+  return `[\n${bundleLines},\n]`;
+}
+
+function generateBundleFile(domain, domains) {
   const prefix = domain.name.toUpperCase();
+  const universal = domain.ownsUniversalRoute
+    ? `
+
+/** Every declaring bundle's claims — the universal-route owner mints cross-bundle lenses from these. */
+export const BUNDLE_ROUTE_CLAIMS: readonly {
+  bundle: string;
+  claims: readonly RouteClaimTemplate[];
+}[] = ${emitBundleClaimsArray(domains)};
+`
+    : '';
   return `${bundleHeader(domain.name)}
 
 ${INTERFACE_BLOCK}
@@ -182,8 +204,7 @@ ${INTERFACE_BLOCK}
 export const ${prefix}_ROUTE_CLAIMS: readonly RouteClaimTemplate[] = ${emitClaimsArray(domain.claims)};
 
 /** Whether this bundle owns the universal /epr route (manifest \`ownsUniversalRoute\`). */
-export const ${prefix}_OWNS_UNIVERSAL_ROUTE = ${domain.ownsUniversalRoute};
-`;
+export const ${prefix}_OWNS_UNIVERSAL_ROUTE = ${domain.ownsUniversalRoute};${universal}\n`;
 }
 
 function generateSeederFile(domains) {
@@ -215,7 +236,7 @@ async function main() {
 
   const outputs = new Map(); // repo-relative path -> content
   for (const domain of domains) {
-    outputs.set(BUNDLE_TARGETS[domain.name], generateBundleFile(domain));
+    outputs.set(BUNDLE_TARGETS[domain.name], generateBundleFile(domain, domains));
   }
   outputs.set(SEEDER_TARGET, generateSeederFile(domains));
 

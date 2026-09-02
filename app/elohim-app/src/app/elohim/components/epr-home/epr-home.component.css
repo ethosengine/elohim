@@ -160,3 +160,106 @@
   font-family: var(--el-font-ui);
   font-size: 14px;
 }
+
+.epr-home__arrival {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--el-surface-2);
+  font-family: var(--el-font-ui);
+  font-size: 13px;
+  color: var(--el-text-strong);
+  text-decoration: none;
+  max-width: 480px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.epr-home__known {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--el-border);
+  border-radius: 10px;
+  background: var(--el-surface);
+  font-family: var(--el-font-ui);
+  font-size: 14px;
+}
+
+.epr-home__btn {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--el-border);
+  background: transparent;
+  color: var(--el-text-strong);
+  font-family: var(--el-font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.epr-home__btn--primary {
+  background: var(--el-action);
+  color: var(--el-on-action);
+  border-color: var(--el-action);
+  align-self: flex-start;
+}
+
+.epr-home__mark {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--el-border);
+  border-radius: 10px;
+  background: var(--el-surface);
+}
+
+.epr-home__mark h3 {
+  margin: 0;
+  font-family: var(--el-font-display);
+  font-weight: 500;
+  font-size: 19px;
+  color: var(--el-text-strong);
+}
+
+.epr-home__mark-head,
+.epr-home__mark-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.epr-home__track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--el-surface-2);
+  overflow: hidden;
+}
+
+.epr-home__track-fill {
+  height: 100%;
+  background: var(--el-amber);
+  border-radius: 999px;
+}
+
+.epr-home__ui {
+  font-family: var(--el-font-ui);
+  font-size: 12px;
+}
+
+.epr-home__ui--muted {
+  color: var(--el-text-muted);
+}

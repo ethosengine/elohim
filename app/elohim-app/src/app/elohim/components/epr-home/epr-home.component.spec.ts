@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 
@@ -10,7 +10,10 @@ import { DistributionService, ResilienceService } from '@elohim/service/public-a
 
 import { EprHomeComponent } from './epr-home.component';
 import { EprFocalComponent } from '../epr-focal/epr-focal.component';
+import { AuthService } from '../../../imagodei/services/auth.service';
+import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { EprResolverService } from '../../services/epr-resolver.service';
+import { SessionNavStackService } from '../../services/session-nav-stack.service';
 import { StorageApiService } from '../../services/storage-api.service';
 import { StorageClientService } from '../../services/storage-client.service';
 
@@ -105,6 +108,14 @@ function q(fixture: ComponentFixture<EprHomeComponent>, id: string): Element | n
 describe('EprHomeComponent', () => {
   let fixture: ComponentFixture<EprHomeComponent>;
   let storage: { getContent: ReturnType<typeof vi.fn> };
+  let navStack: { previous: ReturnType<typeof vi.fn> };
+  let auth: { isAuthenticated: ReturnType<typeof signal<boolean>> };
+  let affinity: {
+    getAffinity: ReturnType<typeof vi.fn>;
+    setAffinity: ReturnType<typeof vi.fn>;
+    trackView: ReturnType<typeof vi.fn>;
+    affinity$: ReturnType<typeof of>;
+  };
 
   async function mount(resourceId: string): Promise<void> {
     await TestBed.configureTestingModule({
@@ -133,6 +144,9 @@ describe('EprHomeComponent', () => {
           provide: GovernanceApiService,
           useValue: { getChallengesForEntity: vi.fn().mockResolvedValue([]) },
         },
+        { provide: SessionNavStackService, useValue: navStack },
+        { provide: AuthService, useValue: auth },
+        { provide: AffinityTrackingService, useValue: affinity },
       ],
     })
       .overrideComponent(EprHomeComponent, {
@@ -148,6 +162,14 @@ describe('EprHomeComponent', () => {
 
   beforeEach(() => {
     storage = { getContent: vi.fn().mockReturnValue(of(rawSimulation)) };
+    navStack = { previous: vi.fn().mockReturnValue(null) };
+    auth = { isAuthenticated: signal(false) };
+    affinity = {
+      getAffinity: vi.fn().mockReturnValue(0.2),
+      setAffinity: vi.fn(),
+      trackView: vi.fn(),
+      affinity$: of({}),
+    };
   });
 
   it('renders the frame with identity and chips for a reachable atom', async () => {
@@ -237,6 +259,9 @@ describe('EprHomeComponent', () => {
           provide: GovernanceApiService,
           useValue: { getChallengesForEntity: vi.fn().mockResolvedValue([]) },
         },
+        { provide: SessionNavStackService, useValue: navStack },
+        { provide: AuthService, useValue: auth },
+        { provide: AffinityTrackingService, useValue: affinity },
       ],
     })
       .overrideComponent(EprHomeComponent, {
@@ -261,5 +286,45 @@ describe('EprHomeComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(q(fixture, 'epr-home-title')?.textContent).toContain('Succession');
+  });
+
+  it('names the previous stop in the arrival chip when the nav stack has one', async () => {
+    navStack.previous.mockReturnValue({
+      url: '/epr/succession',
+      cid: '',
+      label: 'Succession Without Conquest | Elohim Protocol',
+      ts: 1,
+    });
+    await mount('evolution-of-trust');
+    const chip = q(fixture, 'epr-home-arrival')!;
+    expect(chip.textContent).toContain('Succession Without Conquest');
+    expect(chip.textContent).not.toContain('| Elohim Protocol');
+    expect(chip.getAttribute('href')).toBe('/epr/succession');
+  });
+
+  it('renders no arrival chip on a cold link', async () => {
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-arrival')).toBeNull();
+  });
+
+  it('the gate names the referring resource when there is one', async () => {
+    storage.getContent.mockReturnValue(of(null));
+    navStack.previous.mockReturnValue({
+      url: '/epr/evolution-of-trust',
+      cid: '',
+      label: 'The Evolution of Trust | Elohim Protocol',
+      ts: 1,
+    });
+    await mount('concept-bidirectional-trust');
+    expect(q(fixture, 'epr-home-gate')?.textContent).toContain('The Evolution of Trust');
+    expect(q(fixture, 'epr-home-gate-back')?.getAttribute('href')).toBe('/epr/evolution-of-trust');
+  });
+
+  it('shows Your mark only when signed in, as one row without a percentage badge', async () => {
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-your-mark')).toBeNull();
+    auth.isAuthenticated.set(true);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-your-mark')?.textContent).toContain('Practicing · 20%');
   });
 });

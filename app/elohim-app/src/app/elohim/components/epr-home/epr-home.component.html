@@ -16,6 +16,16 @@
 
   @case ('not-found') {
     <main class="epr-home epr-home--gate" data-testid="epr-home-gate">
+      @if (arrival(); as from) {
+        <a
+          class="epr-home__arrival"
+          [href]="from.href"
+          (click)="onArrival($event, from.href)"
+          data-testid="epr-home-arrival"
+        >
+          ‹ {{ from.label }}
+        </a>
+      }
       <p class="epr-home__eyebrow epr-home__eyebrow--warm">Out of reach from this doorway</p>
       <h1 class="epr-home__title">We can't reach this one from here</h1>
       <p class="epr-home__lede">
@@ -24,6 +34,23 @@
         . It isn't gone, and it isn't yours to fix; it just hasn't been brought within reach of this
         doorway yet.
       </p>
+      @if (arrival(); as from) {
+        <div class="epr-home__known">
+          <span class="epr-home__ui epr-home__ui--muted">What we do know</span>
+          <span>
+            Named as related by
+            <a class="epr-home__link" [href]="from.href">{{ from.label }}</a>
+          </span>
+        </div>
+        <a
+          class="epr-home__btn epr-home__btn--primary"
+          [href]="from.href"
+          (click)="onArrival($event, from.href)"
+          data-testid="epr-home-gate-back"
+        >
+          Back to {{ from.label }}
+        </a>
+      }
       <p class="epr-home__address" data-testid="epr-home-address">
         The same address on another doorway may reach it
         <code class="epr-home__mono">{{ address() }}</code>
@@ -34,6 +61,16 @@
   @case ('loaded') {
     @if (atom(); as a) {
       <main class="epr-home" data-testid="epr-home">
+        @if (arrival(); as from) {
+          <a
+            class="epr-home__arrival"
+            [href]="from.href"
+            (click)="onArrival($event, from.href)"
+            data-testid="epr-home-arrival"
+          >
+            ‹ {{ from.label }}
+          </a>
+        }
         <header class="epr-home__identity">
           <p class="epr-home__eyebrow">
             @for (part of eyebrow(); track $index) {
@@ -72,6 +109,40 @@
 
         <div class="epr-home__body" [class.epr-home__body--reading]="a.shape === 'reading'">
           <div class="epr-home__main">
+            @if (signedIn()) {
+              <section class="epr-home__mark" data-testid="epr-home-your-mark">
+                <div class="epr-home__mark-head">
+                  <h3>Your mark on it</h3>
+                  <span class="epr-home__ui epr-home__ui--muted">
+                    {{ affinityWord() }} · {{ affinityPercent() }}%
+                  </span>
+                </div>
+                <div class="epr-home__track">
+                  <div class="epr-home__track-fill" [style.width.%]="affinityPercent()"></div>
+                </div>
+                <div class="epr-home__mark-actions">
+                  <button
+                    type="button"
+                    class="epr-home__btn"
+                    (click)="markPracticing()"
+                    data-testid="epr-home-mark-practicing"
+                  >
+                    I'm practicing this
+                  </button>
+                  <button
+                    type="button"
+                    class="epr-home__btn"
+                    (click)="markGotIt()"
+                    data-testid="epr-home-mark-got-it"
+                  >
+                    I've got this now
+                  </button>
+                  <span class="epr-home__ui epr-home__ui--muted">
+                    Kept on your device, shared only when you say so
+                  </span>
+                </div>
+              </section>
+            }
             @if (a.shape === 'reading') {
               <section
                 class="epr-home__focal epr-home__focal--reading"

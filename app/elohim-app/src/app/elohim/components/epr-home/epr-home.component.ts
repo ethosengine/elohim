@@ -1,15 +1,20 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 
 import { catchError, distinctUntilChanged, from, map, of, startWith, switchMap } from 'rxjs';
 
+import { AuthService } from '@app/imagodei/services/auth.service';
+
 import { GovernanceApiService, eprToUniversalHref } from '@elohim/service';
 import { DistributionService, ResilienceService } from '@elohim/service/public-api';
 
 import { EprRelationship } from '../../models/epr-head.model';
+import { AffinityTrackingService } from '../../services/affinity-tracking.service';
+import { EprNavService } from '../../services/epr-nav.service';
 import { EprResolverService } from '../../services/epr-resolver.service';
+import { SessionNavStackService } from '../../services/session-nav-stack.service';
 import { StorageApiService } from '../../services/storage-api.service';
 import { StorageClientService } from '../../services/storage-client.service';
 import { EprFocalComponent } from '../epr-focal/epr-focal.component';
@@ -59,6 +64,10 @@ export class EprHomeComponent {
   private readonly storageApi = inject(StorageApiService);
   private readonly eprResolver = inject(EprResolverService);
   private readonly governance = inject(GovernanceApiService);
+  private readonly navStack = inject(SessionNavStackService);
+  private readonly eprNav = inject(EprNavService);
+  private readonly auth = inject(AuthService);
+  private readonly affinityService = inject(AffinityTrackingService);
 
   private readonly state = toSignal(
     this.route.paramMap.pipe(
@@ -196,4 +205,50 @@ export class EprHomeComponent {
   readonly rawHref = computed(() =>
     eprToUniversalHref({ id: this.resourceId(), tier: 'head', subview: 'raw' })
   );
+
+  /** Where you actually came from — the previous stop on the session nav stack, or nothing. */
+  readonly arrival = computed(() => {
+    const prev = this.navStack.previous();
+    if (!prev) return null;
+    const label = (prev.label ?? prev.url).replace(/ \| Elohim Protocol$/, '').trim();
+    return { href: prev.url, label: label || prev.url };
+  });
+
+  readonly signedIn = this.auth.isAuthenticated;
+
+  private readonly affinityTick = toSignal(this.affinityService.affinity$, { initialValue: null });
+  readonly affinity = computed(() => {
+    this.affinityTick();
+    const a = this.atom();
+    return a ? this.affinityService.getAffinity(a.id) : 0;
+  });
+  readonly affinityPercent = computed(() => Math.round(this.affinity() * 100));
+  readonly affinityWord = computed(() => {
+    const v = this.affinity();
+    if (v === 0) return 'Unseen';
+    if (v > 0.9) return 'Got it';
+    return 'Practicing';
+  });
+
+  constructor() {
+    effect(() => {
+      const a = this.atom();
+      if (a) this.affinityService.trackView(a.id);
+    });
+  }
+
+  onArrival(event: Event, href: string): void {
+    event.preventDefault();
+    this.eprNav.navigate(href);
+  }
+
+  markPracticing(): void {
+    const a = this.atom();
+    if (a) this.affinityService.setAffinity(a.id, 0.5);
+  }
+
+  markGotIt(): void {
+    const a = this.atom();
+    if (a) this.affinityService.setAffinity(a.id, 1);
+  }
 }
