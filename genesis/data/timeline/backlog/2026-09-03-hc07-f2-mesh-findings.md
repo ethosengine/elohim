@@ -68,10 +68,23 @@ T21 outbound blob fetch over the libp2p/iroh request-response codec caps respons
 chunk the response or route >16 MiB through the blob stream path. Act I "A pin completes only when verified
 bytes land on disk" is probably this.
 
-## 6. Apparatus, fixed on the branch (for the record)
+## 6. Storage: an EMPTY `AGENT_PUBKEY` is taken as a key — standing, hash-neutral
+
+`main.rs:~5684` builds the release-adoption `SoakAttestor` with `args.agent_pubkey.unwrap_or_else(|| hc.agent_key_uhcak())`;
+an env of `AGENT_PUBKEY=""` is `Some("")`, so the fallback never fires and every soak attestation fails
+`soak_context_incomplete: deviceId is required` (station 3 red on 2026-09-03 until the mesh script stopped exporting the
+empty string). Treat empty as absent at the clap/env boundary (`value_parser` rejecting "" or `.filter(|s| !s.is_empty())`)
+so a peer whose launcher could not resolve the key still attests under its admin-derived key.
+
+## 7. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
+- hc 0.7 removed `hc sandbox call`; the mesh script's agent-key probe now uses `hc client call --port <admin> list-apps`
+  with the 0.6 form as fallback, and the storage restart overlay re-resolves the key (fcb81456d).
+- Every storage peer starts with `ELOHIM_RUNTIME_CONFIG_PATH=<mesh>/<peer>/runtime-config.toml` so the rung-4 watcher the
+  ceremony writes to is armed (bb5353321); the rung-5 baseline pair (bundle N + content_store WasmHash) is repinned to the
+  0.7 build and env-overridable (236efbb4c).
 - Seeder post-flight raced asynchronous anchoring (fixed: bounded wait, 7df163202); `@holochain/client`
   override moved to `pnpm-workspace.yaml` (49568f756); release-ceremony driver failures print stdout+stderr
   (c7c458de2); the conductor-spin detector reads `.sandbox_run_log`, which ark mode never writes
