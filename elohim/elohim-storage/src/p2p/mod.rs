@@ -580,6 +580,9 @@ pub struct P2PConfig {
     /// disables broadcasting entirely; `None` falls back to the archetype
     /// default (mobile → disabled, node/steward → 60s, desktop → 300s).
     pub inventory_broadcast_seconds: Option<u64>,
+    /// Periodic shard replication cadence in seconds. The top-level config
+    /// applies the five-second floor before threading this value here.
+    pub replication_interval_seconds: u64,
     /// T23: CID of this peer's steward, threaded from `Config::self_cid`.
     /// `None` disables the custody reconcile sweep — without a self CID the
     /// reconcile pass cannot tell whether a custody-blob commitment is "own"
@@ -687,6 +690,7 @@ impl Default for P2PConfig {
             max_blob_response_size: BLOB_DEFAULT_MAX_RESPONSE_SIZE,
             device_archetype: None,
             inventory_broadcast_seconds: None,
+            replication_interval_seconds: crate::config::DEFAULT_REPLICATION_INTERVAL_SECONDS,
             self_cid: None,
             self_cellkey_agent_cid: None,
             // T23 defaults mirror `config.rs::default_*`. Production callers
@@ -3598,7 +3602,11 @@ impl P2PNode {
             tokio::time::interval(sync_round::round_interval(self.config.sync_interval_secs));
         let mut verify_interval = tokio::time::interval(Duration::from_secs(300));
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
+        let mut replication_interval = tokio::time::interval(Duration::from_secs(
+            self.config
+                .replication_interval_seconds
+                .max(crate::config::MIN_REPLICATION_INTERVAL_SECONDS),
+        ));
         replication_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Drain the replication gap queue every 5 seconds during bootstrap.
         // Dispatches up to MAX_REPLICATION_INFLIGHT items per tick; idle

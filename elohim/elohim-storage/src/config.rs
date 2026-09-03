@@ -76,6 +76,25 @@ fn default_ark_spool_poll_seconds() -> u64 {
     5
 }
 
+pub const DEFAULT_REPLICATION_INTERVAL_SECONDS: u64 = 60;
+pub const MIN_REPLICATION_INTERVAL_SECONDS: u64 = 5;
+
+fn default_replication_interval_seconds() -> u64 {
+    DEFAULT_REPLICATION_INTERVAL_SECONDS
+}
+
+pub fn clamp_replication_interval_seconds(seconds: u64) -> u64 {
+    seconds.max(MIN_REPLICATION_INTERVAL_SECONDS)
+}
+
+pub fn parse_replication_interval_seconds_env(value: &str) -> Option<u64> {
+    value
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(clamp_replication_interval_seconds)
+}
+
 /// Process-wide mirror of [`Config::contest_two_way_declared`], published once
 /// by `main` after the config is fully assembled.
 ///
@@ -677,6 +696,11 @@ pub struct Config {
     #[serde(default)]
     pub inventory_broadcast_seconds: Option<u64>,
 
+    /// Cadence for shard replication cycles. Values below five seconds are
+    /// clamped at startup to keep the cycle bounded under operator overrides.
+    #[serde(default = "default_replication_interval_seconds")]
+    pub replication_interval_seconds: u64,
+
     /// Periodic full reconcile-pass cadence for the custody controller.
     #[serde(default = "default_custody_sweep_seconds")]
     pub custody_sweep_seconds: u64,
@@ -1274,6 +1298,7 @@ impl Default for Config {
             node_role: None,
             region: None,
             inventory_broadcast_seconds: None,
+            replication_interval_seconds: default_replication_interval_seconds(),
             custody_sweep_seconds: default_custody_sweep_seconds(),
             placement_grace_seconds: default_placement_grace_seconds(),
             placement_gap_cooldown_seconds: default_placement_gap_cooldown_seconds(),
@@ -1453,6 +1478,26 @@ mod transport_backend_tests {
         // this ships ON. A default-OFF rotation would leave every custody pledge
         // stale after the first redeploy, silently.
         assert!(super::Config::default().custody_rotation_enabled);
+    }
+
+    #[test]
+    fn replication_interval_env_parses_and_applies_floor() {
+        assert_eq!(
+            super::Config::default().replication_interval_seconds,
+            super::DEFAULT_REPLICATION_INTERVAL_SECONDS
+        );
+        assert_eq!(
+            super::parse_replication_interval_seconds_env("10"),
+            Some(10)
+        );
+        assert_eq!(
+            super::parse_replication_interval_seconds_env("1"),
+            Some(super::MIN_REPLICATION_INTERVAL_SECONDS)
+        );
+        assert_eq!(
+            super::parse_replication_interval_seconds_env("invalid"),
+            None
+        );
     }
 
     #[test]

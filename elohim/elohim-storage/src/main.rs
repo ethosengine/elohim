@@ -350,6 +350,19 @@ async fn async_main(
             config.inventory_broadcast_seconds = Some(n);
         }
     }
+    if let Ok(v) = std::env::var("REPLICATION_INTERVAL_SECONDS") {
+        match elohim_storage::config::parse_replication_interval_seconds_env(&v) {
+            Some(seconds) => config.replication_interval_seconds = seconds,
+            None => warn!(
+                value = %v,
+                "REPLICATION_INTERVAL_SECONDS is not an integer — keeping configured value"
+            ),
+        }
+    }
+    config.replication_interval_seconds =
+        elohim_storage::config::clamp_replication_interval_seconds(
+            config.replication_interval_seconds,
+        );
     if let Ok(v) = std::env::var("CUSTODY_SWEEP_SECONDS") {
         if let Ok(n) = v.parse::<u64>() {
             config.custody_sweep_seconds = n;
@@ -812,6 +825,7 @@ async fn async_main(
         http_port = config.http_port,
         device_archetype = ?config.device_archetype,
         household_id = ?config.household_id,
+        replication_interval_seconds = config.replication_interval_seconds,
         "Starting elohim-storage"
     );
 
@@ -2963,6 +2977,7 @@ async fn async_main(
             // the broadcaster timer in P2PNode::run can resolve cadence.
             device_archetype: config.device_archetype.clone(),
             inventory_broadcast_seconds: config.inventory_broadcast_seconds,
+            replication_interval_seconds: config.replication_interval_seconds,
             // T23: wire custody reconcile sweep parameters from top-level
             // Config so the timer + ConnectionEstablished trigger in
             // P2PNode::run_custody_reconcile see the same values used by the

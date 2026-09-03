@@ -90,7 +90,8 @@
 #                   is a parent that reaps the death itself and leaves a death
 #                   witness in that peer's own spool ($LOCAL_DEV_DIR/<peer>/ark/).
 #                   Each ark-launched storage peer pulls that spool through
-#                   ELOHIM_ARK_SPOOL_PATH and defaults CUSTODY_SWEEP_SECONDS and
+#                   ELOHIM_ARK_SPOOL_PATH, defaults REPLICATION_INTERVAL_SECONDS
+#                   to 10, and defaults CUSTODY_SWEEP_SECONDS and
 #                   INVENTORY_BROADCAST_SECONDS to 15 (explicit values override).
 #                   Declarations (manifest.json + berth.json) are rewritten per
 #                   peer on every launch; the same data root is never run twice.
@@ -132,7 +133,8 @@
 #   MESH_HEAL_MISSING_BACKOFF, MESH_EVIDENCE_ABSENT_BACKOFF,
 #   MESH_HEAD_CORPUS_DIGEST override the storage peers' reconcile/backoff
 #   cadence. Ark-launched storage peers additionally default
-#   CUSTODY_SWEEP_SECONDS and INVENTORY_BROADCAST_SECONDS to 15 seconds; the
+#   REPLICATION_INTERVAL_SECONDS to 10 seconds and CUSTODY_SWEEP_SECONDS and
+#   INVENTORY_BROADCAST_SECONDS to 15 seconds; the
 #   conductor sandboxes also get a fixed kitsune2 gossip
 #   acceleration patch (k2Gossip initiate=1000ms) after generate, before run.
 #
@@ -813,6 +815,29 @@ storage_spool_path_for() { # <peer-name> <http-port>
   fi
 }
 
+storage_replication_interval_for() { # <peer-name> <http-port>
+  local name="$1" port="$2" pid value=""
+  pid="$(storage_pid_for_port "$port")"
+  if [ -n "$pid" ]; then
+    if [ -r "/proc/$pid/environ" ]; then
+      value="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+        | grep '^REPLICATION_INTERVAL_SECONDS=' | head -1)"
+      if [ -n "$value" ]; then
+        echo "${value#REPLICATION_INTERVAL_SECONDS=}s"
+      else
+        echo "60s(default)"
+      fi
+    else
+      echo unreadable
+    fi
+  elif [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] \
+    || [ -f "$LOCAL_DEV_DIR/$name/ark/passport.json" ]; then
+    echo "next-launch:${REPLICATION_INTERVAL_SECONDS:-10}s"
+  else
+    echo "60s(default)"
+  fi
+}
+
 # Transport stamp for evidence produced by `just test mesh`. The launcher knob
 # says what a future start/restart requests; it is not proof of what the running
 # peers mounted. `/p2p/status.irohNodeId` is emitted only by a peer whose iroh
@@ -1400,18 +1425,19 @@ mesh_footprint() {
 
 status_all() {
   echo "conductors:"; ss -tln 2>/dev/null | grep -E "127.0.0.1:44[0-9]{2} " || echo "  (none)"
-  local i=0 port transport spool_path data_root_status=0
+  local i=0 port transport spool_path replication_interval data_root_status=0
   echo "conductor data roots:"
   report_conductor_data_roots || data_root_status=1
   for name in "${PEERS[@]}"; do
     port="$(http_port $i)"
     transport="$(storage_transport_for "$name" "$port")"
     spool_path="$(storage_spool_path_for "$name" "$port")"
+    replication_interval="$(storage_replication_interval_for "$name" "$port")"
     printf "  %-8s admin=%s app=%s  storage=" "$name" "$(admin_port $i)" "$(app_port $i)"
     if curl -s -m 2 "http://localhost:$port/health" >/dev/null; then
-      echo "UP :$port transport=$transport spool=$spool_path"
+      echo "UP :$port transport=$transport spool=$spool_path replication_interval=$replication_interval"
     else
-      echo "down transport=$transport spool=$spool_path"
+      echo "down transport=$transport spool=$spool_path replication_interval=$replication_interval"
     fi
     i=$((i+1))
   done
@@ -1715,6 +1741,7 @@ storage_ark_env() { # <peer-name>
   [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] || return 0
   printf '%s\n' \
     "ELOHIM_ARK_SPOOL_PATH=$LOCAL_DEV_DIR/$1/ark" \
+    "REPLICATION_INTERVAL_SECONDS=${REPLICATION_INTERVAL_SECONDS:-10}" \
     "CUSTODY_SWEEP_SECONDS=${CUSTODY_SWEEP_SECONDS:-15}" \
     "INVENTORY_BROADCAST_SECONDS=${INVENTORY_BROADCAST_SECONDS:-15}"
 }
@@ -2170,6 +2197,7 @@ start_storage_peer() { # <peer-name> <peer-index>
       | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
     mkdir -p "$MESH_DIR/$name"
     env -u ELOHIM_ARK_SPOOL_PATH \
+    -u REPLICATION_INTERVAL_SECONDS \
     -u CUSTODY_SWEEP_SECONDS \
     -u INVENTORY_BROADCAST_SECONDS \
     "${doorway_env[@]}" "${ark_env[@]}" \
