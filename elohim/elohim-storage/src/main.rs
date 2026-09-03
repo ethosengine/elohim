@@ -2348,6 +2348,88 @@ async fn async_main(
                     }
                 }
 
+                // ── Station 2: spool-custody expansion tick ───────────────────
+                //
+                // A ward's conductor is the thing that died, so the ward cannot
+                // author. THIS peer holds a standing `custody-spool` commitment it
+                // authored on its OWN conductor (authorship IS the
+                // counter-signature); this tick expands that consent into one
+                // `custody-blob` per death witness the ward advertises. The custody
+                // reconcile sweep then moves the bytes — spool custody authors
+                // intent; reconcile moves bytes (no new fetch path).
+                //
+                // NOT gated behind `salvage_capacity_enabled`: the `custody-spool`
+                // row IS the consent, and a peer holding none is a safe no-op (the
+                // pass returns before touching the conductor). Runs on the custody
+                // sweep cadence so the per-tick atom budget the pass derives from
+                // `bounds.atomsPerHour` matches the sweep that fetches the bytes.
+                match (registry.lamad_client(), db_pool.clone()) {
+                    (Some(spool_hc), Some(spool_pool)) => {
+                        let spool_author = std::sync::Arc::new(
+                            elohim_storage::services::spool_custody_author::SpoolCustodyAuthor::new(
+                                spool_hc,
+                            ),
+                        );
+                        let spool_cfg =
+                            elohim_storage::services::spool_custody_author::SpoolCustodyConfig {
+                                tick_seconds: config.custody_sweep_seconds.max(1),
+                            };
+                        let mut spool_shutdown = shutdown_tx.subscribe();
+                        tokio::spawn(async move {
+                            use tokio::time::{interval, Duration, MissedTickBehavior};
+                            let mut ticker = interval(Duration::from_secs(spool_cfg.tick_seconds));
+                            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                            loop {
+                                tokio::select! {
+                                    _ = ticker.tick() => {
+                                        let mut conn = match spool_pool.get() {
+                                            Ok(c) => c,
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "spool custody tick: db conn failed (retry next tick)");
+                                                continue;
+                                            }
+                                        };
+                                        // The pass re-resolves this peer's agent_cid per
+                                        // tick and skips authoring when it is not
+                                        // resolvable — never a transport-id provider.
+                                        match spool_author.run_once(&mut conn, spool_cfg, chrono::Utc::now()) {
+                                            Ok(pass) => {
+                                                if !pass.authored.is_empty()
+                                                    || !pass.skipped.is_empty()
+                                                    || pass.skipped_no_self
+                                                {
+                                                    tracing::info!(
+                                                        target: "elohim_storage::spool_custody",
+                                                        authored = pass.authored.len(),
+                                                        already = pass.already,
+                                                        skipped = pass.skipped.len(),
+                                                        skipped_no_self = pass.skipped_no_self,
+                                                        "Station 2: spool custody expansion pass completed"
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "spool custody tick: pass failed (retry next tick)");
+                                            }
+                                        }
+                                    }
+                                    _ = spool_shutdown.recv() => {
+                                        tracing::debug!("spool custody tick: shutdown signal received, exiting");
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                        info!(
+                            tick_seconds = spool_cfg.tick_seconds,
+                            "Station 2: spool custody expansion tick started (no-op without a custody-spool pledge)"
+                        );
+                    }
+                    _ => {
+                        info!("Station 2: spool custody expansion tick disabled: requires lamad HcClient + db pool");
+                    }
+                }
+
                 // ── Custody-commitment rotation tick ──────────────────────────
                 //
                 // A redeploy mints new bundle bytes, so the content row points at

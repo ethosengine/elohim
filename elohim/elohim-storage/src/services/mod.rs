@@ -139,6 +139,7 @@ pub mod sla_service;
 pub mod spatial;
 pub mod spatial_capacity;
 pub mod spatial_dashboard;
+pub mod spool_custody_author; // Station 2 — custody-spool expands to per-hash custody-blob on the custodian's own conductor
 pub mod spool_ingest;
 pub mod standing;
 pub mod standing_projector;

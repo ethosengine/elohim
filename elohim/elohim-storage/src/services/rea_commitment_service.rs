@@ -61,6 +61,47 @@ pub fn deterministic_custody_id(provider: &str, receiver: &str, blob_marker: &st
     format!("custody-blob-{}", &digest[..16])
 }
 
+/// The REA action a STANDING spool-custody commitment carries.
+///
+/// A custodian authors one of these on its OWN conductor toward a ward (the
+/// authorship IS the counter-signature). It is not a per-blob promise: it is the
+/// standing consent that
+/// [`crate::services::spool_custody_author`] expands into one `custody-blob`
+/// commitment per advertised death witness. Rides the existing elohim-DNA
+/// `Commitment` entry type — no new entry type, no coordinator edit.
+pub const SPOOL_CUSTODY_ACTION: &str = "custody-spool";
+
+/// The single `resource_classified_as` entry a spool-custody commitment carries:
+/// `spool:witness:<ward agent_cid>`.
+///
+/// The ward is named by its holochain `agent_cid` (`uhCAk…`) — NEVER a transport
+/// id — so the classification joins the same namespace as
+/// `rea_commitments.provider` / `humans.agent_pub_key`. Must stay byte-identical
+/// to the seeder's `buildSpoolCustodyInput` (`genesis/seeder/src/seed-spool-custody.ts`).
+pub fn spool_classification(ward_agent: &str) -> String {
+    format!("spool:witness:{ward_agent}")
+}
+
+/// Deterministic logical id for a standing spool-custody commitment:
+/// `custody-spool-<sha256(provider|receiver|spool:witness:<ward>)[..16]>`.
+///
+/// Same discipline as [`deterministic_custody_id`]: re-authoring one
+/// `(provider, receiver, ward)` tuple converges on the same projection row, so a
+/// retry is a no-op rather than a corrupt second row. A spool commitment's ward
+/// IS its receiver, so callers normally pass `receiver` twice.
+///
+/// **Cross-language vector (pinned in both languages).**
+/// `deterministic_spool_custody_id("uhCAkA", "uhCAkB", "uhCAkB")`
+/// == `"custody-spool-4c267bbf6ea97775"` — the seeder's TypeScript
+/// `buildSpoolCustodyInput` pins the identical vector.
+pub fn deterministic_spool_custody_id(provider: &str, receiver: &str, ward: &str) -> String {
+    let classification = spool_classification(ward);
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{provider}|{receiver}|{classification}").as_bytes());
+    let digest = hex::encode(hasher.finalize());
+    format!("custody-spool-{}", &digest[..16])
+}
+
 /// Build the canonical storage-layer custody input from an exact manifest
 /// address. Runtime callers must pass `ShardManifest.blob_hash` directly; this
 /// function never resolves or prefers a content-row hash field.
