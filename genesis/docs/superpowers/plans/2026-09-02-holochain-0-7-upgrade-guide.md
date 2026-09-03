@@ -385,6 +385,13 @@ without it the elohim lockfile carries two HDK lines. DNA wasm builds need the j
   now demands a rendezvous — use `SweetConductor::standard()` for non-isolated conductors and
   `from_config_rendezvous(config, SweetLocalRendezvous::new().await)` per isolated conductor;
   `await_consistency(N, cells)` → `await_consistency_s(N, cells)` to keep explicit timeouts.
+  **Trap measured 2026-09-03:** one `SweetLocalRendezvous` PER conductor makes an "isolated pair" home
+  to two different relays, and stock kitsune2 0.5.0 then refuses the cross-relay path — both peers end
+  with 0 in limbo and "Consistency not reached" (`rea_commitment_replication.rs:234`, `lamad.rs:1024`).
+  Share ONE rendezvous per pair; `disable_bootstrap` alone supplies the discovery partition (the 0.6
+  invariant was discovery isolation, never transport isolation). Same failure class as Lane A6's
+  fleet partition, reproduced inside the harness. Each rendezvous also costs real RAM: 15 parallel
+  multi-conductor tests were shed at 80% with the mesh up — size CI shards accordingly.
   Also run `RUSTFLAGS="" cargo build --features hdk` in `crates/doorway-client` (standalone crate, no
   workspace; the hdi 0.8 pin there has no in-tree consumer that enables the feature).
   **Local scope of this gate (measured 2026-09-03):** the full include-ignored matrix is 39 binaries at
@@ -622,7 +629,11 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   incident class). Rule from here: any conductor-side manifest addition and the storage
   `holochain_types` pin land in the SAME batch, and `tests/happ_manifest_relay_url_compat.rs`
   (now asserting strictness) is the tripwire.
-- [ ] **F6: Evidence.** One-line DELTA in `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md`
+- [ ] **F6: Evidence.** Also re-check `elohim/holochain/.epr-meta/notary-authority.habit.md`: its DELTA
+  2026-08-09 records `rea_commitment_replication::project_epr_commitment_replicates_to_peer_b` as
+  known-RED on 0.6 (attributed to cold-cell wasm warm-up); it PASSES on 0.7 with the shared-rendezvous
+  harness (2026-09-03, 186.9 s) — the attribution was probably wrong, and the atom's line is stale.
+  One-line DELTA in `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md`
   and in the dataplane-convergence habit atom (fleet on 0.7 on fresh chains, receipt id);
   `.claude/scripts/habits-project.py`; Wave 3 delta in the campaign plan (`OUTCOME 2026-09-xx: DONE via
   2026-09-02-holochain-0-7-upgrade-guide`); memory `project_holochain_0_7_0_assessment` gets a
