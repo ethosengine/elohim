@@ -266,6 +266,25 @@ pub async fn handle_hc_connect(
                 Ok(info) => {
                     app_found = true;
 
+                    // Unrecoverable is terminal upstream: this app cannot be
+                    // enabled and must be uninstalled. Fail this connection as
+                    // unhealthy before either the cell-ready fast path or the
+                    // disabled-app re-enable path. Returning immediately also
+                    // ensures the reason payload is logged only once per request.
+                    if info.status.as_deref() == Some("unrecoverable") {
+                        error!(
+                            conductor = %conductor_id,
+                            app = %installed_app_id,
+                            cell_id = info.unrecoverable_cell_id.as_deref().unwrap_or("unknown"),
+                            reason = info.unrecoverable_reason.as_deref().unwrap_or("unknown"),
+                            "Chaperone: app is unrecoverable; refusing connection"
+                        );
+                        return json_error(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            "Installed app is unrecoverable and must be uninstalled",
+                        );
+                    }
+
                     if !info.cell_ids.is_empty() {
                         debug!(
                             app = %installed_app_id,

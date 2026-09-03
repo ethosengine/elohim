@@ -14,7 +14,8 @@ use holochain_client::{
     IssueAppAuthenticationTokenPayload,
 };
 use holochain_types::app::{AppBundleSource, AppStatus};
-// 0.7 migration: CapAccess becomes CapAccessType in the 0.7-line API.
+// 0.7 migration: capability access storage uses CapAccessType, while
+// ZomeCallCapGrant's public payload remains CapAccess.
 use holochain_zome_types::prelude::{
     CapAccess, CapSecret, GrantZomeCallCapabilityPayload, ZomeCallCapGrant,
 };
@@ -43,8 +44,12 @@ pub struct AppInfoDetailed {
     pub agent_pub_key: Vec<u8>,
     /// Cell IDs keyed by role name
     pub cell_ids: Vec<(String, CellIdPair)>,
-    /// App status from conductor (e.g. "running", "disabled", "paused")
+    /// App status from conductor ("running", "disabled", "paused", or "unrecoverable")
     pub status: Option<String>,
+    /// Cell whose permanent restore failure made this app unrecoverable.
+    pub unrecoverable_cell_id: Option<String>,
+    /// Operator-facing payload for the permanent restore failure.
+    pub unrecoverable_reason: Option<String>,
 }
 
 /// Typed Holochain admin API client backed by `holochain_client::AdminWebsocket`.
@@ -133,6 +138,7 @@ impl TypedAdminClient {
             roles_settings: None,
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         };
 
         self.admin_ws
@@ -204,12 +210,20 @@ impl TypedAdminClient {
 
         // Convert typed status enum to string
         let status = extract_status_string(&app.status);
+        let (unrecoverable_cell_id, unrecoverable_reason) = match &app.status {
+            AppStatus::Unrecoverable(cell_id, reason) => {
+                (Some(cell_id.to_string()), Some(format!("{reason:?}")))
+            }
+            _ => (None, None),
+        };
 
         Ok(AppInfoDetailed {
             installed_app_id: app.installed_app_id.clone(),
             agent_pub_key,
             cell_ids,
             status,
+            unrecoverable_cell_id,
+            unrecoverable_reason,
         })
     }
 
@@ -356,6 +370,8 @@ fn extract_status_string(status: &AppStatus) -> Option<String> {
         AppStatus::Enabled => Some("running".to_string()),
         AppStatus::Disabled(_) => Some("disabled".to_string()),
         AppStatus::AwaitingMemproofs => Some("paused".to_string()),
+        AppStatus::AwaitingRestore => Some("paused".to_string()),
+        AppStatus::Unrecoverable(_, _) => Some("unrecoverable".to_string()),
     }
 }
 
@@ -382,6 +398,31 @@ mod tests {
         assert_eq!(strip_ws_prefix("ws://localhost:4444"), "localhost:4444");
         assert_eq!(strip_ws_prefix("wss://host:4444"), "host:4444");
         assert_eq!(strip_ws_prefix("localhost:4444"), "localhost:4444");
+    }
+
+    #[test]
+    fn extract_status_string_covers_restore_states() {
+        use holochain_types::app::{UnrecoverableCellReason, WarrantSummary};
+        use holochain_zome_types::prelude::{CellId, Timestamp};
+
+        assert_eq!(
+            extract_status_string(&AppStatus::AwaitingRestore).as_deref(),
+            Some("paused")
+        );
+
+        let agent = AgentPubKey::from_raw_36(vec![0; 36]);
+        let unrecoverable = AppStatus::Unrecoverable(
+            CellId::new(DnaHash::from_raw_36(vec![0; 36]), agent.clone()),
+            UnrecoverableCellReason::ChainForkWarrant(Box::new(WarrantSummary {
+                author: agent.clone(),
+                warrantee: agent,
+                timestamp: Timestamp::from_micros(0),
+            })),
+        );
+        assert_eq!(
+            extract_status_string(&unrecoverable).as_deref(),
+            Some("unrecoverable")
+        );
     }
 
     #[tokio::test]

@@ -1,4 +1,14 @@
-//! Kitsune2 bootstrap protocol (HC 0.6 conductors).
+//! 0.7 migration bootstrap-wire verdict (`kitsune2_bootstrap_srv` 0.4.1 → 0.5.0):
+//! **CONFIRMED-COMPATIBLE.** `PUT /authenticate`, `GET /health`,
+//! `GET /bootstrap/{space}`, and `PUT /bootstrap/{space}/{agent}` retain the
+//! same routes and handler wire shapes. The changed routes are relay-only:
+//! legacy SBD `GET /{pub_key}` was removed, `PUT /relay/register` became
+//! `PUT /relay/keepalive`, and the integrated iroh relay retains `GET /relay`,
+//! `GET /ping`, and `GET /generate_204` with new auth/rate-limit internals.
+//! Doorway serves bootstrap itself but uses separate `iroh-relay` deployments,
+//! so none of those integrated-relay changes alter this module.
+//!
+//! Kitsune2 bootstrap protocol (HC 0.6+ conductors).
 //!
 //! The legacy module (`mod.rs`) speaks the kitsune1 protocol
 //! (`POST /bootstrap` + `X-Op`, MessagePack). Holochain 0.6 conductors run
