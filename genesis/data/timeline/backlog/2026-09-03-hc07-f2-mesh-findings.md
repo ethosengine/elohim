@@ -24,7 +24,7 @@ mechanical 0.7 batch. Note (17:00Z): the 10:20Z pod swap that ended run 2 was a 
 tevah/ark session is running one (with a per-role `/health` probe) so each item can be tagged
 `0.7-delta` or `standing`.
 
-## 1. Stale `Arc<HcClient>` after a conductor restart (storage) — likely standing
+## 1. Stale `Arc<HcClient>` after a conductor restart (storage) — STANDING (0.6 calibration 17:35Z: same shape — jessica/james lamad + node_registry `dead` after the lane's restarts, matthew live; tevah/ark session's per-role probe)
 
 `hc_client_registry.rs:~370-395` re-mints a role's handle after "conductor bridge is DEAD" and publishes it
 through `RwLock<Option<Arc<HcClient>>>` slots. But the long-running reconcile tasks take `hc: &Arc<HcClient>`
@@ -53,7 +53,7 @@ the keys; expose `connections.len()` as a first-class field — it is the F2/F5 
 shard indices beyond the integrity zome's 4+3 ceiling. Either the storage shard planner or the zome bound
 is stale; decide from the design doc, then fix the one that is wrong.
 
-## 4. 0.7 conductor: `database is locked` (SQLITE_BUSY 5/517) in `integrate_dht_ops_consumer` — 0.7 watch item
+## 4. Conductor `database is locked` (SQLITE_BUSY 5/517) in `integrate_dht_ops_consumer` — NOT a 0.7 delta (0.6 calibration 17:35Z under the same lane churn: matthew 5, jessica 452, james 543 since 16:32Z — an upper bound far above 0.7's 7–15 per 15 min at rest)
 
 50–103 per conductor over the hour, 7–15 per 15 min AT REST. `holochain_data` (sqlx, WAL) has no visible
 busy handler where 0.6's `holochain_sqlite` had `ACQUIRE_TIMEOUT_MS` 10 s / 30 s pools. Workflows retry, so
