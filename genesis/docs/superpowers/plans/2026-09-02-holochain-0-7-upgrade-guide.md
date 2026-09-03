@@ -658,14 +658,19 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   `{"serializeError":"key must be a string"}` on 0.7 — `blocked_message_counts` is keyed by DnaHash; stringify
   the keys (`http.rs` ~7090). And node-registry rejects `ShardAssignment shard_index 7..19 exceeds maximum 6
   (4+3 RS encoding)` 13× per peer at boot (pre-existing? verify on 0.6 before blaming 0.7).
-  **F2 DISK BUDGET — CORRECTED (operator cluster read, 2026-09-03 17:00Z):** run 2 ended because the WORKSPACE POD
-  WAS SWAPPED onto a secretless ReplicaSet that a k8s-dqlite SEGV crash loop had rendered at 07:21Z (ethosengine
-  is a dqlite standby; the voters are the three ThinkPads) — NOT because the mesh's writes starved anything:
-  sysstat showed the disk fine, and the first cgroup `io.stat` reading (130–270 MB/s) was 3× over-counted across
-  the md2 mirror. The hygiene stands (sample writes, run the seed legs one at a time, keep compiles off the
-  prologue) and the workspace now has `genesis/agentic/bin/io-guard` + `berth` (host-PSI-actuated, byte rate
-  advisory) — but the F2 gate is NOT budgeted on a write ceiling, and a pod swap is read from the
-  devworkspace-controller/dqlite evidence, never inferred from our own I/O.
+  **F2 DISK BUDGET — CORRECTED (operator's cluster read, 2026-09-03 evening):** the run "ended" because
+  the WORKSPACE POD WAS SWAPPED, but not by our writes: the secretless ReplicaSet was rendered at 07:21Z
+  while k8s-dqlite SEGV-crash-looped and all three voter links (the ThinkPads; ethosengine is a dqlite
+  standby) timed out; the 10:20Z swap was the Deployment flipping onto that stale template. sysstat had
+  the disk at 8–12 MB/s / <1 ms await at 07:07 and 67 MB/s at 10:21; the in-container io.stat readings
+  quoted earlier were 3× inflated (md2 + both mirror members summed). What the host record DOES show is
+  latency contention on two QLC NVMes past rated TBW (10:13Z await 81 ms, queue 52 at 38 MB/s) and the
+  2026-08-29 hard resets under I/O pressure. So the F2 gate reads HOST PSI (`/proc/pressure/io full
+  avg10`) as the primary budget with the byte rate secondary — `genesis/agentic/bin/io-guard` now
+  enforces exactly that and `genesis/agentic/bin/berth` records who holds the mesh / cargo / disk-heavy
+  leases; still: seed legs one at a time, `CARGO_BUILD_JOBS=2` for any build beside a running mesh.
+  A pod swap is read from the devworkspace-controller/dqlite evidence, never inferred from our own I/O.
+  Memory `project_devspace_recovery` carries the corrected incident.
 - [x] **F3 (DONE 2026-09-03 17:3xZ, elohim-edgenode #29 → `conductor-25dd2d0be144`): Conductor image.** Integrator pushes `ethosengine/holochain` `elohim-0.7` and the
   che-devworkspaces branch; pushes `upgrade/holochain-0.7` with `[build:conductor]`. Wait for
   `elohim-edgenode` → `conductor-<hc12>` in Harbor (console line `source-derived pin tag`).
