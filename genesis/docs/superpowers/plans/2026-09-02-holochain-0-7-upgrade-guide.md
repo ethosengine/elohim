@@ -44,7 +44,7 @@ using the guards the 2026-09-02 incident built (packed-hash guard, migration int
 death witness). Cleanup lanes run only after the fleet is green on 0.7.
 
 **Tech Stack:** Rust (cargo, pool slots), Holochain 0.7.0 / hdk 0.7.0 / hdi 0.8.0 / kitsune2 0.5.0 /
-iroh 1.0.2 (conductor side) / lair 0.7.1, `@holochain/client` 0.21, holonix `main-0.7`, Jenkins
+iroh 1.0.3 (conductor side, the tag's own lock — a bare `cargo generate-lockfile` drifts to kitsune2 0.5.1 / iroh 1.1, never do that) / lair 0.7.1, `@holochain/client` 0.21, holonix `main-0.7`, Jenkins
 (che-devworkspaces `elohim-edgenode` job + monorepo orchestrator), k8s manifests under
 `genesis/orchestrator/manifests/`.
 
@@ -126,7 +126,7 @@ Every task's requirements implicitly include this section.
 | `holochain_conductor_api` / `holochain_websocket` / `holochain_keystore` | 0.6.x / 0.7.0-dev.23 | `=0.7.0` |
 | `holochain_client` (Rust) | git fork pin (storage), `=0.9.0-dev.24` (doorway) | `=0.9.0` |
 | `holochain_serialized_bytes` | `=0.0.56` (vendored path patch in 3 crates) | `=0.0.57` (crates.io; vendor dir retired in Lane G) |
-| `kitsune2_*` (inside conductor) | 0.4.1 | 0.5.0 (iroh 1.0.2) |
+| `kitsune2_*` (inside conductor) | 0.4.1 | 0.5.0 (iroh 1.0.3 per the tag lock) |
 | `lair_keystore` (inside conductor) | 0.6.3 | 0.7.1 (no prebuilt binary published; in-proc keystore needs none) |
 | conductor cargo features | `sqlite-encrypted,wasmer_sys,transport-tx5-backend-go-pion,jemalloc` | `encryption,wasmer-sys-cranelift,jemalloc` with `--no-default-features` (drops `schema`; iroh is the only transport, no feature) |
 | `@holochain/client` | 0.20.x (`^0.19.2` in `elohim/holochain/rna/typescript`) | `^0.21.0`, single copy via root `pnpm.overrides` |
@@ -150,7 +150,7 @@ hard-fail startup.** Our templates carry no `db_sync_strategy`/`chc_url`, so onl
 | `Create`, `Update`, `Delete`, `CreateLink`, `DeleteLink` structs | `CreateData`, `UpdateData`, `DeleteData`, `CreateLinkData`, `DeleteLinkData` |
 | `EntryCreationAction` | `TypedAction<EntryCreationData>` |
 | `FlatOp::StoreEntry` / `StoreRecord` / `RegisterUpdate` / `RegisterDelete` / `RegisterAgentActivity` | `FlatOp::CreateEntry` / `CreateRecord` / `Update` / `Delete` / `AgentActivity` |
-| `FlatOp::RegisterCreateLink{..}` / `RegisterDeleteLink{..}` | `FlatOp::Link(OpLink::Create(..))` / `FlatOp::Link(OpLink::Delete(..))` — read `action.data.base_address` etc. directly |
+| `FlatOp::RegisterCreateLink{..}` / `RegisterDeleteLink{..}` | `FlatOp::Link(OpLink::CreateLink { link_type, action })` / `FlatOp::Link(OpLink::DeleteLink { original_action, link_type, action })` — STRUCT variants (measured hdi 0.8.0, Lane B); read `action.data.base_address` / `.tag` directly; `OpRecord::CreateLink` no longer carries `tag` |
 | `OpType::…` (older alias) | same renames as `FlatOp` |
 | `signal_action`: `match action.hashed.content { Action::CreateLink(cl) … }` | `match &action.hashed.content.data { ActionData::CreateLink(cl) … }` |
 | `Record::new(signed_action, Option<Entry>)` | `Record::new(signed_action, RecordEntry)` |
@@ -185,6 +185,13 @@ grep -A1 '^name = "hd[ik]"$' Cargo.lock          # exactly ONE hdi and ONE hdk v
 | J — steward desktop | held until `tauri-plugin-holochain` publishes a 0.7 line | — | external |
 
 Cargo-heavy lanes (A, B, C, D) serialize their compiles on the flock; everything else in them is parallel.
+
+**Prerequisite hunk (learned 2026-09-02, Lane D's first run):** the six `elohim/sdk/domains/*/types`
+crates are path-dependencies of doorway (`imagodei-types`, `infrastructure-types`), storage
+(`shefa-types`, `lamad-types`) and the DNA zomes; their `holo_hash =0.6.0` pin drags serde `=1.0.219`
+into every graph and makes hsb 0.0.57 unresolvable. That one hunk (`=0.6.0` → `=0.7.0`, six lines)
+lives on branch `hc07/sdk-pins` (commit `97696e76c`). Lanes C and D cherry-pick it before their
+pin step; Lane B carries the identical hunk; integration merges byte-for-byte.
 
 ---
 
@@ -260,7 +267,7 @@ where
   Add a test next to the existing slice-hash tests in that crate (find them with
   `grep -rn 'insert_slice_hash' crates/holochain_data/src --include=*.rs | grep -i test`): store
   `h1`, store `h1` again, assert exactly one row; store `h2`, assert one row with `h2`. Run:
-  `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -p holochain_data slice_hash 2>&1 | tail -15; echo EXIT=$?` → EXIT=0.
+  `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -p holochain_data --features test-utils slice_hash 2>&1 | tail -15; echo EXIT=$?` → EXIT=0.
   Commit: `git commit -m "fix(data): change-check slice-hash writes (port of da823fc6a to sqlx)"`.
 - [ ] **A5: Re-port the sys-validation per-dependency backoff.** `git cherry-pick -x c9a6c4439` conflicts in
   `crates/holochain/src/core/workflow/sys_validation_workflow.rs` (1 hunk) and its two test files
@@ -272,7 +279,7 @@ where
   never dropped, never validated), the retry-interval log line carrying the unfetchable count, and
   both metrics. Read the original patch for the exact structures: `git show c9a6c4439 -- crates/holochain/src/core/workflow/sys_validation_workflow.rs`.
   Take the upstream CHANGELOG side and append our entry under "Unreleased". Run:
-  `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -p holochain --lib sys_validation 2>&1 | tail -30; echo EXIT=$?` → EXIT=0
+  `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -p holochain --lib --features build_wasms sys_validation 2>&1 | tail -30; echo EXIT=$?` → EXIT=0
   (this compiles the conductor crate; expect 20+ minutes and ~15 GB in the pool slot — set
   `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev`).
 - [ ] **A6: Re-derive the cross-relay preflight fallback against kitsune2_transport_iroh 0.5.0.**
@@ -305,7 +312,7 @@ where
   Port the two url tests from `patch-delta.diff` (`src/tests/url.rs`) so a foreign-relay peer yields
   `Some(global)` and an address-less node yields `None`. Update root `Cargo.toml` `[patch.crates-io]`
   entry comment to say 0.5.0 and keep `kitsune2_transport_iroh = { path = "patches/kitsune2_transport_iroh" }`.
-  Run: `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -p kitsune2_transport_iroh --lib 2>&1 | tail -15; echo EXIT=$?` → EXIT=0.
+  Run (inside `patches/kitsune2_transport_iroh/` — the crate is workspace-`exclude`d, so cargo refuses `-p` from the root): `flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test --lib 2>&1 | tail -15; echo EXIT=$?` → EXIT=0.
   Commit: `git commit -m "fix(transport-iroh): cross-relay preflight fallback re-derived on kitsune2 0.5.0 (multi-doorway home relays)"`.
 - [ ] **A7: Production feature build check (no image).** In the pool slot:
   `RUSTFLAGS="" flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo check -p holochain --bin holochain --no-default-features --features encryption,wasmer-sys-cranelift,jemalloc 2>&1 | tail -5; echo EXIT=$?` → EXIT=0.
@@ -336,7 +343,10 @@ and `node-registry/zomes/node_registry_{coordinator,integrity}/Cargo.toml` (`hdi
 `elohim/sdk/domains/{lamad,shefa,infrastructure,imagodei,qahal,avodah}/types/Cargo.toml:8`
 (`holo_hash = { version = "=0.6.0", … }` → `"=0.7.0"`); `crates/doorway-client/Cargo.toml:20`
 (`hdi = { version = "0.6", … }` → `"0.8"`); `elohim/holochain/tests/sweettest/Cargo.toml:187-199`.
-`lamad-v1/` is a v1 archive: leave it untouched and note it in the commit.
+`lamad-v1/` is a v1 archive: leave it untouched and note it in the commit. `elohim/holochain/rna/rust/Cargo.toml`
+(`hc-rna`, a non-optional path dep of the elohim DNA, `hdk = "0.6"` → `"0.7"`) belongs to this lane too —
+without it the elohim lockfile carries two HDK lines. DNA wasm builds need the justfile's
+`-C link-arg=--import-undefined` locally (the hc-rna `__hc__*` link atom; CI must never carry it).
 
 - [ ] **B1: Pins.** Apply the table above with `sed -i` per file; then in each DNA workspace run
   `cargo update -p hdk -p hdi -p holochain_serialized_bytes 2>&1 | tail -3` (plain cargo, in-tree target).
@@ -361,7 +371,15 @@ and `node-registry/zomes/node_registry_{coordinator,integrity}/Cargo.toml` (`hdi
   `holochain_types = "=0.7.0"`, `hdk = "=0.7.0"`, `hdi = "=0.8.0"`, `holo_hash = "=0.7.0"`,
   `holochain_serialized_bytes = "=0.0.57"` (drop `datachannel-vendored`: tx5 is gone). Fix
   compile-driven test-code changes (Action shape). Run in the sweettest pool slot:
-  `RUSTFLAGS="" CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__holochain__tests__sweettest/dev flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test 2>&1 | tail -30; echo EXIT=$?` → EXIT=0.
+  `RUSTFLAGS="" CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__holochain__tests__sweettest/dev flock -w 7200 /projects/.cargo-target-pool/upgrade-0.7.lock cargo test -- --include-ignored 2>&1 | tail -30; echo EXIT=$?` → EXIT=0
+  (**`--include-ignored` is load-bearing**: 146 of the suite's tests are `#[ignore]` and CI runs them with
+  `--run-ignored all`; a plain `cargo test` runs 14 and proves nothing about the cross-agent surface).
+  0.7 removed `SweetConductor::from_config` and `get_rendezvous()`; `SweetConductorConfig::standard()`
+  now demands a rendezvous — use `SweetConductor::standard()` for non-isolated conductors and
+  `from_config_rendezvous(config, SweetLocalRendezvous::new().await)` per isolated conductor;
+  `await_consistency(N, cells)` → `await_consistency_s(N, cells)` to keep explicit timeouts.
+  Also run `RUSTFLAGS="" cargo build -p doorway-client --features hdk` in `crates/` (the hdi 0.8 pin
+  there has no in-tree consumer that enables the feature).
   Sweettest needs packed DNAs: pack with the 0.7.0 `hc` from Lane E's `HOLOCHAIN_BIN` directory
   (`hc dna pack` / `hc app pack` per DNA `justfile`); if Lane E has not landed yet, download the
   two binaries into `…/scratchpad/hc-0.7/` from `https://github.com/holochain/holochain/releases/download/holochain-0.7.0/{holochain,hc}-x86_64-unknown-linux-gnu`.
@@ -577,6 +595,12 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   peer homed on `relay.elohim.host`), `✓ canonical head propagated` on the deploy. (6) Re-seed once:
   `just seed apply mesh content` per the seed-workflow for the household this host owns; content
   seeds via the operator's pipeline for the fleet.
+- [ ] **F5a: Manifest strictness (learned in Lane C).** 0.7.0's `AppManifestV0` restores
+  `deny_unknown_fields`, and `NetworkConfig` also dropped `enable_mdns`. A conductor-fork manifest
+  field the storage client does not know takes the admin seam down fleet-wide (the 2026-08 dev.23
+  incident class). Rule from here: any conductor-side manifest addition and the storage
+  `holochain_types` pin land in the SAME batch, and `tests/happ_manifest_relay_url_compat.rs`
+  (now asserting strictness) is the tripwire.
 - [ ] **F6: Evidence.** One-line DELTA in `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md`
   and in the dataplane-convergence habit atom (fleet on 0.7 on fresh chains, receipt id);
   `.claude/scripts/habits-project.py`; Wave 3 delta in the campaign plan (`OUTCOME 2026-09-xx: DONE via
