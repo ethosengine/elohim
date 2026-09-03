@@ -11,10 +11,16 @@ WORKDIR /app
 # from github.com/denoland/rusty_v8/releases. The build script falls back to
 # curl when its Python downloader fails; the slim image has neither, so v8
 # build.rs panics with `Result::unwrap()` on a NotFound IO error.
+# perl: the holochain 0.7 client family (holochain_client 0.9.0 → holochain_conductor_api
+# → holochain_keystore default → lair_keystore rusqlite-bundled-sqlcipher-vendored-openssl)
+# builds OpenSSL from source via openssl-src, whose Configure is a perl script;
+# feature unification defeats this crate's own `default-features = false`.
+# elohim-edge #1424 (2026-09-03): "openssl-src: failed to build OpenSSL from source".
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     make \
+    perl \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

@@ -49,11 +49,15 @@ WORKDIR /app
 # Install build dependencies
 # - build-essential: provides make, gcc for native builds (libsodium-sys-stable)
 # - libsodium-dev: prebuilt libsodium to avoid compiling from source
+# - perl: openssl-src (pulled by the holochain 0.7 client family through the keystore's
+#   vendored sqlcipher+openssl; feature unification, not this crate's choice) runs
+#   OpenSSL's perl Configure — elohim-edge #1424 (2026-09-03) failed without it.
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     build-essential \
     libsodium-dev \
+    perl \
     && rm -rf /var/lib/apt/lists/*
 
 # rustfmt for the `check` stage's fmt gate. Lives HERE (right after apt, before
