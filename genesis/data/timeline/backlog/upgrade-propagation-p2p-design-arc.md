@@ -277,3 +277,12 @@ Brainstorm-class: route through /brainstorm (p2p-design-gate applies —
 upgrade artifacts, lineage records, and adoption elections are data
 entities). Rung 1 may be pulled forward as bounded shift work ahead of the
 full design arc. Not to be ground as unplanned shift iterations.
+
+## Rung 6 — lineage-crossing migration (opened 2026-09-03 by the 0.7 cutover)
+
+The 0.6→0.7 line change was a wipe + re-genesis, not propagation: conductor data layer, integrity hashes and the
+kitsune2 wire all moved and no vehicle carries data across that. Stations, entry-type questions and the evidence are
+in `2026-09-03-lineage-crossing-migration-rna.md` (this arc's next rung; RNA = old+new conductors under the ark, the
+storage P2P plane as the cross-line bridge, a migrate-from recipe in the release manifest before data is held, a
+Mishpat commitment with revert). Cycle-time row for the big-bang line change: pushed 16:5xZ → conductors on 0.7 with
+fresh genesis on the wiped fleet (fill in when edge ≥#1428 lands); seven CI rounds on dispatch defects, zero on the substrate.
