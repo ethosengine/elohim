@@ -57,6 +57,7 @@ pub mod inventory_reorder; // receive-side reorder window for paged inventory re
 pub mod kad_store;
 pub mod observation_gossip;
 pub mod participations_reconcile; // cross-peer membership arm of the projection reconcile
+pub mod private_receive; // station 3b receiver-side pre-authorization: keep a private record only with standing
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
@@ -541,6 +542,7 @@ pub use fanout::{channels_for_reach, FanoutChannel};
 pub use identity_map::{
     CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
 };
+pub use private_receive::{preauthorize_private_record, PrivateReceiveVerdict};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 pub use view_federation::{
@@ -5868,8 +5870,12 @@ impl P2PNode {
                                         // tails (kad head record, quilt-draw blob pull over the
                                         // same libp2p peer) stay here.
                                         let ctx = self.acquisition_ingest_ctx();
+                                        let sender =
+                                            crate::services::custody_standing::Requester::libp2p(
+                                                peer.to_base58(),
+                                            );
                                         if let StoredRecord::Stored { blob_hash, .. } =
-                                            store_acquired_record(&ctx, *record).await
+                                            store_acquired_record(&ctx, sender, *record).await
                                         {
                                             self.publish_epr_head_record(&content_id).await;
                                             if let Some(ref hash) = blob_hash {
@@ -9852,6 +9858,7 @@ impl P2PNode {
             blob_store: self.blob_store.clone(),
             self_cid: self.config.self_cid.clone().unwrap_or_default(),
             write_gate: self.acquisition_write_gate.clone(),
+            custody_standing: self.shard_service.custody_standing(),
         }
     }
 
@@ -10472,6 +10479,13 @@ pub(crate) struct AcquisitionIngestCtx {
     /// without this gate they exceeded even a 30 s busy_timeout — measured
     /// 2026-08-29: `database is locked` on 4 of 31 rows, dropped silently.
     pub(crate) write_gate: Arc<tokio::sync::Mutex<()>>,
+    /// Station 3b (M9) receiver-side pre-authorization: the SAME
+    /// process-lifetime custody resolver `ShardService` gates serving with
+    /// (`ShardService::custody_standing`) — sharing it here reuses its TTL
+    /// cache / single-flight rather than resolving standing twice. `None`
+    /// (reach-gating not wired) fails CLOSED for a `private` record.
+    pub(crate) custody_standing:
+        Option<Arc<dyn crate::services::custody_standing::CustodyStanding>>,
 }
 
 pub(crate) enum StoredRecord {
@@ -10486,8 +10500,14 @@ pub(crate) enum StoredRecord {
 /// Store an acquired content record and settle the acquisition/replication
 /// trackers exactly as the libp2p arm always has. Transport-neutral: the
 /// libp2p `ShardResponse::Content` arm and the iroh pull task both call it.
+///
+/// `sender` is the transport identity the record arrived FROM — station 3b
+/// (M9) receiver-side pre-authorization ([`private_receive::preauthorize_private_record`])
+/// gates every `private`-reach record on it BEFORE `CreateContentInput` is
+/// even built, for both callers, because they share this one function.
 pub(crate) async fn store_acquired_record(
     ctx: &AcquisitionIngestCtx,
+    sender: crate::services::custody_standing::Requester,
     record: crate::p2p::shard_protocol::ContentRecord,
 ) -> StoredRecord {
     let content_id = record.id.clone();
@@ -10510,6 +10530,39 @@ pub(crate) async fn store_acquired_record(
             return StoredRecord::Failed;
         }
     };
+
+    // Station 3b receiver-side pre-authorization (M9): a `private` record is
+    // kept only when THIS peer already holds custody standing for the
+    // sender (or for the digest) — never on the strength of the record's own
+    // `reach`/`created_by` alone. `custody_standing` absent (reach-gating not
+    // wired at boot) fails CLOSED, the same posture the serve-side gate takes
+    // when its own resolver is missing (`WithholdReason::AuthorityUnavailable`).
+    //
+    // Deliberately NOT `&ctx.self_cid`: that is the TRANSPORT identity join
+    // key (libp2p `PeerId` / iroh `NodeId` — see `node_transport.rs` and
+    // `main.rs`'s derivation, which logs literally "self_cid is the libp2p
+    // peer id" / "self_cid is the iroh NodeId"), never the Holochain
+    // `agent_cid` `rea_commitments.provider`/`.receiver` are keyed on.
+    // `preauthorize_private_record` resolves "who am I" itself, through the
+    // SAME `CustodyStanding::resolve_agent(&Requester::local())` seam
+    // `facts_for`'s `Requester::Local` arm already uses and Task 1 already
+    // tests — see that function's module docs for the full identity-coherence
+    // rationale.
+    if crate::private_reach::is_private(&record.reach) {
+        let verdict = private_receive::preauthorize_private_record(
+            ctx.custody_standing.as_deref(),
+            &sender,
+            &record,
+        )
+        .await;
+        if let private_receive::PrivateReceiveVerdict::Skip(reason) = verdict {
+            crate::metrics::inc_private_preauth_skipped(reason);
+            ctx.replication_state.mark_failed(&content_id).await;
+            ctx.acquisition.mark_failed(&content_id).await;
+            return StoredRecord::Failed;
+        }
+    }
+
     let input = crate::db::content_diesel::CreateContentInput {
         id: record.id,
         title: record.title,
@@ -10750,7 +10803,10 @@ pub(crate) async fn acquire_over_iroh(
         false,
     );
     debug!(id = %content_id, peer = %label, transport = "iroh", "Received content record from peer");
-    if let StoredRecord::Stored { blob_hash, .. } = store_acquired_record(&ctx, *record).await {
+    let sender = crate::services::custody_standing::Requester::iroh(addr.node_id.to_string());
+    if let StoredRecord::Stored { blob_hash, .. } =
+        store_acquired_record(&ctx, sender, *record).await
+    {
         if let Some(hash) = blob_hash.filter(|h| !h.is_empty()) {
             if !ctx.blob_store.exists(&hash).await {
                 info!(

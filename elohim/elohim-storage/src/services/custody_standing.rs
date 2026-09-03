@@ -214,6 +214,33 @@ pub fn digest_key(address: &str) -> Option<String> {
 #[async_trait::async_trait]
 pub trait CustodyStanding: Send + Sync + 'static {
     async fn facts_for(&self, requester: &Requester, row: &RowFacts) -> PrivateServeFacts;
+
+    /// Resolve a transport identity to the agent bound to it, if any. The
+    /// SAME resolution `facts_for` performs internally for `requester`,
+    /// exposed standalone for a caller that needs the identity itself rather
+    /// than a standing verdict about it.
+    ///
+    /// Station 3b receiver-side pre-authorization
+    /// ([`crate::p2p::private_receive::preauthorize_private_record`]) resolves
+    /// the SENDER this way: the sender's transport identity, not the
+    /// payload's self-reported `created_by`, is the ward for that decision.
+    async fn resolve_agent(&self, requester: &Requester) -> Option<String>;
+
+    /// Does `agent` hold a LIVE `custody-spool` naming `ward`, or (when
+    /// `digest` is `Some`) a LIVE `custody-blob` naming that digest? Returns
+    /// `(custody_for_ward, custody_for_digest)` — the same two facts
+    /// `facts_for` resolves for `custody_for_ward` / `custody_for_digest`,
+    /// but keyed on an agent the CALLER already knows rather than one this
+    /// trait resolves from a `Requester`.
+    ///
+    /// `facts_for` cannot answer "does MY OWN agent hold standing for X" —
+    /// its `requester` is always resolved through a transport identity, and
+    /// this peer's own agent is not one. Station 3b receiver-side
+    /// pre-authorization needs exactly that question (does the peer that was
+    /// just handed a private record hold standing for the sender), so this
+    /// is the standalone escape hatch rather than a second, decoy `Requester`
+    /// variant.
+    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -834,6 +861,41 @@ impl CustodyStanding for ProjectionCustodyStanding {
             ward_resolved: local.ward.is_some(),
         }
     }
+
+    async fn resolve_agent(&self, requester: &Requester) -> Option<String> {
+        let resolver = self.clone();
+        let requester = requester.clone();
+        tokio::task::spawn_blocking(move || resolver.requester_agent(&requester))
+            .await
+            .ok()
+            .flatten()
+    }
+
+    /// Local projection first (one blocking task, mirrors `facts_for`), then —
+    /// only when NEITHER local fact already stands — the same bounded
+    /// own-conductor fallback `facts_for` uses for `custody_for_ward`. A
+    /// digest hit never pays for the conductor call; it already answers the
+    /// question on its own.
+    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool) {
+        let resolver = self.clone();
+        let agent_owned = agent.to_string();
+        let ward_owned = ward.to_string();
+        let digest_owned = digest.map(|d| d.to_ascii_lowercase());
+        let (mut spool, blob) = tokio::task::spawn_blocking(move || {
+            let spool = resolver.spool_wards(&agent_owned).contains(&ward_owned);
+            let blob = digest_owned
+                .as_deref()
+                .is_some_and(|d| resolver.blob_digests(&agent_owned).contains(d));
+            (spool, blob)
+        })
+        .await
+        .unwrap_or((false, false));
+
+        if !spool && !blob {
+            spool = self.conductor_spool_standing(agent, ward).await;
+        }
+        (spool, blob)
+    }
 }
 
 /// iroh `NodeId` → `agent_cid`, through `peer_transport_manifest`. Behind a
@@ -961,6 +1023,26 @@ impl CustodyStanding for FakeCustodyStanding {
                 .is_some_and(|d| state.blob.contains(&(agent.clone(), d.clone()))),
             ward_resolved: ward.is_some(),
         }
+    }
+
+    async fn resolve_agent(&self, requester: &Requester) -> Option<String> {
+        self.inner
+            .lock()
+            .unwrap()
+            .agents
+            .get(&requester.label())
+            .cloned()
+    }
+
+    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool) {
+        let state = self.inner.lock().unwrap();
+        let spool = state.spool.contains(&(agent.to_string(), ward.to_string()));
+        let blob = digest.is_some_and(|d| {
+            state
+                .blob
+                .contains(&(agent.to_string(), d.to_ascii_lowercase()))
+        });
+        (spool, blob)
     }
 }
 
@@ -1513,5 +1595,116 @@ mod tests {
         assert_eq!(digest_key(&sha), Some(DIGEST.to_string()));
         assert_eq!(digest_key(DIGEST), Some(DIGEST.to_string()));
         assert_eq!(digest_key(&cid), Some(DIGEST.to_string()));
+    }
+
+    // ── `resolve_agent` / `custody_of` — the station 3b receiver-side escape
+    // hatch (`preauthorize_private_record` cannot ask "does THIS peer's own
+    // agent hold standing" through `facts_for`, since that method always
+    // resolves its `requester` through a transport identity). ──
+
+    #[tokio::test]
+    async fn resolve_agent_mirrors_facts_fors_requester_resolution() {
+        let pool = test_pool();
+        let (resolver, requester) = bound_resolver(pool, WARD);
+        assert_eq!(
+            CustodyStanding::resolve_agent(&resolver, &requester).await,
+            Some(WARD.to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_agent_is_none_for_an_unbound_requester() {
+        let (resolver, requester) = unbound_resolver(test_pool());
+        assert_eq!(
+            CustodyStanding::resolve_agent(&resolver, &requester).await,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn custody_of_reads_spool_standing_keyed_by_an_already_known_agent() {
+        let pool = test_pool();
+        insert_commitment(
+            &pool,
+            &deterministic_spool_custody_id(CUSTODIAN, WARD, WARD),
+            SPOOL_CUSTODY_ACTION,
+            CUSTODIAN,
+            WARD,
+            Some(&spool_classification(WARD)),
+            "created",
+        );
+        let resolver = ProjectionCustodyStanding::new(pool);
+        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await;
+        assert!(spool, "CUSTODIAN provides WARD a live custody-spool");
+        assert!(!blob);
+        // A stranger asked about the SAME ward holds neither.
+        let (spool, blob) = resolver.custody_of(STRANGER, WARD, None).await;
+        assert!(!spool);
+        assert!(!blob);
+    }
+
+    #[tokio::test]
+    async fn custody_of_reads_blob_standing_and_skips_the_conductor_call_when_it_already_stands() {
+        let pool = test_pool();
+        insert_commitment(
+            &pool,
+            "custody-blob-of-agent",
+            CUSTODY_BLOB_ACTION,
+            CUSTODIAN,
+            WARD,
+            Some(&format!("sha256-{DIGEST}")),
+            "created",
+        );
+        let lookup = Arc::new(CountingConductor {
+            calls: AtomicUsize::new(0),
+            evidence: None,
+        });
+        let resolver = ProjectionCustodyStanding::new(pool).with_conductor_lookup(lookup.clone());
+        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, Some(DIGEST)).await;
+        assert!(!spool);
+        assert!(blob, "CUSTODIAN provides a live custody-blob for DIGEST");
+        assert_eq!(
+            lookup.calls.load(Ordering::SeqCst),
+            0,
+            "a digest hit already answers the question — no conductor call needed"
+        );
+    }
+
+    #[tokio::test]
+    async fn custody_of_falls_back_to_the_conductor_when_neither_local_fact_stands() {
+        let pool = test_pool();
+        let lookup = Arc::new(CountingConductor {
+            calls: AtomicUsize::new(0),
+            evidence: Some(exact_conductor_evidence()),
+        });
+        let resolver = ProjectionCustodyStanding::new(pool).with_conductor_lookup(lookup.clone());
+        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await;
+        assert!(spool, "the conductor fallback confirms the pledge");
+        assert!(!blob);
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn the_fake_doubles_resolve_agent_and_custody_of_mirror_the_production_shape() {
+        let fake = FakeCustodyStanding::new();
+        let requester = Requester::libp2p("custodian-peer");
+        fake.bind(&requester, CUSTODIAN)
+            .spool_custody(CUSTODIAN, WARD)
+            .blob_custody(CUSTODIAN, DIGEST);
+
+        assert_eq!(
+            CustodyStanding::resolve_agent(&fake, &requester).await,
+            Some(CUSTODIAN.to_string())
+        );
+        assert_eq!(
+            CustodyStanding::resolve_agent(&fake, &Requester::iroh("nobody")).await,
+            None
+        );
+        assert_eq!(fake.custody_of(CUSTODIAN, WARD, None).await, (true, false));
+        assert_eq!(
+            fake.custody_of(CUSTODIAN, STRANGER, Some(DIGEST)).await,
+            (false, true)
+        );
+        assert_eq!(fake.custody_of(STRANGER, WARD, None).await, (false, false));
     }
 }

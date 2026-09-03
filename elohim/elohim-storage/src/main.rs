@@ -3703,10 +3703,18 @@ async fn async_main(
         // node this core is the only thing that turns a peer's inventory into
         // rows and settles `pull.caughtUp` — see p2p_iroh::pull_core.
         if p2p_node.is_none() {
+            // Station 3b (M9): the SAME process-lifetime custody resolver
+            // `shared_shard_service` gates serving with — never a second one.
+            let iroh_pull_custody_standing: Option<
+                Arc<dyn elohim_storage::services::custody_standing::CustodyStanding>,
+            > = custody_standing.clone().map(|resolver| {
+                resolver as Arc<dyn elohim_storage::services::custody_standing::CustodyStanding>
+            });
             let core = elohim_storage::p2p_iroh::IrohPullCore::new(
                 receive_pool.clone(),
                 blob_store.clone(),
                 config.self_cid.clone().unwrap_or_default(),
+                iroh_pull_custody_standing,
             );
             core.clone().spawn(
                 std::time::Duration::from_secs(60),

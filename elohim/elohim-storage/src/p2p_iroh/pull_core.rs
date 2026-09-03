@@ -84,7 +84,18 @@ pub struct IrohPullCore {
 }
 
 impl IrohPullCore {
-    pub fn new(db_pool: Option<DbPool>, blob_store: Arc<BlobStore>, self_cid: String) -> Arc<Self> {
+    /// `custody_standing` — station 3b (M9) receiver-side pre-authorization.
+    /// Pure-iroh mode has no `P2PNode`/`ShardService` to share the resolver
+    /// from, so the composition root threads the SAME process-lifetime
+    /// instance it built for the shared `ShardService` straight in here —
+    /// never a second one. `None` when reach-gating is not wired at boot;
+    /// `store_acquired_record` fails a `private` record closed in that case.
+    pub fn new(
+        db_pool: Option<DbPool>,
+        blob_store: Arc<BlobStore>,
+        self_cid: String,
+        custody_standing: Option<Arc<dyn crate::services::custody_standing::CustodyStanding>>,
+    ) -> Arc<Self> {
         let replication_state = ReplicationState::new();
         let acquisition = AcquisitionState::new();
         let (status_tx, _) = watch::channel(IrohPullStatus {
@@ -107,6 +118,7 @@ impl IrohPullCore {
                 blob_store,
                 self_cid,
                 write_gate: Arc::new(Mutex::new(())),
+                custody_standing,
             },
             gap_queue: Mutex::new(VecDeque::new()),
             acquisition_queue: Mutex::new(VecDeque::new()),

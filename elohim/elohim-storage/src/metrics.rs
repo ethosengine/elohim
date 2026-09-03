@@ -861,6 +861,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// `private`-reach records this peer was HANDED (a libp2p `ShardResponse::Content`
+    /// arm or the iroh pull leg's `GetContent` response) and did NOT persist, by
+    /// refusal reason — the receiver-side twin of `storage_private_withheld_total`
+    /// (that counter is the SERVING peer refusing a request; this one is the
+    /// RECEIVING peer declining to keep what it was sent). One site — the shared
+    /// `store_acquired_record` ingest — so no `site` label. Every reason is
+    /// pre-touched at registration so a gate that has never fired reads as a
+    /// measured zero rather than an absent series.
+    ///
+    /// Decided by [`crate::p2p::private_receive::preauthorize_private_record`],
+    /// reusing [`crate::private_reach::private_serve_verdict`]. Station 3b (M9),
+    /// receiver-side pre-authorization.
+    pub static ref PRIVATE_PREAUTH_SKIPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "storage_private_preauth_skipped_total",
+            "Private-reach records handed to this peer and NOT persisted, by reason (unresolved-requester | no-standing | ward-unresolved | authority-unavailable).",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
     /// Shard-push targets SKIPPED because the selected `agent_cid` had no known
     /// libp2p transport binding (`peer_transport_manifest` + `peer_identity_bindings`
     /// both missed). Before the push-side resolver, distribution errored on EVERY
@@ -2456,6 +2477,13 @@ pub fn register_all() {
                     .with_label_values(&[site, reason.label()])
                     .inc_by(0);
             }
+        }
+        let _ = REGISTRY.register(Box::new(PRIVATE_PREAUTH_SKIPPED.clone()));
+        // Pre-touch every reason — same rationale as PRIVATE_WITHHELD above.
+        for reason in crate::private_reach::WithholdReason::ALL {
+            PRIVATE_PREAUTH_SKIPPED
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
@@ -4188,6 +4216,22 @@ pub fn inc_private_withheld(site: &str, reason: crate::private_reach::WithholdRe
 pub fn private_withheld_count(site: &str, reason: crate::private_reach::WithholdReason) -> u64 {
     PRIVATE_WITHHELD
         .with_label_values(&[site, reason.label()])
+        .get()
+}
+
+/// Record one private record this peer was handed and did NOT persist.
+pub fn inc_private_preauth_skipped(reason: crate::private_reach::WithholdReason) {
+    PRIVATE_PREAUTH_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Current value of one `storage_private_preauth_skipped_total` series.
+/// Process-wide, so callers compare a before/after delta rather than an
+/// absolute.
+pub fn private_preauth_skipped_count(reason: crate::private_reach::WithholdReason) -> u64 {
+    PRIVATE_PREAUTH_SKIPPED
+        .with_label_values(&[reason.label()])
         .get()
 }
 

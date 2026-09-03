@@ -80,6 +80,14 @@ impl ShardService {
         self
     }
 
+    /// The shared custody resolver, if reach-gating is wired. Exposed so the
+    /// acquisition path (`store_acquired_record`, station 3b receiver-side
+    /// pre-authorization) reuses the SAME process-lifetime resolver — and its
+    /// TTL cache / single-flight — rather than constructing a second one.
+    pub(crate) fn custody_standing(&self) -> Option<Arc<dyn CustodyStanding>> {
+        self.custody_standing.clone()
+    }
+
     /// Bind the iroh blob store once it exists (the shard responder is built
     /// before the iroh node). Idempotent; the first binding wins.
     #[cfg(feature = "p2p-iroh")]
