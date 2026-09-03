@@ -254,3 +254,16 @@ identical converged content. Cure surface named by the sprint plan:
 apex multi-A + client fallback (WS3), warm-boot shell cache
 (x-ssr-fetches:0 invariant), and the operator ceiling on adam's
 hosted-agent provisioning.
+
+2026-09-03 (shift land-rung5-batch) — evidence AGAINST green, status NOT flipped here (the
+declared check did not run: Dataplane Validation on edge #1422 lists doorway-failover as "RAN AND
+SKIPPED (apparatus)"). Both alpha doorways failed on every container restart from the first
+post-split storage roll (2026-08-31) until edge #1422 (2026-09-03 03:44Z): the conductor split moved
+the admin/app socat bridge into `<prefix>-conductor-0`, the doorway manifests kept
+`CONDUCTOR_ADMIN_URL` on the storage Service, and every doorway start died minting its app auth
+token (probe kill after one 130 s connect timeout). doorway-B (`elohim.host`) had no Ready pod;
+doorway-A survived on a single pre-split pod. The register saw nothing because no lane restarts a
+doorway and reads the rollout. Fix 2d356dbc2; incident atom
+genesis/data/timeline/backlog/conductor-split-left-doorway-admin-url-on-the-storage-service.md.
+Bind this habit's check to a rollout read (`kube_deployment_status_replicas_unavailable == 0` for
+both doorway Deployments after each edge roll) before calling it green again.
