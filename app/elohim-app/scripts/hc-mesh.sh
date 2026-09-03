@@ -1255,6 +1255,49 @@ terminate_mesh_pids() { # <pid>...
   done
 }
 
+stop_recorded_arks() {
+  local ark_names=() ark_pids=() file name pid deadline alive i failed=0
+  [ -d "$PID_DIR" ] || return 0
+
+  for file in "$PID_DIR"/ark-*; do
+    [ -f "$file" ] || continue
+    name="${file##*/ark-}"
+    if pid="$(live_recorded_pid ark "$name")"; then
+      ark_names+=("$name")
+      ark_pids+=("$pid")
+    fi
+  done
+  [ ${#ark_pids[@]} -gt 0 ] || return 0
+
+  # Signal every supervisor before waiting so no conductor child is included in
+  # the ordinary recorded-pid pass while its restart-owning ark is still alive.
+  kill -TERM "${ark_pids[@]}" 2>/dev/null || true
+  deadline=$((SECONDS + 25))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    alive=0
+    for i in "${!ark_pids[@]}"; do
+      if [ "$(live_recorded_pid ark "${ark_names[$i]}" 2>/dev/null || true)" = "${ark_pids[$i]}" ]; then
+        alive=1
+        break
+      fi
+    done
+    [ "$alive" -eq 0 ] && break
+    sleep 1
+  done
+
+  for i in "${!ark_pids[@]}"; do
+    name="${ark_names[$i]}"
+    pid="${ark_pids[$i]}"
+    if [ "$(live_recorded_pid ark "$name" 2>/dev/null || true)" = "$pid" ]; then
+      echo "stopping ark $name pid=$pid … still alive after 25s" >&2
+      failed=1
+    else
+      echo "stopping ark $name pid=$pid … exited"
+    fi
+  done
+  return "$failed"
+}
+
 fallback_pattern_pids() {
   # Compatibility for meshes launched before PID files existed, or platforms
   # where ss can see a listener but not its owner. The pgrep patterns only
@@ -1309,6 +1352,7 @@ clear_mesh_pidfiles() {
 
 stop_all() {
   local pids=() fallback=() pid
+  stop_recorded_arks || return 1
   while IFS= read -r pid; do pids+=("$pid"); done < <(recorded_mesh_pids)
   while IFS= read -r pid; do pids+=("$pid"); done \
     < <(listener_pids_for_ports $(mesh_owned_ports))
