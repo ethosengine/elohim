@@ -613,7 +613,26 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   (the `server` feature is what carries the binary — without it `cargo install` succeeds and installs
   nothing). Gate for "the mesh is really up": `GET /db/p2p/conductor-diagnostics` on each storage peer
   shows `connections > 0` before the prologue is attempted — household formation cannot succeed on a
-  DHT that never connected, and the prologue's retries read as a seeding bug when they are a relay bug. Then `just mesh prologue`, `just seed validate`,
+  DHT that never connected, and the prologue's retries read as a seeding bug when they are a relay bug.
+  **F2 result so far (2026-09-03, run 2 with the relay):** connectivity gate PASSED — each conductor held
+  2 direct connections through the local relay (`dump_network_stats` via the admin port: `backend: iroh`,
+  `is_direct: true`), all 15 agent infos at every peer, and jessica/james HEALED the landing head "from own
+  conductor (peer discovery)" — cross-conductor DHT on 0.7 works. Seed chain wrote 9 base rows to all three
+  storage peers; the prologue's `DECLARE_ONLY` fan-out to B only exhausted its retry budget before that
+  convergence (~4 min). Not yet measured: `just test mesh`, the rung-5 chain. Two storage follow-ups
+  (hash-neutral, land after the cutover): `/db/p2p/conductor-diagnostics` `transportStats` serializes to
+  `{"serializeError":"key must be a string"}` on 0.7 — `blocked_message_counts` is keyed by DnaHash; stringify
+  the keys (`http.rs` ~7090). And node-registry rejects `ShardAssignment shard_index 7..19 exceeds maximum 6
+  (4+3 RS encoding)` 13× per peer at boot (pre-existing? verify on 0.6 before blaming 0.7).
+  **F2 DISK BUDGET (operator-diagnosed 2026-09-03):** the run ended because the WORKSPACE POD WAS SWAPPED,
+  not because anything crashed — 3 conductors + the prologue seed drove the shared ethosengine NVMe to
+  130–270 MB/s writes, dqlite lease writes stretched to 3–9.7 s, the devworkspace controller lost leader
+  election and re-rendered the Deployment without its secrets (see memory `project_devspace_recovery`).
+  CPU had 16 cores of headroom; RAM was 6 GB of 31. So the F2 gate is budgeted on DISK WRITES: sample
+  `/sys/fs/cgroup/io.stat` every 30 s during the run and stop the prologue if sustained writes exceed
+  ~100 MB/s; run the seed legs one at a time, never beside a cargo build; and if the operator can place
+  the conductor data dirs / `/tmp/elohim-local-mesh` on a PVC off the dqlite node, do that first — it removes
+  the coupling instead of shrinking it. Then `just mesh prologue`, `just seed validate`,
   `just test mesh` (Act I). Then the rung-5 chain on 0.7: the runnable check in
   `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md` (8/8 cucumber) — this is
   the proof that `update_coordinators` and the release controller survive the line change.
