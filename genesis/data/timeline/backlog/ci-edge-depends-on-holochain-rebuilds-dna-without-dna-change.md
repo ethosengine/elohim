@@ -52,3 +52,15 @@ An orchestrator run whose range touches `elohim/elohim-storage/**` and nothing u
 `elohim/holochain/dna/**` prints a Build Plan line binding `elohim-edge` to the prior
 `elohim-holochain` artifact and dispatches no DNA build; a range touching a zome still
 dispatches both, in order.
+
+## 2026-09-03 observation — the same over-build in a second costume (edge #1422)
+
+A DNA-pipeline rebuild whose packed hashes are byte-identical to the baseline (the DNA Hash Guard
+passed on elohim-holochain #1423) still republishes the `elohim-happ:dev-latest` OCI artifact with a
+NEW digest. `resolve-happ-digest.sh` stamps that digest into the conductor pod template
+(`elohim.host/happ-digest`), so the next edge deploy rolled every conductor StatefulSet
+(`statefulset.apps/<prefix>-conductor configured` → `rollout status … --timeout=600s` per peer,
+staggered) although nothing the conductor runs changed. Cost on 2026-09-03: the doorway fix that
+was the point of the deploy waited behind a full conductor fleet roll. The digest that should
+decide a conductor roll is content-derived — the packed DNA hash set (what the guard already
+computes), not the artifact's OCI digest — so a rebuild that changes no DNA rolls no conductor.
