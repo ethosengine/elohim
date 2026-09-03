@@ -69,6 +69,21 @@ order and the probes.
    3 household; `genesis/orchestrator/data/deployments.json` `suspended` is the roster) and the
    conductor workloads — and that both relay Deployments are on `1.0.3-dev-latest`. Nothing below
    starts until every pod in the wave is on the new images.
+**Observed on the first roll (edge #1426, 2026-09-03 21:0x–21:5xZ) — read before step 2.** The storage phase rolled
+all seven peers (`elohim-{adam,matthew,jessica,james,gertrude,susan,eve}-alpha` "rolling update complete"), the alpha
+doorway rolled, and the alpha-b relay Deployment was reconfigured to `iroh-relay:1.0.3-dev-latest`. The CONDUCTOR
+phase did not: it rolls the conductor StatefulSets one peer at a time and waits `rollout status --timeout=600s`
+for readiness, jessica's 0.7 conductor cannot become ready on 0.6 databases, and after the first failure the phase
+HALTS ("NOT rolling elohim-<peer>-alpha-conductor — an earlier peer's conductor rollout failed"). So the fleet now
+runs 0.7 storage against six 0.6 conductors plus one unready 0.7 conductor (jessica). Consequence for the sequence:
+the pipeline's readiness gate means a conductor cannot be rolled onto 0.6 data at all — for the conductor phase the
+wipe comes FIRST. Adjusted order: (a) scale every `*-alpha-conductor` StatefulSet to 0 (or delete the pods and let
+the StatefulSet hold them down) and clear the conductor `databases/` + keystore on every peer, bootstrap pair
+together; (b) stage `DNA_MIGRATION_INTENT` (step 3); (c) re-dispatch the edge roll (`[build:edge]` on dev, ~70 min;
+storage re-rolls idempotently, the conductor phase then finds every peer ready on fresh genesis); (d) continue at
+step 4. Do NOT push anything else to dev while that edge run is deploying — a superseding orchestrator run cancels
+the calling pipeline and marks the roll aborted mid-`rollout status` (that is what cut #1426's conductor phase).
+
 2. **Clear the conductor state — bootstrap pair together.** ONLY THEN clear each conductor's full
    `databases/` tree and keystore. 0.7 cannot read 0.6 databases and the lair/agent re-key is
    expected. Clearing earlier makes the still-running 0.6 storage re-install the 0.6 hashes and
