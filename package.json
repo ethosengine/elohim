@@ -10,7 +10,6 @@
       "@angular-devkit/build-angular>picomatch": "^4.0.4",
       "@angular-devkit/core>picomatch": "^4.0.4",
       "@angular/build>picomatch": "^4.0.4",
-      "@holochain/client": "^0.21.0",
       "@vue/compiler-core": "3.5.34",
       "@vue/compiler-dom": "3.5.34",
       "@vue/compiler-sfc": "3.5.34",

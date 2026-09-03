@@ -28,6 +28,9 @@ packages:
 # pnpm settings home (pnpm >=10 ignores the package.json "pnpm" field).
 # overrides MUST stay in lockstep with the recorded set in pnpm-lock.yaml.
 overrides:
+  # Holochain 0.7 line: ONE copy of the JS client (a second copy breaks instanceof checks —
+  # upstream's documented trap). Lane I of the 0.7 guide.
+  '@holochain/client': ^0.21.0
   libsodium-wrappers: ^0.8.2
   libsodium: ^0.8.2
   playwright: 1.59.1
