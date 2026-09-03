@@ -115,9 +115,18 @@
 #
 #   MESH_FORK_RELAY_URL
 #                   Relay URL for Holochain 0.7's `network … quic <RELAY_URL>`
-#                   generate grammar.
-#                   Defaults to the doorway — a placeholder that must parse as a
-#                   URL, since loopback peers never need a relay.
+#                   generate grammar. Default = the LOCAL iroh-relay this script
+#                   launches (http://localhost:$MESH_RELAY_PORT/). A 0.7
+#                   conductor homes to its relay at boot and kitsune2 0.5 only
+#                   dials peers whose advertised relay matches its own exactly,
+#                   so with no reachable relay three LOOPBACK conductors sit at
+#                   0 connections and never gossip (measured 2026-09-03 with
+#                   relay_url pointed at the doorway, the pre-0.7 placeholder).
+#
+#   MESH_RELAY_BIN  The `iroh-relay` binary (1.0.3, `--features server`) to run
+#                   on MESH_RELAY_PORT (default 3340, upstream's --dev port).
+#                   Unset = the first `iroh-relay` on PATH. MESH_RELAY=0 skips
+#                   the launch — you then own MESH_FORK_RELAY_URL.
 #
 #   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
 #                   warn + INFO on exactly the three modules that diagnose a
@@ -145,8 +154,9 @@
 #   - `hc sandbox generate` WITHOUT a network section can select public
 #     discovery infrastructure. True isolation requires explicit
 #     `network --bootstrap ... quic ...` arguments; the loopback mesh uses
-#     its local doorway for bootstrap and a parseable relay placeholder that
-#     loopback peers never need to contact.
+#     its local doorway for bootstrap and the local iroh-relay as the relay
+#     home (kitsune2 0.5: exact relay match, one relay per space — a
+#     placeholder URL yields a booted conductor with 0 connections).
 #   - Conductor admin/app interfaces bind loopback only; config exposes
 #     `danger_bind_addr` when a cross-pod topology ever needs more. Inside
 #     one container, loopback is correct.
@@ -206,6 +216,9 @@ DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 MESH_PORTAL="${MESH_PORTAL:-1}"
 THRESHOLD_PORT="${THRESHOLD_PORT:-8081}"
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
+# The local iroh-relay every 0.7 conductor homes to (see MESH_FORK_RELAY_URL).
+MESH_RELAY_PORT="${MESH_RELAY_PORT:-3340}"
+MESH_RELAY_BIN="${MESH_RELAY_BIN:-$(command -v iroh-relay 2>/dev/null || true)}"
 DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
 DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
 
@@ -592,7 +605,8 @@ mesh_owned_ports() {
   # Doorway/mongo ports remain owned even when the NEXT requested shape has
   # MESH_DOORWAYS=0; stop must still reap a previously doorway-backed shape.
   printf '%s\n' "$DOORWAY_PORT" "$DOORWAY_B_PORT" \
-    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT" "$THRESHOLD_PORT"
+    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT" "$THRESHOLD_PORT" \
+    "$MESH_RELAY_PORT"
   local i=0
   for _ in "${PEERS[@]}"; do
     printf '%s\n' "$(admin_port "$i")" "$(app_port "$i")" \
@@ -1185,14 +1199,68 @@ assert_toolchain_parity() {
 # Holochain 0.7 has one iroh transport; the matching hc CLI accepts the `quic`
 # network tail and writes relay_url in the conductor's 0.7 schema.
 #
-# MESH_FORK_RELAY_URL is a placeholder on a loopback mesh: peers reach each
-# other directly and the relay only matters for NAT traversal, so pointing it
-# at the doorway (an http URL that parses) is enough. It must be a real URL —
-# `relay_url: null` is rejected with `relative URL without a base: "null"`.
+# The relay is NOT a NAT-traversal nicety on a loopback mesh. A 0.7 conductor
+# homes to relay_url at boot, advertises it in its agent info, and kitsune2 0.5
+# dials only peers whose relay matches its own exactly (one relay per space).
+# With relay_url pointed at the doorway — the pre-0.7 "parseable placeholder" —
+# three loopback conductors booted clean and reported 0 connections for the
+# whole prologue (2026-09-03). So the mesh launches a real iroh-relay
+# (start_local_relay) and every conductor is generated against it. It must be
+# a URL either way — `relay_url: null` is rejected with
+# `relative URL without a base: "null"`.
 # ---------------------------------------------------------------------------
+mesh_relay_url() { echo "${MESH_FORK_RELAY_URL:-http://localhost:$MESH_RELAY_PORT/}"; }
+
 mesh_network_args() { # -> the `network …` tail for `hc sandbox generate`
-  local relay="${MESH_FORK_RELAY_URL:-http://localhost:$DOORWAY_PORT}"
-  echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap quic $relay"
+  echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap quic $(mesh_relay_url)"
+}
+
+# Launch the local iroh-relay unless the operator pointed MESH_FORK_RELAY_URL
+# elsewhere or set MESH_RELAY=0. Plain HTTP (`--dev`), loopback-only; the
+# conductors are generated with relayAllowPlainText so an http:// relay is
+# accepted. The config file is what proves ownership to fallback_pattern_pids.
+start_local_relay() {
+  local url; url="$(mesh_relay_url)"
+  if [ "${MESH_RELAY:-1}" != "1" ]; then
+    echo "relay: not launched (MESH_RELAY=0); conductors home to $url"; return 0
+  fi
+  case "$url" in
+    "http://localhost:$MESH_RELAY_PORT/"|"http://127.0.0.1:$MESH_RELAY_PORT/") ;;
+    *) echo "relay: external ($url); not launching a local iroh-relay"; return 0 ;;
+  esac
+  if curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/"; then
+    record_listener_pid relay a "$MESH_RELAY_PORT" || true
+    echo "iroh-relay already up on :$MESH_RELAY_PORT"; return 0
+  fi
+  if [ -z "$MESH_RELAY_BIN" ] || [ ! -x "$MESH_RELAY_BIN" ]; then
+    echo "ERROR: no iroh-relay binary (MESH_RELAY_BIN unset and none on PATH)." >&2
+    echo "       A 0.7 conductor needs a reachable relay or it never connects. Build one:" >&2
+    echo "         RUSTFLAGS=\"\" cargo install iroh-relay --version 1.0.3 --locked --features server --root <dir>" >&2
+    echo "       then MESH_RELAY_BIN=<dir>/bin/iroh-relay — or MESH_RELAY=0 MESH_FORK_RELAY_URL=<reachable relay>." >&2
+    return 1
+  fi
+  cat > "$MESH_DIR/iroh-relay.toml" <<EOF
+# Written by hc-mesh.sh — the local relay every 0.7 conductor on this mesh
+# homes to. Keys mirror genesis/orchestrator/manifests/doorway/alpha.yaml's
+# relay.toml minus TLS/metrics (--dev ignores TLS anyway).
+enable_relay = true
+http_bind_addr = "127.0.0.1:$MESH_RELAY_PORT"
+enable_quic_addr_discovery = false
+key_cache_capacity = 8192
+access = "everyone"
+enable_metrics = false
+EOF
+  RUST_LOG="${MESH_RELAY_RUST_LOG:-warn}" \
+    nohup "$MESH_RELAY_BIN" --dev -c "$MESH_DIR/iroh-relay.toml" > "$LOGDIR/iroh-relay.log" 2>&1 &
+  record_mesh_pid relay a "$!" || true
+  for _ in $(seq 1 20); do
+    curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/" && break; sleep 1
+  done
+  if ! curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/"; then
+    echo "ERROR: iroh-relay did not come up on :$MESH_RELAY_PORT — see $LOGDIR/iroh-relay.log" >&2
+    return 1
+  fi
+  echo "iroh-relay up on :$MESH_RELAY_PORT ($("$MESH_RELAY_BIN" --version 2>/dev/null || echo iroh-relay))"
 }
 
 patch_mesh_gossip_config() { # <conductor-config.yaml>
@@ -1327,6 +1395,7 @@ fallback_pattern_pids() {
         [[ "$args" == *"--listen 0.0.0.0:$DOORWAY_PORT"* || \
            "$args" == *"--listen 0.0.0.0:$DOORWAY_B_PORT"* ]] && owned=1 ;;
       mongod) [[ "$args" == *"--dbpath $MONGO_DIR"* ]] && owned=1 ;;
+      iroh-relay) [[ "$args" == *"$MESH_DIR/iroh-relay.toml"* ]] && owned=1 ;;
     esac
     [ "$owned" -eq 1 ] && echo "$pid"
   done < <({
@@ -1335,6 +1404,7 @@ fallback_pattern_pids() {
     pgrep -f "elohim-storag[e]" 2>/dev/null
     pgrep -f "(debug|release)/doorwa[y]" 2>/dev/null
     pgrep -f "mongod --dbpath $MESH_DIR/mong[o]" 2>/dev/null
+    pgrep -x iroh-relay 2>/dev/null
   } | sort -un)
 }
 
@@ -1395,11 +1465,12 @@ mesh_footprint() {
       *elohim-storage*--http-port*) role=storage; name="$(sed -n 's/.*--http-port \([0-9]*\).*/\1/p' <<<"$*")" ;;
       *"/doorway "*--listen*) role=doorway; name="$(sed -n 's/.*--listen [^:]*:\([0-9]*\).*/\1/p' <<<"$*")" ;;
       *mongod*"$MESH_DIR"*) role=mongod ;;
+      *iroh-relay*"$MESH_DIR/iroh-relay.toml"*) role=relay; name="$MESH_RELAY_PORT" ;;
       *) continue ;;
     esac
     printf 'footprint %-9s %-8s rss=%dMB cpu=%s%%\n' "$role" "$name" $((rss / 1024)) "$cpu"
     total=$((total + rss / 1024))
-  done < <(ps -eo pid=,rss=,pcpu=,args= | grep -E "holochain --piped|elohim-storage.*--http-port|/doorway .*--listen|mongod --dbpath" | grep -v grep)
+  done < <(ps -eo pid=,rss=,pcpu=,args= | grep -E "holochain --piped|elohim-storage.*--http-port|/doorway .*--listen|mongod --dbpath|iroh-relay --dev" | grep -v grep)
   echo "footprint total rss=${total}MB"
 }
 
@@ -1440,6 +1511,8 @@ status_all() {
   else
     echo "doorways: disabled (MESH_DOORWAYS=0)"
   fi
+  printf "relay    :%s " "$MESH_RELAY_PORT"
+  if curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/"; then echo "UP (conductors home to $(mesh_relay_url))"; else echo "down (0.7 conductors report 0 connections without a reachable relay)"; fi
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   mesh_footprint
@@ -2471,6 +2544,11 @@ EOF
   else
     echo "mongod not found (MONGOD_BIN unset/absent) — doorways will run archive-less (inert warm shell)"
   fi
+
+  # 0. Relay first: every 0.7 conductor homes to it at boot (see
+  # MESH_FORK_RELAY_URL) — a conductor generated before the relay exists is
+  # fine, one that never finds it reports 0 connections forever.
+  start_local_relay || return 1
 
   # 1. Doorway first: it is the island DHT's bootstrap + signal home.
   if ! curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null; then
