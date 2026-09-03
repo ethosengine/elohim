@@ -93,9 +93,14 @@ the calling pipeline and marks the roll aborted mid-`rollout status` (that is wh
    `elohim/holochain/dna/dna-hashes.baseline`):
 
    ```
-   DNA_MIGRATION_INTENT=lamad=uhC0ka1Tpt-_mtrGKILPnCAWTINwdtoRlYreoQM9GWsdVnbDgshr9,imagodei=uhC0kRTnoJojlGSinY8Ko3BWUG55YHQYODF00tZahrxwqJ1cuz9r7,infrastructure=uhC0k5a385O0UxmKsi0DinnaLOOirNrV0B0CPQG0f-X-_n-PDHnFb,node_registry=uhC0k3wIqzPHIBDyUp_UdTq7BsvnYT9h8ZA9-igXlQ_V7tQRj9xb6,mishpat=uhC0kJOs8Qf5Vs1WDNqj2AWVZRqPbAKzZL9kwrPL4AR3JMF3OaOGD
+   DNA_MIGRATION_INTENT=uhC0ka1Tpt-_mtrGKILPnCAWTINwdtoRlYreoQM9GWsdVnbDgshr9,uhC0kRTnoJojlGSinY8Ko3BWUG55YHQYODF00tZahrxwqJ1cuz9r7,uhC0k5a385O0UxmKsi0DinnaLOOirNrV0B0CPQG0f-X-_n-PDHnFb,uhC0k3wIqzPHIBDyUp_UdTq7BsvnYT9h8ZA9-igXlQ_V7tQRj9xb6,uhC0kJOs8Qf5Vs1WDNqj2AWVZRqPbAKzZL9kwrPL4AR3JMF3OaOGD
    ```
 
+   FORMAT (elohim/elohim-storage/src/happ_manager.rs): a comma-separated list of BUNDLE DNA hashes only — no role names.
+   It is read by the `elohim-storage` process (the one that installs the hApp into the conductor), so it goes on the
+   STORAGE container's env, not the conductor's. **With the full wipe of this ceremony it is NOT needed**: a conductor whose
+   `/var/local/lib/holochain` was cleared has no app, and storage first-installs the 0.7 hApp with no flag at all. Set it only
+   on a node whose chains you deliberately keep.
    `DNA_MIGRATION_INTENT=<the five baseline hashes>` on every node for
    the first boot, so the storage supervisor installs the 0.7 hApp deliberately instead of reading a
    "not stale" role structure and doing nothing.
