@@ -146,7 +146,7 @@ Bounds: honour `metadata_json.bounds.max_bytes` and `atoms_per_hour` from the sp
 ## Landing record (2026-09-03)
 
 - **Receipt:** `just test mesh '@concern:death-witness and @station-2'` → 1 scenario, 6/6 steps passed; `genesis/a2o/reports/sprint-report-household-20260903T035920Z-6f621068.{json,md}`.
-- **Commits:** plan a9b19b40b · ingest c25728639 + 1c66f9008 + 537186247 · custody author 5dd815193 + 8dbc7d815 · seeder a6e26bf87 · mesh dials 04c33f87f + f5c93783e + 01d4ea9ef + b2834b34b · mesh stop facae5c4f · steps 6adafb507 + d3f785a2b + 781180588 + 6f6210688 · story ac5a0d995 · (view fix M11 in flight).
+- **Commits:** plan a9b19b40b · ingest c25728639 + 1c66f9008 + 537186247 · custody author 5dd815193 + 8dbc7d815 · seeder a6e26bf87 · mesh dials 04c33f87f + f5c93783e + 01d4ea9ef + b2834b34b · mesh stop facae5c4f · steps 6adafb507 + d3f785a2b + 781180588 + 6f6210688 · story ac5a0d995 · view fix M11 c481676e2.
 - **Deviations from the plan, accepted:** the budget is the measured two minutes, not sixty seconds; the Given step and the hold step read the classification from the row's own metadata when the HTTP view drops it (M11); `Supervisor`-side nothing changed; the replication cadence became a dial (not in the plan) and the custody sweep defaults to 5 s in ark mode; the blob route leg accepts a 403 carrying `requiredReach` (the private row's contract) as long as the bytes on disk hash to the digest.
 - **Found only on the mesh:** the bafkrei/sha256 rendering mismatch at the inventory join; the view's bare-string null; cucumber's 90 s default step timeout; `just mesh stop` leaving arks alive (fixed facae5c4f); the storage image COPY set (fixed by the integrator, 3c29b39d7).
 
