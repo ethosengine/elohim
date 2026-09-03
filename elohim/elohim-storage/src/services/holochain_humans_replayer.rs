@@ -361,9 +361,9 @@ pub async fn snapshot_household_ids_for_cids(
 #[cfg(test)]
 pub(crate) mod test_support {
     use holochain_types::prelude::{
-        Action, ActionHash, AgentPubKey, AppEntryBytes, AppEntryDef, Create, Entry, EntryHash,
-        EntryType, EntryVisibility, Record, SerializedBytes, Signature, SignedActionHashed,
-        Timestamp, UnsafeBytes,
+        Action, ActionData, ActionHash, ActionHeader, AgentPubKey, AppEntryBytes, AppEntryDef,
+        CreateData, Entry, EntryHash, EntryType, EntryVisibility, Record, RecordEntry,
+        SerializedBytes, Signature, SignedActionHashed, Timestamp, UnsafeBytes,
     };
 
     /// Build a `Record` carrying a `MembershipWire`-shaped App entry, so the
@@ -395,21 +395,33 @@ pub(crate) mod test_support {
         // A minimal Create action is enough — the extractor only reads the entry.
         // `new_unchecked` hashes the Action itself (no signature check), so the
         // placeholder prev_action/entry_hash/signature never need to be valid.
-        let action = Action::Create(Create {
-            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
-            timestamp: Timestamp::now(),
-            action_seq: 1,
-            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
-            entry_type: EntryType::App(AppEntryDef {
-                entry_index: 0.into(),
-                zome_index: 0.into(),
-                visibility: EntryVisibility::Public,
+        //
+        // Holochain 0.7 split `Action` into a common `header` plus per-variant
+        // `data`: the old flat `Action::Create(Create { author, timestamp,
+        // action_seq, prev_action, entry_type, entry_hash, weight })` is now
+        // `ActionHeader { author, timestamp, action_seq, prev_action }` +
+        // `ActionData::Create(CreateData { entry_type, entry_hash })`.
+        // `prev_action` became `Option<ActionHash>` (None only for genesis) and
+        // the rate-limiting `weight` field is gone.
+        let action = Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                timestamp: Timestamp::now(),
+                action_seq: 1,
+                prev_action: Some(ActionHash::from_raw_36(vec![3u8; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef {
+                    entry_index: 0.into(),
+                    zome_index: 0.into(),
+                    visibility: EntryVisibility::Public,
+                }),
+                entry_hash: EntryHash::from_raw_36(vec![1u8; 36]),
             }),
-            entry_hash: EntryHash::from_raw_36(vec![1u8; 36]),
-            weight: Default::default(),
-        });
+        };
         let signed = SignedActionHashed::new_unchecked(action, Signature([0u8; 64]));
-        Record::new(signed, Some(entry))
+        // 0.7: `Record::new` takes a `RecordEntry`, not an `Option<Entry>`.
+        Record::new(signed, RecordEntry::Present(entry))
     }
 }
 
@@ -551,6 +563,68 @@ mod tests {
             "an undecodable membership record must mark the household read incomplete"
         );
         assert!(!withdrawn, "an undecodable record is not a withdrawal");
+    }
+
+    /// The cross-boundary msgpack shape, pinned by a test rather than by luck.
+    ///
+    /// `ConductorMembershipReader::list_memberships` decodes the conductor's
+    /// response with `rmp_serde::from_slice::<Vec<Record>>`. That decode is the
+    /// single most upgrade-fragile line in this module: `Record` carries a
+    /// `SignedActionHashed`, whose `Action` was restructured in Holochain 0.7
+    /// (flat variants → `header` + `data`), and whose `holo_hash` fields are raw
+    /// bytes on the wire. This test round-trips a `holochain_types` 0.7 `Record`
+    /// through the SAME encoder the conductor uses and the SAME decoder the
+    /// reader uses, then runs the result through the real extractor — so a
+    /// future client-family bump that silently changes the wire shape fails
+    /// here instead of on a live mesh.
+    ///
+    /// It also guards the rule this module's decode comment states: going
+    /// through the typed `Record` deserializer (never a `serde_json::Value`
+    /// pre-pass) is what keeps the `holo_hash` fields intact.
+    #[test]
+    fn vec_record_survives_msgpack_roundtrip_through_the_reader_decode_path() {
+        let cid = "collective:uhCkkHousehold1";
+        let original = vec![
+            membership_record("agent:uhCAkAlice", "Person", cid, None),
+            membership_record("agent:uhCAkBob", "Person", cid, Some(42)),
+        ];
+
+        // Encode exactly as the conductor does…
+        let bytes = rmp_serde::to_vec_named(&original).expect("encode Vec<Record>");
+        // …and decode exactly as `ConductorMembershipReader` does.
+        let decoded: Vec<Record> =
+            rmp_serde::from_slice(&bytes).expect("Vec<Record> must decode from conductor msgpack");
+
+        assert_eq!(decoded.len(), 2, "both records survive the round trip");
+
+        // The action header survived — these are the fields 0.7 moved.
+        let header = &decoded[0].action().header;
+        assert_eq!(header.action_seq, 1);
+        assert!(
+            header.prev_action.is_some(),
+            "prev_action must round-trip as Some for a non-genesis action"
+        );
+        // The holo_hash-typed fields survived as hashes, not as mangled bytes.
+        assert_eq!(
+            decoded[0].action().author(),
+            original[0].action().author(),
+            "AgentPubKey must survive the msgpack boundary intact"
+        );
+        assert_eq!(
+            decoded[0].action_address(),
+            original[0].action_address(),
+            "the action hash must be stable across the round trip"
+        );
+
+        // And the entry still decodes through the real extractor: Alice is a
+        // current member, Bob withdrew.
+        let (pairs, incomplete, withdrawn) = extract_household_pairs(cid, &decoded);
+        assert!(!incomplete, "a clean round trip is a complete read");
+        assert!(withdrawn, "Bob's withdrawal must survive the round trip");
+        assert_eq!(
+            pairs,
+            vec![("agent:uhCAkAlice".to_string(), cid.to_string())]
+        );
     }
 
     // -----------------------------------------------------------------------

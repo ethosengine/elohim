@@ -1276,7 +1276,7 @@ pub enum P2PCommand {
     PublishRecoveryRevocation(crate::p2p::recovery_revocation::RecoveryRevocationMessage),
     /// Step-zero substrate gossip — broadcast a Holochain conductor's agent_info JSON
     /// to peer pods so their embedded conductors learn about us regardless of
-    /// signal_url. Producer: `conductor_agent_info_gossip::publish_once`.
+    /// which relay they call home. Producer: `conductor_agent_info_gossip::publish_once`.
     /// See `genesis/docs/superpowers/specs/2026-05-28-conductor-agent-info-substrate-gossip-design.md`.
     PublishConductorAgentInfo(crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo),
     /// Advertise that this node holds the EPR atom with the given CID by issuing

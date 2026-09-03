@@ -215,9 +215,19 @@ impl InstalledRoles {
     fn from_app_info(app_info: &holochain_client::AppInfo) -> Self {
         let role_dna_hashes = provisioned_dna_hashes(app_info);
         // "Has data" from app_info alone: provisioned cells exist AND the app is
-        // past AwaitingMemproofs (which means genesis has NOT completed, so
+        // past the pre-genesis states (in which genesis has NOT completed, so
         // there is no chain to lose). Disabled-with-cells counts as data.
-        let genesis_ran = !matches!(app_info.status, AppStatus::AwaitingMemproofs);
+        //
+        // 0.7 added `AwaitingRestore` alongside `AwaitingMemproofs`: restore is
+        // in progress for one or more cells and zome calls are rejected, so
+        // genesis has not completed there either. Storage never sets
+        // `restore_from_dht`, so this state is unreachable for us — it is
+        // matched explicitly rather than left to the `!matches!` default, so a
+        // future restore-capable path cannot silently read as "has data".
+        let genesis_ran = !matches!(
+            app_info.status,
+            AppStatus::AwaitingMemproofs | AppStatus::AwaitingRestore
+        );
         Self {
             has_data: genesis_ran && !role_dna_hashes.is_empty(),
             missing_roles: missing_provisioned_roles(app_info),
@@ -642,7 +652,24 @@ pub async fn ensure_happ_installed(
                 ),
             }
 
-            if matches!(app_info.status, AppStatus::Disabled(_)) {
+            // 0.7 `AppStatus::Unrecoverable(cell_id, reason)` is TERMINAL: restore
+            // hit a permanent failure (a locally-validated ChainIntegrityWarrant
+            // against the agent) and the app cannot be enabled. It is deliberately
+            // NOT folded into `Disabled(_)` — automatically enabling, reinstalling,
+            // uninstalling or hot-swapping on it is the same class of unsafe
+            // auto-remediation as the torn-uninstall guard. Log it once, loudly,
+            // with the reason payload, and leave the DNA_MIGRATION_INTENT /
+            // FORCE_DNA_REINSTALL=wipe gates as the only path off it.
+            if let AppStatus::Unrecoverable(cell_id, reason) = &app_info.status {
+                error!(
+                    app_id = app_id,
+                    cell_id = ?cell_id,
+                    reason = ?reason,
+                    "App is UNRECOVERABLE — restore failed permanently. Not enabling, \
+                     not reinstalling: operator action required via DNA_MIGRATION_INTENT \
+                     or FORCE_DNA_REINSTALL=wipe."
+                );
+            } else if matches!(app_info.status, AppStatus::Disabled(_)) {
                 info!(app_id = app_id, "Enabling disabled app");
                 admin_ws
                     .enable_app(app_id.to_string())
@@ -761,6 +788,14 @@ async fn install_fresh(
         roles_settings: None,
         network_seed: None,
         ignore_genesis_failure: false,
+        // 0.7 addition. `true` suppresses genesis and reconstructs each cell's
+        // source chain by fetching the agent's prior chain from the DHT, and
+        // requires an agent key that already HAS a chain out there. This path
+        // mints a brand-new key immediately above, so there is nothing to
+        // restore — `false` is the only coherent value here, and it preserves
+        // the 0.6 behaviour exactly. Chain restoration is a recovery/migration
+        // concern, not an install-if-absent one.
+        restore_from_dht: false,
     };
 
     admin_ws
@@ -791,12 +826,25 @@ fn coordinator_wasm_hashes(dna_def: &DnaDef) -> std::collections::BTreeMap<Strin
         .coordinator_zomes
         .iter()
         .filter_map(|(name, zome_def)| {
-            zome_def
-                .wasm_hash(name)
-                .ok()
-                .map(|h| (name.to_string(), h.to_string()))
+            coordinator_wasm_hash(zome_def).map(|h| (name.to_string(), h.to_string()))
         })
         .collect()
+}
+
+/// The wasm hash of a coordinator zome, or `None` for an inline zome.
+///
+/// On Holochain 0.6 this was `CoordinatorZomeDef::wasm_hash(&name) -> Result<_>`.
+/// 0.7 removed the method: `wasm_hash` is now a plain field on the
+/// `ZomeDef::Wasm` variant, reached through `as_any_zome_def()`. The `Option`
+/// return carries the same meaning the old `Err` did — an inline zome has no
+/// wasm hash — so both call sites keep their existing skip/report behaviour.
+pub(crate) fn coordinator_wasm_hash(
+    zome_def: &holochain_types::prelude::CoordinatorZomeDef,
+) -> Option<holochain_types::prelude::WasmHash> {
+    match zome_def.as_any_zome_def() {
+        holochain_types::prelude::ZomeDef::Wasm(w) => Some(w.wasm_hash.clone()),
+        _ => None,
+    }
 }
 
 /// Resolve the bundle's per-role [`DnaFile`]s directly from the `.happ` file —
@@ -838,9 +886,8 @@ async fn coordinator_bundle_from_dna_file(dna_file: &DnaFile) -> anyhow::Result<
     let mut zomes = Vec::new();
     let mut resources = Vec::new();
     for (name, zome_def) in &dna_file.dna_def().coordinator_zomes {
-        let wasm_hash = zome_def
-            .wasm_hash(name)
-            .map_err(|e| anyhow::anyhow!("coordinator zome '{name}' has no wasm hash: {e}"))?;
+        let wasm_hash = coordinator_wasm_hash(zome_def)
+            .ok_or_else(|| anyhow::anyhow!("coordinator zome '{name}' has no wasm hash"))?;
         let wasm = dna_file
             .code()
             .get(&wasm_hash)
@@ -1165,7 +1212,7 @@ mod tests {
             },
             integrity_zomes: vec![(
                 integrity_name.clone(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: integrity_hash,
                     dependencies: vec![],
                 })
@@ -1173,7 +1220,7 @@ mod tests {
             )],
             coordinator_zomes: vec![(
                 coordinator_name,
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: coordinator_hash,
                     dependencies: vec![integrity_name],
                 })
@@ -1716,10 +1763,7 @@ mod tests {
         let round_tripped: std::collections::BTreeMap<String, String> = zomes
             .iter()
             .filter_map(|(name, zome_def)| {
-                zome_def
-                    .wasm_hash(name)
-                    .ok()
-                    .map(|h| (name.to_string(), h.to_string()))
+                coordinator_wasm_hash(zome_def).map(|h| (name.to_string(), h.to_string()))
             })
             .collect();
         assert_eq!(round_tripped, expected);

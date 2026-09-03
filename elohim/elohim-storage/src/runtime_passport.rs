@@ -262,15 +262,15 @@ async fn inspect_installed_happ(admin: &AdminWebsocket, app_id: &str) -> HappPas
             Ok(definition) => roles.push(HappRolePassport {
                 role: role.to_string(),
                 dna_hash,
-                // Mirrors happ_manager's coordinator drift readback. Its
-                // extractor is private and that module is owned by another
-                // lane, so the passport repeats only this pure projection.
+                // Mirrors happ_manager's coordinator drift readback. The
+                // per-zome extractor is shared (`happ_manager::coordinator_wasm_hash`)
+                // so the 0.7 `ZomeDef::Wasm` field access lives in exactly one
+                // place; the passport still owns its own projection shape.
                 coordinator_wasm_hashes: definition
                     .coordinator_zomes
                     .iter()
                     .filter_map(|(name, zome)| {
-                        zome.wasm_hash(name)
-                            .ok()
+                        crate::happ_manager::coordinator_wasm_hash(zome)
                             .map(|hash| (name.to_string(), hash.to_string()))
                     })
                     .collect(),

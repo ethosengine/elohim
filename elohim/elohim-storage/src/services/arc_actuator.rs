@@ -667,16 +667,23 @@ mod tests {
         assert_eq!(p.target_factor, 0);
     }
 
+    // Holochain 0.7 `NetworkConfig` shape. `signal_url`, `webrtc_config` and
+    // `enable_mdns` were all removed in 0.7 and the struct is
+    // `deny_unknown_fields`, so a config carrying them hard-fails conductor
+    // startup — this fixture must not model one. `relay_url` and
+    // `bootstrap_url` stay (per-doorway relays are a protocol requirement).
+    // `advanced:` supplies the nested block the indentation-leak assertion below
+    // needs, in place of the retired `webrtc_config.ice_servers` nesting.
     const SAMPLE_CONFIG: &str = "\
 ---
 data_root_path: \"/var/local/lib/holochain\"
 network:
   bootstrap_url: \"https://doorway.elohim.host/bootstrap\"
-  signal_url: \"wss://signal.doorway.elohim.host\"
-  enable_mdns: false
-  webrtc_config:
-    ice_servers:
-      - urls: [\"stun:stun.l.google.com:19302\"]
+  relay_url: \"https://relay.doorway.elohim.host\"
+  advanced:
+    k2:
+      coreFetch:
+        parallelRequestCount: 2
 admin_interfaces:
   - driver:
       type: websocket
@@ -689,9 +696,10 @@ admin_interfaces:
         assert!(out.contains("network:\n  target_arc_factor: 0\n"));
         // Preserved siblings + later top-level keys.
         assert!(out.contains("bootstrap_url:"));
+        assert!(out.contains("relay_url:"));
         assert!(out.contains("admin_interfaces:"));
-        // Did not leak into the webrtc ice_servers nesting.
-        assert!(out.contains("ice_servers:"));
+        // Did not leak into the nested `advanced:` block.
+        assert!(out.contains("parallelRequestCount:"));
     }
 
     #[test]

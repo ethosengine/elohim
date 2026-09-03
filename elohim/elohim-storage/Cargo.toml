@@ -97,82 +97,34 @@ rmp-serde = "1.3"
 rmpv = "1.3"
 
 # Official Holochain client for signed zome calls
-# Holochain 0.6 requires signed calls with nonce, expires_at, and signature
+# Holochain 0.7 requires signed calls with nonce, expires_at, and signature
 # Use lair_signing for the signer, but not wasmer (we're native, not wasm)
-# EXACT PIN (2026-08-08) — the client family is taken from the CONDUCTOR FORK
-# ITSELF, as a git dep on an immutable rev. Three constraints pin it there.
-#
-# 1. THE ADMIN-SEAM CONSTRAINT — why a bare "whatever resolves" pin is banned.
-# The conductor emits `relay_url` in the AppManifestV0 wire shape carried inside
-# every AppInfo. `AppManifestV0` is `#[serde(deny_unknown_fields)]`, so a client
-# whose holochain_types does not KNOW that field rejects EVERY list_apps /
-# install_app / enable_app response with
-#   Deserialize("unknown field relay_url, expected one of name, description,
-#    roles, allow_deferred_memproofs, bootstrap_url, signal_url")
-# which takes down `happ_manager::ensure_happ_installed`, `hc_client`'s ping and
-# `signing`'s cell discovery — the whole storage<->conductor admin seam,
-# fleet-wide (alpha iroh partition, 2026-08-07).
-# Guard: tests/happ_manifest_relay_url_compat.rs.
-#
-# 2. THE holo_hash EXACT-PIN CONSTRAINT — the real reason the previous pin was
-# =0.9.0-dev.24, and the reason a published 0.8.3 CANNOT be used. The sdk domain
-# -types crates (elohim/sdk/domains/*/types, compiled into integrity WASM) hold
-# `holo_hash = "=0.6.0"` as a DNA-hash guard. crates.io `holochain_client 0.8.3`
-# requires `holo_hash ^0.6.3`. Both are the same semver-compatible 0.6.x range,
-# so cargo UNIFIES them into one package and the two requirements deadlock:
-#   error: failed to select a version for `holo_hash`.
-#     ... versions that meet the requirements `=0.6.0` are: 0.6.0
-#     ... previously selected package `holo_hash v0.6.3`
-# The 0.7-dev client family sidestepped this only by living in a semver-
-# INCOMPATIBLE holo_hash range (0.7.0-dev.x), which is what let two holo_hash
-# packages coexist — and which in turn forced the holochain_serialized_bytes
-# 0.0.56/0.0.57 serde deadlock and the vendored [patch.crates-io] below.
-# A git dep resolves this properly: cargo treats `holo_hash` from a git source
-# as a DISTINCT package from the registry one, so the fork's 0.6.3 and the sdk's
-# =0.6.0 coexist exactly the way 0.7.0-dev.9 and 0.6.0 did — same graph shape,
-# same single libsqlite3-sys, but now the client matches the conductor.
-#
-# 3. THE FORK-LINEAGE CONSTRAINT — the point of the exercise. The conductor we
-# run is elohim/holochain-conductor, branch `elohim-0.6.3` (6d0814266, pushed to
-# github.com/ethosengine/holochain). `git diff --stat holochain-0.6.3..elohim-0.6.3`
-# touches only crates/holochain (bin main, an iroh integration test, Cargo.toml),
-# crates/holochain_p2p, and the root manifest/lock — NO client-family crate. So
-# at this rev the fork's client is byte-identical to upstream 0.8.3, and pinning
-# it here costs nothing in wire terms while making the fork the source of record.
-# Capabilities added to the fork's app interface — first instance: the Stage-1
-# call-deadline patch on branch `elohim-0.6.3-call-deadline` @ 8ee534862 — become
-# consumable by bumping `rev` alone, with no version negotiation, no wire skew
-# and no API audit. That was structurally impossible across the 0.9.0-dev split.
-#
-# Note the correction this pin embeds: `relay_url` is NOT exclusive to the 0.7-dev
-# line. It is present in upstream 0.6.3 itself, at
-#   crates/holochain_types/src/app/app_manifest/app_manifest_v0.rs:70
-# (tag `holochain-0.6.3`). The 0.7-dev climb was never required to clear
-# constraint 1; it only ever served as a workaround for constraint 2.
-#
-# Do NOT convert these to a filesystem path dep into elohim/holochain-conductor:
-# that clone is untracked, and a new path dep needs COPY+sed wiring in BOTH edge
-# Dockerfiles. Keep `rev` (immutable), never `branch`. Move all three together.
-holochain_client = { git = "https://github.com/ethosengine/holochain.git", rev = "6d08142662d9c954a1ffac985df6b2fc449a4a10", default-features = false, features = ["lair_signing"] }
-holochain_types = { git = "https://github.com/ethosengine/holochain.git", rev = "6d08142662d9c954a1ffac985df6b2fc449a4a10", default-features = false }
+# EXACT PIN (2026-09-02) — crates.io finals for the Holochain 0.7.0 family.
+# The former git pin onto the conductor fork existed to dodge ONE problem: a
+# `holo_hash` 0.6.0/0.6.3 split. The sdk domain-types crates (compiled into
+# integrity WASM) held `holo_hash = "=0.6.0"` as a DNA-hash guard while the
+# published client required `^0.6.3` — the same semver range, so cargo unified
+# them into one package and the two exact requirements deadlocked; a git source
+# sidestepped it only by being a distinct package, which in turn forced the
+# vendored `holochain_serialized_bytes` 0.0.56 patch. The 0.7 family move
+# retires the whole knot: the sdk types crates and the client family both sit on
+# `holo_hash =0.7.0` (one package, no split) and on hsb 0.0.57 (no patch).
+# Keep these three exact and move them together; the admin seam still depends on
+# the client knowing the conductor's `relay_url` app-manifest field
+# (`AppManifestV0` is `deny_unknown_fields` — an unaware client rejects every
+# list_apps/install_app/enable_app response). Guard: tests/happ_manifest_relay_url_compat.rs.
+holochain_client = { version = "=0.9.0", default-features = false, features = ["lair_signing"] }
+holochain_types = { version = "=0.7.0", default-features = false }
 # Direct use is limited to Bundle::new in happ_manager's coordinator hot-swap;
 # version must stay in the range holochain_types resolves (one shared crate).
-mr_bundle = { git = "https://github.com/ethosengine/holochain.git", rev = "6d08142662d9c954a1ffac985df6b2fc449a4a10", default-features = false }
+mr_bundle = { version = "=0.7.0", default-features = false }
 
-# TOMBSTONE NOTE (2026-08-07, now dormant): `holochain_sqlite` 0.7.0+deprecated is
-# not a soft deprecation — it is a tombstone crate whose lib body is a bare
-# `compile_error!("the holochain_sqlite crate is deprecated and no longer
-# available; use holochain_data instead")`. It hard-FAILS the build.
-#
-# holochain_sqlite is a transitive dep of holochain_types. On the 0.6.3 family the
-# requirement is `^0.6.3`, which cannot reach the 0.7.0 tombstone, so this trap is
-# out of range while the pins above hold. It re-arms the moment anything drags the
-# 0.7 line back in (a caret `^0.7.0-dev.x` resolves `0.7.0+deprecated` as the
-# MAXIMUM match — build metadata does not lower a semver version). If a broad
-# `cargo update` ever re-lands it, the build fails in a third-party crate with no
-# obvious link to the change; the escape is:
-#   cargo update -p holochain_sqlite --precise 0.7.0-dev.24
-# This resolves for real when the holochain family migrates to `holochain_data`.
+# TOMBSTONE NOTE (2026-08-07) — RESOLVED by the 0.7 family move (2026-09-02).
+# `holochain_sqlite` 0.7.0+deprecated is a tombstone crate whose lib body is a
+# bare `compile_error!(… use holochain_data instead)`, and on the 0.6.3 family it
+# was a transitive dep of holochain_types that a stray `cargo update` could drag
+# into range. holochain_types 0.7.0 does not depend on it at all: the crate is
+# absent from this workspace's lock, so the trap has no way to re-arm here.
 
 # Provide custom getrandom implementation for holochain's wasm-oriented dependencies
 # The custom backend delegates to std on native platforms
@@ -430,10 +382,12 @@ wiremock = "0.6"
 # identity_fill.rs's run_once_bounded timeout tests to prove a 120s budget without a real wait.
 tokio = { version = "1", features = ["test-util"] }
 # pkarr resolver e2e (gate #10): minimal in-process pkarr relay using
-# raw hyper (already a regular dep). Avoids dragging axum's serde >=1.0.220
-# transitive constraint, which conflicts with holochain_serialized_bytes
-# 0.0.56's exact pin to serde =1.0.219. Requires `pkarr` directly (not
-# re-exported through iroh) for SignedPacket / PublicKey types in the test.
+# raw hyper (already a regular dep) rather than axum. The original reason was a
+# serde conflict — axum wanted >=1.0.220 while hsb 0.0.56 pinned =1.0.219 — which
+# the 0.7 family move dissolved (hsb 0.0.57 pins serde =1.0.228, and 0.0.56 is
+# gone from the graph). The hyper choice is kept as the smaller dependency, not
+# as a constraint. Requires `pkarr` directly (not re-exported through iroh) for
+# SignedPacket / PublicKey types in the test.
 n0-future = "0.1"
 pkarr = { version = "3.10", default-features = false, features = ["signed_packet"] }
 # Benchmark harness for graph traversal (Task 34)
@@ -456,21 +410,12 @@ path = "src/main.rs"
 
 
 # ---------------------------------------------------------------------------
-# Admin-seam unblock (2026-08-07): see vendor/holochain_serialized_bytes-0.0.56/
-# VENDOR-NOTE.md. Upstream hsb 0.0.56 pins `serde =1.0.219` and hsb 0.0.57 pins
-# `serde =1.0.228`; the sdk domain-types crates hold `holo_hash =0.6.0` (a
-# DNA-hash guard — the same crates are compiled into integrity WASM) which drags
-# in 0.0.56, while the conductor-fork client family drags in 0.0.57 (both its
-# holo_hash 0.6.3 and its holochain_types 0.6.3 require `=0.0.57`; the previous
-# 0.9.0-dev.24 pin did the same). Only one serde 1.x can resolve, so the two
-# exact pins deadlock the client family that knows the conductor's `relay_url`
-# app-manifest field.
-#
-# This patch harmonises 0.0.56's serde pin onto 0.0.57's. Source is verbatim.
-# Scope is this workspace only — the DNA zome workspaces keep their own locks and
-# stay on holo_hash 0.6.0, so no DNA hash moves.
+# The vendored holochain_serialized_bytes 0.0.56 patch was retired with the 0.7
+# family move (2026-09-02): it existed only to harmonise the serde pin of the
+# hsb the sdk `holo_hash =0.6.0` crates dragged in (0.0.56 → serde =1.0.219)
+# with the one the client family required (0.0.57 → serde =1.0.228). On 0.7 both
+# sides require hsb 0.0.57, so there is one hsb, one serde, and no patch.
 [patch.crates-io]
-holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }
 # Fleet-crash fix (2026-09-01): iroh 0.92 resolves iroh-quinn-proto 0.13.0,
 # whose GSO tail-loss-probe path can violate `untracked_bytes <= segment_size`,
 # poison the connection mutex, and abort storage. This vendored crate carries

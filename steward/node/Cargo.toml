@@ -116,11 +116,8 @@ default = []
 bitswap = []
 
 # ---------------------------------------------------------------------------
-# Admin-seam unblock (2026-08-07): elohim-storage (path dep above) pins the
-# holochain 0.7-dev client family, whose holochain_serialized_bytes =0.0.57
-# pins serde =1.0.228, while the sdk domain-types' holo_hash =0.6.0 DNA-hash
-# guards pin hsb =0.0.56 -> serde =1.0.219. Cargo [patch] is workspace-root
-# scoped, so this workspace needs the same stanza as elohim-storage's and
-# doorway-service's — see vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md.
-[patch.crates-io]
-holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }
+# The vendored holochain_serialized_bytes 0.0.56 [patch.crates-io] stanza that
+# mirrored elohim-storage's (cargo [patch] is workspace-root scoped) was retired
+# with the Holochain 0.7 family move (2026-09-02): on 0.7 the sdk domain-types
+# crates and the client family both require hsb 0.0.57, so there is one hsb and
+# one serde, and no workspace needs the harmonising patch.
