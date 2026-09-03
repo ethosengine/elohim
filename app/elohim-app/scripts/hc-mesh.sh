@@ -1808,11 +1808,27 @@ storage_ark_env() { # <peer-name>
 #                                  without regenerating it. Never touches
 #                                  AGENT_PUBKEY or any non-profile key.
 #   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
+# The per-peer runtime-config file (rung 4: a flag flip or a release-channel
+# follow lands on the RUNNING peer within one poll, no restart). elohim-storage's
+# watcher is OFF unless ELOHIM_RUNTIME_CONFIG_PATH names a file, and the a2o
+# release ceremony writes `ELOHIM_RELEASE_CHANNELS = "…"` into exactly this path
+# (steps/delivery/runtime-upgrade-propagation.steps.ts `runtimeConfigPath`) then
+# POSTs /admin/runtime-config/reload — a peer started without it answers
+# `/admin/adoption` with `sweeps: 0, channels: []` forever and station 1 times
+# out on "waiting on <peer>'s /admin/adoption" (2026-09-03). Created empty so the
+# watcher is active from boot; a restart keeps it through restart_env_overlay.
+runtime_config_path_for() { # <peer-name> -> prints the path (file guaranteed to exist)
+  local f="$MESH_DIR/$1/runtime-config.toml"
+  mkdir -p "$MESH_DIR/$1"; [ -f "$f" ] || : > "$f"
+  echo "$f"
+}
+
 restart_env_overlay() { # <captured-environ> <peer-name>
   # The caller's PER-PEER transport selection deliberately beats the captured
   # daemon environment. This is how one slot is cycled into a new transport.
   # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
   printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$(peer_transport "$2")"
+  printf '%s\n' "ELOHIM_RUNTIME_CONFIG_PATH=$(runtime_config_path_for "$2")"
   # T0' pure-iroh bootstrap: storage announces to / seeds its peer book from
   # the doorway's /p2p/manifests projection; localdev doorway is :$DOORWAY_PORT.
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
@@ -2265,6 +2281,7 @@ start_storage_peer() { # <peer-name> <peer-index>
     HOUSEHOLD_ID=household-dowell \
     DEVICE_ARCHETYPE=device-family-node-base \
     ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
+    ELOHIM_RUNTIME_CONFIG_PATH="$(runtime_config_path_for "$name")" \
     PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
     ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
     CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
