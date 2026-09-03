@@ -666,11 +666,11 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   prologue) and the workspace now has `genesis/agentic/bin/io-guard` + `berth` (host-PSI-actuated, byte rate
   advisory) — but the F2 gate is NOT budgeted on a write ceiling, and a pod swap is read from the
   devworkspace-controller/dqlite evidence, never inferred from our own I/O.
-- [ ] **F3: Conductor image.** Integrator pushes `ethosengine/holochain` `elohim-0.7` and the
+- [x] **F3 (DONE 2026-09-03 17:3xZ, elohim-edgenode #29 → `conductor-25dd2d0be144`): Conductor image.** Integrator pushes `ethosengine/holochain` `elohim-0.7` and the
   che-devworkspaces branch; pushes `upgrade/holochain-0.7` with `[build:conductor]`. Wait for
   `elohim-edgenode` → `conductor-<hc12>` in Harbor (console line `source-derived pin tag`).
   Expect a faster build (no CGo).
-- [ ] **F4: Land on dev.** Fast-forward `upgrade/holochain-0.7` → `dev`, push once. Dispatch order
+- [x] **F4 (DONE 2026-09-03 21:xxZ, edge #1426: storage image FROM `conductor-25dd2d0be144` + `elohim-happ:dev-latest` = 0.7 (#1427), `iroh-relay:1.0.3-dev-latest` pushed; the alpha rollout waits on pods that cannot be ready until F5 step 2 wipes the 0.6 databases — the rollout timeout is expected): Land on dev.** Fast-forward `upgrade/holochain-0.7` → `dev`, push once. Dispatch order
   is conductor → dna → edge (the orchestrator does it; do not hand-trigger). The edge build's
   DNA Hash Guard prints `DNA-HASH <role> <hash>` matching F1's baseline.
 - [ ] **F5: Fleet ceremony — operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
