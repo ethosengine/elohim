@@ -91,7 +91,18 @@ fire-and-forget (longRunning) so edge started the moment the app build ended, an
 abort into the DNA build's sweettest shards (#1425 ABORTED, hApp never published). Edge must wait for a
 holochain build that is in its own plan, and a downstream failure must not cancel an upstream long-running build.
 
-## 8. Apparatus, fixed on the branch (for the record)
+## 8. CI: sweettest shard pods evicted for ephemeral storage on the 0.7 line — fixed (6ce1fff69), watch it
+
+Every DNA build since the line moved (#1424, #1425, #1426) lost shards 1-3 to kubelet eviction ("Pod ephemeral local
+storage usage exceeds the total limit of containers 8Gi") mid-run, so only shard 4's tests ever counted and #1424's
+"12 tests run" was one shard, not the matrix. Each shard pod materialises the holonix main-0.7 closure (505 store
+paths) in its writable layer on top of the 945 MB nextest archive and its extraction. Shard limits raised to
+12Gi/24Gi. Related: `elohim/holochain/dna/elohim/flake.lock` still pins holonix `main-0.6` (2fec8bf) while
+`flake.nix` says `main-0.7`; nix re-resolves it at runtime in every CI pod ("updating lock file … → ffcc7c6
+2026-07-30") — the operator regenerates the lock with nix and commits it (Lane E7's stated path); until then the
+resolution is repeated per pod and can drift.
+
+## 9. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
