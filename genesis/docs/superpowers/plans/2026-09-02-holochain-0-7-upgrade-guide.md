@@ -197,6 +197,13 @@ relay connectivity, cross-conductor DHT heal, Act I 203/278 with every red trace
 wasm hashes differ from CI's, so the baseline is CI-sourced by construction). Next: F3/F4 = the one push and
 the dispatch chain conductor → dna → edge; F5 = the operator runbook
 (`2026-09-03-holochain-0-7-fleet-cutover-runbook.md`); F6 = evidence.
+**CI round (2026-09-03 17:xxZ):** conductor image `elohim-edgenode:conductor-25dd2d0be144` published on the
+third try (#27 fabricated gitlink SHA → #28 Jenkins bound the previous Jenkinsfile's `HC_FEATURES` default →
+#29 green); DNA #1424 packed the five 0.7 hashes and the guard accepted the tagged move (baseline commit parked
+on `hc07/dna-baseline`, pushed with the next DNA-path change so this round does not rebuild byte-identical
+DNAs); the orchestrator runs that would have reached edge were superseded/failed, so edge + app are dispatched
+explicitly with `[build:edge] [build:app]` once #1424 finishes (a same-wave dispatch would bake the PREVIOUS
+hApp).
 
 **Prerequisite hunk (learned 2026-09-02, Lane D's first run):** the six `elohim/sdk/domains/*/types`
 crates are path-dependencies of doorway (`imagodei-types`, `infrastructure-types`), storage
