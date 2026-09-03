@@ -619,7 +619,19 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   `is_direct: true`), all 15 agent infos at every peer, and jessica/james HEALED the landing head "from own
   conductor (peer discovery)" — cross-conductor DHT on 0.7 works. Seed chain wrote 9 base rows to all three
   storage peers; the prologue's `DECLARE_ONLY` fan-out to B only exhausted its retry budget before that
-  convergence (~4 min). Not yet measured: `just test mesh`, the rung-5 chain. Two storage follow-ups
+  convergence (~4 min). **F2 run 3 (after the power cut, 13:47–16:04Z): Act I `just test mesh` = 278 scenarios,
+  203 passed / 31 failed / 7 pending / 37 skipped; the rung-5 chain (stations 1–5) = 5/5 PASS on the stock
+  0.7.0 conductor** (receipt `sprint-report-household-20260903T154932Z-fcb81456`, habit atom DELTA 2026-09-03).
+  The 31 Act I reds triage, from their error heads, into: rung-5 apparatus (5, all green after the fixes
+  below); lane-induced conductor SIGTERMs + the stale-`Arc<HcClient>` storage bug they expose (participants
+  1/2/2, custody/quilt reds — findings atom §1); the seeder post-flight race (fixed); ark-mode apparatus (the
+  conductor-spin detector reads `.sandbox_run_log`, which ark never writes); and ~12 delivery/doorway/federation
+  scenarios with NO recent 0.6 full-lane baseline to compare against (the tevah/ark session is running the same
+  lane on 0.6 with a per-role `/health` probe; the findings atom
+  `genesis/data/timeline/backlog/2026-09-03-hc07-f2-mesh-findings.md` carries the classification and the fixes).
+  Nothing in the 31 traced to the conductor line itself. Apparatus fixes landed for the chain: packed `workdir/`
+  staging, the baseline pair repinned to the 0.7 bundle (env-overridable), `ELOHIM_RUNTIME_CONFIG_PATH` armed on
+  every storage peer, `hc client call --port` for the agent key (no empty `AGENT_PUBKEY`). Two storage follow-ups
   (hash-neutral, land after the cutover): `/db/p2p/conductor-diagnostics` `transportStats` serializes to
   `{"serializeError":"key must be a string"}` on 0.7 — `blocked_message_counts` is keyed by DnaHash; stringify
   the keys (`http.rs` ~7090). And node-registry rejects `ShardAssignment shard_index 7..19 exceeds maximum 6
@@ -644,7 +656,9 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
 - [ ] **F4: Land on dev.** Fast-forward `upgrade/holochain-0.7` → `dev`, push once. Dispatch order
   is conductor → dna → edge (the orchestrator does it; do not hand-trigger). The edge build's
   DNA Hash Guard prints `DNA-HASH <role> <hash>` matching F1's baseline.
-- [ ] **F5: Fleet ceremony (operator runbook, sequenced — from `project_alpha_dna_migration_2026_09_02`).**
+- [ ] **F5: Fleet ceremony — operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
+  (the sequenced, step-by-step form of everything below, with the probes and the rollback). Summary (from
+  `project_alpha_dna_migration_2026_09_02`):**
   **Operator authorization 2026-09-03: wipe the WHOLE fleet clean for this upgrade** — every alpha
   conductor's `databases/` + keystore, and each peer's storage state (diesel DB, blob stores, iroh/libp2p
   keys) so the 0.7 fleet is born from one clean genesis and one re-seed; nothing 0.6-era is carried.
