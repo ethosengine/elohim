@@ -478,6 +478,23 @@ function classifications(row: Record<string, unknown>): string[] {
   return value === undefined || value === null ? [] : [String(value)];
 }
 
+/** Commitment metadata may already be decoded or may still be a JSON string. */
+function metadataKind(row: Record<string, unknown>): string | undefined {
+  let metadata = row['metadata'];
+  if (typeof metadata === 'string') {
+    try {
+      metadata = JSON.parse(metadata) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) {
+    return undefined;
+  }
+  const kind = (metadata as Record<string, unknown>)['kind'];
+  return typeof kind === 'string' ? kind : undefined;
+}
+
 /**
  * A peer's live `STORAGE_DIR`, read from the running process rather than
  * reconstructed from a convention, so the drill looks where the peer actually
@@ -678,14 +695,15 @@ Given(
         row =>
           String(row['provider'] ?? '') === agentPubKey &&
           String(row['receiver'] ?? '') === ward &&
-          classifications(row).includes(classification) &&
+          (classifications(row).includes(classification) ||
+            metadataKind(row) === 'custody-spool') &&
           !RETIRED_COMMITMENT_STATES.has(String(row['state'] ?? ''))
       );
       assert.ok(
         pledged,
         `${name} has not counter-signed custody of Jessica's witnesses on its own peer ` +
           `(no live custody-spool row with provider ${agentPubKey}, receiver ${ward}, ` +
-          `classified "${classification}"): ${SPOOL_PRECONDITION}`
+          `classified "${classification}" or metadata.kind "custody-spool"): ${SPOOL_PRECONDITION}`
       );
       custodians.push({ name, url, agentPubKey });
     }
