@@ -76,7 +76,18 @@ an env of `AGENT_PUBKEY=""` is `Some("")`, so the fallback never fires and every
 empty string). Treat empty as absent at the clap/env boundary (`value_parser` rejecting "" or `.filter(|s| !s.is_empty())`)
 so a peer whose launcher could not resolve the key still attests under its admin-derived key.
 
-## 7. Apparatus, fixed on the branch (for the record)
+## 7. Edge bakes the FLOATING `elohim-happ:dev-latest` — make the fetch commit-pinned or guarded (CI)
+
+`elohim/holochain/Jenkinsfile` `fetchHappFromHarbor` pulls `elohim-happ:dev-latest`; when edge and the DNA pipeline are
+dispatched in the same wave (or edge is forced with `[build:edge]` while the DNA build is still running), edge bakes
+the PREVIOUS hApp — 2026-09-03: edge #1424 started 40 min before DNA #1425 could publish the 0.7 hApp, so the first
+0.7 roll carried the 0.6 bundle and had to be re-dispatched. Fix: pull `elohim-happ:1.0.0-dev-<short-sha>` for the
+edge build's own commit first and fall back to `dev-latest` only with a loud WARN; then verify the fetched bundle's
+`hc dna hash` per role against `elohim/holochain/dna/dna-hashes.baseline` and FAIL on mismatch unless the tip carries
+`[dna:migrate]` (the same rule the DNA pipeline's guard enforces). The memory trap "a same-wave dispatch bakes the
+PREVIOUS happ" becomes a build failure instead of a silent fleet roll.
+
+## 8. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
