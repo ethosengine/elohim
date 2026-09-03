@@ -1107,7 +1107,7 @@ async function runOneTeardown(
   assert.equal(
     created.status,
     0,
-    `teardown channel create failed: ${created.stderr || created.stdout}`
+    `teardown channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`
   );
 
   const repPeer = group.peers[0];
@@ -1140,7 +1140,7 @@ async function runOneTeardown(
   assert.equal(
     packaged.status,
     0,
-    `teardown package (peers ${group.peers.join('+')}) failed: ${packaged.stderr || packaged.stdout}`
+    `teardown package (peers ${group.peers.join('+')}) failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
   );
   assert.ok(
     existsSync(teardownManifestPath),
@@ -1161,7 +1161,7 @@ async function runOneTeardown(
   assert.equal(
     published.status,
     0,
-    `teardown publish failed: ${published.stderr || published.stdout}`
+    `teardown publish failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
   );
   const publishedParsed = extractJson<PublishResult>(published.stdout);
   assert.ok(
@@ -1182,7 +1182,7 @@ async function runOneTeardown(
   assert.equal(
     promoted.status,
     0,
-    `teardown promote failed: ${promoted.stderr || promoted.stdout}`
+    `teardown promote failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`
   );
   const promotedParsed = extractJson<PromoteResult>(promoted.stdout);
   assert.equal(
@@ -1339,7 +1339,7 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
   assert.equal(
     packaged.status,
     0,
-    `epr-release-package.ts failed: ${packaged.stderr || packaged.stdout}`
+    `epr-release-package.ts failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
   );
   assert.ok(existsSync(MANIFEST_PATH), `manifest was not written to ${MANIFEST_PATH}`);
 
@@ -1361,12 +1361,12 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
       '--discipline',
       discipline,
     ]);
-    assert.equal(created.status, 0, `channel create failed: ${created.stderr || created.stdout}`);
+    assert.equal(created.status, 0, `channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`);
     c.channelCreated = true;
   }
 
   const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', MANIFEST_PATH]);
-  assert.equal(published.status, 0, `publish failed: ${published.stderr || published.stdout}`);
+  assert.equal(published.status, 0, `publish failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`);
   const parsed = extractJson<PublishResult>(published.stdout);
   assert.ok(parsed.releaseCid, `publish output missing releaseCid: ${JSON.stringify(parsed)}`);
   c.releaseCid = parsed.releaseCid;
@@ -1493,7 +1493,7 @@ async function ensurePromoted(world: E2EWorld): Promise<void> {
     ['promote', CHANNEL_ID, c.releaseCid],
     60_000
   );
-  assert.equal(promoted.status, 0, `promote failed: ${promoted.stderr || promoted.stdout}`);
+  assert.equal(promoted.status, 0, `promote failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`);
   const parsed = extractJson<PromoteResult>(promoted.stdout);
   assert.equal(parsed.tier, 'earned', `promote did not declare earned: ${JSON.stringify(parsed)}`);
   c.promoteResult = parsed;
@@ -1681,7 +1681,7 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
     assert.equal(
       packaged.status,
       0,
-      `epr-release-package.ts (revert target) failed: ${packaged.stderr || packaged.stdout}`
+      `epr-release-package.ts (revert target) failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
     );
     assert.ok(
       existsSync(REVERT_MANIFEST_PATH),
@@ -1797,7 +1797,7 @@ async function ensurePersonalChannelFollowed(world: E2EWorld): Promise<void> {
     assert.equal(
       created.status,
       0,
-      `personal channel create failed: ${created.stderr || created.stdout}`
+      `personal channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`
     );
     c.personalChannelCreated = true;
   }
@@ -1867,7 +1867,7 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
   assert.equal(
     packaged.status,
     0,
-    `personal-channel package failed: ${packaged.stderr || packaged.stdout}`
+    `personal-channel package failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
   );
   assert.ok(existsSync(PERSONAL_MANIFEST_PATH), `personal-channel manifest was not written`);
 
@@ -1875,7 +1875,7 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
   assert.equal(
     published.status,
     0,
-    `personal-channel publish failed: ${published.stderr || published.stdout}`
+    `personal-channel publish failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
   );
   const parsed = extractJson<PublishResult>(published.stdout);
   assert.ok(
@@ -1968,7 +1968,7 @@ async function republishPersonalVariant(
   assert.equal(
     packaged.status,
     0,
-    `personal-channel republish package (${station}) failed: ${packaged.stderr || packaged.stdout}`
+    `personal-channel republish package (${station}) failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
   );
   assert.ok(
     existsSync(republishManifestPath),
@@ -1979,7 +1979,7 @@ async function republishPersonalVariant(
   assert.equal(
     published.status,
     0,
-    `personal-channel republish publish (${station}) failed: ${published.stderr || published.stdout}`
+    `personal-channel republish publish (${station}) failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
   );
   const parsed = extractJson<PublishResult>(published.stdout);
   assert.ok(
