@@ -36,6 +36,21 @@ use elohim_views::projection::ProjectionMode;
 
 pub struct ReaCommitmentService;
 
+/// Build the HTTP view through the commitment classification accessor so both
+/// conductor-projected bare values and seeded JSON-list values retain their
+/// classifications.
+fn commitment_view(commitment: crate::db::models::ReaCommitment) -> ReaCommitmentView {
+    let resource_classified_as = commitment
+        .resource_classified_as
+        .as_ref()
+        .map(|_| commitment.classifications());
+
+    ReaCommitmentView {
+        resource_classified_as,
+        ..ReaCommitmentView::from(commitment)
+    }
+}
+
 /// Serialize automatic first-custody authoring inside one process. The
 /// persistent id check below is the restart-safe guard; this lock closes the
 /// smaller same-process race where two distribution tasks observe no projected
@@ -419,7 +434,7 @@ impl ReaCommitmentService {
                 });
             }
         }
-        Ok(ReaCommitmentView::from(commitment))
+        Ok(commitment_view(commitment))
     }
 
     fn create_via_diesel(
@@ -436,7 +451,7 @@ impl ReaCommitmentService {
                 });
             }
         }
-        Ok(ReaCommitmentView::from(commitment))
+        Ok(commitment_view(commitment))
     }
 
     async fn create_via_conductor(
@@ -532,7 +547,7 @@ impl ReaCommitmentService {
                 commitment_id: commitment.id.clone(),
             });
         }
-        Ok(ReaCommitmentView::from(commitment))
+        Ok(commitment_view(commitment))
     }
 
     pub fn get_by_id(
@@ -540,7 +555,7 @@ impl ReaCommitmentService {
         ctx: &AppContext,
         id: &str,
     ) -> Result<Option<ReaCommitmentView>, StorageError> {
-        rea_commitments::get_commitment(conn, ctx, id).map(|opt| opt.map(ReaCommitmentView::from))
+        rea_commitments::get_commitment(conn, ctx, id).map(|opt| opt.map(commitment_view))
     }
 
     pub fn list(
@@ -549,7 +564,7 @@ impl ReaCommitmentService {
         query: &ReaCommitmentQuery,
     ) -> Result<Vec<ReaCommitmentView>, StorageError> {
         rea_commitments::list_commitments(conn, ctx, query)
-            .map(|v| v.into_iter().map(ReaCommitmentView::from).collect())
+            .map(|v| v.into_iter().map(commitment_view).collect())
     }
 
     pub fn get_by_agent(
@@ -559,7 +574,7 @@ impl ReaCommitmentService {
         limit: i64,
     ) -> Result<Vec<ReaCommitmentView>, StorageError> {
         rea_commitments::get_commitments_for_agent(conn, ctx, agent_id, limit)
-            .map(|v| v.into_iter().map(ReaCommitmentView::from).collect())
+            .map(|v| v.into_iter().map(commitment_view).collect())
     }
 
     /// Whether an update actually changes the commitment's lifecycle state.
@@ -641,7 +656,7 @@ impl ReaCommitmentService {
                 });
             }
         }
-        Ok(ReaCommitmentView::from(commitment))
+        Ok(commitment_view(commitment))
     }
 
     async fn update_state_via_conductor(
@@ -732,7 +747,7 @@ impl ReaCommitmentService {
                 });
             }
         }
-        Ok(ReaCommitmentView::from(commitment))
+        Ok(commitment_view(commitment))
     }
 }
 
@@ -963,6 +978,42 @@ mod tests {
         let mut conn = diesel::SqliteConnection::establish(":memory:").expect("in-memory SQLite");
         conn.run_pending_migrations(MIGRATIONS).expect("migrations");
         conn
+    }
+
+    #[test]
+    fn commitment_view_preserves_bare_and_json_list_classifications() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+        let cases = [
+            ("bare", "class-a", vec!["class-a".to_string()]),
+            (
+                "json-list",
+                r#"["class-a","class-b"]"#,
+                vec!["class-a".to_string(), "class-b".to_string()],
+            ),
+        ];
+
+        for (id, stored, expected) in cases {
+            let commitment = rea_commitments::create_commitment(
+                &mut conn,
+                &ctx,
+                CreateReaCommitmentInput {
+                    id: Some(id.to_string()),
+                    action: "provide".to_string(),
+                    provider: "agent:provider".to_string(),
+                    receiver: "agent:receiver".to_string(),
+                    resource_classified_as: Some(stored.to_string()),
+                    ..Default::default()
+                },
+            )
+            .expect("commitment row");
+
+            assert_eq!(
+                commitment_view(commitment).resource_classified_as,
+                Some(expected),
+                "stored form {id} should retain its classifications in the view"
+            );
+        }
     }
 
     /// Soft gate regression guard: custody-blob without a conductor must succeed
