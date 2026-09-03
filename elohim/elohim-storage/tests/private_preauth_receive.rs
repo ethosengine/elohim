@@ -32,7 +32,9 @@ use elohim_storage::p2p::identity_map::HolochainBackedPeerIdentityMap;
 use elohim_storage::p2p::shard_protocol::ContentRecord;
 use elohim_storage::p2p::{preauthorize_private_record, PrivateReceiveVerdict};
 use elohim_storage::private_reach::WithholdReason;
-use elohim_storage::services::custody_standing::{ProjectionCustodyStanding, Requester};
+use elohim_storage::services::custody_standing::{
+    ConductorCustodyLookup, ConductorSpoolEvidence, ProjectionCustodyStanding, Requester,
+};
 use elohim_storage::services::rea_commitment_service::{
     deterministic_spool_custody_id, spool_classification,
 };
@@ -224,17 +226,32 @@ async fn public_record_is_persisted_without_sender_binding() {
     assert_eq!(verdict, PrivateReceiveVerdict::Keep);
 }
 
+/// A conductor lookup that answers "no such commitment" — the notary's real
+/// absent answer, as opposed to the notary being unreachable.
+struct AbsentConductor;
+
+#[async_trait::async_trait]
+impl ConductorCustodyLookup for AbsentConductor {
+    async fn get_spool_commitment(
+        &self,
+        _id: &str,
+    ) -> Result<Option<ConductorSpoolEvidence>, elohim_storage::error::StorageError> {
+        Ok(None)
+    }
+}
+
 /// A private record from a sender who DOES resolve, but for whom this peer
-/// holds no custody standing at all, is refused (`NoStanding`) — the
-/// resolved-stranger case.
+/// holds no custody standing — locally AND by the conductor's own answer —
+/// is refused as `NoStanding`: the resolved-stranger case.
 #[tokio::test]
 async fn private_record_from_a_resolved_stranger_is_not_persisted() {
     let pool = test_pool();
     seed_self_session(&pool, THIS_PEER);
     let sender_peer = sender_peer_id();
     seed_peer_binding(&pool, &sender_peer, SENDER_AGENT);
-    // Deliberately NO custody-spool / custody-blob commitment seeded.
-    let standing = resolver(&pool);
+    // Deliberately NO custody-spool / custody-blob commitment seeded, and the
+    // conductor confirms the deterministic-id commitment is absent.
+    let standing = resolver(&pool).with_conductor_lookup(Arc::new(AbsentConductor));
 
     let sender = Requester::libp2p(sender_peer);
     let verdict = preauthorize_private_record(Some(&standing), &sender, &record("private")).await;
@@ -242,6 +259,27 @@ async fn private_record_from_a_resolved_stranger_is_not_persisted() {
     assert_eq!(
         verdict,
         PrivateReceiveVerdict::Skip(WithholdReason::NoStanding)
+    );
+}
+
+/// The same resolved stranger on a peer with NO conductor wired at all: the
+/// local projection alone cannot prove absence (it may lag), so the verdict
+/// is the distinct, uncached `AuthorityUnavailable` — still a Skip, never a
+/// Keep. (Task 6 ruling: an unreachable notary is not "commitment absent".)
+#[tokio::test]
+async fn private_record_from_a_resolved_stranger_without_a_conductor_fails_closed() {
+    let pool = test_pool();
+    seed_self_session(&pool, THIS_PEER);
+    let sender_peer = sender_peer_id();
+    seed_peer_binding(&pool, &sender_peer, SENDER_AGENT);
+    let standing = resolver(&pool);
+
+    let sender = Requester::libp2p(sender_peer);
+    let verdict = preauthorize_private_record(Some(&standing), &sender, &record("private")).await;
+
+    assert_eq!(
+        verdict,
+        PrivateReceiveVerdict::Skip(WithholdReason::AuthorityUnavailable)
     );
 }
 
