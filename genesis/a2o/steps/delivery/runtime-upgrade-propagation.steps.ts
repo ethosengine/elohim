@@ -133,7 +133,7 @@ const BASELINE_HAPP = (() => {
   if (pinned) return path.resolve(pinned);
   const preserved = path.join(
     REPO_ROOT,
-    'genesis/a2o/reports/release-ceremony/2026-09-02/baseline-N/elohim.happ'
+    'genesis/a2o/reports/release-ceremony/2026-09-03/baseline-N/elohim.happ'
   );
   if (existsSync(preserved)) return preserved;
   return path.join(REPO_ROOT, 'elohim/holochain/dna/elohim/workdir/elohim.happ');
@@ -1009,15 +1009,23 @@ function extractLastJson<T>(stdout: string): T {
  * NOT the bare sha256 `coordinator-candidate.ts` computes over different
  * bytes; see `MintedCandidate.coordinatorWasmSha256`'s own doc) the fleet
  * reports for lamad's `content_store` coordinator when running
- * `BASELINE_HAPP` (bundle "N") unmodified. This file has no local way to
- * compute a `WasmHash` (that needs Holochain's own hashing, not a plain TS
- * script), so the literal is read once from a peer known to run N on the
- * 2026-09-02 household mesh — and asserted again, for real, every time
- * `runOneTeardown` polls a peer back onto it below: a wrong literal here
- * fails that poll loudly rather than silently declaring the wrong hash
- * "baseline."
+ * `BASELINE_HAPP` (bundle "N") unmodified. The bundle pin and this hash pin
+ * are ONE pair: a new baseline N (a DNA rebuild, a conductor-line change)
+ * moves both, so `E2E_BASELINE_HAPP` and `E2E_BASELINE_COORDINATOR_WASM_HASH`
+ * override them together. The default is the holochain 0.7.0 baseline N
+ * preserved under `reports/release-ceremony/2026-09-03/baseline-N/` (the 0.6
+ * pair, 2026-09-02, was `uhCok88IBM4RXPCWLyz_y00a8Ksyyys03p8Fq7dzOWj1gyqRx7H0B`).
+ * Re-derive it without a conductor: `hc dna unpack <workdir>/lamad.dna -o d`
+ * then WasmHash = 'u' + base64url( 0x84 0x2a 0x24 ‖ blake2b-256(wasm) ‖ loc )
+ * where loc = the 16-byte blake2b of that 32-byte core xor-folded to 4 bytes
+ * (reproduced the conductor's value byte-exact on 2026-09-03). It is asserted
+ * again, for real, every time `runOneTeardown` polls a peer back onto it: a
+ * wrong pin fails that poll loudly rather than silently declaring the wrong
+ * hash "baseline."
  */
-const BASELINE_COORDINATOR_WASM_HASH = 'uhCok88IBM4RXPCWLyz_y00a8Ksyyys03p8Fq7dzOWj1gyqRx7H0B';
+const BASELINE_COORDINATOR_WASM_HASH =
+  process.env['E2E_BASELINE_COORDINATOR_WASM_HASH'] ??
+  'uhCokta9pl3fv4sMfPbWWh_Q4fXh0UA1LsCdTmyuJQ4AZnquZs7fX';
 
 /** At most this many distinct non-baseline hash groups can exist across `PEER_NAMES`. */
 const MAX_TEARDOWN_GROUPS = PEER_NAMES.length;
