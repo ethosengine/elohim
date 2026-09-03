@@ -689,7 +689,7 @@ async function wardIdentities(): Promise<Set<string>> {
 }
 
 Given(
-  "Matthew and James have each counter-signed a commitment to custody Jessica's witnesses",
+  "Matthew and James have each already counter-signed a commitment to custody Jessica's witnesses",
   { timeout: 30_000 },
   async function (this: E2EWorld) {
     const state = scenario(this);

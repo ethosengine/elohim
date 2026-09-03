@@ -89,6 +89,8 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     When Jessica's conductor is killed with SIGKILL
     Then within 10 seconds Jessica's peer lists a death witness for a new incident
     And the witness names the signal, how long the conductor ran, and its last stderr lines
+    # For a kill from outside, the envelope's last decision is its last spawn or restart of that
+    # conductor — the kill itself was nobody's decision inside the envelope.
     And the witness carries the envelope's own last decision about that conductor
     And the witness names the hash of the conductor program the envelope actually started
     And the witness carries Jessica's passport as it stood at the moment of death
@@ -98,17 +100,19 @@ Feature: Death witness — a peer's runtime tells its household why a child died
   # the story of offering and accepting that commitment between humans is a later feature.
   # Budget measured on 2026-09-03, after S0 landed, on the household mesh: kill → ward row (≤5 s ingest) → shard replication
   # tick (10 s dial) with paged peer round trips (~40 s under host load) → custody-blob authored on the
-  # custodian's own conductor (5 s sweep) → bytes already pulled by replication; 60 s was an MVP guess.
+  # custodian's own conductor (5 s sweep) → bytes already pulled by replication. Measured: custody rows
+  # on both custodians ~75 s after the kill; 120 s covers the paged replication cycle plus host-load
+  # variance. 60 s was an MVP guess.
   @station-2
   Scenario: Station 2 — the custodians Jessica already has hold the witness
-    Given Matthew and James have each counter-signed a commitment to custody Jessica's witnesses
+    Given Matthew and James have each already counter-signed a commitment to custody Jessica's witnesses
     When Jessica's conductor is killed with SIGKILL
     Then within 120 seconds Matthew and James each hold a copy of the witness with the same content hash
     And Matthew and James each record on their own peer that they received that witness from Jessica
 
   @wip @browser-only @station-3a
   Scenario: Station 3a — a custodian reads the witness as a death witness, not raw data
-    Given Matthew has counter-signed a commitment to custody Jessica's witnesses
+    Given Matthew has already counter-signed a commitment to custody Jessica's witnesses
     And human "Matthew" is logged in on doorway "alpha" with a device
     When Matthew is viewing the atom home for Jessica's latest death witness
     Then the reach chip shows that the household and its custodians may see it
