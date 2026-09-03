@@ -53,6 +53,7 @@ use diesel::prelude::*;
 use diesel::SqliteConnection;
 use tracing::{info, warn};
 
+use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::reconcile::custody::CommitmentAuthor;
@@ -281,7 +282,7 @@ pub fn ward_inventory_peer_ids(
     Ok(ids)
 }
 
-/// Blob markers advertised under any of `peer_ids`.
+/// Blob digests advertised under any of `peer_ids`.
 fn advertised_blobs(
     conn: &mut SqliteConnection,
     peer_ids: &[String],
@@ -292,10 +293,20 @@ fn advertised_blobs(
         .select(pbi::blob_hash)
         .load(conn)
         .map_err(|e| StorageError::Database(format!("spool custody: advertised blobs: {e}")))?;
-    Ok(rows.into_iter().collect())
+    Ok(rows
+        .into_iter()
+        .filter_map(|marker| digest_key(&marker))
+        .collect())
 }
 
-/// Death-witness content rows held locally, as `blob_hash -> size_bytes`.
+/// Canonical digest key shared by every accepted content-address rendering.
+fn digest_key(address: &str) -> Option<String> {
+    BlobStore::parse_content_address(address)
+        .ok()
+        .map(|digest| digest.to_ascii_lowercase())
+}
+
+/// Death-witness content rows held locally, as `digest -> size_bytes`.
 ///
 /// This is the ONLY qualifier for "is that advertised blob a death witness":
 /// `peer_blob_inventory` carries no metadata column (peer_id, blob_hash,
@@ -337,7 +348,9 @@ fn local_death_witnesses(
             })
             .unwrap_or(false);
         if is_witness {
-            witnesses.insert(blob_hash, size.map(|s| s.max(0) as u64));
+            if let Some(digest) = digest_key(&blob_hash) {
+                witnesses.insert(digest, size.map(|s| s.max(0) as u64));
+            }
         }
     }
     Ok(witnesses)
@@ -369,7 +382,7 @@ fn self_spool_pledges(
         .collect())
 }
 
-/// Blob markers this peer already PROVIDES a `custody-blob` for.
+/// Blob digests this peer already PROVIDES a `custody-blob` for.
 fn self_custody_blob_markers(
     conn: &mut SqliteConnection,
     self_agent: &str,
@@ -385,6 +398,7 @@ fn self_custody_blob_markers(
     Ok(rows
         .iter()
         .filter_map(ReaCommitment::primary_classification)
+        .filter_map(|marker| digest_key(&marker))
         .collect())
 }
 
@@ -464,18 +478,19 @@ pub fn run_spool_custody_pass(
         let mut remaining = per_tick_cap(pledge.bounds.atoms_per_hour, cfg.tick_seconds);
         let mut bytes_left = pledge.bounds.max_bytes;
 
-        for blob in candidates {
-            if covered.contains(blob) {
+        for digest in candidates {
+            let blob_marker = format!("sha256-{digest}");
+            if covered.contains(digest) {
                 pass.already += 1;
                 continue;
             }
-            let size = witnesses.get(blob).copied().flatten().unwrap_or(0);
+            let size = witnesses.get(digest).copied().flatten().unwrap_or(0);
             let over_bytes = bytes_left.is_some_and(|left| size > left);
             if remaining == 0 || over_bytes {
                 warn!(
                     target: "elohim_storage::spool_custody",
                     ward = %pledge.ward,
-                    blob = %blob,
+                    blob = %blob_marker,
                     atoms_per_hour = pledge.bounds.atoms_per_hour,
                     max_bytes = ?pledge.bounds.max_bytes,
                     reason = SkipReason::BoundsExceeded.as_str(),
@@ -484,22 +499,26 @@ pub fn run_spool_custody_pass(
                 );
                 pass.skipped.push(SpoolCustodySkip {
                     ward: pledge.ward.clone(),
-                    blob: Some(blob.clone()),
+                    blob: Some(blob_marker),
                     reason: SkipReason::BoundsExceeded,
                 });
                 continue;
             }
 
-            author.author_custody_blob(blob, self_agent, &pledge.ward)?;
+            author.author_custody_blob(&blob_marker, self_agent, &pledge.ward)?;
             remaining -= 1;
             bytes_left = bytes_left.map(|left| left.saturating_sub(size));
-            covered.insert(blob.clone());
-            pass.authored.push(blob.clone());
+            covered.insert(digest.clone());
+            pass.authored.push(blob_marker.clone());
             info!(
                 target: "elohim_storage::spool_custody",
                 ward = %pledge.ward,
-                blob = %blob,
-                commitment_id = %deterministic_custody_id(self_agent, &pledge.ward, blob),
+                blob = %blob_marker,
+                commitment_id = %deterministic_custody_id(
+                    self_agent,
+                    &pledge.ward,
+                    &blob_marker,
+                ),
                 "spool custody: authored custody-blob for a ward's death witness"
             );
         }
@@ -599,6 +618,9 @@ impl CommitmentAuthor for SpoolCustodyAuthor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cid::Cid;
+    use multihash_codetable::{Code, MultihashDigest};
+
     use crate::db::content_diesel::{create_content, CreateContentInput};
     use crate::db::models::{NewPeerIdentityBindingRow, NewReaCommitment};
     use crate::db::AppContext;
@@ -620,6 +642,15 @@ mod tests {
 
     fn iso(at: DateTime<Utc>) -> String {
         at.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+    }
+
+    fn witness_addresses(bytes: &[u8]) -> (String, String, String) {
+        let digest = Code::Sha2_256.digest(bytes);
+        (
+            BlobStore::compute_hash(bytes),
+            Cid::new_v1(0x55, digest).to_string(),
+            Cid::new_v1(0x71, digest).to_string(),
+        )
     }
 
     /// Records what a pass authored, exactly like the salvage tests' harness —
@@ -796,6 +827,127 @@ mod tests {
             ],
             "provider = self (agent_cid), receiver = the ward"
         );
+    }
+
+    #[test]
+    fn authors_legacy_marker_when_content_is_raw_cid_and_inventory_is_legacy() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let at = now();
+        let (legacy, raw_cid, _) = witness_addresses(b"raw content, legacy inventory");
+        seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
+        seed_witness_row(
+            &mut conn,
+            "witness-raw-content",
+            &raw_cid,
+            DEATH_WITNESS_KIND,
+        );
+        seed_inventory(&mut conn, WARD, &[&legacy], &iso(at));
+
+        let author = RecordingAuthor::default();
+        let pass = run_spool_custody_pass(
+            &mut conn,
+            Some(SELF_AGENT),
+            &author,
+            SpoolCustodyConfig { tick_seconds: 3600 },
+            at,
+        )
+        .unwrap();
+
+        assert_eq!(pass.authored, vec![legacy.clone()]);
+        assert_eq!(author.tuples().len(), 1);
+        assert_eq!(author.tuples()[0].0, legacy);
+    }
+
+    #[test]
+    fn authors_legacy_marker_when_content_is_legacy_and_inventory_is_raw_cid() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let at = now();
+        let (legacy, raw_cid, _) = witness_addresses(b"legacy content, raw inventory");
+        seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
+        seed_witness_row(
+            &mut conn,
+            "witness-legacy-content",
+            &legacy,
+            DEATH_WITNESS_KIND,
+        );
+        seed_inventory(&mut conn, WARD, &[&raw_cid], &iso(at));
+
+        let author = RecordingAuthor::default();
+        let pass = run_spool_custody_pass(
+            &mut conn,
+            Some(SELF_AGENT),
+            &author,
+            SpoolCustodyConfig { tick_seconds: 3600 },
+            at,
+        )
+        .unwrap();
+
+        assert_eq!(pass.authored, vec![legacy.clone()]);
+        assert_eq!(author.tuples().len(), 1);
+        assert_eq!(author.tuples()[0].0, legacy);
+    }
+
+    #[test]
+    fn deduplicates_existing_custody_blob_across_renderings() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let at = now();
+        let (legacy, raw_cid, witness_cid) = witness_addresses(b"existing rendered custody");
+        seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
+        seed_witness_row(
+            &mut conn,
+            "witness-existing-custody",
+            &raw_cid,
+            DEATH_WITNESS_KIND,
+        );
+        seed_inventory(&mut conn, WARD, &[&legacy], &iso(at));
+
+        use crate::db::diesel_schema::rea_commitments;
+        let classification = serde_json::json!([witness_cid]).to_string();
+        let id = deterministic_custody_id(SELF_AGENT, WARD, &witness_cid);
+        diesel::insert_into(rea_commitments::table)
+            .values(&NewReaCommitment {
+                id: &id,
+                h_app_id: "lamad",
+                action: "custody-blob",
+                provider: SELF_AGENT,
+                receiver: WARD,
+                resource_conforms_to: None,
+                resource_classified_as: Some(&classification),
+                resource_quantity_value: None,
+                resource_quantity_unit: Some("B"),
+                effort_quantity_value: None,
+                effort_quantity_unit: None,
+                has_beginning: None,
+                has_end: None,
+                due: None,
+                clause_of: None,
+                in_scope_of: None,
+                medium_of_exchange_id: None,
+                state: "created",
+                finished: 0,
+                note: None,
+                metadata_json: None,
+                dht_anchor_hash: Some("uhCkk-rendered-custody"),
+            })
+            .execute(&mut conn)
+            .unwrap();
+
+        let author = RecordingAuthor::default();
+        let pass = run_spool_custody_pass(
+            &mut conn,
+            Some(SELF_AGENT),
+            &author,
+            SpoolCustodyConfig { tick_seconds: 3600 },
+            at,
+        )
+        .unwrap();
+
+        assert!(pass.authored.is_empty());
+        assert_eq!(pass.already, 1);
+        assert!(author.tuples().is_empty());
     }
 
     #[test]
