@@ -755,6 +755,9 @@ pub struct P2PNode {
     swarm: Arc<RwLock<Swarm<ElohimStorageBehaviour>>>,
     /// Blob store for serving shard requests
     blob_store: Arc<BlobStore>,
+    /// Process-lifetime shard service shared with the iroh ALPN backend. Its
+    /// custody resolver owns the TTL cache and conductor single-flight.
+    shard_service: Arc<crate::shard_service::ShardService>,
     /// Sync manager for CRDT document exchange
     sync_manager: Arc<SyncManager>,
     /// Shutdown signal
@@ -2969,6 +2972,10 @@ impl P2PNode {
             config,
             #[allow(clippy::arc_with_non_send_sync)]
             swarm: Arc::new(RwLock::new(swarm)),
+            shard_service: Arc::new(crate::shard_service::ShardService::new(
+                blob_store.clone(),
+                None,
+            )),
             blob_store,
             sync_manager,
             shutdown_tx,
@@ -3112,6 +3119,23 @@ impl P2PNode {
             pool.clone(),
         ));
         self.db_pool = Some(pool);
+        self
+    }
+
+    /// Replace the default pool-less shard service with the process-lifetime
+    /// service assembled in `main.rs` and shared with iroh.
+    pub fn with_shard_service(mut self, service: Arc<crate::shard_service::ShardService>) -> Self {
+        self.shard_service = service;
+        self
+    }
+
+    /// Inject the canonical libp2p requester resolver. The custody-standing
+    /// resolver receives the same `Arc` at the composition root.
+    pub fn with_identity_map(
+        mut self,
+        identity_map: Arc<dyn identity_map::PeerIdentityMap>,
+    ) -> Self {
+        self.identity_map = identity_map;
         self
     }
 
@@ -5525,7 +5549,11 @@ impl P2PNode {
                         request, channel, ..
                     } => {
                         debug!(peer = %peer, request = ?request, "Received shard request");
-                        let response = self.handle_shard_request(request).await;
+                        // Station 3b (M9): the requesting PeerId was already
+                        // known here and discarded. It is the input the custody
+                        // gate needs to tell a ward or a standing custodian
+                        // apart from a stranger.
+                        let response = self.handle_shard_request(peer, request).await;
 
                         // Send response
                         let mut swarm = self.swarm.write().await;
@@ -7627,12 +7655,11 @@ impl P2PNode {
         }
     }
 
-    /// Handle an incoming shard request
-    /// Snapshot the shard-relevant deps into a transport-neutral
-    /// [`crate::shard_service::ShardService`]. Cheap (clones an
-    /// `Arc<BlobStore>` and an `Option<DbPool>`); construct per-request.
-    pub(crate) fn shard_service(&self) -> crate::shard_service::ShardService {
-        crate::shard_service::ShardService::new(self.blob_store.clone(), self.db_pool.clone())
+    /// The process-lifetime transport-neutral shard service. Returning the Arc
+    /// preserves one custody cache/single-flight across every request and both
+    /// transports.
+    pub(crate) fn shard_service(&self) -> Arc<crate::shard_service::ShardService> {
+        self.shard_service.clone()
     }
 
     /// Handle an incoming shard request from a peer.
@@ -7641,8 +7668,13 @@ impl P2PNode {
     /// [`crate::shard_service::ShardService`] so the iroh-side
     /// [`crate::p2p_iroh::ShardBackend`] can produce wire-byte-identical
     /// responses.
-    async fn handle_shard_request(&self, request: ShardRequest) -> ShardResponse {
-        self.shard_service().handle(request).await
+    async fn handle_shard_request(
+        &self,
+        peer: libp2p::PeerId,
+        request: ShardRequest,
+    ) -> ShardResponse {
+        let requester = crate::services::custody_standing::Requester::libp2p(peer.to_base58());
+        self.shard_service().handle(&requester, request).await
     }
 
     /// Verify that peers still hold their announced shards.

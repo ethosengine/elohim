@@ -76,7 +76,7 @@ pub const DEFAULT_ATOMS_PER_HOUR: u32 = 120;
 /// as live: the DNA mints `created`, the accept/activate paths move it through
 /// `proposed`/`accepted`/`activated`/`active`, and gating on a single state
 /// string here would silently disable the whole station.
-const RETIRED_STATES: [&str; 5] = [
+pub const RETIRED_STATES: [&str; 5] = [
     "cancelled",
     "superseded",
     "revoked",

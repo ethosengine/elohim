@@ -23,6 +23,7 @@ use std::sync::Arc;
 
 use super::shard::ShardBackend;
 use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
+use crate::services::custody_standing::Requester;
 use crate::shard_service::ShardService;
 
 /// Routes [`ShardRequest`] variants into a shared
@@ -46,8 +47,8 @@ impl std::fmt::Debug for ShardServiceBackend {
 
 #[async_trait::async_trait]
 impl ShardBackend for ShardServiceBackend {
-    async fn handle(&self, request: ShardRequest) -> ShardResponse {
-        self.service.handle(request).await
+    async fn handle(&self, requester: &Requester, request: ShardRequest) -> ShardResponse {
+        self.service.handle(requester, request).await
     }
 }
 
@@ -65,16 +66,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_unknown_returns_not_found() {
+    async fn get_without_reach_authority_fails_closed() {
         let backend = fresh_backend().await;
         match backend
-            .handle(ShardRequest::Get {
-                hash: "missing".into(),
-            })
+            .handle(
+                &Requester::local(),
+                ShardRequest::Get {
+                    hash: "missing".into(),
+                },
+            )
             .await
         {
-            ShardResponse::NotFound => {}
-            other => panic!("expected NotFound, got {other:?}"),
+            ShardResponse::Error(message) => {
+                assert_eq!(message, "reach-withheld: authority-unavailable")
+            }
+            other => panic!("expected fail-closed Error, got {other:?}"),
         }
     }
 
@@ -85,10 +91,13 @@ mod tests {
         // instead of an error, exactly as a whole-bytes miss would.
         let backend = fresh_backend().await;
         match backend
-            .handle(ShardRequest::GetManifest {
-                hash: "sha256-0000000000000000000000000000000000000000000000000000000000000000"
-                    .into(),
-            })
+            .handle(
+                &Requester::local(),
+                ShardRequest::GetManifest {
+                    hash: "sha256-0000000000000000000000000000000000000000000000000000000000000000"
+                        .into(),
+                },
+            )
             .await
         {
             ShardResponse::NotFound => {}
@@ -100,11 +109,14 @@ mod tests {
     async fn list_content_without_pool_errors() {
         let backend = fresh_backend().await;
         match backend
-            .handle(ShardRequest::ListContent {
-                reach_filter: None,
-                offset: 0,
-                limit: 10,
-            })
+            .handle(
+                &Requester::local(),
+                ShardRequest::ListContent {
+                    reach_filter: None,
+                    offset: 0,
+                    limit: 10,
+                },
+            )
             .await
         {
             ShardResponse::Error(msg) => assert!(msg.contains("No database pool")),

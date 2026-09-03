@@ -89,7 +89,10 @@ pub fn upsert_preserving_supersession(
 ///
 /// "Active" means: `valid_until IS NULL OR valid_until > now_iso`, AND
 /// `superseded_by IS NULL`. The query returns at most one row — the one with
-/// the latest `observed_at`. The partial index
+/// a verified binding first, then the latest `observed_at`. The verified-first
+/// preference is deterministic and positive-matches `cross_signed`; an
+/// unverified binding remains usable for routing only when no verified binding
+/// is active. The partial index
 /// `idx_peer_identity_bindings_current_per_agent` (keyed on `agent_cid`) covers
 /// supersession-aware filtering for agent-side queries; the per-peer lookup
 /// here uses the existing `idx_peer_identity_bindings_peer_id` index.
@@ -102,11 +105,23 @@ pub fn lookup_active(
 ) -> Result<Option<PeerIdentityBindingRow>, StorageError> {
     use peer_identity_bindings::dsl;
 
+    let verified = dsl::peer_identity_bindings
+        .filter(dsl::peer_id.eq(peer_id))
+        .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now_iso)))
+        .filter(dsl::superseded_by.is_null())
+        .filter(dsl::proof_status.eq(crate::p2p::binding_proof_wire::PROOF_STATUS_CROSS_SIGNED))
+        .order((dsl::observed_at.desc(), dsl::dht_anchor_hash.asc()))
+        .first::<PeerIdentityBindingRow>(conn)
+        .optional()
+        .map_err(|e| StorageError::Database(format!("peer_identity_bindings lookup: {e}")))?;
+    if verified.is_some() {
+        return Ok(verified);
+    }
     dsl::peer_identity_bindings
         .filter(dsl::peer_id.eq(peer_id))
         .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now_iso)))
         .filter(dsl::superseded_by.is_null())
-        .order(dsl::observed_at.desc())
+        .order((dsl::observed_at.desc(), dsl::dht_anchor_hash.asc()))
         .first::<PeerIdentityBindingRow>(conn)
         .optional()
         .map_err(|e| StorageError::Database(format!("peer_identity_bindings lookup: {e}")))

@@ -3086,3 +3086,255 @@ decisionPoints:
       - path: elohim/elohim-storage/src/metrics.rs
         testName: release_adoption_decisions_are_pretouched_on_every_arm_that_has_code
         kind: unit
+  - name: private_serve_verdict
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/private_reach.rs
+      modulePath: private_reach::private_serve_verdict
+      line: 240
+    summary: >
+      Station 3b (M9) — the custody-scoped read gate on the SHARD REPLICATION plane (libp2p
+      /elohim/shard/1.0.0 and the iroh /elohim/shard/2.0.0 ALPN, one ShardService behind both).
+      A `private`-reach content row — and the blob bytes only `private` rows reference — is
+      served to a peer iff that peer RESOLVED to an agent AND (is the ward, OR provides a live
+      `custody-spool` naming the ward, OR provides a live `custody-blob` naming this digest);
+      otherwise it is withheld with a typed reason. Before this predicate, handle_list_content
+      and handle_get_content both read at MinTrust::Invisible ("peers must see all local rows")
+      and handle_get served bytes with no DB read at all, so an ark death witness left its
+      ward's peer toward any peer that asked — while the SAME row already answered 403 over
+      HTTP. Facts are resolved by services::custody_standing::ProjectionCustodyStanding over the
+      local rea_commitments projection plus a bounded own-conductor deterministic-id fallback;
+      the predicate itself is pure. Scope is DECLARED narrow: only `private` changes behaviour;
+      public/commons and every other tier replicate exactly as before.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The decision sits on the SERVING peer's storage — the steward of what its agent
+          authored, enforcing the reach the author declared (the author-side face of
+          p2p::reach_authorization's two-faces model). The receive-side pre-authorization is a
+          separate decision on the acquiring peer (store_acquired_record) and is deliberately
+          NOT this predicate.
+      - id: C1
+        status: n-a
+        justification: >
+          No authority is minted, moved or elected here; the predicate reads standing that a
+          notarized Commitment already carries and answers serve-or-withhold for one request.
+      - id: C2
+        status: answered
+        justification: >
+          A verdict is never persisted: it lives only in the response to one request. A withhold
+          never escalates (no ban, no backoff, no state), and a serve stamps no authority on the
+          requester — the next request re-derives from the same commitment rows.
+      - id: C3
+        status: answered
+        justification: >
+          Liveness is preserved on every arm: a gated ListContent page still RETURNS (withheld
+          rows are omitted, never an error), one process-lifetime ShardService and
+          ProjectionCustodyStanding are shared by libp2p and iroh, and the conductor fallback is
+          per-key single-flight plus TTL-cached in both signs. It is skipped entirely once local
+          evidence decides to serve; unavailable blob authority fails closed with a typed refusal.
+      - id: C4
+        status: answered
+        justification: >
+          A refusal is never rendered as an absence. GetContent and blob Get answer
+          ShardResponse::Error("reach-withheld: <reason>") — never ContentNotFound/NotFound —
+          and the ListContent omission a caller cannot see is COUNTED
+          (storage_private_withheld_total{site=list_content}). Ward-unresolved is its own reason
+          precisely so "I cannot say whose this is" is not laundered into "you are a stranger".
+          Pinned by get_content_refuses_a_stranger_with_reach_withheld and
+          an_unresolved_iroh_requester_is_withheld_the_private_row_but_not_the_public_one.
+      - id: C5
+        status: partial
+        justification: >
+          Standing derives only from commitment evidence with the exact custody-spool action,
+          exact spool:witness:<ward> classification, matching provider/receiver, unfinished and
+          non-retired state; conductor evidence and local projection evidence apply the same
+          predicate. A local row may still be unanchored during projection timing, so anchor
+          presence is observed at DEBUG but is not required in this slice.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded before the uncancellable call is made: at most ONE own-conductor
+          get_rea_commitment per distinct (requester_agent, ward) at a time and per 60 s TTL,
+          cached in BOTH signs on the ONE shared ProjectionCustodyStanding; concurrent misses
+          coalesce behind a per-key mutex. It is skipped when local evidence already answered,
+          the requester is the ward, or a blob pledge stands. Synchronous pool/Diesel work in
+          facts_for runs in spawn_blocking. Pinned by
+          conductor_fallback_is_positive_negative_single_flight_and_ttl_cached and
+          a_non_private_row_never_touches_the_projection.
+      - id: C6b
+        status: answered
+        justification: >
+          private_serve_verdict is pure — six booleans and a string in, a verdict out; no DB, no
+          clock, no network, no conductor. Every impure resolution is behind the CustodyStanding
+          trait, which has a fake implementation for tests.
+      - id: C7
+        status: partial
+        justification: >
+          Inventory gossip still advertises private blob hashes to every peer — custodians need
+          the advert, but a stranger learns that a hash exists even though it can never obtain
+          the bytes. Advertise/serve symmetry on the gossip plane is declared M13, out of this
+          slice.
+      - id: C8
+        status: answered
+        justification: >
+          Every withhold increments storage_private_withheld_total{site,reason} over a closed
+          vocabulary (3 sites x 4 private_reach::WithholdReason variants, all pre-touched at
+          registration so a gate that never fires reads as a measured zero) and emits one INFO
+          naming requester, row and reason; serves to a custodian log at DEBUG.
+      - id: C9
+        status: partial
+        justification: >
+          peer_identity_bindings rows are self-asserted (proof_status defaults unverified), so
+          this gate is a ROUTING cut at the Stage 1 floor, exactly like spool_custody_author's
+          ward resolution — never an attribution cut. The cross-signed binding
+          (identity-cross-signed habit) is the named blocker before this gate may carry economic
+          weight.
+      - id: C10
+        status: answered
+        justification: >
+          No wire change: ShardRequest/ShardResponse are untouched, no variant added, no field
+          added. An older peer simply sees fewer rows in a page and a typed Error string it
+          already knows how to carry.
+      - id: C11
+        status: n-a
+        justification: >
+          The predicate consumes no capacity signal and takes no admission decision; the serve
+          path's existing conductor-admission and read-pool backpressure are unchanged.
+      - id: C12
+        status: answered
+        justification: >
+          This IS the concern: consent is the counter-signed custody-spool a custodian authored
+          on its own conductor toward the ward. The read gate requires its exact action and exact
+          ward classification in addition to provider/receiver/live state; wrong-action and
+          wrong-classification rows do not grant. A retired pledge stops granting it the moment
+          its state enters RETIRED_STATES.
+      - id: C13
+        status: answered
+        justification: >
+          Ordered by evidence class, not by convenience: ward (the row's own subject) > custodian
+          (a notarized pledge for the ward or for this digest) > stranger (refused). All four
+          network stakes are floor-protected — a private row never cheapens at Simulacra.
+      - id: C14
+        status: answered
+        justification: >
+          The residual is named rather than hidden: the withheld count and reason surface in
+          metrics for the omission a caller cannot see, and the iroh-blobs BLAKE3 byte plane
+          (a third-party content-addressed server with no reach concept) is declared M12 —
+          out of this slice, not silently covered by it.
+    contractTests:
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: every_other_reach_serves_unchanged
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: only_canonical_private_is_gated
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_with_an_unresolved_requester_is_withheld
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_serves_to_the_ward
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_serves_to_a_spool_custodian_of_the_ward
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_serves_to_a_blob_custodian_even_with_an_unresolved_ward
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_withholds_from_a_resolved_stranger
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: private_with_an_unresolvable_ward_says_so
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: a_non_private_row_never_touches_the_projection
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: the_ward_is_read_from_created_by_and_serves
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: a_spool_custodian_of_the_ward_serves
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: a_retired_spool_pledge_is_not_standing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: own_custody_blob_names_the_ward_for_a_replicated_copy
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: a_local_unanchored_death_witness_uses_the_spool_peers_self_agent_as_ward
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: an_anchored_death_witness_never_uses_the_local_spool_fallback
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: a_digest_custody_commitment_serves_even_when_the_ward_is_unresolved
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: wrong_action_or_wrong_spool_classification_never_grants_local_standing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: conductor_fallback_is_positive_negative_single_flight_and_ttl_cached
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: wrong_action_or_wrong_classification_never_grants_conductor_standing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: iroh_requester_uses_the_same_positive_conductor_fallback
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: digest_key_collapses_all_three_accepted_address_renderings
+        kind: unit
+      - path: elohim/elohim-storage/src/services/spool_ingest.rs
+        testName: witness_row_stamps_the_resolved_self_agent_when_the_passport_has_no_node
+        kind: unit
+      - path: elohim/elohim-storage/src/services/spool_ingest.rs
+        testName: witness_row_preserves_the_passport_or_none_when_self_agent_is_unresolved
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/identity_map.rs
+        testName: competing_bindings_choose_verified_before_newer_unverified
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: a_private_row_is_omitted_from_a_strangers_list_page
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: a_private_row_is_present_in_a_custodians_list_page
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_content_refuses_a_stranger_with_reach_withheld
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_blob_refuses_when_every_referencing_row_is_private
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_blob_without_pool_fails_closed_as_authority_unavailable
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_blob_without_resolver_fails_closed_as_authority_unavailable
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_blob_reference_query_failure_fails_closed
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: get_blob_serves_a_digest_custodian_when_the_ward_is_unresolved
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: bare_hex_private_reference_is_matched_and_withheld
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: an_unreferenced_blob_still_serves_to_a_stranger
+        kind: unit
+      - path: elohim/elohim-storage/src/shard_service.rs
+        testName: every_non_private_reach_is_unchanged_at_all_three_serve_sites
+        kind: unit
+      - path: elohim/elohim-storage/tests/iroh_shard_real_backend.rs
+        testName: an_unresolved_iroh_requester_is_withheld_the_private_row_but_not_the_public_one
+        kind: integration
+    gapNote: >
+      C5 remains partial in this slice: projection timing can expose an otherwise exact live
+      custody row before dht_anchor_hash is populated, so standing does not yet require anchor
+      presence. Every such grant emits DEBUG with commitment id, provider, and ward. Close this
+      gap when projection ordering can make anchor presence an invariant without withholding a
+      freshly notarized custodian during convergence.

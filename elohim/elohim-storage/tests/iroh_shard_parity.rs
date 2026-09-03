@@ -21,7 +21,11 @@ struct FixedShardBackend;
 
 #[async_trait::async_trait]
 impl ShardBackend for FixedShardBackend {
-    async fn handle(&self, req: ShardRequest) -> ShardResponse {
+    async fn handle(
+        &self,
+        _requester: &elohim_storage::services::custody_standing::Requester,
+        req: ShardRequest,
+    ) -> ShardResponse {
         match req {
             ShardRequest::Get { hash: _ } => ShardResponse::Data(b"shard-bytes-phase7".to_vec()),
             ShardRequest::Have { hash: _ } => ShardResponse::Have(true),

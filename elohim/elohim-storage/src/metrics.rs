@@ -840,6 +840,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// `private`-reach rows (and the bytes only they reference) WITHHELD from a
+    /// peer on the shard replication plane, by serve site and refusal reason.
+    ///
+    /// The `list_content` site is the one a caller cannot see: a withheld row is
+    /// simply absent from the page, so the count IS the observability (C4/C8).
+    /// `get_content` and `get_blob` also answer a typed `reach-withheld: …`
+    /// error on the wire. Every (site, reason) combination is pre-touched at
+    /// registration so a gate that has never fired reads as a measured zero
+    /// rather than an absent series.
+    ///
+    /// Decided by [`crate::private_reach::private_serve_verdict`]; resolved by
+    /// [`crate::services::custody_standing`]. Station 3b (M9).
+    pub static ref PRIVATE_WITHHELD: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "storage_private_withheld_total",
+            "Private-reach rows withheld from a peer on the shard replication plane, by site (list_content | get_content | get_blob) and reason (unresolved-requester | no-standing | ward-unresolved | authority-unavailable).",
+        ),
+        &["site", "reason"],
+    )
+    .unwrap();
+
     /// Shard-push targets SKIPPED because the selected `agent_cid` had no known
     /// libp2p transport binding (`peer_transport_manifest` + `peer_identity_bindings`
     /// both missed). Before the push-side resolver, distribution errored on EVERY
@@ -2422,6 +2443,17 @@ pub fn register_all() {
             for reason in CustodyRotationSkip::ALL {
                 CUSTODY_ROTATION_SKIPPED
                     .with_label_values(&[reason.label()])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(PRIVATE_WITHHELD.clone()));
+        // Pre-touch all 3 sites x 4 reasons — a gate that has never withheld
+        // must read as a measured zero, never as an absent series (the whole
+        // point of counting an omission a caller cannot see).
+        for site in PRIVATE_WITHHOLD_SITES {
+            for reason in crate::private_reach::WithholdReason::ALL {
+                PRIVATE_WITHHELD
+                    .with_label_values(&[site, reason.label()])
                     .inc_by(0);
             }
         }
@@ -4129,6 +4161,34 @@ pub fn inc_custody_rotation_skipped(reason: CustodyRotationSkip) {
     CUSTODY_ROTATION_SKIPPED
         .with_label_values(&[reason.label()])
         .inc();
+}
+
+/// The three sites that can withhold a `private` row on the shard replication
+/// plane. Closed set — it bounds `storage_private_withheld_total`'s cardinality
+/// and is the vocabulary the pre-touch loop and every call site share.
+pub const PRIVATE_WITHHOLD_SITE_LIST_CONTENT: &str = "list_content";
+pub const PRIVATE_WITHHOLD_SITE_GET_CONTENT: &str = "get_content";
+pub const PRIVATE_WITHHOLD_SITE_GET_BLOB: &str = "get_blob";
+pub const PRIVATE_WITHHOLD_SITES: [&str; 3] = [
+    PRIVATE_WITHHOLD_SITE_LIST_CONTENT,
+    PRIVATE_WITHHOLD_SITE_GET_CONTENT,
+    PRIVATE_WITHHOLD_SITE_GET_BLOB,
+];
+
+/// Record one withheld `private` row. `site` must come from
+/// [`PRIVATE_WITHHOLD_SITES`].
+pub fn inc_private_withheld(site: &str, reason: crate::private_reach::WithholdReason) {
+    PRIVATE_WITHHELD
+        .with_label_values(&[site, reason.label()])
+        .inc();
+}
+
+/// Current value of one `storage_private_withheld_total` series. Process-wide,
+/// so callers compare a before/after delta rather than an absolute.
+pub fn private_withheld_count(site: &str, reason: crate::private_reach::WithholdReason) -> u64 {
+    PRIVATE_WITHHELD
+        .with_label_values(&[site, reason.label()])
+        .get()
 }
 
 /// Current value of one [`CUSTODY_ROTATION_SKIPPED`] series. The counter is

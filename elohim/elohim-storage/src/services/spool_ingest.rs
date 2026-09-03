@@ -23,6 +23,9 @@ pub struct SpoolIngest {
     content: Arc<ContentService>,
     blobs: Arc<BlobStore>,
     cfg: SpoolIngestConfig,
+    /// This storage peer's canonical Holochain agent CID, resolved at
+    /// composition time. Never a transport id.
+    self_agent: Option<String>,
     seen: HashSet<String>,
 }
 
@@ -32,11 +35,13 @@ impl SpoolIngest {
         cfg: SpoolIngestConfig,
         content: Arc<ContentService>,
         blobs: Arc<BlobStore>,
+        self_agent: Option<String>,
     ) -> Self {
         Self {
             content,
             blobs,
             cfg,
+            self_agent,
             seen: HashSet::new(),
         }
     }
@@ -137,8 +142,12 @@ impl SpoolIngest {
             }
 
             if !row_exists {
-                self.content
-                    .create(witness_content_input(&witness, &filename_cid, &bytes))?;
+                self.content.create(witness_content_input(
+                    &witness,
+                    &filename_cid,
+                    &bytes,
+                    self.self_agent.as_deref(),
+                ))?;
             }
 
             // Deliberately after the private row: blob_reach treats row-less bytes as servable.
@@ -188,6 +197,7 @@ pub fn witness_content_input(
     witness: &DeathWitness,
     cid: &str,
     bytes: &[u8],
+    self_agent: Option<&str>,
 ) -> CreateContentInput {
     let (blob_cid, blob_hash) = BlobStore::compute_addresses(bytes);
     let metadata = serde_json::json!({
@@ -216,7 +226,14 @@ pub fn witness_content_input(
         content_size_bytes: Some(i32::try_from(bytes.len()).unwrap_or(i32::MAX)),
         metadata_json: Some(metadata.to_string()),
         reach: "private".to_string(),
-        created_by: witness.passport.node.clone(),
+        // The mesh berth passport has no node. Prefer this peer's resolved
+        // agent CID so its local unanchored row still names the ward; when it
+        // is unavailable, preserve the passport value/None. The composition
+        // root resolves this through the same session/cell-key seam used by
+        // custody authoring, so a transport id can never be stamped here.
+        created_by: self_agent
+            .map(str::to_string)
+            .or_else(|| witness.passport.node.clone()),
         tags: Vec::new(),
         content_body: None,
         dht_anchor_hash: None,
@@ -296,6 +313,36 @@ mod tests {
         bytes
     }
 
+    #[test]
+    fn witness_row_stamps_the_resolved_self_agent_when_the_passport_has_no_node() {
+        let mut death_witness = witness(2_000);
+        death_witness.passport.node = None;
+        let bytes = death_witness.canonical_bytes().unwrap();
+        let cid = death_witness.cid().unwrap();
+        let row =
+            witness_content_input(&death_witness, &cid, &bytes, Some("uhCAkResolvedSelfAgent"));
+        assert_eq!(row.created_by.as_deref(), Some("uhCAkResolvedSelfAgent"));
+    }
+
+    #[test]
+    fn witness_row_preserves_the_passport_or_none_when_self_agent_is_unresolved() {
+        let death_witness = witness(2_000);
+        let bytes = death_witness.canonical_bytes().unwrap();
+        let cid = death_witness.cid().unwrap();
+        let row = witness_content_input(&death_witness, &cid, &bytes, None);
+        assert_eq!(
+            row.created_by.as_deref(),
+            death_witness.passport.node.as_deref()
+        );
+
+        let mut unlabelled = death_witness;
+        unlabelled.passport.node = None;
+        let bytes = unlabelled.canonical_bytes().unwrap();
+        let cid = unlabelled.cid().unwrap();
+        let row = witness_content_input(&unlabelled, &cid, &bytes, None);
+        assert_eq!(row.created_by, None);
+    }
+
     async fn ingester(
         spool_root: &Path,
         blob_root: &Path,
@@ -316,6 +363,7 @@ mod tests {
             },
             Arc::clone(&content),
             Arc::clone(&blobs),
+            None,
         );
         (ingest, content, blobs, pool)
     }

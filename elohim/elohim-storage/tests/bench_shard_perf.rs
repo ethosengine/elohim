@@ -183,7 +183,11 @@ mod iroh_bench {
 
     #[async_trait::async_trait]
     impl ShardBackend for FixedShardBackend {
-        async fn handle(&self, req: ShardRequest) -> ShardResponse {
+        async fn handle(
+            &self,
+            _requester: &elohim_storage::services::custody_standing::Requester,
+            req: ShardRequest,
+        ) -> ShardResponse {
             match req {
                 ShardRequest::Get { .. } => ShardResponse::Data(self.data.clone()),
                 ShardRequest::Have { .. } => ShardResponse::Have(true),

@@ -1290,15 +1290,19 @@ mod tests {
     /// iroh-only peer refused EVERY inventory exchange.
     #[test]
     fn inventory_budget_fits_the_deployed_reader_floor() {
-        assert!(
-            INVENTORY_PAYLOAD_BUDGET + INVENTORY_ENVELOPE_RESERVE <= IROH_DEPLOYED_READER_FLOOR,
-            "a sender page must be decodable by the oldest deployed iroh reader"
-        );
+        const {
+            assert!(
+                INVENTORY_PAYLOAD_BUDGET + INVENTORY_ENVELOPE_RESERVE <= IROH_DEPLOYED_READER_FLOOR,
+                "a sender page must be decodable by the oldest deployed iroh reader"
+            );
+        }
         #[cfg(feature = "p2p-iroh")]
-        assert!(
-            crate::p2p_iroh::view_fed::MAX_PAYLOAD >= MAX_PAYLOAD,
-            "the iroh reader cap must be at least as liberal as the libp2p plane's"
-        );
+        const {
+            assert!(
+                crate::p2p_iroh::view_fed::MAX_PAYLOAD >= MAX_PAYLOAD,
+                "the iroh reader cap must be at least as liberal as the libp2p plane's"
+            );
+        }
     }
 
     #[test]

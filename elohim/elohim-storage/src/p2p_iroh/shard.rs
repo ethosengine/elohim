@@ -27,6 +27,7 @@ use iroh::{
 
 use super::codec::{read_frame_default, write_frame};
 use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
+use crate::services::custody_standing::Requester;
 
 /// Iroh-side ALPN for shard transfer. Distinct from libp2p's
 /// `/elohim/shard/1.0.0` — version 2.0.0 marks "iroh transport,
@@ -39,7 +40,12 @@ pub const SHARD_ALPN: &[u8] = b"/elohim/shard/2.0.0";
 
 #[async_trait::async_trait]
 pub trait ShardBackend: Send + Sync + 'static {
-    async fn handle(&self, req: ShardRequest) -> ShardResponse;
+    /// Answer `req` on behalf of an identified `requester`.
+    ///
+    /// The requester is what makes the station-3b custody gate possible on this
+    /// transport: before it, [`IrohShardProtocol::accept`] held the
+    /// [`Connection`] — and therefore the remote `NodeId` — and discarded it.
+    async fn handle(&self, requester: &Requester, req: ShardRequest) -> ShardResponse;
 }
 
 #[derive(Clone)]
@@ -61,13 +67,22 @@ impl std::fmt::Debug for IrohShardProtocol {
 
 impl ProtocolHandler for IrohShardProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        // Resolved ONCE per connection: the remote `NodeId` is a property of the
+        // QUIC connection, not of a stream. A connection that cannot name its
+        // peer yields `Requester::iroh("")`, which resolves to no agent and so
+        // fails closed on every private row.
+        let requester = connection
+            .remote_node_id()
+            .ok()
+            .map(|node_id| Requester::iroh(node_id.to_string()))
+            .unwrap_or_else(|| Requester::iroh(String::new()));
         loop {
             let (mut send, mut recv) = match connection.accept_bi().await {
                 Ok(streams) => streams,
                 Err(_) => return Ok(()),
             };
             let req: ShardRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
-            let res = self.backend.handle(req).await;
+            let res = self.backend.handle(&requester, req).await;
             write_frame(&mut send, &res).await.map_err(io_to_accept)?;
             send.finish()
                 .map_err(|e| AcceptError::from_err(io::Error::other(e.to_string())))?;

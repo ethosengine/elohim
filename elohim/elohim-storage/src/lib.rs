@@ -67,6 +67,7 @@ pub mod epr_head;
 pub mod epr_service;
 pub mod error;
 pub mod graduation; // Graduation evaluator — observations to attestations/events
+pub mod private_reach; // Custody-scoped read gate for `private` rows on the shard replication plane
 
 // The native content-graph seam — read-only trait + resolved-edge value types.
 // Unconditional (NOT graph-native-gated): the trait is the interface a native

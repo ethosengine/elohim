@@ -28,8 +28,13 @@ use elohim_storage::p2p_iroh::{
     parity_harness::TwoNodeFixture, AlpnRegistration, IrohShardClient, IrohShardProtocol,
     ShardBackend, ShardServiceBackend, SHARD_ALPN,
 };
+use elohim_storage::services::custody_standing::ProjectionCustodyStanding;
 use elohim_storage::shard_service::ShardService;
 use tempfile::tempdir;
+
+/// Ark passport `node` of the berth that produced the witness — an agent CID,
+/// so the serving peer can name the ward from the row alone.
+const WARD: &str = "uhCAkWardAgentKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 async fn build_real_backend_with_blob_store() -> (Arc<dyn ShardBackend>, Arc<BlobStore>) {
     // Caller manages the BlobStore so the test can pre-seed bytes.
@@ -40,7 +45,10 @@ async fn build_real_backend_with_blob_store() -> (Arc<dyn ShardBackend>, Arc<Blo
     // exits. (Alternative: thread the TempDir handle out alongside the
     // backend; chosen this way to keep the helper signature small.)
     Box::leak(Box::new(dir));
-    let service = Arc::new(ShardService::new(blob_store.clone(), None));
+    let pool = gate_pool();
+    let standing = Arc::new(ProjectionCustodyStanding::new(pool.clone()));
+    let service =
+        Arc::new(ShardService::new(blob_store.clone(), Some(pool)).with_custody_standing(standing));
     let backend: Arc<dyn ShardBackend> = Arc::new(ShardServiceBackend::new(service));
     (backend, blob_store)
 }
@@ -185,9 +193,19 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
 async fn list_content_without_db_pool_via_iroh_errors() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
-
-    let (fixture, _blob_store) =
-        fixture_with_real_provider_backend(provider_dir.path(), fetcher_dir.path()).await?;
+    let blob_dir = tempdir().unwrap();
+    let blob_store = Arc::new(BlobStore::new(blob_dir.path().to_path_buf()).await?);
+    let service = Arc::new(ShardService::new(blob_store, None));
+    let backend: Arc<dyn ShardBackend> = Arc::new(ShardServiceBackend::new(service));
+    let handler = IrohShardProtocol::new(backend);
+    let provider_extras: Vec<AlpnRegistration> = vec![(SHARD_ALPN.to_vec(), Box::new(handler))];
+    let fixture = TwoNodeFixture::new_asymmetric(
+        provider_dir.path(),
+        provider_extras,
+        fetcher_dir.path(),
+        Vec::new(),
+    )
+    .await?;
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());
     let res = client
@@ -243,6 +261,165 @@ async fn list_content_with_unknown_reach_via_iroh_errors() -> Result<()> {
             );
         }
         other => panic!("expected Error, got {other:?}"),
+    }
+
+    fixture.shutdown().await?;
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Station 3b (M9) — the custody gate, over the real iroh ALPN
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn gate_pool() -> elohim_storage::db::DbPool {
+    use diesel::r2d2::{ConnectionManager, Pool};
+    let url = format!(
+        "file:iroh_shard_gate_{}?mode=memory&cache=shared",
+        uuid::Uuid::new_v4().as_simple()
+    );
+    let pool = Pool::builder()
+        .max_size(1)
+        .build(ConnectionManager::<diesel::SqliteConnection>::new(&url))
+        .expect("pool");
+    elohim_storage::db::run_migrations(&pool).expect("migrations");
+    pool
+}
+
+fn seed_row(pool: &elohim_storage::db::DbPool, id: &str, reach: &str, blob_hash: Option<&str>) {
+    let mut conn = pool.get().expect("conn");
+    elohim_storage::db::content_diesel::create_content(
+        &mut conn,
+        &elohim_storage::db::AppContext::default_lamad(),
+        elohim_storage::db::content_diesel::CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "issue-report".to_string(),
+            content_format: "json".to_string(),
+            blob_hash: blob_hash.map(str::to_string),
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: Some(WARD.to_string()),
+            tags: Vec::new(),
+            content_body: None,
+            dht_anchor_hash: None,
+        },
+    )
+    .expect("seed content row");
+}
+
+/// A provider holding one `private` witness (bytes present) and one `public`
+/// row, gated by the REAL process-shaped `ProjectionCustodyStanding` injected
+/// into the service (the production composition root shares one across both
+/// transports).
+async fn fixture_with_gated_provider(
+    provider_dir: &std::path::Path,
+    fetcher_dir: &std::path::Path,
+) -> Result<(TwoNodeFixture, String)> {
+    let dir = tempdir().unwrap();
+    let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+    Box::leak(Box::new(dir));
+    let stored = blob_store.store(b"death witness bytes").await.unwrap();
+
+    let pool = gate_pool();
+    seed_row(&pool, "witness-private", "private", Some(&stored.hash));
+    seed_row(&pool, "notice-public", "public", None);
+
+    let standing = Arc::new(ProjectionCustodyStanding::new(pool.clone()));
+    let service =
+        Arc::new(ShardService::new(blob_store, Some(pool)).with_custody_standing(standing));
+    let backend: Arc<dyn ShardBackend> = Arc::new(ShardServiceBackend::new(service));
+    let handler = IrohShardProtocol::new(backend);
+    let provider_extras: Vec<AlpnRegistration> = vec![(SHARD_ALPN.to_vec(), Box::new(handler))];
+    let fixture =
+        TwoNodeFixture::new_asymmetric(provider_dir, provider_extras, fetcher_dir, Vec::new())
+            .await?;
+    Ok((fixture, stored.hash))
+}
+
+/// The station-3b assertion on the iroh transport: a fetcher whose `NodeId` the
+/// provider cannot resolve to an agent (no `peer_transport_manifest` row) is
+/// withheld the `private` row and its bytes — and is still served the `public`
+/// one, so the refusal is a custody gate and not an outage.
+#[tokio::test]
+async fn an_unresolved_iroh_requester_is_withheld_the_private_row_but_not_the_public_one(
+) -> Result<()> {
+    let provider_dir = tempdir().unwrap();
+    let fetcher_dir = tempdir().unwrap();
+    let (fixture, hash) =
+        fixture_with_gated_provider(provider_dir.path(), fetcher_dir.path()).await?;
+    let client = IrohShardClient::new(fixture.fetcher.endpoint());
+
+    // 1. The page omits the private row and keeps the public one.
+    let res = client
+        .request(
+            fixture.provider_addr.clone(),
+            &ShardRequest::ListContent {
+                reach_filter: None,
+                offset: 0,
+                limit: 50,
+            },
+        )
+        .await?;
+    match res {
+        ShardResponse::ContentList { items, .. } => {
+            let ids: Vec<&str> = items.iter().map(|i| i.id.as_str()).collect();
+            assert!(
+                !ids.contains(&"witness-private"),
+                "an unresolved iroh peer must not see the private witness: {ids:?}"
+            );
+            assert!(
+                ids.contains(&"notice-public"),
+                "only `private` moves in this station; the public row must still list: {ids:?}"
+            );
+        }
+        other => panic!("expected ContentList, got {other:?}"),
+    }
+
+    // 2. The record is REFUSED, not reported missing (C4).
+    let res = client
+        .request(
+            fixture.provider_addr.clone(),
+            &ShardRequest::GetContent {
+                id: "witness-private".into(),
+            },
+        )
+        .await?;
+    match res {
+        ShardResponse::Error(msg) => assert!(
+            msg.starts_with("reach-withheld: "),
+            "typed refusal expected over the ALPN, got: {msg}"
+        ),
+        other => panic!("a refusal must never arrive as an absence, got {other:?}"),
+    }
+
+    // 3. The bytes are refused too — the byte leg is where the HTTP path's
+    //    asymmetry used to live.
+    let res = client
+        .request(fixture.provider_addr.clone(), &ShardRequest::Get { hash })
+        .await?;
+    match res {
+        ShardResponse::Error(msg) => assert!(
+            msg.starts_with("reach-withheld: "),
+            "private bytes must be refused over the ALPN, got: {msg}"
+        ),
+        other => panic!("expected a reach-withheld refusal, got {other:?}"),
+    }
+
+    // 4. And a public row's record still serves — non-vacuity of the above.
+    let res = client
+        .request(
+            fixture.provider_addr.clone(),
+            &ShardRequest::GetContent {
+                id: "notice-public".into(),
+            },
+        )
+        .await?;
+    match res {
+        ShardResponse::Content(record) => assert_eq!(record.id, "notice-public"),
+        other => panic!("expected the public record to serve, got {other:?}"),
     }
 
     fixture.shutdown().await?;

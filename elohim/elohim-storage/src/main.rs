@@ -1330,39 +1330,6 @@ async fn async_main(
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
 
-    match config.ark_spool_path.clone() {
-        Some(spool_root) => {
-            if let Some(pool) = db_pool.clone() {
-                let content = Arc::new(elohim_storage::services::ContentService::new(
-                    pool,
-                    elohim_storage::db::AppContext::default_lamad(),
-                    Arc::new(elohim_storage::services::events::EventBus::new()),
-                ));
-                let poll = std::time::Duration::from_secs(config.ark_spool_poll_seconds);
-                info!(
-                    spool_root = %spool_root.display(),
-                    poll_secs = config.ark_spool_poll_seconds,
-                    "spool-ingest: watcher ACTIVE"
-                );
-                elohim_storage::services::spool_ingest::SpoolIngest::new(
-                    elohim_storage::services::spool_ingest::SpoolIngestConfig { spool_root, poll },
-                    content,
-                    Arc::clone(&blob_store),
-                )
-                .spawn();
-            } else {
-                warn!(
-                    spool_root = %spool_root.display(),
-                    "spool-ingest: watcher DISABLED because the content database is unavailable"
-                );
-            }
-        }
-        None => info!(
-            env = "ELOHIM_ARK_SPOOL_PATH",
-            "spool-ingest: watcher DISABLED (no path configured)"
-        ),
-    }
-
     // One-shot shard-manifest backfill (no-p2p build). The p2p build runs the
     // distribution-capable variant later, once the p2p handle exists; here we
     // only record manifests so legacy content stops reading as "unmeasured".
@@ -2717,6 +2684,58 @@ async fn async_main(
         info!("PeerStatus heartbeat disabled: no --admin-url / HOLOCHAIN_ADMIN_URL set");
     }
 
+    // Start ark-spool ingest only after the conductor registry is available so
+    // an unlabelled mesh berth can stamp its witness row with this peer's real
+    // agent CID. The fallback remains the passport node/None; never substitute
+    // a libp2p or iroh transport identity.
+    match config.ark_spool_path.clone() {
+        Some(spool_root) => {
+            if let Some(pool) = db_pool.clone() {
+                let self_agent = match (
+                    pool.get(),
+                    hc_registry_for_http
+                        .as_ref()
+                        .and_then(|registry| registry.lamad_client()),
+                ) {
+                    (Ok(mut conn), Some(hc)) => {
+                        elohim_storage::services::salvage_commitment_author::resolve_self_agent_cid(
+                            &mut conn, &hc,
+                        )
+                    }
+                    _ => None,
+                };
+                let content = Arc::new(elohim_storage::services::ContentService::new(
+                    pool,
+                    elohim_storage::db::AppContext::default_lamad(),
+                    Arc::new(elohim_storage::services::events::EventBus::new()),
+                ));
+                let poll = std::time::Duration::from_secs(config.ark_spool_poll_seconds);
+                info!(
+                    spool_root = %spool_root.display(),
+                    poll_secs = config.ark_spool_poll_seconds,
+                    self_agent_resolved = self_agent.is_some(),
+                    "spool-ingest: watcher ACTIVE"
+                );
+                elohim_storage::services::spool_ingest::SpoolIngest::new(
+                    elohim_storage::services::spool_ingest::SpoolIngestConfig { spool_root, poll },
+                    content,
+                    Arc::clone(&blob_store),
+                    self_agent,
+                )
+                .spawn();
+            } else {
+                warn!(
+                    spool_root = %spool_root.display(),
+                    "spool-ingest: watcher DISABLED because the content database is unavailable"
+                );
+            }
+        }
+        None => info!(
+            env = "ELOHIM_ARK_SPOOL_PATH",
+            "spool-ingest: watcher DISABLED (no path configured)"
+        ),
+    }
+
     // Create progress hub for WebSocket streaming
     let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
     info!("Progress hub initialized for WebSocket streaming");
@@ -2829,6 +2848,54 @@ async fn async_main(
     // call site until T9 wires reads/writes into `authorize_reach_for_human`.
     let verification_memo_store: std::sync::Arc<dyn elohim_storage::trust::VerificationMemoStore> =
         std::sync::Arc::new(elohim_storage::trust::memo::InMemoryVerificationMemoStore::new());
+
+    // Station 3b: one process-lifetime custody resolver and one ShardService
+    // are shared by libp2p and iroh. The resolver owns the positive/negative
+    // TTL cache and per-key single-flight, so rebuilding it per request would
+    // silently remove the conductor-call bound.
+    #[cfg(feature = "p2p")]
+    let shard_identity_map: Option<
+        Arc<dyn elohim_storage::p2p::identity_map::PeerIdentityMap>,
+    > = if args.enable_content_db {
+        db_pool.clone().map(|pool| {
+            Arc::new(elohim_storage::p2p::identity_map::HolochainBackedPeerIdentityMap::new(pool))
+                as Arc<dyn elohim_storage::p2p::identity_map::PeerIdentityMap>
+        })
+    } else {
+        None
+    };
+    let custody_standing = if args.enable_content_db {
+        db_pool.clone().map(|pool| {
+            let resolver =
+                elohim_storage::services::custody_standing::ProjectionCustodyStanding::new(pool)
+                    .with_conductor(
+                        hc_registry_for_http
+                            .as_ref()
+                            .and_then(|registry| registry.lamad_client()),
+                    )
+                    .with_spool_ingest(config.ark_spool_path.is_some());
+            #[cfg(feature = "p2p")]
+            let resolver = match shard_identity_map.as_ref() {
+                Some(identity_map) => resolver.with_libp2p_identity_map(identity_map.clone()),
+                None => resolver,
+            };
+            Arc::new(resolver)
+        })
+    } else {
+        None
+    };
+    let mut shared_shard_service = elohim_storage::shard_service::ShardService::new(
+        blob_store.clone(),
+        if args.enable_content_db {
+            db_pool.clone()
+        } else {
+            None
+        },
+    );
+    if let Some(resolver) = custody_standing.as_ref() {
+        shared_shard_service = shared_shard_service.with_custody_standing(resolver.clone());
+    }
+    let shared_shard_service = Arc::new(shared_shard_service);
 
     // Initialize P2P node if enabled.
     // Built when the backend is anything other than pure `Iroh` — i.e. for
@@ -3026,6 +3093,7 @@ async fn async_main(
 
         // Create P2P node with blob store access
         let mut p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
+        p2p_node = p2p_node.with_shard_service(shared_shard_service.clone());
 
         // Adopt-before-author, responder half: this node must be able to serve a
         // peer the serialized head Record behind its declared head, so the peer
@@ -3049,6 +3117,9 @@ async fn async_main(
                 p2p_node = p2p_node.with_policy_enforcement(enforcement);
                 info!("  P2P EPR resolution: DB pool + policy enforcement wired");
             }
+        }
+        if let Some(identity_map) = shard_identity_map.as_ref() {
+            p2p_node = p2p_node.with_identity_map(identity_map.clone());
         }
 
         // Wire the content graph engine so the libp2p EPR read path enforces the
@@ -3282,7 +3353,6 @@ async fn async_main(
             TrustServiceBackend, ViewFedServiceBackend, EPR_ALPN, EPR_ATOM_ALPN,
             IDENTITY_HANDSHAKE_ALPN, SHARD_ALPN, SYNC_ALPN, TRUST_ALPN, VIEW_FED_ALPN,
         };
-        use elohim_storage::shard_service::ShardService;
         use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
         use elohim_storage::trust_service::TrustService;
         use elohim_storage::view_fed_service::{libp2p_keypair_from_ed25519_bytes, ViewFedService};
@@ -3402,14 +3472,7 @@ async fn async_main(
         // automatically under iroh_blobs::ALPN). Per spec, the shard
         // ALPN exists for libp2p-fallback peers that can't use
         // iroh-blobs.
-        let shard_service = Arc::new(ShardService::new(
-            blob_store.clone(),
-            if args.enable_content_db {
-                db_pool.clone()
-            } else {
-                None
-            },
-        ));
+        let shard_service = shared_shard_service.clone();
         let shard_backend: Arc<dyn elohim_storage::p2p_iroh::ShardBackend> =
             Arc::new(ShardServiceBackend::new(shard_service.clone()));
         let shard_handler = IrohShardProtocol::new(shard_backend);

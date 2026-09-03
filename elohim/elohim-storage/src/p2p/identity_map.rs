@@ -257,6 +257,58 @@ mod tests {
         );
     }
 
+    #[test]
+    fn competing_bindings_choose_verified_before_newer_unverified() {
+        use crate::db::diesel_schema::peer_identity_bindings::dsl;
+        use crate::db::models::NewPeerIdentityBindingRow;
+
+        let pool = test_pool();
+        let peer = PeerId::random();
+        let peer_b58 = peer.to_base58();
+        let mut conn = pool.get().unwrap();
+        for (agent, anchor, observed_at) in [
+            ("uhCAkVerified", "anchor-verified", "2026-09-02T00:00:00Z"),
+            (
+                "uhCAkNewerUnverified",
+                "anchor-unverified",
+                "2026-09-03T00:00:00Z",
+            ),
+        ] {
+            diesel::insert_into(dsl::peer_identity_bindings)
+                .values(&NewPeerIdentityBindingRow {
+                    peer_id: peer_b58.clone(),
+                    agent_cid: agent.to_string(),
+                    dht_anchor_hash: anchor.to_string(),
+                    valid_from: "2026-01-01T00:00:00Z".to_string(),
+                    valid_until: None,
+                    observed_at: observed_at.to_string(),
+                    source: "dht".to_string(),
+                    device_archetype: "node".to_string(),
+                    superseded_by: None,
+                    signature: String::new(),
+                    proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
+                })
+                .execute(&mut conn)
+                .unwrap();
+        }
+        // Simulate the projection's verified classification. Production writers
+        // can only obtain this value from signature verification; the test is
+        // setting up the competing read state, not minting a binding.
+        diesel::update(
+            dsl::peer_identity_bindings.filter(dsl::dht_anchor_hash.eq("anchor-verified")),
+        )
+        .set(dsl::proof_status.eq(crate::p2p::binding_proof_wire::PROOF_STATUS_CROSS_SIGNED))
+        .execute(&mut conn)
+        .unwrap();
+        drop(conn);
+
+        let map = HolochainBackedPeerIdentityMap::new(pool);
+        assert_eq!(
+            map.lookup(&peer),
+            CallerIdentity::Agent("uhCAkVerified".to_string())
+        );
+    }
+
     // -------------------------------------------------------------------------
     // StubIdentityMap tests (legacy — kept for harness regression coverage)
     // -------------------------------------------------------------------------
