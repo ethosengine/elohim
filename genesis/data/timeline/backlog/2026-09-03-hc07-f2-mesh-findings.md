@@ -85,7 +85,11 @@ the PREVIOUS hApp — 2026-09-03: edge #1424 started 40 min before DNA #1425 cou
 edge build's own commit first and fall back to `dev-latest` only with a loud WARN; then verify the fetched bundle's
 `hc dna hash` per role against `elohim/holochain/dna/dna-hashes.baseline` and FAIL on mismatch unless the tip carries
 `[dna:migrate]` (the same rule the DNA pipeline's guard enforces). The memory trap "a same-wave dispatch bakes the
-PREVIOUS happ" becomes a build failure instead of a silent fleet roll.
+PREVIOUS happ" becomes a build failure instead of a silent fleet roll. Orchestrator half of the same defect
+(run #1801): the plan printed `[elohim-holochain + elohim] → elohim-edge`, but elohim-holochain is triggered
+fire-and-forget (longRunning) so edge started the moment the app build ended, and edge's failure then CASCADED an
+abort into the DNA build's sweettest shards (#1425 ABORTED, hApp never published). Edge must wait for a
+holochain build that is in its own plan, and a downstream failure must not cancel an upstream long-running build.
 
 ## 8. Apparatus, fixed on the branch (for the record)
 
