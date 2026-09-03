@@ -102,7 +102,17 @@ paths) in its writable layer on top of the 945 MB nextest archive and its extrac
 2026-07-30") — the operator regenerates the lock with nix and commits it (Lane E7's stated path); until then the
 resolution is repeated per pod and can drift.
 
-## 9. Apparatus, fixed on the branch (for the record)
+## 9. CI: storage quality gate's `cargo test --lib` panics on missing fixtures in the Docker context — STANDING
+
+`elohim/elohim-storage/src/services/release_adoption/verify.rs` tests read
+`../../genesis/a2o/scripts/__tests__/fixtures/*.json` and `../rakia/schemas/v1/release-manifest.schema.json` by
+relative path; the storage Dockerfile's build context copies neither, so the `check` stage's `cargo test --lib`
+panics ×20 ("fixture … unreadable") in every edge build — #1423 (0.6, before the cutover) and #1426 alike. It is
+"non-blocking while stabilizing", so it only marks edge UNSTABLE, and the gate is measuring nothing for that
+module. Fix: COPY the two fixture roots into the `check` stage (the path-dep COPY trap), or embed the fixtures with
+`include_str!`.
+
+## 10. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
