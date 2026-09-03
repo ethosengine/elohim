@@ -102,6 +102,16 @@ COPY elohim/elohim-render ./elohim-render
 # path-deps at metadata time regardless of features, so the directory must exist
 # or the build aborts at resolve: "failed to read /elohim-chrome-asset/Cargo.toml".
 COPY elohim/elohim-chrome-asset ./elohim-chrome-asset
+# elohim-ark-core (tevah/ark, 2026-09-02): non-optional path-dep of elohim-storage
+# since the ark spool ingest (c25728639). Flattened /app layout: from /app/ark/core its
+# own deps resolve as ../../epr → /app/epr and ../../elohim-compute → /app/elohim-compute
+# (both COPYd above), ../../epr-rea → /app/epr-rea (COPYd here — first image consumer of
+# elohim-epr-rea), and ../../../crates/seam-contracts → /crates, which does NOT exist in
+# this layout — sed-rewritten below to ../../crates/seam-contracts. Both crates use
+# workspace inheritance; inlined below. Without these COPYs the build aborts at resolve:
+#   error: failed to read `/ark/core/Cargo.toml` (edge #1421, 2026-09-03).
+COPY elohim/ark/core ./ark/core
+COPY elohim/epr-rea ./epr-rea
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -145,6 +155,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-render"|path = "elohim-render"|' Cargo.toml && \
     sed -i 's|path = "../elohim-chrome-asset"|path = "elohim-chrome-asset"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
+    sed -i 's|path = "../ark/core"|path = "ark/core"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
@@ -239,6 +250,26 @@ RUN sed -i \
     -e 's|serde.workspace = true|serde = { version = "1.0", features = ["derive"] }|' \
     -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
     elohim-chrome-asset/Cargo.toml
+
+# elohim-ark-core + elohim-epr-rea (2026-09-02) use workspace inheritance too — inline
+# the values (versions = elohim/Cargo.toml [workspace.dependencies]); ark-core's
+# seam-contracts path needs one fewer `../` in the flattened layout.
+RUN sed -i \
+    -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
+    -e 's|serde = { workspace = true }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json = { workspace = true }|serde_json = "1.0"|' \
+    -e 's|serde_ipld_dagcbor = { workspace = true }|serde_ipld_dagcbor = "0.6"|' \
+    -e 's|cid = { workspace = true }|cid = { version = "0.11", features = ["serde-codec"] }|' \
+    -e 's|chrono = { workspace = true }|chrono = { version = "0.4", features = ["serde"] }|' \
+    -e 's|thiserror = { workspace = true }|thiserror = "2.0"|' \
+    -e 's|sha2 = { workspace = true }|sha2 = "0.10"|' \
+    -e 's|hex = { workspace = true }|hex = "0.4"|' \
+    ark/core/Cargo.toml && \
+    sed -i \
+    -e 's|serde = { workspace = true, features = \["derive"\] }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
+    epr-rea/Cargo.toml
 
 # Create dummy src + bench placeholders to build dependencies.
 # Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
