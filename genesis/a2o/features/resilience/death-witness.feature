@@ -43,9 +43,12 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     waiting). The witness carries the passport at the moment of death.
   - REACH is who may read a record. A witness is readable by the household
     and its custodians and refused to anyone else.
-  - The ATOM HOME is the page in the app that shows one record. It has a
-    REACH CHIP (who may see this) and a FOCAL SLOT (the main area, which
-    renders the record by its kind instead of dumping raw data).
+  - The ATOM HOME is the page in the app that shows one record; a death
+    witness is one kind of record it renders. It has a REACH CHIP (who may
+    see this) and a FOCAL SLOT (the main area, which renders the record by
+    its kind instead of dumping raw data).
+  - An ANONYMOUS CALLER is a request carrying no authenticated peer or human
+    identity at all — the network's stranger.
 
   The incident this story exists to make sayable, 2026-09-02: seven
   conductors died the same way and only a cluster administrator could read
@@ -61,10 +64,11 @@ Feature: Death witness — a peer's runtime tells its household why a child died
   # Every peer named here is a dedicated drill fixture on that mesh (see
   # chaos-peer-churn.feature). Jessica, Matthew, and James are fixture household humans.
   #
-  # Every station is @wip until the household mesh launches its conductors under the
-  # envelope (spec §11 S0); before that the conductor is nobody's child on the mesh and
-  # every assertion below would be vacuous by construction. Stations are decomposed so
-  # the finish line (station 4) is untouched as earlier stations land.
+  # S0 landed 2026-09-02: the household mesh launches its conductors under the envelope
+  # (`MESH_CONDUCTOR_LAUNCH=ark`), so stations 1 and 2 are live; 3a, 3b and 4 stay @wip
+  # until S1 lands rendering, reach enforcement and anchoring. Without the envelope every
+  # assertion below would be vacuous by construction — the Background refuses to run then.
+  # Stations are decomposed so the finish line (station 4) is untouched as earlier stations land.
   #
   # Reused steps: the household-mesh fixture + processControl (household-chaos.steps.ts),
   # custody assertions ("under custody on all N household peers"), the atom-home render
@@ -85,7 +89,10 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     And the witness names the hash of the conductor program the envelope actually started
     And the witness carries Jessica's passport as it stood at the moment of death
 
-  # Budget measured 2026-09-03 on the household mesh: kill → ward row (≤5 s ingest) → shard replication
+  # The custody commitment is a fixture here: the prologue's `seed-spool-custody` leg has each custodian
+  # author a standing custody-spool commitment on ITS OWN conductor (authorship is the counter-signature);
+  # the story of offering and accepting that commitment between humans is a later feature.
+  # Budget measured on 2026-09-03, after S0 landed, on the household mesh: kill → ward row (≤5 s ingest) → shard replication
   # tick (10 s dial) with paged peer round trips (~40 s under host load) → custody-blob authored on the
   # custodian's own conductor (5 s sweep) → bytes already pulled by replication; 60 s was an MVP guess.
   @station-2
@@ -114,5 +121,6 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     Given Jessica's conductor was killed with SIGKILL and a witness was written
     When Jessica's conductor is restarted by the envelope
     Then the incident is anchored on the network from Jessica's own conductor
+    And another household peer can fetch the anchored incident by its content hash
     And the incident counts exactly one death and one restart
     And Jessica's passport records the new incarnation and the verdict "restart"
