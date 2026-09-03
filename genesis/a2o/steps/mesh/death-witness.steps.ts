@@ -86,6 +86,21 @@ interface DeathWitnessState {
   wardAgent?: string;
   /** Station 2: the one sha256 digest behind every rendering of the witness. */
   witnessDigest?: string;
+  /**
+   * Station 3b: the blob address (`blobHash` or `blobCid`) the non-vacuity
+   * control read off Jessica's own credentialled response — the anonymous
+   * probe fetches this same address, never a hash the scenario invents.
+   */
+  witnessBlobRef?: string;
+  /** Station 3b: what an anonymous caller received on both routes. */
+  anonymousFetch?: {
+    rowStatus: number;
+    rowBody: string;
+    blobStatus: number;
+    blobBody: string;
+  };
+  /** Station 3b-ii: the late joiner staged with no custody standing for Jessica. */
+  lateJoiner?: { name: string; url: string; nodeId: string };
 }
 
 const scenarioStates = new WeakMap<E2EWorld, DeathWitnessState>();
@@ -795,5 +810,264 @@ Then(
           `(${[...jessica].join(' | ')})`
       );
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Station 3b — a stranger is refused
+// ---------------------------------------------------------------------------
+
+/**
+ * The row's own reach ("private") is the ONE credential this HTTP boundary
+ * recognises: `handle_db_content_by_id` (elohim-storage/src/http.rs) resolves
+ * `X-Agent-Cid` to a Human and then, for `private`, requires that Human be the
+ * row's OWN recorded creator (`epr_service::authorize_reach_for_human`, the
+ * "self"|"private" arm) — there is no separate admin key or admin listing on
+ * this crate (`API_KEY_ADMIN` is a doorway-service concept; storage's
+ * `/db/content` list route runs the identical per-row gate, so it grants
+ * nothing a credentialled single-item GET does not already grant). So the
+ * non-vacuity control presents Jessica's OWN agent key — the household's
+ * canonical "credential the substrate honours" (station 2 already trusts this
+ * value via `requireAgentKey`) — to her OWN row, and requires 200. A control
+ * that cannot even read its own witness this way would make the anonymous
+ * refusal below meaningless, so it fails loudly rather than degrading.
+ */
+function asHouseholdPeer(name: string): HouseholdPeer {
+  assert.ok(
+    (HOUSEHOLD_PEERS as readonly string[]).includes(name),
+    `"${name}" is not a household peer (expected one of ${HOUSEHOLD_PEERS.join(', ')})`
+  );
+  return name as HouseholdPeer;
+}
+
+Given("Jessica's peer holds a death witness", { timeout: 20_000 }, async function (this: E2EWorld) {
+  const state = scenario(this);
+  if (!state.witnessRow) {
+    const rows = listWitnesses(JESSICA);
+    assert.ok(
+      rows.length > 0,
+      "Jessica's peer holds no death witness yet — run station 1 first, or in the same " +
+        'scenario, so there is something for a stranger to be refused'
+    );
+    state.witnessRow = rows.at(-1);
+    state.witness = undefined;
+  }
+  assert.ok(state.witnessRow, 'unreachable: witnessRow was just resolved or already present');
+  // ark witness show — the local-disk proof the row exists, independent of
+  // any HTTP credential (the same call station 1/2 already rely on).
+  selectedWitness(this);
+  const cid = state.witnessRow.cid;
+  state.witnessDigest ??= witnessDigestOf(cid);
+
+  const { url, agentPubKey } = meshPeer(JESSICA);
+  assert.ok(
+    agentPubKey,
+    'the household fixture records no agentPubKey for "jessica" — restart the mesh so ' +
+      'hc-mesh.sh restamps it'
+  );
+  const control = await getRaw(`${url}/db/content/${cid}`, {
+    headers: { 'X-Agent-Cid': agentPubKey },
+  });
+  assert.equal(
+    control.status,
+    200,
+    `NON-VACUITY CONTROL FAILED: Jessica's own peer refused HER OWN credentialled read of ` +
+      `her witness "${cid}" (status ${control.status}, body: ${control.text.slice(0, 200)}). ` +
+      'Without a caller the substrate WILL serve this row to, an anonymous refusal below ' +
+      "proves nothing — either the row's reach widened, or the row's recorded creator no " +
+      "longer matches Jessica's agentPubKey (check `createdBy` against the ward-resolution " +
+      'note in the station-3b plan).'
+  );
+  let blobRef: string | undefined;
+  try {
+    const body = JSON.parse(control.text) as { blobHash?: string; blobCid?: string };
+    blobRef = body.blobHash ?? body.blobCid ?? undefined;
+  } catch {
+    blobRef = undefined;
+  }
+  state.witnessBlobRef = blobRef ?? state.witnessDigest;
+});
+
+When(
+  'an anonymous caller fetches that witness on peer {string}',
+  { timeout: 20_000 },
+  async function (this: E2EWorld, peerName: string) {
+    const state = scenario(this);
+    assert.ok(
+      state.witnessRow,
+      'no witness was resolved for this scenario — the Given step did not run'
+    );
+    assert.ok(
+      state.witnessBlobRef,
+      'no blob reference was resolved for the witness — the Given step did not run'
+    );
+    const cid = state.witnessRow.cid;
+    const blobRef = state.witnessBlobRef;
+    const { url } = meshPeer(asHouseholdPeer(peerName));
+    // No headers at all: the network's stranger, per the glossary.
+    const row = await getRaw(`${url}/db/content/${cid}`);
+    const blob = await getRaw(`${url}/blob/${encodeURIComponent(blobRef)}`);
+    state.anonymousFetch = {
+      rowStatus: row.status,
+      rowBody: row.text,
+      blobStatus: blob.status,
+      blobBody: blob.text,
+    };
+  }
+);
+
+Then('the fetch was refused with a non-success status', function (this: E2EWorld) {
+  const state = scenario(this);
+  const fetch = state.anonymousFetch;
+  assert.ok(fetch, 'no anonymous fetch was captured — the When step did not run');
+  assert.ok(
+    fetch.rowStatus < 200 || fetch.rowStatus >= 300,
+    `REACH BYPASS: an anonymous caller was served Jessica's witness row (status ${fetch.rowStatus})`
+  );
+  assert.ok(
+    fetch.blobStatus < 200 || fetch.blobStatus >= 300,
+    `REACH BYPASS (byte route): an anonymous caller was served the witness bytes ` +
+      `(status ${fetch.blobStatus})`
+  );
+  if (fetch.rowStatus !== 403) return;
+  let body: { requiredReach?: string } | undefined;
+  try {
+    body = JSON.parse(fetch.rowBody) as { requiredReach?: string };
+  } catch {
+    body = undefined;
+  }
+  if (body?.requiredReach === undefined) {
+    console.warn(`the 403 body carried no requiredReach field: ${fetch.rowBody.slice(0, 200)}`);
+    return;
+  }
+  assert.equal(
+    body.requiredReach,
+    'private',
+    `the 403 named requiredReach "${body.requiredReach}", not "private"`
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Station 3b-ii — a peer without standing receives nothing over the
+// replication plane (staged; @wip until measured on the mesh)
+// ---------------------------------------------------------------------------
+
+/**
+ * Daniel — Jessica's brother, already named in the household's own resilience
+ * story (`genesis/data/humans/humans.json`, `human-daniel-brother`: "the
+ * fifth replicator in the reciprocal-backup chain") — is the fixture human
+ * for the late joiner: a real relative who has not yet made any custody
+ * commitment for Jessica's witnesses, distinct from Matthew and James.
+ */
+const LATE_JOINER_NAME = 'daniel';
+const MESH_SCRIPT_PATH = resolve(REPO_ROOT, 'app/elohim-app/scripts/hc-mesh.sh');
+const JOIN_PEER_TIMEOUT_MS = 300_000;
+const JOINED_PEER_LINE =
+  /^JOINED_PEER name=(\S+) index=(\d+) http=(\S+) irohNodeId=([0-9a-f]{64})$/m;
+/** Fixed path, not a PATH-resolved lookup (mirrors late-joiner-receipt.ts's BASH_BIN). */
+const BASH_BIN = '/bin/bash';
+
+/** Stages one fresh storage peer against the already-running mesh (`hc-mesh.sh join-peer`). */
+function stageLateJoiner(name: string): { url: string; nodeId: string } {
+  const result = spawnSync(BASH_BIN, [MESH_SCRIPT_PATH, 'join-peer', name], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: process.env,
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: JOIN_PEER_TIMEOUT_MS,
+  });
+  assert.equal(
+    result.error,
+    undefined,
+    `hc-mesh.sh join-peer ${name} could not run: ${result.error?.message ?? 'unknown spawn error'}`
+  );
+  const transcript = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  assert.equal(
+    result.status,
+    0,
+    `hc-mesh.sh join-peer ${name} exited ${String(result.status)}:\n${transcript.slice(-2000)}`
+  );
+  const match = JOINED_PEER_LINE.exec(transcript);
+  assert.ok(match, `join-peer emitted no machine-readable JOINED_PEER line for "${name}"`);
+  return { url: match[3], nodeId: match[4] };
+}
+
+/** Sums every Prometheus line naming `name`, tolerating any (or no) labels. */
+function metricTotal(text: string, name: string): number {
+  let total = 0;
+  let found = false;
+  for (const line of text.split('\n')) {
+    if (!line.startsWith(name)) continue;
+    const boundary = line[name.length];
+    if (boundary !== ' ' && boundary !== '{') continue;
+    const value = Number(line.trim().split(/\s+/).at(-1));
+    if (!Number.isFinite(value)) continue;
+    found = true;
+    total += value;
+  }
+  assert.ok(found, `metrics carried no "${name}" line at all`);
+  return total;
+}
+
+Given(
+  "Daniel, Jessica's brother and a fixture human of this household, joins the running mesh " +
+    'as a new peer with no custody commitment for her witnesses',
+  { timeout: JOIN_PEER_TIMEOUT_MS + 10_000 },
+  function (this: E2EWorld) {
+    const state = scenario(this);
+    const joined = stageLateJoiner(LATE_JOINER_NAME);
+    state.lateJoiner = { name: LATE_JOINER_NAME, url: joined.url, nodeId: joined.nodeId };
+  }
+);
+
+Then(
+  "Daniel's peer holds no copy of the witness",
+  { timeout: 20_000 },
+  async function (this: E2EWorld) {
+    const state = scenario(this);
+    assert.ok(
+      state.lateJoiner,
+      'no late joiner was staged — the join step for this scenario did not run'
+    );
+    assert.ok(state.witnessRow, 'no witness row was resolved for this scenario');
+    const cid = state.witnessRow.cid;
+    const joiner = state.lateJoiner;
+    const { status } = await getRaw(`${joiner.url}/db/content/${cid}`);
+    const bypassed = status >= 200 && status < 300;
+    assert.equal(
+      status,
+      404,
+      bypassed
+        ? `REGRESSION: ${joiner.name}'s peer served Jessica's witness "${cid}" (status ${status}) ` +
+            'despite holding no custody-spool commitment for her — receiver-side ' +
+            'pre-authorization did not withhold the insert'
+        : `${joiner.name}'s peer answered ${status} (not 404) for "${cid}" — a non-404 refusal ` +
+            'would mean the row was persisted and only then reach-gated; receiver-side ' +
+            'pre-authorization should skip the insert entirely so the row is simply absent'
+    );
+  }
+);
+
+Then(
+  "Daniel's peer counts one skipped pre-authorization for it",
+  { timeout: 20_000 },
+  async function (this: E2EWorld) {
+    const state = scenario(this);
+    assert.ok(
+      state.lateJoiner,
+      'no late joiner was staged — the join step for this scenario did not run'
+    );
+    const joiner = state.lateJoiner;
+    const { status, text } = await getRaw(`${joiner.url}/metrics`);
+    assert.equal(status, 200, `GET ${joiner.url}/metrics -> ${status}`);
+    // Metric name per the station-3b plan's Task 2 (elohim/elohim-storage/src/metrics.rs):
+    // storage_private_preauth_skipped_total{reason}. If Task 2 lands it under a different
+    // name, the orchestrator amends this literal, not the story.
+    const total = metricTotal(text, 'storage_private_preauth_skipped_total');
+    assert.ok(
+      total >= 1,
+      `${joiner.name}'s peer's storage_private_preauth_skipped_total is ${total} — expected at ` +
+        'least one skip for the witness handed to it without standing'
+    );
   }
 );

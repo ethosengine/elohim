@@ -9,16 +9,26 @@ Feature: Death witness — a peer's runtime tells its household why a child died
 
   - A HOUSEHOLD is a small group of people and their peers who share a mesh,
     trust each other's custody, and are the default audience for each
-    other's records. A STORAGE PEER is a peer that holds data on disk and
-    serves it. A DOORWAY is the gateway a human uses to reach the network
-    from a browser; "alpha" names the test doorway.
+    other's records. Sharing a mesh is not the same as holding custody:
+    belonging to the household does not by itself make a peer a CUSTODIAN
+    of any other peer's witnesses — that takes the counter-signed commitment
+    below. A STORAGE PEER is a peer that holds data on disk and serves it —
+    and keeps doing both even while that peer's own CONDUCTOR is dead, which
+    is how a witness reaches a custodian before any conductor restarts (see
+    DEATH WITNESS). A DOORWAY is the gateway a human uses to reach the
+    network from a browser; "alpha" names the test doorway — here, this
+    household mesh's own doorway, not the separately-deployed fleet doorway
+    other a2o stories reach at doorway-alpha.elohim.host.
   - A PEER is one household's node. It is made of processes; the one that
     matters here is the CONDUCTOR, the process that holds the household's
-    keys and source chains and talks to the network.
+    keys and source chains and talks to the network. A peer is named for the
+    human who operates it, so "Jessica's peer" and "Jessica" (the human) are
+    two different things this story keeps distinct.
   - The ENVELOPE is the parent process that spawns the conductor, holds its
-    stdout and stderr pipes, decides when to restart it, and outlives it.
-    The household mesh launches its conductors under the envelope; without
-    that, every assertion in this story would be vacuous.
+    stdout and stderr pipes, decides when to restart it, and outlives it
+    (the `ark` binary in code). The household mesh launches its conductors
+    under the envelope; without that, every assertion in this story would
+    be vacuous.
   - A DEATH WITNESS is the record the envelope writes the moment a child
     dies: the exit signal or code, how long the child ran, its last lines
     of stderr, the hash of the program the envelope actually started, and
@@ -35,18 +45,29 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     envelope's last decision may be "none: the child was killed from
     outside"; that is still a recorded decision.
   - A CUSTODIAN is another household peer that has agreed, in a signed
-    commitment, to keep copies of this peer's witnesses. The commitment is
-    counter-signed by the custodian, so a peer cannot name a custodian who
-    never agreed. Witnesses are addressed by the hash of their content
-    (a CID), so a custodian's copy is provably the same record. This story
-    assumes the commitment already exists; offering and accepting custody
-    between humans is a separate story.
+    commitment, to keep copies of this peer's witnesses — a custodian KEEPS
+    a copy, it never OWNS the record or the peer it came from. The
+    commitment is counter-signed by the custodian, so a peer cannot name a
+    custodian who never agreed. Witnesses are addressed by the hash of
+    their content (a CID), so a custodian's copy is provably the same
+    record. This story assumes the commitment already exists; offering and
+    accepting custody between humans is a separate story.
   - The PASSPORT is the peer's description of itself: which programs it
     runs, by hash; how many times it has come back up (its INCARNATION);
     and the last VERDICT its envelope reached (restart, give up, keep
     waiting). The witness carries the passport at the moment of death.
   - REACH is who may read a record. A witness is readable by the household
-    and its custodians and refused to anyone else.
+    and its custodians and refused to anyone else — refused, and told that
+    a reach it does not have is required, never told the record does not
+    exist at all.
+  - PRE-AUTHORIZATION is a receiving peer's own check, made before it keeps
+    a copy of a witness the replication plane hands it: does this peer have
+    standing for that witness's household (a live custody commitment, or
+    being the witness's own household)? A SKIPPED PRE-AUTHORIZATION is a
+    failed check — the peer declines to keep the copy at all, and counts
+    one. It is the replication plane's mirror of a stranger's HTTP refusal
+    (station 3b): the same "no standing, nothing kept" rule, applied where a
+    peer receives a copy instead of where a caller requests one.
   - The ATOM HOME is the page in the app that shows one record; a death
     witness is one kind of record it renders. It has a REACH CHIP (who may
     see this) and a FOCAL SLOT (the main area, which renders the record by
@@ -69,10 +90,11 @@ Feature: Death witness — a peer's runtime tells its household why a child died
   # chaos-peer-churn.feature). Jessica, Matthew, and James are fixture household humans.
   #
   # S0 landed 2026-09-02: the household mesh launches its conductors under the envelope
-  # (`MESH_CONDUCTOR_LAUNCH=ark`), so stations 1 and 2 are live; 3a, 3b and 4 stay @wip
-  # until S1 lands rendering, reach enforcement and anchoring. Without the envelope every
-  # assertion below would be vacuous by construction — the Background refuses to run then.
-  # Stations are decomposed so the finish line (station 4) is untouched as earlier stations land.
+  # (`MESH_CONDUCTOR_LAUNCH=ark`), so stations 1, 2 and 3b are live; 3a, 3b-ii and 4 stay
+  # @wip until S1 finishes rendering, the shard-plane custody gate and anchoring. Without
+  # the envelope every assertion below would be vacuous by construction — the Background
+  # refuses to run then. Stations are decomposed so the finish line (station 4) is
+  # untouched as earlier stations land.
   #
   # Reused steps: the household-mesh fixture + processControl (household-chaos.steps.ts),
   # custody assertions ("under custody on all N household peers"), the atom-home render
@@ -118,11 +140,26 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     Then the reach chip shows that the household and its custodians may see it
     And the focal slot renders the record as a death witness, not raw JSON
 
-  @wip @station-3b
+  @station-3b
   Scenario: Station 3b — a stranger is refused
     Given Jessica's peer holds a death witness
     When an anonymous caller fetches that witness on peer "jessica"
     Then the fetch was refused with a non-success status
+
+  # Same claim as station 3b, over the OTHER route a witness leaves a peer: the
+  # replication plane that carries it to a custodian in the first place (station 2).
+  # A custodian earns the witness by counter-signing custody; a peer that never made
+  # that promise must end up holding nothing, even though it joins the very mesh
+  # that carries the witness to Matthew and James. @wip until the mesh measures it —
+  # this is the custody-scoped read gate on the shard replication plane itself.
+  @wip @station-3b-ii @requires:owned-substrate
+  Scenario: Station 3b-ii — a peer without standing receives nothing over the replication plane
+    Given Matthew and James have each already counter-signed a commitment to custody Jessica's witnesses
+    And Daniel, Jessica's brother and a fixture human of this household, joins the running mesh as a new peer with no custody commitment for her witnesses
+    When Jessica's conductor is killed with SIGKILL
+    Then within 120 seconds Matthew and James each hold a copy of the witness with the same content hash
+    And Daniel's peer holds no copy of the witness
+    And Daniel's peer counts one skipped pre-authorization for it
 
   @wip @station-4
   Scenario: Station 4 — the incident becomes a durable network record when the conductor returns
