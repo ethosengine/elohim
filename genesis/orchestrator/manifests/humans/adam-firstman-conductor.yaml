@@ -127,43 +127,8 @@ data:
     network:
       # Bootstrap served by Doorway gateway
       bootstrap_url: "BOOTSTRAP_URL_PLACEHOLDER"
-      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "SIGNAL_URL_PLACEHOLDER"
-      # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while the
-      # build compiles tx5-only). Hand-rendered (this manifest is not sed-templated for
-      # relay_url): adam is node-type=remote, so deployHumanManifest's primaryDoorway
-      # selection (mirroring signal_url above) resolves him to doorway B — shem/apex,
-      # elohim.host — whose relay is https://relay.elohim.host (Wave 2 relay-sovereignty
-      # design, D2: relay is a per-doorway concern, doorway A -> relay.alpha.elohim.host,
-      # doorway B -> relay.elohim.host). Must be live before any transport-iroh build
-      # ships; never fall back to n0's public relay default.
+      # Per-doorway iroh relay; never fall back to a public default.
       relay_url: "https://relay.elohim.host"
-      webrtc_config:
-        iceServers:
-          - urls: ["stun:stun.cloudflare.com:3478"]
-          - urls: ["stun:stun.l.google.com:19302"]
-          # Sovereign TURN relay — see the edgenode template's comment. adam is
-          # the shem-side genesis anchor, the exact peer whose fetches toward the
-          # household fail. The prior diagnostic relay (openrelay.metered.ca)
-          # went globally dead 2026-07-13; replaced by our own coturn pair
-          # (`genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
-          # `alpha-coturn-shem.yaml`). Keep the credential in sync with those
-          # ConfigMaps' `user=`.
-          # Dual-WAN ICE failover: operations (on-prem, alpha.elohim.host) relay
-          # primary, shem (the apex — adam's own premises) redundant — either
-          # works, ICE gathers candidates from both. Role-named DNS (2026-07-28):
-          # no node names in public DNS; each name is beacon-managed and
-          # dynamic-IP-safe. turns:5349 TLS is a later phase; 3478-first.
-          - urls:
-              - "turn:alpha.elohim.host:3478?transport=udp"
-              - "turn:alpha.elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
-          - urls:
-              - "turn:elohim.host:3478?transport=udp"
-              - "turn:elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
       # ARC-CONVERGENCE tuning — REVERTED TO UPSTREAM DEFAULTS for adam only
       # (2026-07-29). This host previously carried the household slow-WAN
       # profile (roundTimeoutMs 60000, maxConcurrentAcceptedRounds 4, added
@@ -195,8 +160,8 @@ data:
     # NOTE — `request_timeout_s` was CONSIDERED AND DROPPED here (2026-07-29).
     # Lowering it from the 60s default was proposed to keep the conductor's own
     # give-up under elohim-storage's 15s heal deadline. Rejected on review: this
-    # key is CONDUCTOR-WIDE, and tx5 first-contact alone can burn 45-60s in
-    # WebRTC connect, so a 10s cap would fast-fail the declare paths we
+    # key is CONDUCTOR-WIDE, and first contact over a slow WAN can consume
+    # most of the 60s default, so a 10s cap would fast-fail the declare paths we
     # deliberately keep on the Network strategy, plus every other DNA's network
     # gets across all of adam's hosted agents. With the heal read path now Local
     # (`resolve_content_head_local`), the cap has no remaining purpose. The

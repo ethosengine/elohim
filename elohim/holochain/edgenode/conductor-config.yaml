@@ -4,7 +4,7 @@
 # This configuration is optimized for web-first development:
 # - Admin interface on port 4444 (restricted origins)
 # - Uses your existing bootstrap server: holostrap.elohim.host
-# - WebRTC networking via tx5/Kitsune2
+# - Iroh-only networking with an operator-specific relay
 
 # Admin interface for conductor management
 admin_interfaces:
@@ -25,17 +25,8 @@ admin_interfaces:
 network:
   # Bootstrap served by Doorway gateway
   bootstrap_url: "https://doorway.elohim.host/bootstrap"
-  # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-  signal_url: "wss://signal.doorway.elohim.host"
-  # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while the
-  # build compiles tx5-only). Value is the planned SOVEREIGN self-hosted iroh-relay —
-  # it must be live before any transport-iroh build ships; never fall back to n0's
-  # public relay default.
+  # Per-doorway iroh relay; never fall back to a public default.
   relay_url: "https://relay.elohim.host"
-  webrtc_config:
-    iceServers:
-      - urls: ["stun:stun.cloudflare.com:3478"]
-      - urls: ["stun:stun.l.google.com:19302"]
   # Slow-WAN peer resilience (2026-07-20): a production node on a slow link
   # was timing out kitsune2 gossip rounds at the 15s default and
   # thrash-retrying, while up to 10 concurrently accepted rounds piled up

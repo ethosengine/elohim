@@ -19,13 +19,13 @@
 #   NETWORK_PROFILE  Conductor network profile (default: isolated)
 #                      isolated   - island DHT, no external peers (today's behavior)
 #                      join-alpha - join the alpha DHT via the deployed doorway's
-#                                   bootstrap + signal servers; auto-fetches the
+#                                   bootstrap + relay; auto-fetches the
 #                                   DEPLOYED bundle (scripts/fetch-deployed-dna.sh)
 #                                   so DNA hashes match what alpha runs
 #   CONDUCTOR_BOOTSTRAP_URL  Bootstrap URL, join-alpha only
 #                            (default: https://doorway-alpha.elohim.host/bootstrap)
-#   CONDUCTOR_SIGNAL_URL     WebRTC signal URL, join-alpha only
-#                            (default: wss://doorway-alpha.elohim.host/signal)
+#   CONDUCTOR_RELAY_URL      Iroh relay URL, join-alpha only
+#                            (default: https://relay.alpha.elohim.host)
 #   FORCE_LOCAL_HAPP         join-alpha only: =1 installs the locally-built hApp
 #                            instead of the fetched deployed bundle (PARTITION
 #                            risk if DNA hashes differ — warning printed)
@@ -146,26 +146,15 @@ done
 # isolated   (default) - island DHT; the generate command is byte-identical to
 #                        the historical behavior. No external peers.
 # join-alpha           - the local conductor joins the alpha DHT via the deployed
-#                        doorway's bootstrap endpoint and the fleet's signal
-#                        subdomain. The signal URL MUST be pathless (tx5 refuses
-#                        a path: "parsing tx5 sig url" panic at boot) — so it is
-#                        wss://signal.alpha.elohim.host, the same value the alpha
-#                        conductors are generated with, never /signal on the doorway.
-# NOTE: doorway's own BOOTSTRAP_URL/SIGNAL_URL env vars are a different concern
-# (Tauri native-handoff channel) — these CONDUCTOR_* vars are conductor-only.
+#                        doorway's bootstrap endpoint and that doorway's iroh relay.
+# NOTE: doorway runtime env vars are a different concern (Tauri native-handoff
+# channel) — these CONDUCTOR_* vars are conductor-only.
 
 case "$NETWORK_PROFILE" in
     isolated)
         ;;
     join-alpha)
         : "${CONDUCTOR_BOOTSTRAP_URL:=https://doorway-alpha.elohim.host/bootstrap}"
-        # PATHLESS, subdomain form — the same URL the alpha fleet's own conductors
-        # are generated with (elohim/holochain/Jenkinsfile: signalUrl). tx5 (HC 0.6)
-        # rejects a path on the signal URL at conductor boot:
-        #   K2Error "parsing tx5 sig url" InvalidLastSymbol → FATAL PANIC, no conductor.
-        # The old default `wss://doorway-alpha.elohim.host/signal` did exactly that
-        # (2026-08-28 sovereign-peer spike); it is gone, not kept as a fallback.
-        : "${CONDUCTOR_SIGNAL_URL:=wss://signal.alpha.elohim.host}"
         ;;
     *)
         echo "Unknown NETWORK_PROFILE: '$NETWORK_PROFILE' (expected: isolated | join-alpha)"
@@ -176,11 +165,8 @@ esac
 # ──────────────────────────────────────────────────────────────────────────────
 # Conductor parity (2026-08-28, sovereign-peer T3 rung). Alpha's conductors run
 # the ethosengine FORK on the iroh transport (agent URLs are
-# https://relay.alpha.elohim.host/…, conductor-config carries relay_url). The
-# stock 0.6.0 tx5 conductor CAN publish itself to alpha's bootstrap and be listed
-# by doorway-alpha's conductor-diagnostics — and then holds connections: [] for
-# ever, because tx5 and iroh never dial each other. That is a false join: reads
-# through it are local-only misses. So, like hc-mesh.sh, a fork pair (holochain +
+# https://relay.alpha.elohim.host/…, conductor-config carries relay_url).
+# So, like hc-mesh.sh, a matching 0.7 pair (holochain +
 # the MATCHING hc — the CLI writes conductor-config.yaml in its own schema) is
 # used when one is present, and join-alpha REFUSES a stock conductor unless
 # ALLOW_STOCK_JOIN=1 says the skew is deliberate.
@@ -188,7 +174,7 @@ esac
 #   MESH_FORK_BIN_DIRS=a:b:c               search list (hc-mesh.sh's convention)
 # Default search adds the cargo-pool release slot the fork is built into.
 # ──────────────────────────────────────────────────────────────────────────────
-: "${CONDUCTOR_RELAY_URL:=https://relay.alpha.elohim.host}"   # pairs with signal.alpha (D2/D7)
+: "${CONDUCTOR_RELAY_URL:=https://relay.alpha.elohim.host}"   # doorway-A relay (D2/D7)
 # App-interface port. The household mesh owns 4445/4455/4465 (matthew/jessica/james, hc-mesh.sh
 # `app_port()`), and a join-alpha workspace conductor is meant to run BESIDE that mesh (T2 and T3
 # rungs together), so join-alpha defaults to 4485 — out of the mesh's range. Isolated keeps 4445
@@ -376,8 +362,7 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
         echo "   ║  🌐 NETWORK_PROFILE=join-alpha — JOINING THE ALPHA DHT         ║"
         echo "   ╚══════════════════════════════════════════════════════════════╝"
         echo "   Bootstrap: $CONDUCTOR_BOOTSTRAP_URL"
-        echo "   Signal:    $CONDUCTOR_SIGNAL_URL"
-        echo "   Relay:     $CONDUCTOR_RELAY_URL  (iroh fork only)"
+        echo "   Relay:     $CONDUCTOR_RELAY_URL"
         echo "   Arc:       target_arc_factor=$CONDUCTOR_ARC_FACTOR  (1 = full peer, 0 = zero-arc reader; fork only)"
         echo ""
         # DNA-hash parity: install the DEPLOYED bundle (what alpha actually
@@ -407,13 +392,9 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
             echo "      risk explicitly with FORCE_LOCAL_HAPP=1."
             exit 1
         fi
-        # Grammar follows the hc on PATH: the fork's 0.6.3 `hc` replaced tx5's
-        # `webrtc <SIGNAL_URL>` with `quic <RELAY_URL>` (iroh); stock keeps webrtc.
-        if hc sandbox generate network --help 2>&1 | grep -qE '^\s+quic\b'; then
-            NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" --target-arc-factor $CONDUCTOR_ARC_FACTOR quic \"$CONDUCTOR_RELAY_URL\""
-        else
-            NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" webrtc \"$CONDUCTOR_SIGNAL_URL\""
-        fi
+        # Holochain 0.7 has one transport. The matching hc CLI writes bootstrap,
+        # relay, and arc settings in the conductor's 0.7 schema.
+        NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" --target-arc-factor $CONDUCTOR_ARC_FACTOR quic \"$CONDUCTOR_RELAY_URL\""
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
 export PATH="$PATH"

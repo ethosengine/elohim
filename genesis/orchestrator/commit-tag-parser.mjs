@@ -25,16 +25,14 @@ export const BUILD_TAG_ALIASES = {
 /**
  * Conductor feature-set presets for the [conductor:<variant>] commit tag.
  *
- * These mirror the elohim-edgenode job's HC_FEATURES contract exactly:
- *   - the default (no variant) is deliberately absent — omitting HC_FEATURES
- *     lets the job's own default stand, which is the production jemalloc build.
- *     Never spell the production set out here; two copies drift and the bare
- *     glibc set is the one that leaked.
- *   - `prof` and `iroh` push ISOLATED image names and never touch :latest.
+ * These mirror the elohim-edgenode job's Holochain 0.7 feature contract:
+ *   - `prof` replaces the production allocator with the isolated profiling build.
+ *   - `iroh` is retained for old commit messages, but is a no-op because iroh is
+ *     the only 0.7 transport and has no cargo feature.
  */
 export const CONDUCTOR_FEATURE_PRESETS = {
-  prof: 'sqlite-encrypted,wasmer_sys,transport-tx5-backend-go-pion,jemalloc-prof',
-  iroh: 'sqlite-encrypted,wasmer_sys,transport-iroh,jemalloc',
+  prof: 'encryption,wasmer-sys-cranelift,jemalloc-prof',
+  iroh: 'encryption,wasmer-sys-cranelift,jemalloc',
 };
 
 /**
@@ -44,18 +42,18 @@ export const CONDUCTOR_FEATURE_PRESETS = {
  *
  * Grammar — comma-separated items inside one tag, repeatable:
  *
- *   [conductor:iroh]                 transport-iroh variant (isolated images)
+ *   [conductor:iroh]                 compatibility no-op; selects the 0.7 default
  *   [conductor:prof]                 jemalloc-prof heap-profiling canary (isolated)
  *   [conductor:canary]               also build the deployable storage image
  *   [conductor:no-push]              build only, no Harbor push (validation)
  *   [conductor:hc=<branch>]          override the holochain fork branch
- *   [conductor:tx5=<branch>]         override the tx5 fork branch
+ *   [conductor:tx5=<branch>]         compatibility-only; parsed but no longer forwarded
  *   [conductor:features=a+b+c]       raw HC_FEATURES ('+' separates; ',' is taken
  *                                    by the item separator). Wins over a preset.
  *
- * A branch override (`hc=` / `tx5=`) is only consulted by the job when the
- * corresponding *_REF is empty, since an exact submodule SHA outranks a branch
- * tip. Use it to build a fork branch that has no submodule pointer yet.
+ * The `hc=` branch override is only consulted by the job when HC_REF is empty,
+ * since an exact submodule SHA outranks a branch tip. Use it to build a fork
+ * branch that has no submodule pointer yet.
  *
  * @param {string} commitMsg
  * @returns {{present: boolean, features?: string, hcBranch?: string,
@@ -89,6 +87,8 @@ export function parseConductorOptions(commitMsg) {
       } else if (key === 'hc') {
         opts.hcBranch = value;
       } else if (key === 'tx5') {
+        // Compatibility-only parse for old commit messages. The orchestrator no
+        // longer forwards this value to the 0.7 conductor job.
         opts.tx5Branch = value;
       } else if (key === 'features') {
         explicitFeatures = value.replace(/\+/g, ',');

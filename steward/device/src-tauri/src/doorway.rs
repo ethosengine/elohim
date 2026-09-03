@@ -53,7 +53,7 @@ pub struct NativeHandoffResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bootstrap_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signal_url: Option<String>,
+    pub relay_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network_seed: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -250,7 +250,7 @@ mod tests {
             "doorwayId": "doorway-alpha",
             "doorwayUrl": "https://doorway.test.local",
             "bootstrapUrl": "http://localhost:8888/bootstrap",
-            "signalUrl": "ws://localhost:8888"
+            "relayUrl": "http://localhost:8888"
         }"#;
 
         let resp: NativeHandoffResponse = serde_json::from_str(json).unwrap();
@@ -259,6 +259,7 @@ mod tests {
             resp.bootstrap_url,
             Some("http://localhost:8888/bootstrap".to_string())
         );
+        assert_eq!(resp.relay_url, Some("http://localhost:8888".to_string()));
         assert!(resp.key_bundle.is_none());
         // is_steward defaults to None when not present (backwards compat)
         assert_eq!(resp.is_steward, None);

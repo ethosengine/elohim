@@ -2,7 +2,7 @@
   description = "Elohim hApp - Multi-DNA Holochain application for decentralized learning";
 
   inputs = {
-    holonix.url = "github:holochain/holonix?ref=main-0.6";
+    holonix.url = "github:holochain/holonix?ref=main-0.7";
     nixpkgs.follows = "holonix/nixpkgs";
   };
 

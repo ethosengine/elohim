@@ -5,9 +5,9 @@
 # Brings up the ALPHA-SHAPED topology entirely on loopback, no k8s, no
 # external services:
 #
-#   1 doorway   (dev mode, serves /bootstrap + /signal for the island DHT,
+#   1 doorway   (dev mode, serves /bootstrap for the island DHT and
 #                proxies all N storage peers)
-#   N conductors (hc sandbox, holochain 0.6: --piped + -f pinned admin ports,
+#   N conductors (hc sandbox, holochain 0.7: --piped + -f pinned admin ports,
 #                -n N native multi-sandbox; discovery via the LOCAL doorway)
 #   N storages  (release binary, Track-2 backend selected independently as
 #                libp2p, dual, or iroh; each bound to its own conductor)
@@ -44,8 +44,8 @@
 #   MESH_DIR        Data root (default: /tmp/elohim-local-mesh)
 #   MESH_TRANSPORT_BACKEND
 #                   elohim-storage Track-2 backend: libp2p (default), dual, or
-#                   iroh. This does NOT change the conductor's kitsune2/tx5
-#                   transport. dual/iroh require STORAGE_BIN built with
+#                   iroh. This does NOT change the conductor's Holochain 0.7
+#                   iroh transport. dual/iroh require STORAGE_BIN built with
 #                   --features "p2p p2p-iroh"; start refuses otherwise.
 #   MESH_PEER_TRANSPORTS
 #                   Per-peer overrides, e.g. matthew=libp2p,jessica=iroh.
@@ -114,9 +114,8 @@
 #                   move a DNA hash, but verify via /health.
 #
 #   MESH_FORK_RELAY_URL
-#                   Relay URL for the fork's `network … quic <RELAY_URL>`
-#                   generate grammar (stock 0.6.0 takes `webrtc <SIGNAL_URL>`
-#                   instead; the grammar is read from the CLI, not guessed).
+#                   Relay URL for Holochain 0.7's `network … quic <RELAY_URL>`
+#                   generate grammar.
 #                   Defaults to the doorway — a placeholder that must parse as a
 #                   URL, since loopback peers never need a relay.
 #
@@ -138,18 +137,16 @@
 #   conductor sandboxes also get a fixed kitsune2 gossip
 #   acceleration patch (k2Gossip initiate=1000ms) after generate, before run.
 #
-# LOAD-BEARING FACTS (verified against holochain 0.6.0 / hc 0.6.0):
+# LOAD-BEARING FACTS (verified against holochain 0.7.0 / hc 0.7.0):
 #   - `hc sandbox --piped` reads the lair passphrase from stdin: the old
 #     socat/PTY wrapper is obsolete.
 #   - `-f p1,p2,..` pins admin ports; `-r=a1,a2,..` pins app ports; no more
 #     log-scraping for dynamic ports.
-#   - tx5 REJECTS a signal URL with a path ("parsing tx5 sig url ...
-#     InvalidLastSymbol"): the URL must be pathless. The doorway detects a
-#     signal request by Host header prefix `signal.`, and `signal.localhost`
-#     resolves to loopback out of the box -> ws://signal.localhost:PORT.
-#   - `hc sandbox generate` WITHOUT a network section points at the PUBLIC
-#     dev-test-bootstrap2.holochain.org. True isolation requires the explicit
-#     `network --bootstrap ... webrtc ...` pointing at the local doorway.
+#   - `hc sandbox generate` WITHOUT a network section can select public
+#     discovery infrastructure. True isolation requires explicit
+#     `network --bootstrap ... quic ...` arguments; the loopback mesh uses
+#     its local doorway for bootstrap and a parseable relay placeholder that
+#     loopback peers never need to contact.
 #   - Conductor admin/app interfaces bind loopback only; config exposes
 #     `danger_bind_addr` when a cross-pod topology ever needs more. Inside
 #     one container, loopback is correct.
@@ -1058,9 +1055,9 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
 #
 # MESH_FORK_BIN_DIRS is searched in order for a directory containing BOTH
 # `holochain` and `hc` — both, because the CLI writes conductor-config.yaml in
-# ITS schema and a mismatched pair simply will not boot (0.6.0 hc + 0.6.3
-# conductor: "unknown field base64_auth_material", then "missing field
-# relay_url"). A directory with only one of them is skipped, loudly, rather than
+# ITS schema and a mismatched pair simply will not boot (for example, a 0.6 CLI
+# writes transport keys that a 0.7 conductor rejects). A directory with only one
+# of them is skipped, loudly, rather than
 # half-adopted.
 # NOTE the cargo-pool slot where a local fork build lands
 # (/projects/.cargo-target-pool/family/dev/crates/dev/release) is deliberately
@@ -1150,13 +1147,11 @@ conductor_version() {
 # The `hc` CLI writes the conductor's config; the conductor parses it. When they
 # are different builds the config is written in one schema and read in another,
 # and the failure surfaces as a config PARSE error at boot with the reason only
-# in the conductor log — measured both directions on 2026-08-21: 0.6.3 refuses
-# `network.base64_auth_material` ("expected one of base64_auth_material_bootstrap,
-# base64_auth_material_relay, …"), and once that key is dropped it fails on
-# `missing field relay_url`, which 0.6.0 never writes.
+# in the conductor log. At 0.7 the removed transport fields are unknown keys,
+# while older CLIs also omit relay_url; either skew fails before boot.
 #
-# The gate compares the FULL version, not the major.minor "minor line": 0.6.0
-# and 0.6.3 agree on 0.6 and are still schema-incompatible — a minor-line check
+# The gate compares the FULL version, not the major.minor "minor line": patch
+# releases have previously carried incompatible config schemas, so a line check
 # would have passed the exact pair that cost the evening. Both versions are
 # printed either way so the mismatch is readable, not inferred.
 #
@@ -1176,9 +1171,9 @@ assert_toolchain_parity() {
   echo "  hc:        $(command -v hc)  -> $hv" >&2
   echo "" >&2
   echo "  \`hc sandbox\` REWRITES conductor-config.yaml in its own schema, so the" >&2
-  echo "  conductor is handed a file it may refuse to parse (0.6.0 hc + 0.6.3" >&2
-  echo "  conductor: 'unknown field base64_auth_material', then 'missing field" >&2
-  echo "  relay_url'). Point HOLOCHAIN_BIN at a DIRECTORY holding both binaries:" >&2
+  echo "  conductor is handed a file it may refuse to parse (for example, a 0.6" >&2
+  echo "  hc paired with a 0.7 conductor). Point HOLOCHAIN_BIN at a DIRECTORY" >&2
+  echo "  holding both matching binaries:" >&2
   echo "     HOLOCHAIN_BIN=/path/to/fork-bin ./hc-mesh.sh start" >&2
   echo "  (MESH_ALLOW_TOOLCHAIN_SKEW=1 to proceed anyway — deliberate skew only.)" >&2
   echo "" >&2
@@ -1187,13 +1182,8 @@ assert_toolchain_parity() {
 }
 
 # ---------------------------------------------------------------------------
-# The generate-time transport subcommand is NOT the same word on both lines.
-# Stock 0.6.0 offers `webrtc <SIGNAL_URL>`; the fork's 0.6.3 `hc` replaced it
-# with `quic <RELAY_URL>` (the iroh transport), and passing the stock word to
-# the fork CLI dies before anything is written:
-#     error: unrecognized subcommand 'webrtc'
-# Read the grammar from the CLI that will actually run rather than branching on
-# a version number — the CLI is the authority on its own subcommands.
+# Holochain 0.7 has one iroh transport; the matching hc CLI accepts the `quic`
+# network tail and writes relay_url in the conductor's 0.7 schema.
 #
 # MESH_FORK_RELAY_URL is a placeholder on a loopback mesh: peers reach each
 # other directly and the relay only matters for NAT traversal, so pointing it
@@ -1202,11 +1192,7 @@ assert_toolchain_parity() {
 # ---------------------------------------------------------------------------
 mesh_network_args() { # -> the `network …` tail for `hc sandbox generate`
   local relay="${MESH_FORK_RELAY_URL:-http://localhost:$DOORWAY_PORT}"
-  if hc sandbox generate network --help 2>&1 | grep -qE '^\s+quic\b'; then
-    echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap quic $relay"
-  else
-    echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap webrtc ws://signal.localhost:$DOORWAY_PORT"
-  fi
+  echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap quic $relay"
 }
 
 patch_mesh_gossip_config() { # <conductor-config.yaml>
@@ -1226,12 +1212,6 @@ k2gossip["minInitiateIntervalMs"] = 1000
 k2gossip["initialInitiateIntervalMs"] = 1000
 advanced["k2Gossip"] = k2gossip
 
-# The fork's `hc` (0.6.3 line, iroh/quic transport) writes a DEFAULT
-# `signal_url` pointing at a PUBLIC Holo server. It is almost certainly inert
-# while irohTransport is active, so preserve it but make the uncertainty loud.
-_sig = network.get("signal_url") or ""
-if _sig and "localhost" not in _sig and "127.0.0.1" not in _sig:
-    print(f"  WARN {path}: signal_url points off-box ({_sig}) — isolated-mesh sovereignty unverified on the fork line", file=sys.stderr)
 network["advanced"] = advanced
 
 with open(path, "w") as f:

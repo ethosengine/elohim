@@ -525,15 +525,28 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
  * Per-environment configuration (doorway URLs, manifest paths, env files).
  */
 def getEnvConfig() {
+    def alphaInfraManifests = [
+        'genesis/orchestrator/manifests/infra/alpha-mongodb.yaml',
+        'genesis/orchestrator/manifests/infra/alpha-nats.yaml',
+        'genesis/orchestrator/manifests/infra/alpha-iroh-connection-ratio-grafana-dashboard.yaml',
+        'genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml',
+        'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml',
+    ]
+    // Lane G flips RETIRE_TX5 after the 0.7 fleet has remained green. Until then,
+    // coturn stays deployed for the still-running 0.6 line.
+    if (env.RETIRE_TX5 == 'true') {
+        alphaInfraManifests = alphaInfraManifests.findAll { !it.contains('coturn') }
+    }
+
     return [
         alpha: [
-            // Single-doorway fallback bootstrap/signal — used by deployHumanManifest
+            // Single-doorway fallback bootstrap/relay — used by deployHumanManifest
             // when an env doesn't declare per-doorway sub-maps. Points at doorway-A
             // (the on-prem doorway) so anything pre-federation keeps the historical
             // behavior; alpha's per-human routing rule overrides this for both
             // family-three and remote personas via doorwayA/doorwayB below.
             bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
-            signalUrl: 'wss://signal.alpha.elohim.host',
+            relayUrl: 'https://relay.alpha.elohim.host',
             // Per-human primary doorway routing (alpha only — staging/prod still
             // run single-doorway envs and use the fallback pair above). Selection
             // rule lives in deployHumanManifest: humanConfig.nodeTypes containing
@@ -543,20 +556,20 @@ def getEnvConfig() {
             // — change in lockstep with those files if either side moves.
             doorwayA: [
                 bootstrapUrl: 'https://doorway-alpha.elohim.host/bootstrap',
-                signalUrl: 'wss://signal.alpha.elohim.host',
+                relayUrl: 'https://relay.alpha.elohim.host',
             ],
             doorwayB: [
                 bootstrapUrl: 'https://elohim.host/bootstrap',
-                signalUrl: 'wss://signal.elohim.host',
+                relayUrl: 'https://relay.elohim.host',
             ],
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
             envFile: 'genesis/orchestrator/environments/alpha.env',
-            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-iroh-connection-ratio-grafana-dashboard.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
+            infraManifests: alphaInfraManifests,
             healthUrl: 'https://doorway-alpha.elohim.host',
         ],
         staging: [
             bootstrapUrl: 'https://doorway-staging.elohim.host/bootstrap',
-            signalUrl: 'wss://signal.doorway-staging.elohim.host',
+            relayUrl: 'https://relay.staging.elohim.host',
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/staging.yaml',
             envFile: 'genesis/orchestrator/environments/staging.env',
             infraManifests: ['genesis/orchestrator/manifests/infra/staging-mongodb.yaml', 'genesis/orchestrator/manifests/infra/staging-nats.yaml'],
@@ -564,7 +577,7 @@ def getEnvConfig() {
         ],
         prod: [
             bootstrapUrl: 'https://doorway.elohim.host/bootstrap',
-            signalUrl: 'wss://signal.doorway.elohim.host',
+            relayUrl: 'https://relay.elohim.host',
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/prod.yaml',
             envFile: 'genesis/orchestrator/environments/prod.env',
             infraManifests: [],
@@ -904,52 +917,20 @@ def resolveHappDigest(String happTag, String deployVersion) {
 }
 
 /**
- * Wave 2 relay-sovereignty (D2): the iroh-generation relay is a per-doorway
- * concern, exactly like signalUrl — so it's keyed off the SAME signalUrl
- * deployHumanManifest already resolved from primaryDoorway. Inert under tx5
- * today (relay_url isn't read until the transport-iroh flip). Explicit
- * mapping, never a silent default (D1): an unrecognized signalUrl means a
- * topology this mapping doesn't know about, and must abort the render rather
- * than guess a relay host.
+ * Relay sovereignty (D2): relay_url is a per-doorway concern. Every doorway map
+ * must declare it explicitly; missing topology is a render error, never a
+ * fallback to a public relay.
  */
-def resolveRelayUrl(String signalUrl, String humanName, String humanEnv) {
-    switch (signalUrl) {
-        case 'wss://signal.alpha.elohim.host':
-            return 'https://relay.alpha.elohim.host'
-        case 'wss://signal.elohim.host':
-            return 'https://relay.elohim.host'
-        default:
-            error "No relay_url mapping for signalUrl '${signalUrl}' (human: ${humanName}, env: ${humanEnv}) — add a case to resolveRelayUrl before deploying this topology."
+def resolveRelayUrl(Map primaryDoorway, String humanName, String humanEnv) {
+    if (!primaryDoorway.relayUrl) {
+        error "No relay_url declared for primary doorway (human: ${humanName}, env: ${humanEnv}) — add relayUrl beside bootstrapUrl before deploying this topology."
     }
+    return primaryDoorway.relayUrl
 }
 
-// Wave-2 Stage 1 is an alpha-namespace-atomic transport flip. The iroh
-// conductor is embedded in this storage image; staging/prod keep their
-// environment storage tags as the rollback wave.
-//
-// PER-COMMIT since 2026-08-07 (edge #1319 RCA). alpha used to return the
-// one-time artifact `elohim-storage-iroh:hc-elohim-0.6.3-iroh`, built once on
-// 2026-08-06 by the che-devworkspaces edgenode job. A static tag never moves:
-// pods restarted on every deploy and re-pulled the same frozen digest, so every
-// storage-side merge to dev after the flip was silently inert on alpha (the
-// honesty-floor gauge elohim_projection_reconcile_converged_blocked_by could not
-// appear, and the fail-closed quiesce gate read actionable=None → DID NOT
-// MEASURE). alpha now tracks dev on the iroh lane, built per commit by
-// scripts/ci/push-storage-iroh.sh from storage-iroh/Dockerfile.
-//
-// The frozen tag is NOT retired: it stays in Harbor as the ratified rollback
-// line for the wave (design doc 2026-08-05-wave2-relay-sovereignty-design.md D9,
-// checklist item 8) and nothing in this pipeline writes it. Rollback is still a
-// single image-tag repoint.
-//
-// Namespace-atomicity (D10) is unchanged: this is keyed on env, not on the
-// human, so all 7 alpha humans resolve to the same image and a partial flip —
-// which would transport-partition the DHT, tx5 peers being unable to dial an
-// iroh peer URL and vice-versa — stays unexpressible.
+// Holochain 0.7 has one iroh transport line, so every environment consumes the
+// storage image produced by this commit.
 def resolveStorageImage(String humanEnv, versions) {
-    if (humanEnv == 'alpha') {
-        return "harbor.ethosengine.com/ethosengine/elohim-storage-iroh:${versions.STORAGE_TAG}"
-    }
     return "harbor.ethosengine.com/ethosengine/elohim-storage:${versions.STORAGE_TAG}"
 }
 
@@ -1054,7 +1035,6 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",
-        "s|SIGNAL_URL_PLACEHOLDER|${primaryDoorway.signalUrl}|g",
         "s|RELAY_URL_PLACEHOLDER|${relayUrl}|g",
         "s|DOORWAY_ORIGIN_PLACEHOLDER|${primaryDoorway.bootstrapUrl - '/bootstrap'}|g",
         "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
@@ -1196,7 +1176,7 @@ def splitBudget(Map humanConfig) {
  *   · the conductor StatefulSet does not exist yet (first rollout) — take the
  *     current storage image, which is the artifact this commit built;
  *   · the conductor fork pin this commit means differs from the pin recorded on
- *     the live StatefulSet (a real conductor/tx5 submodule bump);
+ *     the live StatefulSet (a real conductor submodule bump);
  *   · an operator asks: `[conductor-roll]` in the commit message, or the
  *     CONDUCTOR_ROLL build parameter.
  * Otherwise keeps the live image verbatim, so the pod template is byte-stable
@@ -1428,10 +1408,10 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
 
     // Per-human primary doorway selection. When the env declares doorwayA +
     // doorwayB sub-maps (alpha today), route based on nodeTypes containing
-    // 'remote': shem-side personas → doorwayB (elohim.host / signal.elohim.host),
+    // 'remote': shem-side personas → doorwayB (elohim.host / relay.elohim.host),
     // on-prem family-three → doorwayA (doorway-alpha.elohim.host /
-    // signal.alpha.elohim.host). Single-doorway envs (staging, prod)
-    // fall back to envConfig.bootstrapUrl/signalUrl. This is the single-primary
+    // relay.alpha.elohim.host). Single-doorway envs (staging, prod)
+    // fall back to envConfig.bootstrapUrl/relayUrl. This is the single-primary
     // shape — multi-registration / DNS failover deferred pending the federation
     // audit (see genesis/docs/superpowers/sprints/2026-05-27-federation-wiring-audit.md
     // and memory project_multi_doorway_human_registration). The genesis pair
@@ -1443,7 +1423,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     if (envConfig.doorwayA && envConfig.doorwayB) {
         primaryDoorway = isRemote ? envConfig.doorwayB : envConfig.doorwayA
     } else {
-        primaryDoorway = [bootstrapUrl: envConfig.bootstrapUrl, signalUrl: envConfig.signalUrl]
+        primaryDoorway = [bootstrapUrl: envConfig.bootstrapUrl, relayUrl: envConfig.relayUrl]
     }
 
     // shem's GFiber router hairpin-intercepts hairpinned 443 for the apex
@@ -1452,7 +1432,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // (ssl_verify_result=18) instead of proxying through. Route shem-placed
     // conductors straight to shem's own ingress+coturn node (10.99.0.2)
     // instead of out through the WAN and back. Scoped to exactly the humans
-    // whose primaryDoorway IS doorwayB (i.e. bootstrap_url/signal_url render
+    // whose primaryDoorway IS doorwayB (i.e. bootstrap_url/relay_url render
     // to the hairpinned apex hostnames) — never matthew/jessica/james
     // (doorwayA) and never staging/prod (no doorwayB split there, and
     // 10.99.0.2 is shem's alpha-specific IP). See
@@ -1468,16 +1448,16 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // §residual; same ingress 10.99.0.2 serves the relay host — verified
     // manifests/doorway/alpha-b.yaml Ingress host list).
 
-    // Relay URL (Wave 2 relay-sovereignty, D2) — keyed off signalUrl; see
-    // resolveRelayUrl's doc comment for the fail-loud rationale.
-    def relayUrl = resolveRelayUrl(primaryDoorway.signalUrl, humanConfig.name, humanConfig.env)
+    // Relay URL (relay-sovereignty D2) is declared beside the selected doorway's
+    // bootstrap URL; resolveRelayUrl fails loud if that pairing is absent.
+    def relayUrl = resolveRelayUrl(primaryDoorway, humanConfig.name, humanConfig.env)
 
     // Sed argument list (one -e expression per placeholder, shell-quoted) —
     // built in humanManifestSedArgs to keep this method under the per-def
     // CPS method-size ceiling. See that def's doc comment for the doorway
     // origin derivation and the doorwayRef digest-pin note.
-    // Conductor fork pin this commit means (conductor-<hc12>-<tx512>), derived
-    // from the same submodule pointers scripts/ci/build-storage-image.sh uses.
+    // Conductor fork pin this commit means (conductor-<hc12>), derived from the
+    // same submodule pointer scripts/ci/build-storage-image.sh uses.
     // Empty on failure — resolveConductorWorkloadImage treats that as "cannot
     // judge, hold the live image" rather than guessing a roll.
     def conductorPin = sh(
@@ -1509,7 +1489,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
 
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
 
-    // The conductor-config seam-smoke gate (webrtc_config camelCase / ICE
+    // The conductor-config seam-smoke gate (0.7 relay required / removed tx5 keys forbidden)
     // servers / relay sovereignty) moved to deployHumanConductor with the
     // ConfigMap it validates — this manifest no longer carries a
     // conductor-config.yaml, and the validator hard-fails a manifest without one.
@@ -1737,13 +1717,6 @@ def deployOnlyEnvFilePreflight(String envFile, String targetEnv) {
         ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
         ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
     ]
-    // alpha renders the iroh LANE of the same STORAGE_TAG (resolveStorageImage).
-    // A DEPLOY_ONLY run reusing an env file written before the per-commit iroh
-    // lane existed would otherwise resolve a tag that was never pushed and
-    // ImagePullBackOff the namespace — the failure mode this check exists for.
-    if (targetEnv == 'alpha') {
-        checks << ['elohim-storage-iroh', existing.STORAGE_TAG]
-    }
     def missing = []
     checks.each { repo, tag ->
         if (!tag || tag == 'null') return
@@ -1949,7 +1922,7 @@ spec:
         booleanParam(
             name: 'CONDUCTOR_ROLL',
             defaultValue: false,
-            description: 'Force the per-human conductor StatefulSets to adopt this build\'s storage image. Conductors normally HOLD their image across storage rolls (rung 2: storage/doorway deploys must not restart conductors); they advance on a conductor/tx5 submodule bump, a hApp digest move, this flag, or a [conductor-roll] commit tag. Costs a full-arc re-gossip surge per peer — use deliberately.'
+            description: 'Force the per-human conductor StatefulSets to adopt this build\'s storage image. Conductors normally HOLD their image across storage rolls (rung 2: storage/doorway deploys must not restart conductors); they advance on a conductor submodule bump, a hApp digest move, this flag, or a [conductor-roll] commit tag. Costs a full-arc re-gossip surge per peer — use deliberately.'
         )
         booleanParam(
             name: 'VALIDATE_ONLY',
@@ -2512,15 +2485,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-storage elohim-storage '${STORAGE_TAG}' 'elohim-storage'"
-
-                                // Wave-2 iroh transport lane — MUST run after the tx5-lane push
-                                // above: it overlays the iroh conductor onto the storage image
-                                // that push just put in Harbor. NOT catchError-isolated (unlike
-                                // the relay/beacon builds): resolveStorageImage points every
-                                // alpha human at elohim-storage-iroh:${STORAGE_TAG}, so a
-                                // missing tag must abort here rather than ImagePullBackOff the
-                                // namespace. See scripts/ci/push-storage-iroh.sh.
-                                sh "bash '${env.WORKSPACE}/scripts/ci/push-storage-iroh.sh'"
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-happ-installer elohim-happ-installer '${HAPP_INSTALLER_TAG}' 'hApp Installer'"
 

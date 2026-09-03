@@ -25,32 +25,26 @@ buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 #
 # `rev-parse HEAD:<path>` reads the gitlink from the commit object, so it works
 # for these `update = none` submodules that CI never clones.
-# The tag names BOTH forks that determine the binary: the conductor source and
-# the tx5 commit its [patch.crates-io] routes to ../tx5. A conductor-SHA-only tag
-# would collide — bump tx5 alone and the same tag gets republished over a
-# DIFFERENT binary. (elohim/kitsune2 is deliberately absent: the fork's
-# sibling-clone kitsune2 path patches are commented out, so that submodule cannot
-# change the binary.) Keep this derivation identical to CONDUCTOR_PIN_TAG in
+# Holochain 0.7 has one iroh transport line, so the conductor gitlink alone
+# determines the source-derived tag. elohim/kitsune2 is deliberately absent: its
+# sibling-clone path patches are commented out in the fork, so that submodule
+# cannot change the binary. Keep this derivation identical to CONDUCTOR_PIN_TAG in
 # che-devworkspaces jenkins/Jenkinsfile-elohim-edgenode — the two ends must agree
 # or edge asks for a tag the conductor job never published.
 CONDUCTOR_REGISTRY="harbor.ethosengine.com/ethosengine/elohim-edgenode"
 CONDUCTOR_SHA="$(git rev-parse "HEAD:elohim/holochain-conductor" 2>/dev/null || true)"
-TX5_SHA="$(git rev-parse "HEAD:elohim/tx5" 2>/dev/null || true)"
 
-if [ -z "${CONDUCTOR_SHA}" ] || [ -z "${TX5_SHA}" ]; then
-    echo "FATAL: cannot read the conductor fork submodule pointers."
+if [ -z "${CONDUCTOR_SHA}" ]; then
+    echo "FATAL: cannot read the conductor fork submodule pointer."
     echo "  elohim/holochain-conductor = '${CONDUCTOR_SHA:-<unreadable>}'"
-    echo "  elohim/tx5                 = '${TX5_SHA:-<unreadable>}'"
-    echo "  The storage image embeds the conductor built from BOTH; without the"
-    echo "  pointers there is no way to know which conductor this commit means."
-    echo "  Refusing to guess."
+    echo "  The storage image embeds that conductor; without the pointer there is"
+    echo "  no way to know which conductor this commit means. Refusing to guess."
     exit 1
 fi
 
-CONDUCTOR_PIN="${CONDUCTOR_REGISTRY}:conductor-$(echo "${CONDUCTOR_SHA}" | cut -c1-12)-$(echo "${TX5_SHA}" | cut -c1-12)"
+CONDUCTOR_PIN="${CONDUCTOR_REGISTRY}:conductor-$(git rev-parse HEAD:elohim/holochain-conductor | cut -c1-12)"
 echo "Conductor pin: ${CONDUCTOR_PIN}"
 echo "  holochain-conductor ${CONDUCTOR_SHA}"
-echo "  tx5                 ${TX5_SHA}"
 
 # No pre-flight pull: `nerdctl login harbor` does not run until the push stage,
 # so a pull here would fail on auth even when the image exists. Buildkit resolves

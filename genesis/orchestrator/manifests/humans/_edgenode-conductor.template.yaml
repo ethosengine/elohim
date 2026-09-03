@@ -117,16 +117,7 @@ data:
     network:
       # Bootstrap served by Doorway gateway
       bootstrap_url: "BOOTSTRAP_URL_PLACEHOLDER"
-      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "SIGNAL_URL_PLACEHOLDER"
-      # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while
-      # the build compiles tx5-only). Rendered per-human from primaryDoorway
-      # (deployHumanManifest, mirroring SIGNAL_URL_PLACEHOLDER above): doorway A
-      # humans get https://relay.alpha.elohim.host, doorway B humans get
-      # https://relay.elohim.host — the relay is a per-doorway concern (Wave 2
-      # relay-sovereignty design, D2), not one fleet-wide name. Must be live
-      # before any transport-iroh build ships; never fall back to n0's public
-      # relay default.
+      # Per-doorway iroh relay; never fall back to a public default.
       relay_url: "RELAY_URL_PLACEHOLDER"
       # Authority arc factor: 1 = full DHT authority (kitsune2 default), 0 = leecher.
       # Per-node via deployments.json edgenodeArcFactor (default 1). Set 0 to relieve a
@@ -135,31 +126,6 @@ data:
       # The runtime arc_actuator can NOT change this at runtime (this configMap is a
       # read-only subPath mount) — the lever lives here, baked at deploy.
       target_arc_factor: TARGET_ARC_FACTOR_PLACEHOLDER
-      webrtc_config:
-        iceServers:
-          - urls: ["stun:stun.cloudflare.com:3478"]
-          - urls: ["stun:stun.l.google.com:19302"]
-          # Sovereign TURN relay (Tier-A transport commons). The genesis pair
-          # straddles shem(cloud NAT) ↔ on-prem(home NAT); srflx↔srflx pairing
-          # fails silently with STUN only. Our own coturn pair —
-          # `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`,
-          # `alpha-coturn-shem.yaml`. Keep the credential in sync with those
-          # ConfigMaps' `user=`.
-          # Dual-WAN ICE failover: operations (on-prem, alpha.elohim.host) relay
-          # primary, shem (the apex — adam's premises) redundant — either works,
-          # ICE gathers candidates from both. Role-named DNS (2026-07-28): no
-          # node names in public DNS; each name is beacon-managed and
-          # dynamic-IP-safe. turns:5349 TLS is a later phase; 3478-first.
-          - urls:
-              - "turn:alpha.elohim.host:3478?transport=udp"
-              - "turn:alpha.elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
-          - urls:
-              - "turn:elohim.host:3478?transport=udp"
-              - "turn:elohim.host:3478?transport=tcp"
-            username: "elohim"
-            credential: "alpha-turn-commons-2026"
       # Slow-WAN peer resilience (2026-07-20): let slow gossip rounds run to
       # completion instead of retrying, and bound concurrent accepted rounds so
       # gossip write pressure on the conductor's SQLite write guard stays sane.

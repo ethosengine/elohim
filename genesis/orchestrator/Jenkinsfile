@@ -633,10 +633,10 @@ def dispatchResult(Object result, boolean waited) {
  * elohim-conductor → the elohim-edgenode job (SCM: che-devworkspaces), which
  * compiles the patched holochain conductor. Two things get forwarded:
  *
- *   HC_REF / TX5_REF — the SHAs THIS commit's submodule pointers record. That is
+ *   HC_REF — the SHA THIS commit's conductor submodule pointer records. That is
  *   what makes the built image correspond to committed source: the job publishes
  *   `elohim-edgenode:conductor-<sha12>`, and the edge pipeline derives the same
- *   tag from the same pointers when it bakes the storage image. No hand-edited
+ *   tag from the same pointer when it bakes the storage image. No hand-edited
  *   digest, no manual job run.
  *
  *   The [conductor:…] commit-tag options (parsed into CONDUCTOR_OPTS_JSON) —
@@ -649,9 +649,7 @@ def crossRepoParams(String name) {
     def opts = env.CONDUCTOR_OPTS_JSON ? readJSON(text: env.CONDUCTOR_OPTS_JSON) : [:]
     def out = []
     out.add(stringParam(name: 'HC_REF', value: submoduleSha('elohim/holochain-conductor')))
-    out.add(stringParam(name: 'TX5_REF', value: submoduleSha('elohim/tx5')))
     if (opts.hcBranch)  out.add(stringParam(name: 'HC_BRANCH',  value: opts.hcBranch))
-    if (opts.tx5Branch) out.add(stringParam(name: 'TX5_BRANCH', value: opts.tx5Branch))
     if (opts.features)  out.add(stringParam(name: 'HC_FEATURES', value: opts.features))
     out.add(booleanParam(name: 'BUILD_STORAGE_CANARY', value: opts.canary == true))
     out.add(booleanParam(name: 'SKIP_PUSH', value: opts.skipPush == true))

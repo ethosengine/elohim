@@ -50,17 +50,8 @@ data:
     network:
       # Bootstrap served by Doorway gateway
       bootstrap_url: "https://doorway-staging.elohim.host/bootstrap"
-      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "wss://signal.doorway-staging.elohim.host"
-      # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while the
-      # build compiles tx5-only). Value is the planned SOVEREIGN self-hosted iroh-relay —
-      # it must be live before any transport-iroh build ships; never fall back to n0's
-      # public relay default.
-      relay_url: "https://relay.elohim.host"
-      webrtc_config:
-        iceServers:
-          - urls: ["stun:stun.cloudflare.com:3478"]
-          - urls: ["stun:stun.l.google.com:19302"]
+      # Per-doorway iroh relay; never fall back to a public default.
+      relay_url: "https://relay.staging.elohim.host"
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc

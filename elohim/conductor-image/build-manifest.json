@@ -7,14 +7,13 @@
   "manualOnly": false,
   "triggersGenesis": false,
   "cascades": true,
-  "description": "Custom holochain conductor image (elohim-edgenode) — compiled from the ethosengine/holochain + tx5 forks at the exact SHAs this repo's submodule pointers record. The build itself lives in the che-devworkspaces repo; this manifest is the monorepo-side declaration that makes it orchestrator-dispatchable.",
+  "description": "Custom holochain conductor image (elohim-edgenode) — compiled from the ethosengine/holochain fork at the exact SHA this repo's submodule pointer records. The build itself lives in the che-devworkspaces repo; this manifest is the monorepo-side declaration that makes it orchestrator-dispatchable.",
   "steps": {
     "build-conductor-image": {
-      "description": "Compile the patched conductor and publish elohim-edgenode:conductor-<hc12>-<tx512>. Sources are SUBMODULE POINTERS — a gitlink path has no trailing slash in a changeset, so the globs are the bare paths, NOT `path/**` (which would never match). Bumping elohim/holochain-conductor or elohim/tx5 in a commit is the whole trigger; both appear in the pin tag because both determine the binary (tx5 via the fork's [patch.crates-io] to ../tx5). elohim/kitsune2 is NOT watched: the fork's sibling-clone kitsune2 path patches are commented out, so bumping it cannot change the built binary and must not fire a 90-minute build. Changes to the Dockerfile or the job itself live in the che-devworkspaces submodule and are NOT watched here — a che bump also carries unrelated devspace-image work, so that path is deliberately commit-tag driven ([build:conductor]). buildProcess is deliberately EMPTY even though jenkinsPath names a real file: that file lives inside a submodule the orchestrator checkout never initializes, and build-graph.groovy marks a step stale when it cannot read a buildProcess ref — which would fire this 90-minute build on every single push.",
+      "description": "Compile the patched conductor and publish elohim-edgenode:conductor-<hc12>. The source is a SUBMODULE POINTER — a gitlink path has no trailing slash in a changeset, so the globs are the bare paths, NOT `path/**` (which would never match). Bumping elohim/holochain-conductor in a commit is the whole trigger and its SHA is the pin tag. elohim/kitsune2 is NOT watched: the fork's sibling-clone kitsune2 path patches are commented out, so bumping it cannot change the built binary and must not fire a 90-minute build. Changes to the Dockerfile or the job itself live in the che-devworkspaces submodule and are NOT watched here — a che bump also carries unrelated devspace-image work, so that path is deliberately commit-tag driven ([build:conductor]). buildProcess is deliberately EMPTY even though jenkinsPath names a real file: that file lives inside a submodule the orchestrator checkout never initializes, and build-graph.groovy marks a step stale when it cannot read a buildProcess ref — which would fire this 90-minute build on every single push.",
       "inputs": {
         "sources": [
-          "elohim/holochain-conductor",
-          "elohim/tx5"
+          "elohim/holochain-conductor"
         ],
         "buildProcess": []
       },

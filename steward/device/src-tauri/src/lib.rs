@@ -17,14 +17,14 @@ use tauri_plugin_store::StoreExt;
 const APP_ID: &str = "elohim";
 
 // Build-time environment configuration via environment variables
-// Set ELOHIM_BOOTSTRAP_URL and ELOHIM_SIGNAL_URL during build for custom endpoints
-// Defaults to production if not specified
+// Set ELOHIM_BOOTSTRAP_URL and ELOHIM_RELAY_URL during build for custom endpoints.
+// Defaults preserve the production doorway/relay pairing.
 const DEFAULT_BOOTSTRAP_URL: &str = "https://doorway.elohim.host/bootstrap";
-const DEFAULT_SIGNAL_URL: &str = "wss://signal.doorway.elohim.host";
+const DEFAULT_RELAY_URL: &str = "https://relay.elohim.host";
 
-// Dev environment endpoints (for builds targeting dev/alpha)
+// Dev environment endpoints (the alpha doorway and its own relay)
 const ALPHA_BOOTSTRAP_URL: &str = "https://doorway-alpha.elohim.host/bootstrap";
-const ALPHA_SIGNAL_URL: &str = "wss://signal.doorway-alpha.elohim.host";
+const ALPHA_RELAY_URL: &str = "https://relay.alpha.elohim.host";
 
 /// OAuth callback payload emitted to frontend when deep link is received
 #[derive(Debug, Clone, Serialize)]
@@ -69,7 +69,7 @@ const DOORWAY_STORE: &str = "doorway.json";
 /// 1. Saved doorway handoff data (runtime — from doorway login)
 /// 2. Local dev mode (cargo tauri dev) — localhost
 /// 3. Fresh instance (no agent key) — standalone, no network
-/// 4. ELOHIM_BOOTSTRAP_URL / ELOHIM_SIGNAL_URL env vars (compile time)
+/// 4. ELOHIM_BOOTSTRAP_URL / ELOHIM_RELAY_URL env vars (compile time)
 /// 5. ELOHIM_ENV=dev uses dev endpoints
 /// 6. Default to production endpoints
 ///
@@ -80,30 +80,30 @@ fn network_config() -> NetworkConfig {
     let mut network_config = NetworkConfig::default();
 
     // Check for saved doorway handoff data (runtime override)
-    // Validate that the store isn't stale: bootstrap/signal URLs are only valid
+    // Validate that the store isn't stale: bootstrap/relay URLs are only valid
     // if doorwayUrl is also present (a complete handoff). Partial data (e.g.
     // bootstrap URL without doorwayUrl) indicates a corrupted or partially-cleared store.
     let doorway_url = read_active_account_value("doorwayUrl");
     let doorway_bootstrap = read_active_account_value("bootstrapUrl");
-    let doorway_signal = read_active_account_value("signalUrl");
+    let doorway_relay = read_active_account_value("relayUrl");
     let agent_key = read_active_account_value("agentPubKey");
 
-    if doorway_url.is_some() && (doorway_bootstrap.is_some() || doorway_signal.is_some()) {
+    if doorway_url.is_some() && (doorway_bootstrap.is_some() || doorway_relay.is_some()) {
         // Use doorway-provided URLs (takes priority over compile-time defaults)
         if let Some(ref url) = doorway_bootstrap {
             log::info!("Using doorway bootstrap URL: {}", url);
             network_config.bootstrap_url = url2::Url2::parse(url);
         }
-        if let Some(ref url) = doorway_signal {
-            log::info!("Using doorway signal URL: {}", url);
-            network_config.signal_url = url2::Url2::parse(url);
+        if let Some(ref url) = doorway_relay {
+            log::info!("Using doorway relay URL: {}", url);
+            network_config.relay_url = url2::Url2::parse(url);
         }
-    } else if doorway_bootstrap.is_some() || doorway_signal.is_some() {
+    } else if doorway_bootstrap.is_some() || doorway_relay.is_some() {
         log::warn!("Stale network config detected (URLs without doorwayUrl), using defaults");
     } else if tauri::is_dev() {
         // Development mode: use alpha environment for p2p discovery
         network_config.bootstrap_url = url2::Url2::parse(ALPHA_BOOTSTRAP_URL);
-        network_config.signal_url = url2::Url2::parse(ALPHA_SIGNAL_URL);
+        network_config.relay_url = url2::Url2::parse(ALPHA_RELAY_URL);
     } else if agent_key.is_none() {
         // Fresh instance: no credentials yet. Start in standalone mode (no network).
         // Angular will show the doorway picker. After login + restart,
@@ -121,18 +121,18 @@ fn network_config() -> NetworkConfig {
             })
             .unwrap_or(DEFAULT_BOOTSTRAP_URL);
 
-        let signal_url = option_env!("ELOHIM_SIGNAL_URL")
+        let relay_url = option_env!("ELOHIM_RELAY_URL")
             .or_else(|| {
                 if option_env!("ELOHIM_ENV") == Some("dev") {
-                    Some(ALPHA_SIGNAL_URL)
+                    Some(ALPHA_RELAY_URL)
                 } else {
                     None
                 }
             })
-            .unwrap_or(DEFAULT_SIGNAL_URL);
+            .unwrap_or(DEFAULT_RELAY_URL);
 
         network_config.bootstrap_url = url2::Url2::parse(bootstrap_url);
-        network_config.signal_url = url2::Url2::parse(signal_url);
+        network_config.relay_url = url2::Url2::parse(relay_url);
     }
 
     // Mobile devices don't hold DHT data (reduces battery/bandwidth)
@@ -1044,8 +1044,8 @@ async fn doorway_login(
     if let Some(ref bootstrap) = handoff.bootstrap_url {
         account["bootstrapUrl"] = serde_json::json!(bootstrap);
     }
-    if let Some(ref signal) = handoff.signal_url {
-        account["signalUrl"] = serde_json::json!(signal);
+    if let Some(ref relay) = handoff.relay_url {
+        account["relayUrl"] = serde_json::json!(relay);
     }
     if let Some(ref conductor_id) = handoff.conductor_id {
         account["conductorId"] = serde_json::json!(conductor_id);
