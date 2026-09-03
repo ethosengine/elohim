@@ -13,7 +13,7 @@
 #   IROH_RELAY_VERSION   iroh-relay crate version (default below)
 set -euo pipefail
 
-export IROH_RELAY_VERSION="${IROH_RELAY_VERSION:-0.95.1}"
+export IROH_RELAY_VERSION="${IROH_RELAY_VERSION:-1.0.3}"
 
 echo "Building iroh-relay: ${IMAGE_TAG} (iroh-relay crate ${IROH_RELAY_VERSION})"
 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null

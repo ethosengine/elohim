@@ -618,8 +618,8 @@ metadata:
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
 data:
-  # iroh-relay 0.95.1 server config (TOML). Keys verified against
-  # iroh-relay-0.95.1/src/main.rs `struct Config`.
+  # iroh-relay 1.0.3 server config (TOML). Keys verified against
+  # iroh-relay-1.0.3/src/main.rs `struct Config`.
   relay.toml: |
     # Relay the byte plane. This is the whole point of the deployment.
     enable_relay = true
@@ -720,7 +720,7 @@ spec:
         - name: iroh-relay
           # Mirrored into Harbor from crates.io — see alpha.yaml's HARBOR
           # BUILD RECIPE. Same image, no second build.
-          image: harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+          image: harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-dev-latest
           imagePullPolicy: Always
           args:
             - "--config-path"
@@ -746,7 +746,7 @@ spec:
               cpu: "500m"
           # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
           # /robots.txt is registered on the relay builder UNCONDITIONALLY
-          # (iroh-relay-0.95.1/src/server.rs:383), unlike /generate_204 which
+          # (iroh-relay-1.0.3/src/server.rs:383), unlike /generate_204 which
           # exists on this listener only while TLS is off. Probing robots.txt
           # keeps the probe correct if Phase B ever enables relay-side TLS.
           readinessProbe:

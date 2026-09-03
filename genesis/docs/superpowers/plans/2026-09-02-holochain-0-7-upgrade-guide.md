@@ -565,6 +565,21 @@ default, `--no-default-features`, Go toolchain at `:57-58`, `TX5_FORK/TX5_BRANCH
   steward slot (the Tauri plugin itself is held — Lane J — so this is a config-shape change only).
 - [ ] **E9: Commit** path-limited to the files listed; message
   `chore(ci,config): holochain 0.7 toolchain — conductor features encryption/wasmer-sys-cranelift/jemalloc, no Go, tag conductor-<hc12>, tx5 keys removed from every conductor config, holonix main-0.7`.
+- [x] **E10 (addendum 2026-09-03, found in F2): the relay is LOAD-BEARING and moves with the conductor.**
+  The 0.7 fork's lockfile (elohim-0.7 @ 25dd2d0be144) resolves stock `iroh 1.0.3` + `iroh-relay 1.0.3`
+  under `kitsune2_transport_iroh 0.5.0`; the fleet relay servers were pinned at `0.95.1`. And
+  kitsune2 0.5.0 makes the relay a connectivity precondition, not a NAT nicety: a conductor homes to
+  `relay_url` at boot and dials only peers whose advertised relay matches its own exactly. Measured
+  2026-09-03 on the household mesh: three loopback 0.7 conductors with `relay_url` pointed at the
+  doorway (the 0.6-era placeholder) booted clean and sat at **0 connections** for the whole prologue.
+  Landed on the branch: `scripts/ci/build-iroh-relay.sh` + `push-iroh-relay.sh` + `iroh-relay/Dockerfile`
+  default `1.0.3`; `manifests/doorway/alpha.yaml:901` + `alpha-b.yaml:723` pull
+  `iroh-relay:1.0.3-dev-latest` (a version-scoped tag — the edge pipeline builds+pushes it on the same
+  push; the 0.95.1 line stays in Harbor untouched); `relay.toml` keys verified unchanged at 1.0.3.
+  Local mesh: `hc-mesh.sh` launches `iroh-relay --dev` on `:3340` (`MESH_RELAY_BIN`, `MESH_RELAY_PORT`,
+  `MESH_RELAY=0` to opt out) and generates every conductor against it; `just mesh status` shows a
+  `relay` row. Rule: the relay image tag and the `elohim/holochain-conductor` gitlink move in the
+  SAME push, never separately.
 
 ## Lane I — JavaScript clients
 
@@ -591,9 +606,14 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   `holochain-0.7` HEAD) in one commit. Pack every DNA with the 0.7.0 `hc`, read the five hashes
   (`hc dna hash` per packed DNA — roles: `elohim/workdir/happ.yaml` names), write them to
   `elohim/holochain/dna/dna-hashes.baseline`, and commit with `[dna:migrate]` in the message.
-- [ ] **F2: Local mesh on stock 0.7.0 binaries.** `HOLOCHAIN_BIN=…/scratchpad/hc-0.7 MESH_CONDUCTOR_LAUNCH=ark just mesh start`
+- [ ] **F2: Local mesh on stock 0.7.0 binaries.** `HOLOCHAIN_BIN=…/scratchpad/hc-0.7 MESH_RELAY_BIN=…/iroh-relay-1.0.3/bin/iroh-relay MESH_CONDUCTOR_LAUNCH=ark just mesh start`
   (stock binaries are enough: the fork patches are fleet-scale behaviours; the cross-relay patch is
-  not exercisable on a single-relay mesh). Then `just mesh prologue`, `just seed validate`,
+  not exercisable on a single-relay mesh). The relay is NOT optional (E10): build it once with
+  `RUSTFLAGS="" cargo install iroh-relay --version 1.0.3 --locked --features server --root <dir>`
+  (the `server` feature is what carries the binary — without it `cargo install` succeeds and installs
+  nothing). Gate for "the mesh is really up": `GET /db/p2p/conductor-diagnostics` on each storage peer
+  shows `connections > 0` before the prologue is attempted — household formation cannot succeed on a
+  DHT that never connected, and the prologue's retries read as a seeding bug when they are a relay bug. Then `just mesh prologue`, `just seed validate`,
   `just test mesh` (Act I). Then the rung-5 chain on 0.7: the runnable check in
   `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md` (8/8 cucumber) — this is
   the proof that `update_coordinators` and the release controller survive the line change.
@@ -612,7 +632,9 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   The same authorization covers the household mesh data root for the F2 gate. Sequencing below still
   holds (wipe AFTER the 0.7 images have rolled, bootstrap pair together).
   (1) Confirm the edge roll carrying the 0.7 hApp and the storage image embedding `conductor-<hc12>`
-  has reached every alpha StatefulSet (7 peers + conductor workloads). (2) ONLY THEN clear each
+  has reached every alpha StatefulSet (7 peers + conductor workloads) **and both relay Deployments
+  are on `iroh-relay:1.0.3-dev-latest`** (E10 — the relay rolls in the same wave; a 0.7 conductor
+  against a 0.95.1 relay is the 0-connections failure, and it is silent). (2) ONLY THEN clear each
   conductor's full `databases/` tree — 0.7 cannot read 0.6 databases and the lair/agent re-key is
   expected; clearing earlier makes old storage install the 0.6 hashes and re-key twice. adam and
   matthew (bootstrap pair) are cleared in the same window. (3) `DNA_MIGRATION_INTENT=<five baseline hashes>`

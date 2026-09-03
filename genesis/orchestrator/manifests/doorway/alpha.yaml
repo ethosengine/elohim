@@ -689,24 +689,21 @@ spec:
 #   deployDoorwayManifest already applies this file on every edge deploy.
 #
 # ─ VERSION CONTRACT (do not bump casually) ──────────────────────────────────
-# Conductor 0.6.3 -> kitsune2 0.4.1 -> kitsune2_transport_iroh 0.4.1 ->
-# iroh-holochain 0.95.1 -> iroh-relay-holochain 0.95.1 (the relay CLIENT).
-# The server pinned below is STOCK iroh-relay 0.95.1 from crates.io. That is
-# the right pairing on four independent lines of evidence:
-#   1. iroh-relay-0.95.1/src/http.rs is BYTE-IDENTICAL to
-#      iroh-relay-holochain-0.95.1/src/http.rs (same RELAY_PROTOCOL_VERSION
-#      "iroh-relay-v1", same RELAY_PATH "/relay", same client-auth header).
-#   2. holochain_p2p 0.6.3 and holochain 0.6.3 themselves dev-depend on stock
-#      iroh-relay 0.95.1 with features ["server","test-utils"].
-#   3. Upstream's own conductor rendezvous harness spawns that stock server
-#      and points transport-iroh conductors at it
-#      (crates/holochain/src/sweettest/sweet_conductor_config_rendezvous.rs).
-#   4. iroh-relay 0.95.1 publishes a Cargo.lock whose crypto chain
-#      (curve25519-dalek 5.0.0-pre.1 / ed25519-dalek 3.0.0-pre.1 /
-#      digest 0.11.0-rc.3 / sha2 0.11.0-rc.2) is identical to the conductor's
-#      resolution, which we have already compiled green.
+# Conductor 0.7.0 -> kitsune2 0.5.0 -> kitsune2_transport_iroh 0.5.0 (our
+# cross-relay preflight patch, same deps) -> STOCK iroh 1.0.3 -> iroh-relay
+# 1.0.3 (the relay CLIENT; the iroh-holochain fork line ended with 0.6).
+# The server pinned below is the SAME crate at the SAME version from
+# crates.io — read straight from the fork's Cargo.lock at elohim-0.7
+# (25dd2d0be144): iroh 1.0.3, iroh-relay 1.0.3, kitsune2_transport_iroh 0.5.0.
+# kitsune2 0.5.0 (PR #479) made the relay LOAD-BEARING: a conductor homes to
+# relay_url at boot and only dials peers whose advertised relay matches its
+# own exactly (one relay per space) — a wrong or missing relay is a booted
+# conductor with 0 connections, not a slower one. Server and client must
+# therefore move TOGETHER with the conductor image: bump this tag in the same
+# push as the `elohim/holochain-conductor` gitlink, never on its own.
+# The 0.6-era evidence (0.95.1 pairing) is history, kept in git.
 # The iroh 0.92 storage dataplane can share a relay INSTANCE with this one
-# (the relay wire is identical 0.92<->0.95.1 — frame tags, handshake structs,
+# (the relay wire is identical 0.92<->1.0.3 — frame tags, handshake structs,
 # protocol string, QAD ALPN all unchanged); sharing the CONFIG KEY is not —
 # the conductor's relay is `network.relay_url` in conductor-config, the
 # dataplane's is a separate IrohConfig field. Two keys, one hostname per
@@ -717,8 +714,8 @@ spec:
 #   Jenkinsfile, mirroring the relay-addr-beacon pattern): iroh-relay/Dockerfile
 #   + scripts/ci/build-iroh-relay.sh build the SHORT-named local image,
 #   scripts/ci/push-iroh-relay.sh tags + pushes
-#   harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-<commit-hash> always,
-#   and the :0.95.1-dev-latest alias (the tag pinned below) once the branch
+#   harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-<commit-hash> always,
+#   and the :1.0.3-dev-latest alias (the tag pinned below) once the branch
 #   reaches dev. Both steps are catchError-isolated (UNSTABLE, non-critical
 #   delivery) — a relay-image build/push failure never blocks the edge deploy.
 #   The recipe below is RETAINED for local/emergency rebuilds; do NOT pull a
@@ -730,24 +727,22 @@ spec:
 #   #   ENV RUSTFLAGS=""            # clear the Holochain WASM getrandom flag
 #   #   RUN apt-get update && apt-get install -y --no-install-recommends \
 #   #         pkg-config && rm -rf /var/lib/apt/lists/*
-#   #   RUN cargo install iroh-relay --version 0.95.1 --locked \
+#   #   RUN cargo install iroh-relay --version 1.0.3 --locked \
 #   #         --features server --root /out
 #   #   FROM debian:bookworm-slim AS runtime
 #   #   RUN apt-get update && apt-get install -y --no-install-recommends \
 #   #         ca-certificates && rm -rf /var/lib/apt/lists/*
 #   #   COPY --from=builder /out/bin/iroh-relay /usr/local/bin/iroh-relay
 #   #   ENTRYPOINT ["/usr/local/bin/iroh-relay"]
-#   # --locked IS LOAD-BEARING, not hygiene: iroh-base 0.95.1 exact-pins
-#   # curve25519-dalek =5.0.0-pre.1, the pre-release whose published source
-#   # carries the digest::crypto_common path bug that froze the storage
-#   # dataplane on iroh 0.92. The bug is resolution-conditional; the
-#   # published lock pins the working digest 0.11.0-rc.3. Unlocked is a coin
-#   # flip.
-#   #   nerdctl -n k8s.io build -t iroh-relay:0.95.1 -f <Dockerfile> <ctx>
-#   #   nerdctl -n k8s.io tag  iroh-relay:0.95.1 \
-#   #     harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+#   # --locked: the crate's published resolution, exactly (stable dalek
+#   # chain at 1.0.3 — curve25519-dalek 5.0.0 / ed25519-dalek 3.0.0 /
+#   # digest 0.11.3; the 0.95.1-era pre-release hazard is gone, the pin
+#   # stays because a relay's job is to be boring).
+#   #   nerdctl -n k8s.io build -t iroh-relay:1.0.3 -f <Dockerfile> <ctx>
+#   #   nerdctl -n k8s.io tag  iroh-relay:1.0.3 \
+#   #     harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-dev-latest
 #   #   nerdctl -n k8s.io push \
-#   #     harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+#   #     harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-dev-latest
 #   # (alpha-b.yaml's mirror relay pulls this SAME image — no second recipe.)
 #
 # ─ DNS (operator action, beacon-healed) ─────────────────────────────────────
@@ -763,7 +758,7 @@ spec:
 #     can't see through the terminating proxy, so it falls back to a
 #     challenge/response handshake — one extra RTT per CONNECTION, not per
 #     frame ("Verification not succeeding is part of normal operation",
-#     iroh-relay-0.95.1/src/protos/handshake.rs serverside()).
+#     iroh-relay-1.0.3/src/protos/handshake.rs serverside()).
 #   - QUIC Address Discovery (QAD) is OFF this phase: no LoadBalancer/MetalLB
 #     to carry a raw UDP:7842 path, and ingress-nginx cannot proxy QUIC.
 #     Endpoints don't learn their observed public address from the relay, so
@@ -804,8 +799,8 @@ metadata:
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
 data:
-  # iroh-relay 0.95.1 server config (TOML). Keys verified against
-  # iroh-relay-0.95.1/src/main.rs `struct Config`.
+  # iroh-relay 1.0.3 server config (TOML). Keys verified against
+  # iroh-relay-1.0.3/src/main.rs `struct Config`.
   relay.toml: |
     # Relay the byte plane. This is the whole point of the deployment.
     enable_relay = true
@@ -898,7 +893,7 @@ spec:
         - name: iroh-relay
           # Mirrored into Harbor from crates.io — see the HARBOR BUILD RECIPE
           # in the header above.
-          image: harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+          image: harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-dev-latest
           imagePullPolicy: Always
           args:
             - "--config-path"
@@ -924,7 +919,7 @@ spec:
               cpu: "500m"
           # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
           # /robots.txt is registered on the relay builder UNCONDITIONALLY
-          # (iroh-relay-0.95.1/src/server.rs:383), unlike /generate_204 which
+          # (iroh-relay-1.0.3/src/server.rs:383), unlike /generate_204 which
           # exists on this listener only while TLS is off. Probing robots.txt
           # keeps the probe correct if Phase B ever enables relay-side TLS.
           readinessProbe:

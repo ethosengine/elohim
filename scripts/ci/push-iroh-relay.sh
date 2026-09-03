@@ -14,16 +14,16 @@
 # its build), and a push failure must not abort the edge deploy — set -x keeps
 # any failure visible in the console.
 #
-# The tag is VERSION-SCOPED (iroh-relay:0.95.1-dev-latest, not a bare
+# The tag is VERSION-SCOPED (iroh-relay:1.0.3-dev-latest, not a bare
 # iroh-relay:dev-latest) so a future crate bump (e.g. 1.0.3) publishes under
-# its own dev-latest line instead of clobbering the 0.95.1 one the manifests
+# its own dev-latest line instead of clobbering the one the manifests
 # currently pin.
 #
 # Env: IMAGE_TAG, GIT_COMMIT_HASH, BRANCH_NAME, IROH_RELAY_VERSION
 set -uo pipefail
 set -x
 
-IROH_RELAY_VERSION="${IROH_RELAY_VERSION:-0.95.1}"
+IROH_RELAY_VERSION="${IROH_RELAY_VERSION:-1.0.3}"
 IMAGE="harbor.ethosengine.com/ethosengine/iroh-relay"
 LOCAL="iroh-relay:${IMAGE_TAG}"
 
