@@ -103,10 +103,37 @@ impl SpoolIngest {
             }
 
             let (_, expected_hash) = BlobStore::compute_addresses(&bytes);
-            let row_exists = self.content.get(&filename_cid)?.is_some();
-            if row_exists && self.blobs.exists_by_address(&expected_hash).await? {
-                self.seen.insert(filename_cid);
+            let witness_digest = BlobStore::parse_content_address(&filename_cid)?;
+            let bytes_digest = BlobStore::parse_content_address(&expected_hash)?;
+            if witness_digest != bytes_digest {
+                warn!(
+                    path = %path.display(),
+                    filename_cid = %filename_cid,
+                    bytes_digest = %bytes_digest,
+                    "spool-ingest: refusing witness bytes whose digest differs from filename"
+                );
                 continue;
+            }
+
+            let row_exists = self.content.get(&filename_cid)?.is_some();
+            if self.blobs.exists_by_address(&expected_hash).await? {
+                let present_bytes = self.blobs.get(&expected_hash).await?;
+                let present_digest = BlobStore::parse_content_address(
+                    &BlobStore::compute_addresses(&present_bytes).1,
+                )?;
+                if present_digest == witness_digest && row_exists {
+                    self.seen.insert(filename_cid);
+                    continue;
+                }
+                if present_digest != witness_digest {
+                    warn!(
+                        filename_cid = %filename_cid,
+                        expected_digest = %witness_digest,
+                        actual_digest = %present_digest,
+                        "spool-ingest: repairing blob whose bytes do not match its address"
+                    );
+                    self.blobs.delete(&expected_hash).await?;
+                }
             }
 
             if !row_exists {
@@ -116,7 +143,6 @@ impl SpoolIngest {
 
             // Deliberately after the private row: blob_reach treats row-less bytes as servable.
             let stored = self.blobs.store(&bytes).await?;
-            let witness_digest = BlobStore::parse_content_address(&filename_cid)?;
             let hash_digest = BlobStore::parse_content_address(&stored.hash)?;
             let blob_cid_digest = BlobStore::parse_content_address(&stored.cid)?;
             if witness_digest != hash_digest || witness_digest != blob_cid_digest {
@@ -381,5 +407,68 @@ mod tests {
             content_diesel::content_count(&mut conn, &AppContext::default_lamad()).unwrap(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn a_partial_blob_is_repaired_on_the_next_pass() {
+        let tmp = tempfile::tempdir().unwrap();
+        let spool_root = tmp.path().join("ark");
+        let blob_root = tmp.path().join("pantry");
+        let witness = witness(2_000);
+        let cid = witness.cid().unwrap();
+        let bytes = write_witness(&spool_root, &witness, &cid);
+        let expected_hash = BlobStore::compute_hash(&bytes);
+        let hash_part = expected_hash.strip_prefix("sha256-").unwrap();
+        let blob_path = blob_root
+            .join("blobs")
+            .join(&hash_part[..4])
+            .join(&expected_hash);
+        std::fs::create_dir_all(blob_path.parent().unwrap()).unwrap();
+        std::fs::write(&blob_path, &bytes[..bytes.len() / 2]).unwrap();
+        let (mut ingest, _, blobs, pool) = ingester(&spool_root, &blob_root).await;
+
+        assert_eq!(ingest.run_once().await.unwrap(), vec![cid.clone()]);
+
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            content_diesel::content_count(&mut conn, &AppContext::default_lamad()).unwrap(),
+            1
+        );
+        let repaired = blobs.get(&expected_hash).await.unwrap();
+        assert_eq!(repaired, bytes);
+        assert_eq!(
+            BlobStore::parse_content_address(&BlobStore::compute_hash(&repaired)).unwrap(),
+            BlobStore::parse_content_address(&cid).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn noncanonical_bytes_are_refused_before_any_write() {
+        let tmp = tempfile::tempdir().unwrap();
+        let spool_root = tmp.path().join("ark");
+        let death_witness = witness(2_000);
+        let cid = death_witness.cid().unwrap();
+        let canonical = death_witness.canonical_bytes().unwrap();
+        let schema_marker = b"\x66schema\x01";
+        let marker_start = canonical
+            .windows(schema_marker.len())
+            .position(|window| window == schema_marker)
+            .unwrap();
+        let mut noncanonical = canonical.clone();
+        let schema_value = marker_start + schema_marker.len() - 1;
+        noncanonical.splice(schema_value..=schema_value, [0x18, 0x01]);
+        assert_ne!(noncanonical, canonical);
+        let decoded: DeathWitness = serde_ipld_dagcbor::from_slice(&noncanonical).unwrap();
+        assert_eq!(decoded.cid().unwrap(), cid);
+        let witnesses = spool_root.join("witnesses");
+        std::fs::create_dir_all(&witnesses).unwrap();
+        std::fs::write(witnesses.join(format!("{cid}.cbor")), &noncanonical).unwrap();
+        let unexpected_hash = BlobStore::compute_hash(&noncanonical);
+        let (mut ingest, content, blobs, _) =
+            ingester(&spool_root, &tmp.path().join("pantry")).await;
+
+        assert!(ingest.run_once().await.unwrap().is_empty());
+        assert!(content.get(&cid).unwrap().is_none());
+        assert!(!blobs.exists_by_address(&unexpected_hash).await.unwrap());
     }
 }
