@@ -74,10 +74,34 @@ pub async fn single_agent_conductor() -> Result<(SweetConductor, AgentPubKey)> {
 }
 
 /// Spin up two conductors so tests can exercise cross-agent DHT behavior.
+///
+/// 0.7 — the pair shares ONE rendezvous, for the same reason
+/// [`two_agent_conductors_isolated`] does (see its note): `SweetConductor::standard()`
+/// mints a fresh `SweetLocalRendezvous` per call, and kitsune2 0.5 dials only
+/// peers whose advertised relay matches its own exactly. Two `standard()`
+/// conductors therefore never connect — elohim-holochain #1424 (2026-09-03):
+/// `infrastructure::doorway_visible_across_agents_and_operator_only_can_update`
+/// ("a2 should be able to read a1's doorway within 30s") and
+/// `qahal_formation_test::affirm_membership_happy_path_then_replay_rejected`
+/// ("DHT consistency timeout") both red on 0.7, both green on 0.6 where
+/// `standard()` carried no relay at all. Discovery stays the 0.6 default (mem
+/// bootstrap on), so peers still find each other without `exchange_peer_info`.
 pub async fn two_agent_conductors() -> Result<[(SweetConductor, AgentPubKey); 2]> {
-    let (c1, a1) = single_agent_conductor().await?;
-    let (c2, a2) = single_agent_conductor().await?;
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (c1, a1) = single_agent_conductor_with(rendezvous.clone()).await?;
+    let (c2, a2) = single_agent_conductor_with(rendezvous).await?;
     Ok([(c1, a1), (c2, a2)])
+}
+
+/// One `standard()` conductor homed to a caller-supplied rendezvous, so a
+/// multi-conductor test can put every peer on the same relay.
+pub async fn single_agent_conductor_with(
+    rendezvous: DynSweetRendezvous,
+) -> Result<(SweetConductor, AgentPubKey)> {
+    let config = SweetConductorConfig::standard();
+    let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    Ok((conductor, agent))
 }
 
 /// Spin up two conductors with the bootstrap module DISABLED, for partition
