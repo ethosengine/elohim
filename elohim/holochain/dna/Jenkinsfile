@@ -115,11 +115,18 @@ spec:
         requests:
           memory: "2Gi"
           cpu: "1"
-          ephemeral-storage: "4Gi"
+          # Ephemeral storage sized for the 0.7 line: each shard pod materialises
+          # the holonix main-0.7 closure (505 store paths) in its writable layer,
+          # plus the 945 MB nextest archive and its extraction, and the conductors'
+          # data dirs grow during the run. At 4Gi/8Gi kubelet evicted shards 1-3
+          # MID-RUN in #1424/#1425/#1426 ("Pod ephemeral local storage usage
+          # exceeds the total limit of containers 8Gi") — only one shard's tests
+          # ever counted. The main build pod already runs at 10Gi/20Gi.
+          ephemeral-storage: "12Gi"
         limits:
           memory: "4Gi"
           cpu: "2"
-          ephemeral-storage: "8Gi"
+          ephemeral-storage: "24Gi"
 '''
 
 // Run a single sweettest shard inside its own podTemplate-allocated pod.
