@@ -62,6 +62,29 @@
     "psi_full_avg10_deny_pct": 20,
     "psi_some_avg60_deny_pct": 50,
     "max_concurrent_heavy": 1,
-    "default_jobs": 4
+    "default_jobs": 4,
+    "_write_budget_2026_09_03": "io-guard (genesis/agentic/bin/io-guard) enforces a continuous WRITE budget on top of the admission rules above. Evidence 2026-09-03 10:20Z: the 0.7 household mesh + prologue seed drove the shared NVMe to 130-270 MB/s; dqlite lease writes hit 3-9.7 s, devworkspace-controller lost leader election (25 restarts) and re-rendered this pod WITHOUT its secrets — a pod SWAP, not a crash; CPU had 16 cores free, RAM 6G/31G. Levels are the container's cgroup io.stat write rate over window_s (what WE write) raised by host PSI full avg10 (what the disk suffers). high = PAUSE (SIGSTOP) the newest tier-1 compile tree, one per tick; hard = kill tier-1, pause tier-2; critical/unknown never touched; resume oldest-first once under soft for resume_after_s. guard_mode observe logs would-do only; flip to enforce once every session has moored (berth).",
+    "guard_mode": "enforce",
+    "poll_seconds": 5.0,
+    "window_s": 30,
+    "sustain_s": 20,
+    "resume_after_s": 30,
+    "write_soft_mb_s": 60,
+    "write_high_mb_s": 100,
+    "write_hard_mb_s": 160,
+    "psi_full_high_pct": 10,
+    "psi_full_hard_pct": 20,
+    "grace_seconds": 3.0,
+    "max_actions_per_tick": 1,
+    "events_keep": 500
+  },
+  "berth": {
+    "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued.",
+    "resources": {
+      "mesh": 1,
+      "cargo": 1,
+      "disk-heavy": 1
+    },
+    "mooring_ttl_s": 10800
   }
 }

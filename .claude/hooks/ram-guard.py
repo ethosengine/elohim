@@ -294,6 +294,51 @@ def ensure_daemon():
         return f"ram-guard start failed: {e!r}"
 
 
+IO_GUARD = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "io-guard")
+BERTH = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "berth")
+
+
+def berth_touch(session):
+    """Liveness heartbeat for this session's mooring — one small file rewrite, no subprocess."""
+    try:
+        bdir = os.environ.get("BERTH_DIR") or os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config"), "berth")
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", session or "default")
+        path = os.path.join(bdir, "moorings", f"{safe}.json")
+        with open(path) as f:
+            m = json.load(f)
+        m["last_seen"] = round(time.time(), 3)
+        with open(path, "w") as f:
+            json.dump(m, f, indent=1, sort_keys=True)
+    except Exception:
+        pass
+
+
+def io_guard_and_berth_lines(session):
+    """SessionStart: ensure io-guard (sibling daemon, write budget) and moor this session on the berth
+    so the workspace knows who is here. Model/lab are unknown to a hook — the agent completes its own
+    mooring with `berth moor --model <id> --lab <vendor> --task '<lane>'`."""
+    out = []
+    try:
+        subprocess.run([sys.executable, IO_GUARD, "start"], capture_output=True, text=True, timeout=6)
+        r = subprocess.run([sys.executable, IO_GUARD, "status", "--brief"], capture_output=True, text=True, timeout=6)
+        out.append((r.stdout or r.stderr).strip() or "IO-GUARD: no status")
+    except Exception as e:
+        out.append(f"IO-GUARD: unavailable ({e!r})")
+    try:
+        subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
+                        "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator"],
+                       capture_output=True, text=True, timeout=6)
+        r = subprocess.run([sys.executable, BERTH, "status"], capture_output=True, text=True, timeout=6)
+        st = (r.stdout or "").strip().splitlines()
+        held = [l.strip() for l in st if " held by " in l or "/" in l.split()[1:2]]
+        out.append(f"BERTH: moored as {session} (claude-code; complete it: `berth moor --model <id> --lab <vendor> --task '<lane>'`)"
+                   + (" · leases: " + "; ".join(held) if held else " · no leases held")
+                   + " · claim before mesh/cargo/disk-heavy work: `berth claim <resource>`; `berth status|ledger`")
+    except Exception as e:
+        out.append(f"BERTH: unavailable ({e!r})")
+    return "\n".join(out)
+
+
 def main(argv):
     event = argv[argv.index("--event") + 1] if "--event" in argv else "prompt"
     try:
@@ -313,10 +358,12 @@ def main(argv):
             line = (f"RAM-GUARD {state['level'].upper()}: {_pressure_line(state)} · memory.oom.group={state.get('oom_group')} "
                     f"memory.high={state.get('memory_high')} · sheds compile trees at high, the full ladder at hard; "
                     f"`genesis/agentic/bin/ram-guard status|plan`")
+        line += "\n" + io_guard_and_berth_lines(session)
         _emit("SessionStart", line)
         return
 
     if event == "prompt":
+        berth_touch(session)
         text = prompt_banner(read_state(d), d, session)
         if text:
             print(text)  # UserPromptSubmit: plain stdout lands in context

@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""
+berth — the dev workspace as a berth: who is moored here, what they hold, what they said.
+
+This is the local, ephemeral slice of a protocol shape, not a new invention. In tevah terms the
+workspace container is ONE berth (a blade with declared carrying capacity: RAM, disk-write budget,
+CPU, one household mesh, one heavy cargo slot). Sessions — Claude Code, Codex, Antigravity, a
+human at a terminal — MOOR to it, CLAIM capacity, RELEASE it, and SAY things to each other while
+they deliberate. Every record here is written in the field shape of its eventual protocol home so
+projection is a rename, never a redesign:
+
+  mooring   → a `delegates-compute` Mishpat::Commitment  (provider = the human principal,
+              recipient = the agent {model, lab, runtime, session}, bounds = {write_set, ttl});
+              see genesis/docs/architecture/rea-compute-commitment-primitive.md
+  lease     → a REA commitment to `use` one unit of a berth resource for a bounded window
+              (tevah §5.3 "Commitment (before)"); a refused claim is an honest absence, not a queue
+  note      → a witnessed interaction event between moored agents (low stakes ⇒ never notarized)
+  shed      → tevah §5.3 "breach event", written here by io-guard / ram-guard when they act
+
+Classification (p2p-design-gate, 2026-09-03): every record is Ephemeral (C) — delete the store and
+it is rebuilt from the live processes and the next moor/claim. Source of truth: the running
+workspace. Store: $CLAUDE_CONFIG_DIR/berth (survives container restarts; never inside /tmp; never
+in git). Design note: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md
+
+Commands:
+  berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
+                [--writes a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
+  berth unmoor  --session S                                        leave; releases every lease held
+  berth touch   --session S                                        liveness heartbeat (hooks call it)
+  berth claim   RESOURCE --session S [--note TEXT] [--ttl SECONDS] take one unit; exit 3 if held
+  berth release RESOURCE --session S
+  berth say     --session S [--to SESSION] TEXT                    a deliberation note, on the record
+  berth who     RESOURCE                                           json of the holder (or null)
+  berth status                                                     moorings · leases · capacity
+  berth ledger  [-n 30]                                            the append-only record
+
+Resources (capacity 1 unless pool-policy.json `berth.resources` says otherwise):
+  mesh        the household mesh (start/stop/prologue/test mesh)
+  cargo       one heavy cargo build/test/check per container (pool-policy io.max_concurrent_heavy)
+  disk-heavy  any sustained-write job that is not cargo (prologue seed, pnpm install, blob sync)
+
+Session id resolution: --session, else $BERTH_SESSION, else $CLAUDE_SESSION_ID. A mooring expires
+`ttl` seconds after its last touch (default 3 h); an expired holder's lease can be taken over, and
+the takeover is on the record. Exit codes: 0 ok · 2 usage · 3 refused (held by a live mooring).
+"""
+import json
+import os
+import sys
+import time
+
+CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config")
+PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
+POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json")
+DEFAULT_TTL_S = 3 * 3600
+DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
+
+
+def store_dir():
+    return os.environ.get("BERTH_DIR") or os.path.join(CONFIG_DIR, "berth")
+
+
+def load_capacities(path=POLICY_FILE):
+    caps = dict(DEFAULT_RESOURCES)
+    try:
+        with open(path) as f:
+            pol = json.load(f)
+        io_pol = pol.get("io") or {}
+        if "max_concurrent_heavy" in io_pol:
+            caps["cargo"] = int(io_pol["max_concurrent_heavy"])
+        for k, v in ((pol.get("berth") or {}).get("resources") or {}).items():
+            caps[k] = int(v)
+    except Exception:
+        pass
+    return caps
+
+
+class Berth:
+    def __init__(self, d=None, now=None):
+        self.dir = d or store_dir()
+        self.moor_dir = os.path.join(self.dir, "moorings")
+        os.makedirs(self.moor_dir, exist_ok=True)
+        self.leases_path = os.path.join(self.dir, "leases.json")
+        self.ledger_path = os.path.join(self.dir, "ledger.jsonl")
+        self.now = now or time.time
+        self.capacities = load_capacities()
+
+    # ------------------------------------------------------------ records
+    def _moor_path(self, session):
+        safe = "".join(c if c.isalnum() or c in "_.-" else "_" for c in session)
+        return os.path.join(self.moor_dir, f"{safe}.json")
+
+    def record(self, kind, **fields):
+        ev = {"at": round(self.now(), 3), "kind": kind}
+        ev.update(fields)
+        with open(self.ledger_path, "a") as f:
+            f.write(json.dumps(ev, sort_keys=True) + "\n")
+        return ev
+
+    def ledger(self, n=30):
+        try:
+            with open(self.ledger_path) as f:
+                lines = f.readlines()[-n:]
+            return [json.loads(l) for l in lines if l.strip()]
+        except Exception:
+            return []
+
+    # ------------------------------------------------------------ moorings
+    def moorings(self):
+        out = {}
+        for name in os.listdir(self.moor_dir):
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(self.moor_dir, name)) as f:
+                    m = json.load(f)
+                out[m["session"]] = m
+            except Exception:
+                continue
+        return out
+
+    def mooring(self, session):
+        return self.moorings().get(session)
+
+    def is_live(self, m):
+        if not m:
+            return False
+        pid = m.get("pid")
+        if pid:
+            try:
+                os.kill(int(pid), 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                pass
+        return (self.now() - m.get("last_seen", 0)) < m.get("ttl_s", DEFAULT_TTL_S)
+
+    def moor(self, session, **fields):
+        m = self.mooring(session) or {"session": session, "moored_at": round(self.now(), 3)}
+        for k, v in fields.items():
+            if v is not None:
+                m[k] = v
+        m.setdefault("recipient", {})
+        for k in ("model", "lab", "runtime"):
+            if m.get(k):
+                m["recipient"][k] = m[k]
+        m["recipient"]["session"] = session
+        m.setdefault("bounds", {})
+        if m.get("writes"):
+            m["bounds"]["write_set"] = m["writes"]
+        m["bounds"]["ttl_s"] = m.get("ttl_s", DEFAULT_TTL_S)
+        m.setdefault("ttl_s", DEFAULT_TTL_S)
+        m["last_seen"] = round(self.now(), 3)
+        tmp = self._moor_path(session) + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(m, f, indent=1, sort_keys=True)
+        os.replace(tmp, self._moor_path(session))
+        self.record("moor", session=session, recipient=m["recipient"], provider=m.get("principal"),
+                    task=m.get("task"), bounds=m["bounds"])
+        return m
+
+    def touch(self, session):
+        m = self.mooring(session)
+        if not m:
+            return None
+        m["last_seen"] = round(self.now(), 3)
+        with open(self._moor_path(session), "w") as f:
+            json.dump(m, f, indent=1, sort_keys=True)
+        return m
+
+    def unmoor(self, session):
+        for res, lease in list(self.leases().items()):
+            if lease.get("holder") == session:
+                self.release(res, session, reason="unmoor")
+        try:
+            os.remove(self._moor_path(session))
+        except FileNotFoundError:
+            pass
+        self.record("unmoor", session=session)
+
+    # ------------------------------------------------------------ leases
+    def leases(self):
+        try:
+            with open(self.leases_path) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _write_leases(self, leases):
+        tmp = self.leases_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(leases, f, indent=1, sort_keys=True)
+        os.replace(tmp, self.leases_path)
+
+    def holder_is_live(self, lease):
+        if not lease:
+            return False
+        if lease.get("ttl_s") and (self.now() - lease.get("since", 0)) > lease["ttl_s"]:
+            return False
+        return self.is_live(self.mooring(lease.get("holder")))
+
+    def claim(self, resource, session, note=None, ttl_s=None):
+        """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
+        answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots."""
+        if resource not in self.capacities:
+            self.capacities[resource] = 1
+        leases = self.leases()
+        cap = self.capacities[resource]
+        slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)] if cap > 1 else None
+        if cap == 1:
+            cur = leases.get(resource)
+            if cur and cur.get("holder") == session:
+                cur["since"] = round(self.now(), 3)
+                cur["note"] = note or cur.get("note")
+                leases[resource] = cur
+                self._write_leases(leases)
+                return True, cur, "renewed"
+            if cur and self.holder_is_live(cur):
+                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur["since"])
+                return False, cur, f"held by {cur['holder']} since {time.strftime('%H:%M:%SZ', time.gmtime(cur['since']))}"
+            takeover = cur["holder"] if cur else None
+            lease = {"resource": resource, "holder": session, "since": round(self.now(), 3),
+                     "note": note, "ttl_s": ttl_s, "action": "use"}
+            leases[resource] = lease
+            self._write_leases(leases)
+            self.record("claim", resource=resource, session=session, note=note,
+                        took_over_from=takeover if takeover and takeover != session else None)
+            return True, lease, "taken over from a stale holder" if takeover and takeover != session else "claimed"
+        mine = [l for l in slots if l.get("holder") == session]
+        if mine:
+            return True, mine[0], "renewed"
+        if len(slots) >= cap:
+            holders = ",".join(l["holder"] for l in slots)
+            self.record("refuse", resource=resource, session=session, holder=holders)
+            return False, slots, f"all {cap} slots held by {holders}"
+        lease = {"resource": resource, "holder": session, "since": round(self.now(), 3),
+                 "note": note, "ttl_s": ttl_s, "action": "use"}
+        slots.append(lease)
+        leases[resource + "/slots"] = slots
+        self._write_leases(leases)
+        self.record("claim", resource=resource, session=session, note=note)
+        return True, lease, "claimed"
+
+    def release(self, resource, session, reason=None):
+        leases = self.leases()
+        changed = False
+        cur = leases.get(resource)
+        if cur and cur.get("holder") == session:
+            del leases[resource]
+            changed = True
+        slots = leases.get(resource + "/slots")
+        if slots:
+            kept = [l for l in slots if l.get("holder") != session]
+            if len(kept) != len(slots):
+                leases[resource + "/slots"] = kept
+                changed = True
+        if changed:
+            self._write_leases(leases)
+            self.record("release", resource=resource, session=session, reason=reason)
+        return changed
+
+    def who(self, resource):
+        leases = self.leases()
+        cur = leases.get(resource)
+        if cur and self.holder_is_live(cur):
+            return cur
+        slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)]
+        return slots or None
+
+    # ------------------------------------------------------------ notes
+    def say(self, session, text, to=None):
+        return self.record("note", session=session, to=to, text=text)
+
+
+# ---------------------------------------------------------------- rendering
+
+def _age(secs):
+    secs = max(0, int(secs))
+    return f"{secs}s" if secs < 90 else (f"{secs // 60}m" if secs < 5400 else f"{secs // 3600}h{(secs % 3600) // 60:02d}")
+
+
+def _guard_state(name):
+    try:
+        with open(os.path.join(CONFIG_DIR, name, "state.json")) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def render_status(b):
+    now = b.now()
+    lines = ["BERTH (this workspace as one blade — moorings · leases · capacity)"]
+    ms = b.moorings()
+    if not ms:
+        lines.append("  moorings: none — `berth moor --session <id> --model <id> --lab <vendor> --task '<lane>'`")
+    for s, m in sorted(ms.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
+        r = m.get("recipient", {})
+        live = "live" if b.is_live(m) else "STALE"
+        lines.append(f"  {live:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
+                     f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
+    leases = b.leases()
+    caps = b.capacities
+    lines.append("  leases:")
+    for res in sorted(set(caps) | {k.split('/')[0] for k in leases}):
+        holder = b.who(res)
+        if isinstance(holder, list):
+            desc = ", ".join(f"{l['holder']} ({_age(now - l['since'])})" for l in holder) or "free"
+            lines.append(f"    {res:<11} {len(holder)}/{caps.get(res, 1)}  {desc}")
+        elif holder:
+            lines.append(f"    {res:<11} held by {holder['holder']} for {_age(now - holder['since'])}"
+                         + (f" — {holder['note']}" if holder.get('note') else ""))
+        else:
+            lines.append(f"    {res:<11} free")
+    ram = _guard_state("ram-guard")
+    io = _guard_state("io-guard")
+    if ram:
+        lines.append(f"  ram-guard: {ram.get('level', '?')} {ram.get('pct', '?')}% committed")
+    if io:
+        lines.append(f"  io-guard:  {io.get('level', '?')} write={io.get('write_mb_s', '?')}MB/s ({io.get('window_s', '?')}s)"
+                     f" psi_full10={io.get('psi_full_avg10', '?')}% mode={io.get('mode', '?')} paused={len(io.get('paused', []))}")
+    return "\n".join(lines)
+
+
+def _fmt_ledger(ev):
+    t = time.strftime("%H:%M:%SZ", time.gmtime(ev.get("at", 0)))
+    k = ev.get("kind")
+    if k == "note":
+        return f"{t} {ev.get('session')}→{ev.get('to') or 'all'}: {ev.get('text')}"
+    if k in ("claim", "release", "refuse"):
+        extra = f" (holder {ev.get('holder')})" if ev.get("holder") else ""
+        extra += f" took over from {ev['took_over_from']}" if ev.get("took_over_from") else ""
+        extra += f" — {ev['note']}" if ev.get("note") else ""
+        return f"{t} {k:<7} {ev.get('resource')} by {ev.get('session')}{extra}"
+    if k == "moor":
+        r = ev.get("recipient", {})
+        return f"{t} moor    {ev.get('session')} {r.get('runtime', '?')} {r.get('model', '?')}@{r.get('lab', '?')} task={ev.get('task') or '-'}"
+    if k == "shed":
+        return f"{t} shed    {ev.get('guard')} {ev.get('action')} {ev.get('target')} (level {ev.get('level')}, holder {ev.get('holder')})"
+    return f"{t} {k} {json.dumps({kk: vv for kk, vv in ev.items() if kk not in ('at', 'kind')})}"
+
+
+# ---------------------------------------------------------------- cli
+
+def _opt(argv, name, default=None):
+    if name in argv:
+        i = argv.index(name)
+        if i + 1 < len(argv):
+            v = argv[i + 1]
+            del argv[i:i + 2]
+            return v
+    return default
+
+
+def main(argv):
+    argv = list(argv[1:])
+    if not argv:
+        argv = ["status"]
+    cmd = argv.pop(0)
+    b = Berth()
+    session = _opt(argv, "--session") or os.environ.get("BERTH_SESSION") or os.environ.get("CLAUDE_SESSION_ID")
+    if cmd == "status":
+        print(render_status(b))
+        return 0
+    if cmd == "ledger":
+        n = int(_opt(argv, "-n", "30"))
+        for ev in b.ledger(n):
+            print(_fmt_ledger(ev))
+        return 0
+    if cmd == "who":
+        if not argv:
+            print("usage: berth who RESOURCE", file=sys.stderr)
+            return 2
+        print(json.dumps(b.who(argv[0])))
+        return 0
+    if not session:
+        print("berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID)", file=sys.stderr)
+        return 2
+    if cmd == "moor":
+        writes = _opt(argv, "--writes")
+        m = b.moor(session, model=_opt(argv, "--model"), lab=_opt(argv, "--lab"), runtime=_opt(argv, "--runtime"),
+                   principal=_opt(argv, "--principal"), task=_opt(argv, "--task"),
+                   writes=[w for w in writes.split(",") if w] if writes else None,
+                   pid=int(_opt(argv, "--pid")) if _opt(argv, "--pid") else None,
+                   ttl_s=int(_opt(argv, "--ttl")) if _opt(argv, "--ttl") else None)
+        r = m["recipient"]
+        print(f"moored {session} as {r.get('runtime', '?')} {r.get('model', '?')}@{r.get('lab', '?')} for {m.get('principal') or '?'}")
+        return 0
+    if cmd == "touch":
+        return 0 if b.touch(session) else 1
+    if cmd == "unmoor":
+        b.unmoor(session)
+        print(f"unmoored {session}")
+        return 0
+    if cmd == "claim":
+        if not argv:
+            print("usage: berth claim RESOURCE --session S [--note TEXT] [--ttl SECONDS]", file=sys.stderr)
+            return 2
+        ttl = _opt(argv, "--ttl")
+        note = _opt(argv, "--note")
+        res = argv[0]
+        if not b.mooring(session):
+            b.moor(session)
+        ok, lease, reason = b.claim(res, session, note=note, ttl_s=int(ttl) if ttl else None)
+        if ok:
+            print(f"{res}: {reason} by {session}")
+            return 0
+        print(f"{res}: REFUSED — {reason}. Ask them, or wait; `berth say --to {getattr(lease, 'get', lambda k: None)('holder') if isinstance(lease, dict) else '<holder>'} …`",
+              file=sys.stderr)
+        return 3
+    if cmd == "release":
+        if not argv:
+            print("usage: berth release RESOURCE --session S", file=sys.stderr)
+            return 2
+        print(f"{argv[0]}: {'released' if b.release(argv[0], session) else 'was not held'} by {session}")
+        return 0
+    if cmd == "say":
+        to = _opt(argv, "--to")
+        text = " ".join(argv).strip()
+        if not text:
+            print("usage: berth say --session S [--to SESSION] TEXT", file=sys.stderr)
+            return 2
+        b.say(session, text, to=to)
+        return 0
+    print(__doc__.split("Commands:")[1].split("Resources")[0])
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

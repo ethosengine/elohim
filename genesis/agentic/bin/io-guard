@@ -1,0 +1,489 @@
+#!/usr/bin/env python3
+"""
+io-guard — the workspace's disk-WRITE budget, enforced continuously (sibling of ram-guard).
+
+Why it exists (2026-09-03): the dev workspace, the cargo pool, the household mesh data and the
+cluster's own datastore share ONE NVMe on the control-plane host. At 10:20Z the 0.7 mesh plus a
+prologue seed drove it to 130–270 MB/s of writes; dqlite lease writes stretched to 3–9.7 s, the
+devworkspace controller lost leader election, and its cold-cache re-render rolled this pod WITHOUT
+its secrets. No process crashed — the pod was swapped. The same host hard-reset twice on 2026-08-29
+under I/O pressure (see pool-policy.json `io._comment`). CPU had 16 cores of headroom both times.
+
+What it measures: this container's cgroup `io.stat` write bytes (a rate over a rolling window —
+what WE are doing) and the host's `/proc/pressure/io` (what the disk is suffering — `full avg10`,
+`some avg60`). What it does, by level, on the same typed tier ladder ram-guard uses (critical and
+unknown are never touched; conductors, storage, doorways, the relay, mongod, shells and the agents
+are critical):
+
+  soft   advisory only (status line, hook banner)
+  high   PAUSE (SIGSTOP) the newest tier-1 tree — compile trees: cargo/rustc/rust-lld/cc/ld — one
+         per tick, re-measure; resume (SIGCONT) oldest-first once the window is back under soft
+         for `resume_after_s`. A paused build finishes later; a killed one is re-done from scratch.
+  hard   KILL tier-1 (SIGTERM root-first, SIGKILL after grace — ram-guard's kill_tree), then pause
+         tier-2 (JS builders/test runners, seeders); never tier-3, never critical.
+
+Levels need `sustain_s` of dwell before any action (a 3-second burst is not a storm); PSI `full
+avg10` at or above `psi_full_hard_pct` is `hard` regardless of our own rate (someone else is
+already drowning the disk — do not add to it). Every pause/kill/resume is ONE event in the guard
+ledger AND one `shed` row in the berth ledger, attributed to whoever holds the `cargo` /
+`disk-heavy` lease (genesis/agentic/bin/berth) — tevah §5.3's breach event, local slice.
+
+Modes: `observe` (log what it WOULD do — the default until the policy says otherwise) and
+`enforce`. `IO_GUARD_MODE=enforce|observe` overrides `pool-policy.json io.guard_mode`.
+
+Commands:
+  io-guard start | stop | status [--brief] | plan | run | once [--dry-run] | resume-all
+
+Fail-safe: no cgroup io.stat ⇒ measure PSI only and never pause/kill on rate; no PSI ⇒ rate only.
+The daemon's own pid file and state live in $CLAUDE_CONFIG_DIR/io-guard. Retire-when: tevah §5.2
+lands `io.max` on a delegated cgroup controller for every child — the kernel then holds the budget
+and this user-space shedder has nothing left to decide.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from collections import deque
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", os.path.abspath(os.path.join(HERE, "..", "..", "..")))
+CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config")
+PSI_FILE = os.environ.get("IO_GUARD_PSI_FILE", "/proc/pressure/io")
+
+IO_DEFAULTS = {
+    "guard_mode": "observe",
+    "poll_seconds": 5.0,
+    "window_s": 30,
+    "sustain_s": 20,
+    "resume_after_s": 30,
+    "write_soft_mb_s": 60,
+    "write_high_mb_s": 100,
+    "write_hard_mb_s": 160,
+    "psi_full_high_pct": 10,
+    "psi_full_hard_pct": 20,
+    "grace_seconds": 3.0,
+    "max_actions_per_tick": 1,
+    "events_keep": 500,
+}
+TIER_LADDER = ["tier1", "tier2", "tier3"]
+
+
+def _load(path, name):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    spec = importlib.util.spec_from_file_location(name, path, loader=loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+RG = _load(os.path.join(HERE, "ram-guard"), "ram_guard_for_io")
+BERTH = None
+try:
+    BERTH = _load(os.path.join(HERE, "berth"), "berth_for_io")
+except Exception:
+    BERTH = None
+
+
+# ----------------------------------------------------------------- policy
+
+def load_policy(path=None):
+    pol = dict(IO_DEFAULTS)
+    try:
+        with open(path or RG.POLICY_FILE) as f:
+            io_pol = (json.load(f).get("io") or {})
+        for k in IO_DEFAULTS:
+            if k in io_pol:
+                pol[k] = io_pol[k]
+    except Exception:
+        pass
+    mode = os.environ.get("IO_GUARD_MODE")
+    if mode in ("observe", "enforce"):
+        pol["guard_mode"] = mode
+    return pol
+
+
+def level_for(write_mb_s, psi_full10, policy):
+    """Pure. The higher of the rate level and the PSI level; PSI hard is hard regardless of rate."""
+    lvl = "ok"
+    if write_mb_s >= policy["write_hard_mb_s"] or psi_full10 >= policy["psi_full_hard_pct"]:
+        lvl = "hard"
+    elif write_mb_s >= policy["write_high_mb_s"] or psi_full10 >= policy["psi_full_high_pct"]:
+        lvl = "high"
+    elif write_mb_s >= policy["write_soft_mb_s"]:
+        lvl = "soft"
+    return lvl
+
+
+def actions_for(level, sustained, paused_any):
+    """Pure. What this tick may do: [] | [('pause','tier1')] | [('kill','tier1'),('pause','tier2')] | [('resume',)]."""
+    if level == "hard" and sustained:
+        return [("kill", "tier1"), ("pause", "tier2")]
+    if level == "high" and sustained:
+        return [("pause", "tier1")]
+    if level == "ok" and sustained and paused_any:
+        return [("resume", None)]
+    return []
+
+
+# ----------------------------------------------------------------- sensors
+
+class WriteSensor:
+    """cgroup io.stat write bytes (sum over devices) + host PSI. Rate = bytes over the rolling window."""
+
+    def __init__(self, cgroup_dir, window_s):
+        self.path = os.path.join(cgroup_dir, "io.stat") if cgroup_dir else None
+        self.window_s = window_s
+        self.samples = deque()
+
+    def read_wbytes(self):
+        if not self.path:
+            return None
+        try:
+            total = 0
+            with open(self.path) as f:
+                for line in f:
+                    for tok in line.split():
+                        if tok.startswith("wbytes="):
+                            total += int(tok[7:])
+            return total
+        except Exception:
+            return None
+
+    @staticmethod
+    def read_psi(path=PSI_FILE):
+        out = {"full_avg10": 0.0, "some_avg60": 0.0}
+        try:
+            with open(path) as f:
+                for line in f:
+                    parts = line.split()
+                    if not parts:
+                        continue
+                    kv = dict(p.split("=", 1) for p in parts[1:] if "=" in p)
+                    if parts[0] == "full":
+                        out["full_avg10"] = float(kv.get("avg10", 0.0))
+                    elif parts[0] == "some":
+                        out["some_avg60"] = float(kv.get("avg60", 0.0))
+        except Exception:
+            pass
+        return out
+
+    def sample(self, now=None):
+        now = now or time.time()
+        w = self.read_wbytes()
+        if w is not None:
+            self.samples.append((now, w))
+            while self.samples and now - self.samples[0][0] > self.window_s:
+                self.samples.popleft()
+        return self.rate(now)
+
+    def rate(self, now=None):
+        if len(self.samples) < 2:
+            return 0.0
+        (t0, w0), (t1, w1) = self.samples[0], self.samples[-1]
+        if t1 <= t0:
+            return 0.0
+        return max(0.0, (w1 - w0) / (t1 - t0) / 1048576.0)
+
+
+def proc_write_bytes(pid):
+    try:
+        with open(f"/proc/{pid}/io") as f:
+            for line in f:
+                if line.startswith("write_bytes:"):
+                    return int(line.split()[1])
+    except Exception:
+        return None
+    return None
+
+
+# ----------------------------------------------------------------- daemon
+
+class Daemon:
+    def __init__(self, policy=None, store=None, dry_run=False):
+        self.policy = policy or load_policy()
+        self.store = store or RG.StateStore(os.path.join(CONFIG_DIR, "io-guard"))
+        self.sensor = WriteSensor(RG.detect_cgroup_dir(), self.policy["window_s"])
+        self.dry_run = dry_run
+        self.paused = {}          # root pid -> {"pids": [...], "cmd": str, "tier": str, "at": ts}
+        self.level_since = None
+        self.level = "ok"
+        self.prev_io = {}
+        self.top_writers = []
+        self._load_paused()
+
+    # ---- persistence of paused trees (so a restarted guard can SIGCONT them)
+    def _paused_path(self):
+        return os.path.join(self.store.dir, "paused.json")
+
+    def _load_paused(self):
+        try:
+            with open(self._paused_path()) as f:
+                self.paused = {int(k): v for k, v in json.load(f).items()}
+        except Exception:
+            self.paused = {}
+
+    def _save_paused(self):
+        tmp = self._paused_path() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({str(k): v for k, v in self.paused.items()}, f)
+        os.replace(tmp, self._paused_path())
+
+    # ---- attribution
+    def attribute(self, tbl):
+        cur = {}
+        rates = {}
+        for pid in tbl.by_pid:
+            wb = proc_write_bytes(pid)
+            if wb is None:
+                continue
+            cur[pid] = wb
+            if pid in self.prev_io:
+                rates[pid] = max(0, wb - self.prev_io[pid])
+        self.prev_io = cur
+        by_root = {}
+        for pid, d in rates.items():
+            root = tbl.tree_root(pid)
+            by_root[root] = by_root.get(root, 0) + d
+        top = sorted(by_root.items(), key=lambda kv: -kv[1])[:5]
+        self.top_writers = [
+            {"root": r, "tier": tbl.kind(r), "comm": tbl.by_pid[r].comm if r in tbl.by_pid else "?",
+             "mb": round(b / 1048576.0, 1), "cmd": (tbl.by_pid[r].args[:90] if r in tbl.by_pid else "")}
+            for r, b in top if b > 0
+        ]
+        return by_root
+
+    def holder_for(self, tier):
+        if not BERTH:
+            return None
+        try:
+            b = BERTH.Berth()
+            h = b.who("cargo" if tier == "tier1" else "disk-heavy")
+            if isinstance(h, dict):
+                return h.get("holder")
+            if isinstance(h, list) and h:
+                return ",".join(l.get("holder", "?") for l in h)
+        except Exception:
+            return None
+        return None
+
+    def _berth_shed(self, action, tree, level):
+        if not BERTH:
+            return
+        try:
+            BERTH.Berth().record("shed", guard="io-guard", action=action, target=f"{tree.comm}[{tree.root}]",
+                                 cmd=tree.cmd[:120], level=level, holder=self.holder_for(tree.tier),
+                                 mode=self.policy["guard_mode"])
+        except Exception:
+            pass
+
+    # ---- actions
+    def _act(self, action, tree, level, write_mb_s):
+        mode = self.policy["guard_mode"]
+        ev = {"ts": time.time(), "action": action, "tier": tree.tier, "root": tree.root, "comm": tree.comm,
+              "cmd": tree.cmd, "pids": len(tree.pids), "level": level, "write_mb_s": round(write_mb_s, 1),
+              "mode": mode, "dry_run": self.dry_run, "holder": self.holder_for(tree.tier)}
+        self.store.append_event(ev, self.policy["events_keep"])
+        self.store.log(f"{mode.upper()} {action} {tree.tier} {tree.comm}[{tree.root}] level={level} "
+                       f"write={write_mb_s:.0f}MB/s holder={ev['holder']} :: {tree.cmd[:100]}")
+        self._berth_shed(action if mode == "enforce" and not self.dry_run else f"would-{action}", tree, level)
+        if mode != "enforce" or self.dry_run:
+            return
+        if action == "pause":
+            for pid in tree.pids:
+                try:
+                    os.kill(pid, signal.SIGSTOP)
+                except Exception:
+                    pass
+            self.paused[tree.root] = {"pids": tree.pids, "cmd": tree.cmd, "tier": tree.tier, "at": time.time()}
+            self._save_paused()
+        elif action == "kill":
+            RG.kill_tree(tree.pids, signal.SIGTERM, self.policy["grace_seconds"])
+            self.paused.pop(tree.root, None)
+            self._save_paused()
+
+    def resume_one(self, level):
+        if not self.paused:
+            return False
+        root = sorted(self.paused, key=lambda r: self.paused[r]["at"])[0]
+        info = self.paused.pop(root)
+        for pid in reversed(info["pids"]):
+            try:
+                os.kill(pid, signal.SIGCONT)
+            except Exception:
+                pass
+        self._save_paused()
+        self.store.append_event({"ts": time.time(), "action": "resume", "root": root, "cmd": info["cmd"],
+                                 "tier": info["tier"], "level": level, "mode": self.policy["guard_mode"]})
+        self.store.log(f"RESUME {info['tier']} [{root}] :: {info['cmd'][:100]}")
+        return True
+
+    def resume_all(self):
+        n = 0
+        while self.paused:
+            self.resume_one("stop")
+            n += 1
+        return n
+
+    # ---- tick
+    def tick(self):
+        now = time.time()
+        write_mb_s = self.sensor.sample(now)
+        psi = WriteSensor.read_psi()
+        level = level_for(write_mb_s, psi["full_avg10"], self.policy)
+        if level != self.level:
+            self.level, self.level_since = level, now
+        dwell = now - (self.level_since or now)
+        sustained = dwell >= self.policy["sustain_s"] if level != "ok" else dwell >= self.policy["resume_after_s"]
+        tbl = RG.ProcTable(RG.snapshot_procs())
+        by_root = self.attribute(tbl)
+        # forget paused trees that no longer exist
+        for root in list(self.paused):
+            if root not in tbl.by_pid:
+                self.paused.pop(root, None)
+                self._save_paused()
+        acted = 0
+        for action, tier in actions_for(level, sustained, bool(self.paused)):
+            if acted >= self.policy["max_actions_per_tick"]:
+                break
+            if action == "resume":
+                if self.resume_one(level):
+                    acted += 1
+                continue
+            plan = [t for t in RG.shed_plan(tbl, [tier], os.getpid()) if t.root not in self.paused]
+            if not plan:
+                continue
+            # the tree writing the most right now goes first; ties fall back to newest-first
+            plan.sort(key=lambda t: (-by_root.get(t.root, 0), t.etimes))
+            self._act(action, plan[0], level, write_mb_s)
+            acted += 1
+        self._write_state(level, write_mb_s, psi, dwell)
+        return level, write_mb_s, psi, acted
+
+    def _write_state(self, level, write_mb_s, psi, dwell):
+        s = {"ts": time.time(), "level": level, "write_mb_s": round(write_mb_s, 1), "window_s": self.policy["window_s"],
+             "psi_full_avg10": psi["full_avg10"], "psi_some_avg60": psi["some_avg60"], "dwell_s": round(dwell),
+             "mode": self.policy["guard_mode"], "paused": [{"root": r, **v} for r, v in self.paused.items()],
+             "top_writers": self.top_writers, "soft": self.policy["write_soft_mb_s"], "high": self.policy["write_high_mb_s"],
+             "hard": self.policy["write_hard_mb_s"], "pid": os.getpid(), "measures_rate": self.sensor.path is not None}
+        tmp = self.store.state_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(s, f)
+        os.replace(tmp, self.store.state_path)
+
+    def run(self):
+        with open(self.store.pid_path, "w") as f:
+            f.write(str(os.getpid()))
+        self.store.log(f"io-guard daemon start pid={os.getpid()} mode={self.policy['guard_mode']} "
+                       f"rate={'cgroup io.stat' if self.sensor.path else 'UNAVAILABLE'} psi={PSI_FILE}")
+
+        def _stop(*_):
+            n = self.resume_all()
+            self.store.log(f"io-guard daemon stop (resumed {n} paused trees)")
+            try:
+                os.remove(self.store.pid_path)
+            except Exception:
+                pass
+            sys.exit(0)
+        signal.signal(signal.SIGTERM, _stop)
+        signal.signal(signal.SIGINT, _stop)
+        while True:
+            try:
+                self.tick()
+            except Exception as e:
+                self.store.log(f"tick error: {e!r}")
+            time.sleep(self.policy["poll_seconds"])
+
+
+# ----------------------------------------------------------------- cli
+
+def _running_pid(store):
+    try:
+        with open(store.pid_path) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)
+        return pid
+    except Exception:
+        return None
+
+
+def cmd_start(store):
+    pid = _running_pid(store)
+    if pid:
+        print(f"io-guard already running (pid {pid})")
+        return 0
+    log = open(store.log_path, "a")
+    p = subprocess.Popen([sys.executable, os.path.abspath(__file__), "run"], stdout=log, stderr=log,
+                         stdin=subprocess.DEVNULL, start_new_session=True, close_fds=True)
+    print(f"io-guard started (pid {p.pid})")
+    return 0
+
+
+def cmd_stop(store):
+    pid = _running_pid(store)
+    if not pid:
+        print("io-guard not running")
+        return 0
+    os.kill(pid, signal.SIGTERM)
+    print(f"io-guard stopped (pid {pid})")
+    return 0
+
+
+def status_line(state, brief=False):
+    if not state:
+        return "IO-GUARD: no state — `genesis/agentic/bin/io-guard start`"
+    age = time.time() - state.get("ts", 0)
+    stale = " (STALE — daemon not running?)" if age > 30 else ""
+    line = (f"IO-GUARD {state['level'].upper()}: write {state['write_mb_s']}MB/s over {state['window_s']}s "
+            f"(soft/high/hard {state['soft']}/{state['high']}/{state['hard']}) · host psi_full10={state['psi_full_avg10']}% "
+            f"· mode {state['mode']} · paused {len(state.get('paused', []))}{stale}")
+    if brief:
+        return line
+    tw = state.get("top_writers") or []
+    if tw:
+        line += "\n  top writers/tick: " + "; ".join(f"{w['comm']}[{w['root']}] {w['tier']} {w['mb']}MB" for w in tw[:3])
+    for p in state.get("paused", []):
+        line += f"\n  PAUSED [{p['root']}] {p['tier']} since {time.strftime('%H:%M:%SZ', time.gmtime(p['at']))} :: {p['cmd'][:80]}"
+    return line
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    store = RG.StateStore(os.path.join(CONFIG_DIR, "io-guard"))
+    policy = load_policy()
+    if cmd == "start":
+        return cmd_start(store)
+    if cmd == "stop":
+        return cmd_stop(store)
+    if cmd == "status":
+        print(status_line(store.read_state(), brief="--brief" in argv))
+        return 0
+    if cmd == "plan":
+        tbl = RG.ProcTable(RG.snapshot_procs())
+        for tier in TIER_LADDER[:2]:
+            for t in RG.shed_plan(tbl, [tier], os.getpid()):
+                print(f"{tier} {t.comm}[{t.root}] pids={len(t.pids)} age={t.etimes:.0f}s :: {t.cmd[:100]}")
+        print(f"mode={policy['guard_mode']} thresholds soft/high/hard={policy['write_soft_mb_s']}/{policy['write_high_mb_s']}/{policy['write_hard_mb_s']} MB/s")
+        return 0
+    if cmd == "run":
+        return Daemon(policy, store).run()
+    if cmd == "once":
+        d = Daemon(policy, store, dry_run="--dry-run" in argv)
+        d.sensor.sample()
+        time.sleep(2)
+        level, w, psi, acted = d.tick()
+        print(f"{level} write={w:.1f}MB/s psi_full10={psi['full_avg10']} acted={acted} mode={policy['guard_mode']}")
+        return 0
+    if cmd == "resume-all":
+        d = Daemon(policy, store)
+        print(f"resumed {d.resume_all()} paused trees")
+        return 0
+    print(__doc__.split("Commands:")[1].split("Fail-safe")[0])
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
