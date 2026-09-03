@@ -56,10 +56,11 @@ describe('parseConductorOptions', () => {
     assert.strictEqual(o.features, undefined, 'production feature set must come from the job, not a second copy');
   });
 
-  test('iroh preset selects the transport-iroh feature set', () => {
+  test('iroh preset is a 0.7 compatibility no-op (iroh is the only transport, no cargo feature)', () => {
     const o = parseConductorOptions('[conductor:iroh]');
     assert.strictEqual(o.features, CONDUCTOR_FEATURE_PRESETS.iroh);
-    assert.ok(o.features.includes('transport-iroh'));
+    assert.ok(!o.features.includes('transport-iroh'));
+    assert.ok(o.features.includes('jemalloc'));
     assert.ok(!o.features.includes('jemalloc-prof'));
   });
 
