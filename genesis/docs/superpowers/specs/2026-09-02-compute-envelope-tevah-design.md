@@ -618,6 +618,20 @@ own `/version` rather than echo its own pin.
 - **Missing substrate nodes minted:** M7 the iroh fetch path emits no `serve-blob` receipt; M8 `serve-blob.output_of`
   never names the commitment it discharges; M9 as above; M10 `peer_blob_inventory` persists no kind/type (hints are
   scored and dropped); M11 the commitments HTTP view renders a bare-string `resource_classified_as` as null.
+- **Corrections from station 3b (2026-09-03, plan `2026-09-03-ark-s1-station3b-custody-read-gate-plan`).** The HTTP
+  path already refuses an anonymous caller on both the row (`GET /db/content/{id}` → 403 + `requiredReach`) and the
+  bytes (`GET /blob/{hash}` → `blob_serve_verdict` → 403); the honest gap was the shard replication plane, where the
+  same `ShardService` served every `private` row and blob to any PeerId and receivers persisted them verbatim. The
+  gate is one pure predicate, `private_serve_verdict`, whose standing facts are the counter-signed custody
+  commitments — consent (C12) is the commitment, never the requester's claim — with the requester resolved through
+  the existing identity maps (a routing cut at Stage 1; bindings are self-asserted, so the gate carries no economic
+  weight until `identity-cross-signed` lands). Only `private` changes behaviour; other reaches are a later station.
+  **Posture decided:** 403 acknowledges existence and names the reach required; 404-hides-existence was rejected
+  because inventory gossip already advertises the hash (M13) and the household's own non-vacuity control must tell
+  "refused" from "missing". **Missing nodes minted:** M12 the iroh byte plane (`iroh_blobs` ALPN) has no reach at
+  all — any NodeId pulls any hash; M13 inventory gossip advertises `private` blob hashes to every peer while serve
+  now refuses (advertise/serve asymmetry, C7 partial) — custodians need the advert, strangers learn only that a hash
+  exists.
 
 ## 7. P2P design gate
 
