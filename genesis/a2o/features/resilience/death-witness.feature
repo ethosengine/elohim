@@ -85,7 +85,7 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     And the witness names the hash of the conductor program the envelope actually started
     And the witness carries Jessica's passport as it stood at the moment of death
 
-  @wip @station-2
+  @station-2
   Scenario: Station 2 — the custodians Jessica already has hold the witness
     Given Matthew and James have each counter-signed a commitment to custody Jessica's witnesses
     When Jessica's conductor is killed with SIGKILL
