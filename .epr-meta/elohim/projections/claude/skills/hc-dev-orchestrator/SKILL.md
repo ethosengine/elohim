@@ -63,12 +63,13 @@ just mesh quiesce
 just mesh recovery <warm|cold> <peer> [--label k=v]  # single recovery run (hc-mesh-recovery.sh)
 just mesh recovery-matrix      # cycle the recovery scenario library (MESH_PEER_TRANSPORTS + hc-mesh-recovery.sh)
 just mesh stop
+MESH_RELAY_BIN=<dir>/bin/iroh-relay just mesh start   # holochain 0.7: the conductors need a REAL iroh-relay (see below)
 ```
 
 `MESH_TRANSPORT_BACKEND=libp2p|dual|iroh` selects the elohim-storage Track-2
 backend for the whole household run (default `dual` since 2026-08-23, matching the
-alpha fleet; the conductor kitsune2/tx5
-transport is a separate layer). For example:
+alpha fleet; the conductor's own kitsune2 transport is a separate layer — iroh only
+since holochain 0.7, homed to a relay). For example:
 
 ```bash
 MESH_TRANSPORT_BACKEND=dual just mesh start
@@ -296,10 +297,19 @@ conductor a file it refuses to parse. Therefore:
 - `start` and `conductors-restart` **refuse a mismatched pair** and print both versions.
   The check is on the FULL version, not the major.minor line — 0.6.0 and 0.6.3 agree on `0.6` and are
   still schema-incompatible. `MESH_ALLOW_TOOLCHAIN_SKEW=1` overrides for a deliberate experiment.
-- The **generate transport subcommand differs by line**: stock 0.6.0 `network … webrtc <SIGNAL_URL>`,
-  fork 0.6.3 `network … quic <RELAY_URL>` (iroh). `mesh_network_args()` reads the grammar from
-  `hc sandbox generate network --help` rather than guessing; `MESH_FORK_RELAY_URL` (default: the
-  doorway) fills the relay argument, which must parse as a URL.
+- The **generate transport subcommand** is `network … quic <RELAY_URL>` on holochain 0.7 (iroh is the
+  only transport; the 0.6 stock `webrtc <SIGNAL_URL>` grammar is gone). `mesh_network_args()` fills the
+  relay argument from `mesh_relay_url()` — `MESH_FORK_RELAY_URL`, default the LOCAL iroh-relay the
+  script launches at `http://localhost:$MESH_RELAY_PORT/` (3340). **The relay is load-bearing, not a
+  NAT nicety** (kitsune2 0.5: a conductor homes to `relay_url` at boot and dials only peers whose
+  advertised relay matches its own exactly). Measured 2026-09-03: three loopback 0.7 conductors with
+  `relay_url` pointed at the doorway — the 0.6-era "parseable placeholder" — booted clean and sat at
+  **0 connections** for a whole prologue. Knobs: `MESH_RELAY_BIN` (the `iroh-relay` 1.0.3 binary,
+  built with `RUSTFLAGS="" cargo install iroh-relay --version 1.0.3 --locked --features server --root <dir>`
+  — without `--features server` the install "succeeds" and installs nothing; unset = first
+  `iroh-relay` on PATH), `MESH_RELAY_PORT` (3340), `MESH_RELAY=0` (skip the launch; you then own
+  `MESH_FORK_RELAY_URL`). `just mesh status` prints a `relay` row; the proof the mesh is REALLY up is
+  `dump_network_stats` on each admin port showing `connections` > 0, not three "ready" conductors.
 - Auto-detect searches `$MESH_DIR/fork-bin`, `$REPO_ROOT/.fork-bin`, `/opt/elohim/fork-bin` — opt-in
   homes only. A local fork build in the cargo-pool slot is passed **explicitly**:
   `HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release just mesh start`.
@@ -538,4 +548,14 @@ the ark restarts the conductor; the ark's incarnation is unchanged). Rolling the
 SIGTERM the `ark-*` pids (each stops its conductor with SIGINT + grace), then
 `MESH_CONDUCTOR_LAUNCH=ark just mesh conductors-restart`; afterwards `just mesh storage-restart <peer>`
 for any storage peer the restart flags with a stale app-interface token.
+
+## Per-peer runtime-config (rung 4 — armed from boot, 2026-09-03)
+
+Every storage peer starts with `ELOHIM_RUNTIME_CONFIG_PATH=<mesh>/<peer>/runtime-config.toml`
+(created empty by `start`, kept across `storage-restart`). elohim-storage's runtime-config watcher
+is OFF unless that variable names a file, and the a2o release ceremony writes
+`ELOHIM_RELEASE_CHANNELS = "…"` into exactly that path then POSTs `/admin/runtime-config/reload` —
+a peer started without it answers `/admin/adoption` with `sweeps: 0` forever and rung-5 station 1
+times out on "the household's runtime follows release channel …". A flag flip or a channel follow
+lands on the RUNNING peer within one poll, no restart.
 
