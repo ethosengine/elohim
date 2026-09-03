@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use holochain::sweettest::{
-    SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
+    DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
 };
 use holochain_types::prelude::*;
 use std::path::PathBuf;
@@ -103,26 +103,47 @@ pub async fn two_agent_conductors() -> Result<[(SweetConductor, AgentPubKey); 2]
 /// `await_consistency` still converges — the canonical partition-then-heal
 /// idiom. See kitsune2_core `factories/mem_bootstrap.rs` for the shared-store
 /// keying that makes the default non-isolating.
+///
+/// 0.7 — WHY THE PAIR SHARES ONE RENDEZVOUS. The isolation this helper provides
+/// is DISCOVERY isolation, NOT TRANSPORT isolation. At 0.6 that distinction was
+/// free: `standard()` left the network config at `NetworkConfig::default()`, so
+/// there was no relay and peers simply connected directly once
+/// `exchange_peer_info` had injected each other's agent info. At 0.7,
+/// `SweetConductorConfig::standard()` sets `bootstrap_url = relay_url =
+/// "rendezvous:"`, and each `SweetLocalRendezvous` instance is a DIFFERENT
+/// relay. Giving each conductor its own instance therefore homes the two peers
+/// to two different relays: `exchange_peer_info` still injects peer info, but
+/// no transport path exists between them and gossip never flows.
+///
+/// Measured (2026-09-03, holochain 0.7.0, one rendezvous per conductor):
+///   rea_commitment_replication.rs:234 `await_consistency_s(60, ..)` and
+///   lamad.rs:1024 both failed with "Consistency not reached" — 0 in validation
+///   limbo and 0 in integration limbo on BOTH sides (21 integrated vs 7), i.e.
+///   not slow validation but no connectivity at all. Both pass discovery
+///   isolation and fail transport.
+///
+/// So: ONE rendezvous is created here and shared by the pair (bootstrap+relay
+/// infrastructure in common), while `disable_bootstrap = true` on each
+/// conductor keeps discovery partitioned until the explicit
+/// `exchange_peer_info`. That restores the 0.6 invariant exactly.
 pub async fn two_agent_conductors_isolated() -> Result<[(SweetConductor, AgentPubKey); 2]> {
-    let (c1, a1) = single_agent_conductor_isolated().await?;
-    let (c2, a2) = single_agent_conductor_isolated().await?;
+    // ONE rendezvous, shared: see the transport-vs-discovery note above.
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (c1, a1) = single_agent_conductor_isolated(rendezvous.clone()).await?;
+    let (c2, a2) = single_agent_conductor_isolated(rendezvous).await?;
     Ok([(c1, a1), (c2, a2)])
 }
 
-/// Single conductor with the bootstrap module disabled. See
-/// [`two_agent_conductors_isolated`] for the isolation rationale.
-async fn single_agent_conductor_isolated() -> Result<(SweetConductor, AgentPubKey)> {
+/// Single conductor with the bootstrap module disabled, joined to the rendezvous
+/// the caller supplies. See [`two_agent_conductors_isolated`] for why the
+/// rendezvous is a parameter rather than constructed here.
+async fn single_agent_conductor_isolated(
+    rendezvous: DynSweetRendezvous,
+) -> Result<(SweetConductor, AgentPubKey)> {
     let config = SweetConductorConfig::standard().tune_network_config(|nc| {
         nc.disable_bootstrap = true;
     });
-    // 0.7: see the migration note on `single_agent_conductor`. `standard()` now
-    // points bootstrap/relay at `rendezvous:`, so a rendezvous server must be
-    // supplied even here; `disable_bootstrap = true` is what still keeps the
-    // pair partitioned until an explicit `exchange_peer_info`. Each isolated
-    // conductor gets its OWN rendezvous instance, so there is no shared
-    // discovery surface between them at all.
-    let mut conductor =
-        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     Ok((conductor, agent))
 }
