@@ -45,3 +45,16 @@ that close/open pair is the elohim-native design space.
 ## DoD (for the eventual design pass, not now)
 
 A design doc through p2p-design-gate + a2o governance scenario(s) covering: proposal → deliberation → ratified migration commitment → per-peer `CloseChain`/`OpenChain` execution window → laggard/refusal handling (refusal-not-outvoting) → revert path symmetric with upgrade.
+
+## HOLOCHAIN EVOLUTION EPIC — DESIGN LANDED 2026-09-03 — spec `genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md`
+
+The 0.6→0.7 cutover was the "last out-of-band reset" this item names (a wipe; rung 5 passed on 0.7 but
+carries nothing across a line). The design answers this item's DoD in its §10: the path notarized as the elohim's `migrates-lineage`
+Mishpat commitment (existing entry type, new action arm — no hash move; NOT a consent act — the core protocol is the elohim's to steward, humans get branches + a common language: lineage · witness · notarized path · bridge map), v2 installed BESIDE v1 under the same
+agent key, every witnessed fact carried with its original v1 action + signature in a `NotarizationWitness`
+re-verified by v2's validation (entry hashes survive; only action hashes move), dual-cell peers bridging the
+window, free revert by re-election until a separately notarized `sunsets-lineage` closes the v1 chains (the one
+irreversible act). Lane B keeps the conductor fork on the table: upstream's chain-continuation draft (one DHT
+across an integrity change) as a bounded spike after Station 4. Story: `genesis/a2o/features/delivery/happ-lineage-migration.feature`
+(Stations 1–9). Habit: `elohim/holochain/.epr-meta/happ-lineage-migration.habit.md` (born red). Rehearsal:
+node_registry v1 → v1+witness on the household mesh.

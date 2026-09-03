@@ -250,6 +250,8 @@ storage/doorway class 2-4 h → the storage rollout window alone, with
   in-process watcher; GET /admin/runtime-config reports effective values,
   provenance, and the deliberately boot-only knobs with reasons.
 
+**HOLOCHAIN EVOLUTION EPIC — DESIGN LANDED 2026-09-03** (ladder row 6, the operator renamed it: not a rung, an epic at spec/whitepaper level) (spec `2026-09-03-holochain-evolution-epic-design.md`, habit `happ-lineage-migration` born red, story Stations 1–9; operator course-set: prove it with one DNA change on the mesh, internal revert + upgrade held by the elohim as a notarized path (a commons, not a consent act) with a communication bridge and a common language for branch reconciliation, notarization integrity intact; fork not ruled out).
+
 **Rung 5 DESIGN LANDED 2026-09-01** (five-lens adversarially verified):
 spec `genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md`
 + the six-task implementation family (`task-release-manifest-schema-packager` ·
@@ -268,6 +270,8 @@ external observer and retires k8s as the operations plane.
 | storage/doorway binary | 2-4 h (incl. conductor churn + catch-up) | roll only storage pods — conductors keep arcs (first storage-only roll measuring on edge #1406) |
 | conductor roll | fleet-wide 2.5-3 h churn | staggered per-peer windows, genesis anchor last |
 | coordinator zome — **rung 5, elected (mesh receipt 2026-09-02)** | 2-4 h | publish→3/3 staged ≤19 s · canary hot-swap ~12 s after sweep · soak attest 30 s → observers read 1/1 · promote→3/3 applied 75 s · revert→3/3 restored 31 s; conductor PIDs unchanged end-to-end; five typed refusals became five controller fixes on the way (transcript: `genesis/a2o/reports/release-ceremony/2026-09-01/`) |
+| **conductor line change** (0.6.3→0.7.0, 2026-09-03) | roll + governance (rare) | **NO VEHICLE — fleet wipe + one re-genesis** (rung 5 survived the line, 5/5 on stock 0.7.0, receipt `sprint-report-household-20260903T154932Z-fcb81456`, but carried nothing across it). Never count the wipe as evidence for any rung. |
+| **integrity change / DNA lineage — the Holochain Evolution Epic, DESIGNED 2026-09-03** | wipe + re-seed | spec `genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md`: the elohim's notarized `migrates-lineage` commitment (no per-node consent) → install v2 beside v1 (same key) → carry with NotarizationWitness (v1 action+signature re-verified by v2) → bridge window → free revert by re-election → notarized sunset closes v1 chains. Lane B = conductor-fork spike (one DHT across an integrity change). First measured red: Station 1 of `happ-lineage-migration.feature` on the node_registry rehearsal. |
 
 Cross-cutting lesson (2026-08-31): even atomic changes paid big-bang prices
 because everything ships in ONE vehicle (the pod image). **Separate the

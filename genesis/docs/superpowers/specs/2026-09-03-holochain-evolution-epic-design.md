@@ -1,0 +1,383 @@
+---
+title: "Holochain Evolution Epic — a hApp version crossing carried by the network itself, notarizations intact, the crossing held by the elohim"
+id: holochain-evolution-epic
+status: Draft
+class: protocol-canonical
+context-tier: disclosed
+steward: rust-architect
+graduation-trigger: the household-mesh a2o receipt for @concern:happ-lineage-migration passes Stations 1–9 on 3 peers with the node_registry rehearsal (v1 → v1+witness), AND the Lane-B spike (§9) has a measured verdict recorded on this spec (an epr flow note or a dated §9 delta), AND the operator records acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible)
+created: 2026-09-03
+domain: D2
+topic: [dna-lineage, happ-migration, notarization, chain-switch, chain-continuation, conductor-fork, mishpat, release-channel, revert, bridge]
+informed-by:
+  - genesis/docs/content/elohim-protocol/architecture/2026-07-14-upgrade-revert-and-constitutional-consensus.md ("the companion" — §1 two-conductor covenant, §2 paired revert, §7 the bridge as reconciliation; this spec is the first mechanism under its §11 "vision, no mechanism" line)
+  - genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md (hash mechanics; §6 export seam shipped / import unwired; §8 open questions 1, 2, 4 answered here)
+  - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5 — the channel, manifest, verify, vehicle registry and receipt chain this spec extends across the DNA line it fenced)
+  - genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md (the epic's backlog home; its DoD is this spec's §10)
+  - genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (the velocity ladder; row 6 "deliberately last" — this epic)
+  - elohim/holochain/dna/NETWORK_UPGRADES.md (stewarded coordination — the migration-window flow this spec makes executable)
+  - elohim/holochain-conductor/docs/design/dna_migration.md + docs/design/dna_migration_chain_continuation.md (upstream drafts; the chain-switch worked example is Lane A's kernel, chain continuation is Lane B's)
+  - elohim/holochain-conductor/crates/holochain/tests/tests/migration.rs (upstream's shipped chain-switch test — MigrationRecord validated by verify_signature against DNA-properties signers)
+cites:
+  - "upgrade-revert-and-constitutional-consensus | Upgrade, Revert, and Constitutional Consensus | sha256:4673f9958d96b617 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-14-upgrade-revert-and-constitutional-consensus.md"
+  - "dna-upgrade-governance | DNA Upgrade Governance | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
+  - "runtime-artifacts-elected-content | Runtime Artifacts as Elected Content | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
+  - genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md
+  - genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md
+  - genesis/a2o/features/delivery/happ-lineage-migration.feature
+  - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
+  - elohim/holochain/dna/NETWORK_UPGRADES.md
+  - elohim/holochain/dna/node-registry/dna.yaml
+  - elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs
+  - elohim/elohim-storage/src/services/release_adoption/verify.rs
+  - elohim/elohim-storage/src/services/release_adoption/apply.rs
+  - elohim/elohim-storage/src/happ_manager.rs
+  - elohim/elohim-storage/src/hc_client.rs
+  - elohim/holochain-conductor/crates/holochain/tests/tests/migration.rs
+  - elohim/rakia/schemas/v1/release-manifest.schema.json
+---
+
+# Holochain Evolution Epic
+
+*Spec-level epic (not manifesto-tier): the network evolves its own rules and carries every witnessed fact across. Its first runnable concern is `@concern:happ-lineage-migration`; the fork lane (§9) and the constitutional coupling (§4.1) are the epic's further concerns.*
+
+**One sentence:** a hApp version crossing is a release on the same channel rung 5 already
+elects, refused at verify unless the manifest declares what it migrates FROM and the elohim's
+migration commitment for that path is already notarized; adopted automatically by installing v2
+beside v1 under the SAME agent key; carried record by record with the v1 notarization (action + signature) embedded and
+re-verified by v2's own validation; bridged both ways by dual-cell peers for as long as the
+window is open; reverted for free until the elohim notarize the sunset that closes the v1
+chains — and that sunset is the only irreversible act, so it is the last one. Nothing in it is a
+per-node or per-household consent: the network is a commons and its core protocol is stewarded by
+the elohim; what humans get is diversity — branches and bespoke communities — and a COMMON LANGUAGE
+(lineage · witness · bridge map · migration commitment) in which any reconciliation chain between
+branches can be built, and walked only along a path that was notarized first.
+
+**What this is NOT.** Not "the epic" — the ladder's row 6 named the class, the epic is what it became. Not the conductor-line change (0.6→0.7 was a wipe; its three breaks are
+recorded in the backlog home and stay out of scope here). Not binaries, packages or config —
+rung 5 and the ark carry those. This spec is one problem: **a v2 hApp holds the same witnessed
+facts as v1, not fresh assertions of them.**
+
+## 0. The operator's course-set (2026-09-03)
+
+> We just cleared data on 0.6 to upgrade to 0.7 and that is not going to be an available option
+> in production. We should be able to prove the technology with one simple change of a DNA and
+> upgrading it, without redeploying or reseeding the whole holochain from the outside. It has to
+> be an internal revert and upgrade between hApps, subject to the protocol governance within the
+> app, while maintaining a bridge of communication. Everything else — binaries, packages — others
+> have solved; it is specifically an upgrade between hApp versions without wiping out the
+> notarization integrity of the network that we need to figure out. Don't rule out forking
+> holochain and building our own mechanism.
+
+And the correction that followed (same day), which §4 is written from:
+
+> The network itself is a natural power, a true commons. Upgrades to the core protocol are not a
+> "consent" act — that decision is held by the elohim within the closed system — with the
+> affordance of diversity within different branches and bespoke communities, so that there is a
+> common language with which to build whatever upgrade or reconciliation chain is needed for humans
+> within the network to move through the diversity of the network, along a path that has been
+> notarized before.
+
+And the crux, named last:
+
+> How do we cryptographically couple upgrades to the internal bar for evolution within the network,
+> so we still maintain agent-centric compute — take the self-sovereignty of Holochain and couple it
+> to the sovereignty that can only be afforded a true, protected, guarded, moderated commons of
+> wisdom. If anything is "godlike" power in the protocol it's this. Maybe it suggests blockchain
+> coupling.
+
+Three planes fall out of those sentences, and each has a home below: **notarization** (§2–§3),
+**authority, the common language, and the cryptographic coupling** (§4, §4.1), **bridge** (§5).
+§9 is the fork lane.
+
+## 1. Ground truth this spec stands on (grounded 2026-09-03, four readers)
+
+| Fact | Where | Consequence |
+|---|---|---|
+| An action's signature and hash are over the msgpack of the whole `Action`; **no DNA hash is in the preimage** except the genesis `Dna` action | `holochain_keystore/src/action_ext.rs:32-40`, `holochain_integrity_types/src/action.rs:665-678` | a v1 `Create` signature verifies under v2 with no cross-DNA context |
+| An entry's hash is over the entry bytes alone — no DNA, no action, no agent | `holochain_integrity_types/src/entry.rs:156-178` | byte-identical content keeps its EntryHash (and our CID) across the line; only ActionHashes move |
+| `verify_signature`, `dna_info()` and `hash_action` are all callable inside `validate` | `ribosome/guest_callback/validate.rs:54-62`, `host_fn/verify_signature.rs`, `host_fn/dna_info_2.rs`, `hdi/src/hash.rs:217` (pure guest) | v2's integrity zome can re-verify a v1 notarization |
+| `must_get_*` is same-DNA only — no DNA parameter, resolves through the calling cell's stores | `host_fn/must_get_valid_record.rs:22-70` | a v1 proof must be **embedded**, never referenced (Lane A); a fork could lift this (Lane B) |
+| `close_chain`/`open_chain` + `MigrationTarget::{Dna,Agent}` + `InitProperties` are shipped and unconditional; only `lineage:` and `GetCompatibleCells` sit behind `unstable-migration` (not in our build) | `hdk/src/migrate.rs`, `sys_validation_workflow.rs:1467` (`ActionAfterChainClose`), `holochain_state/src/conductor.rs:107-250` | chain-level lineage is native; the only sys-validation rule is "nothing after CloseChain" — reads of a closed chain are unaffected |
+| Upstream shipped its own chain-switch worked example: `MigrationRecord{summary, signature, signer}` validated by `trusted_signers` from DNA properties + `verify_signature` | `crates/holochain/tests/tests/migration.rs` (backport #5842, 2026-06-26; present in 0.7.0) | Lane A's kernel is upstream-tested; it preserves **authorship** but not the original **notarization** (it re-signs a summary) — the gap §2 closes |
+| Upstream says the `close_hash` one-chain-one-successor binding is **not enforceable in validation** (validators lack visibility of the old network) | `docs/design/dna_migration.md` | fork detection is an out-of-band observer's job — ours is the storage plane (§5) |
+| `InstallAppPayload.agent_key: Option<AgentPubKey>` — a second app can be installed under an existing key; cross-cell `call(CallTargetCell::OtherCell)` is cap-grant-gated but allowed | `holochain_types/src/app.rs:109-113`, `host_fn/call.rs:161-233` | **no re-key**; the v1 cell is readable from the v2 coordinator on a dual-cell peer |
+| Storage assumes ONE app id and the FIRST provisioned cell per role; `install_fresh` always mints a key; lineage drift = uninstall+reinstall | `happ_manager.rs:79,560,741`, `hc_client.rs:209-286` | the storage change is bounded and named (§6) |
+| Rung 5's verify refuses a DNA-line crossing as a typed refusal; vehicles register by `ArtifactClass`; the manifest already carries `envelope.lineageParentCid` and per-role `dnaHash` | `release_adoption/verify.rs:476-486`, `apply.rs:189`, `rakia/schemas/v1/release-manifest.schema.json` | the crossing becomes a **positive branch** of an existing guard, not a new controller |
+| Mishpat `Commitment{action, payload_json, signed_at}` with an open action vocabulary; revocation = a new commitment `revokes-commitment`; `cid = entry_hash` | `mishpat_integrity/src/lib.rs:273-278`, `mishpat/src/commitments.rs:185-206,343-359` | the notarized path is a `migrates-lineage` commitment — **no new entry type, no hash move on mishpat** |
+| `node_registry` is the smallest safe rehearsal DNA: 6 entry types, 1 storage call site, its own bundle, not in the bridge-health SUPERVISED list | `node_registry_integrity/src/lib.rs:220`, `node_registry_api.rs:92`, `conductor_bridge_health.rs:648` | the mesh keeps working while node_registry is mid-migration |
+| hc-rna is compiled into every DNA; `bridge_call` runs in wasm via `call(OtherRole)`; the export seam is live but **unbounded** (no cursor/limit); the migration extern returns "not yet implemented" | `rna/rust/src/bridge.rs:71`, `content_store/src/lib.rs:11476-11611`, `content_store/src/migration.rs:192` | the road exists as a door; the carry function must be **bounded** (the conductor call is uncancellable) |
+| No ecosystem project ships an authorship-preserving hApp→hApp migration; Kangaroo states breaking versions do not port data; 0.8 roadmap lists DNA migration as continuing work, no date on chain continuation | web, 2026-09-03 | nobody is coming to solve this; the rails are ours to finish |
+
+## 2. The notarization-carrying record (the core)
+
+The v2 network must be able to check, with no access to v1, that *agent A asserted content X at
+time T, and v1's validators witnessed it*. The v1 `SignedAction` is exactly that proof, and §1
+shows v2 can verify it. So:
+
+```
+NotarizationWitness (v2 integrity entry type)
+  lineage_dna_hash : DnaHash            // the v1 DNA this proof was witnessed in
+  proofs           : Vec<CarriedProof>  // ≤ WITNESS_BATCH (16) — head-plane bundling, §3
+  CarriedProof
+    action    : Action                  // the v1 action (header + data) — ≈300 B
+    signature : Signature               // the v1 author's signature over it — 64 B
+    entry     : Option<Entry>           // ONLY when the carrier is not the author (§2.2)
+```
+
+**Validation (v2 integrity zome, every peer, deterministic):**
+1. `lineage_dna_hash ∈ dna_info().modifiers.properties.lineage` — the v2 DNA declares its parents
+   in its properties, so its identity commits to its lineage and every peer agrees.
+2. For every proof: `verify_signature(action.signer(), signature, action)` — **`signer()`, not
+   `author`**: a `CloseChain` toward `MigrationTarget::Agent` is signed by the new key.
+3. `hash_action(action)` is the proof's identity (the witness stores nothing else; hash = fact).
+4. If `entry` is present: `hash_entry(entry) == action.data.entry_hash`. If absent: the carrier is
+   the author, and a native v2 `Create` with that `entry_hash` MUST exist on the carrier's chain
+   (checked via `must_get_valid_record` on the *v2* chain — same DNA, allowed).
+5. A witness cannot be updated or deleted (like upstream's MigrationRecord).
+
+What this buys, precisely: **CID continuity** (same EntryHash where the author re-creates
+natively), **notarization continuity** (author, timestamp, entry hash and signature are the v1
+ones, re-verified by v2's validators), **lineage continuity** (the v1 DNA hash is bound into the
+v2 identity and named on every witness). What it does not buy: v1's *DHT-level* validation receipts
+(who in v1 validated the op). The witness carries the author's proof, not the validators'. That
+is the same trust boundary upstream's design §4 draws ("content carrying a valid signature made
+by the agent's own key on a previous network can always be trusted — even where another agent
+copied it across"), and it is the boundary Lane B would remove (§9).
+
+### 2.1 Self-carry (the author migrates)
+
+The author's v2 coordinator calls the v1 cell (`call(OtherCell(v1_cell))`, bounded
+`{cursor, limit}`), receives its own v1 records, `create_entry`s each one natively in v2
+(byte-identical → same EntryHash; the v2 action is a new notarization by the same key) and
+commits one `NotarizationWitness` per batch with `entry: None`. Both facts are now in v2: the
+fresh v2 notarization AND the original v1 one, bound by entry hash.
+
+### 2.2 Held-carry (the author has not migrated, or never will)
+
+A dual-cell peer holding v1 content it did not author carries it with `entry: Some(bytes)`. It
+cannot `create_entry` as the author, so the entry lives inside the witness; v2 readers reach it
+through the witness index (a link from the entry-hash anchor). The original notarization is
+intact; the carrier is only a courier, and says so. When the author later migrates, their
+self-carry supersedes the held copy (the storage projection prefers a native v2 record over a
+held one for the same entry hash). This is the companion §7 bridge — "never fully absorbed and
+never finally excluded" — as a record type.
+
+### 2.3 The rule that makes every future migration cheaper
+
+**Every DNA carries `NotarizationWitness` and a `lineage` property from its next integrity change
+onward.** That is the operator's "they have to know how to upgrade before they hold data": the
+witness type in a DNA is its knowledge of how to be migrated *from* AND how to carry *back* (a
+v1 that has the type can receive v2 witnesses, so a bridge peer mirrors both ways and a laggard on
+v1 keeps seeing the household). The rehearsal (§8) is exactly "add the witness type to
+node_registry" — the first hash move teaches the DNA to migrate.
+
+## 3. P2P Design Gate
+
+### Entity: NotarizationWitness
+- **Classification**: Notarized (A) — the protocol would be lying if a carried proof changed silently; it is a thing in its own right (a witnessed carriage), not an attribute of the content.
+- **Justification**: it is the only object in v2 that proves the v1 notarization; nothing reconstructs it.
+- **Head-Plane Cost Budget**: one witness per ≤16 carried records → node_registry rehearsal: tens; lamad at 3.5k heads: ~220 witnesses, not 3.5k (batching IS the bundling shape — a composite root per author-batch). Unbounded at 1 year only if migrations recur; each migration adds ≈ heads/16. Declared.
+- **Network Stakes**: all four stages; **floor-protected** (Constitutional class — a witness is a proof; never stage-priced).
+- **Content Address Strategy**: Content-Derived (CID) — `entry_hash`; the witness's identity is its proofs.
+- **Transport Affinity**: n/a (entry, not blob).
+- **Source of Truth**: Holochain DHT (v2).
+- **Integrity Zome + DNA-hash class**: `node_registry_integrity` for the rehearsal (each migrated DNA's own integrity zome thereafter) — **DNA-HASH-MOVING by definition** (v2 is a new DNA; this type is the change).
+- **Coordinator Zome**: `node_registry_coordinator::carry_from(CarryInput{v1_cell, cursor, limit}) -> CarryReceipt{witness_entry_hashes, cursor, count, digest}`; `get_witnesses_for(entry_hash) -> Vec<Link>`.
+- **Projections**: SQLite — the migrated entity's existing table gains `notarized_action_hash`, `notarized_dna_hash`, `notarized_at` (from the proof) beside `dht_anchor_hash` (the v2 action); `carried_by` (author | courier). Automerge sync: no.
+- **HTTP Route**: none new; `GET /db/p2p/conductor-diagnostics` and `GET /version` (runtime passport) gain the per-role `{v1, v2, authoring, reading}` cell view.
+- **Anti-Pattern Check**: no UUID; no per-host authoring (the witness is authored once, through the conductor, witnessed by v2's DHT); reach/head/replication kept distinct (a witness moves neither reach nor the content head).
+
+### Entity: migrates-lineage commitment (Mishpat)
+- **Classification**: Notarized (A) — reusing `Commitment` (existing type, `cid = entry_hash`).
+- **Head-Plane Cost**: one per migration + one per revocation/sunset. Negligible.
+- **Network Stakes**: floor-protected (Constitutional).
+- **Address**: Content-Derived (entry hash), as every commitment.
+- **Integrity Zome + DNA-hash class**: `mishpat_integrity` unchanged — **DNA-hash-NEUTRAL**; the new `migrates-lineage` / `sunsets-lineage` action arms are coordinator validation (`validate_commitment_payload`) — a rung-5 hot-swap.
+- **Coordinator Zome**: `mishpat::create_commitment` (existing) with `action: "migrates-lineage"`, payload `{role, from_dna_hash, to_dna_hash, release_cid, constitution_root, roster_cid, signatures: [(agent, sig)] (k-of-n over the payload CID), evidence: {soak: [cid], forecast: cid, deliberation: cid}, window: {opens_at, revert_until, sunset_requires}, revert: {release_cid}}`; revocation via the existing `revokes-commitment` arm (same quorum rule). Coordinator validation (`validate_commitment_payload`) checks the roster chain and the k-of-n signatures; the v2 integrity zome re-checks the same at the witness/commitment it is handed (§4.1) — two validators, one rule.
+- **Projections**: `mishpat_commitments` (existing; `state`, `revoked_at`).
+- **HTTP Route**: existing commitment routes.
+- **Anti-Pattern Check**: the commitment is the elohim's, not a household vote and not a per-node flag; no per-node veto (the constitutional posture of rung-5 §4 stands; course-set: `project_upgrade_authority_constitutional_elohim`).
+
+### Entity: council roster (attestation)
+- **Classification**: Notarized (A) — reusing the elohim DNA's `Content` entry with `kind: council-roster` (the same `metadata_json` valve the release manifest rides). DNA-hash-NEUTRAL.
+- **Head-Plane Cost**: one per roster rotation per reach; tens per year. Negligible.
+- **Network Stakes**: floor-protected (Constitutional).
+- **Address**: Content-Derived (CID); each roster names its predecessor's CID and carries the predecessor's k-of-n signatures; the chain terminates at `constitution_root`.
+- **Coordinator Zome**: `content_store::create_content` (existing) — the roster is content; verification is done by every consumer against the chain, never by trusting the author.
+- **Projections**: SQLite content projection (existing); consumers cache the resolved roster per reach.
+- **Anti-Pattern Check**: no standing key; no per-host roster; sovereignty vocabulary kept at the commons apex, not the individual.
+
+### Entity: `constitution_root` + `lineage` (DNA properties)
+- **Classification**: part of the DNA identity (properties fold into the DNA hash) — not a separate entity; declared here because every validator reads them via `dna_info()`.
+- **Change class**: any change moves the DNA hash — an amendment IS a lineage crossing under this spec.
+
+### Entity: release manifest, artifactClass `happ-lineage`
+- **Classification**: Notarized (A) — the existing rung-5 `Content` entry (`kind: release-manifest`), DNA-hash-NEUTRAL.
+- **Change**: `artifactClass` enum gains `happ-lineage`; `appliesTo.roles[role]` gains `migrateFrom: DnaHash` (required for this class) and `lineage: [DnaHash]` (what the v2 properties declare); `adoptionDiscipline` gains `path: {commitmentCid}` — the notarized migration path this release walks.
+- **Everything else** as rung 5 (channel, staging→earned election, canary, soak attestation, promote, converge, revert-by-re-election).
+
+### Design Constraints Discovered
+- A closed chain can never be extended (`ActionAfterChainClose`), and one agent has one chain per DNA. **Therefore revert after CloseChain is structurally impossible on the same key** → §4 puts the sunset in its own notarized commitment, after convergence, and names it irreversible.
+- `open_chain` need not be committed at `init` (Holochain does not enforce when); upstream's example does it at init because it closes v1 first. We open at sunset (§4), after the window. **Station 8 measures** that a late `OpenChain` is accepted by sys-validation; if not, the fallback is to commit `OpenChain` at install with `prev_target` only and bind `close_hash` at sunset through a second witness.
+- The 0.6→0.7 preimage change (`Action{header,data}`) means a v1 proof made under 0.6 cannot be re-encoded and verified under 0.7. Same-line crossings (this spec) are unaffected; a cross-line proof needs raw signed bytes + `verify_signature_raw`. Recorded, out of scope.
+
+## 4. Authority and the common language — the elohim hold the crossing; humans get diversity and a notarized path
+
+**Who decides.** Upgrade authority over the core protocol is a domain of the network itself,
+vested one degree removed from humans in the elohim at the constitutional level (the 2026-09-01
+course-set, `project_upgrade_authority_constitutional_elohim`). A crossing of the commons DNA line
+is therefore **not a consent act** — no household ratifies it, no node vetoes it, nobody is shown a
+dialog. It is a decision the elohim make inside the closed system, and they make it the only way
+they hold any authority: as a **bounded, revocable, attested commitment** (the compute-commitment
+primitive), never a standing key. The runtime tracks the elected head automatically; adoption
+discipline (canary order, soak, thresholds) is a constitutional artifact of the release ceremony,
+not per-peer preference. Humans keep introspection and escalation (companion §4): they read the
+release's own explanation, look at their own elohim's reasoning, and raise mishandling up the reach
+ladder — and the revert is the remedy, not a refusal to update.
+
+**What humans get instead of a veto is diversity.** Branches and bespoke communities are the VSM
+ecology working, not a deficit: a community may run a declared branch of a DNA with its own lineage.
+The requirement the protocol places on that diversity is a **common language** in which any upgrade
+or reconciliation chain between branches can be built — so a human can move through the diversity of
+the network (join a bespoke community, leave it for the commons, carry their history with them) along
+a path that was **notarized before they walked it**. That language is exactly the four primitives of
+this spec, which is why they are protocol-canonical rather than one migration's tooling:
+
+| Primitive | What it says, in the common language |
+|---|---|
+| `lineage` (DNA property) | "this rule version descends from those" — identity commits to ancestry |
+| `NotarizationWitness` | "this fact was witnessed there, by that key, at that time — here is the proof" — facts cross branches without losing their notarization |
+| migration commitment (Mishpat `migrates-lineage`) | "this path, from that version to this one, on that release, with this revert horizon, is held by these elohim" — the path is notarized before anyone moves |
+| bridge map (the manifest's `migrateFrom` + `lineage` + the carry recipe) | "here is how a record on that branch is carried onto this one, and back" |
+
+A bespoke community's branch reconciling to the commons — or the commons absorbing a branch's
+innovation — is the same ceremony as a version crossing, spoken in the same language, with the
+branch's own elohim holding its side of the commitment. There is no second mechanism.
+
+**The path, executed.**
+
+1. **Proposal.** A `happ-lineage` release is published to the channel in `staging` (rung 5 Station 1). Verify on every peer resolves its `migrateFrom` against installed reality: equal → the crossing is admissible; anything else → `DnaLineageMismatch` exactly as today. **A hApp without a recipe for its parent is a typed refusal, not a wipe.**
+2. **Notarized path.** A `happ-lineage` release is adoptable only when a `migrates-lineage` commitment naming its `release_cid` is already notarized — signed k-of-n by the council roster at the reach the channel is born on, under the same `constitution_root` the release's DNA declares (§4.1; in the household rehearsal the bootstrap steward's key is the declared 1-of-1 roster, exactly as rung 5's §9 MVP authority). The adoption controller reads the commitment through the peer's own conductor (I1, C5 — never from the manifest's say-so); absence is `PathNotNotarized`, a commitment signed below the bar or by keys outside the roster is `QuorumUnmet`, a root mismatch is `RootMismatch`.
+3. **Window.** The commitment opens it → peers adopt in canary order (rung 5 discipline), each installing v2 beside v1, carrying, and attesting `carried == v1 count` (`CarryReceipt.digest` over the v1 export digest). **Both cells stay live.** `revert_until` is the free-revert horizon the elohim hold themselves to.
+4. **Revert (free).** The elohim revoke the commitment (`revokes-commitment`) → the channel re-elects the prior head (rung 5 Station 6) → every peer marks v1 `authoring` again and v2 `reading`; v2 cells are **disabled, never uninstalled** (their witnesses are evidence). Nothing on v1 was ever touched. **Records authored on v2 during the window** are re-authored by their authors on v1 (same entry bytes → same entry hash; a native v1 create needs no witness type), with the v2 proof kept in the disabled cell as evidence; until re-authored they are reported `pending`, never lost. Held-carrying them back for an absent author needs v1 to have the witness type (§2.3) — honest absence in the first rehearsal. This is the companion §2 paired revert as code, and it is the remedy escalation reaches for.
+5. **Sunset (irreversible, a separate notarized act).** Only after fleet convergence AND a second commitment `sunsets-lineage` do peers `close_chain(Dna(v2))` on v1 and `open_chain(Dna(v1), close_hash)` on v2, then disable v1. The closed chains stay readable forever. **The elohim can reverse the crossing at any point before the sunset and at no point after** — which is why the sunset is a distinct commitment with its own soak, not a step in the window.
+
+### 4.1 Constitutional coupling — how the bar is enforced by every agent's own validator
+
+Agent-centricity means nothing exists above the peer: every peer validates with the rules it chose
+to install. So "the elohim hold the crossing" is real only if **each peer's own validator** refuses a
+crossing the elohim did not hold and accepts one they did, with no controller trusted in between.
+The bar for evolution must therefore be something a validator can check in isolation, from bytes it
+already has. Three bindings do it; two have a foothold in the tree today.
+
+**Root binding.** Every DNA's properties carry `constitution_root` — the CID of the constitutional
+rule-set and its council policy (which change class needs which reach and which threshold) — beside
+`lineage`. Properties fold into the DNA hash, so a peer running the DNA has *chosen* that root.
+v2's validator accepts a witness or a commitment only under the same root, or under a root reachable
+by an **amendment** signed under the prior root (companion §5: the root moves only by the hardest
+consensus, across scales). The hApp manifest already carries `progenitor_pubkey` in every role's
+properties (`elohim/holochain/dna/elohim/workdir/happ.yaml`) — the single-key training-wheels root
+that rung 5's §9 MVP authority uses. This is what it grows into; the rehearsal declares a 1-of-1
+roster under that key and says so.
+
+**Quorum binding.** A `migrates-lineage`, `sunsets-lineage` or `amends-constitution` commitment is
+valid only when it carries **k-of-n signatures from the current council roster at the reach the
+change class requires** (coordinator bytes: low; an integrity crossing: high; the root: global). A
+**roster** is an attestation — the set of elohim keys whose earned ceiling meets the bar at that
+reach — signed by the *previous* roster, so it hash-chains to the root and a validator verifies the
+whole chain with the `verify_signature` it already has (§1). Roster membership IS the earned ceiling
+(companion §3): an elohim whose safety or wisdom standing lapses is absent from the next roster; a
+bad signature is attested, revocable, and lowers the signer's ceiling. **No key acts alone; no key
+is standing.** Plain k-of-n signatures are chosen over a threshold scheme deliberately — verifiable
+in validation today with no fork and no new crypto; a threshold signature (FROST) is a later
+optimisation of the same binding, not a different one.
+
+**Evidence binding.** The commitment claims, by CID, the evidence classes the bar requires for its
+change class — rung-5 soak attestations, the simulation-gate forecast (companion §8), the
+deliberation record from the wisdom commons. A validator cannot judge wisdom; it CAN refuse a
+commitment missing a required class or the class's signatures. The wisdom is exercised by the
+signers, who are accountable for it in the open.
+
+What this preserves and what it couples: at the floor, **agent-centric compute intact** — each agent
+validates everything locally and may run a declared branch under a different root (diversity, §4).
+At the apex, **the commons' sovereignty** — the commons' notarizations recognise only paths under the
+commons root, and the root moves only by the hardest consensus. The "godlike" power is contained by
+construction: quorum (no lone key), earned rosters (no standing key), amendment chain (no quiet
+root move), local verification (no trusted controller), and the human floor of branch · introspect ·
+escalate.
+
+**On blockchain coupling — one narrow concession, no authority moves.** A chain would give one thing:
+a global, capture-resistant ordering of which root and which roster are canonical — which also closes
+the single hole upstream admits validation cannot close (a closed v1 chain forking into two
+successors). The agent-centric answer is that a second successor is **not an attack but a declared
+fork** with its own lineage, and the commons is the branch whose path carries the widest-reach
+notarization — more honest than "one chain wins", and it is the diversity affordance. The residual
+worry is a colluding council rewriting the root's *history*. For that, exactly one coupling:
+**optional external timestamp anchoring of the root lineage** (an OpenTimestamps-style witness on a
+public chain), floor-protected as auditability (companion §4, §6). It witnesses the ORDER of roots;
+it never judges them and holds no authority. Nothing else moves onto a chain.
+
+## 5. The bridge — dual-cell peers, both directions, and the fork watch
+
+- A dual-cell peer's storage runs a **bridge sweep** (the reconcile controller, both cells' signals): new v1 records → held-carry into v2 (§2.2); new v2 records → held-carry into v1 **iff v1 has the witness type** (§2.3; not in the first rehearsal — honest absence, measured at Station 6).
+- Laggards (`lag-within-window`) keep authoring on v1 and keep seeing everything, because the household's dual-cell peers mirror. A `declared fork` is a v1 chain that closes toward a DNA not named in any notarized migration commitment (a branch without a bridge map) — the storage plane sees both networks and files it (the out-of-band observer upstream says validation cannot be). `silent staleness` past `sunset` is healed by the ordinary adoption loop.
+- Storage's role→cell map becomes `role -> {v1: CellId, v2: CellId, authoring, reading}`; every `call_zome` for the role targets `authoring`; the bridge sweep reads `reading`. The runtime passport publishes it, and `version-matrix --observed` shows the window fleet-wide.
+
+## 6. What changes, by seam (bounded, named)
+
+| Seam | Change | Class |
+|---|---|---|
+| DNA (rehearsal: node_registry) | `NotarizationWitness` entry type + `lineage` and `constitution_root` properties + validation (§2, §4.1 root binding); coordinator `carry_from` (bounded) + witness index | integrity (hash-moving — the rehearsal IS this) |
+| mishpat coordinator | `migrates-lineage`, `sunsets-lineage`, `amends-constitution` action arms in `validate_commitment_payload` — roster chain + k-of-n signature check (§4.1) | coordinator (rung-5 hot-swap) |
+| elohim DNA content | `kind: council-roster` content (metadata_json valve, like the release manifest) | DNA-hash-neutral |
+| release manifest schema | `artifactClass: happ-lineage`; `appliesTo.roles[*].migrateFrom`, `.lineage`; `adoptionDiscipline.path` | schema |
+| release_adoption verify | `DnaLineageMismatch` gains the positive branch (`happ-lineage` ∧ `migrateFrom == installed`); new refusals `PathNotNotarized`, `PathRevoked`, `QuorumUnmet`, `RootMismatch` | storage |
+| release_adoption apply | `HappLineageVehicle` (`handles: [happ-lineage]`): install `elohim@<hash12>` under the existing key (`agent_key: Some`), enable, authorize both cells, drive `carry_from` to cursor end, attest digest; on sunset: close/open; on revert: disable v2 | storage |
+| happ_manager / hc_client | `install_lineage` beside `ensure_happ_installed` (never uninstalls); `install_fresh(agent_key: Option)`; role→{v1,v2,authoring,reading}; `HcClient::connect` and the two role wrappers resolve `authoring` | storage |
+| runtime passport / diagnostics | per-role dual-cell view | storage |
+| storage projection | `notarized_*` columns + `carried_by`; bridge sweep | storage |
+| a2o | `features/delivery/happ-lineage-migration.feature` Stations 1–9 + steps composing the rung-5 drivers | verification |
+
+## 7. Concern-canon answers (birth rule, C0–C14)
+
+C0 plane: DHT (witness, commitment) + storage controller (vehicle, sweep) — placed. C1 anti-self-election: the channel's election, unchanged. C2 monotonic authority: `authoring` flips only on a verified head change or a revocation; never both cells. C3 liveness: bounded `carry_from` batches; the sweep is a ticker, not a loop over an uncancellable call. C4 honest absence: `carried < v1 count` is reported as a number, never as done; a v1 without the witness type reports `backward-carry: unavailable`. C5 evidence-not-authority: a manifest's `migrateFrom` is a claim verified against installed reality; a commitment is read through the peer's own conductor. C6a bounded work / C6b idempotent: `carry_from` is cursor-driven and idempotent by entry hash. C7 advertise/serve: the passport advertises exactly the cells that serve. C8 observability: `CarryReceipt` per batch + attestation. C9 identity-lineage: same agent key (no re-key); DNA lineage in properties; chain lineage via Close/Open at sunset. C10 contract evolution: `artifactClass` is an additive enum; old controllers refuse unknown classes (already true). C11 backpressure: batch size + the io/ram guards. C12 consent/authorization: the elohim's notarized migration commitment authorizes the path — k-of-n of an earned roster under the declared root (§4.1); no per-node consent exists by design. C13 graduated authority is ALSO §4.1: reach and threshold rise with the change class. C13 graduated authority: canary → promote, rung 5. C14 witnessed residual: the closed v1 chain and disabled v2 cells are kept, never deleted.
+
+## 8. The rehearsal (household mesh, 0.7, this week's shape)
+
+v1 = node_registry as installed. v2 = node_registry + `NotarizationWitness` + `lineage: [v1]`.
+Three peers; james is the canary; jessica stays on v1 until Station 6. The story is
+`genesis/a2o/features/delivery/happ-lineage-migration.feature` (Stations 1–9); its runnable check is
+the habit `elohim/holochain/.epr-meta/happ-lineage-migration.habit.md`. Order of implementation is
+the order of stations; each station is a measured red before it is green.
+
+## 9. Lane B — the conductor fork: keep ONE DHT across an integrity change
+
+We ship a forked conductor already (nine patches, a re-carried relay fallback). Upstream's
+*chain continuation* draft (`docs/design/dna_migration_chain_continuation.md`, design-only, no
+`ContinueChain` in any shipped tree) names the deeper mechanism: split the network identity
+(kitsune space) from the integrity identity, put an `IntegrityHash` on the action header, and
+dispatch app validation per-op to the integrity version the op names. Under that mechanism an
+integrity change does **not** create a new network: no re-authoring, no witnesses, no carry —
+the same actions in the same DHT, validated by the rules in force when they were authored.
+Old peers hold ops that name an integrity version they do not have as *pending-unknown* until
+they upgrade — mixed-version peers keep talking, which is this program's north star.
+
+That is the prize; the cost is deep (kitsune space keying, DhtOp integration, sys-validation,
+the `ActionHeader` preimage moves once). So Lane B is not the first move — it is a **bounded
+spike with a measured question**, run in the fork after Station 4 of Lane A is green:
+
+- **B1 (smallest fork slice, ≈ days):** a validation host fn `must_get_record_from_lineage(dna_hash, action_hash)` that dereferences a *locally installed* lineage cell's store when both cells are on the conductor. Removes proof embedding for dual-cell peers; a peer without the v1 cell still needs Lane A's witness. Measures: can the fork make a foreign lineage visible to validation at all?
+- **B2 (the real question, ≈ weeks, decide after B1):** integrity-version dispatch — `IntegrityHash` in the header, validation dispatched to the matching integrity wasm, network space keyed by a stable `NetworkHash`. Measures on the mesh: two integrity versions, one DHT, mixed peers gossiping, no re-authoring.
+- **Decision rule:** Lane A ships regardless (it is the fallback every DNA carries, §2.3, and it is what a peer without a fork can run). Lane B graduates from spike to program only if B2 measures green on the mesh AND the patch is upstreamable (0.8 roadmap continues DNA migration; a contribution beats a permanent fork — the relay fallback precedent, 0.7 guide Lane H).
+
+## 10. Definition of done (answers the backlog home's DoD)
+
+Stations 1–10 of the story: 10 is the coupling's negative control — a path signed below the bar, or
+by keys outside the roster, or under a different root, is not a path (`QuorumUnmet` / `RootMismatch`
+on every peer's own verification).
+
+
+proposal → the elohim's notarized `migrates-lineage` commitment → per-peer window (install beside,
+carry with witnesses, attest) → laggards mirrored, forks filed → free revert by re-election → the elohim's notarized `sunsets-lineage` → per-peer Close/Open → closed chains readable. Stations 1–10 green on
+the mesh with the node_registry rehearsal; §9 spike verdict recorded; §4 posture accepted.
