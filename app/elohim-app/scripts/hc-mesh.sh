@@ -1817,6 +1817,22 @@ storage_ark_env() { # <peer-name>
 # `/admin/adoption` with `sweeps: 0, channels: []` forever and station 1 times
 # out on "waiting on <peer>'s /admin/adoption" (2026-09-03). Created empty so the
 # watcher is active from boot; a restart keeps it through restart_env_overlay.
+# The conductor's agent key for a running sandbox, on either CLI line: hc 0.7
+# moved the admin call to `hc client call --port <admin> list-apps`; hc 0.6 had
+# `hc sandbox call --running <admin> list-apps`. Prints nothing when neither
+# answers (the storage then derives its own key over the admin socket).
+sandbox_agent_key() { # <admin-port> -> prints uhCAk…, or nothing
+  { hc client call --port "$1" list-apps 2>/dev/null \
+      || hc sandbox call --running "$1" list-apps 2>/dev/null; } \
+    | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4
+}
+
+peer_index_of() { # <peer-name> -> prints the index in PEERS, or returns 1
+  local i=0 n
+  for n in "${PEERS[@]}"; do [ "$n" = "$1" ] && { echo "$i"; return 0; }; i=$((i + 1)); done
+  return 1
+}
+
 runtime_config_path_for() { # <peer-name> -> prints the path (file guaranteed to exist)
   local f="$MESH_DIR/$1/runtime-config.toml"
   mkdir -p "$MESH_DIR/$1"; [ -f "$f" ] || : > "$f"
@@ -1829,6 +1845,12 @@ restart_env_overlay() { # <captured-environ> <peer-name>
   # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
   printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$(peer_transport "$2")"
   printf '%s\n' "ELOHIM_RUNTIME_CONFIG_PATH=$(runtime_config_path_for "$2")"
+  # A capture taken while the sandbox had not answered yet carries AGENT_PUBKEY=""
+  # (see start_storage_peer); re-resolve it from the live conductor on restart.
+  local idx key
+  if idx="$(peer_index_of "$2")" && key="$(sandbox_agent_key "$(admin_port "$idx")")" && [ -n "$key" ]; then
+    printf '%s\n' "AGENT_PUBKEY=$key"
+  fi
   # T0' pure-iroh bootstrap: storage announces to / seeds its peer book from
   # the doorway's /p2p/manifests projection; localdev doorway is :$DOORWAY_PORT.
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
@@ -2262,8 +2284,12 @@ start_storage_peer() { # <peer-name> <peer-index>
   mapfile -t ark_env < <(storage_ark_env "$name")
   if ! curl -s -m 2 "http://localhost:$(http_port "$i")/health" >/dev/null; then
     local agent
-    agent=$(hc sandbox call --running "$(admin_port "$i")" list-apps 2>/dev/null \
-      | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
+    agent="$(sandbox_agent_key "$(admin_port "$i")")"
+    # An EMPTY AGENT_PUBKEY is worse than none: the storage reads Some("") and
+    # never falls back to its own admin-derived key, so the release-adoption soak
+    # attestor has no deviceId ("soak_context_incomplete", station 3, 2026-09-03).
+    local agent_env=()
+    [ -n "$agent" ] && agent_env=("AGENT_PUBKEY=$agent")
     mkdir -p "$MESH_DIR/$name"
     env -u ELOHIM_ARK_SPOOL_PATH \
     -u REPLICATION_INTERVAL_SECONDS \
@@ -2276,7 +2302,7 @@ start_storage_peer() { # <peer-name> <peer-index>
     ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
     ENABLE_P2P=true P2P_PORT="$(p2p_port "$i")" \
     ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \
-    AGENT_PUBKEY="$agent" RELAY_MODE=server \
+    "${agent_env[@]}" RELAY_MODE=server \
     GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
     HOUSEHOLD_ID=household-dowell \
     DEVICE_ARCHETYPE=device-family-node-base \
