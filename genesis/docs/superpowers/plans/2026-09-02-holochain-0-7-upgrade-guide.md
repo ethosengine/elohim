@@ -186,12 +186,17 @@ grep -A1 '^name = "hd[ik]"$' Cargo.lock          # exactly ONE hdi and ONE hdk v
 
 Cargo-heavy lanes (A, B, C, D) serialize their compiles on the flock; everything else in them is parallel.
 
-**Lane status (2026-09-03 02:xxZ):** A DONE (`elohim-0.7` @ `25dd2d0be144`, pushed to ethosengine/holochain) ·
-B DONE pending the lamad + rea_commitment_replication isolation proof (commit `5367b20bd`) · C DONE
-(`b679abbd6`, storage 3206/3206, steward/node rebuilt) · D DONE (`9fc89d5d0`, doorway 1150/1150) ·
-E DONE (`949ad16a6` + che `5d7e4829aaad`, pushed) · I DONE (`e422d3f84`, app 4661/4661). All folded onto
-`upgrade/holochain-0.7` (scratch worktree `wt-integ`) with the two gitlink bumps. Next: F2 local-mesh
-gate (waiting on the household mesh owner's "mesh free"), then F1's `[dna:migrate]` tip + one push.
+**Lane status (2026-09-03 16:1xZ):** A DONE (`elohim-0.7` @ `25dd2d0be144`, pushed to ethosengine/holochain) ·
+B DONE (sweettest on 0.7, shared-rendezvous harness) · C DONE (storage 3206/3206; `cargo check` green again after
+the rebase onto dev's station-3b storage) · D DONE (doorway 1150/1150) · E DONE (+ che `5d7e4829aaad`, pushed;
+E10 relay 1.0.3 addendum) · I DONE (+ the pnpm-workspace override correction). **F2 DONE** on the household mesh:
+relay connectivity, cross-conductor DHT heal, Act I 203/278 with every red traced to apparatus/standing bugs
+(findings atom), rung-5 stations 1–5 **5/5 on the stock 0.7.0 conductor**. Integration branch
+`upgrade/holochain-0.7` rebased onto dev (carries the tevah/ark station-3b commits) — this commit is F1's
+`[dna:migrate]` tip; the DNA-hash baseline is written from the first CI `DNA-HASH` lines after the push (local
+wasm hashes differ from CI's, so the baseline is CI-sourced by construction). Next: F3/F4 = the one push and
+the dispatch chain conductor → dna → edge; F5 = the operator runbook
+(`2026-09-03-holochain-0-7-fleet-cutover-runbook.md`); F6 = evidence.
 
 **Prerequisite hunk (learned 2026-09-02, Lane D's first run):** the six `elohim/sdk/domains/*/types`
 crates are path-dependencies of doorway (`imagodei-types`, `infrastructure-types`), storage
