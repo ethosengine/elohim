@@ -92,7 +92,7 @@ spec:
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-pete-staging:4444"
+              value: "ws://elohim-pete-staging-conductor:4444"
             - name: STORAGE_URL
               value: "http://elohim-pete-staging.elohim-staging.svc.cluster.local:8090"
             - name: STORAGE_URLS

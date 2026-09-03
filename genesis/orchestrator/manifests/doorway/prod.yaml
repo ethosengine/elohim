@@ -142,7 +142,7 @@ spec:
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
-              value: "ws://elohim-frank-prod:4444"
+              value: "ws://elohim-frank-prod-conductor:4444"
             - name: STORAGE_URL
               value: "http://elohim-frank-prod.elohim-prod.svc.cluster.local:8090"
             - name: STORAGE_URLS
