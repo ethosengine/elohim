@@ -715,7 +715,7 @@ Given(
 
 Then(
   'within 120 seconds Matthew and James each hold a copy of the witness with the same content hash',
-  { timeout: 90_000 },
+  { timeout: 150_000 },
   async function (this: E2EWorld) {
     const state = scenario(this);
     const custodians = requireCustodians(state);
