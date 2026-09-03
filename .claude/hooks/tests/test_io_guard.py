@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Tests for the write budget (genesis/agentic/bin/io-guard) and the workspace berth (genesis/agentic/bin/berth).
 
-Evidence basis (2026-09-03 10:20Z): the household mesh + prologue seed wrote 130–270 MB/s to the NVMe the
-cluster datastore shares; dqlite lease writes hit 3–9.7 s, the devworkspace controller lost leader
-election and re-rendered the pod without its secrets. These tests pin the pure decisions: the level
-math (rate OR host PSI, PSI-hard wins), the action ladder (pause at high, kill+pause at hard, resume
-only when quiet AND something is paused, nothing without dwell), and the berth's honest refusal
-(a live holder is named, never queued; a stale holder is taken over on the record).
+Evidence basis (2026-09-03, corrected): the day's secretless pod swap was a k8s-dqlite SEGV loop + a stale
+ReplicaSet, NOT a write storm — sysstat had the disk at 8–12 MB/s and <1 ms await during the lease
+timeouts, and the first guard read 3× the real rate (md mirror summed). The host's real I/O failure
+mode is latency on worn QLC NVMes (10:13Z await 81 ms at 38 MB/s; 2026-08-29 hard resets). These tests
+pin the pure decisions: level math (rate OR host PSI), action level = PSI only unless rate_action,
+pause before kill (kill only after a long hard dwell), nothing when we are not the writer, resume only
+when quiet AND something is paused, and the berth's honest refusal (a live holder is named, never
+queued; a stale holder is taken over on the record).
 """
 import importlib.machinery
 import importlib.util
@@ -47,11 +49,23 @@ def test_level_psi_raises_and_hard_wins_regardless_of_rate():
     assert io.level_for(5, 25, POL) == "hard"
 
 
-def test_actions_need_dwell():
+def test_actions_need_dwell_and_pause_before_kill():
     assert io.actions_for("high", False, False) == []
     assert io.actions_for("hard", False, False) == []
     assert io.actions_for("high", True, False) == [("pause", "tier1")]
-    assert io.actions_for("hard", True, False) == [("kill", "tier1"), ("pause", "tier2")]
+    assert io.actions_for("hard", True, False) == [("pause", "tier1"), ("pause", "tier2")]
+    assert io.actions_for("hard", True, False, long_sustained=True) == [("kill", "tier1"), ("pause", "tier2")]
+
+
+def test_action_level_is_psi_only_unless_rate_action():
+    assert io.action_level("hard", "ok", POL) == "ok"          # 115 MB/s at 22% util: not a reason to act
+    assert io.action_level("ok", "high", POL) == "high"
+    assert io.action_level("hard", "high", {**POL, "rate_action": True}) == "hard"
+
+
+def test_no_action_when_we_are_not_the_writer():
+    assert not io.we_are_writing(5, POL)
+    assert io.we_are_writing(25, POL)
 
 
 def test_resume_only_when_quiet_and_paused():
@@ -75,6 +89,14 @@ def test_psi_parser(tmp_path=None):
     p.write_text("some avg10=1.00 avg60=44.50 avg300=3.00 total=1\nfull avg10=21.25 avg60=2.00 avg300=1.00 total=1\n")
     psi = io.WriteSensor.read_psi(str(p))
     assert psi["full_avg10"] == 21.25 and psi["some_avg60"] == 44.5
+
+
+def test_wbytes_is_max_over_devices_not_sum():
+    text = ("259:0 rbytes=1 wbytes=235166020608 rios=1 wios=1\n"
+            "259:5 rbytes=1 wbytes=235165905920 rios=1 wios=1\n"
+            "9:2 rbytes=1 wbytes=234992402432 rios=1 wios=1\n"
+            "7:9 rbytes=14336 wbytes=0 rios=11 wios=0\n")
+    assert io.WriteSensor.parse_wbytes(text) == 235166020608
 
 
 class Clock:

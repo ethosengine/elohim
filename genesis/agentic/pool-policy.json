@@ -63,7 +63,7 @@
     "psi_some_avg60_deny_pct": 50,
     "max_concurrent_heavy": 1,
     "default_jobs": 4,
-    "_write_budget_2026_09_03": "io-guard (genesis/agentic/bin/io-guard) enforces a continuous WRITE budget on top of the admission rules above. Evidence 2026-09-03 10:20Z: the 0.7 household mesh + prologue seed drove the shared NVMe to 130-270 MB/s; dqlite lease writes hit 3-9.7 s, devworkspace-controller lost leader election (25 restarts) and re-rendered this pod WITHOUT its secrets — a pod SWAP, not a crash; CPU had 16 cores free, RAM 6G/31G. Levels are the container's cgroup io.stat write rate over window_s (what WE write) raised by host PSI full avg10 (what the disk suffers). high = PAUSE (SIGSTOP) the newest tier-1 compile tree, one per tick; hard = kill tier-1, pause tier-2; critical/unknown never touched; resume oldest-first once under soft for resume_after_s. guard_mode observe logs would-do only; flip to enforce once every session has moored (berth).",
+    "_write_budget_2026_09_03": "io-guard (genesis/agentic/bin/io-guard) enforces a continuous budget on top of the admission rules above: host PSI full avg10 is the PRIMARY axis (psi_full_high/hard_pct), the container's cgroup io.stat write rate over window_s is secondary (max over devices — md2 and its two mirror members report the same bytes; the first cut summed them and read 3x). CORRECTION 2026-09-03 evening (operator's cluster read): the day's pod swap was not a write storm — the secretless ReplicaSet was rendered 07:21Z during a k8s-dqlite SEGV crash loop and the 10:20Z swap was the Deployment flipping onto that stale template; sysstat had the disk at 8-12 MB/s, <1 ms await at 07:07 and 67 MB/s at 10:21. What the record does show is fsync/latency contention (10:13Z await 81 ms, queue 52 at 38 MB/s) on two QLC NVMes past rated TBW, plus the 2026-08-29 hard resets — hence PSI-first. high = PAUSE (SIGSTOP) the top-writing tier-1 compile tree, one per tick; hard = kill tier-1, pause tier-2; critical/unknown never touched; resume oldest-first once under soft for resume_after_s; dwell resets on daemon start.",
     "guard_mode": "enforce",
     "poll_seconds": 5.0,
     "window_s": 30,
@@ -76,7 +76,11 @@
     "psi_full_hard_pct": 20,
     "grace_seconds": 3.0,
     "max_actions_per_tick": 1,
-    "events_keep": 500
+    "events_keep": 500,
+    "rate_action": false,
+    "write_min_actionable_mb_s": 20,
+    "kill_after_s": 90,
+    "_dont_restrain_by_accident": "Operator ruling 2026-09-03: manage carrying capacity as a VSM discipline, but never restrain ourselves on a number the disk does not feel. So: action_level is host PSI only (rate_action=false; the byte rate is advisory in status/ledger); no action unless OUR writes are >= write_min_actionable_mb_s (pausing our compile when someone else is the writer relieves nothing); pause before kill — kill only after kill_after_s of hard dwell when pausing did not relieve the host."
   },
   "berth": {
     "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued.",

@@ -2,16 +2,21 @@
 """
 io-guard — the workspace's disk-WRITE budget, enforced continuously (sibling of ram-guard).
 
-Why it exists (2026-09-03): the dev workspace, the cargo pool, the household mesh data and the
-cluster's own datastore share ONE NVMe on the control-plane host. At 10:20Z the 0.7 mesh plus a
-prologue seed drove it to 130–270 MB/s of writes; dqlite lease writes stretched to 3–9.7 s, the
-devworkspace controller lost leader election, and its cold-cache re-render rolled this pod WITHOUT
-its secrets. No process crashed — the pod was swapped. The same host hard-reset twice on 2026-08-29
-under I/O pressure (see pool-policy.json `io._comment`). CPU had 16 cores of headroom both times.
+Why it exists (2026-09-03, corrected the same evening): this workspace, the cargo pool and the
+household mesh share ethosengine's md2 mirror (two QLC NVMes past rated TBW) with everything else on
+the host, and that host has hard-reset under I/O pressure before (2026-08-29: psi_io some=77%, md
+queue depth 218–277, 155 ms write latency — pool-policy.json `io._comment`). The 2026-09-03 pod
+swap was NOT a write storm: the secretless ReplicaSet was rendered at 07:21Z while k8s-dqlite was
+segfaulting in a crash loop, and the 10:20Z swap was the Deployment flipping onto that stale
+template; sysstat shows the disk at 8–12 MB/s and <1 ms await during the 07:07 lease timeouts.
+The first cut of this guard reported 3× the real write rate (it summed io.stat over md2 AND both
+mirror members) — the sensor now takes the max over devices. What the record does support is
+LATENCY contention (10:13Z: await 81 ms, queue depth 52 at 38 MB/s) — so host PSI is the primary
+axis here and the byte rate is secondary.
 
-What it measures: this container's cgroup `io.stat` write bytes (a rate over a rolling window —
-what WE are doing) and the host's `/proc/pressure/io` (what the disk is suffering — `full avg10`,
-`some avg60`). What it does, by level, on the same typed tier ladder ram-guard uses (critical and
+What it measures: the host's `/proc/pressure/io` (what the disk is suffering — `full avg10`,
+`some avg60`; PRIMARY) and this container's cgroup `io.stat` write bytes as a rate over a rolling
+window (what WE are doing; SECONDARY — max over devices, so an md mirror is counted once). What it does, by level, on the same typed tier ladder ram-guard uses (critical and
 unknown are never touched; conductors, storage, doorways, the relay, mongod, shells and the agents
 are critical):
 
@@ -65,6 +70,9 @@ IO_DEFAULTS = {
     "write_hard_mb_s": 160,
     "psi_full_high_pct": 10,
     "psi_full_hard_pct": 20,
+    "rate_action": False,
+    "write_min_actionable_mb_s": 20,
+    "kill_after_s": 90,
     "grace_seconds": 3.0,
     "max_actions_per_tick": 1,
     "events_keep": 500,
@@ -118,15 +126,36 @@ def level_for(write_mb_s, psi_full10, policy):
     return lvl
 
 
-def actions_for(level, sustained, paused_any):
-    """Pure. What this tick may do: [] | [('pause','tier1')] | [('kill','tier1'),('pause','tier2')] | [('resume',)]."""
-    if level == "hard" and sustained:
+def actions_for(level, sustained, paused_any, long_sustained=False):
+    """Pure. Pause before kill — a paused build is restraint we can undo, a killed one is not.
+    high + dwell        → pause tier1
+    hard + dwell        → pause tier1, then tier2
+    hard + LONG dwell   → kill tier1 (pausing did not relieve the disk), pause tier2
+    ok + dwell + paused → resume one"""
+    if level == "hard" and long_sustained:
         return [("kill", "tier1"), ("pause", "tier2")]
+    if level == "hard" and sustained:
+        return [("pause", "tier1"), ("pause", "tier2")]
     if level == "high" and sustained:
         return [("pause", "tier1")]
     if level == "ok" and sustained and paused_any:
         return [("resume", None)]
     return []
+
+
+def action_level(rate_level, psi_level, policy):
+    """Pure. What the guard ACTS on. By default only host pressure (PSI) drives action — the byte rate is
+    advisory, because 2026-09-03 showed 115 MB/s at 22 % util and <1 ms await: a number the disk did not
+    feel is not a reason to restrain ourselves. `rate_action: true` makes the byte rate actionable too."""
+    order = {"ok": 0, "soft": 1, "high": 2, "hard": 3}
+    if policy.get("rate_action"):
+        return rate_level if order[rate_level] >= order[psi_level] else psi_level
+    return psi_level
+
+
+def we_are_writing(write_mb_s, policy):
+    """Pure. Pausing OUR compile when WE are not the writer relieves nothing and restrains us for nothing."""
+    return write_mb_s >= policy["write_min_actionable_mb_s"]
 
 
 # ----------------------------------------------------------------- sensors
@@ -139,17 +168,26 @@ class WriteSensor:
         self.window_s = window_s
         self.samples = deque()
 
+    @staticmethod
+    def parse_wbytes(text):
+        """Max over devices, NOT the sum: an md mirror reports the same bytes on md2 and on every member
+        (verified 2026-09-03: md2 234.99 GB, nvme0n1 235.17 GB, nvme1n1 235.17 GB — a sum reads 3×)."""
+        best = 0
+        for line in text.splitlines():
+            for tok in line.split():
+                if tok.startswith("wbytes="):
+                    try:
+                        best = max(best, int(tok[7:]))
+                    except ValueError:
+                        pass
+        return best
+
     def read_wbytes(self):
         if not self.path:
             return None
         try:
-            total = 0
             with open(self.path) as f:
-                for line in f:
-                    for tok in line.split():
-                        if tok.startswith("wbytes="):
-                            total += int(tok[7:])
-            return total
+                return self.parse_wbytes(f.read())
         except Exception:
             return None
 
@@ -333,11 +371,17 @@ class Daemon:
         now = time.time()
         write_mb_s = self.sensor.sample(now)
         psi = WriteSensor.read_psi()
-        level = level_for(write_mb_s, psi["full_avg10"], self.policy)
-        if level != self.level:
+        rate_level = level_for(write_mb_s, 0.0, self.policy)
+        psi_level = level_for(0.0, psi["full_avg10"], self.policy)
+        shown = level_for(write_mb_s, psi["full_avg10"], self.policy)      # what status displays
+        level = action_level(rate_level, psi_level, self.policy)           # what the guard acts on
+        if level != self.level or self.level_since is None:
+            # a fresh daemon starts its dwell clock now — a build launched a second ago must not pay
+            # for a storm this process never observed (2026-09-03 16:20Z: two rustc trees shed on start)
             self.level, self.level_since = level, now
-        dwell = now - (self.level_since or now)
+        dwell = now - self.level_since
         sustained = dwell >= self.policy["sustain_s"] if level != "ok" else dwell >= self.policy["resume_after_s"]
+        long_sustained = level == "hard" and dwell >= self.policy["kill_after_s"]
         tbl = RG.ProcTable(RG.snapshot_procs())
         by_root = self.attribute(tbl)
         # forget paused trees that no longer exist
@@ -346,13 +390,21 @@ class Daemon:
                 self.paused.pop(root, None)
                 self._save_paused()
         acted = 0
-        for action, tier in actions_for(level, sustained, bool(self.paused)):
+        for action, tier in actions_for(level, sustained, bool(self.paused), long_sustained):
             if acted >= self.policy["max_actions_per_tick"]:
                 break
             if action == "resume":
                 if self.resume_one(level):
                     acted += 1
                 continue
+            if not we_are_writing(write_mb_s, self.policy):
+                # host is under pressure but this container is not the writer: restraining our build
+                # would relieve nothing. Say so once per level episode, act on nothing.
+                if not getattr(self, "_not_ours_logged", None) == self.level_since:
+                    self.store.log(f"{level.upper()} on host PSI ({psi['full_avg10']}% full) but our writes are "
+                                   f"{write_mb_s:.0f}MB/s < {self.policy['write_min_actionable_mb_s']} — not ours, no action")
+                    self._not_ours_logged = self.level_since
+                break
             plan = [t for t in RG.shed_plan(tbl, [tier], os.getpid()) if t.root not in self.paused]
             if not plan:
                 continue
@@ -360,11 +412,11 @@ class Daemon:
             plan.sort(key=lambda t: (-by_root.get(t.root, 0), t.etimes))
             self._act(action, plan[0], level, write_mb_s)
             acted += 1
-        self._write_state(level, write_mb_s, psi, dwell)
+        self._write_state(shown, level, write_mb_s, psi, dwell)
         return level, write_mb_s, psi, acted
 
-    def _write_state(self, level, write_mb_s, psi, dwell):
-        s = {"ts": time.time(), "level": level, "write_mb_s": round(write_mb_s, 1), "window_s": self.policy["window_s"],
+    def _write_state(self, shown, level, write_mb_s, psi, dwell):
+        s = {"ts": time.time(), "level": shown, "action_level": level, "write_mb_s": round(write_mb_s, 1), "window_s": self.policy["window_s"],
              "psi_full_avg10": psi["full_avg10"], "psi_some_avg60": psi["some_avg60"], "dwell_s": round(dwell),
              "mode": self.policy["guard_mode"], "paused": [{"root": r, **v} for r, v in self.paused.items()],
              "top_writers": self.top_writers, "soft": self.policy["write_soft_mb_s"], "high": self.policy["write_high_mb_s"],
@@ -437,8 +489,8 @@ def status_line(state, brief=False):
         return "IO-GUARD: no state — `genesis/agentic/bin/io-guard start`"
     age = time.time() - state.get("ts", 0)
     stale = " (STALE — daemon not running?)" if age > 30 else ""
-    line = (f"IO-GUARD {state['level'].upper()}: write {state['write_mb_s']}MB/s over {state['window_s']}s "
-            f"(soft/high/hard {state['soft']}/{state['high']}/{state['hard']}) · host psi_full10={state['psi_full_avg10']}% "
+    line = (f"IO-GUARD {state['level'].upper()}: host psi_full10={state['psi_full_avg10']}% (acts at 10/20) · "
+            f"our writes {state['write_mb_s']}MB/s over {state['window_s']}s (advisory {state['soft']}/{state['high']}/{state['hard']}) "
             f"· mode {state['mode']} · paused {len(state.get('paused', []))}{stale}")
     if brief:
         return line

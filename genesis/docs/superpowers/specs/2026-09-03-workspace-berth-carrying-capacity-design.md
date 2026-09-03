@@ -35,11 +35,19 @@ who is doing what, and exactly which model from which lab, has to be native; the
 and the space used for them are part of the deliberation process — ephemeral because low stakes,
 but they have a place in the protocol.*
 
-The same day the workspace pod was **swapped** (not restarted) because a mesh seed plus a cargo
-build wrote 130–270 MB/s to the NVMe the cluster datastore shares; dqlite lease writes stretched
-to 3–9.7 s, the devworkspace controller lost leader election and re-rendered the Deployment
-without its secrets. No process crashed. CPU had 16 cores free. The workspace's real carrying
-capacity was a **write budget nobody had declared**, so nobody could refuse work against it.
+The same day the workspace pod was **swapped** (not restarted) and came back without its secrets.
+The first diagnosis blamed a 130–270 MB/s write storm from the mesh seed and a cargo build. The
+operator's cluster read the same evening corrected it: the secretless ReplicaSet was rendered at
+07:21Z while k8s-dqlite was segfaulting in a crash loop (seven core dumps in eight minutes, all
+three voter links timing out at once), and the 10:20Z swap was the Deployment flipping onto that
+stale template; sysstat had the disk at 8–12 MB/s and under 1 ms await during the lease timeouts.
+ethosengine is a dqlite *standby*; the quorum lives on three ThinkPads. And this guard's first cut
+over-read its own byte rate by 3× (it summed io.stat over an md mirror and both members). What the
+record does support is latency contention on two QLC NVMes past rated TBW (10:13Z: 81 ms await,
+queue depth 52 at 38 MB/s; 2026-08-29: two hard resets under I/O pressure). So the carrying
+capacity that matters is **I/O latency headroom, read as host PSI**, with the byte rate secondary —
+and the coordination gap (who is doing what, on which capacity) was real regardless of which
+organ failed.
 
 ## What already models this (inherited, never re-minted)
 
@@ -106,14 +114,40 @@ Two tools, one policy file, one hook line, no cargo build required:
 
 ### What io-guard decides
 
-Level = the higher of the container's own write rate (cgroup `io.stat`, 30 s window) and the
-host's `/proc/pressure/io full avg10`. Thresholds 60/100/160 MB/s and PSI 10/20 %. Nothing happens
+Level = the higher of the host's `/proc/pressure/io full avg10` (primary; 10/20 %) and the
+container's own write rate (cgroup `io.stat`, max over devices so an md mirror counts once, 30 s
+window; 60/100/160 MB/s device-level, secondary). Nothing happens
 without 20 s of dwell. `high` pauses (SIGSTOP) the tree writing the most, tier-1 only, one per
 tick; `hard` kills tier-1 and pauses tier-2; `ok` for 30 s resumes paused trees oldest-first. A
 paused build finishes later; a killed one is redone; a swapped pod loses everything and its secrets.
 `guard_mode: observe` logs `would-…`; `enforce` acts. The first live reading after it started was a
-`cargo test` at 215–257 MB/s with host PSI full at 23 % — hard — two `would-kill` rows in observe,
-then the operator's standing instruction ("implement the cheap fixes") flipped it to enforce.
+`cargo test` the sensor reported at 215–257 MB/s (72–86 MB/s real, the 3× overcount) with host PSI
+full at 23 % — hard on the PSI axis regardless — two `would-kill` rows in observe, then enforce.
+Dwell now resets on daemon start: the first enforce run shed two rustc trees of a build launched a
+second earlier because the level clock carried over a restart.
+
+## VSM placement — a discipline, not a restraint (operator note, 2026-09-03 evening)
+
+The operator's second ruling: *manage our own carrying capacities as a discipline of the VSM
+primitives in our compute, but make sure we don't restrain ourselves by accident.* Placed in Beer's
+terms (the ontology `ark-core` already inherits from `elohim-epr-rea`):
+
+| VSM organ | here | the accidental-restraint failure it must avoid |
+|---|---|---|
+| **System 1** — operations | the sessions and their builds, seeds, mesh runs | none; S1 is what we protect |
+| **System 2** — coordination / anti-oscillation | the berth's leases: one mesh, one cargo slot, one disk-heavy job, refusal by name | queueing silently (a refusal must say who, so S1 can negotiate) |
+| **System 3** — resource bargain | the mooring: a human delegates bounded compute (write set, ttl) to a named agent; the claims are the bargain | bargaining on a number the substrate does not feel |
+| **System 3\*** — sporadic audit | `berth ledger`, `io-guard status`, the shed rows with `holder` | none; audit reads, never acts |
+| **Algedonic channel** — pain that bypasses the hierarchy | host `/proc/pressure/io` (`full avg10`) and ram-guard's committed memory | acting on a *proxy* (our byte rate) instead of the pain (host stall) |
+| **System 4/5** — outside / identity | the operator: topology, quorum placement, lease durations, what counts as capacity | delegated to a daemon |
+
+Concretely, after the corrected incident read: io-guard **acts on host PSI only** (the byte rate
+is advisory in status and ledger), **acts only when this container is a real writer** (below
+20 MB/s of our own writes a host stall is not ours to relieve), **pauses before it kills** (kill
+only after 90 s of hard dwell that pausing did not relieve), and **resets its dwell clock on
+start**. A budget that would have paused a build at 115 MB/s while the disk sat at 22 % utilisation
+and under 1 ms await is restraint by accident; a budget that pauses the one compile writing into a
+disk whose full-stall share is above 10 % for twenty seconds is the discipline.
 
 ## What this deliberately does not do yet
 
@@ -138,6 +172,8 @@ then the operator's standing instruction ("implement the cheap fixes") flipped i
    `bounded_by` them; the period composite is the only new head. The berth ledger is then a
    projection of the sidecar `flows.jsonl` the same way `epr flow` already reads it.
 4. **The workspace joins the fleet as matthew's device peer** (the native-sync recipe already
-   proven), at which point "carrying capacity" is reported the way every peer reports it, and the
-   cluster datastore stops sharing a disk with a developer's cargo pool — the topology fix the
-   operator owns, which no guard substitutes for.
+   proven), at which point "carrying capacity" is reported the way every peer reports it. The
+   topology fix the operator owns is not "move the mesh off the dqlite node" (ethosengine is a
+   standby) but the datastore quorum sitting on the three least reliable machines, the dqlite
+   SEGV itself (install systemd-coredump before the next one), and the controller's lease and
+   cold-cache render — none of which a guard substitutes for.
