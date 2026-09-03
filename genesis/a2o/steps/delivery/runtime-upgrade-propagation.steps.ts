@@ -1369,12 +1369,20 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
       '--discipline',
       discipline,
     ]);
-    assert.equal(created.status, 0, `channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`);
+    assert.equal(
+      created.status,
+      0,
+      `channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`
+    );
     c.channelCreated = true;
   }
 
   const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', MANIFEST_PATH]);
-  assert.equal(published.status, 0, `publish failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`);
+  assert.equal(
+    published.status,
+    0,
+    `publish failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
   const parsed = extractJson<PublishResult>(published.stdout);
   assert.ok(parsed.releaseCid, `publish output missing releaseCid: ${JSON.stringify(parsed)}`);
   c.releaseCid = parsed.releaseCid;
@@ -1501,7 +1509,11 @@ async function ensurePromoted(world: E2EWorld): Promise<void> {
     ['promote', CHANNEL_ID, c.releaseCid],
     60_000
   );
-  assert.equal(promoted.status, 0, `promote failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`);
+  assert.equal(
+    promoted.status,
+    0,
+    `promote failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`
+  );
   const parsed = extractJson<PromoteResult>(promoted.stdout);
   assert.equal(parsed.tier, 'earned', `promote did not declare earned: ${JSON.stringify(parsed)}`);
   c.promoteResult = parsed;
