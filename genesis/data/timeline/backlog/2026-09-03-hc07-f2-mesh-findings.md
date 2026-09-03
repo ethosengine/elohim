@@ -20,7 +20,7 @@ Measured 2026-09-03 13:47–14:55Z: 3 ark conductors (stock holochain 0.7.0), st
 iroh-relay 1.0.3, prologue + full Act I (`just test mesh`: 278 scenarios — 203 passed, 31 failed,
 7 pending, 37 skipped). Connectivity gate PASSED (2 direct connections per conductor through the relay;
 cross-conductor DHT heal observed). Each item below is a separate, hash-neutral fix; none belongs in the
-mechanical 0.7 batch. Baseline caveat: there is NO full-lane 0.6 household report since 2026-08-29 — the
+mechanical 0.7 batch. Note (17:00Z): the 10:20Z pod swap that ended run 2 was a k8s-dqlite crash-loop artefact (stale secretless ReplicaSet), not the mesh's writes — see the guide's corrected F2 disk note. Baseline caveat: there is NO full-lane 0.6 household report since 2026-08-29 — the
 tevah/ark session is running one (with a per-role `/health` probe) so each item can be tagged
 `0.7-delta` or `standing`.
 

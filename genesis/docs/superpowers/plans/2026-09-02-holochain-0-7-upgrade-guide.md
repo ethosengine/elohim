@@ -641,19 +641,14 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   `{"serializeError":"key must be a string"}` on 0.7 — `blocked_message_counts` is keyed by DnaHash; stringify
   the keys (`http.rs` ~7090). And node-registry rejects `ShardAssignment shard_index 7..19 exceeds maximum 6
   (4+3 RS encoding)` 13× per peer at boot (pre-existing? verify on 0.6 before blaming 0.7).
-  **F2 DISK BUDGET (operator-diagnosed 2026-09-03):** the run ended because the WORKSPACE POD WAS SWAPPED,
-  not because anything crashed — 3 conductors + the prologue seed drove the shared ethosengine NVMe to
-  130–270 MB/s writes, dqlite lease writes stretched to 3–9.7 s, the devworkspace controller lost leader
-  election and re-rendered the Deployment without its secrets (see memory `project_devspace_recovery`).
-  CPU had 16 cores of headroom; RAM was 6 GB of 31. So the F2 gate is budgeted on DISK WRITES: sample
-  `/sys/fs/cgroup/io.stat` every 30 s during the run and stop the prologue if sustained writes exceed
-  ~100 MB/s; run the seed legs one at a time, never beside a cargo build; and if the operator can place
-  the conductor data dirs / `/tmp/elohim-local-mesh` on a PVC off the dqlite node, do that first — it removes
-  the coupling instead of shrinking it. Then `just mesh prologue`, `just seed validate`,
-  `just test mesh` (Act I). Then the rung-5 chain on 0.7: the runnable check in
-  `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md` (8/8 cucumber) — this is
-  the proof that `update_coordinators` and the release controller survive the line change.
-  Record receipts under `genesis/a2o/reports/`.
+  **F2 DISK BUDGET — CORRECTED (operator cluster read, 2026-09-03 17:00Z):** run 2 ended because the WORKSPACE POD
+  WAS SWAPPED onto a secretless ReplicaSet that a k8s-dqlite SEGV crash loop had rendered at 07:21Z (ethosengine
+  is a dqlite standby; the voters are the three ThinkPads) — NOT because the mesh's writes starved anything:
+  sysstat showed the disk fine, and the first cgroup `io.stat` reading (130–270 MB/s) was 3× over-counted across
+  the md2 mirror. The hygiene stands (sample writes, run the seed legs one at a time, keep compiles off the
+  prologue) and the workspace now has `genesis/agentic/bin/io-guard` + `berth` (host-PSI-actuated, byte rate
+  advisory) — but the F2 gate is NOT budgeted on a write ceiling, and a pod swap is read from the
+  devworkspace-controller/dqlite evidence, never inferred from our own I/O.
 - [ ] **F3: Conductor image.** Integrator pushes `ethosengine/holochain` `elohim-0.7` and the
   che-devworkspaces branch; pushes `upgrade/holochain-0.7` with `[build:conductor]`. Wait for
   `elohim-edgenode` → `conductor-<hc12>` in Harbor (console line `source-derived pin tag`).
