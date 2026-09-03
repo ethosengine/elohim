@@ -2492,6 +2492,21 @@ habits:
       anchored incident) remain @wip and are S1. NEXT: S1 — storage consumes ark-supervisor, custody-spool
       commitment, amber-offered → green, passport atom; the `epr-rea` torn-line reader (M6) and the S1 gaps
       the reviews named (orphan reaper, SpawnFailed class, shutdown-during-backoff) are in the plan.
+
+      DELTA 2026-09-03 (S1 station 2 GREEN on the household mesh): `just test mesh '@concern:death-witness and
+      @station-2'` → 1 scenario, 6/6 steps PASSED; receipt genesis/a2o/reports/sprint-report-household-20260903T035920Z-6f621068.{json,md}.
+      Chain proven live: ark spool → Jessica's storage ingests the witness (row before blob, one digest; c25728639 +
+      537186247) → the shard replication plane carries the private row to the custodians (dial REPLICATION_INTERVAL_SECONDS,
+      01d4ea9ef) → each custodian's SpoolCustodyAuthor expands its own custody-spool pledge (seeded by the prologue's
+      seed-spool-custody leg, a6e26bf87; authored on the custodian's own conductor = the counter-signature) into a
+      custody-blob for the witness, joining by DIGEST across the bafkrei/sha256 renderings (5dd815193 + 8dbc7d815) → bytes
+      pulled + serve-blob receipt from Jessica's peer. Measured 03:55–03:57Z: custody rows on both custodians ~75 s after
+      the kill; the story's budget is now the measured two minutes (b2834b34b). ZERO DNA change. Defects found only on the
+      mesh and fixed: hash-rendering join; commitments view drops a bare-string classification (M11, view fix in flight,
+      a2o reads the row's own metadata meanwhile); cucumber's 90 s step timeout. Status stays RED: stations 3a/3b/4 are
+      @wip (render, stranger refused, anchored incident). NEXT: station 3b first — the shard replication plane replicates
+      PRIVATE rows and their blobs to every household peer with no reach gate (M9, now with a named site), so "a stranger
+      is refused" is the substrate's next honest move; then 3a render; then 4 anchoring.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md (the primitive, the decision register §12, the corrections to the two atoms §1)"
       - "atoms: genesis/data/timeline/backlog/death-witness-runtime-harvests-a-dying-conductors-last-words.md · genesis/data/timeline/backlog/elohim-native-compute-envelope-the-pod-under-the-runtime.md"

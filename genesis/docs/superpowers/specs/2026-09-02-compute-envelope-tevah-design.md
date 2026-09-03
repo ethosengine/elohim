@@ -596,6 +596,29 @@ own `/version` rather than echo its own pin.
    `Trusted` is the candidate the reach-earning floor already maps to LocalRelationship). Every
    "household tier" in this document reads that way.
 
+### 6.5 Corrections from station 2 on the mesh (2026-09-03)
+
+- **Custody rides the elohim DNA's `Commitment` through `content_store::create_rea_commitment`, which has no
+  action whitelist; its integrity zome has no commitment validation.** `custody-spool` therefore needed no zome
+  edit at all — not merely hash-neutral. The mishpat coordinator's exhaustive action match (§7 M5) governs a
+  different, three-field homonym on a different DHT; M5 is withdrawn for this path.
+- **The custodian's counter-signature already exists as authorship.** A custody-spool row authored on the
+  custodian's own conductor binds the custodian by its own pen; `attestation:custodian-commitment` is reserved
+  for an explicit second signature later, not required for station 2.
+- **The custodian learns of a ward's witness through the shard replication plane** (`run_replication_cycle` →
+  `ShardRequest::ListContent{reach_filter: None}`), which carries unanchored, `private` content rows verbatim
+  between household peers. No inventory hint was needed. The same plane is the named site of the missing
+  custody-scoped read gate (M9): it replicates private rows and their blobs to every household peer with no reach
+  check — station 3b's substrate move.
+- **One digest, two renderings, at every join.** Replicated rows arrive with `blob_hash` in the CID rendering
+  (`bafkrei…`) while inventory rows are `sha256-<hex>`; a join by string equality is silently empty. Join by digest.
+- **Measured budget:** custody rows on both custodians ~75 s after the kill on a loaded host (ingest ≤5 s; the
+  replication cycle pages peers so its effective cadence is ~60–70 s regardless of the tick dial; custody sweep
+  5 s). The story's station-2 budget is two minutes.
+- **Missing substrate nodes minted:** M7 the iroh fetch path emits no `serve-blob` receipt; M8 `serve-blob.output_of`
+  never names the commitment it discharges; M9 as above; M10 `peer_blob_inventory` persists no kind/type (hints are
+  scored and dropped); M11 the commitments HTTP view renders a bare-string `resource_classified_as` as null.
+
 ## 7. P2P design gate
 
 **Entity: RuntimeManifest** — Notarized (A), reusing the `Content` entry type with `metadata_json.kind =
