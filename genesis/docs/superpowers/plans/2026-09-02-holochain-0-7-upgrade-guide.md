@@ -186,6 +186,13 @@ grep -A1 '^name = "hd[ik]"$' Cargo.lock          # exactly ONE hdi and ONE hdk v
 
 Cargo-heavy lanes (A, B, C, D) serialize their compiles on the flock; everything else in them is parallel.
 
+**Lane status (2026-09-03 02:xxZ):** A DONE (`elohim-0.7` @ `25dd2d0be144`, pushed to ethosengine/holochain) ·
+B DONE pending the lamad + rea_commitment_replication isolation proof (commit `5367b20bd`) · C DONE
+(`b679abbd6`, storage 3206/3206, steward/node rebuilt) · D DONE (`9fc89d5d0`, doorway 1150/1150) ·
+E DONE (`949ad16a6` + che `5d7e4829aaad`, pushed) · I DONE (`e422d3f84`, app 4661/4661). All folded onto
+`upgrade/holochain-0.7` (scratch worktree `wt-integ`) with the two gitlink bumps. Next: F2 local-mesh
+gate (waiting on the household mesh owner's "mesh free"), then F1's `[dna:migrate]` tip + one push.
+
 **Prerequisite hunk (learned 2026-09-02, Lane D's first run):** the six `elohim/sdk/domains/*/types`
 crates are path-dependencies of doorway (`imagodei-types`, `infrastructure-types`), storage
 (`shefa-types`, `lamad-types`) and the DNA zomes; their `holo_hash =0.6.0` pin drags serde `=1.0.219`
@@ -378,8 +385,17 @@ without it the elohim lockfile carries two HDK lines. DNA wasm builds need the j
   now demands a rendezvous — use `SweetConductor::standard()` for non-isolated conductors and
   `from_config_rendezvous(config, SweetLocalRendezvous::new().await)` per isolated conductor;
   `await_consistency(N, cells)` → `await_consistency_s(N, cells)` to keep explicit timeouts.
-  Also run `RUSTFLAGS="" cargo build -p doorway-client --features hdk` in `crates/` (the hdi 0.8 pin
-  there has no in-tree consumer that enables the feature).
+  Also run `RUSTFLAGS="" cargo build --features hdk` in `crates/doorway-client` (standalone crate, no
+  workspace; the hdi 0.8 pin there has no in-tree consumer that enables the feature).
+  **Local scope of this gate (measured 2026-09-03):** the full include-ignored matrix is 39 binaries at
+  ~490 s each and the RAM guard sheds it at ~13 GB — CI's sharded nextest (`--run-ignored all`) owns
+  the full matrix; locally run `--test lamad --test rea_commitment_replication` (the two binaries that
+  exercise `two_agent_conductors_isolated`, i.e. the rendezvous-constructor change) plus whatever your
+  edit touched. Known pre-existing red, NOT 0.7: `attention_tending.rs` `create_and_list_succeeds` and
+  `refresh_ttl_appends_timestamp` — `list_my_tending` builds `ChainQueryFilter::new()` without
+  `.include_entries(true)` (default false on 0.6.0/0.6.3/0.7.0), so the list is always empty; the four
+  tests are `#[ignore]` and quarantined by `build-nextest-filter.sh`, so CI never sees them. One-line
+  coordinator fix (hash-neutral), filed separately — not part of the migration commit.
   Sweettest needs packed DNAs: pack with the 0.7.0 `hc` from Lane E's `HOLOCHAIN_BIN` directory
   (`hc dna pack` / `hc app pack` per DNA `justfile`); if Lane E has not landed yet, download the
   two binaries into `…/scratchpad/hc-0.7/` from `https://github.com/holochain/holochain/releases/download/holochain-0.7.0/{holochain,hc}-x86_64-unknown-linux-gnu`.
@@ -583,6 +599,11 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   is conductor → dna → edge (the orchestrator does it; do not hand-trigger). The edge build's
   DNA Hash Guard prints `DNA-HASH <role> <hash>` matching F1's baseline.
 - [ ] **F5: Fleet ceremony (operator runbook, sequenced — from `project_alpha_dna_migration_2026_09_02`).**
+  **Operator authorization 2026-09-03: wipe the WHOLE fleet clean for this upgrade** — every alpha
+  conductor's `databases/` + keystore, and each peer's storage state (diesel DB, blob stores, iroh/libp2p
+  keys) so the 0.7 fleet is born from one clean genesis and one re-seed; nothing 0.6-era is carried.
+  The same authorization covers the household mesh data root for the F2 gate. Sequencing below still
+  holds (wipe AFTER the 0.7 images have rolled, bootstrap pair together).
   (1) Confirm the edge roll carrying the 0.7 hApp and the storage image embedding `conductor-<hc12>`
   has reached every alpha StatefulSet (7 peers + conductor workloads). (2) ONLY THEN clear each
   conductor's full `databases/` tree — 0.7 cannot read 0.6 databases and the lair/agent re-key is
