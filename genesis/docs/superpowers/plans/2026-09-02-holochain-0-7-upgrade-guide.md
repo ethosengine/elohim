@@ -204,6 +204,16 @@ on `hc07/dna-baseline`, pushed with the next DNA-path change so this round does 
 DNAs); the orchestrator runs that would have reached edge were superseded/failed, so edge + app are dispatched
 explicitly with `[build:edge] [build:app]` once #1424 finishes (a same-wave dispatch would bake the PREVIOUS
 hApp).
+**CI round, continued (2026-09-03 18:xx–20:xxZ):** DNA #1424 → two sweettests red on 0.7 (`two_agent_conductors()`
+gave each conductor its own rendezvous — fixed, d937bf19a); #1425/#1426 aborted — kubelet EVICTED the sweettest
+shard pods for ephemeral storage (the holonix 0.7 closure + the 945 MB nextest archive; #1424 had lost shards 1–3
+the same way, so its "12 tests" were one shard) — fixed with 12Gi/24Gi shard limits (6ce1fff69); **#1427 SUCCESS:
+4 shards, 55/55 tests, `elohim-happ:1.0.0-dev-6ce1fff6` = `dev-latest` published**. Edge #1424/#1425 died in the
+doorway quality gate: the 0.7 client family compiles OpenSSL from source (feature-unified through
+`holochain_client` 0.9.0 → keystore → vendored sqlcipher) and the slim builder images lack full `perl` — fixed in
+both Dockerfiles (ca39b39a2), pushed only after #1427 so the edge rebuild fetches the 0.7 hApp. Orchestrator
+defects met on the way (findings atom §7–8): edge starts as soon as the app build ends while the DNA build is
+fire-and-forget, edge fetches the floating `dev-latest` hApp, and an edge failure cascades an abort.
 
 **Prerequisite hunk (learned 2026-09-02, Lane D's first run):** the six `elohim/sdk/domains/*/types`
 crates are path-dependencies of doorway (`imagodei-types`, `infrastructure-types`), storage
