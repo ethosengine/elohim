@@ -577,34 +577,56 @@ export class SeedingVerification {
   private async verifySampleContent(ids: string[]): Promise<PostflightCheck> {
     let found = 0;
     let missing: string[] = [];
+    const checked = Math.min(ids.length, 10);
 
-    for (const id of ids.slice(0, 10)) {
-      // Check up to 10 samples
-      try {
-        const result = await this.appWs.callZome({
-          cell_id: this.cellId,
-          zome_name: this.zomeName,
-          fn_name: 'get_content_by_id',
-          payload: { id },
-        });
+    // Anchoring is ASYNCHRONOUS by contract: `/db/content/bulk` inserts the storage rows and the
+    // storage reconcile sweep notarizes them onto the conductor a few seconds later (measured
+    // 2026-09-03 on holochain 0.7.0: bulk 13:57:24.5 → "Projecting Content from DHT" 13:57:30.6).
+    // A zome read one second after the bulk therefore measures the wrong instant, not a lost
+    // write. Poll until the sweep lands or the budget runs out, and REPORT the elapsed time so
+    // the receipt carries the lag as a number instead of hiding it. SEED_VERIFY_WAIT_MS overrides.
+    const waitMs = Number(process.env.SEED_VERIFY_WAIT_MS ?? 45_000);
+    const startedAt = Date.now();
+    const deadline = startedAt + waitMs;
+    let attempt = 0;
+    for (;;) {
+      found = 0;
+      missing = [];
+      for (const id of ids.slice(0, 10)) {
+        // Check up to 10 samples
+        try {
+          const result = await this.appWs.callZome({
+            cell_id: this.cellId,
+            zome_name: this.zomeName,
+            fn_name: 'get_content_by_id',
+            payload: { id },
+          });
 
-        if (result) {
-          found++;
-        } else {
+          if (result) {
+            found++;
+          } else {
+            missing.push(id);
+          }
+        } catch {
           missing.push(id);
         }
-      } catch {
-        missing.push(id);
       }
+      attempt++;
+      if (found === checked || Date.now() >= deadline) break;
+      if (attempt === 1) {
+        console.log(
+          `   ⏳ ${found}/${checked} anchored so far — waiting for the reconcile sweep to notarize (up to ${Math.round(waitMs / 1000)}s)...`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, 3000));
     }
-
-    const checked = Math.min(ids.length, 10);
+    const elapsedS = ((Date.now() - startedAt) / 1000).toFixed(1);
 
     if (found === checked) {
       return {
         name: 'sample_verification',
         status: 'pass',
-        message: `All ${found} sample entries verified`,
+        message: `All ${found} sample entries verified${attempt > 1 ? ` (anchored after ${elapsedS}s, ${attempt} polls)` : ''}`,
         expected: checked,
         actual: found,
       };
@@ -612,7 +634,7 @@ export class SeedingVerification {
       return {
         name: 'sample_verification',
         status: 'warn',
-        message: `${found}/${checked} sample entries found, missing: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '...' : ''}`,
+        message: `${found}/${checked} sample entries found after ${elapsedS}s, missing: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '...' : ''}`,
         expected: checked,
         actual: found,
       };
@@ -620,7 +642,7 @@ export class SeedingVerification {
       return {
         name: 'sample_verification',
         status: 'fail',
-        message: `None of the ${checked} sample entries found - content may not have been written`,
+        message: `None of the ${checked} sample entries found after ${elapsedS}s - content may not have been written`,
         expected: checked,
         actual: 0,
       };
