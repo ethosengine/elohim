@@ -277,7 +277,7 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
+        FlatOp::CreateEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => {
                 match app_entry {
                     EntryTypes::DoorwayRegistration(doorway) => {
@@ -301,8 +301,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::CreateLink { .. }) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::DeleteLink { .. }) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -310,17 +310,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 /// Validate DoorwayRegistration
 fn validate_doorway_registration(
     doorway: &DoorwayRegistration,
-    action: &Create,
+    action: &TypedAction<CreateData>,
 ) -> ExternResult<ValidateCallbackResult> {
-    Ok(validate_doorway_record(doorway, &action.author))
+    Ok(validate_doorway_record(doorway, action.author()))
 }
 
 /// Validate DoorwayRegistration update
 fn validate_doorway_update(
     doorway: &DoorwayRegistration,
-    action: &Update,
+    action: &TypedAction<UpdateData>,
 ) -> ExternResult<ValidateCallbackResult> {
-    Ok(validate_doorway_record(doorway, &action.author))
+    Ok(validate_doorway_record(doorway, action.author()))
 }
 
 fn validate_doorway_record(
@@ -442,10 +442,10 @@ fn validate_doorway_record(
 /// - Timestamp must be within ±5 minutes of DHT validation time.
 fn validate_peer_status(
     ps: &PeerStatus,
-    action: &Create,
+    action: &TypedAction<CreateData>,
 ) -> ExternResult<ValidateCallbackResult> {
     // Rule 1: author must equal peer_id (self-authored only)
-    if ps.peer_id != action.author {
+    if ps.peer_id != *action.author() {
         return Ok(ValidateCallbackResult::Invalid(
             "PeerStatus.peer_id must match entry author".to_string(),
         ));
@@ -455,7 +455,7 @@ fn validate_peer_status(
     // We compare against action.timestamp (signed by author, non-repudiable)
     // rather than sys_time(): integrity validation must be deterministic, so
     // every validator arrives at the same verdict. See spec §PeerStatus.
-    let now_us = action.timestamp.as_micros();
+    let now_us = action.timestamp().as_micros();
     let ts_us = ps.timestamp.as_micros();
     let delta = (now_us - ts_us).abs();
     if delta > 5 * 60 * 1_000_000 {

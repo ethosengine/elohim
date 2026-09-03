@@ -28,7 +28,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -156,7 +156,7 @@ async fn commitment_by_state_link_notarized_and_readable_by_peer() -> Result<()>
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after state link: {e}"))?;
 

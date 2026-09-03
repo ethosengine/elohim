@@ -265,7 +265,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 
         // Handle Delete actions for PortalHost removal signal.
         // `deletes_address` is the ActionHash of the original Create action.
-        if let Action::Delete(ref delete) = action {
+        if let ActionData::Delete(ref delete) = action.data {
             let original_action_hash = delete.deletes_address.clone();
             if let Some(original_record) = get(original_action_hash.clone(), GetOptions::default())?
             {
@@ -283,9 +283,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             continue;
         }
 
-        let entry_hash = match &action {
-            Action::Create(create) => create.entry_hash.clone(),
-            Action::Update(update) => update.entry_hash.clone(),
+        let entry_hash = match &action.data {
+            ActionData::Create(create) => create.entry_hash.clone(),
+            ActionData::Update(update) => update.entry_hash.clone(),
             _ => continue,
         };
 
@@ -4723,25 +4723,25 @@ pub struct SourceChainLinkRecord {
 
 /// Derive a human-readable entry type string from an `Action`.
 fn entry_type_label(action: &Action) -> String {
-    match action {
-        Action::Dna(_) => "Dna".to_string(),
-        Action::AgentValidationPkg(_) => "AgentValidationPkg".to_string(),
-        Action::InitZomesComplete(_) => "InitZomesComplete".to_string(),
-        Action::OpenChain(_) => "OpenChain".to_string(),
-        Action::CloseChain(_) => "CloseChain".to_string(),
-        Action::Create(c) => match &c.entry_type {
+    match &action.data {
+        ActionData::Dna(_) => "Dna".to_string(),
+        ActionData::AgentValidationPkg(_) => "AgentValidationPkg".to_string(),
+        ActionData::InitZomesComplete(_) => "InitZomesComplete".to_string(),
+        ActionData::OpenChain(_) => "OpenChain".to_string(),
+        ActionData::CloseChain(_) => "CloseChain".to_string(),
+        ActionData::Create(c) => match &c.entry_type {
             EntryType::App(app) => format!("Create:App({})", app.entry_index().index()),
             EntryType::AgentPubKey => "Create:AgentPubKey".to_string(),
             EntryType::CapClaim => "Create:CapClaim".to_string(),
             EntryType::CapGrant => "Create:CapGrant".to_string(),
         },
-        Action::Update(u) => match &u.entry_type {
+        ActionData::Update(u) => match &u.entry_type {
             EntryType::App(app) => format!("Update:App({})", app.entry_index().index()),
             _ => "Update".to_string(),
         },
-        Action::Delete(_) => "Delete".to_string(),
-        Action::CreateLink(_) => "CreateLink".to_string(),
-        Action::DeleteLink(_) => "DeleteLink".to_string(),
+        ActionData::Delete(_) => "Delete".to_string(),
+        ActionData::CreateLink(_) => "CreateLink".to_string(),
+        ActionData::DeleteLink(_) => "DeleteLink".to_string(),
     }
 }
 
@@ -4846,7 +4846,7 @@ pub fn query_my_source_chain_links(_: ()) -> ExternResult<Vec<SourceChainLinkRec
     let mut deleted_map: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     for rec in &delete_records {
-        if let Action::DeleteLink(dl) = rec.action() {
+        if let ActionData::DeleteLink(dl) = &rec.action().data {
             let create_hash = action_hash_b64(&dl.link_add_address);
             let ts = rec.action().timestamp().as_micros().to_string();
             deleted_map.insert(create_hash, ts);
@@ -4855,7 +4855,7 @@ pub fn query_my_source_chain_links(_: ()) -> ExternResult<Vec<SourceChainLinkRec
 
     let mut result = Vec::with_capacity(create_records.len());
     for record in &create_records {
-        if let Action::CreateLink(cl) = record.action() {
+        if let ActionData::CreateLink(cl) = &record.action().data {
             let link_hash = action_hash_b64(record.action_address());
             let base_hash = any_linkable_b64(&cl.base_address);
             let target_hash = any_linkable_b64(&cl.target_address);

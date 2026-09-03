@@ -28,7 +28,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -220,7 +220,7 @@ async fn content_view_intent_composes_use_action_and_replicates() -> Result<()> 
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 

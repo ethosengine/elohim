@@ -39,7 +39,7 @@
 //!   overlap in either direction. This is the house style already documented on
 //!   `LinkTypes::CharterAnchor` ("distinct anchor base, queries never overlap").
 //! - Link validation in `imagodei_integrity` is
-//!   `FlatOp::RegisterCreateLink { .. } => Valid` — unconditional — so no
+//!   `FlatOp::Link(OpLink::CreateLink { .. }) => Valid` — unconditional — so no
 //!   validator change is required either.
 //!
 //! Everything here is **coordinator-zome only**: the DNA hash covers integrity

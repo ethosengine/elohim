@@ -504,14 +504,14 @@ async fn withdraw_membership_clean_exit() -> Result<()> {
 //   - `two_agent_conductors()` spawns two isolated SweetConductors.
 //   - `SweetConductor::exchange_peer_info([&ca, &cb]).await` inside a timeout
 //     loop seeds the local peer tables so the conductors can find each other.
-//   - `await_consistency(60, [&cell_a, &cell_b]).await` waits for the DHT to
+//   - `await_consistency_s(60, [&cell_a, &cell_b]).await` waits for the DHT to
 //     converge before read-after-write cross-conductor assertions.
 //
 // NOTE: This test is ignored until the DNA artifact is packed by Jenkins;
 //   the `#[ignore]` tag matches every other test that needs the .dna bundle.
 
 use elohim_sweettest::common::conductors::two_agent_conductors;
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
@@ -585,7 +585,7 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange (Coll A + Coll B)"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after collective creation: {e}"))?;
 
@@ -615,7 +615,7 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
         .await;
 
     // Wait for the agreement to propagate to conductor B before attestations.
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after agreement creation: {e}"))?;
 
@@ -669,7 +669,7 @@ async fn two_conductor_t0_collab_end_to_end() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange (post-attestation)"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after attestations: {e}"))?;
 

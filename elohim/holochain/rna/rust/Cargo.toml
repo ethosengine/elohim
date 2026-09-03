@@ -32,7 +32,7 @@ path = "src/bin/fixtures.rs"
 required-features = ["cli"]
 
 [dependencies]
-hdk = "0.6"
+hdk = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 regex = "1.10"

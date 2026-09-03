@@ -33,7 +33,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors, SweetAgents},
     fixtures::network_seed,
 };
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -249,7 +249,7 @@ async fn binding_rejects_wrong_signer() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(10, [&cell1, &cell2])
+    await_consistency_s(10, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 

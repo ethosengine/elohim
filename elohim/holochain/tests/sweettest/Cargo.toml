@@ -163,13 +163,13 @@ path = "src/tests/identity_lineage.rs"
 
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
-# Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
+# Versions are pinned to match the DNAs (HDK 0.7.0 / HDI 0.8.0).
 #
-# `datachannel-vendored` provides the webrtc backend tx5-connection requires
-# (without one, tx5-connection's `BackendModule::default` is a transitive
-# compile error). The vendored libdatachannel build adds ~1-2 min to first
-# compile; cached thereafter. It is a holochain *default* feature, so it has
-# to be re-listed explicitly below now that we opt out of the default set.
+# `datachannel-vendored` is GONE at 0.7.0: tx5 no longer exists, iroh is the
+# only transport and needs no feature. The feature set below mirrors the
+# conductor's production set (`encryption,wasmer-sys-cranelift`) plus the two
+# test-only features, and additionally keeps `schema` — sweettest packs and
+# installs DNAs in-process, which the production conductor build does not do.
 #
 # SECURITY — why `default-features = false`:
 # holochain's default set includes `metrics_influxive`, which is NOT required
@@ -177,26 +177,22 @@ path = "src/tests/identity_lineage.rs"
 # `influxive 0.0.5` → { `influxdb 0.7.2` → `reqwest 0.11.27` → `rustls 0.21.12`
 # → `rustls-webpki 0.101.7`, `influxive-downloader` → `tar` }. That
 # `rustls-webpki 0.101.7` copy is affected by RUSTSEC-2026-0098 / -0099 / -0104
-# (all fixed only on the 0.103 line — the 0.101 line has no fix, and
-# `influxdb 0.8` / `reqwest 0.12` are unreachable through the `=0.6.0`
-# holochain pin), so the vulnerable copy cannot be upgraded away — only
-# removed. Dropping the feature removes both chains outright. The test harness
-# never reads InfluxDB metrics.
-# The remaining four entries reproduce holochain's default set verbatim minus
-# `metrics_influxive`; keep them in sync if the holochain pin ever moves.
-holochain = { version = "=0.6.0", default-features = false, features = [
+# (all fixed only on the 0.103 line — the 0.101 line has no fix), so the
+# vulnerable copy cannot be upgraded away — only removed. Dropping the feature
+# removes both chains outright. The test harness never reads InfluxDB metrics.
+# Keep this set in sync with the conductor's if the holochain pin ever moves.
+holochain = { version = "=0.7.0", default-features = false, features = [
   "sweettest",
   "test_utils",
-  "sqlite-encrypted",
+  "encryption",
   "schema",
-  "wasmer_sys",
-  "datachannel-vendored",
+  "wasmer-sys-cranelift",
 ] }
-holochain_types = "=0.6.0"
-hdk = "=0.6.0"
-hdi = "=0.7.0"
-holo_hash = "=0.6.0"
-holochain_serialized_bytes = "=0.0.56"
+holochain_types = "=0.7.0"
+hdk = "=0.7.0"
+hdi = "=0.8.0"
+holo_hash = "=0.7.0"
+holochain_serialized_bytes = "=0.0.57"
 
 # Async runtime
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }

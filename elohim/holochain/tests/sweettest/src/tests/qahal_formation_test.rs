@@ -14,7 +14,7 @@
 //! - ONE DNA loaded with agent 0 as progenitor/bootstrap-steward, installed on
 //!   both conductors → same DNA hash → same DHT.
 //! - `SweetConductor::exchange_peer_info([&c0, &c1])` in a timeout loop, then
-//!   `await_consistency(60, [&cell0, &cell1])` before cross-conductor reads.
+//!   `await_consistency_s(60, [&cell0, &cell1])` before cross-conductor reads.
 //! - Happy path: `conductor.call(...)` (panics on WasmError).
 //! - Rejection paths: `conductor.call_fallible(...)` returns `Result<T, _>`.
 
@@ -26,7 +26,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, two_agent_conductors},
     fixtures::network_seed,
 };
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 
 const DNA: &str = "imagodei";
 const ZOME: &str = "imagodei";
@@ -81,7 +81,7 @@ async fn settle(
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, cells)
+    await_consistency_s(60, cells)
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
     Ok(())

@@ -27,7 +27,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -231,7 +231,7 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
     // that are green in CI also red in this container on the shorter budget.
     // The barrier is what makes a failure of the poll below MEAN something: it
     // is the difference between a substrate red and a stopwatch.
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after create_rea_commitment: {e}"))?;
 

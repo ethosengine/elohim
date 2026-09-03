@@ -164,9 +164,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         let action = signed_action.hashed.content.clone();
         let action_hash = signed_action.hashed.hash.clone();
 
-        let entry_hash = match &action {
-            Action::Create(create) => create.entry_hash.clone(),
-            Action::Update(update) => update.entry_hash.clone(),
+        let entry_hash = match &action.data {
+            ActionData::Create(create) => create.entry_hash.clone(),
+            ActionData::Update(update) => update.entry_hash.clone(),
             _ => continue,
         };
 

@@ -1658,9 +1658,13 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         let author = action.author().clone();
 
         // Only handle Create/Update actions that carry an entry
-        let (action_hash, entry_hash) = match action {
-            Action::Create(create) => (signed_action.as_hash().clone(), create.entry_hash.clone()),
-            Action::Update(update) => (signed_action.as_hash().clone(), update.entry_hash.clone()),
+        let (action_hash, entry_hash) = match &action.data {
+            ActionData::Create(create) => {
+                (signed_action.as_hash().clone(), create.entry_hash.clone())
+            }
+            ActionData::Update(update) => {
+                (signed_action.as_hash().clone(), update.entry_hash.clone())
+            }
             _ => continue,
         };
 

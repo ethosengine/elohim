@@ -1103,7 +1103,7 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
+        FlatOp::CreateEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Human(human) => validate_human(&human),
                 EntryTypes::Agent(agent) => validate_agent(&agent),
@@ -1172,8 +1172,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::CreateLink { .. }) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::DeleteLink { .. }) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -1237,7 +1237,7 @@ fn validate_agent(agent: &Agent) -> ExternResult<ValidateCallbackResult> {
 /// Validate HumanRelationship entry
 fn validate_human_relationship(
     rel: &HumanRelationship,
-    _action: &Create,
+    _action: &TypedAction<CreateData>,
 ) -> ExternResult<ValidateCallbackResult> {
     if rel.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(

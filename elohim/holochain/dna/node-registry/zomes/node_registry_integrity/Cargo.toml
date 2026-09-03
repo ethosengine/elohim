@@ -7,9 +7,9 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdi = "=0.7.0"
+hdi = "=0.8.0"
 serde = "1"
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 
 [profile.release]
 opt-level = "z"

@@ -2804,9 +2804,9 @@ fn resolve_root_author(
             Some(r) => r,
             None => return Ok(None),
         };
-        match record.action() {
-            Action::Update(update) => action_hash = update.original_action_address.clone(),
-            other => return Ok(Some(other.author().clone())),
+        match &record.action().data {
+            ActionData::Update(update) => action_hash = update.original_action_address.clone(),
+            _ => return Ok(Some(record.action().author().clone())),
         }
     }
 }
@@ -3770,8 +3770,8 @@ fn build_content_head_output(
     let head_action_hash = record.action_hashed().hash.clone();
     let author = record.action().author().clone();
     let declared_at = record.action().timestamp();
-    let supersedes = match record.action() {
-        Action::Update(u) => Some(u.original_action_address.clone()),
+    let supersedes = match &record.action().data {
+        ActionData::Update(u) => Some(u.original_action_address.clone()),
         _ => None,
     };
     let entry_hash = record
@@ -5905,13 +5905,13 @@ pub fn verify_carried_election(
     }
 
     // (3) It must BE a canonical-head declaration for THIS id.
-    let create_link = match record.action() {
-        Action::CreateLink(cl) => cl.clone(),
-        other => {
+    let create_link = match &record.action().data {
+        ActionData::CreateLink(cl) => cl.clone(),
+        _ => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "verify_carried_election: carried record {computed:?} is a {} action, not a \
                  CreateLink",
-                other.action_type()
+                record.action().action_type()
             ))));
         }
     };
@@ -14140,9 +14140,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         let action_hash = signed_action.hashed.hash.clone();
 
         // Only process Create and Update actions (not deletes, links, etc.)
-        let entry_hash = match &action {
-            Action::Create(create) => create.entry_hash.clone(),
-            Action::Update(update) => update.entry_hash.clone(),
+        let entry_hash = match &action.data {
+            ActionData::Create(create) => create.entry_hash.clone(),
+            ActionData::Update(update) => update.entry_hash.clone(),
             _ => continue,
         };
 

@@ -31,7 +31,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, two_agent_conductors},
     fixtures::network_seed,
 };
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -260,7 +260,7 @@ async fn session_events_and_onboarding_manifest_round_trip() -> Result<()> {
     // Wait for DHT consistency before Agent B asserts.
     // await_consistency returns Result<_, String>; String isn't StdError, so map
     // into anyhow before `?` (mirrors rea_commitment_replication.rs).
-    await_consistency(10, [&cell_a, &cell_b])
+    await_consistency_s(10, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 

@@ -17,4 +17,4 @@ hdk = ["dep:hdi"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-hdi = { version = "0.6", optional = true }
+hdi = { version = "0.8", optional = true }

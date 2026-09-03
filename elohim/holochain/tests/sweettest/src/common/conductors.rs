@@ -5,7 +5,9 @@
 //! the bootstrap-steward modifier applied where a DNA needs one.
 
 use anyhow::Result;
-use holochain::sweettest::{SweetConductor, SweetConductorConfig, SweetDnaFile};
+use holochain::sweettest::{
+    SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
+};
 use holochain_types::prelude::*;
 use std::path::PathBuf;
 
@@ -56,8 +58,17 @@ pub async fn load_dna(
 /// Returns a conductor plus the freshly-generated agent pubkey. The caller
 /// can then install any DNA with that agent, using [`load_dna`] to build
 /// the DnaFile first.
+// 0.7 MIGRATION NOTE — `SweetConductor::from_config` was REMOVED, and this is
+// not a drop-in rename. At 0.6, `SweetConductorConfig::standard()` left
+// `bootstrap_url`/`signal_url` at `NetworkConfig::default()` and carried no
+// rendezvous, so `from_config` resolved `get_rendezvous() == None` and built a
+// conductor with NO rendezvous server. At 0.7, `standard()` itself sets
+// `bootstrap_url = relay_url = "rendezvous:"` and `get_rendezvous()` is gone,
+// so a rendezvous instance MUST be supplied or those URLs never resolve.
+// The 0.7 shape below is therefore a behaviour change, not a transcription:
+// discovery now runs through a real local rendezvous server.
 pub async fn single_agent_conductor() -> Result<(SweetConductor, AgentPubKey)> {
-    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
+    let mut conductor = SweetConductor::standard().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     Ok((conductor, agent))
 }
@@ -104,7 +115,14 @@ async fn single_agent_conductor_isolated() -> Result<(SweetConductor, AgentPubKe
     let config = SweetConductorConfig::standard().tune_network_config(|nc| {
         nc.disable_bootstrap = true;
     });
-    let mut conductor = SweetConductor::from_config(config).await;
+    // 0.7: see the migration note on `single_agent_conductor`. `standard()` now
+    // points bootstrap/relay at `rendezvous:`, so a rendezvous server must be
+    // supplied even here; `disable_bootstrap = true` is what still keeps the
+    // pair partitioned until an explicit `exchange_peer_info`. Each isolated
+    // conductor gets its OWN rendezvous instance, so there is no shared
+    // discovery surface between them at all.
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     Ok((conductor, agent))
 }

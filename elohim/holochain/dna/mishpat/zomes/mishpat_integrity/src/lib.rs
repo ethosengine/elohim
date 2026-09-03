@@ -414,18 +414,23 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
+        FlatOp::CreateEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
             OpEntry::UpdateEntry { app_entry, .. } => validate_update_entry(&app_entry),
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::StoreRecord(store_record) => match store_record {
+        FlatOp::CreateRecord(store_record) => match store_record {
             OpRecord::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
             OpRecord::UpdateEntry { app_entry, .. } => validate_update_entry(&app_entry),
-            OpRecord::CreateLink { link_type, tag, .. } => validate_create_link(&link_type, &tag),
+            // 0.7: the link tag moved onto the action data (`TypedAction<CreateLinkData>`).
+            OpRecord::CreateLink { link_type, action } => {
+                validate_create_link(&link_type, &action.tag)
+            }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => validate_create_link(&link_type, &tag),
+        FlatOp::Link(OpLink::CreateLink { link_type, action }) => {
+            validate_create_link(&link_type, &action.tag)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

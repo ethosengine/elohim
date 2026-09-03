@@ -30,7 +30,7 @@ use elohim_sweettest::common::{
     conductors::{load_dna, two_agent_conductors},
     fixtures::network_seed,
 };
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -122,7 +122,7 @@ async fn pillar_projection_manifest_with_mechanism_ladder_round_trips() -> Resul
         .await;
 
     // After consistency, Agent B reads it back.
-    await_consistency(30, [&cell_a, &cell_b])
+    await_consistency_s(30, [&cell_a, &cell_b])
         .await
         .expect("DHT consistency must converge for pillar-projection Manifest round-trip");
 
@@ -190,7 +190,7 @@ async fn pillar_projection_manifest_without_ladder_validates() -> Result<()> {
         .call(&cell_a.zome(ZOME), "create_manifest", manifest.clone())
         .await;
 
-    await_consistency(30, [&cell_a, &cell_b])
+    await_consistency_s(30, [&cell_a, &cell_b])
         .await
         .expect("DHT consistency must converge for pillar-projection Manifest round-trip");
 

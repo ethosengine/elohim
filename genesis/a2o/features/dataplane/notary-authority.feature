@@ -54,7 +54,7 @@
 # Design:  genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md
 # Plan:    genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md (C1-C5)
 # Spine:   genesis/manifests/habits.yaml — node `notary-authority`
-@e2e @dataplane @concern:notary-authority @act:i
+@e2e @dataplane @concern:notary-authority @act:i @holochain:0.7
 Feature: Notary authority — the federation converges on ONE earned canonical head
   Converged content state (the value) lives on the CRDT plane; the DHT notary witnesses
   authority, provenance, and HEAD-of-DAG selection over it. Many peers may legitimately author

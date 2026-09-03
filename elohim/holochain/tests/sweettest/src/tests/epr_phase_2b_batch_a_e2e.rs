@@ -651,7 +651,7 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
         conductors::{load_dna, two_agent_conductors},
         fixtures::network_seed,
     };
-    use holochain::sweettest::{await_consistency, SweetConductor};
+    use holochain::sweettest::{await_consistency_s, SweetConductor};
 
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let seed = network_seed("imagodei");
@@ -704,7 +704,7 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(10, [&cell1, &cell2])
+    await_consistency_s(10, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 

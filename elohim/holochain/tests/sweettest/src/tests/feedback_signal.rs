@@ -24,7 +24,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -399,7 +399,7 @@ async fn retraction_by_non_author_rejected() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(10, [&cell_a, &cell_b])
+    await_consistency_s(10, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 
@@ -666,7 +666,7 @@ async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(10, [&cell_a, &cell_b])
+    await_consistency_s(10, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 

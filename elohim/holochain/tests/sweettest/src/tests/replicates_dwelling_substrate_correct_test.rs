@@ -37,7 +37,7 @@
 //! - Negative path: `conductor.call_fallible(...)` returns `Result<T, _>`;
 //!   we assert `is_err()`.
 //! - `exchange_peer_info` in a `while !` loop with a 30-second timeout, then
-//!   `await_consistency(60, [...])`.
+//!   `await_consistency_s(60, [...])`.
 //!
 //! `#[ignore]` — requires packed mishpat.dna artifact from Jenkins pipeline.
 //! Local: `just pack && cargo test --test replicates_dwelling_substrate_correct_test -- --ignored`.
@@ -48,7 +48,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -189,7 +189,7 @@ async fn replicates_dwelling_well_formed_commitment_accepted_and_replicates() ->
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
 
-    await_consistency(60, [&cell_a, &cell_b])
+    await_consistency_s(60, [&cell_a, &cell_b])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after create_commitment: {e}"))?;
 

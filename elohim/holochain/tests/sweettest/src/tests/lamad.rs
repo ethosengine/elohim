@@ -27,9 +27,10 @@
 use anyhow::Result;
 // `Record` is used by the declare-carries-Record test to decode a served
 // record and construct the entry-swap forgery the coordinator must refuse.
-use hdk::prelude::{Record, Timestamp};
+// 0.7: `Record::new` takes a `RecordEntry` (0.6 derived it from an Option<Entry>).
+use hdk::prelude::{Record, RecordEntry, Timestamp};
 use holo_hash::{ActionHash, ActionHashB64, AgentPubKey};
-use holochain::sweettest::{await_consistency, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -913,7 +914,7 @@ async fn resolve_content_head_local_is_nonblocking_and_converges() -> Result<()>
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after local-head create: {e}"))?;
 
@@ -1018,7 +1019,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after independent roots: {e}"))?;
 
@@ -1052,7 +1053,7 @@ async fn declare_canonical_head_converges_independent_roots() -> Result<()> {
     );
 
     // Let the canonical-head link gossip to c2.
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after canonical declare: {e}"))?;
 
@@ -1156,7 +1157,7 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 
@@ -1484,7 +1485,7 @@ async fn earned_beats_newer_staging_at_resolve() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
 
@@ -1697,9 +1698,14 @@ async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("decode served record: {e}"))?;
     let decoy_record: Record = holochain_serialized_bytes::decode(&decoy_served.record)
         .map_err(|e| anyhow::anyhow!("decode decoy record: {e}"))?;
+    // 0.7: `Record::new` takes `RecordEntry` directly (0.6 derived it internally).
+    // Reproducing 0.6's derivation verbatim keeps the swap byte-identical.
     let swapped = Record::new(
         genuine.signed_action().clone(),
-        decoy_record.entry().as_option().cloned(),
+        RecordEntry::new(
+            genuine.action().entry_visibility(),
+            decoy_record.entry().as_option().cloned(),
+        ),
     );
     let swapped_bytes: Vec<u8> = holochain_serialized_bytes::encode(&swapped)
         .map_err(|e| anyhow::anyhow!("encode swapped record: {e}"))?;
@@ -1829,7 +1835,7 @@ async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after carried declare: {e}"))?;
 
@@ -2066,9 +2072,14 @@ async fn adopt_before_author_declares_without_a_local_chain() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("decode served record: {e}"))?;
     let other_record: Record = holochain_serialized_bytes::decode(&other_served.record)
         .map_err(|e| anyhow::anyhow!("decode other record: {e}"))?;
+    // 0.7: `Record::new` takes `RecordEntry` directly (0.6 derived it internally).
+    // Reproducing 0.6's derivation verbatim keeps the swap byte-identical.
     let swapped = Record::new(
         genuine.signed_action().clone(),
-        other_record.entry().as_option().cloned(),
+        RecordEntry::new(
+            genuine.action().entry_visibility(),
+            other_record.entry().as_option().cloned(),
+        ),
     );
     let swapped_bytes: Vec<u8> = holochain_serialized_bytes::encode(&swapped)
         .map_err(|e| anyhow::anyhow!("encode swapped record: {e}"))?;
@@ -2246,7 +2257,7 @@ async fn adopt_before_author_declares_without_a_local_chain() -> Result<()> {
     })
     .await
     .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
-    await_consistency(60, [&cell1, &cell2])
+    await_consistency_s(60, [&cell1, &cell2])
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after adopt declare: {e}"))?;
 

@@ -68,7 +68,7 @@ pub struct PortalHost {
 /// that need link traversal (e.g., confirming the Human is authored by the calling
 /// agent) must live in the **coordinator pre-commit gate** (Task 3).
 pub fn validate_create_portal_host(
-    action: &Create,
+    action: &TypedAction<CreateData>,
     portal_host: &PortalHost,
 ) -> ExternResult<ValidateCallbackResult> {
     // Rule 1: host_url must be non-empty and HTTPS.
@@ -109,7 +109,7 @@ pub fn validate_create_portal_host(
     // Rule 5: added_at within ±5 minutes of the action timestamp.
     // Uses as_micros() for consistency with infrastructure_integrity's PeerStatus validator.
     // Every validator arrives at the same verdict because action.timestamp is non-repudiable.
-    let action_us = action.timestamp.as_micros();
+    let action_us = action.timestamp().as_micros();
     let entry_us = portal_host.added_at.as_micros();
     let delta = (action_us - entry_us).abs();
     if delta > 5 * 60 * 1_000_000 {
@@ -129,9 +129,9 @@ pub fn validate_create_portal_host(
 
 /// PortalHost is immutable — to change a portal host, delete + re-create.
 pub fn validate_update_portal_host(
-    _action: &Update,
+    _action: &TypedAction<UpdateData>,
     _new: &PortalHost,
-    _old_action: &Create,
+    _old_action: &TypedAction<CreateData>,
     _old: &PortalHost,
 ) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Invalid(
@@ -142,8 +142,8 @@ pub fn validate_update_portal_host(
 /// Only the original author can delete (enforced by Holochain core); no additional
 /// business rules needed at M5.
 pub fn validate_delete_portal_host(
-    _action: &Delete,
-    _original_action: &Create,
+    _action: &TypedAction<DeleteData>,
+    _original_action: &TypedAction<CreateData>,
     _original: &PortalHost,
 ) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
