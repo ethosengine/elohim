@@ -2596,6 +2596,15 @@ habits:
       atom), so this proof is household-only until the fleet is re-genesised on the pinned hashes.
 
       DELTA 2026-09-03 16:00Z (holochain 0.7 cutover, F2; receipt `genesis/a2o/reports/sprint-report-household-20260903T154932Z-fcb81456.{md,json}`, log `reports/release-ceremony/2026-09-03/cucumber-stations-1-5-hc07-r6.log`): **Stations 1–5 PASS 5/5 (57/57 steps) on the STOCK holochain 0.7.0 conductor** — household mesh, ark launch, local iroh-relay 1.0.3, storage `dual`; james's controller applied the staged candidate via `sync_coordinators` ("coordinator hot-swap applied (no re-key, no DHT churn)") and attested; promotion + convergence held. The chain survives the conductor line change. Five reruns were spent on apparatus, none on the line: (r1) worktree lacked the packed `workdir/` bundles the packager stats; (r2) the baseline pair was pinned to the 0.6 content_store WasmHash — repinned to the 0.7 bundle N `uhCokta9…` (verified byte-exact by re-deriving Holochain's WasmHash from the packed DNA), now env-overridable; (r3) storage peers had no `ELOHIM_RUNTIME_CONFIG_PATH`, so the rung-4 watcher was never armed (`/admin/adoption` `sweeps:0`); (r4) `hc sandbox call` is gone in 0.7 → `AGENT_PUBKEY=""` → soak attestor had no deviceId. All four are hc-mesh.sh / a2o fixes on `upgrade/holochain-0.7`. Stations 6–8 not re-run this pass (scope = the habit's runnable check, stations 1–5). Status stays green; the 0.7 FLEET receipt (F5) is the next flip.
+
+      DELTA 2026-09-03 22:3xZ (scope, from the 0.7 cutover): this habit's green covers COORDINATOR-ONLY releases — integrity
+      zomes, DNA hashes and the conductor line unchanged. The holochain 0.6→0.7 cutover was three breaks at once (conductor
+      data layer with no upstream migration, integrity hashes moved on the hdk/hdi bump, kitsune2 0.4↔0.5 cannot talk) and
+      NONE of the adoption controller's vehicles carried it: the fleet was wiped and re-genesised (operator authorization
+      2026-09-03). That is not rung-5 evidence and must not be counted as such. The missing rung — carrying a network's data
+      across a lineage break, mixed-version peers still talking through the storage P2P plane, a migrate-from recipe declared
+      in the release manifest BEFORE data is held, adoption as a Mishpat commitment with a revert — is filed as
+      genesis/data/timeline/backlog/2026-09-03-lineage-crossing-migration-rna.md. Today's wipe is the last big-bang by intent.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"

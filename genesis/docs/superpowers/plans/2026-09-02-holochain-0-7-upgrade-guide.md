@@ -701,7 +701,11 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   incident class). Rule from here: any conductor-side manifest addition and the storage
   `holochain_types` pin land in the SAME batch, and `tests/happ_manifest_relay_url_compat.rs`
   (now asserting strictness) is the tripwire.
-- [ ] **F6: Evidence.** Also re-check `elohim/holochain/.epr-meta/notary-authority.habit.md`: its DELTA
+- [ ] **F6: Evidence — with the concession stated.** This cutover is NOT rung-5 evidence for a conductor-line change:
+  rung 5 covers coordinator-only releases; the line change was wiped and re-genesised because no vehicle carries data
+  across a lineage break (see `genesis/data/timeline/backlog/2026-09-03-lineage-crossing-migration-rna.md`). Bank it
+  as "coordinator release propagation survives the line change" (stations 1–5, 5/5 on 0.7) and as the cycle-time
+  row for a big-bang line change, never as upgrade propagation. Also re-check `elohim/holochain/.epr-meta/notary-authority.habit.md`: its DELTA
   2026-08-09 records `rea_commitment_replication::project_epr_commitment_replicates_to_peer_b` as
   known-RED on 0.6 (attributed to cold-cell wasm warm-up); it PASSES on 0.7 with the shared-rendezvous
   harness (2026-09-03, 186.9 s) — the attribution was probably wrong, and the atom's line is stale.
