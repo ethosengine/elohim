@@ -74,7 +74,14 @@ order and the probes.
    expected. Clearing earlier makes the still-running 0.6 storage re-install the 0.6 hashes and
    re-key twice. **adam and matthew (the bootstrap pair) are cleared in the same window** — if only
    one of them comes up on the 0.7 hashes the fleet splits into two DHTs.
-3. **First boot with intent.** `DNA_MIGRATION_INTENT=<the five baseline hashes>` on every node for
+3. **First boot with intent.** The five packed hashes, from elohim-holochain #1424 (2026-09-03, the same values now in
+   `elohim/holochain/dna/dna-hashes.baseline`):
+
+   ```
+   DNA_MIGRATION_INTENT=lamad=uhC0ka1Tpt-_mtrGKILPnCAWTINwdtoRlYreoQM9GWsdVnbDgshr9,imagodei=uhC0kRTnoJojlGSinY8Ko3BWUG55YHQYODF00tZahrxwqJ1cuz9r7,infrastructure=uhC0k5a385O0UxmKsi0DinnaLOOirNrV0B0CPQG0f-X-_n-PDHnFb,node_registry=uhC0k3wIqzPHIBDyUp_UdTq7BsvnYT9h8ZA9-igXlQ_V7tQRj9xb6,mishpat=uhC0kJOs8Qf5Vs1WDNqj2AWVZRqPbAKzZL9kwrPL4AR3JMF3OaOGD
+   ```
+
+   `DNA_MIGRATION_INTENT=<the five baseline hashes>` on every node for
    the first boot, so the storage supervisor installs the 0.7 hApp deliberately instead of reading a
    "not stale" role structure and doing nothing.
 4. **Watch the supervisor, not the pod status.** A dead conductor child is reported with its exit
