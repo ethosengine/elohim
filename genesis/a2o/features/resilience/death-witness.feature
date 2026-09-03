@@ -85,11 +85,14 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     And the witness names the hash of the conductor program the envelope actually started
     And the witness carries Jessica's passport as it stood at the moment of death
 
+  # Budget measured 2026-09-03 on the household mesh: kill → ward row (≤5 s ingest) → shard replication
+  # tick (10 s dial) with paged peer round trips (~40 s under host load) → custody-blob authored on the
+  # custodian's own conductor (5 s sweep) → bytes already pulled by replication; 60 s was an MVP guess.
   @station-2
   Scenario: Station 2 — the custodians Jessica already has hold the witness
     Given Matthew and James have each counter-signed a commitment to custody Jessica's witnesses
     When Jessica's conductor is killed with SIGKILL
-    Then within 60 seconds Matthew and James each hold a copy of the witness with the same content hash
+    Then within 120 seconds Matthew and James each hold a copy of the witness with the same content hash
     And Matthew and James each record on their own peer that they received that witness from Jessica
 
   @wip @browser-only @station-3a

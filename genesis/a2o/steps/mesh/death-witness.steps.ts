@@ -346,7 +346,7 @@ Then(
 const CUSTODIANS: readonly HouseholdPeer[] = ['matthew', 'james'];
 
 /** The station's own wall-clock budget and poll interval — real time, no fake clock. */
-const CUSTODY_WINDOW_MS = 60_000;
+const CUSTODY_WINDOW_MS = 120_000;
 const CUSTODY_POLL_MS = 1_000;
 
 /**
@@ -714,7 +714,7 @@ Given(
 );
 
 Then(
-  'within 60 seconds Matthew and James each hold a copy of the witness with the same content hash',
+  'within 120 seconds Matthew and James each hold a copy of the witness with the same content hash',
   { timeout: 90_000 },
   async function (this: E2EWorld) {
     const state = scenario(this);
