@@ -194,6 +194,10 @@ pub struct PrivateServeFacts {
     pub custody_for_digest: bool,
     /// This peer could name the ward at all.
     pub ward_resolved: bool,
+    /// The authority needed for the final standing answer was readable. False
+    /// only when a required conductor fallback had no client, errored, or timed
+    /// out; that is never equivalent to an absent commitment.
+    pub authority_available: bool,
 }
 
 impl PrivateServeFacts {
@@ -208,6 +212,7 @@ impl PrivateServeFacts {
             custody_for_ward: false,
             custody_for_digest: false,
             ward_resolved: false,
+            authority_available: true,
         }
     }
 
@@ -233,10 +238,12 @@ impl PrivateServeFacts {
 /// 3. Requester is the ward → `Serve`. The ward's own copy comes home.
 /// 4. Requester holds spool custody for the ward, or blob custody for this
 ///    digest → `Serve`. Either pledge alone is standing.
-/// 5. Ward unresolved → `Withhold(WardUnresolved)`, chosen over `NoStanding`
+/// 5. Required authority unavailable → `Withhold(AuthorityUnavailable)`; a
+///    transient bridge failure is not evidence that standing is absent.
+/// 6. Ward unresolved → `Withhold(WardUnresolved)`, chosen over `NoStanding`
 ///    because "I cannot say whose this is" is a different operator action from
 ///    "you are a stranger to its ward".
-/// 6. Otherwise → `Withhold(NoStanding)`.
+/// 7. Otherwise → `Withhold(NoStanding)`.
 pub fn private_serve_verdict(facts: &PrivateServeFacts) -> PrivateServeVerdict {
     if !is_private(&facts.reach) {
         return PrivateServeVerdict::Serve(ServeReason::NonPrivate);
@@ -254,6 +261,9 @@ pub fn private_serve_verdict(facts: &PrivateServeFacts) -> PrivateServeVerdict {
     // stands even when this holder cannot independently resolve the ward.
     if facts.custody_for_digest {
         return PrivateServeVerdict::Serve(ServeReason::BlobCustody);
+    }
+    if !facts.authority_available {
+        return PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable);
     }
     if !facts.ward_resolved {
         return PrivateServeVerdict::Withhold(WithholdReason::WardUnresolved);
@@ -274,6 +284,7 @@ mod tests {
             custody_for_ward: false,
             custody_for_digest: false,
             ward_resolved: true,
+            authority_available: true,
         }
     }
 
@@ -341,6 +352,18 @@ mod tests {
         assert_eq!(
             private_serve_verdict(&stranger()),
             PrivateServeVerdict::Withhold(WithholdReason::NoStanding)
+        );
+    }
+
+    #[test]
+    fn unavailable_authority_is_not_laundered_into_absent_standing() {
+        let facts = PrivateServeFacts {
+            authority_available: false,
+            ..stranger()
+        };
+        assert_eq!(
+            private_serve_verdict(&facts),
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
         );
     }
 

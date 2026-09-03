@@ -23,9 +23,10 @@ pub struct SpoolIngest {
     content: Arc<ContentService>,
     blobs: Arc<BlobStore>,
     cfg: SpoolIngestConfig,
-    /// This storage peer's canonical Holochain agent CID, resolved at
-    /// composition time. Never a transport id.
-    self_agent: Option<String>,
+    /// Resolves this peer's canonical Holochain agent CID once per ingest pass.
+    /// Never a transport id; re-reading lets a late/restarted conductor heal
+    /// the stamp without restarting storage.
+    self_agent_resolver: Arc<dyn Fn() -> Option<String> + Send + Sync + 'static>,
     seen: HashSet<String>,
 }
 
@@ -41,13 +42,23 @@ impl SpoolIngest {
             content,
             blobs,
             cfg,
-            self_agent,
+            self_agent_resolver: Arc::new(move || self_agent.clone()),
             seen: HashSet::new(),
         }
     }
 
+    /// Replace the fixed compatibility value with a live per-pass resolver.
+    pub fn with_self_agent_resolver(
+        mut self,
+        resolver: Arc<dyn Fn() -> Option<String> + Send + Sync + 'static>,
+    ) -> Self {
+        self.self_agent_resolver = resolver;
+        self
+    }
+
     /// Run one bounded directory pass and return the witness CIDs fully ingested.
     pub async fn run_once(&mut self) -> Result<Vec<String>, StorageError> {
+        let self_agent = (self.self_agent_resolver)();
         let witness_dir = self.cfg.spool_root.join("witnesses");
         let mut entries = tokio::fs::read_dir(&witness_dir).await?;
         let mut paths = Vec::new();
@@ -146,7 +157,7 @@ impl SpoolIngest {
                     &witness,
                     &filename_cid,
                     &bytes,
-                    self.self_agent.as_deref(),
+                    self_agent.as_deref(),
                 ))?;
             }
 
@@ -243,6 +254,7 @@ pub fn witness_content_input(
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use ark_core::{
         DeathWitness, EffectiveTier, ExitClass, Passport, ProcessPassport, RestartVerdict,
@@ -392,6 +404,45 @@ mod tests {
             BlobStore::parse_content_address(row.blob_cid.as_deref().unwrap()).unwrap(),
             BlobStore::parse_content_address(&row.id).unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn self_agent_is_re_resolved_for_each_ingest_pass() {
+        let tmp = tempfile::tempdir().unwrap();
+        let spool_root = tmp.path().join("ark");
+        let blob_root = tmp.path().join("pantry");
+        let mut first = witness(2_000);
+        first.passport.node = None;
+        let first_cid = first.cid().unwrap();
+        write_witness(&spool_root, &first, &first_cid);
+
+        let (ingest, content, _, _) = ingester(&spool_root, &blob_root).await;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut ingest = ingest.with_self_agent_resolver({
+            let calls = Arc::clone(&calls);
+            Arc::new(move || {
+                (calls.fetch_add(1, Ordering::SeqCst) > 0)
+                    .then(|| "uhCAkLateConductorAgentAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string())
+            })
+        });
+        assert_eq!(ingest.run_once().await.unwrap(), vec![first_cid.clone()]);
+        assert_eq!(content.get(&first_cid).unwrap().unwrap().created_by, None);
+
+        let mut second = witness(3_000);
+        second.passport.node = None;
+        let second_cid = second.cid().unwrap();
+        write_witness(&spool_root, &second, &second_cid);
+        assert_eq!(ingest.run_once().await.unwrap(), vec![second_cid.clone()]);
+        assert_eq!(
+            content
+                .get(&second_cid)
+                .unwrap()
+                .unwrap()
+                .created_by
+                .as_deref(),
+            Some("uhCAkLateConductorAgentAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

@@ -3132,8 +3132,11 @@ decisionPoints:
           Liveness is preserved on every arm: a gated ListContent page still RETURNS (withheld
           rows are omitted, never an error), one process-lifetime ShardService and
           ProjectionCustodyStanding are shared by libp2p and iroh, and the conductor fallback is
-          per-key single-flight plus TTL-cached in both signs. It is skipped entirely once local
-          evidence decides to serve; unavailable blob authority fails closed with a typed refusal.
+          per-key single-flight plus TTL-cached in both signs after a real answer and wrapped in a
+          3 s timeout. The supervised lamad client is re-resolved inside each fallback flight, so
+          boot-time absence or a conductor restart cannot disable the fallback for process life.
+          It is skipped entirely once local evidence decides to serve; unavailable blob authority
+          fails closed with a typed refusal.
       - id: C4
         status: answered
         justification: >
@@ -3142,6 +3145,10 @@ decisionPoints:
           and the ListContent omission a caller cannot see is COUNTED
           (storage_private_withheld_total{site=list_content}). Ward-unresolved is its own reason
           precisely so "I cannot say whose this is" is not laundered into "you are a stranger".
+          A missing conductor client, conductor error, or timeout is likewise a distinct,
+          uncached Withhold(AuthorityUnavailable), never a cached negative/absent commitment;
+          serve-side facts and receiver-side preauthorization both preserve that typed reason so
+          their authority-unavailable metric series increments.
           Pinned by get_content_refuses_a_stranger_with_reach_withheld and
           an_unresolved_iroh_requester_is_withheld_the_private_row_but_not_the_public_one.
       - id: C5
@@ -3159,14 +3166,15 @@ decisionPoints:
           get_rea_commitment per distinct (requester_agent, ward) at a time and per 60 s TTL,
           cached in BOTH signs on the ONE shared ProjectionCustodyStanding; concurrent misses
           coalesce behind a per-key mutex. It is skipped when local evidence already answered,
-          the requester is the ward, or a blob pledge stands. Synchronous pool/Diesel work in
+          the requester is the ward, or a blob pledge stands. Each keyed cache is capped at 4096,
+          sweeping expired entries before evicting the oldest. Synchronous pool/Diesel work in
           facts_for runs in spawn_blocking. Pinned by
           conductor_fallback_is_positive_negative_single_flight_and_ttl_cached and
           a_non_private_row_never_touches_the_projection.
       - id: C6b
         status: answered
         justification: >
-          private_serve_verdict is pure — six booleans and a string in, a verdict out; no DB, no
+          private_serve_verdict is pure — seven booleans and a string in, a verdict out; no DB, no
           clock, no network, no conductor. Every impure resolution is behind the CustodyStanding
           trait, which has a fake implementation for tests.
       - id: C7
@@ -3279,6 +3287,21 @@ decisionPoints:
         testName: conductor_fallback_is_positive_negative_single_flight_and_ttl_cached
         kind: unit
       - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: conductor_resolver_recovers_after_boot_race_on_the_next_expired_miss
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: conductor_error_is_authority_unavailable_and_is_not_cached
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: conductor_timeout_is_authority_unavailable
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: real_absent_conductor_answer_is_cached_negative
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
+        testName: every_keyed_standing_cache_stays_within_its_process_cap
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_standing.rs
         testName: wrong_action_or_wrong_classification_never_grants_conductor_standing
         kind: unit
       - path: elohim/elohim-storage/src/services/custody_standing.rs
@@ -3292,6 +3315,12 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/services/spool_ingest.rs
         testName: witness_row_preserves_the_passport_or_none_when_self_agent_is_unresolved
+        kind: unit
+      - path: elohim/elohim-storage/src/services/spool_ingest.rs
+        testName: self_agent_is_re_resolved_for_each_ingest_pass
+        kind: unit
+      - path: elohim/elohim-storage/src/private_reach.rs
+        testName: unavailable_authority_is_not_laundered_into_absent_standing
         kind: unit
       - path: elohim/elohim-storage/src/p2p/identity_map.rs
         testName: competing_bindings_choose_verified_before_newer_unverified
@@ -3309,7 +3338,7 @@ decisionPoints:
         testName: get_blob_refuses_when_every_referencing_row_is_private
         kind: unit
       - path: elohim/elohim-storage/src/shard_service.rs
-        testName: get_blob_without_pool_fails_closed_as_authority_unavailable
+        testName: get_blob_on_a_peer_without_a_content_db_serves_as_before
         kind: unit
       - path: elohim/elohim-storage/src/shard_service.rs
         testName: get_blob_without_resolver_fails_closed_as_authority_unavailable

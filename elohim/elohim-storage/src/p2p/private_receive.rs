@@ -143,9 +143,16 @@ pub async fn preauthorize_private_record(
         .as_deref()
         .or(record.blob_cid.as_deref())
         .and_then(digest_key);
-    let (custody_for_ward, custody_for_digest) = standing
+    let (custody_for_ward, custody_for_digest) = match standing
         .custody_of(&this_peer_agent, &sender_agent, digest.as_deref())
-        .await;
+        .await
+    {
+        Ok(custody) => custody,
+        Err(reason) => {
+            log_skip_once(sender, Some(&sender_agent), reason, &record.id);
+            return PrivateReceiveVerdict::Skip(reason);
+        }
+    };
 
     if custody_for_ward || custody_for_digest {
         PrivateReceiveVerdict::Keep

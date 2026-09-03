@@ -2691,19 +2691,16 @@ async fn async_main(
     match config.ark_spool_path.clone() {
         Some(spool_root) => {
             if let Some(pool) = db_pool.clone() {
-                let self_agent = match (
-                    pool.get(),
-                    hc_registry_for_http
-                        .as_ref()
-                        .and_then(|registry| registry.lamad_client()),
-                ) {
-                    (Ok(mut conn), Some(hc)) => {
+                let self_agent_pool = pool.clone();
+                let self_agent_registry = hc_registry_for_http.clone();
+                let self_agent_resolver: Arc<dyn Fn() -> Option<String> + Send + Sync> =
+                    Arc::new(move || {
+                        let hc = self_agent_registry.as_ref()?.lamad_client()?;
+                        let mut conn = self_agent_pool.get().ok()?;
                         elohim_storage::services::salvage_commitment_author::resolve_self_agent_cid(
                             &mut conn, &hc,
                         )
-                    }
-                    _ => None,
-                };
+                    });
                 let content = Arc::new(elohim_storage::services::ContentService::new(
                     pool,
                     elohim_storage::db::AppContext::default_lamad(),
@@ -2713,15 +2710,16 @@ async fn async_main(
                 info!(
                     spool_root = %spool_root.display(),
                     poll_secs = config.ark_spool_poll_seconds,
-                    self_agent_resolved = self_agent.is_some(),
+                    self_agent_resolved = self_agent_resolver().is_some(),
                     "spool-ingest: watcher ACTIVE"
                 );
                 elohim_storage::services::spool_ingest::SpoolIngest::new(
                     elohim_storage::services::spool_ingest::SpoolIngestConfig { spool_root, poll },
                     content,
                     Arc::clone(&blob_store),
-                    self_agent,
+                    None,
                 )
+                .with_self_agent_resolver(self_agent_resolver)
                 .spawn();
             } else {
                 warn!(
@@ -2864,16 +2862,16 @@ async fn async_main(
     } else {
         None
     };
+    #[cfg(any(feature = "p2p", feature = "p2p-iroh"))]
     let custody_standing = if args.enable_content_db {
         db_pool.clone().map(|pool| {
             let resolver =
-                elohim_storage::services::custody_standing::ProjectionCustodyStanding::new(pool)
-                    .with_conductor(
-                        hc_registry_for_http
-                            .as_ref()
-                            .and_then(|registry| registry.lamad_client()),
-                    )
-                    .with_spool_ingest(config.ark_spool_path.is_some());
+                elohim_storage::services::custody_standing::ProjectionCustodyStanding::new(pool);
+            let resolver = match hc_registry_for_http.as_ref() {
+                Some(registry) => resolver.with_conductor_registry(Arc::clone(registry)),
+                None => resolver,
+            };
+            let resolver = resolver.with_spool_ingest(config.ark_spool_path.is_some());
             #[cfg(feature = "p2p")]
             let resolver = match shard_identity_map.as_ref() {
                 Some(identity_map) => resolver.with_libp2p_identity_map(identity_map.clone()),
@@ -2884,6 +2882,7 @@ async fn async_main(
     } else {
         None
     };
+    #[cfg(any(feature = "p2p", feature = "p2p-iroh"))]
     let mut shared_shard_service = elohim_storage::shard_service::ShardService::new(
         blob_store.clone(),
         if args.enable_content_db {
@@ -2892,9 +2891,11 @@ async fn async_main(
             None
         },
     );
+    #[cfg(any(feature = "p2p", feature = "p2p-iroh"))]
     if let Some(resolver) = custody_standing.as_ref() {
         shared_shard_service = shared_shard_service.with_custody_standing(resolver.clone());
     }
+    #[cfg(any(feature = "p2p", feature = "p2p-iroh"))]
     let shared_shard_service = Arc::new(shared_shard_service);
 
     // Initialize P2P node if enabled.

@@ -50,7 +50,7 @@ pub struct ShardService {
     /// [`private_serve_verdict`] decides on. Wired automatically whenever a
     /// content pool exists. Production injects one process-lifetime resolver at
     /// the composition root and shares this service across both transports.
-    /// `None` fails closed for blob `Get`, because authority cannot be read.
+    /// A resolver missing while a pool exists fails closed for blob `Get`.
     custody_standing: Option<Arc<dyn CustodyStanding>>,
 }
 
@@ -200,10 +200,12 @@ impl ShardService {
         requester: &Requester,
         hash: &str,
     ) -> Result<Option<(ServeReason, String)>, WithholdReason> {
-        let pool = self
-            .db_pool
-            .as_ref()
-            .ok_or(WithholdReason::AuthorityUnavailable)?;
+        // A peer composed without a content DB cannot hold private reference
+        // rows. Preserve the pre-gate blob-serving behaviour for that explicit
+        // configuration; fail closed only when configured authority breaks.
+        let Some(pool) = self.db_pool.as_ref() else {
+            return Ok(None);
+        };
         self.custody_standing
             .as_ref()
             .ok_or(WithholdReason::AuthorityUnavailable)?;
@@ -631,21 +633,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_blob_without_pool_fails_closed_as_authority_unavailable() {
-        let svc = fresh_service().await;
+    async fn get_blob_on_a_peer_without_a_content_db_serves_as_before() {
+        let dir = tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+        let stored = blob_store.store(b"db-less peer blob").await.unwrap();
+        let svc = ShardService::new(blob_store, None);
         match svc
-            .handle(
-                &Requester::local(),
-                ShardRequest::Get {
-                    hash: "missing".into(),
-                },
-            )
+            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
             .await
         {
-            ShardResponse::Error(message) => {
-                assert_eq!(message, "reach-withheld: authority-unavailable")
-            }
-            other => panic!("missing reach authority must fail closed, got {other:?}"),
+            ShardResponse::Data(bytes) => assert_eq!(bytes, b"db-less peer blob"),
+            other => panic!("a peer without a content DB must serve as before, got {other:?}"),
         }
     }
 

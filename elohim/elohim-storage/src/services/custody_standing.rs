@@ -30,8 +30,8 @@
 //! bounded BEFORE it is made:
 //!
 //! * at most ONE conductor call per distinct `(requester_agent, ward)` per TTL
-//!   (60 s), cached in BOTH signs, so a negative answer costs one call per
-//!   minute rather than one per row;
+//!   (60 s), cached in BOTH signs only when the conductor returned a real
+//!   present/absent answer; unavailable authority is withheld and not cached;
 //! * it is skipped entirely when the local projection already answered, when the
 //!   requester IS the ward, or when a blob-custody pledge already stands;
 //! * every other lookup is a set built by ONE indexed SELECT per agent per TTL,
@@ -49,7 +49,7 @@ use tracing::{debug, warn};
 
 use crate::blob_store::BlobStore;
 use crate::db::DbPool;
-use crate::private_reach::{is_private, PrivateServeFacts};
+use crate::private_reach::{is_private, PrivateServeFacts, WithholdReason};
 use crate::services::rea_commitment_service::{
     deterministic_spool_custody_id, spool_classification,
 };
@@ -64,6 +64,14 @@ pub const CUSTODY_BLOB_ACTION: &str = "custody-blob";
 /// resolution, both custody sets, and BOTH signs of the conductor fallback.
 pub const STANDING_TTL: Duration = Duration::from_secs(60);
 
+/// Deadline for the deterministic-id conductor fallback. A timeout is an
+/// unavailable authority answer, never evidence that the commitment is absent.
+pub const CONDUCTOR_FALLBACK_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Process-lifetime cap for each keyed standing cache. Entries are ephemeral
+/// projections: expired values are reconstructable from SQLite/the conductor.
+const STANDING_CACHE_MAX_ENTRIES: usize = 4_096;
+
 /// Row cap on any one custody-set SELECT. A peer providing more live custody
 /// pledges than this answers from the capped set — the cap is far above any
 /// household pledge count and exists so one poisoned projection cannot turn a
@@ -73,6 +81,10 @@ const MAX_CUSTODY_ROWS: i64 = 5_000;
 type CustodyKey = (String, String);
 type ConductorSingleflight =
     Arc<tokio::sync::Mutex<HashMap<CustodyKey, Arc<tokio::sync::Mutex<()>>>>>;
+type HcClientResolver =
+    Arc<dyn Fn() -> Option<Arc<crate::hc_client::HcClient>> + Send + Sync + 'static>;
+type ConductorLookupResolver =
+    Arc<dyn Fn() -> Option<Arc<dyn ConductorCustodyLookup>> + Send + Sync + 'static>;
 type SpoolWardProjectionRow = (String, String, Option<String>, String, Option<String>);
 type CustodyBlobProjectionRow = (String, Option<String>, String, String, Option<String>);
 
@@ -240,7 +252,15 @@ pub trait CustodyStanding: Send + Sync + 'static {
     /// just handed a private record hold standing for the sender), so this
     /// is the standalone escape hatch rather than a second, decoy `Requester`
     /// variant.
-    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool);
+    ///
+    /// A required conductor fallback can fail with typed unavailable authority;
+    /// callers must not launder that into absent standing.
+    async fn custody_of(
+        &self,
+        agent: &str,
+        ward: &str,
+        digest: Option<&str>,
+    ) -> Result<(bool, bool), WithholdReason>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,6 +280,28 @@ impl<T: Clone> Cached<T> {
         } else {
             None
         }
+    }
+}
+
+fn insert_bounded<K, V>(map: &mut HashMap<K, Cached<V>>, key: K, value: Cached<V>)
+where
+    K: Clone + Eq + std::hash::Hash,
+{
+    map.insert(key, value);
+    if map.len() <= STANDING_CACHE_MAX_ENTRIES {
+        return;
+    }
+
+    map.retain(|_, cached| cached.at.elapsed() < STANDING_TTL);
+    while map.len() > STANDING_CACHE_MAX_ENTRIES {
+        let Some(oldest) = map
+            .iter()
+            .min_by_key(|(_, cached)| cached.at)
+            .map(|(key, _)| key.clone())
+        else {
+            break;
+        };
+        map.remove(&oldest);
     }
 }
 
@@ -336,11 +378,11 @@ pub struct ProjectionCustodyStanding {
     pool: DbPool,
     /// Retained separately from the lookup trait so self-agent resolution can
     /// use the conductor cell key when no active local session exists.
-    hc: Option<Arc<crate::hc_client::HcClient>>,
-    /// The lamad/content_store conductor bridge. `None` ⇒ no fallback; the local
-    /// projection alone decides (a missing projection then reads as no standing,
-    /// which is fail-closed).
-    conductor: Option<Arc<dyn ConductorCustodyLookup>>,
+    hc_resolver: Option<HcClientResolver>,
+    /// Resolves the CURRENT lamad/content_store conductor bridge inside the
+    /// per-key single-flight. A missing bridge is unavailable authority, never
+    /// negative standing, and the next miss re-resolves this handle.
+    conductor_resolver: Option<ConductorLookupResolver>,
     #[cfg(feature = "p2p")]
     libp2p_identity_map: Option<Arc<dyn crate::p2p::identity_map::PeerIdentityMap>>,
     /// Whether this process owns the configured ark spool. This is evidence
@@ -356,8 +398,8 @@ impl Clone for ProjectionCustodyStanding {
     fn clone(&self) -> Self {
         Self {
             pool: self.pool.clone(),
-            hc: self.hc.clone(),
-            conductor: self.conductor.clone(),
+            hc_resolver: self.hc_resolver.clone(),
+            conductor_resolver: self.conductor_resolver.clone(),
             #[cfg(feature = "p2p")]
             libp2p_identity_map: self.libp2p_identity_map.clone(),
             spool_ingest_enabled: self.spool_ingest_enabled,
@@ -370,7 +412,7 @@ impl Clone for ProjectionCustodyStanding {
 impl std::fmt::Debug for ProjectionCustodyStanding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ProjectionCustodyStanding")
-            .field("has_conductor_fallback", &self.conductor.is_some())
+            .field("has_conductor_fallback", &self.conductor_resolver.is_some())
             .field("spool_ingest_enabled", &self.spool_ingest_enabled)
             .finish_non_exhaustive()
     }
@@ -380,8 +422,8 @@ impl ProjectionCustodyStanding {
     pub fn new(pool: DbPool) -> Self {
         Self {
             pool,
-            hc: None,
-            conductor: None,
+            hc_resolver: None,
+            conductor_resolver: None,
             #[cfg(feature = "p2p")]
             libp2p_identity_map: None,
             spool_ingest_enabled: false,
@@ -392,15 +434,42 @@ impl ProjectionCustodyStanding {
 
     /// Attach the own-conductor bridge used for the deterministic-id fallback.
     pub fn with_conductor(mut self, hc: Option<Arc<crate::hc_client::HcClient>>) -> Self {
-        self.hc = hc.clone();
-        self.conductor = hc
-            .map(|hc| Arc::new(HcConductorCustodyLookup { hc }) as Arc<dyn ConductorCustodyLookup>);
+        let resolver: HcClientResolver = Arc::new(move || hc.clone());
+        self = self.with_hc_resolver(resolver);
+        self
+    }
+
+    /// Attach the supervised registry rather than a boot-time client snapshot.
+    /// Every fallback miss and self-agent refresh sees the registry's live slot.
+    pub fn with_conductor_registry(
+        mut self,
+        registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+    ) -> Self {
+        let resolver: HcClientResolver = Arc::new(move || registry.lamad_client());
+        self = self.with_hc_resolver(resolver);
         self
     }
 
     /// Test/composition seam for the exact-id conductor lookup.
     pub fn with_conductor_lookup(mut self, lookup: Arc<dyn ConductorCustodyLookup>) -> Self {
-        self.conductor = Some(lookup);
+        self.conductor_resolver = Some(Arc::new(move || Some(Arc::clone(&lookup))));
+        self
+    }
+
+    /// Test/composition seam for a lookup whose availability changes at runtime.
+    #[cfg(test)]
+    fn with_conductor_lookup_resolver(mut self, resolver: ConductorLookupResolver) -> Self {
+        self.conductor_resolver = Some(resolver);
+        self
+    }
+
+    fn with_hc_resolver(mut self, resolver: HcClientResolver) -> Self {
+        self.hc_resolver = Some(Arc::clone(&resolver));
+        self.conductor_resolver = Some(Arc::new(move || {
+            resolver().map(|hc| {
+                Arc::new(HcConductorCustodyLookup { hc }) as Arc<dyn ConductorCustodyLookup>
+            })
+        }));
         self
     }
 
@@ -444,7 +513,8 @@ impl ProjectionCustodyStanding {
             return hit;
         }
         let mut conn = self.conn()?;
-        let resolved = match self.hc.as_ref() {
+        let hc = self.hc_resolver.as_ref().and_then(|resolve| resolve());
+        let resolved = match hc.as_ref() {
             Some(hc) => {
                 crate::services::salvage_commitment_author::resolve_self_agent_cid(&mut conn, hc)
             }
@@ -517,7 +587,8 @@ impl ProjectionCustodyStanding {
             }
         };
         if let Ok(mut c) = self.cache.lock() {
-            c.requester.insert(
+            insert_bounded(
+                &mut c.requester,
                 key,
                 Cached {
                     value: resolved.clone(),
@@ -577,7 +648,8 @@ impl ProjectionCustodyStanding {
             }
         }
         if let Ok(mut c) = self.cache.lock() {
-            c.spool_wards.insert(
+            insert_bounded(
+                &mut c.spool_wards,
                 agent.to_string(),
                 Cached {
                     value: set.clone(),
@@ -606,7 +678,8 @@ impl ProjectionCustodyStanding {
             }
         }
         if let Ok(mut c) = self.cache.lock() {
-            c.blob_digests.insert(
+            insert_bounded(
+                &mut c.blob_digests,
                 agent.to_string(),
                 Cached {
                     value: set.clone(),
@@ -721,14 +794,17 @@ impl ProjectionCustodyStanding {
     /// `custody-spool` for `ward` that this peer's projection has not yet
     /// converged?
     ///
-    /// ONE call per `(requester, ward)` per TTL, cached in both signs. NOT
-    /// wrapped in a timeout: a conductor zome call is uncancellable, so the
-    /// budget is spent by bounding how often it is made, never by dropping it
-    /// mid-flight.
-    async fn conductor_spool_standing(&self, requester_agent: &str, ward: &str) -> bool {
+    /// ONE call per `(requester, ward)` per TTL, cached in both signs only after
+    /// a real conductor answer. Missing/error/timeout authority is distinct and
+    /// uncached so a transient bridge failure cannot black out a custodian.
+    async fn conductor_spool_standing(
+        &self,
+        requester_agent: &str,
+        ward: &str,
+    ) -> Result<bool, WithholdReason> {
         let key = (requester_agent.to_string(), ward.to_string());
         if let Some(hit) = self.cached_conductor(&key) {
-            return hit;
+            return Ok(hit);
         }
         let flight = {
             let mut flights = self.conductor_singleflight.lock().await;
@@ -742,17 +818,25 @@ impl ProjectionCustodyStanding {
         if let Some(hit) = self.cached_conductor(&key) {
             self.conductor_singleflight.lock().await.remove(&key);
             drop(guard);
-            return hit;
+            return Ok(hit);
         }
-        let Some(conductor) = self.conductor.clone() else {
-            self.remember_conductor(key.clone(), false);
+        let Some(conductor) = self
+            .conductor_resolver
+            .as_ref()
+            .and_then(|resolve| resolve())
+        else {
             self.conductor_singleflight.lock().await.remove(&key);
             drop(guard);
-            return false;
+            return Err(WithholdReason::AuthorityUnavailable);
         };
         let id = deterministic_spool_custody_id(requester_agent, ward, ward);
-        let holds = match conductor.get_spool_commitment(&id).await {
-            Ok(Some(c)) => {
+        let answer = tokio::time::timeout(
+            CONDUCTOR_FALLBACK_TIMEOUT,
+            conductor.get_spool_commitment(&id),
+        )
+        .await;
+        let holds = match answer {
+            Ok(Ok(Some(c))) => {
                 !c.finished
                     && !RETIRED_STATES.contains(&c.state.as_str())
                     && c.action == SPOOL_CUSTODY_ACTION
@@ -762,16 +846,24 @@ impl ProjectionCustodyStanding {
                         .iter()
                         .any(|value| value == &spool_classification(ward))
             }
-            Ok(None) => false,
-            Err(e) => {
+            Ok(Ok(None)) => false,
+            Ok(Err(e)) => {
                 debug!(commitment = %id, error = %e, "custody-standing: conductor fallback unavailable");
-                false
+                self.conductor_singleflight.lock().await.remove(&key);
+                drop(guard);
+                return Err(WithholdReason::AuthorityUnavailable);
+            }
+            Err(_) => {
+                warn!(commitment = %id, timeout_secs = CONDUCTOR_FALLBACK_TIMEOUT.as_secs(), "custody-standing: conductor fallback timed out");
+                self.conductor_singleflight.lock().await.remove(&key);
+                drop(guard);
+                return Err(WithholdReason::AuthorityUnavailable);
             }
         };
         self.remember_conductor(key.clone(), holds);
         self.conductor_singleflight.lock().await.remove(&key);
         drop(guard);
-        holds
+        Ok(holds)
     }
 
     fn cached_conductor(&self, key: &(String, String)) -> Option<bool> {
@@ -783,7 +875,8 @@ impl ProjectionCustodyStanding {
 
     fn remember_conductor(&self, key: (String, String), holds: bool) {
         if let Ok(mut c) = self.cache.lock() {
-            c.conductor.insert(
+            insert_bounded(
+                &mut c.conductor,
                 key,
                 Cached {
                     value: holds,
@@ -800,6 +893,7 @@ struct LocalStandingFacts {
     requester_is_ward: bool,
     custody_for_ward: bool,
     custody_for_digest: bool,
+    authority_available: bool,
 }
 
 #[async_trait::async_trait]
@@ -830,6 +924,7 @@ impl CustodyStanding for ProjectionCustodyStanding {
                 requester_is_ward,
                 custody_for_ward,
                 custody_for_digest,
+                authority_available: true,
             })
         })
         .await;
@@ -846,9 +941,16 @@ impl CustodyStanding for ProjectionCustodyStanding {
         // already decided to serve.
         if !local.custody_for_ward && !local.requester_is_ward && !local.custody_for_digest {
             if let Some(w) = local.ward.as_deref() {
-                local.custody_for_ward = self
+                match self
                     .conductor_spool_standing(&local.requester_agent, w)
-                    .await;
+                    .await
+                {
+                    Ok(holds) => local.custody_for_ward = holds,
+                    Err(WithholdReason::AuthorityUnavailable) => {
+                        local.authority_available = false;
+                    }
+                    Err(_) => unreachable!("conductor fallback has one error class"),
+                }
             }
         }
 
@@ -859,6 +961,7 @@ impl CustodyStanding for ProjectionCustodyStanding {
             custody_for_ward: local.custody_for_ward,
             custody_for_digest: local.custody_for_digest,
             ward_resolved: local.ward.is_some(),
+            authority_available: local.authority_available,
         }
     }
 
@@ -876,7 +979,12 @@ impl CustodyStanding for ProjectionCustodyStanding {
     /// own-conductor fallback `facts_for` uses for `custody_for_ward`. A
     /// digest hit never pays for the conductor call; it already answers the
     /// question on its own.
-    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool) {
+    async fn custody_of(
+        &self,
+        agent: &str,
+        ward: &str,
+        digest: Option<&str>,
+    ) -> Result<(bool, bool), WithholdReason> {
         let resolver = self.clone();
         let agent_owned = agent.to_string();
         let ward_owned = ward.to_string();
@@ -892,9 +1000,9 @@ impl CustodyStanding for ProjectionCustodyStanding {
         .unwrap_or((false, false));
 
         if !spool && !blob {
-            spool = self.conductor_spool_standing(agent, ward).await;
+            spool = self.conductor_spool_standing(agent, ward).await?;
         }
-        (spool, blob)
+        Ok((spool, blob))
     }
 }
 
@@ -1022,6 +1130,7 @@ impl CustodyStanding for FakeCustodyStanding {
                 .as_ref()
                 .is_some_and(|d| state.blob.contains(&(agent.clone(), d.clone()))),
             ward_resolved: ward.is_some(),
+            authority_available: true,
         }
     }
 
@@ -1034,7 +1143,12 @@ impl CustodyStanding for FakeCustodyStanding {
             .cloned()
     }
 
-    async fn custody_of(&self, agent: &str, ward: &str, digest: Option<&str>) -> (bool, bool) {
+    async fn custody_of(
+        &self,
+        agent: &str,
+        ward: &str,
+        digest: Option<&str>,
+    ) -> Result<(bool, bool), WithholdReason> {
         let state = self.inner.lock().unwrap();
         let spool = state.spool.contains(&(agent.to_string(), ward.to_string()));
         let blob = digest.is_some_and(|d| {
@@ -1042,7 +1156,7 @@ impl CustodyStanding for FakeCustodyStanding {
                 .blob
                 .contains(&(agent.to_string(), d.to_ascii_lowercase()))
         });
-        (spool, blob)
+        Ok((spool, blob))
     }
 }
 
@@ -1136,6 +1250,51 @@ mod tests {
         }
     }
 
+    #[test]
+    fn every_keyed_standing_cache_stays_within_its_process_cap() {
+        let mut cache = StandingCache::default();
+        for i in 0..=STANDING_CACHE_MAX_ENTRIES {
+            let key = format!("key-{i}");
+            insert_bounded(
+                &mut cache.requester,
+                key.clone(),
+                Cached {
+                    value: Some(key.clone()),
+                    at: Instant::now(),
+                },
+            );
+            insert_bounded(
+                &mut cache.spool_wards,
+                key.clone(),
+                Cached {
+                    value: HashSet::from([key.clone()]),
+                    at: Instant::now(),
+                },
+            );
+            insert_bounded(
+                &mut cache.blob_digests,
+                key.clone(),
+                Cached {
+                    value: HashSet::from([key.clone()]),
+                    at: Instant::now(),
+                },
+            );
+            insert_bounded(
+                &mut cache.conductor,
+                (key.clone(), key),
+                Cached {
+                    value: false,
+                    at: Instant::now(),
+                },
+            );
+        }
+
+        assert_eq!(cache.requester.len(), STANDING_CACHE_MAX_ENTRIES);
+        assert_eq!(cache.spool_wards.len(), STANDING_CACHE_MAX_ENTRIES);
+        assert_eq!(cache.blob_digests.len(), STANDING_CACHE_MAX_ENTRIES);
+        assert_eq!(cache.conductor.len(), STANDING_CACHE_MAX_ENTRIES);
+    }
+
     #[tokio::test]
     async fn a_non_private_row_never_touches_the_projection() {
         // No pool rows at all, no conductor: a public row must still resolve to
@@ -1219,7 +1378,7 @@ mod tests {
         assert!(!facts.custody_for_ward, "a revoked pledge is not live");
         assert_eq!(
             private_serve_verdict(&facts),
-            PrivateServeVerdict::Withhold(WithholdReason::NoStanding)
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
         );
     }
 
@@ -1245,13 +1404,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_resolved_stranger_is_withheld_with_no_standing() {
+    async fn a_resolved_stranger_without_conductor_authority_says_authority_unavailable() {
         let pool = test_pool();
         let (resolver, requester) = bound_resolver(pool, STRANGER);
         let facts = resolver.facts_for(&requester, &private_row()).await;
         assert_eq!(
             private_serve_verdict(&facts),
-            PrivateServeVerdict::Withhold(WithholdReason::NoStanding)
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
         );
     }
 
@@ -1425,13 +1584,43 @@ mod tests {
         assert!(!facts.custody_for_ward);
         assert_eq!(
             private_serve_verdict(&facts),
-            PrivateServeVerdict::Withhold(WithholdReason::NoStanding)
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
         );
     }
 
     struct CountingConductor {
         calls: AtomicUsize,
         evidence: Option<ConductorSpoolEvidence>,
+    }
+
+    struct ErrorConductor {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl ConductorCustodyLookup for ErrorConductor {
+        async fn get_spool_commitment(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ConductorSpoolEvidence>, crate::error::StorageError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Err(crate::error::StorageError::Conductor(
+                "transient test failure".to_string(),
+            ))
+        }
+    }
+
+    struct SlowConductor;
+
+    #[async_trait::async_trait]
+    impl ConductorCustodyLookup for SlowConductor {
+        async fn get_spool_commitment(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ConductorSpoolEvidence>, crate::error::StorageError> {
+            tokio::time::sleep(CONDUCTOR_FALLBACK_TIMEOUT + Duration::from_secs(1)).await;
+            Ok(Some(exact_conductor_evidence()))
+        }
     }
 
     #[async_trait::async_trait]
@@ -1507,6 +1696,97 @@ mod tests {
                 .custody_for_ward
         );
         assert_eq!(negative.calls.load(Ordering::SeqCst), 1, "negative TTL hit");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn conductor_resolver_recovers_after_boot_race_on_the_next_expired_miss() {
+        let pool = test_pool();
+        let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
+        let lookups = Arc::new(AtomicUsize::new(0));
+        let positive: Arc<dyn ConductorCustodyLookup> = Arc::new(CountingConductor {
+            calls: AtomicUsize::new(0),
+            evidence: Some(exact_conductor_evidence()),
+        });
+        let resolver = resolver.with_conductor_lookup_resolver({
+            let lookups = Arc::clone(&lookups);
+            let positive = Arc::clone(&positive);
+            Arc::new(move || {
+                if lookups.fetch_add(1, Ordering::SeqCst) == 0 {
+                    None
+                } else {
+                    Some(Arc::clone(&positive))
+                }
+            })
+        });
+
+        let first = resolver.facts_for(&requester, &private_row()).await;
+        assert_eq!(
+            private_serve_verdict(&first),
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
+        );
+        tokio::time::advance(STANDING_TTL + Duration::from_millis(1)).await;
+        let second = resolver.facts_for(&requester, &private_row()).await;
+        assert_eq!(
+            private_serve_verdict(&second),
+            PrivateServeVerdict::Serve(ServeReason::SpoolCustody)
+        );
+        assert_eq!(lookups.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn conductor_error_is_authority_unavailable_and_is_not_cached() {
+        let pool = test_pool();
+        let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
+        let lookup = Arc::new(ErrorConductor {
+            calls: AtomicUsize::new(0),
+        });
+        let resolver = resolver.with_conductor_lookup(lookup.clone());
+
+        for _ in 0..2 {
+            let facts = resolver.facts_for(&requester, &private_row()).await;
+            assert_eq!(
+                private_serve_verdict(&facts),
+                PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
+            );
+        }
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            resolver.custody_of(CUSTODIAN, WARD, None).await,
+            Err(WithholdReason::AuthorityUnavailable)
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn conductor_timeout_is_authority_unavailable() {
+        let pool = test_pool();
+        let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
+        let resolver = resolver.with_conductor_lookup(Arc::new(SlowConductor));
+
+        let facts = resolver.facts_for(&requester, &private_row()).await;
+        assert_eq!(
+            private_serve_verdict(&facts),
+            PrivateServeVerdict::Withhold(WithholdReason::AuthorityUnavailable)
+        );
+    }
+
+    #[tokio::test]
+    async fn real_absent_conductor_answer_is_cached_negative() {
+        let pool = test_pool();
+        let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
+        let lookup = Arc::new(CountingConductor {
+            calls: AtomicUsize::new(0),
+            evidence: None,
+        });
+        let resolver = resolver.with_conductor_lookup(lookup.clone());
+
+        for _ in 0..2 {
+            let facts = resolver.facts_for(&requester, &private_row()).await;
+            assert_eq!(
+                private_serve_verdict(&facts),
+                PrivateServeVerdict::Withhold(WithholdReason::NoStanding)
+            );
+        }
+        assert_eq!(lookup.calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -1634,13 +1914,15 @@ mod tests {
             "created",
         );
         let resolver = ProjectionCustodyStanding::new(pool);
-        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await;
+        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await.unwrap();
         assert!(spool, "CUSTODIAN provides WARD a live custody-spool");
         assert!(!blob);
-        // A stranger asked about the SAME ward holds neither.
-        let (spool, blob) = resolver.custody_of(STRANGER, WARD, None).await;
-        assert!(!spool);
-        assert!(!blob);
+        // A stranger asked about the SAME ward needs the unavailable conductor
+        // fallback; that is not evidence of absent standing.
+        assert_eq!(
+            resolver.custody_of(STRANGER, WARD, None).await,
+            Err(WithholdReason::AuthorityUnavailable)
+        );
     }
 
     #[tokio::test]
@@ -1660,7 +1942,10 @@ mod tests {
             evidence: None,
         });
         let resolver = ProjectionCustodyStanding::new(pool).with_conductor_lookup(lookup.clone());
-        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, Some(DIGEST)).await;
+        let (spool, blob) = resolver
+            .custody_of(CUSTODIAN, WARD, Some(DIGEST))
+            .await
+            .unwrap();
         assert!(!spool);
         assert!(blob, "CUSTODIAN provides a live custody-blob for DIGEST");
         assert_eq!(
@@ -1678,7 +1963,7 @@ mod tests {
             evidence: Some(exact_conductor_evidence()),
         });
         let resolver = ProjectionCustodyStanding::new(pool).with_conductor_lookup(lookup.clone());
-        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await;
+        let (spool, blob) = resolver.custody_of(CUSTODIAN, WARD, None).await.unwrap();
         assert!(spool, "the conductor fallback confirms the pledge");
         assert!(!blob);
         assert_eq!(lookup.calls.load(Ordering::SeqCst), 1);
@@ -1700,11 +1985,17 @@ mod tests {
             CustodyStanding::resolve_agent(&fake, &Requester::iroh("nobody")).await,
             None
         );
-        assert_eq!(fake.custody_of(CUSTODIAN, WARD, None).await, (true, false));
+        assert_eq!(
+            fake.custody_of(CUSTODIAN, WARD, None).await,
+            Ok((true, false))
+        );
         assert_eq!(
             fake.custody_of(CUSTODIAN, STRANGER, Some(DIGEST)).await,
-            (false, true)
+            Ok((false, true))
         );
-        assert_eq!(fake.custody_of(STRANGER, WARD, None).await, (false, false));
+        assert_eq!(
+            fake.custody_of(STRANGER, WARD, None).await,
+            Ok((false, false))
+        );
     }
 }

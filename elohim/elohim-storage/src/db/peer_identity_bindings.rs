@@ -8,7 +8,8 @@
 //! - `upsert` — called by the ReconcileController when an AgentPeerBinding signal
 //!   arrives (Task A.4 controller, Task A.8 signal handler).
 //! - `lookup_active` — called by `HolochainBackedPeerIdentityMap::lookup` on the
-//!   P2P hot path; returns the most recently observed active binding for a peer.
+//!   P2P hot path and by `services::hub_resolver::resolve_peer_dwelling_hub`;
+//!   both callers receive the verified-first active binding for a peer.
 
 use crate::db::diesel_schema::peer_identity_bindings;
 use crate::db::models::{NewPeerIdentityBindingRow, PeerIdentityBindingRow};
@@ -92,7 +93,9 @@ pub fn upsert_preserving_supersession(
 /// a verified binding first, then the latest `observed_at`. The verified-first
 /// preference is deterministic and positive-matches `cross_signed`; an
 /// unverified binding remains usable for routing only when no verified binding
-/// is active. The partial index
+/// is active. Both `p2p::identity_map::HolochainBackedPeerIdentityMap::lookup`
+/// and `services::hub_resolver::resolve_peer_dwelling_hub` use this same
+/// verified-first ordering. The partial index
 /// `idx_peer_identity_bindings_current_per_agent` (keyed on `agent_cid`) covers
 /// supersession-aware filtering for agent-side queries; the per-peer lookup
 /// here uses the existing `idx_peer_identity_bindings_peer_id` index.
