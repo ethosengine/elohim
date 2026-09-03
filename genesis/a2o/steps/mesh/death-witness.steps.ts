@@ -228,21 +228,43 @@ Given('the household mesh is three storage peers: Jessica, Matthew, and James', 
   );
 });
 
-Given("each peer's conductor is running as a child of that peer's envelope", () => {
-  for (const peer of HOUSEHOLD_PEERS) {
-    if (!existsSync(passportPath(peer)) || !existsSync(arkPidPath(peer))) {
-      throw new Error(ARK_PRECONDITION);
+// A conductor the envelope is bringing back after an earlier station's kill reads `ready: false`
+// for the seconds its readiness ladder takes (measured 2026-09-03: station 2's Background ran the
+// instant station 1 finished and found Jessica's passport not ready). "Running as a child of the
+// envelope" is exactly the promise the envelope keeps by re-spawning it, so this precondition
+// WAITS, bounded, for ready + child-of-ark instead of asserting the instant it is read.
+const ENVELOPE_READY_BUDGET_MS = 90_000;
+
+Given(
+  "each peer's conductor is running as a child of that peer's envelope",
+  { timeout: ENVELOPE_READY_BUDGET_MS + 10_000 },
+  async () => {
+    for (const peer of HOUSEHOLD_PEERS) {
+      if (!existsSync(passportPath(peer)) || !existsSync(arkPidPath(peer))) {
+        throw new Error(ARK_PRECONDITION);
+      }
+      const deadline = Date.now() + ENVELOPE_READY_BUDGET_MS;
+      let lastReason = '';
+      for (;;) {
+        const process = conductor(readPassport(peer), peer);
+        if (process.ready === true) {
+          const childPid = requirePid(process.pid, `${peer}'s conductor pid`);
+          assert.equal(
+            parentPid(childPid, peer),
+            recordedArkPid(peer),
+            `${peer}'s conductor is not a child of its recorded ark process`
+          );
+          break;
+        }
+        lastReason = `${peer}'s ark passport does not mark conductor ready (pid ${String(process.pid)})`;
+        if (Date.now() >= deadline) {
+          throw new Error(`${lastReason} after ${ENVELOPE_READY_BUDGET_MS / 1000}s`);
+        }
+        await wait(1_000);
+      }
     }
-    const process = conductor(readPassport(peer), peer);
-    assert.equal(process.ready, true, `${peer}'s ark passport does not mark conductor ready`);
-    const childPid = requirePid(process.pid, `${peer}'s conductor pid`);
-    assert.equal(
-      parentPid(childPid, peer),
-      recordedArkPid(peer),
-      `${peer}'s conductor is not a child of its recorded ark process`
-    );
   }
-});
+);
 
 When("Jessica's conductor is killed with SIGKILL", function (this: E2EWorld) {
   const state = scenario(this);
