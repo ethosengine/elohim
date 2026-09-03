@@ -17,15 +17,17 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     keys and source chains and talks to the network.
   - The ENVELOPE is the parent process that spawns the conductor, holds its
     stdout and stderr pipes, decides when to restart it, and outlives it.
-    Today nothing on the household mesh is the conductor's parent; this
-    story only means something once the envelope is.
+    The household mesh launches its conductors under the envelope; without
+    that, every assertion in this story would be vacuous.
   - A DEATH WITNESS is the record the envelope writes the moment a child
     dies: the exit signal or code, how long the child ran, its last lines
     of stderr, the hash of the program the envelope actually started, and
     the envelope's own last decision about that child (for example "I
     reinstalled the app because the bundle drifted"). Deaths of the same
     child that follow each other belong to one INCIDENT; the incident is
-    the durable record, and each death is one witness inside it. A witness
+    the durable record: each death is one witness inside it, and each
+    restart the envelope performs is one restart inside it, so the incident
+    tells the whole crash-and-recovery cycle. A witness
     is first written to the peer's own disk, where the envelope needs no
     network; it is ANCHORED later — committed to the distributed network
     through the peer's own conductor, so it survives the loss of that peer —
@@ -36,7 +38,9 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     commitment, to keep copies of this peer's witnesses. The commitment is
     counter-signed by the custodian, so a peer cannot name a custodian who
     never agreed. Witnesses are addressed by the hash of their content
-    (a CID), so a custodian's copy is provably the same record.
+    (a CID), so a custodian's copy is provably the same record. This story
+    assumes the commitment already exists; offering and accepting custody
+    between humans is a separate story.
   - The PASSPORT is the peer's description of itself: which programs it
     runs, by hash; how many times it has come back up (its INCARNATION);
     and the last VERDICT its envelope reached (restart, give up, keep

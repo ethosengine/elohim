@@ -474,8 +474,24 @@ async function listRows(url: string, what: string): Promise<Record<string, unkno
 /** `resourceClassifiedAs` is a JSON list by contract; older rows carry it bare. */
 function classifications(row: Record<string, unknown>): string[] {
   const value = row['resourceClassifiedAs'];
-  if (Array.isArray(value)) return value.map(entry => String(entry));
-  return value === undefined || value === null ? [] : [String(value)];
+  if (Array.isArray(value) && value.length > 0) return value.map(entry => String(entry));
+  if (value !== undefined && value !== null && !Array.isArray(value)) return [String(value)];
+  // The storage view drops a bare-string classification (M11); the author also records the
+  // marker in metadata, which is the same claim from the row's own pen.
+  let metadata = row['metadata'];
+  if (typeof metadata === 'string') {
+    try {
+      metadata = JSON.parse(metadata) as unknown;
+    } catch {
+      metadata = undefined;
+    }
+  }
+  if (metadata && typeof metadata === 'object') {
+    const m = metadata as Record<string, unknown>;
+    const marker = m['blobMarker'] ?? m['blobHash'];
+    if (typeof marker === 'string' && marker.length > 0) return [marker];
+  }
+  return [];
 }
 
 /** Commitment metadata may already be decoded or may still be a JSON string. */
@@ -740,7 +756,7 @@ Then(
     const shortfalls = [...pending].map(([name, why]) => `${name}: ${why}`).join('; ');
     assert.fail(
       `Jessica's witness ${cid} (sha256-${digest}) was not held by every custodian within ` +
-        `60 seconds — ${shortfalls}`
+        `${CUSTODY_WINDOW_MS / 1000} seconds — ${shortfalls}`
     );
   }
 );
