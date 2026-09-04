@@ -52,12 +52,37 @@
 //! author-mintable electorate — mishpat integrity verifies no signatures and no
 //! arm binds a roster to the elohim's key or root — so it raises forgery cost
 //! from one commitment to two; it is not yet a trust boundary.
-//! - **The lifecycle** (`state`, `revoked_at`) is read off the
-//!   `mishpat_commitments` projection row, which is where the
-//!   `CommitmentByState` link and the revocation land
-//!   (`db::mishpat_commitments::get_by_cid`). A commitment whose row has not
-//!   projected yet is read as `proposed` — fail-closed, because
+//! - **The lifecycle** (`state`, `revoked_at`) is DHT truth, read down the same
+//!   C5 rail as the body: `mishpat::get_commitment_state_links` through this
+//!   peer's own conductor. The local `mishpat_commitments` row is only a
+//!   CACHE, consulted when the DHT carries no transition at all; no links and
+//!   no row reads as `proposed` — fail-closed, because
 //!   [`super::verify::verify_path`] establishes a path only on `"active"`.
+//!
+//! # Task 19 — why the lifecycle moved off the projection row
+//!
+//! The row is written from `CommitmentCommitted`, a post-commit signal on the
+//! AUTHORING conductor, so only the peer whose elohim notarized a commitment
+//! ever holds a row for it. That made two facts unreadable everywhere else:
+//! activation (worked around by inferring it from the entry's own action) and,
+//! far worse, REVOCATION — a `revokes-commitment` is a separate entry whose row
+//! also only ever lands on its author, so an elohim could pull a migration path
+//! back and every peer it was meant to stop would keep reading the path as
+//! active. That is Station 7's revocation, and no amount of care on the reading
+//! side could close it while the fact lived in a private index.
+//!
+//! It is closed on the WRITING side (`mishpat::commitments::author_lifecycle_link`,
+//! coordinator-only): a lineage commitment records `active` on its own anchor
+//! when the validator accepts its quorum, and a quorum-checked revocation
+//! records `revoked` on the anchor it revokes. Both are `CommitmentByState`
+//! links on the DHT, so every peer reads the same lifecycle through its own
+//! conductor — evidence, never a peer's word.
+//!
+//! The entry-action inference this replaces is deliberately GONE. Reading
+//! "active" off the fact that an entry exists made activation an inference any
+//! author could produce; reading it off the link makes it an ACT the coordinator
+//! only performs after the quorum check, and — unlike an inference — an act that
+//! a revocation can undo.
 
 use std::sync::Arc;
 
@@ -66,11 +91,20 @@ use seam_contracts::Answer;
 use super::{ArtifactClass, PathEvidence, ReleaseManifest, RosterEvidence};
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
+use crate::services::conductor_writes::CommitmentStateLink;
 
 /// The lifecycle state a commitment is read as when its projection row has not
 /// landed (or could not be read). Fail-closed: `verify_path` establishes a path
 /// only on `"active"`, so an unknown lifecycle refuses rather than adopts.
 const UNPROJECTED_STATE: &str = "proposed";
+
+/// The lifecycle state a `CommitmentByState` link records for an activation.
+/// The one value [`super::verify::verify_path`] establishes a path on.
+const ACTIVE_STATE: &str = "active";
+
+/// The lifecycle state a quorum-checked revocation records ON THE ANCHOR IT
+/// REVOKES. Terminal: nothing reopens a revoked path (epic Station 8).
+const REVOKED_STATE: &str = "revoked";
 
 /// The signature count a path's discipline requires when the commitment body
 /// does not declare one. One is the floor, never zero — a `required_signatures`
@@ -176,68 +210,26 @@ pub async fn fetch_path_evidence(
         Err(()) => return Answer::Unreachable,
     };
 
-    // The projection carries the lifecycle; the DHT entry carries the body.
-    // A projection we could not READ is unreachable — never a state we made up.
+    // ── The lifecycle, off the DHT (Task 19) ────────────────────────────────
+    // The transitions this peer's own conductor can see on the commitment's
+    // anchor. An unreadable read is `Unreachable` — never a state we made up.
+    let links = match read_state_links(hc, cid).await {
+        Ok(links) => links,
+        Err(()) => return Answer::Unreachable,
+    };
+    // The projection row, still read — but only as a CACHE now, and still
+    // subject to the same C4 line: a row we could not READ is unreachable.
     let Some(row) = lifecycle(db, cid).await else {
         return Answer::Unreachable;
     };
-    let (state, revoked_at) = match row {
-        Some(pair) => pair,
-        // NO ROW HERE. Measured on the household mesh 2026-09-04 (epic Task 11,
-        // Station 2): `CommitmentCommitted` is a post-commit signal on the
-        // AUTHOR's conductor, so only the peer whose elohim notarized the path
-        // ever projects a `mishpat_commitments` row for it. Every other peer
-        // reads the same commitment off its own DHT view — body, signatures and
-        // all — and finds no row, and reading that as [`UNPROJECTED_STATE`]
-        // refused the path on two of three peers with "is proposed, not
-        // active". That is our own index gap being asserted as a fact about
-        // someone else's governance, which is precisely the substitution this
-        // module exists to refuse.
-        //
-        // For a LINEAGE commitment the entry IS the lifecycle statement: it was
-        // created through the arm the mishpat coordinator validates as a
-        // lineage commitment, and its only other state is REVOKED, which
-        // arrives as a separate `revokes-commitment` entry. So an absent row on
-        // a lineage action reads ACTIVE from the notarized entry, and the row —
-        // when this peer has one — still governs, including its `revoked_at`.
-        //
-        // Any OTHER action keeps the old fail-closed default: those classes
-        // have a real acceptance step, and absence there genuinely means "not
-        // accepted here yet".
-        //
-        // WHICH action, though, is read off the ENTRY (`out.action`) and never
-        // off the body — see [`notarized_lineage_state`] for the forgery that
-        // distinction closes.
-        // OPEN TRUST BOUNDARY, named rather than closed this round: the
-        // `None` in `(state, None)` below is `revoked_at`, and `verify_path`
-        // checks `revoked_at` FIRST — before `state`, before the quorum count.
-        // A revocation projects the same way a commitment does, off the
-        // AUTHOR's post-commit signal, so a `revokes-commitment` reaches only
-        // the peer whose elohim wrote it. On every other peer this arm reads
-        // "no row" and therefore "not revoked", and an elohim's revocation of a
-        // migration path is invisible to the peers it is meant to stop. That is
-        // the SAME hole as Station 10's missing roster check, pointed at the
-        // revert instead of the quorum, and it is why Station 7 (revert before
-        // the sunset) is not yet measurable on the mesh.
-        //
-        // The seam that closes it: read the revocation where every peer can see
-        // it — `mishpat::get_commitment_state_links` through THIS peer's own
-        // conductor, the same C5 rail the commitment body already comes down —
-        // rather than off a projection only the author holds. Filed as Task 13
-        // / Station 7 in the epic's §11.4.
-        None => match notarized_lineage_state(&out.action) {
-            Some(state) => {
-                tracing::debug!(
-                    commitment_cid = %cid,
-                    entry_action = %out.action,
-                    "release-adoption: lineage path has no local projection row — reading the \
-                     notarized entry itself as active (the row is an index, not the authority)"
-                );
-                (state.to_string(), None)
-            }
-            None => (UNPROJECTED_STATE.to_string(), None),
-        },
-    };
+    let (state, revoked_at) = resolve_lifecycle(&links, row);
+    tracing::debug!(
+        commitment_cid = %cid,
+        state = %state,
+        revoked = revoked_at.is_some(),
+        state_links = links.len(),
+        "release-adoption: path lifecycle resolved from this peer's own DHT view"
+    );
 
     Answer::Present(evidence_from(
         // The commitment's CID is its ENTRY hash, never its action hash —
@@ -485,47 +477,106 @@ fn to_lower_camel(snake: &str) -> String {
     out
 }
 
-/// The lifecycle a LINEAGE commitment carries on its own, or `None` for every
-/// other action.
+/// Read every `CommitmentByState` transition on a commitment's anchor through
+/// THIS peer's own conductor.
 ///
-/// `migrates-lineage` / `sunsets-lineage` are the two actions whose
-/// notarization IS their activation — see the call site for the measurement
-/// that made this necessary, and `mishpat_projection`'s own dispatch arm for
-/// the same rule applied to the row this peer writes when it IS the author.
-///
-/// # The argument is the ENTRY's action, never the body's
-///
-/// `entry_action` is `GetCommitmentOutput.action` — the `Commitment` entry's
-/// own discriminator, which is what `mishpat::validate_commitment_payload`
-/// dispatched on when it decided whether this payload had to satisfy
-/// `validate_lineage_signatures` at all. The `payload_json` carries a SECOND
-/// copy of that string, and it is only pinned to the entry's for the arms that
-/// happen to check it: `validate_ratifies_limit_gradient`, for one, never
-/// compares them. So a commitment created as `ratifies-limit-gradient` whose
-/// body declares `"action": "migrates-lineage"` passes the coordinator with no
-/// signatures at all — and reading the BODY here would have handed that forgery
-/// an ACTIVE path on every peer that had not projected a row, which is every
-/// peer but the author. Read the entry. `signals.rs` keys the projection the
-/// same way (`commitment.action`), for the same reason.
-///
-/// # What this does and does not assume about the quorum
-///
-/// AUTHOR-SIDE ONLY. `validate_lineage_signatures` runs in the AUTHORING
-/// conductor's wasm when the entry is created, so a lineage commitment that
-/// EXISTS was quorum-checked by whoever wrote it. Receiving peers do NOT
-/// re-verify: mishpat integrity's `commitment_action_requirements` has no
-/// lineage arm, so nothing re-runs those signature checks on gossip. This
-/// function therefore states the LIFECYCLE ("a lineage commitment is active
-/// unless revoked"), never the quorum's soundness — the quorum's own
-/// enforcement gap is Station 10's, filed with the roster gap it shares.
-fn notarized_lineage_state(entry_action: &str) -> Option<&'static str> {
-    match entry_action {
-        "migrates-lineage" | "sunsets-lineage" => Some("active"),
-        _ => None,
+/// The C5 rail for LIFECYCLE, and it draws the same C4 line the body read does:
+/// an empty `Vec` is the conductor ANSWERING that its DHT view carries no
+/// transition (the caller falls back to the cache, then to `proposed`); an
+/// `Err(())` is a failure to ASK or to READ, which makes the whole evidence
+/// [`Answer::Unreachable`] and the refusal `conductor_unavailable`.
+async fn read_state_links(hc: &Arc<HcClient>, cid: &str) -> Result<Vec<CommitmentStateLink>, ()> {
+    match crate::services::conductor_writes::get_commitment_state_links(hc, cid).await {
+        Ok(links) => Ok(links),
+        Err(e) => {
+            tracing::debug!(
+                commitment_cid = %cid,
+                error = %e,
+                "release-adoption: path lifecycle links unreadable — unreachable, never a state"
+            );
+            Err(())
+        }
     }
 }
 
-/// The commitment's projected lifecycle.
+/// The lifecycle the DHT declares, or `None` when it declares none.
+///
+/// # Not a timeline replay, a fail-closed ladder
+///
+/// `signed_at` is caller-supplied and its format is not pinned (the mishpat
+/// coordinator's own doc allows ISO-8601 *or* epoch seconds), so ordering the
+/// links by it would be guessing. It does not need to be ordered:
+///
+/// 1. **Any `revoked` link wins outright.** Revocation is terminal — nothing
+///    reopens a revoked path (epic Station 8) — so whichever order the links
+///    arrive in, the answer is the same. `revoked_at` is the smallest declared
+///    signing time among them, which makes the value deterministic rather than
+///    dependent on DHT link order.
+/// 2. Otherwise any `active` link makes it active.
+/// 3. Otherwise the smallest state string present, deterministically — some
+///    transition this reader does not know, which `verify_path` refuses anyway
+///    because it is not `"active"`.
+///
+/// Links carrying no usable state at all read as `None`, and the caller falls
+/// back to the cache exactly as it does for an empty answer.
+fn lifecycle_from_links(links: &[CommitmentStateLink]) -> Option<(String, Option<String>)> {
+    let revoked_at = links
+        .iter()
+        .filter(|l| l.state == REVOKED_STATE)
+        .map(|l| l.signed_at.clone())
+        .filter(|at| !at.is_empty())
+        .min();
+    if links.iter().any(|l| l.state == REVOKED_STATE) {
+        // A revocation with an unreadable time is still a revocation: fall back
+        // to the state string itself rather than dropping the refusal, because
+        // `verify_path` checks `revoked_at` before it checks `state`.
+        return Some((
+            REVOKED_STATE.to_string(),
+            Some(revoked_at.unwrap_or_else(|| REVOKED_STATE.to_string())),
+        ));
+    }
+    if links.iter().any(|l| l.state == ACTIVE_STATE) {
+        return Some((ACTIVE_STATE.to_string(), None));
+    }
+    links
+        .iter()
+        .map(|l| l.state.clone())
+        .filter(|s| !s.is_empty())
+        .min()
+        .map(|s| (s, None))
+}
+
+/// Join DHT truth with the local cache.
+///
+/// `state` is the DHT's when the DHT says anything at all; the row answers only
+/// when it does not, and `proposed` when neither does (fail-closed — a state we
+/// cannot establish is never `active`).
+///
+/// `revoked_at` is the UNION of the two, and deliberately so. Revocation is
+/// terminal and monotone, so a revocation observed from either source revokes:
+/// honouring the row here can only ever ADD a refusal, never mint a permission,
+/// and it keeps the author of a revocation — the one peer whose row knows about
+/// it — refusing even against a stale `active` link. The precedence is the DHT's
+/// when both speak.
+fn resolve_lifecycle(
+    links: &[CommitmentStateLink],
+    row: Option<(String, Option<String>)>,
+) -> (String, Option<String>) {
+    let (row_state, row_revoked_at) = match row {
+        Some((state, at)) => (Some(state), at),
+        None => (None, None),
+    };
+    let (state, link_revoked_at) = match lifecycle_from_links(links) {
+        Some(pair) => pair,
+        None => (
+            row_state.unwrap_or_else(|| UNPROJECTED_STATE.to_string()),
+            None,
+        ),
+    };
+    (state, link_revoked_at.or(row_revoked_at))
+}
+
+/// The commitment's projected lifecycle — the CACHE, since Task 19.
 ///
 /// Three answers, and the two nested layers are both load-bearing:
 /// `None` — the projection could not be READ at all (no pool, a checkout that
@@ -535,15 +586,13 @@ fn notarized_lineage_state(entry_action: &str) -> Option<&'static str> {
 ///
 /// The distinction is the same C4 line the conductor read draws, applied to the
 /// second source. An **absent row** is an answer — this peer holds no
-/// projection for the commitment — and what that answer MEANS is the caller's
-/// to decide per action class ([`UNPROJECTED_STATE`] and a refusal for the
-/// classes with an acceptance step; the notarized entry itself for a lineage
-/// path, whose row only ever exists on the peer that authored it). A **failed
-/// read** — no pool configured, a pool checkout that timed out, a query error,
-/// a blocking task that panicked — is not an answer, and returning `proposed`
-/// for it would let a busy sqlite read as "the elohim did not notarize this
-/// path". Those all come back `None`, and the caller answers
-/// [`Answer::Unreachable`].
+/// projection for the commitment, which for a lineage path is every peer but
+/// its author — and [`resolve_lifecycle`] decides what that answer means now
+/// that the DHT carries the fact directly. A **failed read** — no pool
+/// configured, a pool checkout that timed out, a query error, a blocking task
+/// that panicked — is not an answer, and returning `proposed` for it would let
+/// a busy sqlite read as "the elohim did not notarize this path". Those all
+/// come back `None`, and the caller answers [`Answer::Unreachable`].
 #[allow(clippy::option_option)]
 async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<Option<(String, Option<String>)>> {
     let pool = db.cloned()?;
@@ -597,68 +646,150 @@ mod tests {
         }
     }
 
+    /// A `CommitmentByState` transition as this peer read it back off its own
+    /// conductor.
+    fn link(state: &str, signed_at: &str) -> CommitmentStateLink {
+        CommitmentStateLink {
+            state: state.to_string(),
+            signed_at: signed_at.to_string(),
+            event_hash: "uhCkkLifecycleEvent".to_string(),
+        }
+    }
+
     /// The measured Station-2 defect on the two peers that did NOT notarize:
     /// only the AUTHOR's storage projects a `mishpat_commitments` row (the
     /// `CommitmentCommitted` signal is a post-commit hook on the author's own
-    /// conductor), so every other peer reads the same notarized commitment off
-    /// its own DHT view and finds no row. Reading that as `proposed` refused
-    /// the path on jessica and james with "is proposed, not active" while
-    /// matthew — who happened to author it — passed.
+    /// conductor), so every other peer read the same notarized commitment off
+    /// its own DHT view and found no row — and "no row" was refused as
+    /// `proposed`.
+    ///
+    /// Task 19 closes it where the fact belongs: the mishpat coordinator
+    /// authors an `active` link on the commitment's own anchor when it accepts
+    /// the quorum, so every peer reads the activation off the DHT, with no row
+    /// and no inference.
     #[test]
-    fn a_lineage_entry_carries_its_own_active_state() {
+    fn an_active_link_is_read_by_a_peer_that_holds_no_row() {
         assert_eq!(
-            notarized_lineage_state("migrates-lineage"),
-            Some("active"),
-            "a notarized migrates-lineage entry IS the activation: it went through the arm the \
-             coordinator validates as a lineage commitment, and its only other state is revoked"
+            resolve_lifecycle(&[link(ACTIVE_STATE, "2026-09-04T00:00:00Z")], None),
+            ("active".to_string(), None),
+            "a peer with no projection row must still read the DHT's activation"
         );
-        assert_eq!(notarized_lineage_state("sunsets-lineage"), Some("active"));
-        // Every class with a real acceptance step keeps the fail-closed default.
-        assert_eq!(notarized_lineage_state("delegates-compute"), None);
-        assert_eq!(notarized_lineage_state(""), None);
     }
 
-    /// **The forgery this keying closes.** `mishpat::validate_commitment_payload`
-    /// dispatches on the ENTRY's `action`, and only some arms pin the body's
-    /// second copy of that string to it — `validate_ratifies_limit_gradient`
-    /// does not. So a commitment created as `ratifies-limit-gradient`, whose
-    /// `payload_json` declares `"action": "migrates-lineage"`, is accepted by
-    /// the coordinator carrying NO signatures whatsoever. Keying off the body
-    /// would have handed exactly that forgery an ACTIVE migration path on every
-    /// peer without a projection row — which, until a revocation projects, is
-    /// every peer but the author.
+    /// **The Task 19 deliverable, at the reading end.** A revocation authored
+    /// by ANOTHER peer reaches this one as a `revoked` link on the path's
+    /// anchor — no row, no signal, no peer's word — and `verify_path` refuses
+    /// `path_revoked` because it checks `revoked_at` before anything else.
     #[test]
-    fn a_forged_body_action_never_makes_a_path() {
-        let forged_body = serde_json::json!({
-            "action": "migrates-lineage",
-            "role": "node_registry",
-            "from_dna_hash": "uhC0kINSTALLED",
-            "to_dna_hash": "uhC0kV2NODEREG",
-            "signatures": [],
-        });
+    fn a_revocation_authored_elsewhere_is_read_as_revoked_here() {
+        let links = [
+            link(ACTIVE_STATE, "2026-09-04T00:00:00Z"),
+            link(REVOKED_STATE, "2026-09-05T00:00:00Z"),
+        ];
         assert_eq!(
-            forged_body.get("action").and_then(|v| v.as_str()),
-            Some("migrates-lineage"),
-            "the fixture must really carry the forged claim, or this test pins nothing"
+            resolve_lifecycle(&links, None),
+            (
+                "revoked".to_string(),
+                Some("2026-09-05T00:00:00Z".to_string())
+            ),
+            "a revoked link must win outright over the activation it pulls back"
         );
-        // The ENTRY says what it actually is, and that is what decides.
+        // …and in the other link order, because the ladder does not replay a
+        // timeline it cannot order (see `lifecycle_from_links`).
+        let reversed = [links[1].clone(), links[0].clone()];
         assert_eq!(
-            notarized_lineage_state("ratifies-limit-gradient"),
-            None,
-            "a body that CLAIMS migrates-lineage under a different entry action must never read \
-             as a lineage path — no row plus this None is UNPROJECTED_STATE, i.e. \
-             path_not_notarized, never active"
+            resolve_lifecycle(&reversed, None),
+            resolve_lifecycle(&links, None)
         );
-        // And the refusal it produces is the fail-closed one, not a path.
-        let ev = evidence_from(
-            "uhCEkForgedPath",
-            &forged_body,
-            UNPROJECTED_STATE.to_string(),
-            None,
-            roster(),
+    }
+
+    /// A revoked link whose signing time is unreadable is still a revocation —
+    /// `verify_path` reads `revoked_at.is_some()`, so dropping the time would
+    /// drop the refusal.
+    #[test]
+    fn a_revocation_with_no_readable_time_still_refuses() {
+        let (state, revoked_at) = resolve_lifecycle(&[link(REVOKED_STATE, "")], None);
+        assert_eq!(state, "revoked");
+        assert!(
+            revoked_at.is_some(),
+            "an unreadable revocation time must never turn a revocation into a pass"
         );
-        assert_eq!(ev.state, "proposed");
-        assert_ne!(ev.state, "active");
+    }
+
+    /// The row is a CACHE, and only that: when the DHT says anything at all,
+    /// the DHT's state is the answer.
+    #[test]
+    fn the_dht_outranks_the_local_row() {
+        assert_eq!(
+            resolve_lifecycle(
+                &[link(ACTIVE_STATE, "2026-09-04T00:00:00Z")],
+                Some(("proposed".to_string(), None))
+            )
+            .0,
+            "active"
+        );
+    }
+
+    /// …but revocation is TERMINAL and MONOTONE, so it is a union rather than
+    /// a precedence: a revocation the author's own row knows about still
+    /// refuses, even against a stale `active` link. Honouring the cache here
+    /// can only ever add a refusal, never mint a permission.
+    #[test]
+    fn a_row_revocation_still_refuses_against_an_active_link() {
+        let (state, revoked_at) = resolve_lifecycle(
+            &[link(ACTIVE_STATE, "2026-09-04T00:00:00Z")],
+            Some((
+                "revoked".to_string(),
+                Some("2026-09-05T00:00:00Z".to_string()),
+            )),
+        );
+        assert_eq!(state, "active", "the DHT still owns the state");
+        assert_eq!(
+            revoked_at,
+            Some("2026-09-05T00:00:00Z".to_string()),
+            "and the revocation the cache holds still refuses the path"
+        );
+    }
+
+    /// No links and no row is `proposed` — fail-closed. The entry-action
+    /// inference that used to fill this gap is gone on purpose: it made
+    /// activation something an author could produce by writing an entry,
+    /// which is exactly what a revocation then could not undo.
+    #[test]
+    fn no_links_and_no_row_is_proposed() {
+        assert_eq!(
+            resolve_lifecycle(&[], None),
+            (UNPROJECTED_STATE.to_string(), None)
+        );
+        assert_ne!(resolve_lifecycle(&[], None).0, ACTIVE_STATE);
+    }
+
+    /// With no links, the row answers — the cache is still read, it is just no
+    /// longer the authority.
+    #[test]
+    fn with_no_links_the_row_answers() {
+        assert_eq!(
+            resolve_lifecycle(
+                &[],
+                Some((
+                    "revoked".to_string(),
+                    Some("2026-09-05T00:00:00Z".to_string())
+                ))
+            ),
+            (
+                "revoked".to_string(),
+                Some("2026-09-05T00:00:00Z".to_string())
+            )
+        );
+    }
+
+    /// A transition this reader does not know reads as itself, deterministically
+    /// — and `verify_path` refuses it, because it is not `"active"`.
+    #[test]
+    fn an_unknown_transition_is_deterministic_and_refuses() {
+        let links = [link("zeta", "t2"), link("alpha", "t1")];
+        assert_eq!(resolve_lifecycle(&links, None), ("alpha".to_string(), None));
+        assert_ne!(resolve_lifecycle(&links, None).0, ACTIVE_STATE);
     }
 
     /// A migrates-lineage commitment body in the shape the NOTARIZING side
@@ -877,12 +1008,12 @@ mod tests {
         );
     }
 
-    /// The projection row's lifecycle — not the body's — decides `state` and
-    /// `revoked_at`. A revoked commitment whose BODY still reads active must
-    /// come through as revoked, because revocation is a lifecycle fact that
-    /// lands after the entry was written and can never be inside it.
+    /// The lifecycle [`resolve_lifecycle`] settled — not the body's — decides
+    /// `state` and `revoked_at`. A revoked commitment whose BODY still reads
+    /// active must come through as revoked, because revocation is a lifecycle
+    /// fact that lands after the entry was written and can never be inside it.
     #[test]
-    fn the_projection_row_supplies_the_lifecycle_not_the_body() {
+    fn the_lifecycle_is_supplied_by_the_caller_never_read_off_the_body() {
         let ev = evidence_from(
             "uhCEkPathCommitment",
             &body(),

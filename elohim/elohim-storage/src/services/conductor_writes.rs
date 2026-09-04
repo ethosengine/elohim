@@ -1625,6 +1625,51 @@ pub async fn get_commitment(
     Ok(out)
 }
 
+/// Wire mirror of one `mishpat::commitments::CommitmentStateLink` — a
+/// `CommitmentByState` link projected to its wire shape by the coordinator.
+///
+/// Every field is a `String` here (unlike [`GetCommitmentOutput`]) because the
+/// coordinator renders them so: `state`/`signed_at` are parsed out of the
+/// LinkTag (`"<state>|<signed_at>"`) and `event_hash` is the link target
+/// already base64-encoded via HoloHash `Display`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CommitmentStateLink {
+    /// The lifecycle state this transition records, e.g. `"active"` / `"revoked"`.
+    pub state: String,
+    /// The deterministic, caller-supplied signing time of the transition.
+    pub signed_at: String,
+    /// Base64 `ActionHash` of the action that justifies the transition.
+    pub event_hash: String,
+}
+
+/// Read every `CommitmentByState` link off a commitment's anchor through THIS
+/// peer's own conductor (`mishpat::get_commitment_state_links`).
+///
+/// The sibling of [`get_commitment`], and the C5 rail for LIFECYCLE: the
+/// commitment body says what the commitment is, these links say what has since
+/// been done to it. An empty `Vec` is an ANSWER ("this conductor's DHT view
+/// carries no transition for that anchor"), never an outage — an outage is
+/// `Err`, and callers must keep the two apart (C4).
+pub async fn get_commitment_state_links(
+    hc: &Arc<HcClient>,
+    cid: &str,
+) -> Result<Vec<CommitmentStateLink>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&cid.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode get_commitment_state_links cid: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome_mishpat(MISHPAT_ZOME, "get_commitment_state_links", payload)
+        .await?;
+    let out: Vec<CommitmentStateLink> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Vec<CommitmentStateLink>: {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod collective_cid_tests {
     use super::*;
