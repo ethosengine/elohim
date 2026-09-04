@@ -500,6 +500,27 @@ pub struct ContentHeadWire {
     /// regardless of recency) without re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
+    /// The STAGING declaration standing BENEATH an earned winner — the next
+    /// release on this channel awaiting promotion
+    /// (`content_store::select_staging_candidate`, a pure function of the same
+    /// link set, so every peer names the same candidate).
+    ///
+    /// `Some` only when [`Self::canonical_earned`] is `Some(true)` AND a staging
+    /// declaration postdates the winning earned one. `None` otherwise, and
+    /// `None` from any pre-candidate coordinator via `serde(default)` — which
+    /// reads as "no candidate stands beneath this head", the safe default: a
+    /// peer that cannot see a candidate simply keeps following the winner.
+    ///
+    /// This never competes with [`Self::head_action_hash`]. The elected head is
+    /// still the single winner; the candidate is a SUBORDINATE declaration a
+    /// canary may verify and attest ahead of promotion.
+    #[serde(default)]
+    pub staging_candidate: Option<HoloHashB64>,
+    /// The candidate declaration LINK's notarized DHT timestamp — the same clock
+    /// class as [`Self::canonical_declared_at`] and orderable against it.
+    /// `Some` exactly when [`Self::staging_candidate`] is `Some`.
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<i64>,
 }
 
 impl ContentHeadWire {
@@ -550,6 +571,16 @@ pub struct CanonicalElectionWire {
     /// `content_diesel::CanonicalOrdering` directly.
     pub canonical_declared_at: i64,
     pub canonical_earned: bool,
+    /// The STAGING declaration standing beneath an earned winner — see
+    /// `ContentHeadWire::staging_candidate` for the full contract. Additive and
+    /// `serde(default)`: a pre-candidate coordinator omits the key and it reads
+    /// as "no candidate".
+    #[serde(default)]
+    pub staging_candidate: Option<HoloHashB64>,
+    /// The candidate declaration LINK's notarized timestamp. `Some` exactly when
+    /// [`Self::staging_candidate`] is `Some`.
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<i64>,
 }
 
 impl CanonicalElectionWire {
