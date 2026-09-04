@@ -33,6 +33,9 @@ use std::path::PathBuf;
 use holochain_client::AdminWebsocket;
 use holochain_types::prelude::DnaHash;
 
+/// The constitution the crossing under test is notarized under (Task 17b).
+const CONSTITUTION_ROOT: &str = "bafyLineageConstitutionRootInstallLineageIT";
+
 #[tokio::test]
 #[ignore = "needs a conductor: MESH_ADMIN_URL=ws://localhost:4444 (admin port, not the app port 4445), LINEAGE_TEST_HAPP=<path to a one-role .happ>"]
 async fn install_lineage_installs_beside_under_same_key() {
@@ -78,6 +81,10 @@ async fn install_lineage_installs_beside_under_same_key() {
         key.clone(),
         std::slice::from_ref(&v1_hash),
         "node_registry",
+        // Task 17b: the constitution this crossing is notarized under, written
+        // into the side app's own DNA modifiers so the cell this install MINTS
+        // declares the root its successor will be checked against.
+        Some(CONSTITUTION_ROOT),
     )
     .await
     .expect("install_lineage (first call, fresh install)");
@@ -89,6 +96,7 @@ async fn install_lineage_installs_beside_under_same_key() {
         key.clone(),
         std::slice::from_ref(&v1_hash),
         "node_registry",
+        Some(CONSTITUTION_ROOT),
     )
     .await
     .expect("install_lineage (second call, must be idempotent no-op)");
@@ -123,6 +131,48 @@ async fn install_lineage_installs_beside_under_same_key() {
         "[evidence] both '{}' and '{lineage_app_id}' present under the same agent key {}",
         elohim_storage::happ_manager::APP_ID,
         key
+    );
+
+    // **Task 17b, against a REAL conductor.** The root install wrote must be
+    // readable back off the installed cell's own modifiers — that is the wire
+    // `verify_path`'s root check stands on, and a unit round-trip proves only
+    // that our encoder agrees with our decoder. Decoded INDEPENDENTLY here
+    // (a local struct, not the passport's) so this cannot pass by both ends
+    // sharing one mistake.
+    #[derive(serde::Deserialize)]
+    struct InstalledProps {
+        #[serde(default)]
+        constitution_root: Option<String>,
+        #[serde(default)]
+        lineage: Vec<String>,
+    }
+    let provisioned = side
+        .cell_info
+        .get("node_registry")
+        .and_then(|cells| {
+            cells.iter().find_map(|c| match c {
+                holochain_client::CellInfo::Provisioned(p) => Some(p),
+                _ => None,
+            })
+        })
+        .expect("the side app has a provisioned node_registry cell");
+    let props: InstalledProps = rmp_serde::from_slice(provisioned.dna_modifiers.properties.bytes())
+        .expect("the installed cell's properties decode as a named map");
+    assert_eq!(
+        props.constitution_root.as_deref(),
+        Some(CONSTITUTION_ROOT),
+        "install_lineage must write the constitution root into the cell it mints — without it \
+         every role reports None and verify_path's root check cannot fire on a live peer"
+    );
+    assert_eq!(
+        props.lineage,
+        vec![v1_hash.to_string()],
+        "the root rides ALONGSIDE the lineage the integrity zome validates against, never \
+         instead of it"
+    );
+    eprintln!(
+        "[evidence] installed cell declares constitution_root={:?} lineage={:?}",
+        props.constitution_root, props.lineage
     );
 
     // Test-only cleanup. Production install_lineage never calls

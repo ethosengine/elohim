@@ -427,7 +427,7 @@ struct PassportLineageProperties {
 /// — inventing a root, or failing the whole passport — would either fabricate
 /// a constitutional fact or take the node's `/version` down over a property we
 /// simply could not read.
-fn constitution_root_from_properties(properties: &[u8]) -> Option<String> {
+pub(crate) fn constitution_root_from_properties(properties: &[u8]) -> Option<String> {
     rmp_serde::from_slice::<PassportLineageProperties>(properties)
         .ok()?
         .constitution_root

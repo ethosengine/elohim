@@ -887,9 +887,26 @@ pub(crate) fn lineage_install_needs_enable(status: &holochain_types::prelude::Ap
 /// answer here.
 ///
 /// `roles_settings[role]` carries a `lineage` property (the DNA hashes this
-/// bundle's cell supersedes) and the base app's network seed for `role`, so
-/// the new cell lands on the same DHT the base app's cell for that role is
-/// on rather than forking a private network.
+/// bundle's cell supersedes), an optional `constitution_root` (Task 17b — the
+/// constitution the crossing is notarized under), and the base app's network
+/// seed for `role`, so the new cell lands on the same DHT the base app's cell
+/// for that role is on rather than forking a private network.
+///
+/// # Why the root is written HERE and not only read
+///
+/// `runtime_passport::constitution_root_from_properties` reads a role's root
+/// off its installed cell's modifiers, and `verify_path` refuses a path whose
+/// root disagrees with it. Until this function wrote one, nothing ever did —
+/// every cell installed rootless, every passport reported `None`, and the
+/// root check could not fire on a live peer. Writing it at install is what
+/// closes that loop: the cell this crossing MINTS declares the root its own
+/// successor will be checked against, so the constitution is carried forward
+/// by the act of crossing rather than re-declared by each release.
+///
+/// `None` writes no key at all rather than a null — undeclared is a real
+/// state (the passport reports `None`, `verify_path` falls back to the
+/// manifest's declaration and says `root: undeclared` if there is none
+/// either), whereas an empty root is a root nothing can equal.
 ///
 /// Idempotent, and idempotent about the WHOLE job: this function installs AND
 /// enables, so "already installed" is only a no-op when the existing app is
@@ -897,6 +914,30 @@ pub(crate) fn lineage_install_needs_enable(status: &holochain_types::prelude::Ap
 /// then failed at `enable_app` gets its enable RECONCILED here — see
 /// [`lineage_install_needs_enable`] for why returning `Ok` on a disabled app
 /// would strand a retry forever.
+/// The DNA properties a lineage side app is installed with.
+///
+/// Pure, so the msgpack shape that lands in the cell's modifiers can be
+/// round-tripped against `runtime_passport::constitution_root_from_properties`
+/// in a test with no conductor — the two are opposite ends of one wire, and
+/// this is the seam that lets them be pinned together.
+///
+/// A `None` root omits the KEY, rather than writing a null. Both decode to
+/// "declares no root" today, but omission is the honest encoding of a fact
+/// nobody stated, and it matches what a bundle's own `happ.yaml` looks like
+/// before a constitution exists.
+fn lineage_properties_json(
+    lineage: &[DnaHash],
+    constitution_root: Option<&str>,
+) -> serde_json::Value {
+    let mut props = serde_json::json!({
+        "lineage": lineage.iter().map(|h| h.to_string()).collect::<Vec<_>>(),
+    });
+    if let Some(root) = constitution_root.filter(|r| !r.is_empty()) {
+        props["constitution_root"] = serde_json::Value::String(root.to_string());
+    }
+    props
+}
+
 pub async fn install_lineage(
     admin_ws: &AdminWebsocket,
     happ_path: &Path,
@@ -904,6 +945,7 @@ pub async fn install_lineage(
     agent_key: AgentPubKey,
     lineage: &[DnaHash],
     role: &str,
+    constitution_root: Option<&str>,
 ) -> anyhow::Result<()> {
     let apps = admin_ws
         .list_apps(None)
@@ -938,11 +980,9 @@ pub async fn install_lineage(
     // direct dependency here, so we go through its generic Deserialize impl
     // (self-describing, format-agnostic) via serde_json instead of naming
     // the type directly.
-    let lineage_json = serde_json::json!({
-        "lineage": lineage.iter().map(|h| h.to_string()).collect::<Vec<_>>(),
-    });
-    let properties: YamlProperties = serde_json::from_value(lineage_json)
-        .map_err(|e| anyhow::anyhow!("build lineage properties: {e}"))?;
+    let properties: YamlProperties =
+        serde_json::from_value(lineage_properties_json(lineage, constitution_root))
+            .map_err(|e| anyhow::anyhow!("build lineage properties: {e}"))?;
 
     let mut roles_settings = std::collections::HashMap::new();
     roles_settings.insert(
@@ -1428,6 +1468,60 @@ mod tests {
         };
 
         DnaFile::new(dna_def, vec![integrity, coordinator]).await
+    }
+
+    /// **Task 17b — the properties WIRE, both ends.**
+    ///
+    /// `lineage_properties_json` builds what the conductor stores in the side
+    /// app's DNA modifiers; `runtime_passport::constitution_root_from_properties`
+    /// reads it back off an installed cell. They are opposite ends of ONE wire
+    /// and nothing else pins them together, so this round-trips through the
+    /// actual msgpack encoding rather than asserting each side in isolation —
+    /// which is how a writer and a reader drift into two different ideas of the
+    /// same map.
+    ///
+    /// `YamlProperties` wraps a private yaml value and is not constructible
+    /// here without going through serde, so the encode step mirrors what
+    /// `install_lineage` does: JSON in, msgpack out, the way
+    /// `SerializedBytes` stores it.
+    #[test]
+    fn install_properties_round_trip_to_the_passport_decoder() {
+        use crate::runtime_passport::constitution_root_from_properties;
+
+        let lineage = vec![DnaHash::from_raw_32(vec![0x42; 32])];
+        let root = "bafyLineageConstitutionRoot";
+
+        let with_root = lineage_properties_json(&lineage, Some(root));
+        assert_eq!(with_root["constitution_root"], root);
+        assert_eq!(with_root["lineage"][0], lineage[0].to_string());
+        let encoded = rmp_serde::to_vec_named(&with_root).expect("encode properties");
+        assert_eq!(
+            constitution_root_from_properties(&encoded).as_deref(),
+            Some(root),
+            "what install writes must be exactly what the passport reads — this is the seam \
+             verify_path's root check stands on"
+        );
+
+        // No root: the KEY is absent, not null — and the passport reads that
+        // as "this role declares no root", which is the honest state for every
+        // cell installed before the property existed.
+        let without = lineage_properties_json(&lineage, None);
+        assert!(
+            without.get("constitution_root").is_none(),
+            "an undeclared root omits the key rather than writing a null"
+        );
+        let encoded = rmp_serde::to_vec_named(&without).expect("encode properties");
+        assert!(constitution_root_from_properties(&encoded).is_none());
+        // The lineage the integrity zome validates against is unchanged by
+        // either shape — the root rides ALONGSIDE it, never instead of it.
+        assert_eq!(without["lineage"][0], lineage[0].to_string());
+
+        // An empty root is treated as undeclared at the WRITE side too, so an
+        // empty `--constitution-root` can never mint a cell under a root
+        // nothing can equal.
+        assert!(lineage_properties_json(&lineage, Some(""))
+            .get("constitution_root")
+            .is_none());
     }
 
     /// **The install-ok/enable-fail resume.** `install_lineage` is two admin

@@ -57,7 +57,7 @@ use seam_contracts::Answer;
 
 use super::{
     AdoptionRefusal, Artifact, ArtifactClass, HeadTier, PathEvidence, RefusalReason,
-    ReleaseManifest, VerifiedRelease, RELEASE_MANIFEST_KIND,
+    ReleaseManifest, RoleBinding, RosterEvidence, VerifiedRelease, RELEASE_MANIFEST_KIND,
 };
 use crate::services::release_attestation::QualifyingEvidence;
 
@@ -744,6 +744,61 @@ pub fn verify_lineage(
 /// notarized (yet)", never "refused"; `Answer::Unreachable` means this peer's
 /// own conductor could not answer, which establishes nothing about the
 /// commitment either way.
+/// Where the root a crossing is checked against came from, or that there is
+/// none.
+///
+/// **Task 17b.** The precedence is the whole of the design decision:
+///
+/// 1. **The INSTALLED cell's root wins.** It is a fact about THIS peer, read
+///    off its own DNA modifiers by the runtime passport — not a claim the
+///    release makes about itself. A release can never use its own declaration
+///    to escape a root the peer already stands under.
+/// 2. **Otherwise the manifest's DECLARED `roleBinding.constitutionRoot`.**
+///    Every cell installed before the property existed declares nothing, and
+///    without this fallback every such crossing would go unchecked — the root
+///    check would be dead code on exactly the fleet it was written for.
+/// 3. **Otherwise undeclared**, and the check is SKIPPED and said out loud.
+///    Skipping is not passing: nothing was verified, and reporting that is the
+///    same C4 discipline `threshold_unchecked` applies to a count nobody could
+///    take.
+fn root_to_check_against<'a>(inst: &'a InstalledRole, binding: &'a RoleBinding) -> RootSource<'a> {
+    if let Some(root) = inst.constitution_root.as_deref().filter(|r| !r.is_empty()) {
+        return RootSource::Installed(root);
+    }
+    match binding
+        .constitution_root
+        .as_deref()
+        .filter(|r| !r.is_empty())
+    {
+        Some(root) => RootSource::Declared(root),
+        None => RootSource::Undeclared,
+    }
+}
+
+/// The three answers [`root_to_check_against`] gives, kept typed so the
+/// precedence is unit-testable without reaching through `verify_path`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootSource<'a> {
+    /// The adopting peer's own installed cell declares this root.
+    Installed(&'a str),
+    /// The installed cell declares none; the manifest declares this one.
+    Declared(&'a str),
+    /// Nobody declares a root. The check is skipped, and says so.
+    Undeclared,
+}
+
+impl RootSource<'_> {
+    /// How the refusal names where the root came from — "running under" reads
+    /// as the fact it is, "declared under" as the claim it is.
+    fn origin(&self) -> &'static str {
+        match self {
+            RootSource::Installed(_) => "running under installed",
+            RootSource::Declared(_) => "declared under",
+            RootSource::Undeclared => "under no",
+        }
+    }
+}
+
 pub fn verify_path(
     manifest: &ReleaseManifest,
     installed: &InstalledReality,
@@ -823,23 +878,61 @@ pub fn verify_path(
     // peer on the mesh (measured, Station 10, `cucumber-stations-mvp-r14`) —
     // the quorum was a headcount with no electorate.
     //
-    // EVIDENCE, NEVER AUTHORITY (C5). `roster_members` was read through this
-    // peer's OWN conductor from the commitment the body's `roster_cid` names,
-    // never taken from the body's word for who its signers are. What is NOT
-    // checked here is the roster's own chain back to `constitution_root`:
-    // that is the integrity-side arm, hash-moving on mishpat, and named as
-    // such rather than faked here.
-    let Some(members) = ev.roster_members.as_ref() else {
-        // C4 applied to the ROSTER: this is the conductor's answer of
-        // absence, not our failure to read (that is `Unreachable` above, and
-        // refuses as `conductor_unavailable`). A quorum this peer cannot
-        // check is not a quorum it may assume — so it refuses, and self-heals
-        // the moment the roster gossips here.
-        return Err(refuse(
-            RefusalReason::QuorumUnmet,
-            format!("roster {} not found", ev.roster_cid),
-        ));
+    // EVIDENCE, NEVER AUTHORITY (C5). The roster was read through this peer's
+    // OWN conductor from the commitment the body's `roster_cid` names, never
+    // taken from the body's word for who its signers are.
+    //
+    // AND THE HONEST LIMIT, stated where the check is: the roster check is a
+    // coherence check against an author-supplied, author-mintable electorate —
+    // mishpat integrity verifies no signatures and no arm binds a roster to the
+    // elohim's key or root — so it raises forgery cost from one commitment to
+    // two; it is not yet a trust boundary.
+    let members = match &ev.roster {
+        RosterEvidence::Read {
+            members,
+            constitution_root,
+        } => {
+            // An electorate minted under a DIFFERENT constitution — or under
+            // none — is not this constitution's electorate. Without this, a
+            // forger needed only to mint any roster at all; with it, the roster
+            // has to at least agree with the root the path claims.
+            if !ev.constitution_root.is_empty()
+                && constitution_root.as_deref() != Some(ev.constitution_root.as_str())
+            {
+                return Err(refuse(
+                    RefusalReason::RootMismatch,
+                    format!(
+                        "roster {} declares root {} — path {} is notarized under {}",
+                        ev.roster_cid,
+                        constitution_root.as_deref().unwrap_or("none"),
+                        ev.commitment_cid,
+                        ev.constitution_root
+                    ),
+                ));
+            }
+            members
+        }
+        // TERMINAL. No amount of gossip makes a non-address resolve — the
+        // commitment has to be reissued naming a real roster.
+        RosterEvidence::Unaddressable => {
+            return Err(refuse(
+                RefusalReason::QuorumUnmet,
+                format!("roster {} is not an address", ev.roster_cid),
+            ));
+        }
+        // C4 applied to the ROSTER: the conductor's answer of absence, not our
+        // failure to read (that is `Unreachable` above, refusing as
+        // `conductor_unavailable`). A quorum this peer cannot check is not a
+        // quorum it may assume — so it refuses, and self-heals the moment the
+        // roster gossips here.
+        RosterEvidence::NotFound => {
+            return Err(refuse(
+                RefusalReason::QuorumUnmet,
+                format!("roster {} not found", ev.roster_cid),
+            ));
+        }
     };
+
     for signer in &ev.signers {
         if !members.iter().any(|m| m == signer) {
             return Err(refuse(
@@ -854,17 +947,26 @@ pub fn verify_path(
     // stranger at all refuses), and a body whose `signatures` array carries
     // more elements than it does readable `agent`s reaches here with a
     // headcount the roster cannot back.
-    let on_roster = ev
+    //
+    // DEDUPED, mirroring `mishpat::validate_lineage_signatures`'s own
+    // duplicate-signer refusal: one key signing twice is one signer, and
+    // `["A", "A"]` against `required_signatures: 2` must not read as a
+    // two-of-two quorum on the peer that receives it just because it did not
+    // on the peer that wrote it.
+    let on_roster: std::collections::BTreeSet<&str> = ev
         .signers
         .iter()
+        .map(String::as_str)
         .filter(|s| members.iter().any(|m| m == *s))
-        .count();
-    if on_roster < ev.required_signatures {
+        .collect();
+    if on_roster.len() < ev.required_signatures {
         return Err(refuse(
             RefusalReason::QuorumUnmet,
             format!(
-                "{} of {} signatures from roster {}",
-                on_roster, ev.required_signatures, ev.roster_cid
+                "{} of {} distinct signatures from roster {}",
+                on_roster.len(),
+                ev.required_signatures,
+                ev.roster_cid
             ),
         ));
     }
@@ -888,12 +990,37 @@ pub fn verify_path(
                 ),
             ));
         }
-        if let Some(root) = inst.constitution_root.as_deref() {
-            if root != ev.constitution_root {
-                return Err(refuse(
-                    RefusalReason::RootMismatch,
-                    format!("path root {} ≠ installed root {root}", ev.constitution_root),
-                ));
+        // **Task 17b.** Which root this crossing is checked against, and
+        // where it came from — see [`root_to_check_against`] for the
+        // precedence and why an undeclared root is reported rather than
+        // silently passed.
+        match root_to_check_against(inst, binding) {
+            RootSource::Installed(root) | RootSource::Declared(root) => {
+                if root != ev.constitution_root {
+                    return Err(refuse(
+                        RefusalReason::RootMismatch,
+                        format!(
+                            "path {} is notarized under root {}, but role '{role}' is {} root {}",
+                            ev.commitment_cid,
+                            if ev.constitution_root.is_empty() {
+                                "none"
+                            } else {
+                                ev.constitution_root.as_str()
+                            },
+                            root_to_check_against(inst, binding).origin(),
+                            root
+                        ),
+                    ));
+                }
+            }
+            RootSource::Undeclared => {
+                tracing::info!(
+                    role = %role,
+                    commitment_cid = %ev.commitment_cid,
+                    "release-adoption: root: undeclared — neither the installed cell nor the \
+                     manifest names a constitution for this role, so the root check is SKIPPED \
+                     (it is not a pass)"
+                );
             }
         }
     }
@@ -1358,6 +1485,7 @@ mod tests {
                 coordinator_zomes: None,
                 migrate_from: None,
                 lineage: None,
+                constitution_root: None,
             },
         );
         m.applies_to = AppliesTo { roles };
@@ -1424,7 +1552,20 @@ mod tests {
             required_signatures: 1,
             roster_cid: LINEAGE_ROSTER_CID.to_string(),
             signers: vec![ROSTER_MEMBER.to_string()],
-            roster_members: Some(vec![ROSTER_MEMBER.to_string()]),
+            roster: RosterEvidence::Read {
+                members: vec![ROSTER_MEMBER.to_string()],
+                constitution_root: Some(LINEAGE_ROOT.to_string()),
+            },
+        }
+    }
+
+    /// The roster as this peer read it, with `members` swapped. Keeps the
+    /// roster's ROOT agreeing with the path's, so a members-only test cannot
+    /// accidentally be measuring the root arm instead.
+    fn roster_of(members: &[&str]) -> RosterEvidence {
+        RosterEvidence::Read {
+            members: members.iter().map(|m| m.to_string()).collect(),
+            constitution_root: Some(LINEAGE_ROOT.to_string()),
         }
     }
 
@@ -1487,11 +1628,210 @@ mod tests {
         // …and the same commitment with the SECOND signer on the roster
         // passes, so what is pinned is the membership rule and not a blanket
         // refusal of every two-signature path.
-        ev.roster_members = Some(vec![
-            ROSTER_MEMBER.to_string(),
-            OFF_ROSTER_SIGNER.to_string(),
-        ]);
+        ev.roster = roster_of(&[ROSTER_MEMBER, OFF_ROSTER_SIGNER]);
         verify_path(&m, &inst, &Answer::Present(ev)).expect("both signers on the roster");
+    }
+
+    /// **Hardening 1.** A roster minted under a DIFFERENT constitution — or
+    /// under none at all — is not this constitution's electorate. Without
+    /// this, a forger needed only to mint ANY roster naming themselves; with
+    /// it the roster has to at least agree with the root the path claims.
+    #[test]
+    fn a_roster_under_another_root_is_not_this_constitutions_electorate() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.roster = RosterEvidence::Read {
+            members: vec![ROSTER_MEMBER.to_string()],
+            constitution_root: Some("bafyANOTHERConstitutionRoot".to_string()),
+        };
+        let r = verify_path(&m, &inst, &Answer::Present(ev.clone())).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::RootMismatch);
+        assert!(
+            r.detail.contains("bafyANOTHERConstitutionRoot") && r.detail.contains(LINEAGE_ROOT),
+            "the refusal must name BOTH roots; got {:?}",
+            r.detail
+        );
+
+        // A roster declaring NO root is refused the same way — silence is not
+        // agreement.
+        ev.roster = RosterEvidence::Read {
+            members: vec![ROSTER_MEMBER.to_string()],
+            constitution_root: None,
+        };
+        assert_eq!(
+            verify_path(&m, &inst, &Answer::Present(ev))
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::RootMismatch
+        );
+    }
+
+    /// **Hardening 2.** One key signing twice is ONE signer. `mishpat`'s own
+    /// `validate_lineage_signatures` refuses a duplicate signer at commit
+    /// time; a receiving peer must not read `["A", "A"]` as a two-of-two
+    /// quorum merely because it did not write the commitment itself.
+    #[test]
+    fn a_key_signing_twice_is_one_signer() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.required_signatures = 2;
+        ev.signatures = 2;
+        ev.signers = vec![ROSTER_MEMBER.to_string(), ROSTER_MEMBER.to_string()];
+        // Both signers ARE on the roster, so the stranger arm cannot be what
+        // refuses this — only the dedupe can.
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
+        assert!(
+            r.detail.contains("1 of 2 distinct"),
+            "the refusal must report DISTINCT signers, not the headcount; got {:?}",
+            r.detail
+        );
+    }
+
+    /// **Hardening 3.** A body declaring `required_signatures: 0` must not be
+    /// able to mint a path that needs no signature: `0 of 0` satisfies every
+    /// comparison here. The floor is applied at parse time
+    /// (`path_evidence::evidence_from`), and this pins that the floor is what
+    /// `verify_path` then enforces.
+    #[test]
+    fn a_zero_quorum_body_still_needs_the_floor() {
+        use super::super::path_evidence::evidence_from;
+        let body = serde_json::json!({
+            "roster_cid": "uhCEkZeroQuorumRoster",
+            "signatures": [],
+            "required_signatures": 0,
+        });
+        let ev = evidence_from(
+            "uhCEkZeroQuorumPath",
+            &body,
+            "active".to_string(),
+            None,
+            RosterEvidence::Read {
+                members: vec![],
+                constitution_root: None,
+            },
+        );
+        assert_eq!(ev.required_signatures, 1, "an explicit zero floors to one");
+        assert!(ev.signatures < ev.required_signatures);
+
+        // …and it refuses on the count arm rather than sailing through.
+        let mut m = lineage_manifest();
+        m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
+            commitment_cid: "uhCEkZeroQuorumPath".to_string(),
+        });
+        assert_eq!(
+            verify_path(
+                &m,
+                &installed_with("node_registry", INSTALLED_NR),
+                &Answer::Present(ev)
+            )
+            .unwrap_err()
+            .reason_code(),
+            RefusalReason::QuorumUnmet
+        );
+    }
+
+    /// **Task 17b.** The root precedence, at the level it is decided.
+    ///
+    /// The INSTALLED root wins because it is a fact about THIS peer; the
+    /// manifest's declaration is the fallback for every cell that predates the
+    /// property; nobody declaring one is `Undeclared`, which is skipped and
+    /// SAID, never silently passed.
+    #[test]
+    fn the_installed_root_wins_over_the_declared_one() {
+        let mut inst = InstalledRole {
+            role: "node_registry".to_string(),
+            dna_hash: INSTALLED_NR.to_string(),
+            coordinator_zomes: BTreeMap::new(),
+            constitution_root: Some(LINEAGE_ROOT.to_string()),
+        };
+        let mut binding = lineage_manifest().applies_to.roles["node_registry"].clone();
+        binding.constitution_root = Some("bafyTHE-RELEASES-OWN-CLAIM".to_string());
+
+        assert_eq!(
+            root_to_check_against(&inst, &binding),
+            RootSource::Installed(LINEAGE_ROOT),
+            "a release must never use its own declaration to escape the root this peer runs under"
+        );
+
+        // A cell installed before the property existed declares nothing — the
+        // manifest's declaration is what keeps the crossing checked at all.
+        inst.constitution_root = None;
+        assert_eq!(
+            root_to_check_against(&inst, &binding),
+            RootSource::Declared("bafyTHE-RELEASES-OWN-CLAIM")
+        );
+
+        // Nobody declares one: skipped, and reported as `root: undeclared`.
+        binding.constitution_root = None;
+        assert_eq!(
+            root_to_check_against(&inst, &binding),
+            RootSource::Undeclared
+        );
+
+        // An EMPTY root on either side is undeclared, never a root nothing can
+        // equal — which would refuse every crossing under it.
+        inst.constitution_root = Some(String::new());
+        binding.constitution_root = Some(String::new());
+        assert_eq!(
+            root_to_check_against(&inst, &binding),
+            RootSource::Undeclared
+        );
+    }
+
+    /// **Task 17b, through the floor.** The declared root fires `RootMismatch`
+    /// on a peer whose installed cell declares nothing — which is every peer
+    /// today, and the whole reason the fallback exists.
+    #[test]
+    fn a_declared_root_is_checked_when_the_installed_cell_declares_none() {
+        let mut m = lineage_manifest();
+        m.applies_to
+            .roles
+            .get_mut("node_registry")
+            .unwrap()
+            .constitution_root = Some("bafyDECLAREDConstitutionRoot".to_string());
+
+        let mut inst = installed_with("node_registry", INSTALLED_NR);
+        inst.roles
+            .get_mut("node_registry")
+            .unwrap()
+            .constitution_root = None;
+
+        // The path is notarized under LINEAGE_ROOT; the manifest declares a
+        // different one. Nothing installed declares anything, so before the
+        // fallback this crossing went unchecked.
+        let r = verify_path(&m, &inst, &Answer::Present(path_evidence_ok())).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::RootMismatch);
+        assert!(
+            r.detail.contains("bafyDECLAREDConstitutionRoot")
+                && r.detail.contains("declared under"),
+            "the refusal must name the declared root AND say it was declared, not installed; \
+             got {:?}",
+            r.detail
+        );
+
+        // Declaring the SAME root the path carries passes.
+        m.applies_to
+            .roles
+            .get_mut("node_registry")
+            .unwrap()
+            .constitution_root = Some(LINEAGE_ROOT.to_string());
+        verify_path(&m, &inst, &Answer::Present(path_evidence_ok()))
+            .expect("a declared root that agrees with the path is a pass");
+
+        // …and with NOBODY declaring a root, the check is skipped: the path's
+        // root goes unverified, which is honest and reported, not a refusal.
+        m.applies_to
+            .roles
+            .get_mut("node_registry")
+            .unwrap()
+            .constitution_root = None;
+        verify_path(&m, &inst, &Answer::Present(path_evidence_ok()))
+            .expect("root: undeclared skips the check rather than refusing");
     }
 
     /// **C4 on the roster.** A roster this peer's conductor answered "no such
@@ -1505,12 +1845,24 @@ mod tests {
         let inst = installed_with("node_registry", INSTALLED_NR);
 
         let mut ev = path_evidence_ok();
-        ev.roster_members = None;
+        ev.roster = RosterEvidence::NotFound;
+        let r = verify_path(&m, &inst, &Answer::Present(ev.clone())).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
+        assert!(
+            r.detail.contains(LINEAGE_ROSTER_CID) && r.detail.contains("not found"),
+            "the refusal must name the roster that could not be found; got {:?}",
+            r.detail
+        );
+
+        // …and the TERMINAL sibling reads differently on purpose. "Not found"
+        // may still gossip here; "is not an address" never will, and an
+        // operator's next move is a reissued commitment, not patience.
+        ev.roster = RosterEvidence::Unaddressable;
         let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
         assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
         assert!(
-            r.detail.contains(LINEAGE_ROSTER_CID),
-            "the refusal must name the roster that could not be found; got {:?}",
+            r.detail.contains("is not an address"),
+            "an unaddressable roster must not read as one that might still arrive; got {:?}",
             r.detail
         );
     }

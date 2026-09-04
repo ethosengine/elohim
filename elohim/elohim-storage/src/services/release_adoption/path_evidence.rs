@@ -43,9 +43,15 @@
 //!   `constitution_root`, `roster_cid`, `signatures`, `signers`,
 //!   `required_signatures`) is read out of the DHT entry's `payload_json` —
 //!   the notarized bytes themselves.
-//! - **The roster** (`roster_members`) is a SECOND commitment, named by the
-//!   body's `roster_cid` and fetched down the same C5 rail — see
-//!   [`roster_members`].
+//! - **The roster** (`roster`) is a SECOND commitment, named by the body's
+//!   `roster_cid` and fetched down the same C5 rail — see [`read_roster`].
+//!
+//! # What the roster check is, and is not
+//!
+//! The roster check is a coherence check against an author-supplied,
+//! author-mintable electorate — mishpat integrity verifies no signatures and no
+//! arm binds a roster to the elohim's key or root — so it raises forgery cost
+//! from one commitment to two; it is not yet a trust boundary.
 //! - **The lifecycle** (`state`, `revoked_at`) is read off the
 //!   `mishpat_commitments` projection row, which is where the
 //!   `CommitmentByState` link and the revocation land
@@ -57,7 +63,7 @@ use std::sync::Arc;
 
 use seam_contracts::Answer;
 
-use super::{ArtifactClass, PathEvidence, ReleaseManifest};
+use super::{ArtifactClass, PathEvidence, ReleaseManifest, RosterEvidence};
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
 
@@ -94,6 +100,21 @@ pub async fn fetch_path_evidence(
         return Answer::Absent;
     };
     let cid = path.commitment_cid.as_str();
+
+    // The path names a commitment that is not an ADDRESS. `mishpat::get_commitment`
+    // would answer with a GUEST ERROR (`EntryHash::try_from`), which reads as
+    // `conductor_unavailable` — our outage — when the honest finding is that the
+    // MANIFEST named a commitment that cannot exist. Same rule as the roster's
+    // (see [`read_roster`]), applied to the sibling read: an unaddressable cid is
+    // an observed absence, `path_not_notarized`, and no gossip will change it.
+    if !is_addressable_cid(cid) {
+        tracing::debug!(
+            commitment_cid = %cid,
+            "release-adoption: manifest names a path commitment that is not an address — \
+             absent, never an outage"
+        );
+        return Answer::Absent;
+    }
 
     // No bridge at all — we could not ask. NEVER Absent (C4).
     let Some(hc) = hc else {
@@ -150,8 +171,8 @@ pub async fn fetch_path_evidence(
     // such entry" for is `None`, which `verify_path` refuses as
     // `quorum_unmet`.
     let roster_cid = string_field(&payload, "roster_cid");
-    let roster_members = match roster_members(Some(hc), &roster_cid).await {
-        Ok(members) => members,
+    let roster = match read_roster(Some(hc), &roster_cid).await {
+        Ok(roster) => roster,
         Err(()) => return Answer::Unreachable,
     };
 
@@ -226,12 +247,11 @@ pub async fn fetch_path_evidence(
         &payload,
         state,
         revoked_at,
-        roster_members,
+        roster,
     ))
 }
 
-/// The members of the roster a path names, read through THIS peer's own
-/// conductor.
+/// The roster a path names, read through THIS peer's own conductor.
 ///
 /// **Task 16 / epic §4.1.** A `migrates-lineage` body carries both the
 /// signatures and the `roster_cid` they are supposed to be drawn from, and
@@ -242,53 +262,61 @@ pub async fn fetch_path_evidence(
 /// locally, exactly as the path commitment itself is, so a release still
 /// cannot ship its own permission.
 ///
-/// Three outcomes, and the C4 line runs between the last two:
+/// The roster check is a coherence check against an author-supplied,
+/// author-mintable electorate — mishpat integrity verifies no signatures and no
+/// arm binds a roster to the elohim's key or root — so it raises forgery cost
+/// from one commitment to two; it is not yet a trust boundary.
+///
+/// Four outcomes, and the C4 line runs above the last one:
 ///
 /// | outcome | meaning | what the caller does |
 /// |---|---|---|
-/// | `Ok(Some(members))` | the roster is on this conductor's DHT view | `verify_path` counts against it |
-/// | `Ok(None)` | the conductor answered "no such entry", or the body named no roster | `quorum_unmet` — a quorum we cannot check is not a quorum we may assume |
+/// | `Ok(Read{..})` | the roster is on this conductor's DHT view | `verify_path` counts against it, and checks its root |
+/// | `Ok(Unaddressable)` | the body named no roster, or one that is not an address | `quorum_unmet`, TERMINAL — no gossip resolves a non-address |
+/// | `Ok(NotFound)` | the conductor answered "no such entry" | `quorum_unmet`, may still gossip here |
 /// | `Err(())` | we could not ASK, or could not READ the answer | the whole evidence is `Unreachable` → `conductor_unavailable` |
 ///
-/// The roster commitment's own payload is read for `members` only. This side
-/// deliberately does NOT re-verify the roster's predecessor chain back to
-/// `constitution_root` (epic §4.1's full rule): that is the integrity-side
-/// arm, and it is hash-moving on mishpat. What this closes is the measured
-/// hole — an off-roster signer satisfying quorum — as EVIDENCE this peer read
-/// for itself, never as authority it invented.
-async fn roster_members(
-    hc: Option<&Arc<HcClient>>,
-    roster_cid: &str,
-) -> Result<Option<Vec<String>>, ()> {
-    // A body naming no roster, or naming one that is not even an ADDRESS,
-    // names no members. Neither is an outage — the commitment really does say
-    // nothing this peer can go and look at — so both are an ANSWER of absence,
-    // and `verify_path` refuses `quorum_unmet` rather than passing an
-    // uncheckable quorum.
+/// The roster body is read for `members` and its own `constitution_root`. This
+/// side deliberately does NOT re-verify the roster's predecessor CHAIN back to
+/// that root (epic §4.1's full rule): that is the integrity-side arm, and it is
+/// hash-moving on mishpat.
+async fn read_roster(hc: Option<&Arc<HcClient>>, roster_cid: &str) -> Result<RosterEvidence, ()> {
+    // A body naming no roster, or naming one that is not even an ADDRESS, names
+    // no members. Neither is an outage — the commitment really does say nothing
+    // this peer can go and look at — so both are an ANSWER, and `verify_path`
+    // refuses `quorum_unmet` rather than passing an uncheckable quorum.
     //
     // The shape check is not decoration. `mishpat::get_commitment` does
-    // `EntryHash::try_from(cid)` and returns a GUEST ERROR for anything that
-    // is not a base64 entry hash, which arrives here as `Err` and would be
-    // read as `conductor_unavailable` — our outage — when what actually
-    // happened is that the notarized body named a roster that cannot exist.
-    // Checking the shape locally keeps that a statement about the COMMITMENT,
-    // and costs no round trip.
+    // `EntryHash::try_from(cid)` and returns a GUEST ERROR for anything that is
+    // not a base64 entry hash, which arrives here as `Err` and would be read as
+    // `conductor_unavailable` — our outage — when what actually happened is that
+    // the notarized body named a roster that cannot exist. Checking the shape
+    // locally keeps that a statement about the COMMITMENT, and costs no round
+    // trip.
     if roster_cid.is_empty() || !is_addressable_cid(roster_cid) {
         tracing::debug!(
             roster_cid = %roster_cid,
             "release-adoption: path names no addressable roster — an absent roster, never an outage"
         );
-        return Ok(None);
+        return Ok(RosterEvidence::Unaddressable);
     }
     // Unreachable by construction: `fetch_path_evidence` already returned on a
     // missing bridge before it got here, so this arm is belt-and-braces for any
-    // future caller — and it must still be Err, never Ok(None).
+    // future caller — and it must still be Err, never an answer.
     let Some(hc) = hc else {
         return Err(());
     };
     match crate::services::conductor_writes::get_commitment(hc, roster_cid).await {
         Ok(Some(out)) => match serde_json::from_str::<serde_json::Value>(&out.payload_json) {
-            Ok(body) => Ok(Some(string_array_field(&body, "members"))),
+            Ok(body) => Ok(RosterEvidence::Read {
+                members: string_array_field(&body, "members"),
+                // The root the ROSTER declares itself under. Empty or absent is
+                // `None` — "this roster declares no root" — which `verify_path`
+                // refuses against a path that DOES declare one: an electorate
+                // that names no constitution is not this constitution's.
+                constitution_root: Some(string_field(&body, "constitution_root"))
+                    .filter(|root| !root.is_empty()),
+            }),
             Err(e) => {
                 tracing::warn!(
                     roster_cid = %roster_cid,
@@ -307,7 +335,7 @@ async fn roster_members(
                 roster_cid = %roster_cid,
                 "release-adoption: path roster is not on this conductor's DHT view yet"
             );
-            Ok(None)
+            Ok(RosterEvidence::NotFound)
         }
         Err(e) => {
             tracing::debug!(
@@ -332,7 +360,7 @@ pub fn evidence_from(
     payload: &serde_json::Value,
     state: String,
     revoked_at: Option<String>,
-    roster_members: Option<Vec<String>>,
+    roster: RosterEvidence,
 ) -> PathEvidence {
     PathEvidence {
         commitment_cid: commitment_cid.to_string(),
@@ -348,7 +376,7 @@ pub fn evidence_from(
         // against; an element without one contributes no signer, so it can
         // never be counted toward a roster quorum.
         signers: signer_agents(payload),
-        roster_members,
+        roster,
         // The COUNT of signatures the commitment carries — read as the length
         // of the array, so a body that lists three signers cannot claim four.
         signatures: payload
@@ -356,12 +384,20 @@ pub fn evidence_from(
             .and_then(|v| v.as_array())
             .map(|a| a.len())
             .unwrap_or(0),
+        // FLOORED, never taken verbatim. An absent field defaults to the
+        // floor, and so does an EXPLICIT zero: `0 of 0` satisfies every
+        // comparison in `verify_path`, so a body declaring
+        // `required_signatures: 0` would otherwise mint a path that needs no
+        // signature at all — the one value a quorum rule must not be able to
+        // express. `.max()` rather than a rejection, because a body we cannot
+        // read as stricter is read as the floor, never as unconstrained.
         required_signatures: payload
             .get("required_signatures")
             .or_else(|| payload.get("requiredSignatures"))
             .and_then(|v| v.as_u64())
             .map(|n| n as usize)
-            .unwrap_or(DEFAULT_REQUIRED_SIGNATURES),
+            .unwrap_or(DEFAULT_REQUIRED_SIGNATURES)
+            .max(DEFAULT_REQUIRED_SIGNATURES),
     }
 }
 
@@ -550,12 +586,15 @@ mod tests {
 
     /// The roster [`body`] names, as this peer read it back off its own
     /// conductor: the three signers of the fixture, and nobody else.
-    fn roster() -> Option<Vec<String>> {
-        Some(vec![
-            "uhCAkSignerOne".to_string(),
-            "uhCAkSignerTwo".to_string(),
-            "uhCAkSignerThree".to_string(),
-        ])
+    fn roster() -> RosterEvidence {
+        RosterEvidence::Read {
+            members: vec![
+                "uhCAkSignerOne".to_string(),
+                "uhCAkSignerTwo".to_string(),
+                "uhCAkSignerThree".to_string(),
+            ],
+            constitution_root: Some("bafyLineageConstitutionRoot".to_string()),
+        }
     }
 
     /// The measured Station-2 defect on the two peers that did NOT notarize:
@@ -687,7 +726,7 @@ mod tests {
             vec!["uhCAkSignerOne", "uhCAkSignerTwo", "uhCAkSignerThree"]
         );
         assert_eq!(ev.signers.len(), ev.signatures);
-        assert_eq!(ev.roster_members, roster());
+        assert_eq!(ev.roster, roster());
     }
 
     /// **Task 16, the parse half.** A signature element with no readable
@@ -733,13 +772,13 @@ mod tests {
     #[tokio::test]
     async fn a_body_naming_no_addressable_roster_is_an_absent_roster_not_an_outage() {
         assert_eq!(
-            roster_members(None, "").await,
-            Ok(None),
-            "no roster named is an ANSWER of absence, and never a dial"
+            read_roster(None, "").await,
+            Ok(RosterEvidence::Unaddressable),
+            "no roster named is an ANSWER, and never a dial"
         );
         assert_eq!(
-            roster_members(None, "a2o-fixture-bootstrap-steward-roster").await,
-            Ok(None),
+            read_roster(None, "a2o-fixture-bootstrap-steward-roster").await,
+            Ok(RosterEvidence::Unaddressable),
             "a roster cid that is not an ADDRESS is a fact about the commitment, never an outage"
         );
         assert!(!is_addressable_cid("a2o-fixture-bootstrap-steward-roster"));
@@ -750,9 +789,91 @@ mod tests {
         let real = holochain_types::prelude::EntryHash::from_raw_32(vec![0x5A; 32]).to_string();
         assert!(is_addressable_cid(&real));
         assert_eq!(
-            roster_members(None, &real).await,
+            read_roster(None, &real).await,
             Err(()),
             "a roster we could not ASK about is unreachable, never absence"
+        );
+    }
+
+    /// **Hardening 4 — the SIBLING read.** The same rule applied to the path's
+    /// own `commitmentCid`. `mishpat::get_commitment` guest-errors on a
+    /// non-entry-hash, which would read as `conductor_unavailable` — our
+    /// outage — when the honest finding is that the MANIFEST named a
+    /// commitment that cannot exist. Asserted with no bridge, which would
+    /// answer `Unreachable` if the cid were dialled.
+    #[tokio::test]
+    async fn an_unaddressable_path_commitment_is_absent_not_unreachable() {
+        let mut m = super::super::test_support::lineage_manifest();
+        m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
+            commitment_cid: "not-an-entry-hash-at-all".to_string(),
+        });
+        assert!(
+            matches!(fetch_path_evidence(None, None, &m).await, Answer::Absent),
+            "a path commitment that is not an address is path_not_notarized, never our outage"
+        );
+
+        // The control: a REAL entry hash with no bridge stays Unreachable, so
+        // what is pinned is the addressability rule and not a blanket Absent.
+        m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
+            commitment_cid: holochain_types::prelude::EntryHash::from_raw_32(vec![0x11; 32])
+                .to_string(),
+        });
+        assert!(matches!(
+            fetch_path_evidence(None, None, &m).await,
+            Answer::Unreachable
+        ));
+    }
+
+    /// **Hardening 1, the parse half.** The roster's OWN
+    /// `constitution_root` is read alongside its members — `verify_path`
+    /// refuses a roster minted under a different constitution, and it can only
+    /// do that if this side carries the root. An empty or absent root is
+    /// `None` ("declares no root"), never an empty string masquerading as one.
+    #[test]
+    fn a_roster_body_carries_the_root_it_declares_itself_under() {
+        let body = serde_json::json!({
+            "members": ["uhCAkSignerOne"],
+            "constitution_root": "bafyLineageConstitutionRoot",
+        });
+        assert_eq!(
+            string_field(&body, "constitution_root"),
+            "bafyLineageConstitutionRoot"
+        );
+        for empty in [
+            serde_json::json!({}),
+            serde_json::json!({"constitution_root": ""}),
+        ] {
+            assert!(
+                Some(string_field(&empty, "constitution_root"))
+                    .filter(|r| !r.is_empty())
+                    .is_none(),
+                "a roster declaring no root is None, never an empty-string root"
+            );
+        }
+    }
+
+    /// **Hardening 3, at the parse site.** An EXPLICIT `required_signatures: 0`
+    /// floors to [`DEFAULT_REQUIRED_SIGNATURES`] — `0 of 0` satisfies every
+    /// comparison in `verify_path`, so a zero would mint a path needing no
+    /// signature at all. `.max()` rather than a rejection: a body we cannot
+    /// read as stricter is read as the floor, never as unconstrained.
+    #[test]
+    fn an_explicit_zero_quorum_floors_rather_than_going_vacuous() {
+        let zero = serde_json::json!({ "signatures": [], "required_signatures": 0 });
+        let ev = evidence_from("uhCEkX", &zero, "active".to_string(), None, roster());
+        assert_eq!(ev.required_signatures, DEFAULT_REQUIRED_SIGNATURES);
+        assert!(ev.required_signatures > 0);
+        assert!(
+            ev.signatures < ev.required_signatures,
+            "a zero-quorum body must still fail the count check"
+        );
+        // A stated quorum ABOVE the floor is untouched — the floor raises, it
+        // never caps.
+        let three = serde_json::json!({ "signatures": [], "required_signatures": 3 });
+        assert_eq!(
+            evidence_from("uhCEkX", &three, "active".to_string(), None, roster())
+                .required_signatures,
+            3
         );
     }
 

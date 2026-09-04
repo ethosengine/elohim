@@ -230,6 +230,25 @@ pub struct RoleBinding {
     /// must land on this chain. `None` for every class but `happ-lineage`.
     #[serde(default)]
     pub lineage: Option<Vec<String>>,
+    /// **Task 17b.** The constitution this role's crossing is notarized under
+    /// — the same root the path's `migrates-lineage` commitment carries
+    /// (epic §4.1). `None` for every class but `happ-lineage`, and for a
+    /// lineage release packaged without `--constitution-root`.
+    ///
+    /// This is the FALLBACK side of [`verify::verify_path`]'s root check. The
+    /// adopting peer's INSTALLED v1 root wins whenever its cell declares one,
+    /// because that is a fact about this peer rather than a claim by the
+    /// release. This declaration is what the path is checked against when the
+    /// v1 cell declares nothing — which is every cell installed before the
+    /// property existed, and is why a crossing is not left unchecked merely
+    /// because the v1 predates the constitution. A release cannot use it to
+    /// ESCAPE a root: where an installed root exists, this is ignored.
+    ///
+    /// [`apply::HappLineageVehicle`] also writes it into the v2 side app's DNA
+    /// modifiers, so the cell this crossing mints declares the root its own
+    /// successor will be checked against.
+    #[serde(default)]
+    pub constitution_root: Option<String>,
 }
 
 /// Role name → the installed reality this release binds to.
@@ -295,17 +314,47 @@ pub struct PathEvidence {
     /// check needs.
     #[serde(default)]
     pub signers: Vec<String>,
-    /// **Task 16.** The roster's members, read through THIS peer's own
-    /// conductor (C5 — never from the path commitment's say-so).
+    /// **Task 16.** The roster, read through THIS peer's own conductor
+    /// (C5 — never from the path commitment's say-so).
     ///
-    /// `None` is an ANSWER, not a failure: the roster commitment is not on
-    /// this peer's DHT view, and [`verify::verify_path`] refuses
-    /// `quorum_unmet` because a quorum it cannot check is not a quorum it may
-    /// assume. A roster this peer could not READ never reaches here at all —
-    /// that is [`seam_contracts::Answer::Unreachable`] on the whole evidence
-    /// (C4), which refuses as `conductor_unavailable` instead.
+    /// A roster this peer could not READ never reaches here at all — that is
+    /// [`seam_contracts::Answer::Unreachable`] on the whole evidence (C4),
+    /// which refuses as `conductor_unavailable`. Everything that DOES reach
+    /// here is an answer, and [`RosterEvidence`] keeps the three answers apart
+    /// because they are three different refusals.
     #[serde(default)]
-    pub roster_members: Option<Vec<String>>,
+    pub roster: RosterEvidence,
+}
+
+/// What this peer found when it went to look at the roster a path names.
+///
+/// Three answers, and the difference between the last two is an operator's
+/// next move: an unaddressable roster is TERMINAL (no amount of gossip makes a
+/// non-address resolve — the commitment has to be reissued), while a
+/// not-found roster may simply not have reached this peer yet.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum RosterEvidence {
+    /// The roster commitment was read off this conductor's DHT view.
+    Read {
+        /// The agent keys the roster names. An empty list is a real answer —
+        /// a roster nobody is on, which no signer can satisfy.
+        members: Vec<String>,
+        /// The constitution the ROSTER declares itself under. Cross-checked
+        /// against the path's own root: an electorate minted under a different
+        /// constitution is not this constitution's electorate.
+        constitution_root: Option<String>,
+    },
+    /// The path names a roster that is not an ADDRESS at all — nothing this
+    /// conductor could ever be asked about. A fact about the commitment, not
+    /// about our reachability, and terminal.
+    Unaddressable,
+    /// The conductor answered, and answered "no such entry". Fail-closed by
+    /// DEFAULT as well as by value: a `PathEvidence` deserialized from a peer
+    /// one build behind, carrying no roster field, must never read as a
+    /// satisfied roster.
+    #[default]
+    NotFound,
 }
 
 /// Where the artifact came from.
@@ -945,7 +994,16 @@ pub(crate) mod test_support {
     /// The DNA hash a `happ-lineage` release crosses TO.
     pub const V2_NR: &str = "uhC0knBUbHoWC8FJowoRoWD8s7bA16J7PglOU3shVv5UTG79BG16Q";
     /// The commitment a lineage manifest's `adoptionDiscipline.path` names.
-    pub const LINEAGE_PATH_CID: &str = "uhCEkLineagePathCommitment";
+    ///
+    /// A REAL entry hash, computed rather than spelled, because
+    /// `path_evidence::fetch_path_evidence` now refuses an unaddressable path
+    /// cid as `Absent` before it ever dials (Task 16 hardening 4). A
+    /// hand-written `uhCEkLineagePathCommitment` is not an address, so a
+    /// fixture carrying one would have silently exercised the refusal arm in
+    /// every test that meant to exercise the read.
+    pub fn lineage_path_cid() -> String {
+        holochain_types::prelude::EntryHash::from_raw_32(vec![0x7E; 32]).to_string()
+    }
     /// The role the MVP rehearsal crosses (spec §4.1).
     pub const ROLE: &str = "node_registry";
 
@@ -963,7 +1021,7 @@ pub(crate) mod test_support {
     }
 
     /// A `happ-lineage` manifest whose one role declares the crossing
-    /// [`INSTALLED_NR`] → [`V2_NR`], with a path naming [`LINEAGE_PATH_CID`].
+    /// [`INSTALLED_NR`] → [`V2_NR`], with a path naming [`lineage_path_cid`].
     pub fn lineage_manifest() -> ReleaseManifest {
         let mut m = from_fixture();
         m.artifact_class = ArtifactClass::HappLineage;
@@ -976,11 +1034,15 @@ pub(crate) mod test_support {
                 coordinator_zomes: None,
                 migrate_from: Some(INSTALLED_NR.to_string()),
                 lineage: Some(vec![INSTALLED_NR.to_string()]),
+                // Task 17b: the shared lineage fixture declares NO root, so
+                // every test that does not opt in exercises the `Undeclared`
+                // branch — the state every peer is in today.
+                constitution_root: None,
             },
         );
         m.applies_to = AppliesTo { roles };
         m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
-            commitment_cid: LINEAGE_PATH_CID.to_string(),
+            commitment_cid: lineage_path_cid(),
         });
         m
     }

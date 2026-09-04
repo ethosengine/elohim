@@ -1013,6 +1013,12 @@ impl ApplyVehicle for HappLineageVehicle {
             agent_key,
             &lineage,
             role,
+            // **Task 17b.** The constitution this crossing is notarized under,
+            // written into the v2 cell's own modifiers so the cell this apply
+            // MINTS declares the root its successor will be checked against.
+            // `None` writes no key — a release that declares no root installs a
+            // rootless cell, exactly as every cell before the property existed.
+            binding.constitution_root.as_deref(),
         )
         .await
         .map_err(|e| {
