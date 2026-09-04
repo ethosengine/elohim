@@ -14,3 +14,5 @@ serde.workspace = true
 serde_json.workspace = true
 mishpat_integrity = { path = "../mishpat_integrity" }
 qahal-types = { path = "../../../../../sdk/domains/qahal/types" }
+# Lineage-arm signature decoding (Task 2) — same pin as imagodei's zomes.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }

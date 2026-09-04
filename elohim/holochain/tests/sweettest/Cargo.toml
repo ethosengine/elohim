@@ -220,5 +220,9 @@ ed25519-dalek = "2"
 # Shared wire types for coordinator I/O — same holo_hash pin (=0.6.0) as the DNA workspace.
 qahal-types = { path = "../../../sdk/domains/qahal/types" }
 
+# base64-encode/decode lineage-arm signatures for the mishpat Task 2 tests —
+# same pin as the mishpat/imagodei zomes.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
 [dev-dependencies]
 # Every integration test shares these — kept in dev-deps so `cargo check --tests` is lean.

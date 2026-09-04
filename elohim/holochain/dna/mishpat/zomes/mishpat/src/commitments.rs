@@ -200,6 +200,8 @@ pub fn validate_commitment_payload(input: &CreateCommitmentInput) -> Result<(), 
         "sets-authority-arc" => validate_sets_authority_arc(&payload),
         "author-lens" => validate_author_lens(&payload),
         "binds-identity" => validate_binds_identity(&payload),
+        "migrates-lineage" => validate_migrates_lineage(&payload),
+        "sunsets-lineage" => validate_sunsets_lineage(&payload),
         other => Err(format!(
             "commitments::validate_commitment_payload unhandled action: {other}"
         )),
@@ -357,6 +359,20 @@ fn validate_revokes_commitment(payload: &serde_json::Value) -> Result<(), String
         .unwrap_or("");
     if signed.is_empty() {
         return Err("revokes-commitment signed_at must be present".into());
+    }
+    // Quorum on revocation (Task 2): when the payload names the target
+    // commitment's action (`target_action`), the target is a lineage
+    // commitment (`migrates-lineage` | `sunsets-lineage` are the only actions
+    // that carry `target_action` in this MVP) — the SAME signature-quorum rule
+    // that authored the lineage commitment gates pulling it back. A lineage
+    // commitment cannot be revoked by one signer's say-so alone.
+    if payload
+        .get("target_action")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .is_some()
+    {
+        validate_lineage_signatures(payload)?;
     }
     Ok(())
 }
@@ -717,6 +733,161 @@ fn validate_binds_identity(payload: &serde_json::Value) -> Result<(), String> {
              (self|steward-set|recovery-quorum)"
         )),
     }
+}
+
+// =============================================================================
+// Lineage arms (Holochain Evolution Epic Task 2) — migrates-lineage /
+// sunsets-lineage commitments, and the signature-quorum rule they share with
+// revokes-commitment when the revoked target is a lineage commitment.
+//
+// Quorum rule (MVP, epic spec §3): `signatures` non-empty, unique agents, and
+// every signature verifies over the literal UTF-8 bytes of
+// `signing_payload_cid` (NOT the field re-serialized — `verify_signature_raw`
+// is required here; the msgpack-serializing `verify_signature` would check
+// the signature against the msgpack encoding of the byte vector instead of
+// the literal bytes the caller actually signed, and would never verify).
+// `required_signatures` (default 1) is k in k-of-n; roster-chain verification
+// against `roster_cid` is deferred to Task 2b (needs the elohim-DNA bridge) —
+// this MVP declares the 1-of-1 progenitor roster.
+// =============================================================================
+
+fn validate_lineage_signatures(payload: &serde_json::Value) -> Result<(), String> {
+    let cid = payload
+        .get("signing_payload_cid")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or("signing_payload_cid must be a non-empty string")?;
+    let sigs = payload
+        .get("signatures")
+        .and_then(|v| v.as_array())
+        .filter(|a| !a.is_empty())
+        .ok_or("signatures must be a non-empty array")?;
+    let required = payload
+        .get("required_signatures")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as usize;
+    let mut seen = std::collections::BTreeSet::new();
+    for s in sigs {
+        let agent = s
+            .get("agent")
+            .and_then(|v| v.as_str())
+            .ok_or("signature.agent missing")?;
+        if !seen.insert(agent.to_string()) {
+            return Err(format!("duplicate signer {agent}"));
+        }
+        let key = AgentPubKey::try_from(agent)
+            .map_err(|e| format!("signature.agent invalid: {e:?}"))?;
+        let raw = {
+            use base64::{engine::general_purpose::STANDARD, Engine as _};
+            STANDARD
+                .decode(
+                    s.get("signature")
+                        .and_then(|v| v.as_str())
+                        .ok_or("signature.signature missing")?,
+                )
+                .map_err(|e| format!("signature not base64: {e}"))?
+        };
+        let bytes: [u8; 64] = raw
+            .try_into()
+            .map_err(|_| "signature must be 64 bytes".to_string())?;
+        // `verify_signature_raw` verifies the LITERAL bytes (no re-serialization) —
+        // the counterpart to `keystore.sign(agent, bytes)`, which signs the
+        // literal bytes too. See the module note above.
+        let ok = verify_signature_raw(key, Signature(bytes), cid.as_bytes().to_vec())
+            .map_err(|e| format!("verify_signature: {e:?}"))?;
+        if !ok {
+            return Err(format!(
+                "signature by {agent} does not verify over signing_payload_cid"
+            ));
+        }
+    }
+    if seen.len() < required {
+        return Err(format!(
+            "quorum unmet: {} of {required} signatures",
+            seen.len()
+        ));
+    }
+    Ok(())
+}
+
+fn validate_migrates_lineage(payload: &serde_json::Value) -> Result<(), String> {
+    for field in [
+        "action",
+        "role",
+        "from_dna_hash",
+        "to_dna_hash",
+        "release_cid",
+        "constitution_root",
+        "roster_cid",
+        "signing_payload_cid",
+        "signatures",
+        "evidence",
+        "window",
+    ] {
+        if payload.get(field).is_none() {
+            return Err(format!("migrates-lineage missing required field: {field}"));
+        }
+    }
+    if payload["action"] != "migrates-lineage" {
+        return Err("action field must equal 'migrates-lineage'".into());
+    }
+    for f in ["from_dna_hash", "to_dna_hash"] {
+        let h = payload[f].as_str().unwrap_or("");
+        if !h.starts_with("uhC0k") {
+            return Err(format!("{f} must be a DNA hash (uhC0k…)"));
+        }
+    }
+    if payload["from_dna_hash"] == payload["to_dna_hash"] {
+        return Err("from_dna_hash and to_dna_hash must differ".into());
+    }
+    let w = payload["window"].as_object().ok_or("window must be object")?;
+    let (opens_at, revert_until) = (
+        w.get("opens_at")
+            .and_then(|v| v.as_str())
+            .ok_or("window.opens_at missing")?,
+        w.get("revert_until")
+            .and_then(|v| v.as_str())
+            .ok_or("window.revert_until missing")?,
+    );
+    // RFC3339 UTC strings compare lexicographically ONLY when both are
+    // `Z`-suffixed (fixed-offset forms sort out of chronological order).
+    if !opens_at.ends_with('Z') || !revert_until.ends_with('Z') {
+        return Err("window.opens_at and window.revert_until must be RFC3339 UTC ('Z'-suffixed)"
+            .into());
+    }
+    if opens_at >= revert_until {
+        return Err("window.opens_at must precede window.revert_until".into());
+    }
+    validate_lineage_signatures(payload)
+}
+
+fn validate_sunsets_lineage(payload: &serde_json::Value) -> Result<(), String> {
+    for field in [
+        "action",
+        "role",
+        "from_dna_hash",
+        "to_dna_hash",
+        "migration_commitment_cid",
+        "signing_payload_cid",
+        "signatures",
+        "evidence",
+        "window",
+    ] {
+        if payload.get(field).is_none() {
+            return Err(format!("sunsets-lineage missing required field: {field}"));
+        }
+    }
+    if payload["action"] != "sunsets-lineage" {
+        return Err("action field must equal 'sunsets-lineage'".into());
+    }
+    let sunsets_at = payload["window"]
+        .get("sunsets_at")
+        .and_then(|v| v.as_str())
+        .ok_or("window.sunsets_at missing")?;
+    if !sunsets_at.ends_with('Z') {
+        return Err("window.sunsets_at must be RFC3339 UTC ('Z'-suffixed)".into());
+    }
+    validate_lineage_signatures(payload)
 }
 
 fn validate_delegates_compute(payload: &serde_json::Value) -> Result<(), String> {
