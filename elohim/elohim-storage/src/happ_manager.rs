@@ -70,10 +70,13 @@ use std::time::Duration;
 
 use holochain_client::{AdminWebsocket, AllowedOrigins, CellInfo, InstallAppPayload};
 use holochain_types::app::{
-    AppBundle, AppBundleSource, AppStatus, CoordinatorSource, UpdateCoordinatorsPayload,
+    AppBundle, AppBundleSource, AppStatus, CoordinatorSource, RoleSettings,
+    UpdateCoordinatorsPayload,
 };
 use holochain_types::dna::{CoordinatorBundle, CoordinatorManifest, DnaFile, ZomeManifest};
-use holochain_types::prelude::{DnaDef, ZomeDependency};
+use holochain_types::prelude::{
+    AgentPubKey, DnaDef, DnaHash, DnaModifiersOpt, YamlProperties, ZomeDependency,
+};
 use tracing::{error, info, warn};
 
 /// Default installed app ID.
@@ -809,6 +812,139 @@ async fn install_fresh(
         .await
         .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
     info!(app_id = app_id, "hApp enabled");
+
+    Ok(())
+}
+
+/// The lineage-scoped installed-app-id for a second app sharing the base
+/// app's agent key: `{base}@{first 12 chars of the DNA hash after the
+/// "uhC0k" HoloHash prefix}` — e.g. `elohim@yvKwO2J5u3mf`. Deterministic and
+/// collision-resistant enough for the evaluation window a lineage app lives
+/// in (it is never the base app's permanent identity).
+pub fn lineage_app_id(base: &str, dna_hash: &str) -> String {
+    let short: String = dna_hash.chars().skip(5).take(12).collect();
+    format!("{base}@{short}")
+}
+
+/// Read the network seed the base app's `role` cell was provisioned with, so
+/// a lineage install can inherit it. Cells only share a DHT/network family
+/// when they share a network seed — installing a lineage app WITHOUT this
+/// would silently fork the new cell onto its own network, isolated from the
+/// base app's peers, rather than joining the same evolving DHT.
+async fn base_role_seed(
+    admin_ws: &AdminWebsocket,
+    base_app_id: &str,
+    role: &str,
+) -> anyhow::Result<String> {
+    let apps = admin_ws
+        .list_apps(None)
+        .await
+        .map_err(|e| anyhow::anyhow!("list_apps: {e}"))?;
+    let base = apps
+        .iter()
+        .find(|a| a.installed_app_id == base_app_id)
+        .ok_or_else(|| anyhow::anyhow!("base app '{base_app_id}' is not installed"))?;
+    let cells = base
+        .cell_info
+        .get(role)
+        .ok_or_else(|| anyhow::anyhow!("base app '{base_app_id}' has no role '{role}'"))?;
+    let provisioned = cells
+        .iter()
+        .find_map(|c| match c {
+            CellInfo::Provisioned(p) => Some(p),
+            _ => None,
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!("base app '{base_app_id}' role '{role}' has no provisioned cell")
+        })?;
+    Ok(provisioned.dna_modifiers.network_seed.clone())
+}
+
+/// Install a second app alongside the base app ([`APP_ID`]), under the SAME
+/// agent key — never a new one — so both apps' source chains are authored by
+/// the one identity. Used to bring a lineage DNA (a coordinator- or
+/// integrity-zome evolution of an already-installed role) onto the conductor
+/// for evaluation without touching the base app's chains: no uninstall, no
+/// re-key, no data loss — see the module doc for why a reinstall is never the
+/// answer here.
+///
+/// `roles_settings[role]` carries a `lineage` property (the DNA hashes this
+/// bundle's cell supersedes) and the base app's network seed for `role`, so
+/// the new cell lands on the same DHT the base app's cell for that role is
+/// on rather than forking a private network.
+///
+/// Idempotent: if `lineage_app_id` is already installed, this is a no-op —
+/// safe to call on every boot/reconcile pass the same way [`install_fresh`]
+/// is guarded by its caller's `list_apps` check.
+pub async fn install_lineage(
+    admin_ws: &AdminWebsocket,
+    happ_path: &Path,
+    lineage_app_id: &str,
+    agent_key: AgentPubKey,
+    lineage: &[DnaHash],
+    role: &str,
+) -> anyhow::Result<()> {
+    let apps = admin_ws
+        .list_apps(None)
+        .await
+        .map_err(|e| anyhow::anyhow!("list_apps: {e}"))?;
+    if apps.iter().any(|a| a.installed_app_id == lineage_app_id) {
+        info!(
+            app_id = lineage_app_id,
+            "lineage app already installed — idempotent"
+        );
+        return Ok(());
+    }
+
+    let network_seed = base_role_seed(admin_ws, APP_ID, role).await?;
+
+    // YamlProperties wraps a private `yaml_serde::Value`; the crate is not a
+    // direct dependency here, so we go through its generic Deserialize impl
+    // (self-describing, format-agnostic) via serde_json instead of naming
+    // the type directly.
+    let lineage_json = serde_json::json!({
+        "lineage": lineage.iter().map(|h| h.to_string()).collect::<Vec<_>>(),
+    });
+    let properties: YamlProperties = serde_json::from_value(lineage_json)
+        .map_err(|e| anyhow::anyhow!("build lineage properties: {e}"))?;
+
+    let mut roles_settings = std::collections::HashMap::new();
+    roles_settings.insert(
+        role.to_string(),
+        RoleSettings::Provisioned {
+            membrane_proof: None,
+            modifiers: Some(DnaModifiersOpt {
+                network_seed: Some(network_seed),
+                properties: Some(properties),
+            }),
+            init_properties: None,
+        },
+    );
+
+    let payload = InstallAppPayload {
+        source: AppBundleSource::Path(happ_path.to_path_buf()),
+        agent_key: Some(agent_key),
+        installed_app_id: Some(lineage_app_id.to_string()),
+        roles_settings: Some(roles_settings),
+        network_seed: None,
+        ignore_genesis_failure: false,
+        restore_from_dht: false,
+    };
+
+    admin_ws
+        .install_app(payload)
+        .await
+        .map_err(|e| anyhow::anyhow!("install_app({lineage_app_id}) failed: {e}"))?;
+    info!(
+        app_id = lineage_app_id,
+        "lineage app installed beside the base app under the existing key"
+    );
+
+    admin_ws
+        .enable_app(lineage_app_id.to_string())
+        .await
+        .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
+    info!(app_id = lineage_app_id, "lineage app enabled");
 
     Ok(())
 }
@@ -1809,11 +1945,26 @@ mod tests {
     #[tokio::test]
     #[ignore = "diagnostic: set ELOHIM_HAPP_PROBE to a .happ path"]
     async fn probe_bundle_dna_hashes() {
-        let Ok(path) = std::env::var("ELOHIM_HAPP_PROBE") else { return };
-        let hashes = bundle_dna_hashes(std::path::Path::new(&path)).await.expect("resolve");
-        for (role, h) in &hashes { eprintln!("[probe] bundle_dna_hashes {role} = {h}"); }
-        let files = bundle_role_dna_files(std::path::Path::new(&path)).await.expect("resolve files");
-        for (role, f) in &files { eprintln!("[probe] bundle_role_dna_files {role} = {}", f.dna_hash()); }
+        let Ok(path) = std::env::var("ELOHIM_HAPP_PROBE") else {
+            return;
+        };
+        let hashes = bundle_dna_hashes(std::path::Path::new(&path))
+            .await
+            .expect("resolve");
+        for (role, h) in &hashes {
+            eprintln!("[probe] bundle_dna_hashes {role} = {h}");
+        }
+        let files = bundle_role_dna_files(std::path::Path::new(&path))
+            .await
+            .expect("resolve files");
+        for (role, f) in &files {
+            eprintln!("[probe] bundle_role_dna_files {role} = {}", f.dna_hash());
+        }
     }
 
+    #[test]
+    fn lineage_app_id_takes_12_chars_after_the_uhc0k_prefix() {
+        let hash = "uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH";
+        assert_eq!(lineage_app_id("elohim", hash), "elohim@yvKwO2J5u3mf");
+    }
 }
