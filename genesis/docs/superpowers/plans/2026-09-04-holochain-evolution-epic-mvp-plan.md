@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:cd90459caf3769fe | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:34b14055bad5132e | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -813,6 +813,26 @@ The rehearsal measures with these open and says so in every receipt. They are in
 - Test: sweettest — jessica's post-close v1 write, carried by james (who never sealed), is refused by v2 as after-close.
 
 - [ ] **Task 23 deliverable: Station 8's "every peer" claim holds — a post-close v1 fact is refused by v2 regardless of which courier carries it.**
+
+---
+
+### Tasks 24–25: growth shapes found by reading the landed code (2026-09-05; G8 coordinator-side now, G9 rides the crossing)
+
+### Task 24: G8 — the export walk is linear, the digest computed once per walk
+
+**Files:**
+- Modify: `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` (unconditional): `export_records` / `export_held_records` take an opaque `cursor` that carries `(position, chain_head_hash)`; the first page computes the digest and total ONCE and returns them with the cursor; later pages verify the head has not moved (else refuse `chain moved — restart at 0`) and walk only their window (`query` with a `sequence_range`); `entry_already_witnessed` batches the witness lookups per page. Storage's `fold_carry` and `next_sweep` already restart on a digest change — unchanged.
+- Test: sweettest — a 200-record chain exports in pages with one digest computation; a mid-walk write makes the next page refuse with the named reason.
+
+- [ ] **Task 24 deliverable: carrying N records costs O(N) record loads, not O(N²/64); default `node-registry.dna` hash unchanged.**
+
+### Task 25: G9 — bounded after-close validation (rides the Tasks 21–23 crossing)
+
+**Files:**
+- Modify: integrity `refuse_carried_after_close` (gated block): each witness carries `close_seq: Option<u32>` for its lineage; validation compares a carried proof's `action_seq` against the close named in the SAME witness (present after the seal per Task 23) and walks the carrier chain only when the witness predates the seal, bounded by `ChainFilter::until_hash` of the last witness.
+- Test: sweettest — validation cost per witness is constant after the seal (assert the walk length via a counter exposed in test builds).
+
+- [ ] **Task 25 deliverable: after-close validation is O(1) per witness once the close travels in the witness; hash-moving, lands with Tasks 21–23.**
 
 ---
 
