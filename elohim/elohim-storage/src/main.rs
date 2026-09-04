@@ -4033,6 +4033,25 @@ async fn async_main(
     // role's dual-cell state. The passport only ever snapshots this Arc —
     // it never holds it live.
     http_server = http_server.with_lineage_roles(Arc::clone(&lineage_roles));
+    // Station 6 (Task 12): the trailing bridge sweep. CONSTRUCTED here, where
+    // `http_server` is still owned, so `/version` can snapshot it and
+    // `POST /admin/lineage/reset` can clear it; the ticker itself is SPAWNED
+    // further down, after the apply vehicles are registered — see the "Station
+    // 6" block below for why it is spawned there and outside them.
+    let lineage_bridge = hc_registry_for_http.as_ref().map(|registry| {
+        Arc::new(
+            elohim_storage::services::lineage_bridge::LineageBridge::new(
+                Arc::clone(&lineage_roles),
+                Arc::clone(registry),
+                args.app_id.clone(),
+            ),
+        )
+    });
+    if let Some(ref bridge) = lineage_bridge {
+        // The SAME Arc the ticker will hold, so `/version` reads the live sweep
+        // and the reset route clears the one being written.
+        http_server = http_server.with_lineage_bridge(Arc::clone(bridge));
+    }
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
     // When the iroh node started successfully, thread its blob store so that
@@ -5814,6 +5833,25 @@ async fn async_main(
                 "release-adoption controller spawned"
             );
         }
+    }
+
+    // ── Station 6: the trailing lineage bridge sweep ──────────────────────────
+    //
+    // The apply vehicle above crosses THIS peer's own chain once, when a window
+    // opens. Its neighbours keep authoring on v1 for as long as the window is
+    // open, and those records reach v2 only if somebody held-carries them. This
+    // ticker is that somebody.
+    //
+    // Spawned OUTSIDE the release-adoption block on purpose: a window can be
+    // open on a node whose adoption controller never armed (an operator-driven
+    // crossing, a fixture, a peer with no artifact source), and a courier that
+    // only sweeps where a controller happens to be running is a courier that
+    // silently stops.
+    //
+    // It idles at zero conductor cost while no window is open — the first thing
+    // a tick reads is the in-process `LineageRoles` snapshot.
+    if let Some(bridge) = lineage_bridge {
+        bridge.spawn(shutdown_tx.subscribe());
     }
 
     info!("Press Ctrl+C to stop.");

@@ -84,6 +84,7 @@ pub mod inference_router;
 pub mod knowledge_service;
 pub mod lens_facing; // lens-market service layer — DB → affinity fold → LensBindingView (S5)
 pub mod limit_gradient_registry;
+pub mod lineage_bridge; // Station 6 — trailing held-carry sweep: one page per tick per neighbour while a lineage window is open
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;

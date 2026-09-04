@@ -126,6 +126,9 @@
 
 pub mod apply;
 pub mod artifact_pull;
+/// The `carry_from` wire mirror + cursor fold, shared by the apply vehicle and
+/// the trailing bridge sweep (Task 12).
+pub mod carry;
 pub mod path_evidence;
 pub mod state;
 pub mod verify;

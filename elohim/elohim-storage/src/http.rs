@@ -393,6 +393,12 @@ pub struct HttpServer {
     /// test fixture that never wires it → `/version` reports an empty
     /// lineage snapshot, byte-identical to the pre-Task-8 shape.
     lineage_roles: Option<Arc<crate::lineage_roles::LineageRoles>>,
+    /// The trailing bridge sweep (Task 12), wired at startup from the SAME
+    /// `Arc<LineageBridge>` the ticker task holds. `GET /version` snapshots it
+    /// (never holds the Arc in the passport) and `POST /admin/lineage/reset`
+    /// clears it. `None` on a fixture that never wired one → an empty sweep,
+    /// which serializes identically to the pre-Task-12 shape.
+    lineage_bridge: Option<Arc<crate::services::lineage_bridge::LineageBridge>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -904,6 +910,7 @@ impl HttpServer {
             admin_websocket: None,
             happ_app_id: None,
             lineage_roles: None,
+            lineage_bridge: None,
             fan_out_ctx: None,
             network_stakes_resolver: None,
             #[cfg(feature = "ssr")]
@@ -1054,6 +1061,18 @@ impl HttpServer {
         lineage_roles: Arc<crate::lineage_roles::LineageRoles>,
     ) -> Self {
         self.lineage_roles = Some(lineage_roles);
+        self
+    }
+
+    /// Wire the trailing bridge sweep (Task 12). Pass the SAME
+    /// `Arc<LineageBridge>` that was spawned as the ticker, so `/version`
+    /// reads the live sweep and `POST /admin/lineage/reset` clears the one the
+    /// ticker is actually writing.
+    pub fn with_lineage_bridge(
+        mut self,
+        lineage_bridge: Arc<crate::services::lineage_bridge::LineageBridge>,
+    ) -> Self {
+        self.lineage_bridge = Some(lineage_bridge);
         self
     }
 
@@ -1536,6 +1555,11 @@ impl HttpServer {
                             .lineage_roles
                             .as_ref()
                             .map(|lineage_roles| lineage_roles.snapshot())
+                            .unwrap_or_default(),
+                        sweep: self
+                            .lineage_bridge
+                            .as_ref()
+                            .map(|bridge| bridge.snapshot())
                             .unwrap_or_default(),
                     },
                 )
@@ -5219,6 +5243,15 @@ impl HttpServer {
             }
             None => Vec::new(),
         };
+        // Task 12: the bridge's cursors are ordinals into a view of a side app
+        // this route is about to disable (and maybe uninstall). Leaving them
+        // behind would resume a sweep at a position with nothing behind it, so
+        // baseline convergence forgets them for the same reason and at the same
+        // moment it forgets the window — unconditional and conductor-free, like
+        // the `reset_all` above it.
+        if let Some(bridge) = self.lineage_bridge.as_ref() {
+            bridge.reset();
+        }
 
         let Some(admin_ws) = self.admin_websocket.as_deref().cloned().or_else(|| {
             self.hc_registry

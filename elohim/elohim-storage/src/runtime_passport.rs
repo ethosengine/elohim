@@ -12,6 +12,7 @@ use holochain_client::{AdminWebsocket, CellInfo};
 use serde::Serialize;
 
 use crate::lineage_roles::RoleLineage;
+use crate::services::lineage_bridge::{AgentSweep, SweepKey};
 
 const HAPP_INVENTORY_BUDGET: Duration = Duration::from_secs(5);
 
@@ -117,6 +118,83 @@ pub struct RoleLineageView {
     pub reading_dna_hash: String,
     pub authoring_dna_hash: String,
     pub closed: bool,
+    /// **Task 12.** Whether a record authored on V2 during this window can
+    /// travel BACKWARD into the v1 line.
+    ///
+    /// At MVP the answer is `unavailable` whenever the two cells are on
+    /// different DNAs, and it is a fact about v1 rather than a limitation of
+    /// this build: the v1 integrity zome has no witness entry type, so there is
+    /// nothing on that side that could hold a carried v2 record. Forward carry
+    /// (v1 → v2, both the apply vehicle's self-carry and the bridge's
+    /// held-carry) is unaffected.
+    ///
+    /// Reported rather than assumed so an operator reading `/version` during a
+    /// window is never left to infer it from silence.
+    pub backward_carry: BackwardCarry,
+    /// **Task 12.** What the trailing bridge sweep has OBSERVED of each
+    /// neighbour still authoring on v1, sorted by agent. Empty — and absent
+    /// from the wire — before the first sweep, and on a build with no bridge
+    /// wired.
+    ///
+    /// **These are observations, never claims of completeness.** Each entry
+    /// describes this peer's own integrated view of that neighbour's chain; a
+    /// held page is not self-evidencing. Station 6 establishes completeness by
+    /// comparing this view against the neighbour's OWN `export_records`, which
+    /// is a harness-side cross-view check — storage never calls a neighbour's
+    /// HTTP to manufacture one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sweep: Vec<AgentSweepView>,
+}
+
+/// Whether backward (v2 → v1) carry is possible for a role's crossing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BackwardCarry {
+    /// The two cells are on different DNAs and the v1 line has no witness type
+    /// by construction — a record authored on v2 has nowhere to land in v1.
+    Unavailable,
+    /// Reading and authoring resolve to the same DNA, so nothing has to cross
+    /// a line at all.
+    Available,
+}
+
+/// One neighbour's trailing sweep, projected from
+/// [`crate::services::lineage_bridge::AgentSweep`].
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSweepView {
+    /// The neighbour, canonical `uhCAk…`.
+    pub agent: String,
+    /// Where the next tick resumes; absent means "at the beginning", which is
+    /// equally the fresh state, the end of the local view, and a restart.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<u32>,
+    /// The highest action sequence the predecessor observed for this chain —
+    /// the ONE number that reaches past this peer's own view, and so the only
+    /// cross-view staleness signal a reader gets. Its distance from `total` is
+    /// normally large (it spans every action, not just app entries) and is not
+    /// a staleness measure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_head: Option<u32>,
+    /// The record count of THIS PEER'S view of the neighbour's chain — never
+    /// the neighbour's own total.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u32>,
+    /// The digest of this peer's view. Two couriers at different catch-up
+    /// points legitimately report different digests for the same neighbour;
+    /// that is a staleness signal, not a fork.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    /// Records this sweep has NEWLY moved into v2 for this neighbour,
+    /// accumulated over ticks. A re-walk of an already-carried view adds
+    /// nothing.
+    pub carried: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sweep: Option<String>,
+    /// A page failure, or the `restarted:` note a mid-walk digest change
+    /// leaves. Cleared by the next clean page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -155,6 +233,14 @@ pub struct StoragePassportContext {
     /// every `/version` call. Empty on a node with no lineage window ever
     /// opened, which is byte-identical to the pre-Task-8 response.
     pub lineage: BTreeMap<String, RoleLineage>,
+    /// **Task 12.** Point-in-time copy of the trailing bridge sweep
+    /// (`LineageBridge::snapshot()`), keyed `(role, agent)`. Same discipline as
+    /// `lineage` above: the passport holds the SNAPSHOT, never the
+    /// `Arc<LineageBridge>`. Empty on a node with no bridge wired and on one
+    /// that has never swept — both of which serialize identically to the
+    /// pre-Task-12 response, because a role with no lineage window emits no
+    /// `lineage` object to hang a `sweep` off at all.
+    pub sweep: BTreeMap<SweepKey, AgentSweep>,
 }
 
 /// Assemble a fresh storage runtime passport.
@@ -178,7 +264,7 @@ pub async fn assemble_storage_passport(ctx: StoragePassportContext) -> RuntimeVe
     let happ = match ctx.admin_websocket.as_ref() {
         Some(admin) => match tokio::time::timeout(
             HAPP_INVENTORY_BUDGET,
-            inspect_installed_happ(admin, &ctx.app_id, &ctx.lineage),
+            inspect_installed_happ(admin, &ctx.app_id, &ctx.lineage, &ctx.sweep),
         )
         .await
         {
@@ -275,6 +361,7 @@ async fn inspect_installed_happ(
     admin: &AdminWebsocket,
     app_id: &str,
     lineage: &BTreeMap<String, RoleLineage>,
+    sweep: &BTreeMap<SweepKey, AgentSweep>,
 ) -> HappPassport {
     let apps = match admin.list_apps(None).await {
         Ok(apps) => apps,
@@ -372,7 +459,7 @@ async fn inspect_installed_happ(
         } else {
             None
         };
-        let lineage_view = lineage_view_for(role, &dna_hash, lineage, authoring_dna_hash);
+        let lineage_view = lineage_view_for(role, &dna_hash, lineage, authoring_dna_hash, sweep);
 
         roles.push(HappRolePassport {
             role: role.to_string(),
@@ -492,18 +579,50 @@ fn lineage_view_for(
     dna_hash: &str,
     snapshot: &BTreeMap<String, RoleLineage>,
     authoring_dna_hash: Option<String>,
+    sweep: &BTreeMap<SweepKey, AgentSweep>,
 ) -> Option<RoleLineageView> {
     let entry = snapshot.get(role)?;
     if entry.authoring_app_id == entry.reading_app_id && !entry.closed {
         return None;
     }
+    let authoring_dna_hash = authoring_dna_hash.unwrap_or_else(|| "unknown".to_string());
+    // An `"unknown"` authoring hash is NOT read as "same DNA": a lookup that
+    // failed is not evidence that backward carry is possible, and reporting
+    // `available` from a failed lookup is the one direction of error that
+    // false-reassures.
+    let backward_carry = if authoring_dna_hash == dna_hash {
+        BackwardCarry::Available
+    } else {
+        BackwardCarry::Unavailable
+    };
     Some(RoleLineageView {
         reading_app_id: entry.reading_app_id.clone(),
         authoring_app_id: entry.authoring_app_id.clone(),
         reading_dna_hash: dna_hash.to_string(),
-        authoring_dna_hash: authoring_dna_hash.unwrap_or_else(|| "unknown".to_string()),
+        authoring_dna_hash,
         closed: entry.closed,
+        backward_carry,
+        sweep: sweep_view_for(role, sweep),
     })
+}
+
+/// This role's slice of the bridge sweep, agent-sorted (the `BTreeMap` key
+/// order already is).
+fn sweep_view_for(role: &str, sweep: &BTreeMap<SweepKey, AgentSweep>) -> Vec<AgentSweepView> {
+    sweep
+        .iter()
+        .filter(|((swept_role, _), _)| swept_role == role)
+        .map(|((_, agent), state)| AgentSweepView {
+            agent: agent.clone(),
+            cursor: state.cursor,
+            observed_head: state.observed_head,
+            total: state.total,
+            digest: state.last_digest.clone(),
+            carried: state.carried,
+            last_sweep: state.last_sweep.clone(),
+            last_error: state.last_error.clone(),
+        })
+        .collect()
 }
 
 pub fn host_passport() -> HostPassport {
@@ -565,6 +684,7 @@ mod tests {
             libp2p_active: false,
             iroh_active: false,
             lineage: BTreeMap::new(),
+            sweep: BTreeMap::new(),
         })
         .await;
         let actual = serde_json::to_value(response).unwrap();
@@ -593,6 +713,7 @@ mod tests {
             libp2p_active: true,
             iroh_active: true,
             lineage: BTreeMap::new(),
+            sweep: BTreeMap::new(),
         })
         .await;
         let json = serde_json::to_value(response).unwrap();
@@ -743,7 +864,13 @@ mod tests {
                 dna_hash: "uhC0k-example".to_string(),
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: None,
-                lineage: lineage_view_for("node_registry", "uhC0k-example", &BTreeMap::new(), None),
+                lineage: lineage_view_for(
+                    "node_registry",
+                    "uhC0k-example",
+                    &BTreeMap::new(),
+                    None,
+                    &BTreeMap::new(),
+                ),
                 constitution_root: None,
             }],
             error: None,
@@ -760,7 +887,14 @@ mod tests {
     #[test]
     fn lineage_view_for_no_entry_returns_none() {
         let snapshot: BTreeMap<String, RoleLineage> = BTreeMap::new();
-        assert!(lineage_view_for("node_registry", "uhC0k-base", &snapshot, None).is_none());
+        assert!(lineage_view_for(
+            "node_registry",
+            "uhC0k-base",
+            &snapshot,
+            None,
+            &BTreeMap::new()
+        )
+        .is_none());
     }
 
     #[test]
@@ -779,6 +913,7 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             Some("uhC0k-lineage".to_string()),
+            &BTreeMap::new(),
         )
         .expect("open window projects a view");
         assert_eq!(view.reading_app_id, "elohim");
@@ -786,6 +921,71 @@ mod tests {
         assert_eq!(view.reading_dna_hash, "uhC0k-base");
         assert_eq!(view.authoring_dna_hash, "uhC0k-lineage");
         assert!(!view.closed);
+        // Task 12: the two cells are on different DNAs, so a v2 record has
+        // nowhere to land in the v1 line.
+        assert_eq!(view.backward_carry, BackwardCarry::Unavailable);
+        assert!(view.sweep.is_empty(), "no bridge sweep has run yet");
+    }
+
+    /// **Task 12.** The sweep projection: this role's slice only, agent-sorted,
+    /// with the courier's own observations verbatim — and NEVER a completeness
+    /// claim, which is why there is no `complete` field to assert on.
+    #[test]
+    fn the_sweep_view_carries_this_roles_neighbours_only() {
+        use crate::services::lineage_bridge::AgentSweep;
+
+        let mut snapshot = BTreeMap::new();
+        snapshot.insert(
+            "node_registry".to_string(),
+            RoleLineage {
+                reading_app_id: "elohim".to_string(),
+                authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
+                closed: false,
+            },
+        );
+        let mut sweep = BTreeMap::new();
+        sweep.insert(
+            ("node_registry".to_string(), "uhCAkJessica".to_string()),
+            AgentSweep {
+                cursor: Some(16),
+                last_digest: Some("digest-a".into()),
+                observed_head: Some(57),
+                total: Some(41),
+                carried: 16,
+                last_sweep: Some("2026-09-04T00:00:00Z".into()),
+                last_error: None,
+            },
+        );
+        // A different ROLE's neighbour must not leak into this role's view.
+        sweep.insert(
+            ("lamad".to_string(), "uhCAkAdam".to_string()),
+            AgentSweep::default(),
+        );
+
+        let view = lineage_view_for(
+            "node_registry",
+            "uhC0k-base",
+            &snapshot,
+            Some("uhC0k-lineage".to_string()),
+            &sweep,
+        )
+        .expect("open window projects a view");
+        assert_eq!(view.sweep.len(), 1);
+        let jessica = &view.sweep[0];
+        assert_eq!(jessica.agent, "uhCAkJessica");
+        assert_eq!(jessica.cursor, Some(16));
+        assert_eq!(jessica.observed_head, Some(57));
+        assert_eq!(jessica.total, Some(41));
+        assert_eq!(jessica.digest.as_deref(), Some("digest-a"));
+        assert_eq!(jessica.carried, 16);
+        assert!(jessica.last_error.is_none());
+
+        // And it reaches the wire in camelCase, under the role's `lineage`.
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(json["backwardCarry"], "unavailable");
+        assert_eq!(json["sweep"][0]["observedHead"], 57);
+        assert_eq!(json["sweep"][0]["lastSweep"], "2026-09-04T00:00:00Z");
+        assert!(json["sweep"][0].get("lastError").is_none());
     }
 
     #[test]
@@ -804,12 +1004,21 @@ mod tests {
                 closed: true,
             },
         );
-        let view = lineage_view_for("node_registry", "uhC0k-base", &snapshot, None)
-            .expect("closed=true alone still projects a view");
+        let view = lineage_view_for(
+            "node_registry",
+            "uhC0k-base",
+            &snapshot,
+            None,
+            &BTreeMap::new(),
+        )
+        .expect("closed=true alone still projects a view");
         assert_eq!(view.reading_app_id, "elohim");
         assert_eq!(view.authoring_app_id, "elohim");
         assert_eq!(view.authoring_dna_hash, "unknown");
         assert!(view.closed);
+        // An `"unknown"` authoring hash is never read as "same DNA" — a failed
+        // lookup must not report backward carry as available.
+        assert_eq!(view.backward_carry, BackwardCarry::Unavailable);
     }
 
     #[test]
@@ -825,7 +1034,14 @@ mod tests {
                 closed: false,
             },
         );
-        assert!(lineage_view_for("node_registry", "uhC0k-base", &snapshot, None).is_none());
+        assert!(lineage_view_for(
+            "node_registry",
+            "uhC0k-base",
+            &snapshot,
+            None,
+            &BTreeMap::new()
+        )
+        .is_none());
     }
 
     #[test]

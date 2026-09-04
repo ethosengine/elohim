@@ -583,189 +583,18 @@ impl ApplyVehicle for HappBundleVehicle {
 // happ-lineage → install beside, carry, attest (rung 6)
 // ---------------------------------------------------------------------------
 
-/// How many v1 records ONE `carry_from` call moves.
-///
-/// **C3/C6a — the work is bounded on the WASM side, before the call is made.**
-/// `HcClient::call_zome` has no timeout and no cancellation path, so a
-/// caller-side deadline would merely abandon a conductor that keeps running.
-/// The only honest bound is a small batch the extern can always finish, driven
-/// by a cursor: 32 records per call, as many calls as the chain needs, each one
-/// individually cheap enough that the sweep tick is never held hostage.
-pub const CARRY_PAGE_LIMIT: u32 = 32;
+// The `carry_from` wire contract and its cursor fold live in
+// [`super::carry`] — Task 12 added a SECOND driver (the trailing bridge sweep,
+// `crate::services::lineage_bridge`) that shares the contract and not the loop.
+// Re-exported here so every pre-Task-12 name (`apply::CarryInput`,
+// `apply::CarryReceipt`, `apply::CARRY_PAGE_LIMIT`) still resolves unchanged.
+use super::carry::fold_carry;
+pub use super::carry::{
+    call_carry_from, CarryInput, CarryReceipt, CarrySource, CARRY_FN, CARRY_PAGE_LIMIT, CARRY_ZOME,
+};
 
-/// The hard ceiling on pages ONE role's carry may walk in ONE apply.
-///
-/// At [`CARRY_PAGE_LIMIT`] this is ~131k records — far beyond the rehearsal
-/// corpus, and finite. A zome that never sets `next_cursor` to `None` would
-/// otherwise loop this vehicle forever inside a controller sweep; the ceiling
-/// turns that into a typed `apply_failed` an operator can read.
-const MAX_CARRY_PAGES: u32 = 4_096;
-
-/// The zome the lineage carry runs in, on the v2 (side) cell.
-const CARRY_ZOME: &str = "node_registry_coordinator";
-/// The coordinator function that carries one page. Task 9 lands it.
-const CARRY_FN: &str = "carry_from";
 /// This vehicle's stable receipt name.
 const LINEAGE_VEHICLE: &str = "happ-lineage";
-
-/// Wire mirror of the v2 cell's `carry_from` INPUT (Task 9's contract).
-///
-/// Mirrored here — rather than imported from the zome — for the same reason
-/// [`super::ReleaseManifest`] mirrors T1's schema: the zome crate is a wasm
-/// target this crate does not link. The mirror is the contract, and it is
-/// pinned by the round-trip test below.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CarryInput {
-    /// The v1 cell to read FROM — the base app's provisioned cell for this
-    /// role. Passed explicitly rather than discovered in-wasm: the v2 cell has
-    /// no way to know which of a conductor's cells is its own predecessor, and
-    /// guessing is the one thing a migration must never do.
-    pub v1_cell: holochain_client::CellId,
-    /// `None` starts at the beginning. Cursor-driven, so a carry that is
-    /// interrupted resumes rather than restarting.
-    ///
-    /// **Correction (Task 9, as landed): the zome is NOT yet idempotent by
-    /// entry hash.** An earlier draft of this comment claimed C6b was already
-    /// held on the zome side; it is not. `carry_from` calls `create_entry`
-    /// unconditionally for a self-carry, so re-carrying a cursor re-creates the
-    /// entry (same entry hash, NEW action) and commits a SECOND
-    /// `NotarizationWitness` for the page. Within one `fold_carry` sweep this
-    /// cannot happen — the non-advancing-cursor refusal below stops it — but a
-    /// RETRIED whole apply would double-carry.
-    ///
-    /// Filed follow-up station: *carry idempotency — query the chain for the
-    /// entry hash before `create_entry`* (and skip the witness for a page whose
-    /// proofs are all already witnessed). Until that lands, treat a retried
-    /// apply as producing duplicate actions, not as a no-op.
-    pub cursor: Option<u32>,
-    pub limit: u32,
-}
-
-/// Wire mirror of the v2 cell's `carry_from` OUTPUT — ONE page.
-///
-/// # The decode contract Task 9 must honour
-///
-/// `v1_digest` and `witness_hash` are `String`. A coordinator that returns a
-/// native `EntryHash`/`ActionHash` here sends a msgpack BYTE ARRAY, and this
-/// decode fails with "invalid value: byte array, expected a string" — the
-/// 2026-06-13 signal-decode class that has now bitten this codebase three
-/// times. The zome renders the canonical base64 (`HoloHash`'s `Display`)
-/// before returning; the storage side never re-derives a hash.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CarryReceipt {
-    /// Records this page moved into v2.
-    pub carried: u32,
-    /// Where the next page starts, or `None` when v1 is exhausted. The loop's
-    /// ONLY termination condition — never a count comparison, because a count
-    /// the caller derived is not evidence the chain ended.
-    pub next_cursor: Option<u32>,
-    /// The digest over the v1 export as of this page.
-    pub v1_digest: String,
-    /// The `NotarizationWitness` this page authored, base64.
-    pub witness_hash: String,
-    /// **Additive.** The v1 cell's own total record count, when the zome can
-    /// state it. `#[serde(default)]` so a page that omits it decodes to `None`
-    /// on an older peer and a newer peer's page decodes on an older build —
-    /// the additive-wire floor, applied to a contract Task 9 owns.
-    ///
-    /// This is the ONLY honest source for
-    /// [`super::LineageCarryReceipt::v1_count`]. It is never derived from
-    /// `carried`: a count this side computed from its own walk cannot witness
-    /// that the walk was complete, which is precisely what
-    /// `carried == v1_count` is supposed to establish.
-    #[serde(default)]
-    pub v1_total: Option<u32>,
-}
-
-/// Fold a cursor-driven carry into one [`super::LineageCarryReceipt`].
-///
-/// Split out from the vehicle and parameterised by the page fetcher so the
-/// FOLD — which is where an off-by-one silently under-reports a migration —
-/// is unit-testable with no conductor, no cell and no installed app.
-///
-/// `fetch` returns `Err(String)` for a failed page; the fold turns it into an
-/// `apply_failed` naming the cursor it died on, because "the carry failed" with
-/// no position is not a diagnosis.
-async fn fold_carry<F, Fut>(
-    role: &str,
-    mut fetch: F,
-) -> Result<super::LineageCarryReceipt, AdoptionRefusal>
-where
-    F: FnMut(Option<u32>) -> Fut,
-    Fut: std::future::Future<Output = Result<CarryReceipt, String>>,
-{
-    let mut cursor: Option<u32> = None;
-    let mut carried: u32 = 0;
-    let mut first_digest: Option<String> = None;
-    let mut v1_total: Option<u32> = None;
-    let mut witness_hashes: Vec<String> = Vec::new();
-
-    for page_no in 0..MAX_CARRY_PAGES {
-        let page = fetch(cursor).await.map_err(|e| {
-            AdoptionRefusal::new(
-                RefusalReason::ApplyFailed,
-                format!(
-                    "{CARRY_FN}(role='{role}', cursor={cursor:?}) failed on page {page_no}: {e}"
-                ),
-            )
-        })?;
-        carried = carried.saturating_add(page.carried);
-        if first_digest.is_none() {
-            first_digest = Some(page.v1_digest.clone());
-        }
-        // LAST non-`None` wins: v1's total is a fact about v1, so the freshest
-        // statement of it is the one to keep. A page that says nothing leaves
-        // the previous statement standing rather than erasing it.
-        if page.v1_total.is_some() {
-            v1_total = page.v1_total;
-        }
-        // A page that authored no witness contributes none — an empty string
-        // in the audit trail would read as a witness that exists and is blank.
-        if !page.witness_hash.is_empty() {
-            witness_hashes.push(page.witness_hash);
-        }
-
-        let Some(next) = page.next_cursor else {
-            return Ok(super::LineageCarryReceipt {
-                role: role.to_string(),
-                carried,
-                // Whatever v1 ITSELF said its total was — `None` when v1 never
-                // told us, which reads as "unknown" and never as "equal to
-                // what we carried". Deriving this from `carried` would make
-                // `carried == v1_count` true by construction and therefore
-                // worthless as the completeness proof it exists to be.
-                v1_count: v1_total,
-                // The LAST page's digest — what the carry ended up with.
-                digest: page.v1_digest,
-                v1_digest: first_digest.unwrap_or_default(),
-                witness_hashes,
-            });
-        };
-        // A cursor that does not ADVANCE would walk the same page until the
-        // ceiling — the same records re-carried, the same witness re-authored,
-        // and a receipt whose `carried` is a multiple of the truth.
-        if let Some(prev) = cursor {
-            if next <= prev {
-                return Err(AdoptionRefusal::new(
-                    RefusalReason::ApplyFailed,
-                    format!(
-                        "{CARRY_FN}(role='{role}') returned a cursor that does not advance \
-                         ({prev} → {next}) — refusing rather than re-carrying the same page"
-                    ),
-                ));
-            }
-        }
-        cursor = Some(next);
-    }
-
-    Err(AdoptionRefusal::new(
-        RefusalReason::ApplyFailed,
-        format!(
-            "{CARRY_FN}(role='{role}') did not reach the end of v1 within {MAX_CARRY_PAGES} pages \
-             ({carried} carried so far) — refusing rather than looping a controller sweep"
-        ),
-    ))
-}
 
 /// **Rung 6.** The migration vehicle: install v2 BESIDE v1 under the same key,
 /// carry every v1 record with a witness, then flip the role to authoring on v2.
@@ -974,19 +803,6 @@ impl HappLineageVehicle {
     }
 }
 
-/// One page of the carry, over the side app's own client.
-async fn call_carry_from(
-    client: &Arc<crate::hc_client::HcClient>,
-    input: CarryInput,
-) -> Result<CarryReceipt, String> {
-    let payload = rmp_serde::to_vec_named(&input).map_err(|e| format!("encode CarryInput: {e}"))?;
-    let bytes = client
-        .call_zome(CARRY_ZOME, CARRY_FN, payload)
-        .await
-        .map_err(|e| e.to_string())?;
-    rmp_serde::from_slice(&bytes).map_err(|e| format!("decode CarryReceipt: {e}"))
-}
-
 #[async_trait::async_trait]
 impl ApplyVehicle for HappLineageVehicle {
     async fn apply(&self, verified: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal> {
@@ -1056,6 +872,11 @@ impl ApplyVehicle for HappLineageVehicle {
                     v1_cell: cell_ref.clone(),
                     cursor,
                     limit: CARRY_PAGE_LIMIT,
+                    // The apply path is always a SELF-carry: this vehicle
+                    // crosses its own agent's chain. A neighbour's records
+                    // reach v2 through the trailing bridge sweep
+                    // (`crate::services::lineage_bridge`), never here.
+                    source: CarrySource::Own,
                 },
             )
             .await
@@ -1934,6 +1755,9 @@ mod tests {
                 v1_digest: "digest-after-page-one".to_string(),
                 witness_hash: "uhCEkWitnessOne".to_string(),
                 v1_total: None,
+                self_carried: 32,
+                v1_observed_head: None,
+                already_carried: 0,
             },
             CarryReceipt {
                 carried: 7,
@@ -1944,6 +1768,9 @@ mod tests {
                 // verbatim and NEVER from `carried` — 5 ≠ 39 on purpose, so a
                 // fold that derived the count would fail this assertion.
                 v1_total: Some(5),
+                self_carried: 7,
+                v1_observed_head: Some(33),
+                already_carried: 0,
             },
         ]);
         let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
@@ -1985,6 +1812,9 @@ mod tests {
                 v1_digest: "d".to_string(),
                 witness_hash: String::new(),
                 v1_total: None,
+                self_carried: 0,
+                v1_observed_head: None,
+                already_carried: 1,
             })
         })
         .await
@@ -2030,6 +1860,9 @@ mod tests {
             v1_digest: "digest".to_string(),
             witness_hash: "uhCEkWitness".to_string(),
             v1_total: Some(39),
+            self_carried: 32,
+            v1_observed_head: Some(41),
+            already_carried: 0,
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
@@ -2066,7 +1899,10 @@ mod tests {
     fn the_carry_is_bounded_by_batch_and_by_page_ceiling() {
         const {
             assert!(CARRY_PAGE_LIMIT > 0);
-            assert!(MAX_CARRY_PAGES > 0);
+            // The page ceiling now lives with the fold it bounds
+            // (`super::carry`); asserted here because THIS is the caller whose
+            // sweep it keeps finite.
+            assert!(super::super::carry::MAX_CARRY_PAGES > 0);
         }
         assert_eq!(CARRY_PAGE_LIMIT, 32);
         assert_eq!(CARRY_ZOME, "node_registry_coordinator");
