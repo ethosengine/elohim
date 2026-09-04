@@ -349,6 +349,12 @@ const CANARY_APPLY_BUDGET_MS = 600_000;
  * (`apply::LINEAGE_VEHICLE`), as it appears on `appliedRelease.vehicle`. */
 const LINEAGE_VEHICLE = 'happ-lineage';
 
+/** How many `export_records` pages `readV1Export` will walk before it refuses.
+ * `EXPORT_CAP` in the v1 zome is 64 records per page, so this covers a chain of
+ * ~2k records — far past anything the household holds, which is what makes
+ * hitting it a signal rather than a limit. */
+const V1_EXPORT_PAGE_CAP = 32;
+
 // ---------------------------------------------------------------------------
 // Conductor rail — role/zome-parameterized, see module doc "Conductor rail"
 // ---------------------------------------------------------------------------
@@ -1239,6 +1245,20 @@ async function assertStation1Admissible(): Promise<void> {
       `${peer} refused the well-formed lineage release with dna_lineage_mismatch — the bridge ` +
         `map was NOT recognised: ${JSON.stringify(verdict)}`
     );
+    // POSITIVELY, not merely "some later refusal": this release names a path
+    // that is deliberately not notarized, so the arm every peer must have
+    // reached is the PATH arm — `path_not_notarized`, in exactly those words.
+    // Asserting only `!== dna_lineage_mismatch` would pass on
+    // `manifest_schema_invalid`, `role_not_installed` or a stray
+    // `conductor_unavailable`, none of which prove the bridge map was checked
+    // and accepted. `verify_envelope` (verify.rs:1046) runs before
+    // `verify_path` (:1059), so naming the path arm IS naming admissibility.
+    assert.equal(
+      reason,
+      'path_not_notarized',
+      `${peer} did not reach the PATH arm — "admissible" is exactly "the envelope passed and the ` +
+        `only thing left to refuse is the un-notarized path": ${JSON.stringify(verdict)}`
+    );
     // The passing path's own observed state is worth a receipt: today that is
     // `state: "refused", refusal.reason: "path_not_notarized"` — see module doc "The
     // verify_path caveat" for why that is the CORRECT admissible signal right now, not a
@@ -1742,7 +1762,8 @@ async function readV1Export(
     let digest = '';
     let total: number | null = null;
     let cursor: number | undefined;
-    for (let page = 0; page < 32; page += 1) {
+    let exhausted = false;
+    for (let page = 0; page < V1_EXPORT_PAGE_CAP; page += 1) {
       const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
         records: unknown[];
         entries: unknown[];
@@ -1756,9 +1777,22 @@ async function readV1Export(
         const hash = entryHashOfSignedAction(record);
         if (hash) entryHashes.push(hash);
       }
-      if (raw.next_cursor === null || raw.next_cursor === undefined) break;
+      if (raw.next_cursor === null || raw.next_cursor === undefined) {
+        exhausted = true;
+        break;
+      }
       cursor = raw.next_cursor;
     }
+    // The page cap is a guard against a cursor that never advances, NOT a
+    // stopping rule. Hitting it means this baseline is a PREFIX of the chain,
+    // and every "untouched"/"carried == v1Count" comparison built on a prefix
+    // would silently be comparing the wrong set.
+    assert.ok(
+      exhausted,
+      `${peer}'s v1 export did not reach a null cursor within ${V1_EXPORT_PAGE_CAP} pages ` +
+        `(${entryHashes.length} records read, total reported ${total}) — this baseline is a ` +
+        `PREFIX of the chain, not the chain`
+    );
     return { digest, total, entryHashes };
   } finally {
     await rail.close();

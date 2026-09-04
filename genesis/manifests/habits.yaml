@@ -2668,7 +2668,7 @@ habits:
     status: red
     active: false
     checks:
-      - "a2o @concern:happ-lineage-migration (genesis/a2o/features/delivery/happ-lineage-migration.feature — Stations 1-10, @wip; steps not yet written; rehearsal = node_registry v1 → v1+NotarizationWitness on the household mesh, 0.7)"
+      - "a2o @concern:happ-lineage-migration (genesis/a2o/features/delivery/happ-lineage-migration.feature — Stations 1-10, @wip; steps in genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts with the fixture helpers lineage-candidate.ts + lineage-commitments.ts; a live run needs A2O_RUN_WIP=1 or the @wip gate holds every scenario; rehearsal = node_registry v1 → v1+NotarizationWitness on the household mesh, 0.7)"
       - "spike verdict (§9 Lane B, conductor fork): must_get_record_from_lineage host fn measured in elohim/holochain-conductor before B2 is decided — recorded as a dated delta below"
     evidence: >
       DELTA 2026-09-03 (birth, RED): declared after the 0.6→0.7 cutover proved the class has no vehicle
@@ -2712,6 +2712,9 @@ habits:
       `fetch_path_evidence`'s `get_commitment` errors and answers `Unreachable` — C4 working exactly as
       designed (a read failure is never fabricated into an absence). `verify_envelope` runs before
       `verify_path` (verify.rs:1046 then :1059), so reaching that arm at all IS the admissibility proof.
+      SUPERSEDED by Station 2's fact (1): the fixture's path pointer is now a decodable `fakeEntryHash`, so
+      the positive branch's live refusal is `path_not_notarized`, and the Station 1 step asserts that arm
+      BY NAME rather than merely "not dna_lineage_mismatch" (fix round 1, item 4).
 
       DELTA 2026-09-04 (Station 2 GREEN on the household mesh; receipt
       `genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r7.{log,json}`, run stamp
@@ -2811,6 +2814,33 @@ habits:
       green; Stations 5 and 10 are red and BLOCKED with their gaps named in the DELTA above. Status stays
       RED — it is the controller's to flip, and two stations of the seven are still unmeasurable on this
       substrate.
+
+      DELTA 2026-09-04 (fix round 1 after review — one CRITICAL closed, and one OPEN TRUST BOUNDARY named;
+      re-run receipt `genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r16.{log,json}`,
+      Stations 1 and 2, 2 scenarios / 22 steps, ALL PASSED, 4m01s, on the rebuilt mesh; gate: storage lib
+      tests + `cargo clippy --features "p2p p2p-iroh" --all-targets -- -D warnings` EXIT=0 + fmt):
+      CRITICAL — the lineage-class decision read `payload_json["action"]`, which is SELF-DECLARED. The
+      mishpat coordinator dispatches on the ENTRY's action and only some arms pin the body's second copy to
+      it (`validate_ratifies_limit_gradient` never does), so a commitment created as
+      `ratifies-limit-gradient` whose body claims `"action": "migrates-lineage"` passes the coordinator
+      carrying NO signatures — and would have read as an ACTIVE migration path on every peer without a
+      projection row, which is every peer but the author. Both sides now key on the ENTRY
+      (`GetCommitmentOutput.action` reading, `commitment.action` projecting, as `signals.rs` already did),
+      each pinned by its own forgery test. QUALIFIED: `validate_lineage_signatures` is AUTHOR-SIDE ONLY —
+      mishpat integrity's `commitment_action_requirements` has no lineage arm, so receiving peers never
+      re-verify a lineage quorum on gossip; "active" states the LIFECYCLE, never the quorum's soundness on
+      this peer. OPEN TRUST BOUNDARY, named and NOT closed this round: a `revokes-commitment` projects off
+      the author's post-commit signal too, so every other peer reads "no row" and therefore "not revoked" —
+      and `verify_path` checks `revoked_at` FIRST. An elohim's revocation of a migration path is invisible
+      to the peers it is meant to stop: the SAME hole as Station 10's missing roster check, pointed at the
+      revert instead of the quorum, and why Station 7 is not yet measurable. The seam that closes it is
+      `mishpat::get_commitment_state_links` through the peer's OWN conductor — the C5 rail the commitment
+      body already comes down — rather than a projection only the author holds (Task 13 / Station 7).
+      Also tightened: Station 1 asserts the PATH arm BY NAME (`path_not_notarized`, all three peers in
+      r16) instead of merely "not dna_lineage_mismatch", which would have passed on a stray
+      `manifest_schema_invalid` or `conductor_unavailable`; and `readV1Export` refuses a baseline that hit
+      its page cap, because a PREFIX of the chain would silently make every "untouched" and
+      `carried == v1Count` comparison compare the wrong set.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
