@@ -178,6 +178,38 @@ fn cite_seal_on_missing_upstream_is_an_error() {
     );
 }
 
+/// `seal --on` must refuse a target that is not a readable file under the root, whichever
+/// governor arm it lands in. A sealed edge to nothing is a record that reads as evidence.
+#[test]
+fn seal_refuses_an_on_target_that_does_not_exist_under_root() {
+    let dir = fixture();
+    let root = dir.path();
+
+    // (1) explicit cite-seal — dangling at birth
+    assert!(seal::seal(root, "app/foo.ts", "spec/nope.md", Some("cite-seal"), None).is_err());
+    // (2) explicit governed — no seal to compute, still a user error
+    assert!(seal::seal(
+        root,
+        "app/foo.ts",
+        "spec/nope.md",
+        Some("test:some-test"),
+        None
+    )
+    .is_err());
+    // (3) auto-derived governor — the arm a caller reaches by omitting --governor entirely
+    assert!(seal::seal(root, "app/foo.ts", "spec/nope.md", None, None).is_err());
+    // (4) a directory is not a file
+    assert!(seal::seal(root, "app/foo.ts", "spec", Some("cite-seal"), None).is_err());
+
+    // Nothing was appended by any of the four refusals.
+    let s = walk::status(root).expect("status");
+    assert_eq!(
+        s.edges_sealed + s.edges_stale + s.edges_held + s.edges_dangling + s.edges_governed,
+        0,
+        "a refused seal leaves the sidecar byte-identical"
+    );
+}
+
 #[test]
 fn reseal_on_a_currently_ok_edge_is_an_error() {
     let dir = fixture();

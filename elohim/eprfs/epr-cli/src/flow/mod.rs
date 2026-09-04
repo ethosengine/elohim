@@ -730,10 +730,14 @@ pub fn parse_frontmatter(text: &str) -> Frontmatter {
         if let Some(key) = &pending {
             let l = trimmed.trim_start();
             if let Some(item) = l.strip_prefix("- ") {
+                // The SAME quote stripping the scalar arm below does. A cite envelope is
+                // quoted in YAML nearly every time (it contains `:` and `|`), and an item kept
+                // verbatim carried its wrapper into `cite_path`/`cite_slug` — so every quoted
+                // cite-seal edge resolved to a path no file has and rendered `dangling`.
                 fm.lists
                     .entry(key.clone())
                     .or_default()
-                    .push(item.trim().to_string());
+                    .push(item.trim().trim_matches('"').trim_matches('\'').to_string());
                 continue;
             }
         }
@@ -1043,6 +1047,47 @@ mod tests {
 
     fn line(email: &str, ts: &str, trailers: &str) -> String {
         format!("{email}{FIELD_SEP}{ts}{FIELD_SEP}{trailers}")
+    }
+
+    /// The defect: a cite list item is quoted in YAML almost every time, and the LIST arm of
+    /// `parse_frontmatter` pushed it verbatim while the SCALAR arm stripped its quotes. Every
+    /// consumer downstream — `cite_path`, `cite_slug`, `edges::resolve_target` — therefore saw
+    /// a path ending in `"`, which no file has, so every quoted cite-seal edge resolved to a
+    /// target that does not exist and rendered `dangling`.
+    #[test]
+    fn a_quoted_cite_list_item_yields_a_clean_path_and_slug() {
+        let doc = concat!(
+            "---\n",
+            "id: fixture\n",
+            "cites:\n",
+            "  - \"the-slug | why it is cited | sha256:0123456789abcdef | path: genesis/docs/x.md\"\n",
+            "  - 'single-quoted | why | sha256:fedcba9876543210 | path: genesis/docs/y.md'\n",
+            "  - bare-slug | why | sha256:00112233445566aa | path: genesis/docs/z.md\n",
+            "---\n\nbody\n",
+        );
+        let fm = parse_frontmatter(doc);
+        let cites = fm.list("cites");
+        assert_eq!(cites.len(), 3);
+
+        let paths: Vec<String> = cites.iter().filter_map(|c| cite_path(c)).collect();
+        assert_eq!(
+            paths,
+            vec![
+                "genesis/docs/x.md".to_string(),
+                "genesis/docs/y.md".to_string(),
+                "genesis/docs/z.md".to_string(),
+            ],
+            "a path may not carry the YAML quote that wrapped its envelope"
+        );
+        assert_eq!(
+            cite_slug(&cites[0]).as_deref(),
+            Some("the-slug"),
+            "nor may the slug carry the opening quote"
+        );
+        assert_eq!(
+            cite_fingerprint(&cites[0]).as_deref(),
+            Some("sha256:0123456789abcdef")
+        );
     }
 
     #[test]
