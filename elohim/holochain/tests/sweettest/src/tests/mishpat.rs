@@ -67,6 +67,16 @@ struct CommitmentOutput {
     pub entry_hash: EntryHash,
 }
 
+/// Mirror of `mishpat::GetCommitmentOutput` (lib.rs's `get_commitment` reader).
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct GetCommitmentOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub action: String,
+    pub payload_json: String,
+    pub signed_at: String,
+}
+
 /// Single-conductor mishpat cell fixture — mirrors `bootstrap_steward_is_configured`'s
 /// setup (single_agent_conductor + load_dna + setup_app_for_agent) so the
 /// lineage-arm tests below don't repeat the conductor/DNA/app wiring.
@@ -648,6 +658,111 @@ async fn migrates_lineage_commitment_rejects_non_integer_required_signatures() -
     assert!(
         err.contains("required_signatures must be a non-negative integer"),
         "refusal must name the required_signatures type requirement: {err}"
+    );
+    Ok(())
+}
+
+// =============================================================================
+// Holochain Evolution Epic Task 11 part 2a — create_lineage_commitment: the
+// CALLING agent signs signing_payload_cid with its own key IN-ZOME (via
+// sign_raw), satisfying the SAME validate_lineage_signatures gate
+// create_commitment enforces. Exists because @holochain/client cannot sign
+// raw bytes with the agent's real conductor-held key from JS.
+// =============================================================================
+
+/// A well-formed `migrates-lineage` payload with `signatures: []` — the
+/// caller never supplies a signature; `create_lineage_commitment` appends its
+/// own in-zome.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_lineage_commitment_self_signs_and_validates() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafy-test-create-lineage-commitment-self-signs";
+    let mut unsigned = migrates_lineage_payload(cid, "", &alice);
+    unsigned["signatures"] = serde_json::json!([]);
+
+    let out: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_lineage_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: unsigned.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await;
+    assert!(
+        !out.entry_hash.to_string().is_empty(),
+        "create_lineage_commitment must self-sign in-zome and produce a valid commitment"
+    );
+
+    // Fetch the record back and inspect the projected signature — proves the
+    // signature that landed on the DHT is the calling agent's own.
+    let fetched: Option<GetCommitmentOutput> = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "get_commitment",
+            out.entry_hash.to_string(),
+        )
+        .await;
+    let fetched = fetched.expect("commitment must be readable back by its entry_hash cid");
+    let signed_payload: serde_json::Value = serde_json::from_str(&fetched.payload_json)?;
+    let signatures = signed_payload["signatures"]
+        .as_array()
+        .expect("signatures must be an array");
+    assert_eq!(
+        signatures.len(),
+        1,
+        "exactly one self-signature must be appended: {signatures:?}"
+    );
+    assert_eq!(
+        signatures[0]["agent"].as_str(),
+        Some(alice.to_string().as_str()),
+        "the appended signature must be attributed to the calling agent"
+    );
+
+    // A second call by the SAME agent — on the payload already carrying
+    // alice's signature (the record just fetched back) — is refused. A
+    // double self-sign is a caller bug, not a silent no-op.
+    let dup_err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_lineage_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: fetched.payload_json.clone(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        dup_err.contains("already signed"),
+        "a second self-sign by the same agent must be refused, naming why: {dup_err}"
+    );
+
+    // Plain create_commitment on the ORIGINAL unsigned payload is refused by
+    // the SAME validator create_lineage_commitment satisfies — proving
+    // create_lineage_commitment's earlier success came from satisfying the
+    // validator (via a real in-zome signature), not from bypassing it.
+    let unsigned_err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: unsigned.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        unsigned_err.contains("signatures"),
+        "plain create_commitment on the unsigned payload must be refused by the same \
+         validator: {unsigned_err}"
     );
     Ok(())
 }

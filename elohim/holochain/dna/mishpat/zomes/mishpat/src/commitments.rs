@@ -46,6 +46,98 @@ pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<Commitmen
     })
 }
 
+/// Create a Commitment whose `payload_json.signatures` gains ONE new entry —
+/// the CALLING agent's own signature over `payload_json.signing_payload_cid`,
+/// produced in-zome via `sign_raw` (never `sign`, which msgpack-serializes the
+/// input first; `sign_raw`/`verify_signature_raw` are the literal-bytes pair
+/// `validate_lineage_signatures` requires — see the module note above).
+///
+/// This exists because a browser client (`@holochain/client`) cannot sign raw
+/// bytes with its agent's real conductor-held key from JS — only the conductor
+/// itself can invoke lair. So the CALLER of THIS extern is who signs: the
+/// agent's own key, over `signing_payload_cid` and nothing else. This extern
+/// never accepts a caller-supplied key or byte payload to sign — there is no
+/// parameter for either. It is the primary path for the `migrates-lineage` /
+/// `sunsets-lineage` quorum (epic Task 11), but does not itself restrict
+/// `action` — `validate_commitment_payload` (via `validate_lineage_signatures`
+/// for the lineage arms) is what decides whether an action needs signatures at
+/// all and validates whatever accumulates.
+///
+/// A second call by an agent who already signed is refused (Guest error) —
+/// double-signing is a caller bug, not a silent no-op.
+///
+/// Delegates the actual entry-creation to `create_commitment` (the exact same
+/// validation + `create_entry` path `create_commitment` uses) — no duplicated
+/// create logic.
+#[hdk_extern]
+pub fn create_lineage_commitment(input: CreateCommitmentInput) -> ExternResult<CommitmentOutput> {
+    let mut payload: serde_json::Value = serde_json::from_str(&input.payload_json).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "create_lineage_commitment: payload_json not parseable: {e}"
+        )))
+    })?;
+
+    let cid = payload
+        .get("signing_payload_cid")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "create_lineage_commitment: payload_json.signing_payload_cid must be a \
+                 non-empty string"
+                    .to_string()
+            ))
+        })?
+        .to_string();
+
+    let me = agent_info()?.agent_initial_pubkey;
+    let me_str = me.to_string();
+
+    if let Some(sigs) = payload.get("signatures").and_then(|v| v.as_array()) {
+        if sigs
+            .iter()
+            .any(|s| s.get("agent").and_then(|a| a.as_str()) == Some(me_str.as_str()))
+        {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "create_lineage_commitment: agent {me_str} has already signed this payload"
+            ))));
+        }
+    }
+
+    // sign_raw signs the LITERAL bytes with no msgpack re-serialization — the
+    // counterpart to `verify_signature_raw` above (see module note).
+    let sig = hdk::ed25519::sign_raw(me.clone(), cid.as_bytes().to_vec())?;
+    let sig_b64 = {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        STANDARD.encode(sig.0)
+    };
+
+    let entry = serde_json::json!({ "agent": me_str, "signature": sig_b64 });
+    match payload
+        .get_mut("signatures")
+        .and_then(|v| v.as_array_mut())
+    {
+        Some(arr) => arr.push(entry),
+        None => {
+            payload
+                .as_object_mut()
+                .ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest(
+                        "create_lineage_commitment: payload_json must be a JSON object"
+                            .to_string()
+                    ))
+                })?
+                .insert("signatures".to_string(), serde_json::Value::Array(vec![entry]));
+        }
+    }
+
+    create_commitment(CreateCommitmentInput {
+        action: input.action,
+        payload_json: payload.to_string(),
+        signed_at: input.signed_at,
+    })
+}
+
 // =============================================================================
 // CommitmentByState link author (Slice-2b T11)
 // =============================================================================
