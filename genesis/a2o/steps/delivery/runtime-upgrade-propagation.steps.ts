@@ -2693,11 +2693,35 @@ async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
 }
 
 /**
- * Waits for a qualifying attestation SWEPT AFTER james's own soak on the
- * second fix elapsed. The `/admin/adoption` row carries one attestation block
- * per channel, not per release, so "swept after this candidate's soak could
- * have completed" is the observable bound that keeps the first fix's evidence
- * from being read as the second's.
+ * Waits for a qualifying attestation naming the SECOND FIX — read off JAMES's
+ * row, not matthew's.
+ *
+ * ## Which row carries a staged candidate's evidence
+ *
+ * A channel row's `attestations` block is evidence for the release that row
+ * RESOLVED, and a row resolves the channel's WINNER. While the second fix is
+ * staged beneath the standing earned head, the winner is still the earned head
+ * (that is the whole point of Station 9), so matthew's and jessica's apply-mode
+ * rows report evidence for the WINNER and a candidate beneath it can never
+ * appear there. Run shift-it5-20260904T084753Z red exactly here: james applied
+ * the second fix in 30s while matthew's row kept reporting
+ * `resolvedHead: {cid: <earned winner>, tier: earned}, verdict: applied`.
+ *
+ * james's CANARY row is different: the controller substitutes the staging
+ * candidate for him ("canary follows the staging candidate standing beneath the
+ * earned head — the winner does not move until promotion"), so his
+ * `resolvedHead.cid` IS the candidate and his `attestations` count attestations
+ * naming it. Pinning on `resolvedHead.cid === secondReleaseCid` also removes
+ * the need for the old swept-after-the-soak heuristic: the evidence is
+ * identified by the release it is for, not by a timestamp that only suggests
+ * which release it might be about.
+ *
+ * The other way to ask is by cid — `content_store::get_attestations_for_subject
+ * <releaseCid>`, what `scripts/release-attestation-probe.ts` walks and what the
+ * storage controller's own `release_attestation.rs` counts before a promotion.
+ * That is a ZOME call: no HTTP surface exposes it (`release-ceremony.ts promote`
+ * gathers no evidence itself; storage registers no by-cid attestation route), so
+ * james's row is the observable this fixture can honestly read.
  */
 async function ensureSecondAttested(world: E2EWorld): Promise<void> {
   const c = ceremony();
@@ -2705,36 +2729,36 @@ async function ensureSecondAttested(world: E2EWorld): Promise<void> {
   if (c.secondAttestationRow) return;
 
   const waitStartedAt = Date.now();
+  // The SAME budget Station 3 gives its attestation, measured from the point
+  // the soak can first have completed rather than from now: Station 3's budget
+  // starts after its own canary apply returned, and folding the 30s soak into a
+  // 95s budget left a single 60s sweep interval with no margin.
   const soakDoneAt = waitStartedAt + SOAK_SECS * 1000;
-  // The SAME budget Station 3 gives its attestation — measured from the point
-  // the soak can first have completed, not from now. Station 3's budget starts
-  // after its own canary apply returned; this station additionally requires a
-  // sweep LATER than the soak (see this function's doc), and folding the soak
-  // into the budget left one 60s sweep interval with no margin. Run
-  // shift-it4-20260904T082029Z reds here on exactly that arithmetic.
   const deadline = soakDoneAt + ATTESTATION_BUDGET_MS;
   let lastRow: AdoptionChannelRow | undefined;
   while (Date.now() < deadline) {
-    const report = await getAdoptionReport(world, 'matthew');
+    const report = await getAdoptionReport(world, CANARY_PEER);
     lastRow = findChannelRow(report, CHANNEL_ID);
-    const sweptAt = (lastRow?.lastCheckedAt ?? 0) * 1000;
-    if ((lastRow?.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD && sweptAt > soakDoneAt) {
+    const onCandidate = lastRow?.resolvedHead?.cid === c.secondReleaseCid;
+    if (onCandidate && (lastRow?.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD) {
       c.secondAttestationRow = lastRow;
       c.secondAttestationTimestamp = Date.now();
       // eslint-disable-next-line no-console
       console.log(
         `[station9] qualifying attestation for the second fix after ` +
-          `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + ` +
-          `${ATTESTATION_BUDGET_MS}ms budget): ${JSON.stringify(lastRow?.attestations)}`
+          `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + ${ATTESTATION_BUDGET_MS}ms budget), ` +
+          `read off ${CANARY_PEER}'s canary row whose resolvedHead IS the candidate ` +
+          `${String(c.secondReleaseCid)}: ${JSON.stringify(lastRow?.attestations)}`
       );
       return;
     }
     await new Promise<void>(resolve => setTimeout(resolve, 10_000));
   }
   assert.fail(
-    `no qualifying attestation for the second fix on ${CHANNEL_ID} within ` +
-      `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + the ${ATTESTATION_BUDGET_MS}ms budget ` +
-      `station 3 uses); last row: ${JSON.stringify(lastRow)}`
+    `no qualifying attestation naming the second fix ${String(c.secondReleaseCid)} on ` +
+      `${CANARY_PEER}'s row for ${CHANNEL_ID} within ${Date.now() - waitStartedAt}ms (soak ` +
+      `${SOAK_SECS}s + the ${ATTESTATION_BUDGET_MS}ms budget station 3 uses); last row: ` +
+      JSON.stringify(lastRow)
   );
 }
 
@@ -3869,6 +3893,21 @@ Then(
         result.row.appliedRelease?.cid,
         c.secondReleaseCid,
         `${peer} has not applied the second fix: ${JSON.stringify(result.row)}`
+      );
+      // The promotion moved the WINNER: these two are apply-mode peers, so the
+      // head they resolve is the channel's winner — and it must now be the
+      // second fix, earned. (Before the promotion the same rows resolved the
+      // PREVIOUS earned head while the candidate was staged beneath it; that is
+      // what the earlier Then asserted.)
+      assert.equal(
+        result.row.resolvedHead?.cid,
+        c.secondReleaseCid,
+        `${peer} resolves ${JSON.stringify(result.row.resolvedHead)}, not the promoted second fix`
+      );
+      assert.equal(
+        result.row.resolvedHead?.tier,
+        'earned',
+        `${peer} resolves the second fix at tier "${String(result.row.resolvedHead?.tier)}"`
       );
       assert.ok(result.pidAfter.length > 0, `${peer}'s conductor PID could not be read`);
       assert.equal(
