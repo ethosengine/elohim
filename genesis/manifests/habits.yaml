@@ -1850,6 +1850,11 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-09-05 (valueflow authoring surface closed through its own verbs; no status
+      flip): the plan's 11 tasks were claimed and fulfilled with `epr flow claim` / `fulfill --on`,
+      lifting commitments outflow 0.429 -> 2.000/day on the 2026-08-29..09-05 window (level 616,
+      inflow 5.571/day, still FILLING). Task-level fulfilment is now a real drain path; the rate
+      is still net positive, so RED stands. An event, not a rate.
       DELTA 2026-09-05 (first task-level fulfilments via epr flow claim/fulfill;
       event, not a rate; no status flip): valueflow-authoring Task 11 dogfooded
       the new verbs against the Holochain Evolution Epic MVP plan — decompose

@@ -29,6 +29,11 @@ retire-when: >
   held a full quarter with no operator override. A system actually in equilibrium does not
   need a weekly reader.
 ---
+DELTA 2026-09-05 (valueflow authoring surface closed through its own verbs; no status
+flip): the plan's 11 tasks were claimed and fulfilled with `epr flow claim` / `fulfill --on`,
+lifting commitments outflow 0.429 -> 2.000/day on the 2026-08-29..09-05 window (level 616,
+inflow 5.571/day, still FILLING). Task-level fulfilment is now a real drain path; the rate
+is still net positive, so RED stands. An event, not a rate.
 DELTA 2026-09-05 (first task-level fulfilments via epr flow claim/fulfill;
 event, not a rate; no status flip): valueflow-authoring Task 11 dogfooded
 the new verbs against the Holochain Evolution Epic MVP plan — decompose
