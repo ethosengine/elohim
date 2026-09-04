@@ -77,6 +77,17 @@ struct GetCommitmentOutput {
     pub signed_at: String,
 }
 
+/// Mirror of `mishpat::commitments::CommitmentStateLink` (the
+/// `get_commitment_state_links` reader's element). Every field is a `String`
+/// on the wire — the coordinator parses `state`/`signed_at` out of the LinkTag
+/// and renders the target `ActionHash` as base64.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct CommitmentStateLink {
+    pub state: String,
+    pub signed_at: String,
+    pub event_hash: String,
+}
+
 /// Single-conductor mishpat cell fixture — mirrors `bootstrap_steward_is_configured`'s
 /// setup (single_agent_conductor + load_dna + setup_app_for_agent) so the
 /// lineage-arm tests below don't repeat the conductor/DNA/app wiring.
@@ -763,6 +774,190 @@ async fn create_lineage_commitment_self_signs_and_validates() -> Result<()> {
         unsigned_err.contains("signatures"),
         "plain create_commitment on the unsigned payload must be refused by the same \
          validator: {unsigned_err}"
+    );
+    Ok(())
+}
+
+// =============================================================================
+// Holochain Evolution Epic Task 19 — lifecycle as a DHT-visible ACT.
+//
+// Lifecycle used to live only in each peer's own `mishpat_commitments`
+// projection, written from a post-commit signal on the AUTHORING conductor. So
+// only the author of a commitment could see it activate, and only the author of
+// a REVOCATION could see the path pulled back — Station 7's revocation was
+// unreadable by the very peers it was meant to stop. These tests pin the
+// coordinator-side half of the cure: the commitment records its own activation,
+// and a quorum-checked revocation records `revoked` on the anchor it revokes.
+// @dna-scope: mishpat
+// =============================================================================
+
+/// Notarizing a `migrates-lineage` commitment records `active` on its OWN
+/// anchor, in the same call the validator accepted the quorum — so a peer
+/// holding no projection row still reads the activation off the DHT.
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_records_its_own_activation() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb19";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let migrated: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: migrates_lineage_payload(cid, &sig_b64, &alice).to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await;
+
+    let links: Vec<CommitmentStateLink> = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "get_commitment_state_links",
+            migrated.entry_hash.to_string(),
+        )
+        .await;
+    assert_eq!(
+        links.len(),
+        1,
+        "exactly one lifecycle transition must be recorded on notarization: {links:?}"
+    );
+    assert_eq!(links[0].state, "active");
+    assert_eq!(
+        links[0].signed_at, "2026-09-04T00:00:00Z",
+        "the tag must carry the caller-supplied Category-A signing time"
+    );
+    assert_eq!(
+        links[0].event_hash,
+        migrated.action_hash.to_string(),
+        "the transition's proof is the notarizing action itself"
+    );
+    Ok(())
+}
+
+/// **The Station 7 seam.** A quorum-checked revocation of a lineage commitment
+/// records `revoked` on the ANCHOR IT REVOKES — the same anchor every peer
+/// already reads the commitment body off — so the revocation is visible to
+/// peers that authored neither entry.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lineage_revocation_records_revoked_on_the_path_it_revokes() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb20";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let migrated: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: migrates_lineage_payload(cid, &sig_b64, &alice).to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await;
+    let target_cid = migrated.entry_hash.to_string();
+
+    let revoke_cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb21";
+    let revoke_sig_b64 = sign_cid(&conductor, &alice, revoke_cid).await?;
+    let revocation = serde_json::json!({
+        "action": "revokes-commitment",
+        "target_cid": target_cid,
+        "target_action": "migrates-lineage",
+        "reason": "jessica raised a wrongly-named courier",
+        "signed_at": "2026-09-05T00:00:00Z",
+        "signing_payload_cid": revoke_cid,
+        "signatures": [{"agent": alice.to_string(), "signature": revoke_sig_b64}]
+    });
+    let revoked: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "revokes-commitment".into(),
+                payload_json: revocation.to_string(),
+                signed_at: "2026-09-05T00:00:00Z".into(),
+            },
+        )
+        .await;
+
+    // Read the lifecycle off the PATH's anchor — not the revocation's.
+    let links: Vec<CommitmentStateLink> = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "get_commitment_state_links",
+            target_cid.clone(),
+        )
+        .await;
+    let revoked_link = links
+        .iter()
+        .find(|l| l.state == "revoked")
+        .unwrap_or_else(|| panic!("a revoked transition must be on the path's anchor: {links:?}"));
+    assert_eq!(revoked_link.signed_at, "2026-09-05T00:00:00Z");
+    assert_eq!(
+        revoked_link.event_hash,
+        revoked.action_hash.to_string(),
+        "the revocation action itself is the proof a verifier replays"
+    );
+    assert!(
+        links.iter().any(|l| l.state == "active"),
+        "the activation stays on the record — a revocation adds a transition, \
+         it never rewrites one: {links:?}"
+    );
+    Ok(())
+}
+
+/// A revocation that names no LINEAGE `target_action` was never run through the
+/// signature quorum, so it records nothing — and the existing non-lineage
+/// revoke paths (lenses, identity heads, the commons provide loop) keep
+/// behaving exactly as they did.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_non_lineage_revocation_records_no_transition() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb22";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let migrated: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: migrates_lineage_payload(cid, &sig_b64, &alice).to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await;
+    let target_cid = migrated.entry_hash.to_string();
+
+    let legacy = serde_json::json!({
+        "action": "revokes-commitment",
+        "target_cid": target_cid,
+        "reason": "withdrawn",
+        "signed_at": "2026-09-05T00:00:00Z",
+    });
+    let _: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "revokes-commitment".into(),
+                payload_json: legacy.to_string(),
+                signed_at: "2026-09-05T00:00:00Z".into(),
+            },
+        )
+        .await;
+
+    let links: Vec<CommitmentStateLink> = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "get_commitment_state_links",
+            target_cid,
+        )
+        .await;
+    assert!(
+        !links.iter().any(|l| l.state == "revoked"),
+        "a revocation that was never quorum-checked must not speak for a lineage \
+         commitment's lifecycle: {links:?}"
     );
     Ok(())
 }

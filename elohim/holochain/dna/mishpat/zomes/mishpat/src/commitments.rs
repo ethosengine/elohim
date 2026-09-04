@@ -40,10 +40,156 @@ pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<Commitmen
 
     let action_hash = create_entry(&mishpat_integrity::EntryTypes::Commitment(entry.clone()))?;
     let entry_hash = hash_entry(&entry)?;
+
+    // **Epic Task 19.** The lifecycle a lineage commitment carries becomes an
+    // ACT on the DHT here, in the same call that the validator accepted — see
+    // [`author_lifecycle_link`] for why the entry alone was not enough.
+    author_lifecycle_link(&input, &entry_hash, &action_hash)?;
+
     Ok(CommitmentOutput {
         action_hash,
         entry_hash,
     })
+}
+
+/// The state a lineage commitment's own notarization records.
+const LIFECYCLE_ACTIVE: &str = "active";
+/// The state a revocation records ON THE COMMITMENT IT REVOKES.
+const LIFECYCLE_REVOKED: &str = "revoked";
+
+/// The two commitment actions whose notarization IS their activation.
+const LINEAGE_ACTIONS: [&str; 2] = ["migrates-lineage", "sunsets-lineage"];
+
+/// Which `CommitmentByState` link a freshly-notarized commitment authors, if
+/// any. Pure and native-testable — the WASM-side arm is [`author_lifecycle_link`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LifecycleLink {
+    /// `active`, on the new commitment's OWN anchor. A `migrates-lineage` /
+    /// `sunsets-lineage` entry has no separate acceptance step: the coordinator
+    /// ran `validate_lineage_signatures` before the entry existed, so the entry
+    /// existing IS the quorum having been accepted.
+    ActivatesSelf,
+    /// `revoked`, on the anchor of the commitment this one names in
+    /// `target_cid`. The revocation is a SECOND entry, so without this link the
+    /// only peer that can see a path was pulled back is whoever wrote it.
+    RevokesTarget(String),
+}
+
+/// Decide the lifecycle link for `(action, payload)`.
+///
+/// # Why this exists (epic §4, §7 C5 — Station 7's revocation)
+///
+/// Lifecycle was read off `mishpat_commitments`, which only the AUTHOR of a
+/// commitment ever projects (`CommitmentCommitted` is a post-commit signal on
+/// the authoring conductor). So on every peer but one, an activation had to be
+/// INFERRED from the entry's action, and a revocation was invisible entirely —
+/// an elohim could pull a migration path back and the peers it was meant to
+/// stop would never see it. A `CommitmentByState` link is on the DHT, off the
+/// commitment's own anchor, and gossips like any other link: the same fact,
+/// readable by every peer, through its own conductor.
+///
+/// # The gate is the quorum, not the action name
+///
+/// `revokes-commitment` authors a link only when the payload names a LINEAGE
+/// `target_action` — which is exactly the condition under which
+/// [`validate_revokes_commitment`] runs the full
+/// [`validate_lineage_signatures`] quorum. A revocation that was never
+/// quorum-checked never speaks for a lineage commitment's lifecycle, and the
+/// existing non-lineage revoke paths (lenses, identity heads, the commons
+/// provide loop) are untouched — they author no link and are read exactly as
+/// they were.
+pub fn lifecycle_link_for(action: &str, payload: &serde_json::Value) -> Option<LifecycleLink> {
+    if LINEAGE_ACTIONS.contains(&action) {
+        return Some(LifecycleLink::ActivatesSelf);
+    }
+    if action != "revokes-commitment" {
+        return None;
+    }
+    let target_action = payload.get("target_action").and_then(|v| v.as_str())?;
+    if !LINEAGE_ACTIONS.contains(&target_action) {
+        return None;
+    }
+    let target_cid = payload
+        .get("target_cid")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())?;
+    Some(LifecycleLink::RevokesTarget(target_cid.to_string()))
+}
+
+/// Author the lifecycle link [`lifecycle_link_for`] names, if it names one.
+///
+/// Runs INSIDE `create_commitment`, so both the plain extern and
+/// [`create_lineage_commitment`] (which delegates to it) author the link —
+/// there is no path that notarizes a lineage commitment without recording its
+/// activation, and no path that revokes one without recording the revocation.
+///
+/// Coordinator-only, and DNA-hash-neutral by construction: `CommitmentByState`
+/// and its tag rule already exist in `mishpat_integrity` (Slice-2b T11) and are
+/// not touched.
+fn author_lifecycle_link(
+    input: &CreateCommitmentInput,
+    entry_hash: &EntryHash,
+    action_hash: &ActionHash,
+) -> ExternResult<()> {
+    // Cheap action gate BEFORE the parse: every other commitment action pays
+    // nothing at all for this — no second deserialization, no link, no change.
+    if !LINEAGE_ACTIONS.contains(&input.action.as_str()) && input.action != "revokes-commitment" {
+        return Ok(());
+    }
+    let payload: serde_json::Value = serde_json::from_str(&input.payload_json).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "create_commitment: payload_json not parseable: {e}"
+        )))
+    })?;
+    let Some(link) = lifecycle_link_for(&input.action, &payload) else {
+        return Ok(());
+    };
+
+    // The tag's `signed_at` segment must be non-empty (mishpat_integrity's
+    // `validate_commitment_by_state_tag`). The caller-supplied `signed_at` is
+    // the deterministic Category-A time; the payload carries a second copy for
+    // the arms that declare one. Refuse LOUDLY rather than author a link the
+    // validator will reject — a silent integrity refusal here would fail the
+    // whole commitment with a message about a tag nobody asked for.
+    let signed_at = if input.signed_at.is_empty() {
+        payload
+            .get("signed_at")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+    } else {
+        input.signed_at.as_str()
+    };
+    if signed_at.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "create_commitment: {} needs a non-empty signed_at to record its lifecycle on the DHT",
+            input.action
+        ))));
+    }
+
+    let (base, state) = match link {
+        LifecycleLink::ActivatesSelf => (entry_hash.clone(), LIFECYCLE_ACTIVE),
+        LifecycleLink::RevokesTarget(target_cid) => {
+            // A lineage revocation names the anchor it revokes. Anything that
+            // is not an EntryHash cannot BE that anchor, and accepting it would
+            // notarize a revocation that revokes nothing readable.
+            let base = EntryHash::try_from(target_cid.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "create_commitment: revokes-commitment naming a lineage target_action must \
+                     name a target_cid that is a base64 EntryHash: {target_cid}"
+                )))
+            })?;
+            (base, LIFECYCLE_REVOKED)
+        }
+    };
+
+    let tag = format!("{state}|{signed_at}");
+    create_link(
+        base,
+        action_hash.clone(),
+        LinkTypes::CommitmentByState,
+        LinkTag::new(tag.as_bytes().to_vec()),
+    )?;
+    Ok(())
 }
 
 /// Create a Commitment whose `payload_json.signatures` gains ONE new entry —
@@ -68,14 +214,18 @@ pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<Commitmen
 ///
 /// Delegates the actual entry-creation to `create_commitment` (the exact same
 /// validation + `create_entry` path `create_commitment` uses) — no duplicated
-/// create logic.
+/// create logic. That delegation is also what makes a lineage commitment
+/// authored here DHT-visibly ACTIVE: `create_commitment` authors the
+/// `active` `CommitmentByState` link on the new anchor once the validator has
+/// accepted the quorum (epic Task 19, [`author_lifecycle_link`]).
 #[hdk_extern]
 pub fn create_lineage_commitment(input: CreateCommitmentInput) -> ExternResult<CommitmentOutput> {
-    let mut payload: serde_json::Value = serde_json::from_str(&input.payload_json).map_err(|e| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "create_lineage_commitment: payload_json not parseable: {e}"
-        )))
-    })?;
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&input.payload_json).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "create_lineage_commitment: payload_json not parseable: {e}"
+            )))
+        })?;
 
     let cid = payload
         .get("signing_payload_cid")
@@ -113,21 +263,20 @@ pub fn create_lineage_commitment(input: CreateCommitmentInput) -> ExternResult<C
     };
 
     let entry = serde_json::json!({ "agent": me_str, "signature": sig_b64 });
-    match payload
-        .get_mut("signatures")
-        .and_then(|v| v.as_array_mut())
-    {
+    match payload.get_mut("signatures").and_then(|v| v.as_array_mut()) {
         Some(arr) => arr.push(entry),
         None => {
             payload
                 .as_object_mut()
                 .ok_or_else(|| {
                     wasm_error!(WasmErrorInner::Guest(
-                        "create_lineage_commitment: payload_json must be a JSON object"
-                            .to_string()
+                        "create_lineage_commitment: payload_json must be a JSON object".to_string()
                     ))
                 })?
-                .insert("signatures".to_string(), serde_json::Value::Array(vec![entry]));
+                .insert(
+                    "signatures".to_string(),
+                    serde_json::Value::Array(vec![entry]),
+                );
         }
     }
 
@@ -853,10 +1002,10 @@ fn validate_lineage_signatures(payload: &serde_json::Value) -> Result<(), String
         .ok_or("signatures must be a non-empty array")?;
     let required = match payload.get("required_signatures") {
         None => 1usize,
-        Some(v) => v
-            .as_u64()
-            .ok_or("required_signatures must be a non-negative integer")?
-            as usize,
+        Some(v) => {
+            v.as_u64()
+                .ok_or("required_signatures must be a non-negative integer")? as usize
+        }
     };
     let mut seen = std::collections::BTreeSet::new();
     for s in sigs {
@@ -867,8 +1016,8 @@ fn validate_lineage_signatures(payload: &serde_json::Value) -> Result<(), String
         if !seen.insert(agent.to_string()) {
             return Err(format!("duplicate signer {agent}"));
         }
-        let key = AgentPubKey::try_from(agent)
-            .map_err(|e| format!("signature.agent invalid: {e:?}"))?;
+        let key =
+            AgentPubKey::try_from(agent).map_err(|e| format!("signature.agent invalid: {e:?}"))?;
         let raw = {
             use base64::{engine::general_purpose::STANDARD, Engine as _};
             STANDARD
@@ -932,7 +1081,9 @@ fn validate_migrates_lineage(payload: &serde_json::Value) -> Result<(), String> 
     if payload["from_dna_hash"] == payload["to_dna_hash"] {
         return Err("from_dna_hash and to_dna_hash must differ".into());
     }
-    let w = payload["window"].as_object().ok_or("window must be object")?;
+    let w = payload["window"]
+        .as_object()
+        .ok_or("window must be object")?;
     let (opens_at, revert_until) = (
         w.get("opens_at")
             .and_then(|v| v.as_str())
@@ -944,8 +1095,9 @@ fn validate_migrates_lineage(payload: &serde_json::Value) -> Result<(), String> 
     // RFC3339 UTC strings compare lexicographically ONLY when both are
     // `Z`-suffixed (fixed-offset forms sort out of chronological order).
     if !opens_at.ends_with('Z') || !revert_until.ends_with('Z') {
-        return Err("window.opens_at and window.revert_until must be RFC3339 UTC ('Z'-suffixed)"
-            .into());
+        return Err(
+            "window.opens_at and window.revert_until must be RFC3339 UTC ('Z'-suffixed)".into(),
+        );
     }
     if opens_at >= revert_until {
         return Err("window.opens_at must precede window.revert_until".into());
@@ -2059,5 +2211,123 @@ mod tests {
             validate_commitment_payload(&input).is_err(),
             "recovery-quorum without integer m and n must fail validation"
         );
+    }
+    // =========================================================================
+    // Epic Task 19 — the lifecycle link a fresh commitment authors.
+    // =========================================================================
+
+    /// A lineage commitment's own notarization IS its activation, so both
+    /// lineage arms record `active` on their own anchor. Without this, every
+    /// peer but the author had to INFER activation from the entry's action.
+    #[test]
+    fn lineage_notarization_activates_itself() {
+        for action in ["migrates-lineage", "sunsets-lineage"] {
+            assert_eq!(
+                lifecycle_link_for(action, &serde_json::json!({})),
+                Some(LifecycleLink::ActivatesSelf),
+                "{action} must record its own activation on the DHT"
+            );
+        }
+    }
+
+    /// **The Station 7 seam.** A revocation of a lineage commitment records
+    /// `revoked` on the anchor of the commitment it revokes — the only way a
+    /// peer that did not author the revocation can see the path was pulled
+    /// back.
+    #[test]
+    fn a_lineage_revocation_records_revoked_on_its_target() {
+        let payload = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "uhCEkTARGET",
+            "target_action": "migrates-lineage",
+            "signed_at": "2026-09-05T00:00:00Z",
+        });
+        assert_eq!(
+            lifecycle_link_for("revokes-commitment", &payload),
+            Some(LifecycleLink::RevokesTarget("uhCEkTARGET".to_string()))
+        );
+    }
+
+    /// The link gate is the QUORUM gate, not the action name. A
+    /// `revokes-commitment` that names no lineage `target_action` was never
+    /// run through `validate_lineage_signatures`, so it never speaks for a
+    /// lineage commitment's lifecycle — and the existing non-lineage revoke
+    /// paths (lenses, identity heads, the commons provide loop) stay byte-for-
+    /// byte what they were.
+    #[test]
+    fn a_non_lineage_revocation_records_nothing() {
+        let legacy = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "uhCEkTARGET",
+            "signed_at": "2026-09-05T00:00:00Z",
+        });
+        assert_eq!(lifecycle_link_for("revokes-commitment", &legacy), None);
+
+        let other_target = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "uhCEkTARGET",
+            "target_action": "replicates-content",
+        });
+        assert_eq!(
+            lifecycle_link_for("revokes-commitment", &other_target),
+            None
+        );
+    }
+
+    /// A lineage revocation naming no target names no anchor: no link rather
+    /// than a link on nothing. (`validate_revokes_commitment` refuses the
+    /// empty `target_cid` before this is ever reached; this pins the
+    /// belt-and-braces arm.)
+    #[test]
+    fn a_lineage_revocation_without_a_target_records_nothing() {
+        let no_target = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "",
+            "target_action": "migrates-lineage",
+        });
+        assert_eq!(lifecycle_link_for("revokes-commitment", &no_target), None);
+    }
+
+    /// **The forgery the ENTRY-side keying closes.**
+    /// `validate_commitment_payload` dispatches on the ENTRY's action, and only
+    /// some arms pin the body's second copy of that string to it —
+    /// `validate_ratifies_limit_gradient` does not — so a commitment created as
+    /// `ratifies-limit-gradient` whose body declares `"migrates-lineage"` is
+    /// accepted carrying no signatures at all. It authors no activation link
+    /// either, because the gate reads the entry's action and never the body's:
+    /// with no link and no row, storage reads it as `proposed`, which
+    /// `verify_path` refuses.
+    #[test]
+    fn a_forged_body_action_authors_no_activation() {
+        let forged = serde_json::json!({
+            "action": "migrates-lineage",
+            "role": "node_registry",
+            "signatures": [],
+        });
+        assert_eq!(lifecycle_link_for("ratifies-limit-gradient", &forged), None);
+    }
+
+    /// Every other commitment action authors no lifecycle link at all — the
+    /// blast radius of Task 19 is the lineage arms and nothing else.
+    #[test]
+    fn every_other_action_records_nothing() {
+        for action in [
+            "delegates-compute",
+            "replicates-content",
+            "replicates-dwelling",
+            "ratifies-limit-gradient",
+            "binds-identity",
+            "author-lens",
+            "",
+        ] {
+            assert_eq!(
+                lifecycle_link_for(
+                    action,
+                    &serde_json::json!({"target_action": "migrates-lineage"})
+                ),
+                None,
+                "{action} must author no CommitmentByState link"
+            );
+        }
     }
 }
