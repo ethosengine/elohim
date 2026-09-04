@@ -228,6 +228,36 @@ const PEER_CONDUCTOR_PORTS: Record<PeerName, { admin: number; app: number }> = {
   james: { admin: 4464, app: 4465 },
 };
 
+/** Same default `release-ceremony.ts` uses for its own `conductor()` connects. */
+const CONDUCTOR_CONNECT_TIMEOUT_MS = 5_000;
+
+/**
+ * Copied byte-for-byte (behaviourally) from `release-ceremony.ts`'s own module-local
+ * `withTimeout` — a silent-but-open port would otherwise hang past the cucumber step timeout and
+ * leave a dangling handle, exactly the failure mode that helper exists to close. Every connect on
+ * `connectRoleConductor`'s rail goes through this, mirroring which calls `conductor()` wraps
+ * (`AdminWebsocket.connect` / `AppWebsocket.connect` only — `listApps`,
+ * `authorizeSigningCredentials` and `issueAppAuthenticationToken` are NOT wrapped there either).
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timeout after ${timeoutMs}ms: ${label}`)),
+      timeoutMs
+    );
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error as Error);
+      }
+    );
+  });
+}
+
 interface RoleConductorRail {
   call: (fnName: string, payload: unknown) => Promise<unknown>;
   /** base64 AgentPubKey this rail authors/calls as — the resolved cell's own agent key. */
@@ -258,10 +288,14 @@ async function connectRoleConductor(
   zomeName: string
 ): Promise<RoleConductorRail> {
   const ports = PEER_CONDUCTOR_PORTS[peer];
-  const admin = await AdminWebsocket.connect({
-    url: new URL(`ws://127.0.0.1:${ports.admin}`),
-    wsClientOptions: { origin: APP_ID },
-  });
+  const admin = await withTimeout(
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${ports.admin}`),
+      wsClientOptions: { origin: APP_ID },
+    }),
+    CONDUCTOR_CONNECT_TIMEOUT_MS,
+    `admin connect ${peer}:${ports.admin}`
+  );
   const apps = await admin.listApps({});
   const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
   if (!app) {
@@ -277,11 +311,15 @@ async function connectRoleConductor(
   const authToken = await admin.issueAppAuthenticationToken({
     installed_app_id: app.installed_app_id,
   });
-  const appWs = await AppWebsocket.connect({
-    url: new URL(`ws://127.0.0.1:${ports.app}`),
-    token: authToken.token,
-    wsClientOptions: { origin: APP_ID },
-  });
+  const appWs = await withTimeout(
+    AppWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${ports.app}`),
+      token: authToken.token,
+      wsClientOptions: { origin: APP_ID },
+    }),
+    CONDUCTOR_CONNECT_TIMEOUT_MS,
+    `app connect ${peer}:${ports.app}`
+  );
   const call = async (fnName: string, payload: unknown): Promise<unknown> =>
     appWs.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
   const close = async (): Promise<void> => {
@@ -909,12 +947,22 @@ async function assertStation1Admissible(): Promise<void> {
     (_peer, row) => row.resolvedHead?.cid === c.releaseCid && row.verdict !== null
   );
   for (const peer of PEER_NAMES) {
-    const reason = results[peer]?.row.verdict?.refusal?.reason;
+    const verdict = results[peer]?.row.verdict;
+    const reason = verdict?.refusal?.reason;
     assert.notEqual(
       reason,
       'dna_lineage_mismatch',
       `${peer} refused the well-formed lineage release with dna_lineage_mismatch — the bridge ` +
-        `map was NOT recognised: ${JSON.stringify(results[peer]?.row.verdict)}`
+        `map was NOT recognised: ${JSON.stringify(verdict)}`
+    );
+    // The passing path's own observed state is worth a receipt: today that is
+    // `state: "refused", refusal.reason: "path_not_notarized"` — see module doc "The
+    // verify_path caveat" for why that is the CORRECT admissible signal right now, not a
+    // silent gap. Once the evidence fetch lands this line will start logging `state: "ok"`
+    // (or later, `applied`) instead.
+    console.error(
+      `[happ-lineage-migration] Station 1 admissible check on ${peer}: state=${verdict?.state}, ` +
+        `refusal.reason=${reason ?? '(none)'}`
     );
   }
 }
