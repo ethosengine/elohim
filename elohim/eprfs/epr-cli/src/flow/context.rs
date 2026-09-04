@@ -505,7 +505,7 @@ fn habit_scope_for(
 /// absence — rather than an error: a governance line is an enrichment of the screen, and an
 /// enrichment that can veto its subject is a dependency in the wrong direction.
 fn governance_for(root: &Path, rel: &str) -> Option<Governance> {
-    let resolution = eprfs_meta::resolve_path(root, &root.join(rel)).ok()?;
+    let resolution = eprfs_meta::resolve_path(root, root.join(rel)).ok()?;
     let authority = crate::authority::AuthorityIndex::load(root)
         .ok()
         .and_then(|index| index.find(Path::new(rel)).map(|p| p.package_path.clone()));
