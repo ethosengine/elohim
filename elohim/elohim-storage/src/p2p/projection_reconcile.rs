@@ -9770,6 +9770,11 @@ mod tests {
                 winner_target: "uhCkkghost-winner".into(),
                 canonical_declared_at: 42,
                 canonical_earned: true,
+                // Additive on the wire (7e17a2d96); this fixture is about the
+                // ghost/unattempted arm, so the earned winner stands with no
+                // staging candidate beneath it.
+                staging_candidate: None,
+                staging_candidate_declared_at: None,
             }),
         );
         for id in unattempted {
