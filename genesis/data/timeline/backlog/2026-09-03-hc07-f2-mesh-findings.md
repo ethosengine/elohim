@@ -121,7 +121,20 @@ are per-conductor: the pool must mint on each target's admin (`conductorWsHost(.
 the primary. Separately, both doorways' `--conductor-url` still named the pre-split storage host (fixed in the
 manifests, 2026-09-04).
 
-## 11. Apparatus, fixed on the branch (for the record)
+## 11. First re-seed of a fresh fleet (genesis #1553, 2026-09-04 03:xxZ) — what the pipeline still assumes
+
+- `Verify Target Health` gated on the site root, which is 503 until the seed exists (fixed: `/health`, 83ae73bda).
+- `Seed Conductor Identities` reported `[C] Conflict` for matthew: his conductor already embodied a UUID human id
+  (`5f27bc9b-…`) before the seeder reached it — something creates a Human on first contact with an empty conductor
+  (doorway A's zome caller or storage's identity fill). One agent = one Human, so on a fresh genesis the seeder must
+  run before any self-heal, or the self-heal must use `SELF_HUMAN_ID`. Operator attention per the seeder's own doc.
+- `stakes seed adam: HTTP 403` — adam's storage runs with `ALLOW_SEED_NETWORK_STAKES` off (posture, not a bug; the
+  manifest seeded on matthew + jessica).
+- The landing and lamad-spa rows seed with `blobHash: null` / `serverBlobHash: null`: the SPA bundles are staged by
+  the APP pipeline's "Upload SPA Blob" stage, so `/` stays 503 and `/lamad/` 404 until an app run follows the seed —
+  the app run that ran before the roll (#1688) declared against the old fleet and is gone with the wipe.
+
+## 12. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
