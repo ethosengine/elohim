@@ -274,12 +274,40 @@ export class AgencyService {
         return getVisitorDataResidency();
       case 'hosted':
         return getHostedDataResidency();
+      case STAGE_HOSTED_STEWARD:
+        return this.getHostedStewardDataResidency();
       case STAGE_APP_STEWARD:
       case STAGE_NODE_STEWARD:
         return getAppUserDataResidency();
       default:
         return getVisitorDataResidency();
     }
+  }
+
+  /**
+   * Residency for a graduated steward in recovery mode.
+   *
+   * The doorway is temporarily providing conductor compute, so the data lives
+   * exactly where a hosted human's does — DHT for everything the network holds.
+   * What differs is the identity row: authority has NOT moved to the doorway.
+   * It still belongs to the steward's peer-native portal; the doorway only holds
+   * recovery compute (see the conductor-compute / identity-authority matrix in
+   * agency.model.ts). Falling through to the visitor residency, as this used to,
+   * told a steward in recovery their data was "Browser only / Temporary".
+   */
+  private getHostedStewardDataResidency(): DataResidencyItem[] {
+    return getHostedDataResidency().map(item =>
+      item.category === 'identity'
+        ? {
+            ...item,
+            label: 'Identity Keys',
+            description:
+              'Authority stays on your peer-native portal (doorway holds recovery compute)',
+            locationLabel: 'Your Portal + Doorway (recovery)',
+            controlledBy: 'user' as const,
+          }
+        : item
+    );
   }
 
   /**
@@ -302,7 +330,7 @@ export class AgencyService {
         label: 'Agent Public Key',
         value: displayInfo.agentPubKey,
         truncated: this.truncateKey(displayInfo.agentPubKey),
-        canExport: stage !== 'hosted', // Can't export from custodial hosting
+        canExport: keyLocation !== 'custodial', // Can't export from custodial hosting
         canRevoke: false,
       });
     }
@@ -325,6 +353,8 @@ export class AgencyService {
         return 'none';
       case 'hosted':
         return 'custodial'; // Keys held by edge node
+      case STAGE_HOSTED_STEWARD:
+        return 'custodial'; // Doorway holds recovery compute; authority is the steward's portal
       case STAGE_APP_STEWARD:
         return 'device'; // Keys on local conductor
       case STAGE_NODE_STEWARD:
@@ -340,14 +370,23 @@ export class AgencyService {
   private getKeyLocationInfo(stage: AgencyStage, location: KeyLocation): KeyInfo | null {
     switch (location) {
       case 'custodial':
-        return {
-          type: KEY_TYPE_SIGNING,
-          label: KEY_LABEL_SIGNING,
-          value: 'Held by Edge Node',
-          truncated: 'Custodial',
-          canExport: false,
-          canRevoke: false,
-        };
+        return stage === STAGE_HOSTED_STEWARD
+          ? {
+              type: KEY_TYPE_SIGNING,
+              label: KEY_LABEL_SIGNING,
+              value: 'Held by the doorway while your device is unreachable',
+              truncated: 'Doorway (recovery)',
+              canExport: false,
+              canRevoke: false,
+            }
+          : {
+              type: KEY_TYPE_SIGNING,
+              label: KEY_LABEL_SIGNING,
+              value: 'Held by Edge Node',
+              truncated: 'Custodial',
+              canExport: false,
+              canRevoke: false,
+            };
       case 'device':
         return {
           type: KEY_TYPE_SIGNING,
@@ -407,6 +446,7 @@ export class AgencyService {
       case 'visitor':
         return { data: 'Browser only', progress: 'Temporary' };
       case 'hosted':
+      case STAGE_HOSTED_STEWARD:
         return { data: 'DHT Network', progress: 'Saved' };
       case STAGE_APP_STEWARD:
         return { data: 'Your Device', progress: 'Saved' };

@@ -11,6 +11,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
+import { HostingAccountService } from './hosting-account.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import type {
   EdgeNodeDisplayInfo,
@@ -749,6 +750,104 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.networkStats).toBeUndefined();
+    });
+  });
+  // ==========================================================================
+  // hosted-steward — a graduated steward signed in through a doorway
+  // ==========================================================================
+
+  describe('hosted-steward (recovery mode)', () => {
+    let stewardService: AgencyService;
+
+    beforeEach(() => {
+      // hosted-steward used to fall through every switch default: visitor
+      // residency, key location 'none', summary { Unknown, Unknown }. So the
+      // badge told a steward in recovery their data was "Browser only /
+      // Temporary" — the opposite of true.
+      TestBed.resetTestingModule();
+
+      const stewardConnection = signal<HolochainConnection>({
+        state: 'connected',
+        adminWs: null,
+        appWs: null,
+        cellId: null,
+        cellIds: new Map(),
+        agentPubKey: 'agent-pub-key-123',
+        appInfo: null,
+      });
+
+      const holochainClient = {
+        // A REMOTE conductor (the doorway's) — recovery compute, not the
+        // steward's own device.
+        getDisplayInfo: vi
+          .fn()
+          .mockReturnValue(
+            createMockDisplayInfo('connected', 'wss://doorway-alpha.elohim.host/conductor', true)
+          ),
+        connection: stewardConnection.asReadonly(),
+      };
+
+      TestBed.configureTestingModule({
+        providers: [
+          AgencyService,
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: HolochainClientService, useValue: holochainClient },
+          { provide: AuthService, useValue: { isAuthenticated: vi.fn().mockReturnValue(true) } },
+          {
+            provide: HostingAccountService,
+            useValue: {
+              account: signal({ isSteward: true }).asReadonly(),
+              isLoading: signal(false).asReadonly(),
+              loadAccount: vi.fn().mockResolvedValue(null),
+            },
+          },
+        ],
+      });
+
+      stewardService = TestBed.inject(AgencyService);
+    });
+
+    it('detects the hosted-steward stage', () => {
+      expect(stewardService.currentStage()).toBe('hosted-steward');
+    });
+
+    it('reports DHT residency, never the visitor "browser only" story', () => {
+      const residency = stewardService.agencyState().dataResidency;
+      const locations = residency.map(item => item.locationLabel);
+
+      expect(locations).not.toContain('Browser Memory');
+      expect(locations).not.toContain('Browser Storage');
+      expect(locations.filter(label => label === 'DHT Network').length).toBeGreaterThan(0);
+    });
+
+    it('names the steward portal as identity authority, doorway as recovery compute', () => {
+      const identity = stewardService
+        .agencyState()
+        .dataResidency.find(item => item.category === 'identity');
+
+      expect(identity).toBeDefined();
+      expect(identity?.locationLabel).toBe('Your Portal + Doorway (recovery)');
+      expect(identity?.description).toContain('peer-native portal');
+      expect(identity?.description).toContain('recovery compute');
+      expect(identity?.controlledBy).toBe('user');
+    });
+
+    it('shows a custodial signing key labelled as doorway recovery', () => {
+      const keys = stewardService.agencyState().keys;
+      const signing = keys.find(k => k.type === 'signing-key');
+
+      expect(signing).toBeDefined();
+      expect(signing?.truncated).toBe('Doorway (recovery)');
+      expect(signing?.canExport).toBe(false);
+
+      // The agent key itself is custodial too while in recovery.
+      const agentKey = keys.find(k => k.type === 'agent-pubkey');
+      expect(agentKey?.canExport).toBe(false);
+    });
+
+    it('summarises as saved DHT data, not Unknown/Unknown', () => {
+      expect(stewardService.getStageSummary()).toEqual({ data: 'DHT Network', progress: 'Saved' });
     });
   });
 });
