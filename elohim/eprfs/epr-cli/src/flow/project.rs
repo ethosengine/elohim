@@ -681,8 +681,12 @@ fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
     }
     deriv.label(&scope_cid, covenant_rel);
 
+    // "Max 2 active" is the covenant's sentence; 3.0 is its encoding. `Bound::breached_by` for
+    // a ceiling is `stock >= limit`, so the limit is the FIRST FORBIDDEN level, not the last
+    // permitted one — a limit of 2.0 would refuse the very state the covenant allows, and did,
+    // live, on a register with exactly two active habits.
     let bound = Bound {
-        limit: 2.0,
+        limit: 3.0,
         unit: WIP_FENCE_UNIT.to_string(),
         threshold_pct: 50.0,
         sense: None,

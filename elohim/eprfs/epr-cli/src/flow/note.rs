@@ -534,11 +534,19 @@ fn claimed_for_session(root: &Path, session: &str) -> Option<String> {
 
 /// Resolve `--on` to `(resource CID, human label)`.
 ///
-/// Two admissible shapes, and no third: a **CIDv1 string**, which must already be an atom this
-/// sidecar knows, or a **repo-relative path**, whose canonical body CID is computed the way every
-/// other resource identity on this path is. Both refuse with [`FlowError::UnknownResource`]
-/// rather than minting an orphan — a note pointing at nothing is worse than no note, because it
-/// reads as evidence.
+/// THREE admissible shapes, the same three `claim` and `fulfill` accept, tried in order of
+/// decreasing precision. A **CIDv1 string**, which must already be an atom this sidecar knows. A
+/// **gap id**, which resolves to the newest commitment carrying it and, failing that, to the
+/// intent that raised it — so a note about a task lands on the promise, not on the whole plan.
+/// A **repo-relative path**, whose canonical body CID is computed the way every other resource
+/// identity on this path is. All three refuse with [`FlowError::UnknownResource`] rather than
+/// minting an orphan — a note pointing at nothing is worse than no note, because it reads as
+/// evidence.
+///
+/// The gap-id arm exists because it was MISSING: `claim` and `fulfill` learned it and `note` did
+/// not, so the one verb the three non-discharging statuses are told to use could not name the
+/// item it was blocked on. A vocabulary that refuses the record it recommends is not a
+/// vocabulary.
 ///
 /// The CID arm deliberately verifies *membership* instead of accepting any well-formed CID:
 /// `atom_cid` will happily parse an address for something that was never recorded, and a note
@@ -557,6 +565,13 @@ fn resolve_target(
         )));
     }
 
+    // A gap id: the newest commitment carrying it — the live promise — else the intent that
+    // raised it, which is all that exists before anyone claims it. "Newest" is sidecar append
+    // order, the same rule `claim`'s gap-id arm holds, so a superseded claim never wins.
+    if let Some(cid) = gap_id_target(on, records) {
+        return Ok((cid, on.to_string()));
+    }
+
     let canonical_root = std::fs::canonicalize(root).map_err(|source| FlowError::Read {
         path: root.to_path_buf(),
         source,
@@ -567,9 +582,42 @@ fn resolve_target(
         canonical_root.join(on)
     };
     let confined = confine_under(&canonical_root, &abs)?;
-    let cid =
-        body_cid_of_file(&confined).ok_or_else(|| FlowError::UnknownResource(on.to_string()))?;
+    let cid = body_cid_of_file(&confined).ok_or_else(|| {
+        FlowError::UnknownResource(format!(
+            "{on} (not an atom address this sidecar knows, not a gap id any commitment or \
+             intent carries, and not a readable path)"
+        ))
+    })?;
     Ok((cid, rel_to_root(&canonical_root, &confined)))
+}
+
+/// The address a gap id names: the newest commitment carrying it in `classified_as`, else the
+/// intent whose slot-1 subject equals it.
+///
+/// Commitments are preferred over intents on purpose. A note about a task in flight is about the
+/// PROMISE — that is where a verdict, a correction and a blocked observation all belong, and it
+/// is what makes them roll up onto the plan's screen with a `via` marker instead of appearing as
+/// unattributed remarks on the document.
+fn gap_id_target(on: &str, records: &[(Cid, FlowRecord)]) -> Option<Cid> {
+    records
+        .iter()
+        .rev()
+        .find_map(|(cid, record)| match record {
+            FlowRecord::Commitment(c) if c.resource_spec.classified_as.iter().any(|s| s == on) => {
+                Some(*cid)
+            }
+            _ => None,
+        })
+        .or_else(|| {
+            records.iter().rev().find_map(|(cid, record)| match record {
+                FlowRecord::Intent(i)
+                    if i.resource_spec.classified_as.get(1).map(String::as_str) == Some(on) =>
+                {
+                    Some(*cid)
+                }
+                _ => None,
+            })
+        })
 }
 
 /// Does any record in the sidecar mint or name `cid`? Short-circuits on the first hit and builds

@@ -866,6 +866,10 @@ impl StocksOutcome {
                     println!("      level:   {}", m.level_basis);
                     println!("      inflow:  {}", m.inflow_basis);
                     println!("      outflow: {}", m.outflow_basis);
+                    println!(
+                        "    outflow arm: fulfillment only — Dismiss is a regression marker \
+                         (empty `fulfills`) and no path mints a Revoked commitment"
+                    );
                 }
                 None => {
                     println!("    verdict:  {}", stock.verdict.word());
@@ -895,11 +899,10 @@ impl StocksOutcome {
             if let Some(bound) = &stock.bound {
                 println!("    level:    {:.0} {}", bound.level, bound.unit);
                 println!(
-                    "    band:     limit {:.0}, band edge {:.0} (ceiling — the fabric breaches \
+                    "    band:     limit {:.0}, band edge {:.1} (ceiling — the fabric breaches \
                      at level >= limit)",
                     bound.limit, bound.band_edge
                 );
-                println!("    verdict:  {}", stock.verdict.word());
                 match &bound.signal {
                     Some(signal) => println!("    signal:   {signal}"),
                     None => println!("    signal:   none (inside the band)"),
@@ -907,10 +910,6 @@ impl StocksOutcome {
                 println!("    bound:    {}", bound.bound_ref);
                 println!("    basis:    {}", bound.level_basis);
             }
-            println!(
-                "    outflow arm: fulfillment only — Dismiss is a regression marker (empty \
-                 `fulfills`) and no path mints a Revoked commitment"
-            );
         }
         println!(
             "  equilibrium (every stock draining): {}",
@@ -1070,7 +1069,9 @@ fn active_habits_report(root: &Path, records: &[(Cid, FlowRecord)]) -> StockRepo
             signal,
             level_basis: format!(
                 "projected level: {} of {} habits in {} carry `active: true`, counted at read \
-                 time — not event-derived, so the declared window does not bear on it",
+                 time — not event-derived, so the declared window does not bear on it. The \
+                 covenant's fence is max 2 active (fence breaches at 3), which is why the \
+                 declared limit is the first forbidden level rather than the last permitted one",
                 level,
                 habits.len(),
                 super::registers::HABITS_REGISTER_REL

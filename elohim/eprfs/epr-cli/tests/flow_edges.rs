@@ -1381,7 +1381,7 @@ fn the_wip_fence_is_projected_as_one_bounded_commitment_and_is_idempotent() {
         ]
     );
     let bound = fence.bound.as_ref().expect("the fence IS its bound");
-    assert_eq!(bound.limit, 2.0);
+    assert_eq!(bound.limit, 3.0);
     assert_eq!(bound.unit, "active-habit");
     assert_eq!(bound.threshold_pct, 50.0);
     // A ceiling and a declared source are the v1 DEFAULTS and must be encoded as absent —
@@ -1422,9 +1422,18 @@ fn the_active_habits_level_is_judged_against_the_fence_band_and_check_refuses_ov
         .as_ref()
         .expect("a bounded stock carries its reading");
     assert_eq!(bound.level, 0.0);
-    assert_eq!(bound.limit, 2.0);
-    assert_eq!(bound.band_edge, 1.0);
+    // The covenant's "max 2 active" against a ceiling that breaches at `stock >= limit`: three
+    // is the first FORBIDDEN level, so the limit is 3.0. 50% of 3 puts the band edge at 1.5.
+    assert_eq!(bound.limit, 3.0);
+    assert_eq!(bound.band_edge, 1.5);
     assert!(bound.signal.is_none());
+    assert!(
+        bound
+            .level_basis
+            .contains("max 2 active (fence breaches at 3)"),
+        "the basis must state the covenant's number, not only the encoded limit: {}",
+        bound.level_basis
+    );
     assert!(
         bound.level_basis.contains("projected"),
         "the level is read from the register, not folded from events; the basis must say so: {}",
@@ -1436,35 +1445,40 @@ fn the_active_habits_level_is_judged_against_the_fence_band_and_check_refuses_ov
          over-claim this whole vocabulary exists to prevent"
     );
 
-    // One active: the band edge — the signal BEFORE the line. Still not a breach.
+    // One active: below the 1.5 band edge, plainly inside the band.
     write_register(root, 1);
+    let report = fence_reading(root);
+    assert_eq!(report.verdict.word(), "WITHIN-BOUND");
+    assert!(report.verdict.is_equilibrium());
+    assert!(report.bound.as_ref().unwrap().signal.is_none());
+
+    // Two active: the covenant's MAXIMUM. Past the 1.5 band edge, so it warns — which is what
+    // sitting exactly at the fence should feel like — and it does not refuse.
+    write_register(root, 2);
     let report = fence_reading(root);
     assert_eq!(report.verdict.word(), "AT-BAND-EDGE");
     assert!(
         report.verdict.is_equilibrium(),
-        "an approach warns; it does not refuse"
+        "two active is what the covenant permits and must pass --check"
     );
     assert_eq!(
         report.bound.as_ref().unwrap().signal.as_deref(),
         Some("algedonic-approach")
     );
 
-    // Two and three: the fabric's ceiling is INCLUSIVE (`stock >= limit`), so a limit of 2.0
-    // breaches AT two. See the report's finding on this.
-    for active in [2, 3] {
-        write_register(root, active);
-        let report = fence_reading(root);
-        assert_eq!(report.verdict.word(), "OVER-BOUND", "{active} active");
-        assert!(
-            !report.verdict.is_equilibrium(),
-            "--check must exit non-zero at {active} active"
-        );
-        assert_eq!(
-            report.bound.as_ref().unwrap().signal.as_deref(),
-            Some("algedonic-breach")
-        );
-        assert_eq!(report.bound.as_ref().unwrap().level, active as f64);
-    }
+    // Three: the first forbidden level.
+    write_register(root, 3);
+    let report = fence_reading(root);
+    assert_eq!(report.verdict.word(), "OVER-BOUND");
+    assert!(
+        !report.verdict.is_equilibrium(),
+        "--check must exit non-zero at three active"
+    );
+    assert_eq!(
+        report.bound.as_ref().unwrap().signal.as_deref(),
+        Some("algedonic-breach")
+    );
+    assert_eq!(report.bound.as_ref().unwrap().level, 3.0);
 }
 
 #[test]
@@ -1480,4 +1494,68 @@ fn an_unreadable_register_or_a_missing_fence_refuses_rather_than_reading_zero() 
         "an absent register is not a stock of zero"
     );
     assert!(!report.verdict.is_equilibrium());
+}
+
+/// `note --on <gap-id>` — the arm `claim` and `fulfill` had and `note` did not, which is why the
+/// observer hook could not record a BLOCKED report against the item it was blocked on.
+#[test]
+fn a_note_resolves_a_gap_id_to_its_commitment_and_rolls_up_onto_the_plan() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let commitment = claimed(root, "epic#1", &implementer);
+
+    let outcome = note::note(
+        root,
+        "epic#1",
+        "observation",
+        "blocked on the cargo lease; nothing was appended",
+        None,
+        None,
+        &implementer,
+    )
+    .expect("a gap id is a legal --on");
+    assert_eq!(
+        outcome.resource, commitment,
+        "a gap id lands on the promise it names, not on the plan"
+    );
+    assert_eq!(
+        outcome.on, "epic#1",
+        "and the label is the id the caller used"
+    );
+
+    // And it reaches the plan's one screen, marked with the commitment it came via.
+    let result = context::context(root, "plans/epic.md").expect("context runs");
+    let observation = result
+        .notes
+        .iter()
+        .find(|n| n.kind == "run:observation")
+        .expect("the observation rolls up onto the plan");
+    assert_eq!(observation.via.as_deref(), Some("epic#1"));
+
+    // An unclaimed gap item still resolves — to the INTENT, which is the only thing that exists.
+    let on_intent = note::note(
+        root,
+        "epic#2",
+        "observation",
+        "not claimed yet",
+        None,
+        None,
+        &implementer,
+    )
+    .expect("an unclaimed gap id resolves to its intent");
+    assert_eq!(on_intent.resource, intent_cid_for(root, "epic#2"));
+
+    // A name that is neither refuses, and says so.
+    let err = note::note(
+        root,
+        "epic#99",
+        "observation",
+        "nothing to attach to",
+        None,
+        None,
+        &implementer,
+    )
+    .expect_err("an unknown gap id is not a silent no-op");
+    assert!(err.to_string().contains("epic#99"), "{err}");
 }
