@@ -1538,6 +1538,17 @@ pub struct CarryReceipt {
     /// `sum(carried) == v1_total` check can actually fail. `None` when the
     /// predecessor bundle predates that field.
     pub v1_total: Option<u32>,
+    /// **Additive.** How many of `carried` were re-created NATIVELY on this
+    /// chain (self-carry, §2.1) — held-carries are excluded. `carried` alone
+    /// cannot tell the two apart, and only the self-carried share is content
+    /// this DNA now holds as its own commits rather than as bytes inside a
+    /// witness.
+    ///
+    /// `#[serde(default)]` so a consumer built against the pre-hardening
+    /// receipt still decodes, and a page from a zome that predates the field
+    /// reads as 0 rather than failing.
+    #[serde(default)]
+    pub self_carried: u32,
 }
 
 /// Pull ONE bounded page from a predecessor cell and witness it here.
@@ -1597,9 +1608,23 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         }
     };
 
+    // `records` and `entries` are paired POSITIONALLY, so a page whose two
+    // vectors disagree in length cannot be paired at all — index i would mean a
+    // different record in each. Refuse the page rather than silently carrying
+    // the wrong bytes (or `None`) alongside an action.
+    if page.records.len() != page.entries.len() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "carry_from: the predecessor returned {} records but {} entries — the page cannot \
+             be paired positionally",
+            page.records.len(),
+            page.entries.len()
+        ))));
+    }
+
     // (3) self-carry vs held-carry, per §2.1/§2.2.
     let me = agent_info()?.agent_initial_pubkey;
     let mut proofs: Vec<CarriedProof> = Vec::with_capacity(page.records.len());
+    let mut self_carried: u32 = 0;
 
     for (i, signed) in page.records.iter().enumerate() {
         let action = signed.action().clone();
@@ -1626,8 +1651,31 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
                     )))
                 })?;
                 if let Some(typed) = typed {
+                    // The whole promise of self-carry is CID continuity: the
+                    // re-created entry must hash to exactly what the carried
+                    // action commits to. If the two lineage ends disagree about
+                    // the struct's shape, the round-trip silently produces
+                    // DIFFERENT bytes — a new entry hash under an old action's
+                    // proof. Refuse the page; never fall through to
+                    // `entry: None`, which would drop the only copy of the
+                    // bytes the witness needed.
+                    let recreated_hash = hash_entry(&typed)?;
+                    let committed = action.entry_hash().ok_or_else(|| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "carry_from: proof {i}: an app entry was carried but the action \
+                             references no entry hash"
+                        )))
+                    })?;
+                    if &recreated_hash != committed {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "carry_from: proof {i}: re-created entry hash differs from the \
+                             carried action's — schema drift between lineage ends (re-created \
+                             {recreated_hash}, carried action commits to {committed})"
+                        ))));
+                    }
                     create_entry(typed)?;
                     recreated = true;
+                    self_carried = self_carried.saturating_add(1);
                 }
             }
         }
@@ -1659,5 +1707,6 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         v1_digest: page.digest,
         witness_hash,
         v1_total: page.total,
+        self_carried,
     })
 }

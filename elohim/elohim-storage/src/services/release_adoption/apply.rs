@@ -622,8 +622,21 @@ pub struct CarryInput {
     /// guessing is the one thing a migration must never do.
     pub v1_cell: holochain_client::CellId,
     /// `None` starts at the beginning. Cursor-driven, so a carry that is
-    /// interrupted resumes rather than restarting (C6b: idempotent by entry
-    /// hash on the zome side).
+    /// interrupted resumes rather than restarting.
+    ///
+    /// **Correction (Task 9, as landed): the zome is NOT yet idempotent by
+    /// entry hash.** An earlier draft of this comment claimed C6b was already
+    /// held on the zome side; it is not. `carry_from` calls `create_entry`
+    /// unconditionally for a self-carry, so re-carrying a cursor re-creates the
+    /// entry (same entry hash, NEW action) and commits a SECOND
+    /// `NotarizationWitness` for the page. Within one `fold_carry` sweep this
+    /// cannot happen — the non-advancing-cursor refusal below stops it — but a
+    /// RETRIED whole apply would double-carry.
+    ///
+    /// Filed follow-up station: *carry idempotency — query the chain for the
+    /// entry hash before `create_entry`* (and skip the witness for a page whose
+    /// proofs are all already witnessed). Until that lands, treat a retried
+    /// apply as producing duplicate actions, not as a no-op.
     pub cursor: Option<u32>,
     pub limit: u32,
 }

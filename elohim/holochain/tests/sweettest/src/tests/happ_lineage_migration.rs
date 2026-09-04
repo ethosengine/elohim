@@ -122,6 +122,10 @@ struct CarryReceipt {
     /// Station 3's equality `carried == v1_count` is only falsifiable if this
     /// is READ from v1's export page, never derived from `carried`.
     v1_total: Option<u32>,
+    /// Additive: how many of `carried` were re-created NATIVELY here
+    /// (held-carries excluded).
+    #[serde(default)]
+    self_carried: u32,
 }
 
 /// The properties both node_registry versions read.
@@ -477,6 +481,11 @@ async fn probe_a_carry_from_pulls_one_bounded_page_across_cells() -> Result<()> 
         receipt.carried,
         receipt.v1_total.expect("v1 reported a total"),
         "Station 3: everything v1 had was carried"
+    );
+    assert_eq!(
+        receipt.self_carried, 1,
+        "the one record is the agent's OWN, so it is a self-carry — re-created natively on \
+         this chain, not held as bytes inside the witness"
     );
     assert!(
         !receipt.witness_hash.is_empty(),
