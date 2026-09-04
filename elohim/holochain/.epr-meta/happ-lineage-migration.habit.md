@@ -18,6 +18,20 @@ refs:
   - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
   - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (ladder row 6)"
   - "upstream kernel: elohim/holochain-conductor/crates/holochain/tests/tests/migration.rs (chain-switch, #5842)"
+guard: >
+  Risk R1–R4 (scale; measured from CODE on 2026-09-04, not yet from a run — rows 1–4 of
+  genesis/data/timeline/backlog/arch-scale-risk-backlog.md). Every station can be green on
+  node_registry (tens of records, three peers) while all four are live, because none has a
+  trigger below ~3k entries: R1 the export re-walks and re-digests the WHOLE chain per 64-record
+  page (≈N²/64); R2 witness validation walks the carrier's whole activity per witness (O(W²) per
+  validator, worse after Tasks 21–23 add couriers); R3 chains ≈×1.06 per migration, never pruned,
+  and the held-carry fans out ∝ peers × records (≈110 min per courier for 3.5k records at
+  16/30 s); R4 dual cells ≈×2 conductor RAM for the whole window on a tier that already hit
+  ~14 GB overnight. Retire-when names three ALPHA crossings and lamad is the first role that
+  exercises R1/R2 — so a green here on the rehearsal DNA is necessary and NOT sufficient, and
+  the Station 3/5/8 receipts must carry elapsed, catch-up minutes and RSS before the first lamad
+  crossing is scheduled. R1 and R5 retire coordinator-side (hash-neutral); R2 is an integrity
+  change and rides the sunset-hardening crossing.
 retire-when: >
   when three consecutive integrity changes reach the alpha fleet through their release channel
   with every witness verified and zero records re-seeded from outside, each with its cycle-time
@@ -194,3 +208,9 @@ r16) instead of merely "not dna_lineage_mismatch", which would have passed on a 
 `manifest_schema_invalid` or `conductor_unavailable`; and `readV1Export` refuses a baseline that hit
 its page cap, because a PREFIX of the chain would silently make every "untouched" and
 `carried == v1Count` comparison compare the wrong set.
+
+DELTA 2026-09-04 (risk discipline; no status move): four scale risks read off the landed code and filed as
+rows 1–4 of `genesis/data/timeline/backlog/arch-scale-risk-backlog.md` (tag `risk`, CONVENTIONS §Risks), carried
+here as `guard:` R1–R4 and as `inject` pointers at `elohim/holochain/dna/.epr-meta` and the elohim-storage
+manifest. None is measured by r15/r16 (node_registry, tens of records); the first live measure is a lamad-scale
+run, and the receipts need elapsed / catch-up minutes / RSS before that run means anything.

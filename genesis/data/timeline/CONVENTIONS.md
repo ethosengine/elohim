@@ -145,6 +145,44 @@ This is the **same lifecycle** stories and feature files use. One vocabulary, th
 
 `regression` is orthogonal-sideways: when `/deliver` re-judges a previously-delivered feature as `partial`/`error_state`/`missing` after a prior `delivered`, the entry flips to `regression` and `regression_from` preserves the prior level. The historian surfaces these as risk-precedent annotations; the cartographer ranks them high in next-actions for repair.
 
+## Risks — a view, not a kind (tag `risk`)
+
+A **project risk** is a concern with a *measurable trigger that has not fired yet*. It is not a
+fourth kind: it is a `backlog` row (in a cluster, per `backlog/CLUSTERS.md`) carrying the tag
+`risk`, and the **risk view** is the query `tags contains risk` — exactly as the timeline, roadmap
+and kanban views are queries over the one collection. First cluster: `backlog/arch-scale-risk-backlog.md`.
+
+**Row shape** (a cluster table, one row per risk): `# | Risk | Where (file + symbol) | Trigger
+(measurable) | Horizon | L / I | Mitigation → graduates to | Status`. The trigger is a number
+someone can read off a receipt or a probe, never an adjective. The horizon names the roadmap
+`target_window` or the milestone that first exercises it. The mitigation names the smallest change
+that retires the row and the surface it graduates to (an epic gap id, a plan task, a habit `guard:`).
+
+**Filed when the code lands, not when it bites.** The reader is a reviewer or an implementer, so a
+risk is written at the moment its shape is visible in a diff — a full-chain walk per page, a
+per-record DHT read, a fan-out ∝ peers × records — with the scale at which it was measured.
+
+**Surface and recall — five fire points, all pre-existing.** Storing a risk is not recall; a row is
+wired into each surface it deserves, in the same pass:
+
+1. *At the point of touch* — an `inject` rule in the nearest `.epr-meta` (`when: { write: <file>,
+   contains-any: [<symbols>] }` + `dedupe-of: <cluster path>`) so the next editor of that code
+   sees the row. Never blocks; fires only on that code.
+2. *At planning* — the `risk` tag is what `/converge` and the historian's precedent search read;
+   the p2p-design-gate's head-plane question cites the matching row. Run the MemPalace sync after
+   filing so the pickup hook can recall it.
+3. *At session start* — a risk that threatens a declared habit is a numbered entry in that habit
+   atom's `guard:` (precedent: `governance-plane-single-evaluator`), rendered by `just status
+   habits --full`. A risk with a runnable trigger probe may instead be born as an `unwired` habit.
+   No new headline line: the habit register is the surface with a reader.
+4. *Every measured run* — the a2o receipt that exercises the code carries the trigger number
+   (elapsed, count, RSS), so the row's evidence accrues without anyone re-reading it.
+5. *When it fires* — the row flips to `status: regression` with `regression_from` and the receipt,
+   and the historian writes the chronicle entry (two entries, one moment). The row is retired only
+   when the mitigation lands, never because it fired.
+
+The cartographer owns the rows (backlog authority); any agent may file one at landing time.
+
 ## Ownership and write rules
 
 - **historian** writes under `timeline/chronicle/` only. May not write under `roadmap/` or `backlog/`.

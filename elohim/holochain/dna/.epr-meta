@@ -34,6 +34,25 @@ rules:
       design — `epr:validator-dna-hash-neutrality` is registered machinery with NO concern-canon
       row, because the ceremony tested DNA-hash-neutrality as a class and declined it ("no runtime
       predicate… it becomes the third registered validator, not a class").
+  - id: scale-risk-lineage-carry
+    class: inject
+    when:
+      write: "lib.rs"
+      contains-any: ["export_records", "export_held_records", "chain_digest", "carry_from", "entry_already_witnessed", "refuse_carried_after_close", "readopt_from"]
+    dedupe-of: genesis/data/timeline/backlog/arch-scale-risk-backlog.md
+    retire-when: >
+      when rows 1, 2 and 5 of the scale-risk cluster read `retired` — the export digest pinned by
+      cursor, the close lookup bounded, the witness link keyed by lineage — so an edit here can no
+      longer re-introduce a whole-chain walk without a review noticing.
+    why: >
+      SCALE RISK ON THIS PATH — rows 1, 2 and 5 of the scale-risk cluster live in the functions
+      you are editing: the export walks the WHOLE chain and re-digests it on every 64-record page
+      (≈N²/64 loads; lamad at 3.5k heads ≈190k), witness validation walks the carrier's whole
+      activity per witness (O(W²) per carrier, per validator), and idempotency does one get_links
+      + get per carried record. Green on node_registry (tens of records) says nothing about lamad.
+      Keep the digest page-independent by pinning it to the cursor, keep the close lookup bounded,
+      and put the trigger numbers (elapsed vs v1_count) on the receipt. Advisory only.
+
 cites:
   - substrate-convergence-five-defect-arc
 ---
