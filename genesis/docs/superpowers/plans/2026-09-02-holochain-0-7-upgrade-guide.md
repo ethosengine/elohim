@@ -681,7 +681,11 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   `/db/p2p/conductor-diagnostics` on both → 35 agents = 7 peers × 5 DNA spaces, agent URLs homed on BOTH
   `relay.alpha.elohim.host` and `relay.elohim.host` — the D2 measure (cross-relay preflight patch) holds on the
   live fleet. No env flags were needed (wiped conductors first-install). Re-seed = `[build:genesis]` push after
-  #1428 ends. Operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
+  #1428 ends. **Re-seed landed (genesis #1553, 2026-09-04 03:3xZ, operator-started):** 3,378 content inserted /
+  0 errors; matthew 3,442 · adam 3,441 · jessica 65 replicated (0 pending); propagation probes on the 0.7 fleet:
+  jessica served the build-unique probe blob on the first attempt (p2p data plane moved bytes), replica persisted
+  (filesystem 2→4); custody-convergence missing on adam only (his stakes posture); the seeder's identities leg hit the
+  genesis stage-order defect on matthew (findings §11). Landing/lamad bundles follow via the app pipeline. Operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
   (the sequenced, step-by-step form of everything below, with the probes and the rollback). Summary (from
   `project_alpha_dna_migration_2026_09_02`):**
   **Operator authorization 2026-09-03: wipe the WHOLE fleet clean for this upgrade** — every alpha
