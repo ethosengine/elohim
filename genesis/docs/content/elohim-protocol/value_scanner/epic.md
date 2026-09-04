@@ -52,6 +52,8 @@ What if every family interaction—from morning chores to afternoon shopping—c
 
 Not value extraction. Value creation.
 
+A word on the name before the story continues. In this document an *Elohim* is a software agent that runs on the household's own devices, acts on the values the family has declared together, and negotiates on the family's behalf with other such agents: a personal Elohim for each member, a family Elohim on the home hub, and store, community and global Elohim beyond the front door. They speak a common protocol, the Elohim Protocol, so that a child's agent and a store's agent can reach an agreement in milliseconds without either surrendering what it protects. The Value Scanner is the family-facing product built on that protocol. No agent here is an authority over the family; each is a steward of the values it was given.
+
 The Elohim Value Scanner (EVS) transforms routine family activities into a rich economy of care, learning, and mutual support. It uses the same devices you already have (smartphones, simple home cameras, QR codes) but with radically different logic: care is the primary currency, money is just one type of value among many.
 
 Here's the revolutionary insight: When care becomes computable, it becomes valuable. When it becomes valuable, it becomes cultivatable. When it becomes cultivatable, it transforms how families function.
@@ -185,7 +187,7 @@ All micro-negotiations resolve into one QR code containing:
 - Economic transaction (payments)
 - Value creation (tokens earned)
 - Story elements (achievements, care acts)
-- REA flows (resources, events, agents, commitments)
+- REA flows: Resources, Events and Agents, the accounting ontology that records what happened before anything is priced, together with the Commitments that were made along the way
 
 ### Phase 5: Story (Evening Celebration)
 The day's activities become family narrative. Not data points but stories of care, growth, and contribution.
@@ -381,6 +383,43 @@ The community sees anonymous patterns that benefit everyone:
 - 34 tons CO₂ prevented
 
 No individual data. No surveillance. Just patterns that help businesses serve and families thrive.
+
+---
+
+## The Tokens Come Last
+
+If you have read this far you have met the tokens the way Tommy meets them: as play. A vibration in the produce aisle, a line on the kitchen display, a smile at dinner. That is the right order. Here, near the end, is the reasoning underneath them, which is deliberately not where we started.
+
+### Play is not the problem
+
+Humans have carried value in tokens for as long as there have been humans: shells, stamped metal, tally sticks, guild marks, logos, badges, the sigil on a flag. A token is a way of holding meaning in the hand and passing it to a neighbour, and it is fun to hold. The Elohim Protocol does not ask families to give that up. A care economy that could not be played would not be lived in. Tommy's care bonus is a smile, and it stays.
+
+### A token is a metric, and a metric is not the thing
+
+What the protocol does insist on is the difference between the token and the act. Goodhart's law, in the phrasing Marilyn Strathern gave it: *when a measure becomes a target, it ceases to be a good measure.* A care token that could be farmed would stop measuring care within a week, and the children would learn the farming. Our own [care-aggregation floor](../../../superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md) names this collapse as the first threat and answers it with peer-witnessed outcomes over raw counts, witness diversity, and evaluation by discernment rather than by formula. The same law is taught, from the other direction, in our [values course on metrics](../../fct/Module%209%20-%20Centering%20Values%20-%20Metrics%20are%20Not%20Neutral,%20Centering%20the%20Fruits%20of%20the%20Spirit.md).
+
+So every token in this story is a *reading*, never the record. Underneath the reading is the REA flow: the strawberries are a Resource, the handoff to Emma is an Event, Tommy and Emma are Agents, and the morning mission was a Commitment. Bernard Lietaer's observation in *Rethinking Money* is the hinge: currency is the information that moves in an exchange, not the object that carries it. Because the flow is recorded before anything is priced, the ledger is already full of currency held in abstract, and any token is one revocable denomination of a record that outlives it. That argument is made in full in the [monetary posture research](../../../../research/monetary-posture-internal-currencies-external-fiat-2026-08-23.md) at §2.9, and it is the reason the family hub can show care, time and growth as three readings of one Tuesday without any of them being the truth of it.
+
+### Why the emblem is never optimised first
+
+The world as we know it optimises the emblem up front. A number is chosen, the number becomes the target, and everything that the number cannot see is starved until the organisation, and then the person, becomes a maximiser of the number. We did not need a machine to teach us the paperclip maximiser; we conditioned ourselves into it and called it incentive. The protocol refuses that order of operations by construction, and the refusal draws on research this corpus has taken seriously rather than admired from a distance.
+
+A word about where that respect came from, because it did not start as respect. This project began from a Christian reading in which *the love of money is a root of all kinds of evil* (1 Timothy 6:10), and that warning still stands at the floor. What the research below added was not a contradiction of it but a deeper account of what money actually is, so that the warning could be honoured with design rather than with avoidance. Gesell and Lietaer are named here because they are where that account first came clear to us. They are not exclusive and they are not the end of the reading; Proudhon, George, the WIR, Carson and Bauwens are read alongside them in the succession argument, and the [monetary posture research](../../../../research/monetary-posture-internal-currencies-external-fiat-2026-08-23.md) names the wider list. What follows is the part of that reading the tokens rest on.
+
+- **Silvio Gesell** saw in 1916 that the trouble with money is its zero cost of carry: the one asset that never decays holds all the leverage, so it is the thing to hoard, and hoarding it is what makes it a target. His stamped money, *Freigeld*, put a carrying cost on the note. The [succession argument](../succession.md) at §3.2 reads Gesell and George as twin pillars, and at §3.3 records that the WIR, the one design in the lineage that lived, dropped his demurrage in 1948 because the stamp could be discarded and the institution could not. Here the stamp returns as a setting rather than a law. The protocol's resource-flow layer, the part that keeps the accounts of stewardship and resource flow, lets a community switch on decay and renewal: a balance that sits unused slowly returns to the commons, while a balance that keeps moving between people is renewed. That is Gesell's carrying cost expressed as a lens a household or a neighbourhood declares for itself rather than a stamp a state prints on every note, and it is why no care token here is a unit held as property. The rule is described in [the resource-flow rules](../shefa.md).
+- **Lietaer** documented a whole ecology of complementary currencies and never resolved their recursion: each one needed a competent, funded, trustworthy institution at its centre, so you could not have a thousand currencies if each needed a bank (succession §3.6). The five Elohim negotiating over an olive-oil bottle are the answer to that recursion. The family Elohim is the clerk; the council, at arm's length from the flows it accounts, is the issuer; and the record beneath both is witnessed by peers rather than kept by a bank (succession §5.2 and §5.3).
+- **The floor and the ceiling.** The protocol never computes a payout at the ceiling and never exercises judgment at the floor (succession, orientation). Tommy's discovery budget, the no-nuts rule and the age ladder are floor: mechanical, the same for everyone, unarguable. The care bonus and the celebration are ceiling: discerning, contextual, and free to be playful precisely because nothing at the floor depends on them.
+- **The common inheritance.** The protocol's settled positions are numbered as Stances, and the fourth draws a line between what a person makes and what the community makes around them. A worker keeps the produce of their labour. The value that arises only because many people are present together, the rising worth of a location, the yield of a network, and the power to issue money itself, is the common inheritance, and it belongs to a commons that nobody holds as property. The protocol therefore socialises issuance rather than abolishing it, and holds that issuance behind preconditions that are not yet met. Until they are, the protocol mints nothing, and the tokens in this story remain what they are today: readings of a record. The position is stated in full as [Stance I.4](../values-forward.md).
+
+### One record, a few readings
+
+This story has used several token names along the way: care, time, growth, discovery, community participation, study, learning. They are illustrative readings, not separate currencies. There is one REA record of what happened, and a token name is a dimension along which a family or a community chooses to read it. The story's canonical set is three: **care** (an act done for someone), **time** (parent or household hours saved), and **growth** (something learned or attempted for the first time). A library, a school or a garden may declare a reading of its own over the same record, and it will interoperate because the record is shared. The protocol does not create distinct currencies for any of them; it records once and lets each community denominate.
+
+### Keeping the game honest, fair, and fun
+
+The vulnerabilities are real and they are held. Children, elders, people with disabilities and anyone in a bad month are exactly the players a farmable metric would harm first, so the ladder of progressive permissions bounds how much stake any player can carry, and reach is earned rather than bought. The evening story is a celebration and never a leaderboard: nobody wins Tuesday. Risk and play live in the ceiling, where the worst outcome is a smaller bonus. Honesty lives in the floor and in the ledger, where the worst outcome is prevented.
+
+That is why the tokens come last. Not because they matter least, but because a token designed first becomes the target, and a token discovered last, resting on a record it cannot corrupt, can be what tokens have always been at their best: a small, shared, joyful way of saying that something real happened between people.
 
 ---
 
