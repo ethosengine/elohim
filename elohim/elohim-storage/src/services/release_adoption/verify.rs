@@ -811,6 +811,59 @@ pub fn verify_path(
         ));
     }
 
+    // **Task 16 — the roster check (epic §4.1).** The count above says HOW
+    // MANY signed; this says WHOSE signature was ever allowed to count. Until
+    // it existed, a `migrates-lineage` commitment notarized through a
+    // household peer whose key sits on no roster at all was accepted by every
+    // peer on the mesh (measured, Station 10, `cucumber-stations-mvp-r14`) —
+    // the quorum was a headcount with no electorate.
+    //
+    // EVIDENCE, NEVER AUTHORITY (C5). `roster_members` was read through this
+    // peer's OWN conductor from the commitment the body's `roster_cid` names,
+    // never taken from the body's word for who its signers are. What is NOT
+    // checked here is the roster's own chain back to `constitution_root`:
+    // that is the integrity-side arm, hash-moving on mishpat, and named as
+    // such rather than faked here.
+    let Some(members) = ev.roster_members.as_ref() else {
+        // C4 applied to the ROSTER: this is the conductor's answer of
+        // absence, not our failure to read (that is `Unreachable` above, and
+        // refuses as `conductor_unavailable`). A quorum this peer cannot
+        // check is not a quorum it may assume — so it refuses, and self-heals
+        // the moment the roster gossips here.
+        return Err(refuse(
+            RefusalReason::QuorumUnmet,
+            format!("roster {} not found", ev.roster_cid),
+        ));
+    };
+    for signer in &ev.signers {
+        if !members.iter().any(|m| m == signer) {
+            return Err(refuse(
+                RefusalReason::QuorumUnmet,
+                format!("signer {} is not on roster {}", signer, ev.roster_cid),
+            ));
+        }
+    }
+    // The rule the refusal above is only the loud half of: an off-roster
+    // signature NEVER counts toward `required_signatures`. Kept as its own
+    // check because it is the invariant — the loop is one policy over it (any
+    // stranger at all refuses), and a body whose `signatures` array carries
+    // more elements than it does readable `agent`s reaches here with a
+    // headcount the roster cannot back.
+    let on_roster = ev
+        .signers
+        .iter()
+        .filter(|s| members.iter().any(|m| m == *s))
+        .count();
+    if on_roster < ev.required_signatures {
+        return Err(refuse(
+            RefusalReason::QuorumUnmet,
+            format!(
+                "{} of {} signatures from roster {}",
+                on_roster, ev.required_signatures, ev.roster_cid
+            ),
+        ));
+    }
+
     for (role, binding) in &manifest.applies_to.roles {
         let Some(inst) = installed.roles.get(role) else {
             // Already refused as RoleNotInstalled by verify_envelope, which
@@ -1363,7 +1416,97 @@ mod tests {
             constitution_root: LINEAGE_ROOT.to_string(),
             signatures: 1,
             required_signatures: 1,
+            roster_cid: LINEAGE_ROSTER_CID.to_string(),
+            signers: vec![ROSTER_MEMBER.to_string()],
+            roster_members: Some(vec![ROSTER_MEMBER.to_string()]),
         }
+    }
+
+    /// The roster the lineage path names, and the one key on it — a declared
+    /// 1-of-1 progenitor roster, exactly the household-rehearsal shape epic
+    /// §4.1 describes.
+    const LINEAGE_ROSTER_CID: &str = "uhCEkLineageCouncilRoster";
+    const ROSTER_MEMBER: &str = "uhCAkBootstrapStewardKey";
+    /// A household peer's key — a real agent, a real signature, and on no
+    /// roster. This is the agent the live Station 10 run notarized a path
+    /// through, and every peer accepted it.
+    const OFF_ROSTER_SIGNER: &str = "uhCAkJessicaHouseholdKey";
+
+    /// **Task 16 deliverable.** A commitment signed by an agent who is not on
+    /// the earned roster is `quorum_unmet` — even though the COUNT is
+    /// satisfied, which is precisely what the mesh accepted before this check
+    /// existed. The refusal names the signer and the roster, so an operator
+    /// can go and look at both.
+    #[test]
+    fn verify_path_refuses_a_signer_who_is_not_on_the_roster() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.signers = vec![OFF_ROSTER_SIGNER.to_string()];
+        // The count is MET — one signature, one required. Only the roster
+        // makes this a refusal.
+        assert_eq!(ev.signatures, 1);
+        assert_eq!(ev.required_signatures, 1);
+
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
+        assert!(
+            r.detail.contains(OFF_ROSTER_SIGNER) && r.detail.contains(LINEAGE_ROSTER_CID),
+            "the refusal must name the stranger AND the roster they are absent from; got {:?}",
+            r.detail
+        );
+    }
+
+    /// An off-roster signature never COUNTS, which is the invariant the
+    /// stranger-refusal above is one policy over. Here the quorum needs two
+    /// and the body carries two — one member, one stranger — so a check that
+    /// counted signatures rather than members would pass.
+    #[test]
+    fn only_roster_members_count_toward_the_quorum() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.required_signatures = 2;
+        ev.signatures = 2;
+        ev.signers = vec![ROSTER_MEMBER.to_string(), OFF_ROSTER_SIGNER.to_string()];
+        let r = verify_path(&m, &inst, &Answer::Present(ev.clone())).unwrap_err();
+        assert_eq!(
+            r.reason_code(),
+            RefusalReason::QuorumUnmet,
+            "2 of 2 signatures, but only 1 of them from the roster"
+        );
+
+        // …and the same commitment with the SECOND signer on the roster
+        // passes, so what is pinned is the membership rule and not a blanket
+        // refusal of every two-signature path.
+        ev.roster_members = Some(vec![
+            ROSTER_MEMBER.to_string(),
+            OFF_ROSTER_SIGNER.to_string(),
+        ]);
+        verify_path(&m, &inst, &Answer::Present(ev)).expect("both signers on the roster");
+    }
+
+    /// **C4 on the roster.** A roster this peer's conductor answered "no such
+    /// entry" for refuses `quorum_unmet` — a quorum we cannot check is not a
+    /// quorum we may assume. (A roster we could not READ never reaches
+    /// `verify_path` at all: that is `Answer::Unreachable` on the whole
+    /// evidence, pinned in `path_evidence`.)
+    #[test]
+    fn a_roster_this_peer_cannot_find_refuses_rather_than_assuming_a_quorum() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.roster_members = None;
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
+        assert!(
+            r.detail.contains(LINEAGE_ROSTER_CID),
+            "the refusal must name the roster that could not be found; got {:?}",
+            r.detail
+        );
     }
 
     /// **Task 4 deliverable, positive half.** A `happ-lineage` release whose

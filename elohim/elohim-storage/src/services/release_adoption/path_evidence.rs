@@ -40,8 +40,12 @@
 //! Deliberately two sources, because they are two different facts:
 //!
 //! - **The commitment body** (`from_dna_hash`, `to_dna_hash`,
-//!   `constitution_root`, `signatures`, `required_signatures`) is read out of
-//!   the DHT entry's `payload_json` — the notarized bytes themselves.
+//!   `constitution_root`, `roster_cid`, `signatures`, `signers`,
+//!   `required_signatures`) is read out of the DHT entry's `payload_json` —
+//!   the notarized bytes themselves.
+//! - **The roster** (`roster_members`) is a SECOND commitment, named by the
+//!   body's `roster_cid` and fetched down the same C5 rail — see
+//!   [`roster_members`].
 //! - **The lifecycle** (`state`, `revoked_at`) is read off the
 //!   `mishpat_commitments` projection row, which is where the
 //!   `CommitmentByState` link and the revocation land
@@ -139,6 +143,18 @@ pub async fn fetch_path_evidence(
         }
     };
 
+    // **Task 16.** The roster the body NAMES, read through this peer's own
+    // conductor — the second C5 read, and the one that decides whose
+    // signature counts. An unreadable roster is `Unreachable` (never a pass,
+    // never an off-roster acceptance); a roster the conductor answered "no
+    // such entry" for is `None`, which `verify_path` refuses as
+    // `quorum_unmet`.
+    let roster_cid = string_field(&payload, "roster_cid");
+    let roster_members = match roster_members(Some(hc), &roster_cid).await {
+        Ok(members) => members,
+        Err(()) => return Answer::Unreachable,
+    };
+
     // The projection carries the lifecycle; the DHT entry carries the body.
     // A projection we could not READ is unreachable — never a state we made up.
     let Some(row) = lifecycle(db, cid).await else {
@@ -210,7 +226,84 @@ pub async fn fetch_path_evidence(
         &payload,
         state,
         revoked_at,
+        roster_members,
     ))
+}
+
+/// The members of the roster a path names, read through THIS peer's own
+/// conductor.
+///
+/// **Task 16 / epic §4.1.** A `migrates-lineage` body carries both the
+/// signatures and the `roster_cid` they are supposed to be drawn from, and
+/// until this read existed nothing anywhere compared the two: a commitment
+/// notarized by a household peer whose key is on no roster at all was accepted
+/// by every peer on the mesh (measured, Station 10, `cucumber-stations-mvp-r14`).
+/// The signers are the body's own claim; the ROSTER is not — it is looked up
+/// locally, exactly as the path commitment itself is, so a release still
+/// cannot ship its own permission.
+///
+/// Three outcomes, and the C4 line runs between the last two:
+///
+/// | outcome | meaning | what the caller does |
+/// |---|---|---|
+/// | `Ok(Some(members))` | the roster is on this conductor's DHT view | `verify_path` counts against it |
+/// | `Ok(None)` | the conductor answered "no such entry", or the body named no roster | `quorum_unmet` — a quorum we cannot check is not a quorum we may assume |
+/// | `Err(())` | we could not ASK, or could not READ the answer | the whole evidence is `Unreachable` → `conductor_unavailable` |
+///
+/// The roster commitment's own payload is read for `members` only. This side
+/// deliberately does NOT re-verify the roster's predecessor chain back to
+/// `constitution_root` (epic §4.1's full rule): that is the integrity-side
+/// arm, and it is hash-moving on mishpat. What this closes is the measured
+/// hole — an off-roster signer satisfying quorum — as EVIDENCE this peer read
+/// for itself, never as authority it invented.
+async fn roster_members(
+    hc: Option<&Arc<HcClient>>,
+    roster_cid: &str,
+) -> Result<Option<Vec<String>>, ()> {
+    // A body naming no roster names no members. Not an outage — the commitment
+    // really says nothing — so it is an ANSWER of absence, and `verify_path`
+    // refuses `quorum_unmet` rather than passing an uncheckable quorum.
+    if roster_cid.is_empty() {
+        return Ok(None);
+    }
+    // Unreachable by construction: `fetch_path_evidence` already returned on a
+    // missing bridge before it got here, so this arm is belt-and-braces for any
+    // future caller — and it must still be Err, never Ok(None).
+    let Some(hc) = hc else {
+        return Err(());
+    };
+    match crate::services::conductor_writes::get_commitment(hc, roster_cid).await {
+        Ok(Some(out)) => match serde_json::from_str::<serde_json::Value>(&out.payload_json) {
+            Ok(body) => Ok(Some(string_array_field(&body, "members"))),
+            Err(e) => {
+                tracing::warn!(
+                    roster_cid = %roster_cid,
+                    error = %e,
+                    "release-adoption: roster commitment payload_json does not parse — unreadable, \
+                     never an empty roster"
+                );
+                Err(())
+            }
+        },
+        // The conductor ANSWERED: the roster is not on its DHT view. That is an
+        // observed absence, and it refuses — self-healing the moment the roster
+        // gossips to this peer.
+        Ok(None) => {
+            tracing::debug!(
+                roster_cid = %roster_cid,
+                "release-adoption: path roster is not on this conductor's DHT view yet"
+            );
+            Ok(None)
+        }
+        Err(e) => {
+            tracing::debug!(
+                roster_cid = %roster_cid,
+                error = %e,
+                "release-adoption: path roster unreadable — unreachable, never absence"
+            );
+            Err(())
+        }
+    }
 }
 
 /// Build the evidence from a commitment body plus its projected lifecycle.
@@ -225,6 +318,7 @@ pub fn evidence_from(
     payload: &serde_json::Value,
     state: String,
     revoked_at: Option<String>,
+    roster_members: Option<Vec<String>>,
 ) -> PathEvidence {
     PathEvidence {
         commitment_cid: commitment_cid.to_string(),
@@ -233,6 +327,14 @@ pub fn evidence_from(
         from_dna_hash: string_field(payload, "from_dna_hash"),
         to_dna_hash: string_field(payload, "to_dna_hash"),
         constitution_root: string_field(payload, "constitution_root"),
+        roster_cid: string_field(payload, "roster_cid"),
+        // WHO signed, as the body renders them — the roster check's input.
+        // Read off each element's `agent`, which is the field
+        // `mishpat::validate_lineage_signatures` verifies the signature
+        // against; an element without one contributes no signer, so it can
+        // never be counted toward a roster quorum.
+        signers: signer_agents(payload),
+        roster_members,
         // The COUNT of signatures the commitment carries — read as the length
         // of the array, so a body that lists three signers cannot claim four.
         signatures: payload
@@ -260,6 +362,51 @@ fn string_field(payload: &serde_json::Value, snake: &str) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or_default()
         .to_string()
+}
+
+/// A string ARRAY field from a commitment body, accepting either spelling —
+/// the same snake/camel tolerance [`string_field`] applies, for the same
+/// reason. A non-array, or an element that is not a string, contributes
+/// nothing rather than erroring: an unparseable member can never be matched
+/// by a signer, so it fails closed.
+fn string_array_field(payload: &serde_json::Value, snake: &str) -> Vec<String> {
+    let camel = to_lower_camel(snake);
+    payload
+        .get(snake)
+        .or_else(|| payload.get(camel.as_str()))
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The agents named by a body's `signatures: [{agent, signature}]` array.
+///
+/// A body that spells its signatures as bare strings (the shape some older
+/// fixtures use) is read as those strings being the agents, so a roster check
+/// still has something to compare rather than silently seeing zero signers and
+/// falling through to the count rule.
+fn signer_agents(payload: &serde_json::Value) -> Vec<String> {
+    payload
+        .get("signatures")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|s| {
+                    s.get("agent")
+                        .and_then(|v| v.as_str())
+                        .or_else(|| s.as_str())
+                })
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// `from_dna_hash` → `fromDnaHash`. Small enough to keep local; the alternative
@@ -379,6 +526,16 @@ async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<Option<(String, Opt
 mod tests {
     use super::*;
 
+    /// The roster [`body`] names, as this peer read it back off its own
+    /// conductor: the three signers of the fixture, and nobody else.
+    fn roster() -> Option<Vec<String>> {
+        Some(vec![
+            "uhCAkSignerOne".to_string(),
+            "uhCAkSignerTwo".to_string(),
+            "uhCAkSignerThree".to_string(),
+        ])
+    }
+
     /// The measured Station-2 defect on the two peers that did NOT notarize:
     /// only the AUTHOR's storage projects a `mishpat_commitments` row (the
     /// `CommitmentCommitted` signal is a post-commit hook on the author's own
@@ -437,6 +594,7 @@ mod tests {
             &forged_body,
             UNPROJECTED_STATE.to_string(),
             None,
+            roster(),
         );
         assert_eq!(ev.state, "proposed");
         assert_ne!(ev.state, "active");
@@ -483,7 +641,13 @@ mod tests {
     /// to report a different number.
     #[test]
     fn a_payload_fixture_parses_into_the_evidence_verify_path_reads() {
-        let ev = evidence_from("uhCEkPathCommitment", &body(), "active".to_string(), None);
+        let ev = evidence_from(
+            "uhCEkPathCommitment",
+            &body(),
+            "active".to_string(),
+            None,
+            roster(),
+        );
         assert_eq!(ev.commitment_cid, "uhCEkPathCommitment");
         assert_eq!(ev.from_dna_hash, "uhC0kINSTALLED");
         assert_eq!(ev.to_dna_hash, "uhC0kV2NODEREG");
@@ -492,6 +656,61 @@ mod tests {
         assert_eq!(ev.required_signatures, 3);
         assert_eq!(ev.state, "active");
         assert!(ev.revoked_at.is_none());
+        // **Task 16.** WHO signed, off each element's `agent` — the field the
+        // notarizing validator itself verifies the signature against. The
+        // roster the body NAMES is carried too, so a refusal can point at it.
+        assert_eq!(ev.roster_cid, "bafyProgenitorRoster");
+        assert_eq!(
+            ev.signers,
+            vec!["uhCAkSignerOne", "uhCAkSignerTwo", "uhCAkSignerThree"]
+        );
+        assert_eq!(ev.signers.len(), ev.signatures);
+        assert_eq!(ev.roster_members, roster());
+    }
+
+    /// **Task 16, the parse half.** A signature element with no readable
+    /// `agent` contributes NO signer while still counting toward
+    /// `signatures` — which is exactly the gap `verify_path`'s
+    /// count-only-roster-members rule closes: the headcount says three, the
+    /// roster can back one, and the path is refused.
+    #[test]
+    fn a_signature_without_a_readable_agent_names_no_signer() {
+        let body = serde_json::json!({
+            "roster_cid": "bafyProgenitorRoster",
+            "signatures": [
+                { "agent": "uhCAkSignerOne", "signature": "c2ln" },
+                { "signature": "c2ln" },
+                { "agent": "", "signature": "c2ln" },
+            ],
+            "required_signatures": 3,
+        });
+        let ev = evidence_from("uhCEkX", &body, "active".to_string(), None, roster());
+        assert_eq!(ev.signatures, 3, "the array length is unchanged");
+        assert_eq!(
+            ev.signers,
+            vec!["uhCAkSignerOne"],
+            "an element with no readable agent can never be counted onto a roster"
+        );
+    }
+
+    /// A body naming no roster at all reads as `roster_members: None` WITHOUT
+    /// a conductor round-trip — asserted by passing no bridge, which would
+    /// answer `Err` (→ `Unreachable`) if the empty cid were dialled. The
+    /// refusal that `None` produces is `verify_path`'s.
+    #[tokio::test]
+    async fn a_body_naming_no_roster_is_an_absent_roster_not_an_outage() {
+        assert_eq!(
+            roster_members(None, "").await,
+            Ok(None),
+            "no roster named is an ANSWER of absence, and never a dial"
+        );
+        // …whereas a roster that IS named with no bridge to ask through is an
+        // outage, and must never read as an empty/absent roster (C4).
+        assert_eq!(
+            roster_members(None, "bafyProgenitorRoster").await,
+            Err(()),
+            "a roster we could not ASK about is unreachable, never absence"
+        );
     }
 
     /// The projection row's lifecycle — not the body's — decides `state` and
@@ -505,6 +724,7 @@ mod tests {
             &body(),
             "active".to_string(),
             Some("2026-09-04T10:00:00Z".to_string()),
+            roster(),
         );
         assert_eq!(ev.revoked_at.as_deref(), Some("2026-09-04T10:00:00Z"));
         // And the fail-closed default a missing row produces.
@@ -513,6 +733,7 @@ mod tests {
             &body(),
             UNPROJECTED_STATE.to_string(),
             None,
+            roster(),
         );
         assert_eq!(unprojected.state, "proposed");
         assert_ne!(
@@ -530,6 +751,7 @@ mod tests {
             &serde_json::json!({}),
             "active".to_string(),
             None,
+            roster(),
         );
         assert_eq!(ev.signatures, 0);
         // The SAME default the notarizing side applies
@@ -554,13 +776,36 @@ mod tests {
             "signatures": ["a"],
             "requiredSignatures": 1,
         });
-        let ev = evidence_from("uhCEkX", &camel, "active".to_string(), None);
+        let ev = evidence_from("uhCEkX", &camel, "active".to_string(), None, roster());
         assert_eq!(ev.from_dna_hash, "uhC0kINSTALLED");
         assert_eq!(ev.to_dna_hash, "uhC0kV2NODEREG");
         assert_eq!(ev.constitution_root, "bafyRoot");
         assert_eq!(ev.signatures, 1);
         assert_eq!(ev.required_signatures, 1);
         assert_eq!(to_lower_camel("from_dna_hash"), "fromDnaHash");
+    }
+
+    /// The roster body's `members` parse, which is the whole of what this side
+    /// reads off the roster commitment. A non-string or empty member is
+    /// DROPPED rather than erroring — an unparseable member can never be
+    /// matched by a signer, so dropping it fails closed, while erroring would
+    /// turn one malformed entry into a `conductor_unavailable` on an otherwise
+    /// readable roster.
+    #[test]
+    fn a_roster_body_parses_its_members_and_drops_the_unreadable_ones() {
+        let roster_body = serde_json::json!({
+            "action": "declares-roster",
+            "constitution_root": "bafyLineageConstitutionRoot",
+            "members": ["uhCAkSignerOne", 7, "", "uhCAkSignerTwo", null],
+        });
+        assert_eq!(
+            string_array_field(&roster_body, "members"),
+            vec!["uhCAkSignerOne", "uhCAkSignerTwo"]
+        );
+        // A roster body with no members list at all is an EMPTY roster — read
+        // as an answer, and one no signer can be on, so every path under it
+        // refuses.
+        assert!(string_array_field(&serde_json::json!({}), "members").is_empty());
     }
 
     /// Every class but `happ-lineage` is Absent WITHOUT a conductor round-trip
@@ -668,6 +913,7 @@ mod tests {
             &body(),
             UNPROJECTED_STATE.to_string(),
             None,
+            roster(),
         );
         assert_eq!(ev.state, "proposed");
         assert_ne!(
@@ -702,7 +948,7 @@ mod tests {
             .await
             .expect("a reachable projection always answers")
             .expect("the row is present now");
-        let ev = evidence_from("uhCEkPathCommitment", &body(), state, revoked);
+        let ev = evidence_from("uhCEkPathCommitment", &body(), state, revoked, roster());
         assert_eq!(ev.state, "active");
         assert_eq!(
             ev.revoked_at.as_deref(),

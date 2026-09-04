@@ -283,6 +283,29 @@ pub struct PathEvidence {
     pub signatures: usize,
     /// Signatures the commitment's discipline requires.
     pub required_signatures: usize,
+    /// **Task 16.** The roster the path names (`roster_cid`) — the earned
+    /// council roster under [`Self::constitution_root`] whose members are the
+    /// only keys whose signature counts. Carried so the refusals can NAME the
+    /// roster an operator has to go and look at.
+    #[serde(default)]
+    pub roster_cid: String,
+    /// **Task 16.** The agents the commitment's `signatures` array names, as
+    /// rendered in the notarized body. The COUNT lives in
+    /// [`Self::signatures`]; this is who they were, which is what the roster
+    /// check needs.
+    #[serde(default)]
+    pub signers: Vec<String>,
+    /// **Task 16.** The roster's members, read through THIS peer's own
+    /// conductor (C5 — never from the path commitment's say-so).
+    ///
+    /// `None` is an ANSWER, not a failure: the roster commitment is not on
+    /// this peer's DHT view, and [`verify::verify_path`] refuses
+    /// `quorum_unmet` because a quorum it cannot check is not a quorum it may
+    /// assume. A roster this peer could not READ never reaches here at all —
+    /// that is [`seam_contracts::Answer::Unreachable`] on the whole evidence
+    /// (C4), which refuses as `conductor_unavailable` instead.
+    #[serde(default)]
+    pub roster_members: Option<Vec<String>>,
 }
 
 /// Where the artifact came from.
