@@ -9,8 +9,8 @@ serves:
   - runtime-upgrade-propagation
   - dataplane-convergence
 cites:
-  - genesis/docs/superpowers/plans/2026-09-02-holochain-0-7-upgrade-guide.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - "holochain-0-7-upgrade-guide | Holochain 0.7.0 Upgrade Guide | sha256:8819a0f70c1d72d3 | path: genesis/docs/superpowers/plans/2026-09-02-holochain-0-7-upgrade-guide.md"
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
   - genesis/data/timeline/backlog/iroh-cross-relay-preflight-fails-closed.md
 memory_anchors:
   - project_alpha_dna_migration_2026_09_02
