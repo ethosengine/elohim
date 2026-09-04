@@ -22,7 +22,11 @@
  * refuses. The retired `soakSecs 900` / `attestationThreshold 2` defaults
  * wedged a three-device household twice in one night — one attester
  * archetype, a threshold of two — and a number nobody typed is not a
- * discipline. See `AdoptionDiscipline` and `resolveAdoptionDiscipline`.
+ * discipline. An inherited release records the channel's own rule verbatim in
+ * `adoptionDiscipline.channelDiscipline`, separately from its own effective
+ * numbers, so a revert's act-specific `attestationThreshold: 0` can never
+ * become the channel's rule for the releases that follow it. See
+ * `AdoptionDiscipline`, `readChannelDiscipline` and `resolveAdoptionDiscipline`.
  *
  * Spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md §5, §8.
  *
@@ -122,10 +126,14 @@ Adoption discipline (spec §5) — declared or inherited, never defaulted:
   --attestation-threshold <n>   independent attestations to earn
   --canary <name>               ordered rollout wave; repeatable
   --inherit-discipline-from <url>
-                                copy the discipline the household already registered for this
-                                channel from that storage peer (the channel root's own
-                                registered discipline, or its current head release manifest's);
-                                --soak-secs/--attestation-threshold/--canary still override
+                                copy the discipline the household registered for this channel
+                                from that storage peer: the channel root's own registered
+                                discipline, else the channelDiscipline the head release manifest
+                                carries forward, else that head's own adoptionDiscipline (refused
+                                when the head is revert-shaped — threshold 0 is the revert ACT's
+                                rule, not the channel's). --soak-secs/--attestation-threshold/
+                                --canary still override the EFFECTIVE numbers; the channel's rule
+                                is recorded verbatim as adoptionDiscipline.channelDiscipline
 
 happ-lineage (spec 2026-09-03-holochain-evolution-epic-design §4):
   --migrate-from <role>=<dnaHash>
@@ -575,6 +583,23 @@ interface AdoptionDiscipline {
    */
   inheritedFrom?: string;
   /**
+   * THE CHANNEL'S OWN RULE, carried forward verbatim by every release that
+   * inherits it — distinct from the three fields above, which are THIS
+   * release's effective rule.
+   *
+   * The two diverge on a revert: a revert declares `attestationThreshold: 0`
+   * because nobody attests a release the fleet is being asked to LEAVE, and
+   * that zero is a property of the revert ACT, not of the channel. Without
+   * this field the zero would become the channel's rule for every later
+   * release, because the only record any reader can reach is the current head
+   * (see `readChannelDiscipline` for why no root or by-cid read exists).
+   */
+  channelDiscipline?: {
+    soakSecs: number;
+    attestationThreshold: number;
+    canaryOrder: string[];
+  };
+  /**
    * happ-lineage only: the notarized migrates-lineage commitment (entry hash)
    * that this release's crossing walks (spec 2026-09-03-holochain-evolution-
    * epic-design §4). Required by the schema's root `if/then` when
@@ -617,7 +642,10 @@ function resolveRef(schema: JsonObject, node: JsonObject): JsonObject {
  * the next time that schema is touched — this set is the producer's promise,
  * not a second schema.
  */
-const PRODUCER_ADDITIVE_KEYS = new Set(['/adoptionDiscipline/inheritedFrom']);
+const PRODUCER_ADDITIVE_KEYS = new Set([
+  '/adoptionDiscipline/inheritedFrom',
+  '/adoptionDiscipline/channelDiscipline',
+]);
 
 /**
  * The schema is deliberately OPEN so mixed-version peers tolerate fields they
@@ -935,7 +963,16 @@ async function resolveAppliesTo(options: Options): Promise<{ roles: Record<strin
 const CHANNEL_ROOT_KIND = 'release-channel';
 const RELEASE_MANIFEST_KIND = 'release-manifest';
 
-/** The two fields of a storage content row this tool reads for inheritance. */
+/**
+ * A revert declares `attestationThreshold: 0` because nobody attests a release
+ * the fleet is being asked to LEAVE (measured: packaging a revert at the
+ * forward threshold left every peer refusing `threshold_unmet` forever). No
+ * field marks a manifest as a revert, so that zero IS the revert signature —
+ * and it is a property of the revert ACT, never of the channel.
+ */
+const REVERT_ACT_THRESHOLD = 0;
+
+/** The fields of a storage content row this tool reads for inheritance. */
 interface ChannelContentItem {
   metadata?: {
     kind?: unknown;
@@ -989,13 +1026,32 @@ function disciplineShape(
  *   - the channel ROOT record (`kind: "release-channel"`), carrying the
  *     `discipline` the steward registered at `channel create`; or
  *   - the channel's current HEAD release manifest (`kind: "release-manifest"`),
- *     carrying that release's `adoptionDiscipline`.
+ *     carrying `adoptionDiscipline.channelDiscipline` (the channel's own rule,
+ *     carried forward) and that release's own effective rule.
  *
- * One read answers both because the row IS the channel's current head record:
- * before the first publish it is the root; after it, the head manifest. That
- * ordering is the story's own rule — "once a channel has a head, every later
- * release on that channel inherits the head's discipline unless the steward
- * deliberately changes it."
+ * ## Only ONE record is reachable, so the channel's rule must ride it
+ *
+ * There is no read path to any record but the current head. Measured
+ * 2026-09-04: `GET /db/content/{id}` serves only the projected current
+ * version (`update_content` overwrites the row, so the root's registered
+ * `discipline` is gone after the first publish); storage registers no
+ * versions/history route and `GET /db/dht/{hash}` is a 404 stub (its conductor
+ * bridge is deferred); and no zome extern lists an id's versions, so even a
+ * conductor cannot retrieve the root — `scripts/release-lineage-probe.ts`
+ * §"Version-listing extern" documents exactly that gap. A `lineageParentCid`
+ * walk is therefore impossible too: there is nothing to fetch a parent WITH.
+ *
+ * Hence `channelDiscipline`: every release that inherits carries the channel's
+ * own rule forward verbatim, so the one reachable record always holds it. The
+ * order this function applies:
+ *
+ *   1. root record  -> its registered `discipline` (the origin of the rule);
+ *   2. head manifest with `channelDiscipline` -> that, the channel's rule
+ *      carried forward, EVEN when the head is a revert whose own threshold is
+ *      the revert act's 0;
+ *   3. head manifest without one -> its own `adoptionDiscipline`, unless it is
+ *      revert-shaped (threshold 0), which is an ACT's rule and would silently
+ *      become the channel's — refuse instead of inheriting it.
  */
 async function readChannelDiscipline(
   baseUrl: string,
@@ -1006,17 +1062,51 @@ async function readChannelDiscipline(
   const row = (await getJson(url, timeoutMs)) as ChannelContentItem;
   const anchor = typeof row.dhtAnchorHash === 'string' ? row.dhtAnchorHash : null;
   const kind = row.metadata?.kind;
-  if (kind === RELEASE_MANIFEST_KIND) {
-    const shape = disciplineShape(
-      row.metadata?.manifest?.adoptionDiscipline,
-      `the head release manifest on ${url}`
-    );
-    return { ...shape, source: `the channel head's release manifest at ${url}`, anchor };
-  }
+
   if (kind === CHANNEL_ROOT_KIND) {
     const shape = disciplineShape(row.metadata?.discipline, `the channel root at ${url}`);
-    return { ...shape, source: `the channel's registered discipline at ${url}`, anchor };
+    return {
+      ...shape,
+      source: `the channel's registered discipline (root record) at ${url}`,
+      anchor,
+    };
   }
+
+  if (kind === RELEASE_MANIFEST_KIND) {
+    const head = row.metadata?.manifest?.adoptionDiscipline;
+    const carried =
+      typeof head === 'object' && head !== null
+        ? (head as Record<string, unknown>)['channelDiscipline']
+        : undefined;
+    if (carried !== undefined) {
+      const shape = disciplineShape(carried, `the channelDiscipline on ${url}`);
+      return {
+        ...shape,
+        source: `the channel discipline carried forward by the head release manifest at ${url}`,
+        anchor,
+      };
+    }
+    const shape = disciplineShape(head, `the head release manifest on ${url}`);
+    if (shape.attestationThreshold === REVERT_ACT_THRESHOLD) {
+      throw new PackagingFailure(
+        `the head of ${channelId} declares attestationThreshold ${REVERT_ACT_THRESHOLD} and carries no ` +
+          `channelDiscipline, which is the signature of a REVERT — a threshold nobody could ever meet ` +
+          `is a property of the revert act, not of the channel, and no read path exists to walk past ` +
+          `the head to recover the channel's own rule`,
+        [
+          `head record: ${anchor ?? '(no anchor reported)'} at ${url}`,
+          "declare this release's discipline explicitly with --soak-secs + --attestation-threshold,",
+          'or inherit from a peer whose head for this channel is a real release rather than a revert.',
+        ]
+      );
+    }
+    return {
+      ...shape,
+      source: `the head release manifest's own adoptionDiscipline at ${url}`,
+      anchor,
+    };
+  }
+
   throw new PackagingFailure(
     `${url} is not a release channel: its metadata.kind is ${JSON.stringify(kind ?? null)}, ` +
       `not "${CHANNEL_ROOT_KIND}" or "${RELEASE_MANIFEST_KIND}"`
@@ -1063,18 +1153,28 @@ async function resolveAdoptionDiscipline(
   if (options.attestationThreshold === null) fromChannel.push('attestationThreshold');
   if (options.canaryOrder.length === 0) fromChannel.push('canaryOrder');
 
+  // The channel's own rule, carried forward VERBATIM — never the effective
+  // numbers below, which may carry this release's own act-specific override
+  // (a revert's threshold 0 being the whole reason the two must stay apart).
+  const channelDiscipline = {
+    soakSecs: inherited.soakSecs,
+    attestationThreshold: inherited.attestationThreshold,
+    canaryOrder: inherited.canaryOrder,
+  };
   const discipline: AdoptionDiscipline = {
     soakSecs: options.soakSecs ?? inherited.soakSecs,
     attestationThreshold: options.attestationThreshold ?? inherited.attestationThreshold,
     canaryOrder: options.canaryOrder.length > 0 ? options.canaryOrder : inherited.canaryOrder,
-    ...(fromChannel.length > 0 && inherited.anchor ? { inheritedFrom: inherited.anchor } : {}),
+    channelDiscipline,
+    ...(inherited.anchor ? { inheritedFrom: inherited.anchor } : {}),
   };
   console.error(
     `inherited ${fromChannel.length > 0 ? fromChannel.join('+') : 'nothing (every field overridden)'} ` +
       `from ${inherited.source}` +
-      (inherited.anchor ? ` (head ${inherited.anchor})` : ' (row reports no head anchor)') +
-      `: soakSecs=${discipline.soakSecs} attestationThreshold=${discipline.attestationThreshold} ` +
-      `canaryOrder=${JSON.stringify(discipline.canaryOrder)}`
+      (inherited.anchor ? ` (record ${inherited.anchor})` : ' (row reports no record anchor)') +
+      `: effective soakSecs=${discipline.soakSecs} attestationThreshold=${discipline.attestationThreshold} ` +
+      `canaryOrder=${JSON.stringify(discipline.canaryOrder)}; channelDiscipline carried forward=` +
+      JSON.stringify(channelDiscipline)
   );
   return discipline;
 }

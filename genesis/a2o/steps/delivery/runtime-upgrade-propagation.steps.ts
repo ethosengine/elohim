@@ -407,6 +407,13 @@ interface ManifestAdoptionDiscipline {
   attestationThreshold?: number;
   canaryOrder?: string[];
   inheritedFrom?: string;
+  /**
+   * The CHANNEL's own rule, carried forward verbatim by every release that
+   * inherits — distinct from the effective numbers above. It exists because a
+   * revert declares `attestationThreshold: 0` for the revert ACT, and the head
+   * record is the only record any later release can read.
+   */
+  channelDiscipline?: { soakSecs: number; attestationThreshold: number; canaryOrder: string[] };
 }
 
 /** The fields of a packaged manifest Station 9 reads back for verification. */
@@ -1813,6 +1820,15 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
         // envelope (appliesTo bound to the live passport) is the safety here.
         '--attestation-threshold',
         '0',
+        // …and that zero is the revert ACT's rule, never the channel's. The
+        // revert becomes the channel's head, and the head is the only record
+        // any later release can read (no root, history, or by-cid read exists
+        // — see `readChannelDiscipline`), so it must carry the household's own
+        // registered discipline forward as `adoptionDiscipline.channelDiscipline`.
+        // Without this flag Station 9 would inherit threshold 0 from the revert
+        // and the household's single attester would silently disappear.
+        FLAG_INHERIT_DISCIPLINE_FROM,
+        matthewUrl,
         '--canary',
         CANARY_PEER,
         '--peer',
@@ -3540,6 +3556,19 @@ Then(
       c.station9ParentCid,
       `the second fix's discipline names inheritedFrom ${String(discipline.inheritedFrom)}, not the ` +
         `channel head ${String(c.station9ParentCid)} it should have been inherited from`
+    );
+    // The CHANNEL's own rule, carried forward verbatim — the field that keeps a
+    // revert's act-specific threshold 0 from becoming the household's rule when
+    // Station 6 ran before this one and left a revert as the head.
+    assert.deepEqual(
+      discipline.channelDiscipline,
+      {
+        soakSecs: SOAK_SECS,
+        attestationThreshold: ATTESTATION_THRESHOLD,
+        canaryOrder: [CANARY_PEER],
+      },
+      `the second fix carries channelDiscipline ${JSON.stringify(discipline.channelDiscipline)}, not ` +
+        "the household's registered rule"
     );
   }
 );
