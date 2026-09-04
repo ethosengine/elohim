@@ -1172,6 +1172,23 @@ impl AdoptionController {
             }
         }
 
+        // What the staged bytes WOULD install — the evidence the by-bytes exit
+        // reads. Derived from the artifact itself because a manifest declares
+        // only what it SUPERSEDES.
+        let target_coordinators =
+            super::apply::staged_target_coordinators(&manifest, &fetched).await;
+        // FRESHNESS GATE. The by-bytes exit STOPS work on the strength of the
+        // installed-reality snapshot, so — unlike a refusal, which self-heals
+        // on the next sweep — it may not be taken from a stale one. Exactly one
+        // bypass-TTL re-read, the same bounded shape (and the same threshold)
+        // the lineage-mismatch re-read above uses, and only when the exit is
+        // actually about to fire.
+        if installed_age_secs >= REREAD_STALE_THRESHOLD_SECS
+            && verify::already_runs_target(&manifest, &installed, &target_coordinators)
+        {
+            installed = self.installed_reality_refresh(now).await;
+        }
+
         let verdict = match verify::verify(VerifyInput {
             channel_id: &channel.channel_id,
             release_cid: &release_cid,
@@ -1181,31 +1198,95 @@ impl AdoptionController {
             artifacts: &fetched,
             attestations: attestations.as_ref(),
             tier: resolved.tier,
+            target_coordinators: &target_coordinators,
         }) {
+            // ALREADY CURRENT BY BYTES: this peer runs exactly what the release
+            // would install. Never a refusal — and routed through the SAME mode
+            // table as a fresh apply, because "I already run these bytes" is a
+            // fact about installed reality, not a licence to skip the mode's
+            // rules about which tier this peer adopts.
+            Ok(verify::VerifyOutcome::AlreadyCurrent { roles }) => {
+                tracing::info!(
+                    channel = %channel.channel_id,
+                    release_cid = %release_cid,
+                    roles = ?roles,
+                    mode = channel.mode.label(),
+                    "release-adoption: already current BY BYTES — this peer runs the release's \
+                     target coordinator wasm for every role it touches"
+                );
+                match decide_post_verify_action(channel.mode, resolved.tier, true) {
+                    // The mode WOULD have applied this head, and there is
+                    // nothing left to apply. Recorded so the C6b exit takes
+                    // over next sweep and this convergence costs one resolve
+                    // from here on.
+                    PostVerifyAction::Apply => {
+                        state::record_applied(
+                            &channel.channel_id,
+                            AppliedRelease {
+                                cid: release_cid.clone(),
+                                at: now,
+                                vehicle: super::VEHICLE_ALREADY_INSTALLED.to_string(),
+                            },
+                            false,
+                        );
+                        Verdict::Applied {
+                            release_cid: release_cid.clone(),
+                            vehicle: super::VEHICLE_ALREADY_INSTALLED.to_string(),
+                            already_current: true,
+                        }
+                    }
+                    // `apply` mode on a STAGING head. Nothing to do either way,
+                    // and recording an apply here would let this peer skip the
+                    // threshold read an operator watching promotion wants.
+                    PostVerifyAction::Waiting => Verdict::Waiting {
+                        release_cid: release_cid.clone(),
+                        detail: "this peer already runs these exact coordinator bytes; apply \
+                                 mode adopts earned heads only, so there is nothing to do on \
+                                 either side of the promotion"
+                            .to_string(),
+                    },
+                    // Observe records nothing and applies nothing — but "you
+                    // already run this" is a PASS, not the
+                    // `coordinator_lineage_mismatch` the supersedes check alone
+                    // would have reported.
+                    PostVerifyAction::Observed => Verdict::Ok {
+                        release_cid: release_cid.clone(),
+                    },
+                    PostVerifyAction::Refused => unreachable!(
+                        "verify::verify already enforced the threshold for tier {:?} before the \
+                         by-bytes exit",
+                        resolved.tier
+                    ),
+                }
+            }
             // OBSERVE MODE ENDS HERE: the `VerifiedRelease` is reported and
             // dropped. `apply` and `canary` diverge on a STAGING head — see
             // `decide_post_verify_action`, the single source both this call
             // site and its table test consult: `apply` adopts EARNED heads
             // only (a verified STAGING head there is `Waiting`), `canary`
             // adopts either tier.
-            Ok(verified) => match decide_post_verify_action(channel.mode, resolved.tier, true) {
-                PostVerifyAction::Apply => self.apply_verified(&channel.channel_id, verified).await,
-                PostVerifyAction::Waiting => Verdict::Waiting {
-                    release_cid: verified.release_cid,
-                    detail: "verified; this peer adopts only earned releases — the canary \
+            Ok(verify::VerifyOutcome::Verified(verified)) => {
+                match decide_post_verify_action(channel.mode, resolved.tier, true) {
+                    PostVerifyAction::Apply => {
+                        self.apply_verified(&channel.channel_id, *verified).await
+                    }
+                    PostVerifyAction::Waiting => Verdict::Waiting {
+                        release_cid: verified.release_cid,
+                        detail: "verified; this peer adopts only earned releases — the canary \
                                  soaks it first"
-                        .to_string(),
-                },
-                PostVerifyAction::Observed => Verdict::Ok {
-                    release_cid: verified.release_cid,
-                },
-                PostVerifyAction::Refused => unreachable!(
-                    "verify::verify already enforced the threshold for tier {:?} — \
+                            .to_string(),
+                    },
+                    PostVerifyAction::Observed => Verdict::Ok {
+                        release_cid: verified.release_cid,
+                    },
+                    PostVerifyAction::Refused => unreachable!(
+                        "verify::verify already enforced the threshold for tier {:?} — \
                          Ok(verified) implies it was met (or was Staging, which never enforces \
                          it)",
-                    resolved.tier
-                ),
-            },
+                        resolved.tier
+                    ),
+                }
+            }
             Err(refusal) => Verdict::Refused { refusal },
         };
 

@@ -31,6 +31,16 @@
 //! 5. **Threshold** — per the manifest's own `adoptionDiscipline`, read through
 //!    T5's `count_qualifying_attestations`. When it cannot be read the verdict
 //!    is `threshold_unchecked`, which is **not a pass**.
+//! 6. **Artifacts, then already-current, then coordinator lineage** — the
+//!    envelope's coordinator-wasm (SUPERSEDES) leg is the one check that cannot
+//!    be settled before the bytes are on disk, because the question it should
+//!    ask first is *does this peer already run what these bytes install?*
+//!    ([`already_runs_target`]). A channel re-authored over the SAME bytes — a
+//!    threshold-0 revert — produces a new release CID for coordinator wasm the
+//!    peer is already running, and the supersedes check alone can only see that
+//!    the peer no longer runs the OLD bytes. That is convergence being reported
+//!    as `coordinator_lineage_mismatch`, forever, which is what this ordering
+//!    fixes (measured live on the household mesh, 2026-09-04).
 //!
 //! # Why the artifact check is byte-exact and not "close enough"
 //!
@@ -417,6 +427,13 @@ fn verify_artifact_shape(artifact: &Artifact) -> Result<(), AdoptionRefusal> {
 
 /// **The compatibility envelope (spec §8).** Variety lives above it; unity is
 /// enforced AT it.
+///
+/// Since 2026-09-04 this covers the additive floor, the wire epochs, role
+/// presence and **the DNA line** — everything that can be, and therefore is,
+/// decided before a byte is fetched. The coordinator-wasm (SUPERSEDES) leg
+/// moved to [`verify_coordinator_lineage`], which runs after the artifacts so
+/// [`already_runs_target`] can answer first. Watch's early call to this function
+/// is unchanged and still pays for the DNA-line refusal up front.
 pub fn verify_envelope(
     manifest: &ReleaseManifest,
     installed: &Answer<InstalledReality>,
@@ -488,9 +505,112 @@ pub fn verify_envelope(
             ));
         }
 
-        // For a coordinator-bundle release the declared hashes are what the
-        // release SUPERSEDES — what it applies ONTO. A peer that does not run
-        // them is not the peer this release was cut for.
+        // The coordinator-wasm (SUPERSEDES) leg is deliberately NOT here — see
+        // [`verify_coordinator_lineage`]. It has to run AFTER the artifact
+        // bytes are on disk, because the by-bytes exit that precedes it can
+        // only be decided from those bytes.
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Already current BY BYTES — the exit that precedes the supersedes check
+// ---------------------------------------------------------------------------
+
+/// What a release's artifact bytes WOULD install, per role: role name → (zome
+/// name → coordinator wasm hash). Derived from the staged bundle itself
+/// (`happ_manager::bundle_coordinator_wasm_hashes`), because a release manifest
+/// declares only the hashes it SUPERSEDES and never the ones it provides.
+pub type TargetCoordinators = BTreeMap<String, BTreeMap<String, String>>;
+
+/// **Already current by BYTES.** Does this peer's installed reality ALREADY
+/// equal what this release would install, for every role the release touches?
+///
+/// Why this is not the same question as `appliedRelease.cid == resolvedHead.cid`
+/// (the C6b idempotence exit in `watch`): a channel can be re-authored as a NEW
+/// manifest over the SAME bytes — a threshold-0 revert does exactly that — and
+/// then the CIDs differ while the bytes do not. Measured live on the household
+/// mesh 2026-09-04: james ran the release's target coordinator wasm and refused
+/// the re-authored manifest for it on every sweep with
+/// `coordinator_lineage_mismatch`, because the only thing the supersedes check
+/// can see is that james does not run the OLD bytes — which is precisely what
+/// having already adopted the new ones means.
+///
+/// Three states, and only the first is an exit:
+///
+/// - every touched role's installed coordinator map equals the target's → the
+///   peer is CURRENT; applying would be a byte-for-byte no-op.
+/// - some touched role differs (including a role the target does not name) →
+///   NOT current: fall through to [`verify_coordinator_lineage`], which decides
+///   whether this peer is one this release was cut for.
+/// - the target is unknown (a non-bundle artifact class, unreadable bytes, or
+///   an installed reality we could not read) → NOT current, same fall-through.
+///   Absence of evidence never takes an exit that STOPS work.
+///
+/// Exactness is the safety property: the comparison is the whole per-role zome
+/// map, which is the same drift unit `happ_manager::role_report` computes, so
+/// "already current" here means exactly "a hot-swap of this bundle would report
+/// zero drift for this role". A peer running NEITHER the superseded nor the
+/// target bytes fails it and is refused, as before.
+pub fn already_runs_target(
+    manifest: &ReleaseManifest,
+    installed: &Answer<InstalledReality>,
+    target: &Answer<TargetCoordinators>,
+) -> bool {
+    let (Answer::Present(installed), Answer::Present(target)) = (installed, target) else {
+        return false;
+    };
+    // A release that touches no role can never be "already current by bytes":
+    // there is nothing to have equalled.
+    if manifest.applies_to.roles.is_empty() {
+        return false;
+    }
+    manifest.applies_to.roles.keys().all(|role| {
+        match (installed.roles.get(role), target.get(role)) {
+            // An empty target map is not equality evidence — it is a bundle
+            // that resolved no coordinator zomes for the role at all.
+            (Some(running), Some(want)) if !want.is_empty() => running.coordinator_zomes == *want,
+            _ => false,
+        }
+    })
+}
+
+/// The coordinator-wasm leg of the envelope: **who this release was cut for.**
+///
+/// For a coordinator-bundle release the manifest's declared hashes are what the
+/// release SUPERSEDES — what it applies ONTO. A peer that does not run them is
+/// not the peer this release was cut for.
+///
+/// Split out of [`verify_envelope`] so the by-bytes exit
+/// ([`already_runs_target`]) can be decided first: the target hashes live in the
+/// artifact bytes, so this check is the one part of the envelope that cannot be
+/// settled before those bytes are staged and verified. Everything the envelope
+/// decides about corruption — the DNA line above all — stays in
+/// `verify_envelope`, where it is still paid for before a byte is fetched.
+pub fn verify_coordinator_lineage(
+    manifest: &ReleaseManifest,
+    installed: &Answer<InstalledReality>,
+) -> Result<(), AdoptionRefusal> {
+    let installed = match installed {
+        Answer::Present(reality) => reality,
+        Answer::Unreachable | Answer::Absent => {
+            return Err(refuse(
+                RefusalReason::InstalledRealityUnknown,
+                "this peer's own installed reality could not be read — the coordinator lineage \
+                 was not checked, which is not the same as failing it",
+            ));
+        }
+    };
+    for (role, binding) in &manifest.applies_to.roles {
+        let Some(installed_role) = installed.roles.get(role) else {
+            return Err(refuse(
+                RefusalReason::RoleNotInstalled,
+                format!(
+                    "release binds role '{role}', which this peer does not run (installed: {:?})",
+                    installed.roles.keys().collect::<Vec<_>>()
+                ),
+            ));
+        };
         let running = installed_role.wasm_hashes();
         let missing: Vec<&String> = binding
             .coordinator_wasm_hashes
@@ -695,13 +815,40 @@ pub struct VerifyInput<'a> {
     /// canary soaking a staging head must be able to verify it with zero
     /// qualifying attestations.
     pub tier: HeadTier,
+    /// **The by-bytes evidence (2026-09-04).** What the STAGED artifact would
+    /// install, per role — `Answer::Absent` for an artifact class that installs
+    /// no coordinators, `Answer::Unreachable` when the bytes could not be read.
+    /// Read only by [`already_runs_target`]; absence never takes the exit.
+    pub target_coordinators: &'a Answer<TargetCoordinators>,
+}
+
+/// What the floor decided. Two ways to pass, and they are not the same fact.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VerifyOutcome {
+    /// The release passed the whole floor and is ready for a vehicle.
+    Verified(Box<VerifiedRelease>),
+    /// This peer ALREADY runs exactly what the release would install, for every
+    /// role it touches ([`already_runs_target`]). Convergence, reached without
+    /// spending a vehicle — and never a refusal, however the manifest was
+    /// authored. The roles are carried for the report.
+    AlreadyCurrent { roles: Vec<String> },
 }
 
 /// Run the whole floor. The ONLY constructor of a [`VerifiedRelease`].
 ///
 /// Order matters for cost, not correctness: shape and channel identity are free
 /// and reject the largest class of garbage before any installed-reality read.
-pub fn verify(input: VerifyInput<'_>) -> Result<VerifiedRelease, AdoptionRefusal> {
+///
+/// **The one place order is load-bearing** is the tail. The by-bytes exit
+/// ([`already_runs_target`]) sits AFTER [`verify_artifacts`] and BEFORE
+/// [`verify_coordinator_lineage`]:
+///
+/// - after the artifacts, because the target hashes are read out of the staged
+///   bytes, and trusting bytes whose length and digest have not been checked
+///   would move the floor from "verify then apply" to "believe what is on disk";
+/// - before the supersedes check, because a peer that already runs the target
+///   is exactly the peer the supersedes check reports as running neither.
+pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> {
     let manifest = verify_shape(input.body)?;
 
     if manifest.channel_id != input.channel_id {
@@ -727,12 +874,23 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifiedRelease, AdoptionRefusal
     }
     let artifact_paths = verify_artifacts(&manifest, input.artifacts)?;
 
-    Ok(VerifiedRelease {
+    // ALREADY CURRENT BY BYTES — decided from bytes that just proved out, and
+    // decided BEFORE the supersedes check that would otherwise refuse exactly
+    // the peers this exit is about.
+    if already_runs_target(&manifest, input.installed, input.target_coordinators) {
+        return Ok(VerifyOutcome::AlreadyCurrent {
+            roles: manifest.applies_to.roles.keys().cloned().collect(),
+        });
+    }
+
+    verify_coordinator_lineage(&manifest, input.installed)?;
+
+    Ok(VerifyOutcome::Verified(Box::new(VerifiedRelease {
         channel_id: input.channel_id.to_string(),
         release_cid: input.release_cid.to_string(),
         manifest,
         artifact_paths,
-    })
+    })))
 }
 
 #[cfg(test)]
@@ -762,6 +920,18 @@ mod tests {
         .into_iter()
         .map(|n| (n, fixture(n)))
         .collect()
+    }
+
+    /// Unwrap the floor's PASS outcome. `AlreadyCurrent` is a pass too, but a
+    /// different fact — a test that meant to exercise the vehicle path must
+    /// fail loudly rather than silently measure the by-bytes exit.
+    fn expect_verified(outcome: VerifyOutcome) -> VerifiedRelease {
+        match outcome {
+            VerifyOutcome::Verified(v) => *v,
+            VerifyOutcome::AlreadyCurrent { roles } => {
+                panic!("expected a verified release; the by-bytes exit fired for roles {roles:?}")
+            }
+        }
     }
 
     fn installed_from(role: &str, dna: &str, zome: &str, wasm: &str) -> Answer<InstalledReality> {
@@ -950,6 +1120,10 @@ mod tests {
     /// The right DNA on the wrong coordinator generation. Kept distinct from
     /// the DNA line because the cures are different: this one a hot-swap can
     /// reach, the DNA line only a rung-6 migration can.
+    ///
+    /// Lives on [`verify_coordinator_lineage`] rather than [`verify_envelope`]
+    /// since 2026-09-04: the supersedes leg runs after the artifact bytes are
+    /// staged, so the by-bytes exit gets to answer first.
     #[test]
     fn a_superseded_coordinator_this_peer_does_not_run_refuses_separately() {
         let body = fixture("release-manifest-coordinator-bundle.json");
@@ -961,10 +1135,197 @@ mod tests {
             "content_store",
             "uhCokQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ",
         );
-        let refusal = verify_envelope(&manifest, &installed).expect_err("wrong generation");
+        // The envelope proper no longer carries this leg — the DNA line and
+        // the epoch/role checks pass, and only the supersedes check refuses.
+        verify_envelope(&manifest, &installed)
+            .expect("the envelope's own checks pass on this peer");
+        let refusal =
+            verify_coordinator_lineage(&manifest, &installed).expect_err("wrong generation");
         assert_eq!(
             refusal.reason_code(),
             RefusalReason::CoordinatorLineageMismatch
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Already current BY BYTES (2026-09-04) — the live james refusal
+    // -----------------------------------------------------------------------
+
+    /// Target evidence for one role, in the shape
+    /// `happ_manager::bundle_coordinator_wasm_hashes` returns.
+    fn target_of(role: &str, zome: &str, wasm: &str) -> Answer<TargetCoordinators> {
+        Answer::Present(
+            [(
+                role.to_string(),
+                [(zome.to_string(), wasm.to_string())]
+                    .into_iter()
+                    .collect::<BTreeMap<String, String>>(),
+            )]
+            .into_iter()
+            .collect(),
+        )
+    }
+
+    const TARGET_WASM: &str = "uhCokomHUyeMYCMYlWYPFzsepfRjgOi50RXulOl5MQ4STwULXJ7Wb";
+    const THIRD_WASM: &str = "uhCokZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
+
+    /// **The measured case.** A channel re-authored over the SAME bytes mints a
+    /// new release CID, so the CID-equality idempotence exit cannot see it —
+    /// and the peer that already adopted those bytes no longer runs what the
+    /// manifest says it supersedes. Refusing that peer forever is the bug;
+    /// running the target bytes IS being current.
+    #[test]
+    fn a_peer_running_the_target_bytes_is_already_current() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from("lamad", &binding.dna_hash, "content_store", TARGET_WASM);
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+
+        assert!(already_runs_target(&manifest, &installed, &target));
+        // And the supersedes check ALONE would have refused exactly this peer.
+        assert_eq!(
+            verify_coordinator_lineage(&manifest, &installed)
+                .expect_err("the supersedes check cannot see convergence")
+                .reason_code(),
+            RefusalReason::CoordinatorLineageMismatch
+        );
+    }
+
+    /// The peer the release WAS cut for still proceeds: it runs the superseded
+    /// bytes, not the target ones, so there is nothing already-current about
+    /// it and the floor must hand it to a vehicle.
+    #[test]
+    fn a_peer_running_the_superseded_bytes_proceeds() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from(
+            "lamad",
+            &binding.dna_hash,
+            "content_store",
+            &binding.coordinator_wasm_hashes[0],
+        );
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+
+        assert!(!already_runs_target(&manifest, &installed, &target));
+        verify_coordinator_lineage(&manifest, &installed)
+            .expect("the peer this release was cut for");
+    }
+
+    /// Running NEITHER is still `coordinator_lineage_mismatch`. The exit must
+    /// not become a way for any peer to claim convergence.
+    #[test]
+    fn a_peer_running_neither_is_still_a_coordinator_lineage_mismatch() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from("lamad", &binding.dna_hash, "content_store", THIRD_WASM);
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+
+        assert!(!already_runs_target(&manifest, &installed, &target));
+        assert_eq!(
+            verify_coordinator_lineage(&manifest, &installed)
+                .expect_err("runs neither")
+                .reason_code(),
+            RefusalReason::CoordinatorLineageMismatch
+        );
+    }
+
+    /// Absence of target evidence never takes an exit that stops work: an
+    /// unreadable bundle, an artifact class that installs no coordinators, and
+    /// an unreadable passport all fall through to the supersedes check.
+    #[test]
+    fn unknown_evidence_never_takes_the_by_bytes_exit() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from("lamad", &binding.dna_hash, "content_store", TARGET_WASM);
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+
+        assert!(!already_runs_target(&manifest, &installed, &Answer::Absent));
+        assert!(!already_runs_target(
+            &manifest,
+            &installed,
+            &Answer::Unreachable
+        ));
+        assert!(!already_runs_target(
+            &manifest,
+            &Answer::Unreachable,
+            &target
+        ));
+        // An empty per-role target map is not equality evidence either.
+        let empty_role: Answer<TargetCoordinators> = Answer::Present(
+            [("lamad".to_string(), BTreeMap::new())]
+                .into_iter()
+                .collect(),
+        );
+        assert!(!already_runs_target(&manifest, &installed, &empty_role));
+    }
+
+    /// EVERY touched role must match. A release that touches two roles and
+    /// finds one of them drifted is not already current — applying it would
+    /// still change something.
+    #[test]
+    fn every_touched_role_must_equal_the_target() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let mut manifest = verify_shape(&body).unwrap();
+        let lamad = manifest.applies_to.roles["lamad"].clone();
+        manifest
+            .applies_to
+            .roles
+            .insert("imagodei".to_string(), lamad.clone());
+
+        let installed = Answer::Present(InstalledReality {
+            app_id: "elohim".to_string(),
+            roles: [
+                (
+                    "lamad".to_string(),
+                    InstalledRole {
+                        role: "lamad".to_string(),
+                        dna_hash: lamad.dna_hash.clone(),
+                        coordinator_zomes: [("content_store".to_string(), TARGET_WASM.to_string())]
+                            .into_iter()
+                            .collect(),
+                    },
+                ),
+                (
+                    "imagodei".to_string(),
+                    InstalledRole {
+                        role: "imagodei".to_string(),
+                        dna_hash: lamad.dna_hash.clone(),
+                        coordinator_zomes: [("identity".to_string(), THIRD_WASM.to_string())]
+                            .into_iter()
+                            .collect(),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        });
+
+        let target: Answer<TargetCoordinators> = Answer::Present(
+            [
+                (
+                    "lamad".to_string(),
+                    [("content_store".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+                (
+                    "imagodei".to_string(),
+                    [("identity".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        assert!(
+            !already_runs_target(&manifest, &installed, &target),
+            "one drifted role means the release still has work to do"
         );
     }
 
@@ -1163,6 +1524,7 @@ mod tests {
             artifacts: &[],
             attestations: None,
             tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
         })
         .expect_err("wrong channel");
         assert_eq!(refusal.reason_code(), RefusalReason::ChannelIdMismatch);
@@ -1203,8 +1565,10 @@ mod tests {
             artifacts: &artifacts,
             attestations: Some(&evidence),
             tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
         })
         .expect("every arm passes");
+        let verified = expect_verified(verified);
         assert_eq!(verified.channel_id, manifest.channel_id);
         assert_eq!(verified.release_cid, "uhCkkTheWinningVersion");
         assert_eq!(verified.artifact_paths.len(), manifest.artifacts.len());
@@ -1251,6 +1615,7 @@ mod tests {
             artifacts: &artifacts,
             attestations: Some(&unmet),
             tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
         })
         .expect_err("an EARNED head with an unmet threshold is still refused");
         assert_eq!(earned_refused.reason_code(), RefusalReason::ThresholdUnmet);
@@ -1264,9 +1629,13 @@ mod tests {
             artifacts: &artifacts,
             attestations: Some(&unmet),
             tier: HeadTier::Staging,
+            target_coordinators: &Answer::Absent,
         })
         .expect("the SAME unmet evidence never refuses a STAGING head");
-        assert_eq!(staging_verified.release_cid, "uhCkkStagingUnmet");
+        assert_eq!(
+            expect_verified(staging_verified).release_cid,
+            "uhCkkStagingUnmet"
+        );
 
         // And with no evidence at all (`threshold_unchecked` on a real read
         // failure): still refused on Earned, still verified on Staging.
@@ -1279,6 +1648,7 @@ mod tests {
             artifacts: &artifacts,
             attestations: None,
             tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
         })
         .expect_err("unchecked is not a pass on an EARNED head");
         assert_eq!(
@@ -1295,6 +1665,7 @@ mod tests {
             artifacts: &artifacts,
             attestations: None,
             tier: HeadTier::Staging,
+            target_coordinators: &Answer::Absent,
         })
         .expect("an unread threshold never gates a STAGING head either");
     }

@@ -1264,6 +1264,117 @@ mod tests {
         assert!(!state.is_backing_off(2_001));
     }
 
+    /// **Peer-pull (2026-09-04).** `artifact_unavailable` is transient, so a
+    /// channel whose bytes have not replicated climbs the ladder — 30 s, then
+    /// 120 s, then 600 s — and both epic deliveries of 2026-09-04 sat there
+    /// until an operator hand-PUT the blob. With
+    /// [`super::artifact_pull::PeerPullArtifactSource`] wired, the pull that finally
+    /// lands must put the channel back on FULL cadence, not leave it serving
+    /// its climbed rung: the ladder measures consecutive refusals, and the
+    /// first non-refusal is the evidence that the condition is over.
+    #[test]
+    fn a_pull_that_finally_lands_clears_the_artifact_unavailable_ladder() {
+        let mut state = ChannelAdoptionState::new(&FollowedChannel {
+            channel_id: "runtime:coordinators:elohim:epic".to_string(),
+            mode: AdoptionMode::Apply,
+        });
+        for tick in 1..=3 {
+            state.record(
+                1_000 * tick,
+                None,
+                Verdict::Refused {
+                    refusal: AdoptionRefusal::new(
+                        RefusalReason::ArtifactUnavailable,
+                        "blob is not held locally",
+                    ),
+                },
+                None,
+            );
+        }
+        assert_eq!(state.consecutive_refusals, 3);
+        let climbed = state
+            .next_check_not_before
+            .expect("a transient refusal is on the ladder");
+        assert!(climbed > 3_000, "three refusals have climbed the ladder");
+
+        state.record(
+            4_000,
+            None,
+            Verdict::Applied {
+                release_cid: "uhCkkPulledThenApplied".to_string(),
+                vehicle: "sync_coordinators".to_string(),
+                already_current: false,
+            },
+            None,
+        );
+        assert_eq!(
+            state.consecutive_refusals, 0,
+            "the ladder is reset, not held"
+        );
+        assert_eq!(state.next_check_not_before, None);
+        assert!(!state.is_backing_off(4_001));
+    }
+
+    /// **Already current BY BYTES (2026-09-04).** The by-bytes exit reports
+    /// `Applied { already_current: true }` with the
+    /// [`super::VEHICLE_ALREADY_INSTALLED`] label — a success, so it clears the
+    /// ladder a run of `coordinator_lineage_mismatch` refusals had climbed, and
+    /// it records an `appliedRelease` the C6b exit reads next sweep.
+    #[test]
+    fn already_current_by_bytes_clears_the_ladder_and_records_the_applied_release() {
+        let mut state = ChannelAdoptionState::new(&FollowedChannel {
+            channel_id: "runtime:coordinators:elohim:epic".to_string(),
+            mode: AdoptionMode::Apply,
+        });
+        state.record(
+            1_000,
+            None,
+            Verdict::Refused {
+                refusal: AdoptionRefusal::new(
+                    RefusalReason::CoordinatorLineageMismatch,
+                    "release supersedes coordinator wasm this peer does not run",
+                ),
+            },
+            None,
+        );
+        assert_eq!(state.consecutive_refusals, 1);
+
+        state.record_applied(
+            AppliedRelease {
+                cid: "uhCkktI48lSxdGOi7Hx9Ew10wkmq1iDrJJ98oG7W02G3q6".to_string(),
+                at: 2_000,
+                vehicle: super::super::VEHICLE_ALREADY_INSTALLED.to_string(),
+            },
+            false,
+        );
+        state.record(
+            2_000,
+            None,
+            Verdict::Applied {
+                release_cid: "uhCkktI48lSxdGOi7Hx9Ew10wkmq1iDrJJ98oG7W02G3q6".to_string(),
+                vehicle: super::super::VEHICLE_ALREADY_INSTALLED.to_string(),
+                already_current: true,
+            },
+            None,
+        );
+
+        assert_eq!(state.consecutive_refusals, 0);
+        assert_eq!(state.next_check_not_before, None);
+        assert!(
+            !state.pending_restart,
+            "nothing was staged — no vehicle ran at all"
+        );
+        let applied = state
+            .applied_release
+            .as_ref()
+            .expect("the C6b exit needs an appliedRelease to read next sweep");
+        assert_eq!(applied.vehicle, super::super::VEHICLE_ALREADY_INSTALLED);
+        assert_eq!(
+            state.verdict.as_ref().unwrap().reason_label(),
+            super::super::REASON_ALREADY_CURRENT
+        );
+    }
+
     /// **The canary-first fix.** `Waiting` is neither a pass-and-stop nor a
     /// refusal — a peer in `apply` mode that verified a STAGING head is doing
     /// nothing wrong, so it must be checked at full cadence next sweep, never

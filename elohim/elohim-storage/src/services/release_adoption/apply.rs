@@ -286,6 +286,68 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::rename(&tmp, path)
 }
 
+// ---------------------------------------------------------------------------
+// What the staged bytes WOULD install — the by-bytes evidence (2026-09-04)
+// ---------------------------------------------------------------------------
+
+/// Read the per-role TARGET coordinator wasm hashes out of a release's STAGED
+/// artifact, for [`super::verify::already_runs_target`].
+///
+/// Lives here rather than in `verify` because it is I/O — `verify` is pure by
+/// contract, and the caller assembles evidence. Lives here rather than in
+/// `watch` because reading a coordinator bundle is this module's knowledge: it
+/// is the same `happ_manager` resolution the hot-swap vehicle above routes to,
+/// so the hashes compared are exactly the hashes a hot-swap would splice in.
+///
+/// Honest absence, three ways — and none of them ever takes the exit:
+///
+/// - `Absent` — this artifact class installs no coordinators (`config-epr`,
+///   `storage-binary`), so there is nothing to be already-current *by*.
+/// - `Unreachable` — the bytes are not usable evidence: the positional pairing
+///   between `manifest.artifacts` and the staged paths does not hold, the
+///   fetched bytes do not match the manifest's declared length/digest, or the
+///   bundle could not be unpacked. **The digest guard is load-bearing**: this
+///   runs before `verify_artifacts` has judged, so it re-checks rather than
+///   assumes — target hashes read out of unverified bytes could otherwise talk
+///   a peer into "already current" from a substituted artifact.
+/// - `Present` — role → (zome → wasm hash) for every role the bundle resolves.
+pub async fn staged_target_coordinators(
+    manifest: &super::ReleaseManifest,
+    fetched: &[super::verify::FetchedArtifact],
+) -> seam_contracts::Answer<super::verify::TargetCoordinators> {
+    use seam_contracts::Answer;
+
+    match manifest.artifact_class {
+        ArtifactClass::CoordinatorBundle | ArtifactClass::HappBundle => {}
+        // A config or binary release installs no coordinator wasm; "already
+        // current by coordinator bytes" is not a question it can answer.
+        ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary => return Answer::Absent,
+    }
+
+    let [declared] = manifest.artifacts.as_slice() else {
+        return Answer::Unreachable;
+    };
+    let Some(actual) = fetched.iter().find(|f| f.blob_cid == declared.blob_cid) else {
+        return Answer::Unreachable;
+    };
+    if actual.bytes != declared.bytes || !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
+        return Answer::Unreachable;
+    }
+
+    match crate::happ_manager::bundle_coordinator_wasm_hashes(&actual.path).await {
+        Ok(target) => Answer::Present(target),
+        Err(e) => {
+            tracing::debug!(
+                path = %actual.path.display(),
+                error = %e,
+                "release-adoption: staged bundle could not be read for its target coordinator \
+                 hashes — the by-bytes exit is simply not available for this release"
+            );
+            Answer::Unreachable
+        }
+    }
+}
+
 fn receipt(verified: &VerifiedRelease, vehicle: &str, detail: serde_json::Value) -> AppliedReceipt {
     AppliedReceipt {
         channel_id: verified.channel_id.clone(),

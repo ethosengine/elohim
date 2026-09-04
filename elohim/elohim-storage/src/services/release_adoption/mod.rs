@@ -422,6 +422,19 @@ pub const REASON_IDLE: &str = "idle";
 /// head resolve.
 pub const REASON_ALREADY_CURRENT: &str = "already_current";
 
+/// **Already current BY BYTES (2026-09-04).** The `vehicle` label recorded on
+/// [`state::AppliedRelease`] when convergence was reached without a vehicle
+/// acting: this peer's installed reality already equalled what the release's
+/// artifact bytes would install, for every role the release touches
+/// ([`verify::already_runs_target`]).
+///
+/// A distinct label rather than a vehicle name, because no vehicle ran. An
+/// operator reading `/admin/adoption` must be able to tell "the hot-swap
+/// applied this" from "this peer was already there when the manifest was
+/// re-authored over the same bytes" — the second is exactly what a threshold-0
+/// revert produces on a peer that had already adopted the bytes in canary mode.
+pub const VEHICLE_ALREADY_INSTALLED: &str = "already_installed";
+
 /// **Design 2026-09-01 (canary-first adoption).** The `reason` label for
 /// [`state::Verdict::Waiting`]: a peer in `apply` mode verified a STAGING
 /// head and is doing nothing wrong — `apply` adopts EARNED heads only, and

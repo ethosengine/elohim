@@ -879,6 +879,33 @@ async fn bundle_role_dna_files(
     Ok(out)
 }
 
+/// The bundle's per-role TARGET coordinator wasm hashes: role name → (zome
+/// name → coordinator wasm hash, base64 `uhCok…`).
+///
+/// The same two steps [`sync_coordinators_for_app_info`] takes to compute a
+/// role's `bundled_coordinators`, exposed on their own and **entirely offline
+/// from the conductor** — no admin websocket, no `list_apps`, no
+/// `get_dna_definition`. That matters because the release-adoption controller
+/// needs to know what a staged bundle WOULD install before it decides whether
+/// applying it would change anything: a release manifest declares only the
+/// coordinator hashes it SUPERSEDES (the packager reads them off the packaging
+/// peer's live passport), never the ones it provides, so the target hashes are
+/// knowable only from the artifact bytes themselves.
+///
+/// Same resolution path as [`bundle_role_dna_files`], so the hashes equal what
+/// a hot-swap of this exact bundle would splice in — computed once, from the
+/// bundle, rather than re-derived by a second implementation that could drift.
+pub(crate) async fn bundle_coordinator_wasm_hashes(
+    happ_path: &Path,
+) -> anyhow::Result<std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>>
+{
+    let role_dnas = bundle_role_dna_files(happ_path).await?;
+    Ok(role_dnas
+        .into_iter()
+        .map(|(role, dna_file)| (role, coordinator_wasm_hashes(dna_file.dna_def())))
+        .collect())
+}
+
 /// Build a [`CoordinatorBundle`] from a DnaFile's coordinator zomes — the
 /// payload shape `update_coordinators` consumes. Resources are the coordinator
 /// wasm bytes already carried in the DnaFile's code map.
