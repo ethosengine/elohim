@@ -89,7 +89,7 @@ pub fn shell_asset_refs(index_html: &str) -> Vec<AssetRef> {
         } else {
             continue;
         };
-        let Some(raw) = attr_value(&tag, attr) else {
+        let Some(raw) = attr_value(tag, attr) else {
             continue;
         };
         if raw.contains("://") || raw.starts_with("//") || raw.starts_with("data:") {
