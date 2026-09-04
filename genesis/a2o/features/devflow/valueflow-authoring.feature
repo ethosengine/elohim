@@ -28,6 +28,10 @@ Feature: A task moves through one readable valueflow from claim to verdict
   # `epr flow claim`, `epr flow fulfill`, `epr flow context`, `epr flow
   # project` — so `@requires:epr-cli` names one binary, not a family of tools.
   #
+  #   valueflow    — the append-only, content-addressed record of intents,
+  #                  commitments, fulfillments and notes that `epr flow`
+  #                  keeps in a repository; the scenarios read and write
+  #                  nothing else.
   #   scratch repository — an isolated, throwaway git repository the scenario
   #                  creates; nothing here reads or writes the live checkout's
   #                  valueflow.
@@ -36,12 +40,18 @@ Feature: A task moves through one readable valueflow from claim to verdict
   #                  decomposed into gap items and projected into the
   #                  valueflow by `epr flow project`, so each task exists as
   #                  an intent an implementer can claim.
+  #   actor identity — the `agent:<role>@<model>` identity an actor passes
+  #                  with --as, or the git author when none is passed; two
+  #                  identities are distinct when their strings differ.
   #   commitment   — the still-open promise minted when an actor claims that
   #                  gap; its provider is the incumbent actor.
-  #   provider     — the REA role naming who supplies the promised work; the
-  #                  claiming actor fills it.
+  #   provider     — the REA (Resource-Event-Agent) role naming who supplies
+  #                  the promised work; the claiming actor fills it.
   #   task brief   — the short description of intended work attached to a
   #                  claim.
+  #   task report  — the evidence an implementer submits against a
+  #                  commitment; only a report with status DONE or
+  #                  DONE_WITH_CONCERNS constitutes a discharge.
   #   discharge    — a fulfillment event that names the commitment and closes
   #                  it. Describing blocked work is evidence, not discharge.
   #   ruling       — a binding decision recorded as a note against a gap or
@@ -60,6 +70,17 @@ Feature: A task moves through one readable valueflow from claim to verdict
   #                  twice.
   #   gate         — the `just gate <name>` command declared for the project
   #                  that owns a source path, not a recipe guessed by an agent.
+
+  Scenario: One task moves from claim to verdict and the record reads as its story
+    Given a projected plan with one unclaimed gap item and an implementer and a reviewer with distinct actor identities
+    When the implementer claims the gap with a task brief
+    And the implementer submits a task report with status "DONE" naming its commit
+    And the reviewer records a verdict "approved" on that gap
+    And the orchestrator records a ruling accepting the delivery
+    When anyone reads context for the gap
+    Then the commitment shows the implementer as provider and is discharged by exactly one fulfillment
+    And the notes read newest first: the ruling, then the verdict from its named verdict field, then nothing older
+    And the gap's story is recoverable from the record alone without any conversation transcript
 
   Scenario: A gap can have one incumbent claim, never two
     Given a projected plan contains an unclaimed gap item
@@ -87,14 +108,14 @@ Feature: A task moves through one readable valueflow from claim to verdict
   Scenario: Context shows the newest review decision before the ruling it followed
     Given a ruling note is recorded against a claimed gap
     And a reviewer later records an approved verdict note against that same gap
-    When an agent reads context for the gap
+    When the orchestrator reads context for the gap
     Then both the ruling and the verdict are readable in the notes section
     And the newer verdict is rendered before the older ruling
     And the verdict is rendered from its named verdict field as "approved"
 
   Scenario: Context names the promise and command that govern a storage source file
     Given a source file in a project with a declared habit and gate
-    When an agent reads context for that source-file path
+    When the orchestrator reads context for that source-file path
     Then the habit section names the covering habit, its status, active flag, and first check
     And the gate section names the declared "just gate" command that owns the file
     And the gate section includes any Cargo target directory and Rust flags declared by that project
