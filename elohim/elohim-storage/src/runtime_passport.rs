@@ -90,6 +90,19 @@ pub struct HappRolePassport {
     /// stays in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lineage: Option<RoleLineageView>,
+    /// **Task 17.** The constitutional root this role's INSTALLED cell
+    /// declares, read from its DNA modifiers' `properties` (the same
+    /// `LineageProperties` map the node-registry integrity zome reads
+    /// `lineage` out of). `None` — and so omitted — for a role whose
+    /// properties declare no root, which is every role that has never crossed
+    /// under a constitution.
+    ///
+    /// This is what makes `release_adoption::verify_path`'s `root_mismatch`
+    /// arm reachable: it compares roots only when the installed role declares
+    /// one, and before this field existed every role declared `None`, so a
+    /// path notarized under a FOREIGN root was accepted on every live peer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constitution_root: Option<String>,
 }
 
 /// The dual-cell state of one role: which app id currently serves reads,
@@ -291,8 +304,8 @@ async fn inspect_installed_happ(
 
     let mut roles = Vec::new();
     for (role, cells) in &app.cell_info {
-        let Some(cell_id) = cells.iter().find_map(|cell| match cell {
-            CellInfo::Provisioned(provisioned) => Some(provisioned.cell_id.clone()),
+        let Some(provisioned) = cells.iter().find_map(|cell| match cell {
+            CellInfo::Provisioned(provisioned) => Some(provisioned),
             _ => None,
         }) else {
             roles.push(HappRolePassport {
@@ -301,9 +314,16 @@ async fn inspect_installed_happ(
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: Some("role has no provisioned cell".to_string()),
                 lineage: None,
+                constitution_root: None,
             });
             continue;
         };
+        let cell_id = provisioned.cell_id.clone();
+        // Task 17: the root is a property of the INSTALLED cell's modifiers,
+        // which `list_apps` already returned — no extra admin round trip, and
+        // no second source that could disagree with the hash beside it.
+        let constitution_root =
+            constitution_root_from_properties(provisioned.dna_modifiers.properties.bytes());
 
         let dna_hash = cell_id.dna_hash().to_string();
         let (coordinator_wasm_hashes, mut role_error) =
@@ -360,6 +380,7 @@ async fn inspect_installed_happ(
             coordinator_wasm_hashes,
             error: role_error,
             lineage: lineage_view,
+            constitution_root,
         });
     }
 
@@ -369,6 +390,48 @@ async fn inspect_installed_happ(
         error: None,
         lineage_apps,
     }
+}
+
+/// The identity-bearing DNA properties, as far as the PASSPORT needs to read
+/// them.
+///
+/// A storage-side mirror of the node-registry integrity zome's
+/// `LineageProperties` (`node_registry_integrity/src/lib.rs`), narrowed to the
+/// one field the passport projects. It is a mirror rather than a shared type
+/// because the zome's own struct is behind the `lineage-witness` cargo feature
+/// and holds `Vec<DnaHash>`, which this side has no reason to decode.
+///
+/// Unknown keys are IGNORED by construction (no `deny_unknown_fields`), which
+/// is load-bearing: the same properties map carries the bootstrap steward's
+/// `progenitor_pubkey` and the `lineage` list, and a strict decode would read
+/// every one of today's installed cells as having no root.
+#[derive(Debug, Clone, serde::Deserialize)]
+struct PassportLineageProperties {
+    #[serde(default)]
+    constitution_root: Option<String>,
+}
+
+/// **Task 17.** The `constitution_root` an installed cell's DNA modifiers
+/// declare, or `None`.
+///
+/// `properties` is the msgpack `SerializedBytes` the conductor stored at
+/// install time (see `happ_manager::install_lineage`, which writes the same
+/// map through `YamlProperties`). Every failure mode — properties that are
+/// nil, properties that are not a map, a map with no `constitution_root`, a
+/// root declared as the empty string — is `None`, i.e. "this role declares no
+/// root".
+///
+/// `None` is SAFE here, and deliberately so: `verify_path` compares roots only
+/// when the installed role declares one, so a role with no readable root
+/// imposes no root constraint rather than refusing every path. The alternative
+/// — inventing a root, or failing the whole passport — would either fabricate
+/// a constitutional fact or take the node's `/version` down over a property we
+/// simply could not read.
+fn constitution_root_from_properties(properties: &[u8]) -> Option<String> {
+    rmp_serde::from_slice::<PassportLineageProperties>(properties)
+        .ok()?
+        .constitution_root
+        .filter(|root| !root.is_empty())
 }
 
 /// Every installed app id that is a lineage side-app of `base_app_id`
@@ -560,12 +623,109 @@ mod tests {
             )]),
             error: None,
             lineage: None,
+            constitution_root: None,
         };
         let json = serde_json::to_value(role).unwrap();
         assert!(json.get("dnaHash").is_some());
         assert!(json.get("coordinatorWasmHashes").is_some());
         assert!(json.get("dna_hash").is_none());
         assert!(json.get("lineage").is_none());
+        // **Task 17.** A role declaring no root omits the key entirely —
+        // byte-identical to the pre-Task-17 shape, which is what keeps this
+        // an additive `/version` change.
+        assert!(json.get("constitutionRoot").is_none());
+    }
+
+    /// **Task 17.** The properties decode, against the msgpack shape the
+    /// conductor actually stores.
+    ///
+    /// Modifiers `properties` is a `SerializedBytes` msgpack MAP, written at
+    /// install time from the same JSON `happ_manager::install_lineage` builds.
+    /// The fixture therefore carries the OTHER keys that really live beside
+    /// the root — `progenitor_pubkey` (the bootstrap steward) and `lineage`
+    /// (the DNA chain the node-registry integrity zome validates against) —
+    /// because a strict decode would read every installed cell today as
+    /// having no root, and this test is the thing that would notice.
+    #[test]
+    fn constitution_root_is_read_from_the_cells_own_properties() {
+        #[derive(serde::Serialize)]
+        struct Props<'a> {
+            progenitor_pubkey: &'a str,
+            lineage: Vec<&'a str>,
+            constitution_root: Option<&'a str>,
+        }
+
+        let with_root = rmp_serde::to_vec_named(&Props {
+            progenitor_pubkey: "uhCAkBootstrapStewardKey",
+            lineage: vec!["uhC0kV1NodeRegistry"],
+            constitution_root: Some("bafyLineageConstitutionRoot"),
+        })
+        .expect("encode properties");
+        assert_eq!(
+            constitution_root_from_properties(&with_root).as_deref(),
+            Some("bafyLineageConstitutionRoot"),
+            "the root must survive the two sibling keys it shares the map with"
+        );
+
+        // A cell whose properties declare no root — every role today.
+        let without_root = rmp_serde::to_vec_named(&Props {
+            progenitor_pubkey: "uhCAkBootstrapStewardKey",
+            lineage: vec![],
+            constitution_root: None,
+        })
+        .expect("encode properties");
+        assert!(constitution_root_from_properties(&without_root).is_none());
+
+        // …and every unreadable shape is the same honest `None`, never a
+        // fabricated root and never a failed passport: empty properties (the
+        // `SerializedBytes::default()` a plain install leaves), msgpack nil,
+        // a non-map, and a root declared as the empty string.
+        assert!(constitution_root_from_properties(&[]).is_none());
+        assert!(constitution_root_from_properties(&rmp_serde::to_vec(&()).unwrap()).is_none());
+        assert!(constitution_root_from_properties(&rmp_serde::to_vec(&7u8).unwrap()).is_none());
+        let empty_root = rmp_serde::to_vec_named(&Props {
+            progenitor_pubkey: "uhCAkBootstrapStewardKey",
+            lineage: vec![],
+            constitution_root: Some(""),
+        })
+        .expect("encode properties");
+        assert!(
+            constitution_root_from_properties(&empty_root).is_none(),
+            "an empty root declares nothing — it must never become a root every path is \
+             compared against"
+        );
+    }
+
+    /// **Task 17, the seam.** A root read off the installed cell reaches
+    /// `verify_path` through `InstalledReality::from_happ_passport` — the one
+    /// line that made `root_mismatch` reachable at all. Pinned here because
+    /// the passport is where the value originates; the refusal itself is
+    /// pinned in `release_adoption::verify`.
+    #[test]
+    fn the_passports_root_reaches_installed_reality() {
+        use crate::services::release_adoption::verify::InstalledReality;
+        use seam_contracts::Answer;
+
+        let happ = HappPassport {
+            app_id: "elohim".to_string(),
+            roles: vec![HappRolePassport {
+                role: "node_registry".to_string(),
+                dna_hash: "uhC0k-example".to_string(),
+                coordinator_wasm_hashes: BTreeMap::new(),
+                error: None,
+                lineage: None,
+                constitution_root: Some("bafyLineageConstitutionRoot".to_string()),
+            }],
+            error: None,
+            lineage_apps: Vec::new(),
+        };
+        let Answer::Present(installed) = InstalledReality::from_happ_passport(&happ) else {
+            panic!("a role with no error is installed reality, not an outage");
+        };
+        assert_eq!(
+            installed.roles["node_registry"].constitution_root.as_deref(),
+            Some("bafyLineageConstitutionRoot")
+        );
     }
 
     /// **Task 8.** An empty snapshot (the default, and every node until a
@@ -582,6 +742,7 @@ mod tests {
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: None,
                 lineage: lineage_view_for("node_registry", "uhC0k-example", &BTreeMap::new(), None),
+                constitution_root: None,
             }],
             error: None,
             lineage_apps: lineage_apps_for("elohim", &[]),

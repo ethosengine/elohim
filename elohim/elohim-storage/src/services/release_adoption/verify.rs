@@ -133,9 +133,14 @@ impl InstalledReality {
                     role: role.role.clone(),
                     dna_hash: role.dna_hash.clone(),
                     coordinator_zomes: role.coordinator_wasm_hashes.clone(),
-                    // The runtime passport does not expose a per-role
-                    // constitution root yet — every role declares none.
-                    constitution_root: None,
+                    // **Task 17.** Carried from the passport, which reads it
+                    // off the INSTALLED cell's own DNA modifiers. Until this
+                    // line, every role reported `None` and `verify_path`'s
+                    // root check — which only fires when the installed role
+                    // declares a root — could never fire on a live peer.
+                    // `None` still means "this role declares no root", and
+                    // imposes no root constraint.
+                    constitution_root: role.constitution_root.clone(),
                 },
             );
         }
@@ -1194,6 +1199,7 @@ mod tests {
                     .collect(),
                 error: None,
                 lineage: None,
+                constitution_root: None,
             }],
             error: None,
             lineage_apps: Vec::new(),
@@ -1689,6 +1695,7 @@ mod tests {
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: Some("get_dna_definition failed".to_string()),
                 lineage: None,
+                constitution_root: None,
             }],
             error: None,
             lineage_apps: Vec::new(),
