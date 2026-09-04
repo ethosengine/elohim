@@ -956,6 +956,61 @@ fn a_ruling_and_a_verdict_are_readable_in_context_newest_first() {
     );
 }
 
+/// The `--notes N` window: exactly N, taken off the NEWEST end, never a different set.
+#[test]
+fn the_notes_window_shows_exactly_n_taken_from_the_newest_end() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let author = NoteActor::default();
+    for reason in ["first", "second", "third", "fourth"] {
+        note::note(
+            root,
+            "plans/epic.md",
+            "observation",
+            reason,
+            None,
+            None,
+            &author,
+        )
+        .expect("note runs");
+    }
+
+    let all = context::context_with(root, "plans/epic.md", 10).expect("context runs");
+    let reasons: Vec<&str> = all
+        .notes
+        .iter()
+        .filter_map(|n| n.reason.as_deref())
+        .collect();
+    assert_eq!(
+        reasons,
+        vec!["fourth", "third", "second", "first"],
+        "newest first across the whole set"
+    );
+
+    let capped = context::context_with(root, "plans/epic.md", 2).expect("context runs");
+    assert_eq!(capped.notes.len(), 2, "exactly N, never N+1");
+    assert_eq!(capped.notes[0].reason.as_deref(), Some("fourth"));
+    assert_eq!(
+        capped.notes[1].reason.as_deref(),
+        Some("third"),
+        "the window truncates the OLD end, so the newest N survive"
+    );
+
+    // N larger than the set is not an error and does not pad.
+    assert_eq!(
+        context::context_with(root, "plans/epic.md", 99)
+            .expect("context runs")
+            .notes
+            .len(),
+        4
+    );
+    // And zero is a legal, if useless, window rather than a panic.
+    assert!(context::context_with(root, "plans/epic.md", 0)
+        .expect("context runs")
+        .notes
+        .is_empty());
+}
+
 #[test]
 fn a_content_address_target_skips_the_path_only_sections_and_says_why() {
     let dir = valueflow_fixture();
