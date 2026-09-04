@@ -447,7 +447,7 @@ def main():
             f"ONE BUILD AT A TIME: a build is already running in this workspace — pid {pids}: "
             f"{drivers[0]} ({len(live)} compiler/linker processes). Two concurrent builds saturate "
             f"the host's worn NVMe mirror (2026-08-29 resets). Wait for it: "
-            f"`while pgrep -x rustc >/dev/null || pgrep -f 'cargo (build|test|check|clippy)' >/dev/null; do sleep 15; done` "
+            f"`while pgrep -x rustc >/dev/null || pgrep -x cargo >/dev/null; do sleep 15; done` (exact names — a `pgrep -f` pattern matches other sessions' waiter shells and never exits) "
             f"— never kill another session's build."
         )
 
