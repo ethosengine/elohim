@@ -497,6 +497,12 @@ pub struct AdoptionController {
     /// The post-apply soak observer's rail (T5). `None` leaves applies
     /// un-attested rather than falsely attested.
     soak: Option<Arc<SoakAttestor>>,
+    /// The local projection pool, for the ONE read that needs it: a
+    /// migrates-lineage commitment's projected lifecycle (`state`,
+    /// `revoked_at`), which the path-evidence fetch pairs with the DHT entry's
+    /// body. `None` leaves that lifecycle at its fail-closed default
+    /// (`proposed`), which refuses a crossing rather than assuming one.
+    db: Option<crate::db::DbPool>,
     staging_root: PathBuf,
     cached_reality: tokio::sync::Mutex<Option<(i64, Answer<InstalledReality>)>>,
 }
@@ -509,6 +515,7 @@ impl AdoptionController {
             installed: None,
             apply: None,
             soak: None,
+            db: None,
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
         }
@@ -544,6 +551,16 @@ impl AdoptionController {
     /// apply is un-attested, which is a missing datum. Never a fabricated one.
     pub fn with_soak_attestor(mut self, soak: Arc<SoakAttestor>) -> Self {
         self.soak = Some(soak);
+        self
+    }
+
+    /// Equip the local projection pool. Read by exactly one thing: the
+    /// migrates-lineage path evidence's LIFECYCLE half
+    /// (`super::path_evidence::fetch_path_evidence`). Without it a
+    /// `happ-lineage` release refuses `path_not_notarized` — fail-closed, and
+    /// the only cost on a node that follows no lineage channel is a `None`.
+    pub fn with_db(mut self, db: crate::db::DbPool) -> Self {
+        self.db = Some(db);
         self
     }
 
@@ -1397,12 +1414,16 @@ impl AdoptionController {
             attestations: attestations.as_ref(),
             tier: resolved.tier,
             target_coordinators: &target_coordinators,
-            // **Rung 6.** No caller fetches migrates-lineage path evidence
-            // yet — that fetch site is a later task's. `verify_path` is a
-            // no-op for every artifact class this sweep can see today, so
-            // `Answer::Absent` here changes nothing about this sweep's
-            // behavior.
-            path: Answer::Absent,
+            // **Rung 6.** The fetch site (I1/C5): the commitment is read
+            // through THIS peer's own conductor, its lifecycle off this
+            // peer's own projection. Absent for every artifact class but
+            // `happ-lineage`, which costs a non-lineage sweep exactly nothing.
+            path: super::path_evidence::fetch_path_evidence(
+                self.hc.as_ref(),
+                self.db.as_ref(),
+                &manifest,
+            )
+            .await,
         }) {
             // ALREADY CURRENT BY BYTES: this peer runs exactly what the release
             // would install. Never a refusal — and routed through the SAME mode

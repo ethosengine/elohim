@@ -126,6 +126,7 @@
 
 pub mod apply;
 pub mod artifact_pull;
+pub mod path_evidence;
 pub mod state;
 pub mod verify;
 pub mod watch;
@@ -383,6 +384,52 @@ pub struct AppliedReceipt {
     /// changed, exe-slot before/after). Additive by construction.
     #[serde(default)]
     pub detail: serde_json::Value,
+    /// **Rung 6.** The lineage carry a
+    /// [`apply::HappLineageVehicle`] performed, when that is the vehicle that
+    /// acted. `None` — and absent from the wire — for every other vehicle,
+    /// which is what keeps this an ADDITIVE receipt change: a peer one build
+    /// behind reads a `happ-lineage` receipt without it, and every existing
+    /// receipt serialises byte-for-byte as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carry: Option<LineageCarryReceipt>,
+}
+
+/// **Rung 6.** What a whole `happ-lineage` carry amounted to, for ONE role —
+/// the storage-side fold of the per-page `CarryReceipt`s the v2 cell's
+/// `carry_from` returns.
+///
+/// # Two receipts, deliberately two names
+///
+/// The zome's receipt is per PAGE (`apply::CarryReceipt`: `carried`,
+/// `next_cursor`, `v1_digest`, `witness_hash`); this one is per CARRY. Giving
+/// them the same name would make "which one is on the wire here?" a question a
+/// reader has to answer from context at every call site, and the two shapes are
+/// not interchangeable: one is a cursor step, the other is a completed crossing.
+///
+/// The deliverable's assertion — `carried == v1_count` and `digest ==
+/// v1_digest` — is read off exactly these fields on the mesh (Task 11's
+/// Station 3/4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LineageCarryReceipt {
+    /// The role whose v1 cell was carried into v2.
+    pub role: String,
+    /// Records carried, summed over every page the cursor walked.
+    pub carried: u32,
+    /// Records the walk covered in v1. See
+    /// [`apply::CarryReceipt`] for why this equals `carried` by construction
+    /// today: the per-page wire Task 9 owns reports no independent v1 total,
+    /// so a divergence between the two is a fact only the v1 cell itself can
+    /// establish (Station 3/4 reads it there, not from this receipt).
+    pub v1_count: u32,
+    /// The digest the LAST page reported — what the carry ended up with.
+    pub digest: String,
+    /// The digest the FIRST page reported — what the carry started from.
+    pub v1_digest: String,
+    /// Every page's witness hash, in cursor order. The audit trail C8 asks
+    /// for: one witness per page, never a single summary hash that hides
+    /// which pages actually ran.
+    pub witness_hashes: Vec<String>,
 }
 
 /// The apply seam. Implemented per artifact class in [`apply`] (T4).
@@ -854,6 +901,73 @@ impl std::fmt::Display for AdoptionRefusal {
 }
 
 impl std::error::Error for AdoptionRefusal {}
+
+/// Manifest fixtures shared by more than one child module's tests.
+///
+/// Lives here rather than in whichever module happened to need it first: a
+/// `happ-lineage` manifest is read by the path-evidence fetch, by the lineage
+/// vehicle, and by the floor, and three private copies of it would drift into
+/// three different ideas of what a lineage release looks like.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    /// The DNA hash a mesh peer runs BEFORE the crossing.
+    pub const INSTALLED_NR: &str = "uhC0kiK2ZWeqhFWCEPyYngFb51yBMWXaSCrUZoL8g5ubbbPIa84yR";
+    /// The DNA hash a `happ-lineage` release crosses TO.
+    pub const V2_NR: &str = "uhC0knBUbHoWC8FJowoRoWD8s7bA16J7PglOU3shVv5UTG79BG16Q";
+    /// The commitment a lineage manifest's `adoptionDiscipline.path` names.
+    pub const LINEAGE_PATH_CID: &str = "uhCEkLineagePathCommitment";
+    /// The role the MVP rehearsal crosses (spec §4.1).
+    pub const ROLE: &str = "node_registry";
+
+    /// Read the shipped coordinator-bundle fixture and reshape it — the same
+    /// two-independent-sources discipline `verify`'s own tests use: the
+    /// envelope, provenance and reach come off disk, so a schema change breaks
+    /// this rather than being mirrored by it.
+    fn from_fixture() -> ReleaseManifest {
+        const FIXTURE: &str =
+            "../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-coordinator-bundle.json";
+        let text = std::fs::read_to_string(FIXTURE)
+            .unwrap_or_else(|e| panic!("fixture {FIXTURE} unreadable: {e}"));
+        let body: serde_json::Value = serde_json::from_str(&text).expect("fixture is JSON");
+        verify::verify_shape(&body).expect("fixture is a legal manifest")
+    }
+
+    /// A `happ-lineage` manifest whose one role declares the crossing
+    /// [`INSTALLED_NR`] → [`V2_NR`], with a path naming [`LINEAGE_PATH_CID`].
+    pub fn lineage_manifest() -> ReleaseManifest {
+        let mut m = from_fixture();
+        m.artifact_class = ArtifactClass::HappLineage;
+        let mut roles = BTreeMap::new();
+        roles.insert(
+            ROLE.to_string(),
+            RoleBinding {
+                dna_hash: V2_NR.to_string(),
+                coordinator_wasm_hashes: vec!["uhCEkTargetWasm".to_string()],
+                coordinator_zomes: None,
+                migrate_from: Some(INSTALLED_NR.to_string()),
+                lineage: Some(vec![INSTALLED_NR.to_string()]),
+            },
+        );
+        m.applies_to = AppliesTo { roles };
+        m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
+            commitment_cid: LINEAGE_PATH_CID.to_string(),
+        });
+        m
+    }
+
+    /// The same manifest with the crossing REMOVED — a `happ-lineage` release
+    /// whose roles declare no `migrateFrom`, which the vehicle refuses.
+    pub fn lineage_manifest_without_migrate_from() -> ReleaseManifest {
+        let mut m = lineage_manifest();
+        for binding in m.applies_to.roles.values_mut() {
+            binding.migrate_from = None;
+        }
+        m
+    }
+}
 
 #[cfg(test)]
 mod tests {

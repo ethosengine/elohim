@@ -364,6 +364,10 @@ fn receipt(verified: &VerifiedRelease, vehicle: &str, detail: serde_json::Value)
         vehicle: vehicle.to_string(),
         applied_at_unix: now_unix(),
         detail,
+        // Only [`HappLineageVehicle`] ever carries, and it fills this in
+        // itself. Every other vehicle's receipt is byte-identical to what it
+        // was before rung 6 (the field is `skip_serializing_if = None`).
+        carry: None,
     }
 }
 
@@ -572,6 +576,454 @@ impl ApplyVehicle for HappBundleVehicle {
 
     fn name(&self) -> &'static str {
         "happ_bundle"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// happ-lineage → install beside, carry, attest (rung 6)
+// ---------------------------------------------------------------------------
+
+/// How many v1 records ONE `carry_from` call moves.
+///
+/// **C3/C6a — the work is bounded on the WASM side, before the call is made.**
+/// `HcClient::call_zome` has no timeout and no cancellation path, so a
+/// caller-side deadline would merely abandon a conductor that keeps running.
+/// The only honest bound is a small batch the extern can always finish, driven
+/// by a cursor: 32 records per call, as many calls as the chain needs, each one
+/// individually cheap enough that the sweep tick is never held hostage.
+pub const CARRY_PAGE_LIMIT: u32 = 32;
+
+/// The hard ceiling on pages ONE role's carry may walk in ONE apply.
+///
+/// At [`CARRY_PAGE_LIMIT`] this is ~131k records — far beyond the rehearsal
+/// corpus, and finite. A zome that never sets `next_cursor` to `None` would
+/// otherwise loop this vehicle forever inside a controller sweep; the ceiling
+/// turns that into a typed `apply_failed` an operator can read.
+const MAX_CARRY_PAGES: u32 = 4_096;
+
+/// The zome the lineage carry runs in, on the v2 (side) cell.
+const CARRY_ZOME: &str = "node_registry_coordinator";
+/// The coordinator function that carries one page. Task 9 lands it.
+const CARRY_FN: &str = "carry_from";
+/// This vehicle's stable receipt name.
+const LINEAGE_VEHICLE: &str = "happ-lineage";
+
+/// Wire mirror of the v2 cell's `carry_from` INPUT (Task 9's contract).
+///
+/// Mirrored here — rather than imported from the zome — for the same reason
+/// [`super::ReleaseManifest`] mirrors T1's schema: the zome crate is a wasm
+/// target this crate does not link. The mirror is the contract, and it is
+/// pinned by the round-trip test below.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CarryInput {
+    /// The v1 cell to read FROM — the base app's provisioned cell for this
+    /// role. Passed explicitly rather than discovered in-wasm: the v2 cell has
+    /// no way to know which of a conductor's cells is its own predecessor, and
+    /// guessing is the one thing a migration must never do.
+    pub v1_cell: holochain_client::CellId,
+    /// `None` starts at the beginning. Cursor-driven, so a carry that is
+    /// interrupted resumes rather than restarting (C6b: idempotent by entry
+    /// hash on the zome side).
+    pub cursor: Option<u32>,
+    pub limit: u32,
+}
+
+/// Wire mirror of the v2 cell's `carry_from` OUTPUT — ONE page.
+///
+/// # The decode contract Task 9 must honour
+///
+/// `v1_digest` and `witness_hash` are `String`. A coordinator that returns a
+/// native `EntryHash`/`ActionHash` here sends a msgpack BYTE ARRAY, and this
+/// decode fails with "invalid value: byte array, expected a string" — the
+/// 2026-06-13 signal-decode class that has now bitten this codebase three
+/// times. The zome renders the canonical base64 (`HoloHash`'s `Display`)
+/// before returning; the storage side never re-derives a hash.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CarryReceipt {
+    /// Records this page moved into v2.
+    pub carried: u32,
+    /// Where the next page starts, or `None` when v1 is exhausted. The loop's
+    /// ONLY termination condition — never a count comparison, because a count
+    /// the caller derived is not evidence the chain ended.
+    pub next_cursor: Option<u32>,
+    /// The digest over the v1 export as of this page.
+    pub v1_digest: String,
+    /// The `NotarizationWitness` this page authored, base64.
+    pub witness_hash: String,
+}
+
+/// Fold a cursor-driven carry into one [`super::LineageCarryReceipt`].
+///
+/// Split out from the vehicle and parameterised by the page fetcher so the
+/// FOLD — which is where an off-by-one silently under-reports a migration —
+/// is unit-testable with no conductor, no cell and no installed app.
+///
+/// `fetch` returns `Err(String)` for a failed page; the fold turns it into an
+/// `apply_failed` naming the cursor it died on, because "the carry failed" with
+/// no position is not a diagnosis.
+async fn fold_carry<F, Fut>(
+    role: &str,
+    mut fetch: F,
+) -> Result<super::LineageCarryReceipt, AdoptionRefusal>
+where
+    F: FnMut(Option<u32>) -> Fut,
+    Fut: std::future::Future<Output = Result<CarryReceipt, String>>,
+{
+    let mut cursor: Option<u32> = None;
+    let mut carried: u32 = 0;
+    let mut first_digest: Option<String> = None;
+    let mut witness_hashes: Vec<String> = Vec::new();
+
+    for page_no in 0..MAX_CARRY_PAGES {
+        let page = fetch(cursor).await.map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!(
+                    "{CARRY_FN}(role='{role}', cursor={cursor:?}) failed on page {page_no}: {e}"
+                ),
+            )
+        })?;
+        carried = carried.saturating_add(page.carried);
+        if first_digest.is_none() {
+            first_digest = Some(page.v1_digest.clone());
+        }
+        // A page that authored no witness contributes none — an empty string
+        // in the audit trail would read as a witness that exists and is blank.
+        if !page.witness_hash.is_empty() {
+            witness_hashes.push(page.witness_hash);
+        }
+
+        let Some(next) = page.next_cursor else {
+            return Ok(super::LineageCarryReceipt {
+                role: role.to_string(),
+                carried,
+                // The per-page wire reports no independent v1 total, so the
+                // only number this side can honestly put here is what the walk
+                // covered — and the walk ended because v1 said it was
+                // exhausted, not because we counted. The INDEPENDENT
+                // `carried == v1_count` proof is read off the v1 cell itself
+                // on the mesh (Task 11 Station 3/4), never off this receipt.
+                v1_count: carried,
+                // The LAST page's digest — what the carry ended up with.
+                digest: page.v1_digest,
+                v1_digest: first_digest.unwrap_or_default(),
+                witness_hashes,
+            });
+        };
+        // A cursor that does not ADVANCE would walk the same page until the
+        // ceiling — the same records re-carried, the same witness re-authored,
+        // and a receipt whose `carried` is a multiple of the truth.
+        if let Some(prev) = cursor {
+            if next <= prev {
+                return Err(AdoptionRefusal::new(
+                    RefusalReason::ApplyFailed,
+                    format!(
+                        "{CARRY_FN}(role='{role}') returned a cursor that does not advance \
+                         ({prev} → {next}) — refusing rather than re-carrying the same page"
+                    ),
+                ));
+            }
+        }
+        cursor = Some(next);
+    }
+
+    Err(AdoptionRefusal::new(
+        RefusalReason::ApplyFailed,
+        format!(
+            "{CARRY_FN}(role='{role}') did not reach the end of v1 within {MAX_CARRY_PAGES} pages \
+             ({carried} carried so far) — refusing rather than looping a controller sweep"
+        ),
+    ))
+}
+
+/// **Rung 6.** The migration vehicle: install v2 BESIDE v1 under the same key,
+/// carry every v1 record with a witness, then flip the role to authoring on v2.
+///
+/// # Why "beside" and not "instead"
+///
+/// Every other vehicle in this module preserves the cell. This one cannot —
+/// crossing the DNA line means a NEW cell by definition. What it preserves
+/// instead is the **agent key**: `happ_manager::install_lineage` installs the
+/// side app with `agent_key: Some(<the base app's key>)`, so both apps' source
+/// chains are authored by one identity, and the network seed is inherited from
+/// the base role so the new cell joins the same DHT family rather than forking
+/// onto its own. No uninstall, no re-key, no data loss — v1 stays live and
+/// readable (C14: the closed v1 chain is kept, never deleted).
+///
+/// # The order is the safety argument
+///
+/// install → connect → carry → **then** open the window. Authoring moves to v2
+/// only after every v1 record is in it. Which means the failure shape is fixed
+/// and boring:
+///
+/// **Any failure leaves the side app INSTALLED and the window CLOSED.**
+///
+/// Never an uninstall (that would delete a cell whose bytes may be the only
+/// copy of a partial carry), and never a half-open window (a role authoring
+/// into a cell that is missing history is exactly the corruption this rung
+/// exists to avoid). A refused apply is retried by the next sweep, and
+/// `install_lineage` is idempotent on an already-installed app id, so the
+/// retry resumes rather than duplicating.
+pub struct HappLineageVehicle {
+    admin: holochain_client::AdminWebsocket,
+    base_app_id: String,
+    lineage: Arc<crate::lineage_roles::LineageRoles>,
+    registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+}
+
+impl HappLineageVehicle {
+    /// The classes this vehicle handles, as a const so the trait impl and the
+    /// test read ONE source rather than two lists that can disagree.
+    pub const HANDLES: &'static [ArtifactClass] = &[ArtifactClass::HappLineage];
+
+    pub fn new(
+        admin: holochain_client::AdminWebsocket,
+        base_app_id: impl Into<String>,
+        lineage: Arc<crate::lineage_roles::LineageRoles>,
+        registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+    ) -> Self {
+        Self {
+            admin,
+            base_app_id: base_app_id.into(),
+            lineage,
+            registry,
+        }
+    }
+
+    /// The roles this release actually crosses on — those declaring
+    /// `migrateFrom`. Pure, so the refusal is testable without a conductor.
+    ///
+    /// A `happ-lineage` release where no role declares a crossing is a
+    /// contradiction: the class exists to name a DNA line being crossed, and a
+    /// manifest that names none would have this vehicle install a side app for
+    /// nothing and carry nothing into it.
+    fn crossings(
+        manifest: &super::ReleaseManifest,
+    ) -> Result<Vec<(&String, &super::RoleBinding)>, AdoptionRefusal> {
+        let crossings: Vec<_> = manifest
+            .applies_to
+            .roles
+            .iter()
+            .filter(|(_, binding)| binding.migrate_from.is_some())
+            .collect();
+        if crossings.is_empty() {
+            return Err(AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!(
+                    "no role declares migrateFrom on this happ-lineage release (roles: {:?}) — \
+                     the class names a DNA line being crossed, and this manifest crosses none",
+                    manifest.applies_to.roles.keys().collect::<Vec<_>>()
+                ),
+            ));
+        }
+        Ok(crossings)
+    }
+
+    /// The DNA lineage a role's side app is installed with. Pure.
+    ///
+    /// `install_lineage` writes these into the new cell's DNA properties, and
+    /// the integrity zome validates crossings against them — so an EMPTY
+    /// lineage is not a permissive default, it is a cell that accepts crossing
+    /// from nothing. Refuse rather than install one.
+    fn lineage_hashes(
+        role: &str,
+        binding: &super::RoleBinding,
+    ) -> Result<Vec<holochain_types::prelude::DnaHash>, AdoptionRefusal> {
+        let declared = binding.lineage.as_ref().ok_or_else(|| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!(
+                    "role '{role}' declares migrateFrom but no lineage — installing with an empty \
+                     lineage property would mint a cell that accepts crossing from nothing"
+                ),
+            )
+        })?;
+        declared
+            .iter()
+            .map(|h| {
+                holochain_types::prelude::DnaHash::try_from(h.as_str()).map_err(|e| {
+                    AdoptionRefusal::new(
+                        RefusalReason::ApplyFailed,
+                        format!("role '{role}' lineage member '{h}' is not a DNA hash: {e}"),
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// This conductor's record of the BASE app — the agent key the side app
+    /// inherits and the v1 cells the carry reads from.
+    async fn base_app_info(&self) -> Result<holochain_client::AppInfo, AdoptionRefusal> {
+        let apps = self.admin.list_apps(None).await.map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!("could not read this conductor's installed apps ({e})"),
+            )
+        })?;
+        apps.into_iter()
+            .find(|a| a.installed_app_id == self.base_app_id)
+            .ok_or_else(|| {
+                AdoptionRefusal::new(
+                    RefusalReason::BootstrapOutOfBand,
+                    format!(
+                        "app '{}' is not installed on this conductor — there is no v1 to install \
+                         beside and no key to inherit; a fresh joiner's first bundle is seeded out \
+                         of band",
+                        self.base_app_id
+                    ),
+                )
+            })
+    }
+
+    /// The base app's provisioned cell for `role` — the carry's v1 source.
+    fn v1_cell(
+        base: &holochain_client::AppInfo,
+        role: &str,
+    ) -> Result<holochain_client::CellId, AdoptionRefusal> {
+        base.cell_info
+            .get(role)
+            .and_then(|cells| {
+                cells.iter().find_map(|c| match c {
+                    holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+                    _ => None,
+                })
+            })
+            .ok_or_else(|| {
+                AdoptionRefusal::new(
+                    RefusalReason::ApplyFailed,
+                    format!(
+                        "base app '{}' has no provisioned cell for role '{role}' — nothing to \
+                         carry FROM",
+                        base.installed_app_id
+                    ),
+                )
+            })
+    }
+}
+
+/// One page of the carry, over the side app's own client.
+async fn call_carry_from(
+    client: &Arc<crate::hc_client::HcClient>,
+    input: CarryInput,
+) -> Result<CarryReceipt, String> {
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| format!("encode CarryInput: {e}"))?;
+    let bytes = client
+        .call_zome(CARRY_ZOME, CARRY_FN, payload)
+        .await
+        .map_err(|e| e.to_string())?;
+    rmp_serde::from_slice(&bytes).map_err(|e| format!("decode CarryReceipt: {e}"))
+}
+
+#[async_trait::async_trait]
+impl ApplyVehicle for HappLineageVehicle {
+    async fn apply(&self, verified: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal> {
+        let (_, happ_path) = sole_artifact(verified, LINEAGE_VEHICLE)?;
+        let crossings = Self::crossings(&verified.manifest)?;
+        let base = self.base_app_info().await?;
+        let agent_key = base.agent_pub_key.clone();
+
+        let mut applied: Vec<(String, super::LineageCarryReceipt)> = Vec::new();
+        for (role, binding) in crossings {
+            let lineage_app_id =
+                crate::happ_manager::lineage_app_id(&self.base_app_id, &binding.dna_hash);
+            let lineage = Self::lineage_hashes(role, binding)?;
+            let v1_cell = Self::v1_cell(&base, role)?;
+
+            // (1) INSTALL BESIDE — same key, inherited network seed, idempotent
+            // on an app id that is already there (so a retried sweep resumes).
+            crate::happ_manager::install_lineage(
+                &self.admin,
+                happ_path,
+                &lineage_app_id,
+                agent_key.clone(),
+                &lineage,
+                role,
+            )
+            .await
+            .map_err(|e| {
+                AdoptionRefusal::new(
+                    RefusalReason::ApplyFailed,
+                    format!("install_lineage('{lineage_app_id}') for role '{role}': {e}"),
+                )
+            })?;
+
+            // (2) A FRESH client for the side app, owned for exactly this
+            // apply. Never cached on the vehicle: a handle held across applies
+            // outlives the window it belongs to, and a reverted or sunset
+            // window would still have a live authoring path into v2.
+            let client = self
+                .registry
+                .connect_app(&lineage_app_id, role)
+                .await
+                .map_err(|e| {
+                    AdoptionRefusal::new(
+                        RefusalReason::ApplyFailed,
+                        format!(
+                            "installed '{lineage_app_id}' but could not connect to it ({e}) — the \
+                             side app stays installed and the window stays CLOSED"
+                        ),
+                    )
+                })?;
+
+            // (3) CARRY to the cursor's end.
+            let client_ref = &client;
+            let cell_ref = &v1_cell;
+            let carry = fold_carry(role, move |cursor| async move {
+                call_carry_from(
+                    client_ref,
+                    CarryInput {
+                        v1_cell: cell_ref.clone(),
+                        cursor,
+                        limit: CARRY_PAGE_LIMIT,
+                    },
+                )
+                .await
+            })
+            .await?;
+
+            // (4) AND ONLY NOW does authoring move. Every refusal above
+            // returned before this line, which is what makes "failure leaves
+            // the window closed" a property of the control flow rather than a
+            // promise in a comment.
+            self.lineage.open_window(role, &lineage_app_id);
+            tracing::info!(
+                channel = %verified.channel_id,
+                release_cid = %verified.release_cid,
+                role,
+                lineage_app_id = %lineage_app_id,
+                carried = carry.carried,
+                "release-adoption: lineage window OPEN — the role authors on v2, v1 stays live"
+            );
+            applied.push((lineage_app_id, carry));
+        }
+
+        let detail = serde_json::json!({
+            "baseAppId": self.base_app_id,
+            "happ": happ_path.display().to_string(),
+            "crossings": applied.iter().map(|(app_id, carry)| serde_json::json!({
+                "role": carry.role,
+                "lineageAppId": app_id,
+                "carried": carry.carried,
+                "digest": carry.digest,
+                "v1Digest": carry.v1_digest,
+                "witnessHashes": carry.witness_hashes,
+            })).collect::<Vec<_>>(),
+        });
+        let mut out = receipt(verified, LINEAGE_VEHICLE, detail);
+        // `AppliedReceipt.carry` is one carry; `detail.crossings` is all of
+        // them. The MVP rehearsal crosses exactly one role (spec §4.1), so the
+        // singular field is the one an operator reads — and a multi-role
+        // release is still fully reported rather than silently truncated.
+        out.carry = applied.into_iter().next().map(|(_, carry)| carry);
+        Ok(out)
+    }
+
+    fn handles(&self) -> &'static [ArtifactClass] {
+        Self::HANDLES
+    }
+
+    fn name(&self) -> &'static str {
+        LINEAGE_VEHICLE
     }
 }
 
@@ -1268,5 +1720,219 @@ mod tests {
             chrono::DateTime::parse_from_rfc3339(&formatted).is_ok(),
             "got {formatted}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // happ-lineage (rung 6)
+    // -----------------------------------------------------------------------
+
+    /// The lineage vehicle declares EXACTLY its own class — asserted on the
+    /// const the trait impl returns, so the two cannot drift.
+    #[test]
+    fn the_lineage_vehicle_declares_exactly_happ_lineage() {
+        assert_eq!(
+            HappLineageVehicle::HANDLES,
+            &[ArtifactClass::HappLineage],
+            "a vehicle that also claimed happ-bundle would route DNA-preserving \
+             hot-swaps through a migration"
+        );
+        assert_eq!(LINEAGE_VEHICLE, "happ-lineage");
+    }
+
+    /// A `happ-lineage` release where no role declares `migrateFrom` is
+    /// refused BY NAME, before any conductor is touched. The class exists to
+    /// name a DNA line being crossed; a manifest crossing none would install a
+    /// side app for nothing.
+    #[test]
+    fn a_lineage_release_with_no_migrate_from_is_refused_by_name() {
+        let manifest = super::super::test_support::lineage_manifest_without_migrate_from();
+        let refusal = HappLineageVehicle::crossings(&manifest)
+            .expect_err("a crossing-less lineage release must refuse");
+        assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
+        assert!(
+            refusal.detail.contains("no role declares migrateFrom"),
+            "got {}",
+            refusal.detail
+        );
+    }
+
+    /// …and the same manifest WITH the crossing selects exactly the crossing
+    /// role, so the refusal above is about the declaration and not about the
+    /// selector being broken.
+    #[test]
+    fn the_crossing_roles_are_exactly_those_declaring_migrate_from() {
+        let manifest = super::super::test_support::lineage_manifest();
+        let crossings = HappLineageVehicle::crossings(&manifest).expect("declares a crossing");
+        assert_eq!(crossings.len(), 1);
+        assert_eq!(crossings[0].0.as_str(), super::super::test_support::ROLE);
+        assert_eq!(
+            crossings[0].1.migrate_from.as_deref(),
+            Some(super::super::test_support::INSTALLED_NR)
+        );
+    }
+
+    /// A crossing with no `lineage` is refused rather than installed with an
+    /// EMPTY lineage property — a cell that accepts crossing from nothing.
+    #[test]
+    fn a_crossing_without_a_declared_lineage_is_refused_never_installed_empty() {
+        let mut manifest = super::super::test_support::lineage_manifest();
+        let binding = manifest
+            .applies_to
+            .roles
+            .get_mut(super::super::test_support::ROLE)
+            .unwrap();
+        binding.lineage = None;
+        let refusal = HappLineageVehicle::lineage_hashes(super::super::test_support::ROLE, binding)
+            .expect_err("no lineage must refuse");
+        assert!(
+            refusal.detail.contains("accepts crossing from nothing"),
+            "got {}",
+            refusal.detail
+        );
+
+        // A declared lineage parses into real DNA hashes — and the parse is a
+        // CHECKSUM validation, not a prefix sniff, which is what makes a
+        // typo'd lineage member a refusal rather than a cell that accepts
+        // crossing from a hash nothing will ever produce.
+        let real = holochain_types::prelude::DnaHash::from_raw_32(vec![0x5A; 32]).to_string();
+        binding.lineage = Some(vec![real.clone()]);
+        let hashes =
+            HappLineageVehicle::lineage_hashes(super::super::test_support::ROLE, binding).unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0].to_string(), real);
+
+        // And a member that is not a DNA hash refuses rather than installing a
+        // lineage the integrity zome will never match.
+        binding.lineage = Some(vec!["not-a-dna-hash".to_string()]);
+        assert!(
+            HappLineageVehicle::lineage_hashes(super::super::test_support::ROLE, binding).is_err()
+        );
+    }
+
+    /// **The fold.** Two pages walked to the cursor's end: `carried` sums,
+    /// `v1_digest` is the FIRST page's, `digest` is the LAST page's, and every
+    /// page's witness is collected in cursor order.
+    #[tokio::test]
+    async fn the_carry_loop_folds_two_pages_into_one_receipt() {
+        let pages = std::sync::Mutex::new(vec![
+            CarryReceipt {
+                carried: 32,
+                next_cursor: Some(32),
+                v1_digest: "digest-after-page-one".to_string(),
+                witness_hash: "uhCEkWitnessOne".to_string(),
+            },
+            CarryReceipt {
+                carried: 7,
+                next_cursor: None,
+                v1_digest: "digest-after-page-two".to_string(),
+                witness_hash: "uhCEkWitnessTwo".to_string(),
+            },
+        ]);
+        let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
+
+        let carry = fold_carry("node_registry", |cursor| {
+            seen.lock().unwrap().push(cursor);
+            let page = pages.lock().unwrap().remove(0);
+            async move { Ok(page) }
+        })
+        .await
+        .expect("a carry that reaches the cursor's end");
+
+        assert_eq!(carry.role, "node_registry");
+        assert_eq!(carry.carried, 39, "32 + 7, summed across pages");
+        assert_eq!(carry.v1_count, 39);
+        assert_eq!(carry.v1_digest, "digest-after-page-one");
+        assert_eq!(carry.digest, "digest-after-page-two");
+        assert_eq!(
+            carry.witness_hashes,
+            vec!["uhCEkWitnessOne", "uhCEkWitnessTwo"]
+        );
+        // The cursor was threaded — page two asked from where page one ended.
+        assert_eq!(*seen.lock().unwrap(), vec![None, Some(32)]);
+    }
+
+    /// A zome that returns a cursor which does not advance is refused rather
+    /// than re-carrying the same page until the ceiling — which would report a
+    /// `carried` that is a multiple of the truth.
+    #[tokio::test]
+    async fn a_cursor_that_does_not_advance_is_refused_never_re_carried() {
+        let refusal = fold_carry("node_registry", |_cursor| async move {
+            Ok(CarryReceipt {
+                carried: 1,
+                next_cursor: Some(1),
+                v1_digest: "d".to_string(),
+                witness_hash: String::new(),
+            })
+        })
+        .await
+        .expect_err("a stuck cursor must refuse");
+        assert!(
+            refusal.detail.contains("does not advance"),
+            "got {}",
+            refusal.detail
+        );
+    }
+
+    /// A failed page names the cursor it died on — "the carry failed" with no
+    /// position is not a diagnosis an operator can resume from.
+    #[tokio::test]
+    async fn a_failed_page_names_the_cursor_it_died_on() {
+        let refusal = fold_carry("node_registry", |_cursor| async move {
+            Err("Websocket closed: No connection".to_string())
+        })
+        .await
+        .expect_err("a failed page must refuse");
+        assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
+        assert!(
+            refusal.detail.contains("cursor=None"),
+            "got {}",
+            refusal.detail
+        );
+        assert!(
+            refusal.detail.contains("Websocket closed"),
+            "the zome's own error text survives: {}",
+            refusal.detail
+        );
+    }
+
+    /// The page wire round-trips through the msgpack encoding the zome call
+    /// uses, and `witness_hash`/`v1_digest` are STRINGS — a coordinator
+    /// returning a native HoloHash there sends a byte array and this decode
+    /// fails (the 2026-06-13 signal-decode class).
+    #[test]
+    fn the_carry_page_wire_round_trips_as_named_msgpack() {
+        let page = CarryReceipt {
+            carried: 32,
+            next_cursor: Some(32),
+            v1_digest: "digest".to_string(),
+            witness_hash: "uhCEkWitness".to_string(),
+        };
+        let bytes = rmp_serde::to_vec_named(&page).unwrap();
+        let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(page, back);
+
+        // A byte-array where a string belongs does NOT silently decode.
+        let hostile = rmp_serde::to_vec_named(&serde_json::json!({
+            "carried": 1,
+            "next_cursor": serde_json::Value::Null,
+            "v1_digest": [1u8, 2, 3],
+            "witness_hash": "uhCEkWitness",
+        }))
+        .unwrap();
+        assert!(rmp_serde::from_slice::<CarryReceipt>(&hostile).is_err());
+    }
+
+    /// The batch is bounded BEFORE the call is made, and the page ceiling is
+    /// finite — `call_zome` has no cancellation path, so a caller-side timeout
+    /// would abandon a conductor that keeps running.
+    #[test]
+    fn the_carry_is_bounded_by_batch_and_by_page_ceiling() {
+        const {
+            assert!(CARRY_PAGE_LIMIT > 0);
+            assert!(MAX_CARRY_PAGES > 0);
+        }
+        assert_eq!(CARRY_PAGE_LIMIT, 32);
+        assert_eq!(CARRY_ZOME, "node_registry_coordinator");
+        assert_eq!(CARRY_FN, "carry_from");
     }
 }

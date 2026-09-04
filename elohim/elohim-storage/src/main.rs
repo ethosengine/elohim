@@ -5674,6 +5674,20 @@ async fn async_main(
                     admin.clone(),
                     args.app_id.clone(),
                 )));
+            // Rung 6. Registered only alongside the other conductor-touching
+            // vehicles AND only when a registry exists to dial the side app
+            // through — a lineage apply that could install v2 but never
+            // connect to it would leave a side app it can neither carry into
+            // nor account for. Unregistered, `happ-lineage` refuses
+            // `no_vehicle_for_class`, which is the honest answer.
+            if let Some(ref registry) = hc_registry_for_http {
+                vehicles = vehicles.with(std::sync::Arc::new(apply::HappLineageVehicle::new(
+                    admin.clone(),
+                    args.app_id.clone(),
+                    std::sync::Arc::clone(&lineage_roles),
+                    std::sync::Arc::clone(registry),
+                )));
+            }
         }
         if elohim_storage::runtime_config::config_path().is_some() {
             vehicles = vehicles.with(std::sync::Arc::new(apply::ConfigEprVehicle::new()));
@@ -5752,6 +5766,11 @@ async fn async_main(
         let mut controller = watch::AdoptionController::new(staging_root.clone())
             .with_artifact_source(artifacts)
             .with_apply_vehicles(std::sync::Arc::new(vehicles));
+        // Rung 6's path evidence pairs the commitment's DHT body with its
+        // PROJECTED lifecycle (`state`/`revoked_at`), which lives here.
+        if let Some(ref pool) = db_pool {
+            controller = controller.with_db(pool.clone());
+        }
         if let Some(hc) = hc_for_adoption.clone() {
             controller = controller.with_conductor(hc.clone());
             // T5's rail. Requires a conductor to author through, so it is

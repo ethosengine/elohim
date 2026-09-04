@@ -86,6 +86,16 @@ pub struct HcClientRegistry {
     /// other role already has, instead of connecting once at startup and
     /// staying dead forever after any conductor restart.
     pub node_registry: RwLock<Option<Arc<HcClient>>>,
+    /// The conductor URLs every role in this registry dialed with.
+    ///
+    /// Kept so a caller that needs a client for an app id which is NOT a
+    /// supervised role — the lineage ("side") app a `happ-lineage` apply
+    /// installs beside the base app (Task 7) — can dial the SAME conductor
+    /// without a second copy of the URLs being threaded through half of
+    /// `main.rs`. `None` on [`Self::empty`]: a registry that never connected
+    /// knows no URLs, and [`Self::connect_app`] fails closed there rather than
+    /// guessing a localhost default.
+    inputs: Option<HcRegistryInputs>,
 }
 
 /// The roles the supervisor keeps alive. Ordered coldest-first, matching the
@@ -121,6 +131,7 @@ impl HcClientRegistry {
             imagodei: RwLock::new(imagodei),
             lamad: RwLock::new(lamad),
             node_registry: RwLock::new(node_registry),
+            inputs: Some(inputs.clone()),
         }
     }
 
@@ -132,7 +143,46 @@ impl HcClientRegistry {
             imagodei: RwLock::new(None),
             lamad: RwLock::new(None),
             node_registry: RwLock::new(None),
+            inputs: None,
         }
+    }
+
+    /// Connect a FRESH client to an arbitrary installed app id on the SAME
+    /// conductor this registry dials, under `role`.
+    ///
+    /// The lineage-app path (Task 7's `HappLineageVehicle`): a `happ-lineage`
+    /// apply installs `elohim@<hash12>` beside the base app and then has to
+    /// drive `carry_from` on the NEW cell. That app is not a supervised role
+    /// and must never become one — it is per-crossing, it is not part of this
+    /// node's steady-state serving surface, and a slot for it would outlive
+    /// the window it belongs to.
+    ///
+    /// So the handle is returned, never cached: the caller owns it for exactly
+    /// the length of one apply and drops it. Nothing here mutates the registry.
+    pub async fn connect_app(
+        &self,
+        app_id: &str,
+        role: &str,
+    ) -> Result<Arc<HcClient>, crate::error::StorageError> {
+        let inputs = self.inputs.as_ref().ok_or_else(|| {
+            crate::error::StorageError::Conductor(
+                "this registry never connected, so the conductor URLs are unknown — cannot dial a \
+                 side app"
+                    .into(),
+            )
+        })?;
+        let config = HcClientConfig {
+            admin_url: inputs.admin_url.clone(),
+            app_url: inputs.app_url.clone(),
+            // Deliberately NOT `inputs.lineage.app_id_for(role)`: the caller is
+            // naming the app it wants. Routing this through the window resolver
+            // would make "connect me to the lineage app" resolve to whatever
+            // the window currently says, which is the value the caller is in
+            // the middle of establishing.
+            app_id: app_id.to_string(),
+            role: Some(role.to_string()),
+        };
+        HcClient::connect(config).await.map(Arc::new)
     }
 
     fn slot(&self, role: &str) -> Option<&RwLock<Option<Arc<HcClient>>>> {
