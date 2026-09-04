@@ -9,7 +9,7 @@ invariant: >
 status: green
 active: false
 checks:
-  - "a2o @concern:runtime-upgrade-propagation (genesis/a2o/features/delivery/runtime-upgrade-propagation.feature — Stations 1-8 RUNNABLE (r12 2026-09-02, 8/8): steps/delivery/runtime-upgrade-propagation.steps.ts composes the three drivers against the household mesh; the two constitutional scenarios stay scenario-level @wip / pending)"
+  - "a2o @concern:runtime-upgrade-propagation (genesis/a2o/features/delivery/runtime-upgrade-propagation.feature — Stations 1-9 RUNNABLE on holochain 0.7 (it8/it9 2026-09-04, 9/9 twice; r12 2026-09-02 8/8 on 0.6): steps/delivery/runtime-upgrade-propagation.steps.ts composes the three drivers against the household mesh; the two constitutional scenarios stay scenario-level @wip / pending)"
   - "manual chain (mesh): genesis/a2o/scripts/epr-release-package.ts (T1) → release-ceremony.ts channel create / publish / promote / revert <manifest> (T2) → GET /admin/adoption on every peer (T3/T4) → release-attestation-probe.ts EXIT=0 (T5)"
 refs:
   - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
@@ -90,3 +90,30 @@ is the only earned-tier verb), so a long-lived channel cannot take a second cand
 minting a fresh channel per run (`runtime:coordinators:elohim:a2o-<stamp>`). The story's "ONE head with two tiers" implies
 publish-over-earned must be admissible once the publisher has ADOPTED the earned head (AUTHOR-THEN-ADOPT arm). Current
 state: workaround = fresh channel per release (epic Task 2 fix round 1); the driver fix is an open rung-5 item.
+
+DELTA 2026-09-04 10:2xZ (overnight shift `rung5-long-lived-channel-0-7-mesh`; receipts `genesis/a2o/reports/release-ceremony/2026-09-04/shift-it*.{log,json}`):
+**Stations 1–8 PASS 8/8 on the holochain 0.7.0 household mesh** (it1 06:24Z, 100/100 steps, 12m39s — the first
+8/8 on the 0.7 line; F2's 5/5 was Stations 1–5) after one fixture cure: every non-first release names its lineage
+parent (5e4d97633; the 0.7 content_store orders the release chain, so a null-parent revert is honestly
+`lineage_parent_mismatch`). **Station 9 — the NEXT release on the SAME long-lived channel — PASS** (it7 10:1xZ,
+198 s): the seam filed 2026-09-05 is closed by four composed cures, each observed live before the run: (1) zome
+`content_store` election carries a STAGING CANDIDATE beneath the earned winner and admits a staging declaration
+over an earned head when the manifest names it as lineage parent (438443cf0 + wire 7e17a2d96 + sweettest
+096017d75; packed DNA hash unchanged; delivered to the mesh BY RUNG 5 on channel `c3-20260904t062743z`:
+publish→3/3 earned-applied 300 s, PIDs unchanged); (2) the canary follows the candidate (`watch.rs` 86445bd08 —
+"canary follows the staging candidate standing beneath the earned head", 8 unit tests); (3) a peer already running a
+release's TARGET bytes is `already_installed` (a73897f77 — james's live `coordinator_lineage_mismatch` at kickoff
+became `alreadyCurrent` after the restart) and release artifacts are PULLED from peers, shard manifests followed
+(35f0746ad + c8930c2f2 — the c3 ceremony needed two hand `PUT /blob`s; the fixture's personal-channel rebase now
+lands without one); (4) the driver admits `publish` over an earned head once the steward has ADOPTED it
+(`--adoption-url`, ab3bf32bc) and the packager never defaults a discipline — declared or inherited from the
+channel, carried through reverts as `channelDiscipline` (9e1ac7a7b, 6e0b89285). Unit tests: `cargo test --lib
+services::release_adoption` 104/104 (80b79717e). Fixture stations read a staged candidate's evidence BY CID
+(`release-ceremony.ts attestations <cid>`, 312d4f05d) because no `/admin/adoption` row reports it (backlog
+2026-09-04-rung5-c3-mesh-findings §4). Status stays **green**; scope now includes the second release on a
+long-lived channel. Pending the integrator: this batch is committed, not pushed (no push credentials in the shift
+session; rakia gitlink 4947469 must be pushed first) — the fleet leg of `retire-when` is unchanged.
+STABILITY 2026-09-04 11:2xZ: two consecutive full passes on the same binary — it8 `shift-it8-20260904T101912Z` 9/9
+117/117 (28m05s) and it9 `shift-it9-20260904T104809Z` 9/9 117/117 (28m12s); Station 9 200 s / 190 s. The `checks:`
+line's "Stations 1-8 RUNNABLE" now reads Stations 1–9 on the 0.7 line (this delta is the evidence). Not yet a
+Jenkins-confirmed batch (no push from the shift session).
