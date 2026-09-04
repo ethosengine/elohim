@@ -6,6 +6,11 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Forwards to the integrity crate — coordinator externs that touch the gated
+# NotarizationWitness/EntryToWitness types are gated the same way here.
+lineage-witness = ["node_registry_integrity/lineage-witness"]
+
 [dependencies]
 hdk = "=0.7.0"
 serde = "1"

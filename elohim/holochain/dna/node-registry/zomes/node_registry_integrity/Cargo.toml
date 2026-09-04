@@ -6,6 +6,12 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Off by default: default build packs BYTE-IDENTICAL to pristine node-registry
+# (no DNA-hash move). Landing the witness on the fleet happens through the
+# Holochain Evolution Epic's own ceremony, not a CI roll.
+lineage-witness = []
+
 [dependencies]
 hdi = "=0.8.0"
 serde = "1"

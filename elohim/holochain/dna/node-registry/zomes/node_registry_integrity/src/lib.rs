@@ -217,7 +217,7 @@ pub struct ShardAssignment {
 // Entry Types Enum
 // =============================================================================
 
-#[hdk_entry_types]
+#[cfg(not(feature = "lineage-witness"))] #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     NodeRegistration(NodeRegistration),
@@ -232,7 +232,7 @@ pub enum EntryTypes {
 // Link Types
 // =============================================================================
 
-#[hdk_link_types]
+#[cfg(not(feature = "lineage-witness"))] #[hdk_link_types]
 pub enum LinkTypes {
     // Node discovery
     RegionToNode,              // Anchor(region) -> NodeRegistration
@@ -259,7 +259,7 @@ pub enum LinkTypes {
 // Validation Rules
 // =============================================================================
 
-#[hdk_extern]
+#[cfg(not(feature = "lineage-witness"))] #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::CreateEntry(store_entry) => match store_entry {
@@ -332,6 +332,276 @@ fn validate_shard_assignment(
             return Ok(ValidateCallbackResult::Invalid(
                 "ShardAssignment assignment_hash must not be empty when present".to_string(),
             ));
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Lineage / Notarization carrying (Holochain Evolution Epic §2)
+//
+// Spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md
+//
+// A `NotarizationWitness` carries a proof that was witnessed in a PREDECESSOR
+// DNA (v1) into this DNA (v2). The proof is the v1 `Action` plus the v1
+// author's `Signature` over it. Because an action's signature preimage is the
+// msgpack of the whole `Action` and contains NO DNA hash (except the genesis
+// `Dna` action), v2's validators can re-verify a v1 notarization with no access
+// to v1 at all.
+//
+// EVERYTHING in this section is gated behind the `lineage-witness` cargo
+// feature (off by default): the default build must pack BYTE-IDENTICAL to
+// pristine node-registry (no DNA-hash move) until the epic's own ceremony
+// lands this on the fleet, not a CI roll. It lives at the END of the file,
+// appended after the original content rather than interleaved with it, so
+// the default build's compiled output — including any `file!()`/`line!()`
+// location constants the toolchain bakes into panic/error paths for the
+// SURVIVING code above — is not perturbed by this section's mere physical
+// presence in the source text (cfg strips it from the AST, not from the
+// file's line count). The `#[hdk_entry_types]` / `#[hdk_link_types]` macros
+// also do not honor a `#[cfg]` on an individual variant (they consume the
+// token stream before rustc's cfg-stripping reaches their generated code),
+// so `EntryTypes` / `LinkTypes` / `validate` are each declared TWICE — once
+// above (feature OFF, `#[cfg(not(feature = "lineage-witness"))]` combined
+// onto their existing attribute line so it adds zero lines) and once here
+// (feature ON) — rather than as one shared item with a cfg'd variant.
+// =============================================================================
+
+/// Maximum proofs carried by one witness (head-plane bundling budget, §3).
+#[cfg(feature = "lineage-witness")]
+pub const WITNESS_BATCH: usize = 16;
+
+/// DNA properties this integrity zome reads via `dna_info()`.
+///
+/// `lineage` is the list of predecessor DNA hashes this DNA declares as its
+/// parents. Because properties fold into the DNA hash, the DNA's own identity
+/// commits to its lineage and every peer agrees on it without consulting
+/// anything off-chain.
+///
+/// Unknown keys are ignored, so this coexists with the bootstrap-steward
+/// `progenitor_pubkey` property in the same properties map.
+#[cfg(feature = "lineage-witness")]
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct LineageProperties {
+    #[serde(default)]
+    pub lineage: Vec<DnaHash>,
+    #[serde(default)]
+    pub constitution_root: Option<String>,
+}
+
+/// One notarization carried forward from a predecessor DNA.
+#[cfg(feature = "lineage-witness")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CarriedProof {
+    /// The predecessor action, embedded verbatim (0.7 `Action { header, data }`).
+    pub action: Action,
+    /// The predecessor author's signature over `action`.
+    pub signature: Signature,
+    /// The entry bytes — present ONLY for held-carry (§2.2), where the carrier
+    /// is not the author and therefore cannot re-create the entry natively.
+    pub entry: Option<Entry>,
+}
+
+/// A witnessed carriage: proofs from ONE predecessor DNA.
+#[cfg(feature = "lineage-witness")]
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct NotarizationWitness {
+    /// The predecessor DNA these proofs were witnessed in. MUST be declared in
+    /// this DNA's `lineage` property.
+    pub lineage_dna_hash: DnaHash,
+    /// The carried proofs (<= `WITNESS_BATCH`).
+    pub proofs: Vec<CarriedProof>,
+}
+
+// --- feature-ON EntryTypes: the pristine 6 variants PLUS the witness, ------
+// appended LAST so existing entry-def indices are stable.
+#[cfg(feature = "lineage-witness")]
+#[hdk_entry_types]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    NodeRegistration(NodeRegistration),
+    NodeHeartbeat(NodeHeartbeat),
+    HealthAttestation(HealthAttestation),
+    CustodianAssignment(CustodianAssignment),
+    StringAnchor(StringAnchor),
+    ShardAssignment(ShardAssignment),
+    NotarizationWitness(NotarizationWitness),
+}
+
+// --- feature-ON LinkTypes: the pristine 12 variants PLUS EntryToWitness. --
+#[cfg(feature = "lineage-witness")]
+#[hdk_link_types]
+pub enum LinkTypes {
+    // Node discovery
+    RegionToNode,              // Anchor(region) -> NodeRegistration
+    StatusToNode,              // Anchor(status) -> NodeRegistration
+    TierToNode,                // Anchor(steward_tier) -> NodeRegistration
+    IdToNodeRegistration,      // Anchor(node_id) -> NodeRegistration (for lookups by ID)
+    CustodianToNode,           // Anchor(custodian="available") -> NodeRegistration (nodes opted-in)
+
+    // Health tracking
+    NodeToHeartbeat,           // NodeRegistration -> NodeHeartbeat (latest)
+    NodeToAttestations,        // NodeRegistration -> HealthAttestation (all)
+
+    // Custodian assignments
+    ContentToAssignment,       // Anchor(content_id) -> CustodianAssignment
+    NodeToAssignment,          // NodeRegistration -> CustodianAssignment (what node custodies)
+
+    // Shard assignments
+    ContentToShardAssignment,   // Anchor(content_hash) -> ShardAssignment
+    CustodianToShardAssignment, // Anchor(custodian_did) -> ShardAssignment
+    ShardIndexToAssignment,     // Anchor(content_hash:shard_index) -> ShardAssignment
+
+    // Lineage / notarization carrying
+    EntryToWitness,             // EntryHash(carried entry) -> NotarizationWitness
+}
+
+// --- feature-ON validate(): pristine rules PLUS the witness rules. --------
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        // --- NotarizationWitness (Holochain Evolution Epic §2) --------------
+        // Both the StoreEntry and StoreRecord ops are matched, as upstream's
+        // MigrationRecord does, so the rule holds for every authority.
+        FlatOp::CreateEntry(OpEntry::CreateEntry {
+            app_entry: EntryTypes::NotarizationWitness(witness),
+            ..
+        })
+        | FlatOp::CreateRecord(OpRecord::CreateEntry {
+            app_entry: EntryTypes::NotarizationWitness(witness),
+            ..
+        }) => validate_notarization_witness(&witness),
+
+        // (4a) a witness can never be updated.
+        FlatOp::CreateEntry(OpEntry::UpdateEntry {
+            app_entry: EntryTypes::NotarizationWitness(_),
+            ..
+        })
+        | FlatOp::CreateRecord(OpRecord::UpdateEntry {
+            app_entry: EntryTypes::NotarizationWitness(_),
+            ..
+        })
+        | FlatOp::Update(OpUpdate::Entry {
+            app_entry: EntryTypes::NotarizationWitness(_),
+            ..
+        }) => Ok(ValidateCallbackResult::Invalid(
+            "NotarizationWitness entries cannot be updated".to_string(),
+        )),
+
+        // (4b) a witness can never be deleted. The flattened delete ops carry
+        // only the Delete action, so the deleted action is resolved with
+        // `must_get_action` (HDI-legal) to learn its entry type.
+        FlatOp::Delete(OpDelete { ref action }) => {
+            refuse_witness_delete(&action.data.deletes_address)
+        }
+        FlatOp::CreateRecord(OpRecord::DeleteEntry { ref action }) => {
+            refuse_witness_delete(&action.data.deletes_address)
+        }
+
+        // --- pre-existing rules --------------------------------------------
+        FlatOp::CreateEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
+            OpEntry::UpdateEntry { app_entry, .. } => validate_create_entry(&app_entry),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+        // TODO: Add link validation (e.g., verify link targets are valid entry types)
+        FlatOp::Link(OpLink::CreateLink { .. }) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::DeleteLink { .. }) => Ok(ValidateCallbackResult::Valid),
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Refuse a delete whose target is a `NotarizationWitness`.
+#[cfg(feature = "lineage-witness")]
+fn refuse_witness_delete(deletes_address: &ActionHash) -> ExternResult<ValidateCallbackResult> {
+    let deleted = must_get_action(deletes_address.clone())?;
+    if let Some(EntryType::App(app_entry_def)) = deleted.action().entry_type() {
+        let witness: ScopedEntryDefIndex = (&UnitEntryTypes::NotarizationWitness).try_into()?;
+        if app_entry_def.zome_index == witness.zome_index
+            && app_entry_def.entry_index == witness.zome_type
+        {
+            return Ok(ValidateCallbackResult::Invalid(
+                "NotarizationWitness entries cannot be deleted".to_string(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate a carried notarization, per spec §2.
+///
+/// 1. `lineage_dna_hash` is declared in this DNA's `lineage` property.
+/// 2. every proof's signature verifies against `Action::signer()` — NOT the
+///    author: a `CloseChain` toward `MigrationTarget::Agent` is signed by the
+///    NEW key, which is exactly the semantics `holochain_keystore`'s
+///    `action_signer()` uses when the conductor signs and verifies actions.
+/// 3. when `entry` is carried (held-carry), it must hash to the entry hash the
+///    carried action commits to.
+#[cfg(feature = "lineage-witness")]
+fn validate_notarization_witness(
+    witness: &NotarizationWitness,
+) -> ExternResult<ValidateCallbackResult> {
+    // (1) lineage — read from the DNA's own identity-bearing properties.
+    let properties: LineageProperties =
+        dna_info()?.modifiers.properties.try_into().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "NotarizationWitness: could not deserialize DNA properties: {e:?}"
+            )))
+        })?;
+
+    if !properties.lineage.contains(&witness.lineage_dna_hash) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "NotarizationWitness lineage_dna_hash {} is not declared in this DNA's lineage property",
+            witness.lineage_dna_hash
+        )));
+    }
+
+    if witness.proofs.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "NotarizationWitness must carry at least one proof".to_string(),
+        ));
+    }
+
+    if witness.proofs.len() > WITNESS_BATCH {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "NotarizationWitness carries {} proofs, exceeding WITNESS_BATCH {}",
+            witness.proofs.len(),
+            WITNESS_BATCH
+        )));
+    }
+
+    for (i, proof) in witness.proofs.iter().enumerate() {
+        // (2) the predecessor notarization itself.
+        if !verify_signature(
+            proof.action.signer().clone(),
+            proof.signature.clone(),
+            &proof.action,
+        )? {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "NotarizationWitness proof {i}: carried signature does not verify against the \
+                 action's signer {}",
+                proof.action.signer()
+            )));
+        }
+
+        // (3) held-carry: the carried entry must be the one the action commits to.
+        if let Some(entry) = &proof.entry {
+            let Some(expected) = proof.action.entry_hash() else {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "NotarizationWitness proof {i}: an entry was carried but the action \
+                     references no entry hash"
+                )));
+            };
+            let actual = hash_entry(entry.clone())?;
+            if &actual != expected {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "NotarizationWitness proof {i}: carried entry hashes to {actual}, but the \
+                     action commits to {expected}"
+                )));
+            }
         }
     }
 

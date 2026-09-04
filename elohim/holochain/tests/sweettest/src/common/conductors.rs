@@ -174,3 +174,28 @@ async fn single_agent_conductor_isolated(
 
 // Re-export for tests that need direct access to the agent helper.
 pub use holochain::sweettest::SweetAgents;
+
+/// Load a DNA bundle from an EXPLICIT path, with caller-supplied properties.
+///
+/// [`load_dna`] resolves a DNA by name through [`dna_path`] and can only encode
+/// the bootstrap-steward property shape. Lineage tests need two DIFFERENT
+/// artifacts of the same DNA (a predecessor copied aside before an integrity
+/// change, and the freshly built successor) and need to declare arbitrary
+/// properties — notably `lineage`, which folds into the successor's DNA hash.
+///
+/// Properties are passed as already-encoded [`SerializedBytes`] so the caller
+/// owns the shape; `None` leaves the bundle's own properties in place.
+pub async fn load_dna_from_path(
+    path: &std::path::Path,
+    network_seed: &str,
+    properties: Option<SerializedBytes>,
+) -> Result<DnaFile> {
+    let bytes = std::fs::read(path)?;
+    let bundle = DnaBundle::unpack(bytes.as_slice())?;
+    let modifiers = DnaModifiersOpt {
+        network_seed: Some(network_seed.to_string()),
+        properties,
+    };
+    let (dna_file, _dna_hash) = bundle.into_dna_file(modifiers).await?;
+    Ok(dna_file)
+}

@@ -8,6 +8,10 @@ pub use node_registry_integrity::{
     EntryTypes, LinkTypes,
 };
 
+// Gated behind `lineage-witness` — see node_registry_integrity's Cargo.toml.
+#[cfg(feature = "lineage-witness")]
+pub use node_registry_integrity::{NotarizationWitness, CarriedProof, LineageProperties, WITNESS_BATCH};
+
 pub mod shape;
 pub use shape::{NodeShapeInput, register_node_shape};
 
@@ -1248,4 +1252,109 @@ fn calculate_expiration(days: i64) -> ExternResult<String> {
     let now = sys_time()?;
     let expiration = now.as_micros() + (days * 24 * 60 * 60 * 1_000_000);
     Ok(format!("{}", expiration))
+}
+
+// ============================================================================
+// LINEAGE / MIGRATION HELPERS (Holochain Evolution Epic — probes A & B)
+//
+// Spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md §2
+//
+// These three externs are DNA-hash-NEUTRAL: they live in the coordinator zome,
+// which is not covered by the DNA hash (integrity zomes + modifiers only).
+// They exist so a v1 cell can hand its own notarizations (action + signature)
+// to a v2 cell, and so a chain-switch can be driven from a test/agent.
+// ============================================================================
+
+/// Read one of THIS agent's own actions off the local source chain, signed.
+///
+/// Local-only by construction (`query`), so it never waits on the network and
+/// is deterministic in a single-conductor test. Returns `None` when the hash
+/// is not on this chain.
+#[hdk_extern]
+pub fn get_signed_action(action_hash: ActionHash) -> ExternResult<Option<SignedActionHashed>> {
+    let records = query(ChainQueryFilter::new().include_entries(false))?;
+    Ok(records
+        .into_iter()
+        .find(|r| r.action_address() == &action_hash)
+        .map(|r| r.signed_action))
+}
+
+/// Close this chain toward a successor DNA. Returns the real `CloseChain`
+/// action hash, which the successor's `open_chain` must name.
+#[hdk_extern]
+pub fn close_chain_for(dna_hash: DnaHash) -> ExternResult<ActionHash> {
+    close_chain(Some(MigrationTarget::Dna(dna_hash)))
+}
+
+/// Record on THIS chain which DNA it migrated from, naming the predecessor's
+/// `CloseChain` action hash. Holochain does not constrain when this is
+/// committed — probe B measures whether a LATE open_chain is accepted.
+#[hdk_extern]
+pub fn open_chain_from(input: (DnaHash, ActionHash)) -> ExternResult<ActionHash> {
+    let (prev_dna_hash, close_hash) = input;
+    open_chain(MigrationTarget::Dna(prev_dna_hash), close_hash)
+}
+
+// ============================================================================
+// NOTARIZATION CARRYING (Holochain Evolution Epic §2)
+//
+// Gated behind `lineage-witness` — these externs create/read the gated
+// NotarizationWitness entry and EntryToWitness link, so they cannot compile
+// (let alone run) when the integrity zome was built without the feature.
+// ============================================================================
+
+/// Commit a batch of predecessor notarizations into THIS DNA.
+///
+/// The integrity zome re-verifies every carried signature against the carried
+/// action's `signer()`, and refuses the witness if `lineage_dna_hash` is not
+/// declared in this DNA's `lineage` property. On acceptance one link is created
+/// per proof, from the carried entry hash to the witness, so a v2 reader can
+/// ask "what predecessor notarizations exist for this entry hash?".
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn commit_witness(witness: NotarizationWitness) -> ExternResult<ActionHash> {
+    let entry_hashes: Vec<EntryHash> = witness
+        .proofs
+        .iter()
+        .filter_map(|p| p.action.entry_hash().cloned())
+        .collect();
+
+    let action_hash = create_entry(EntryTypes::NotarizationWitness(witness))?;
+
+    for entry_hash in entry_hashes {
+        create_link(
+            entry_hash,
+            action_hash.clone(),
+            LinkTypes::EntryToWitness,
+            (),
+        )?;
+    }
+
+    Ok(action_hash)
+}
+
+/// Every witness carrying a predecessor notarization for this entry hash.
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn get_witnesses_for(entry_hash: EntryHash) -> ExternResult<Vec<Link>> {
+    let query = LinkQuery::try_new(entry_hash, LinkTypes::EntryToWitness)?;
+    get_links(query, GetStrategy::default())
+}
+
+/// This agent's own chain activity as the local authority sees it.
+///
+/// `close_chain` is NOT an authoring-time guard: `ActionAfterChainClose` is
+/// enforced in the sys-validation workflow (`register_agent_activity`), i.e. by
+/// the agent-activity AUTHORITY, not by the source chain. So a post-close
+/// commit still returns an `ActionHash` locally; the refusal shows up here, in
+/// `rejected_activity` / `status`. Probe B measures exactly that.
+#[hdk_extern]
+pub fn my_chain_activity(_: ()) -> ExternResult<AgentActivityStatus> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    get_agent_activity(
+        agent,
+        ChainQueryFilter::new(),
+        ActivityRequest::Full,
+        GetOptions::local(),
+    )
 }

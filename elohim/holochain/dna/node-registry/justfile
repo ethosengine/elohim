@@ -52,3 +52,12 @@ wasm: build
 # Build WASM + pack DNA
 pack: build
     hc dna pack . -o {{dna_name}}.dna
+
+# Build the `lineage-witness` feature variant (Holochain Evolution Epic §2:
+# NotarizationWitness entry type + EntryToWitness link, off by default so the
+# plain `build`/`pack` recipes above stay DNA-hash-neutral) and pack it to
+# node-registry-v2.dna — the successor artifact `happ_lineage_migration.rs`
+# reads via NODE_REGISTRY_V2_DNA (or the in-repo default).
+build-witness:
+    cargo build --release --target {{wasm_target}} --features lineage-witness
+    hc dna pack . -o node-registry-v2.dna
