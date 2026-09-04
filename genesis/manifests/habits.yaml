@@ -2479,6 +2479,42 @@ habits:
       legs and gate) so that the shell component and the runtime path are one rendering path — the
       habit then describes the runtime, not an Angular component.
 
+  - id: hosted-human-lifecycle
+    invariant: >
+      A hosted human's account at a doorway is their own from the portal forward and gone when
+      they close it: registering through the portal yields the display name they typed and a
+      cell of their own on a pool conductor (never a shared one), and closing through the portal
+      leaves no session, no cell on any pool conductor, and no active account row — so the
+      whole hosted stage can be walked end to end from the UI and leave the deployment as it
+      was found.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:hosted-human-lifecycle (genesis/a2o/features/auth/hosted-human/05-leaving.feature — @browser-only @act:i; authority is the household lane: `just test mesh features/auth/hosted-human/05-leaving.feature`; on a deployed doorway run with ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml A2O_ALLOW_DESTRUCTIVE=0 — the story creates and removes its own human, so it is safe on a shared fleet)"
+    evidence: >
+      DELTA 2026-09-04 (DECLARED red — the check exists and measures nothing passing): baseline against https://doorway-alpha.elohim.host — a
+      fresh POST /auth/register answered with the operator's own Human profile (display name, bio,
+      affinities), because every deployed doorway runs DEV_MODE=true and the hosted branch skips
+      provisioning under it, recovering the singleton conductor's existing Human. No self-service
+      close exists (only an admin soft-delete of the credential row; no cell reclaim, no session
+      end). The feature file is written and parses (cucumber --dry-run 2026-09-04); every scenario is @wip until the step definitions land, so the check currently reports 0 passed — red on evidence, not intention.
+    first_move: >
+      Land the step definitions and the close-account route so the @wip scenarios execute and
+      this habit measures red on a real run, then move the register/login provisioning
+      gate off `dev_mode` so a registrant gets their own cell (the red that the 2026-09-04
+      baseline observed: a fresh registration on alpha answered with the operator's profile).
+    refs:
+      - "genesis/docs/superpowers/plans/2026-09-04-hosted-human-lifecycle-e2e-plan.md (the plan; P2P gate output in §2)"
+      - "genesis/a2o/features/browser/doorway-portal-login.feature (the sign-in station this story reuses)"
+      - "genesis/a2o/features/auth/agency-pipeline-coherence.feature (the account-page agency pipeline this story asserts at 'Hosted')"
+      - "doorway/doorway-service/src/routes/auth_routes.rs (register/login; provisioning gated on dev_mode today)"
+      - "doorway/doorway-service/src/conductor/provisioner.rs (provision_agent / deprovision_agent — the reclaim primitive already exists)"
+    retire-when: >
+      when account closure is a notarized, peer-witnessed governance action whose effect on the
+      hosting doorway is reconciled by the substrate (the doorway reads "closed" from the DHT and
+      reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
+      and the practice under watch has become a property of the substrate.
+
   - id: runtime-death-witnessed
     invariant: >
       A supervised child's death is witnessed by the runtime that was its parent: its exit class,
@@ -2867,11 +2903,31 @@ habits:
       `manifest_schema_invalid` or `conductor_unavailable`; and `readV1Export` refuses a baseline that hit
       its page cap, because a PREFIX of the chain would silently make every "untouched" and
       `carried == v1Count` comparison compare the wrong set.
+
+      DELTA 2026-09-04 (risk discipline; no status move): four scale risks read off the landed code and filed as
+      rows 1–4 of `genesis/data/timeline/backlog/arch-scale-risk-backlog.md` (tag `risk`, CONVENTIONS §Risks), carried
+      here as `guard:` R1–R4 and as `inject` pointers at `elohim/holochain/dna/.epr-meta` and the elohim-storage
+      manifest. None is measured by r15/r16 (node_registry, tens of records); the first live measure is a lamad-scale
+      run, and the receipts need elapsed / catch-up minutes / RSS before that run means anything.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (ladder row 6)"
       - "upstream kernel: elohim/holochain-conductor/crates/holochain/tests/tests/migration.rs (chain-switch, #5842)"
+    guard: >
+      Risk R1–R4 (scale; measured from CODE on 2026-09-04, not yet from a run — rows 1–4 of
+      genesis/data/timeline/backlog/arch-scale-risk-backlog.md). Every station can be green on
+      node_registry (tens of records, three peers) while all four are live, because none has a
+      trigger below ~3k entries: R1 the export re-walks and re-digests the WHOLE chain per 64-record
+      page (≈N²/64); R2 witness validation walks the carrier's whole activity per witness (O(W²) per
+      validator, worse after Tasks 21–23 add couriers); R3 chains ≈×1.06 per migration, never pruned,
+      and the held-carry fans out ∝ peers × records (≈110 min per courier for 3.5k records at
+      16/30 s); R4 dual cells ≈×2 conductor RAM for the whole window on a tier that already hit
+      ~14 GB overnight. Retire-when names three ALPHA crossings and lamad is the first role that
+      exercises R1/R2 — so a green here on the rehearsal DNA is necessary and NOT sufficient, and
+      the Station 3/5/8 receipts must carry elapsed, catch-up minutes and RSS before the first lamad
+      crossing is scheduled. R1 and R5 retire coordinator-side (hash-neutral); R2 is an integrity
+      change and rides the sunset-hardening crossing.
     retire-when: >
       when three consecutive integrity changes reach the alpha fleet through their release channel
       with every witness verified and zero records re-seeded from outside, each with its cycle-time
