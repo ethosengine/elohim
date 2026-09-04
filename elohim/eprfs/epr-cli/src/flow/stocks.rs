@@ -92,17 +92,24 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use cid::Cid;
-use elohim_epr::measure::Period;
+// Re-exported: `parse_period` returns one and `parse_window` takes one, so a caller that uses
+// this module's own API cannot name the type it needs without it.
+pub use elohim_epr::measure::Period;
 use elohim_epr_rea::{
-    atom_cid, stock_over_window_within, AgentRef, Commitment, CommitmentState, FlowEvent,
-    FlowRecord, FlowStore, Magnitude, PinnedRef, ReaVerb, SidecarFlowStore, Stock, StockError,
-    Window, Within,
+    atom_cid, stock_over_window_within, AgentRef, AlgedonicKind, Commitment, CommitmentState,
+    FlowEvent, FlowRecord, FlowStore, Magnitude, PinnedRef, ReaVerb, SidecarFlowStore, Stock,
+    StockError, Window, Within,
 };
 use serde::Serialize;
 
+use super::project::WIP_FENCE_UNIT;
 use super::{
     producing_commit, repo_agent, repo_scope_atom, FlowError, FlowResult, Labels, REPO_AGENT,
 };
+
+/// The slot-0 tag on the WIP fence commitment `project` mints. One constant names the promise
+/// and finds it again, so the minting leg and the reading leg cannot drift on the spelling.
+const WIP_FENCE_TAG: &str = "register:wip-fence";
 
 /// The unit every derived commitment-stock event is counted in.
 ///
@@ -577,6 +584,16 @@ pub enum EquilibriumVerdict {
     Filling,
     /// No verdict was reachable. Fail-closed.
     Refused { reason: RefusalReason },
+    /// A BOUNDED stock inside its declared band. The analog of [`Self::Draining`] for a stock
+    /// whose level is projected rather than folded: nothing is flowing to compare, and the
+    /// bound's question — "is the level admissible" — is answered yes.
+    WithinBound,
+    /// The band edge is crossed and the limit is not: the signal BEFORE the line. It warns and
+    /// does not refuse, because a fence that failed on approach would be a fence at the band
+    /// edge, which is not the number anyone declared.
+    AtBandEdge,
+    /// The limit itself is crossed.
+    OverBound,
 }
 
 /// Why no verdict was reachable — typed, so `--check`'s non-zero exit can say which absence it
@@ -614,8 +631,15 @@ impl RefusalReason {
 
 impl EquilibriumVerdict {
     /// Does this verdict let `--check` exit 0? Only `Draining` does.
+    /// What `--check` passes on. A bounded stock passes inside its band AND at the band edge —
+    /// an approach is a warning, and the number that refuses is the limit.
     pub fn is_equilibrium(&self) -> bool {
-        matches!(self, EquilibriumVerdict::Draining)
+        matches!(
+            self,
+            EquilibriumVerdict::Draining
+                | EquilibriumVerdict::WithinBound
+                | EquilibriumVerdict::AtBandEdge
+        )
     }
 
     pub fn word(&self) -> &'static str {
@@ -623,6 +647,9 @@ impl EquilibriumVerdict {
             EquilibriumVerdict::Draining => "DRAINING",
             EquilibriumVerdict::Filling => "FILLING",
             EquilibriumVerdict::Refused { .. } => "REFUSED",
+            EquilibriumVerdict::WithinBound => "WITHIN-BOUND",
+            EquilibriumVerdict::AtBandEdge => "AT-BAND-EDGE",
+            EquilibriumVerdict::OverBound => "OVER-BOUND",
         }
     }
 }
@@ -682,14 +709,22 @@ pub fn equilibrium_verdict(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StockName {
     Commitments,
+    /// The habits the register declares `active: true`, judged against the WIP fence's Bound.
+    ///
+    /// A different KIND of stock from `commitments`, and the difference is the point: its level
+    /// is a PROJECTION read from the register at read time, not a fold over events. So it has no
+    /// inflow and no outflow to compare, and the question it answers is not "is the drain
+    /// adequate" but "is the level admissible" — which is what a bound is for.
+    ActiveHabits,
 }
 
 impl StockName {
     pub fn parse(raw: &str) -> FlowResult<Self> {
         match raw.trim() {
             "commitments" => Ok(StockName::Commitments),
+            "active-habits" => Ok(StockName::ActiveHabits),
             other => Err(FlowError::InvalidArguments(format!(
-                "unknown stock `{other}` — the set is: commitments"
+                "unknown stock `{other}` — the set is: commitments|active-habits"
             ))),
         }
     }
@@ -697,12 +732,14 @@ impl StockName {
     pub fn label(self) -> &'static str {
         match self {
             StockName::Commitments => "commitments",
+            StockName::ActiveHabits => "active-habits",
         }
     }
 
     pub fn unit(self) -> &'static str {
         match self {
             StockName::Commitments => COMMITMENT_UNIT,
+            StockName::ActiveHabits => WIP_FENCE_UNIT,
         }
     }
 }
@@ -757,6 +794,33 @@ pub struct StockReport {
     pub undated_discharges: usize,
     pub discharges_of_unheld: usize,
     pub redundant_discharges: usize,
+    /// A projected level judged against a declared [`Bound`]. `None` for every event-derived
+    /// stock, and skipped on the wire, so the `commitments` payload is byte-identical to the one
+    /// emitted before bounded stocks existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bound: Option<BoundReading>,
+}
+
+/// A level read from a register, and the band it was judged in.
+///
+/// Every field a reader needs to disagree with the verdict is here — the level, the limit, the
+/// band edge, the promise the limit came from, and where the level itself was read. A bound
+/// verdict with no basis is an assertion.
+#[derive(Debug, Clone, Serialize)]
+pub struct BoundReading {
+    pub level: f64,
+    pub limit: f64,
+    pub band_edge: f64,
+    pub unit: String,
+    /// The fence commitment whose `Bound` this level was judged against — the promise, by
+    /// address, so the verdict can be traced to the thing that declared it.
+    pub bound_ref: String,
+    /// `algedonic-approach` at the band edge, `algedonic-breach` past the limit, absent inside
+    /// the band. The vocabulary is [`elohim_epr_rea::AlgedonicKind`]'s, not a second one.
+    pub signal: Option<String>,
+    /// Where the level came from. Stated because it is NOT event-derived, and a reader who
+    /// assumed it was would draw a rate out of it.
+    pub level_basis: String,
 }
 
 /// The whole readout.
@@ -764,7 +828,8 @@ pub struct StockReport {
 pub struct StocksOutcome {
     pub window: WindowView,
     pub stocks: Vec<StockReport>,
-    /// True only when **every** stock's verdict is `Draining`. This is what `--check` exits on.
+    /// True only when **every** stock's verdict passes: `Draining` for a folded stock, inside
+    /// the band (or at its edge) for a bounded one. This is what `--check` exits on.
     pub equilibrium: bool,
 }
 
@@ -827,6 +892,21 @@ impl StocksOutcome {
                     stock.discharges_of_unheld, stock.redundant_discharges
                 );
             }
+            if let Some(bound) = &stock.bound {
+                println!("    level:    {:.0} {}", bound.level, bound.unit);
+                println!(
+                    "    band:     limit {:.0}, band edge {:.0} (ceiling — the fabric breaches \
+                     at level >= limit)",
+                    bound.limit, bound.band_edge
+                );
+                println!("    verdict:  {}", stock.verdict.word());
+                match &bound.signal {
+                    Some(signal) => println!("    signal:   {signal}"),
+                    None => println!("    signal:   none (inside the band)"),
+                }
+                println!("    bound:    {}", bound.bound_ref);
+                println!("    basis:    {}", bound.level_basis);
+            }
             println!(
                 "    outflow arm: fulfillment only — Dismiss is a regression marker (empty \
                  `fulfills`) and no path mints a Revoked commitment"
@@ -865,10 +945,16 @@ pub fn stocks(root: &Path, window: &Window, names: &[StockName]) -> FlowResult<S
 
     let mut reports = Vec::with_capacity(names.len());
     for name in names {
-        let view = match name {
-            StockName::Commitments => derive_commitment_view(root, &labels, &records)?,
+        let report = match name {
+            StockName::Commitments => {
+                let view = derive_commitment_view(root, &labels, &records)?;
+                report(*name, &view, window, name.unit())
+            }
+            // Not folded. Its level is read, and the window is irrelevant to it — which the
+            // reading says out loud rather than leaving a reader to infer from a missing rate.
+            StockName::ActiveHabits => active_habits_report(root, &records),
         };
-        reports.push(report(*name, &view, window, name.unit()));
+        reports.push(report);
     }
 
     Ok(StocksOutcome {
@@ -881,6 +967,116 @@ pub fn stocks(root: &Path, window: &Window, names: &[StockName]) -> FlowResult<S
         equilibrium: reports.iter().all(|r| r.verdict.is_equilibrium()),
         stocks: reports,
     })
+}
+
+/// The WIP fence reading: a PROJECTED level from the habit register, judged against the Bound
+/// the fence commitment declares.
+///
+/// Two refusals, and both are the same principle this whole leg exists for — an absence must
+/// never read as a zero. An unreadable register is not a repository with no active habits, and a
+/// missing fence commitment is not a repository with no limit; both are "we cannot see it", and
+/// `--check` must go non-zero on either.
+///
+/// The bound is READ from the commitment rather than restated here. The promise is the authority
+/// on its own limit; a constant in this function would be a second declaration of it, free to
+/// drift from the one the projection minted.
+fn active_habits_report(root: &Path, records: &[(Cid, FlowRecord)]) -> StockReport {
+    let name = StockName::ActiveHabits;
+    let refused = |kind: &'static str, error: String| StockReport {
+        stock: name.label().to_string(),
+        unit: name.unit().to_string(),
+        verdict: EquilibriumVerdict::Refused {
+            reason: RefusalReason::FoldRefused { kind, error },
+        },
+        measures: None,
+        observed_in_window: 0,
+        excluded_by_unit: 0,
+        undated_mints: 0,
+        undated_discharges: 0,
+        discharges_of_unheld: 0,
+        redundant_discharges: 0,
+        bound: None,
+    };
+
+    let habits = match super::registers::read_habits(root) {
+        Ok(habits) => habits,
+        Err(error) => {
+            return refused(
+                "register-unreadable",
+                format!(
+                    "{error} — an unreadable register is not a repository with zero active habits"
+                ),
+            )
+        }
+    };
+    let level = habits.iter().filter(|habit| habit.active).count() as f64;
+
+    let fence = records.iter().find_map(|(cid, record)| match record {
+        FlowRecord::Commitment(commitment)
+            if commitment.state == CommitmentState::Active
+                && commitment
+                    .resource_spec
+                    .classified_as
+                    .first()
+                    .map(String::as_str)
+                    == Some(WIP_FENCE_TAG) =>
+        {
+            commitment.bound.as_ref().map(|bound| (*cid, bound))
+        }
+        _ => None,
+    });
+    let Some((fence_cid, bound)) = fence else {
+        return refused(
+            "no-fence-commitment",
+            "no active `register:wip-fence` commitment carries a bound — run `epr flow project` \
+             to mint it from the habits covenant"
+                .to_string(),
+        );
+    };
+
+    let (verdict, signal) = if bound.breached_by(level) {
+        (
+            EquilibriumVerdict::OverBound,
+            Some(AlgedonicKind::Breach.as_str().to_string()),
+        )
+    } else if bound.approached_by(level) {
+        (
+            EquilibriumVerdict::AtBandEdge,
+            Some(AlgedonicKind::Approach.as_str().to_string()),
+        )
+    } else {
+        (EquilibriumVerdict::WithinBound, None)
+    };
+
+    StockReport {
+        stock: name.label().to_string(),
+        unit: name.unit().to_string(),
+        verdict,
+        // Deliberately absent. A projected level has no inflow and no outflow, and a zero in
+        // either slot would be read as a measured rate of nothing happening.
+        measures: None,
+        observed_in_window: 0,
+        excluded_by_unit: 0,
+        undated_mints: 0,
+        undated_discharges: 0,
+        discharges_of_unheld: 0,
+        redundant_discharges: 0,
+        bound: Some(BoundReading {
+            level,
+            limit: bound.limit,
+            band_edge: bound.band_edge(),
+            unit: bound.unit.clone(),
+            bound_ref: fence_cid.to_string(),
+            signal,
+            level_basis: format!(
+                "projected level: {} of {} habits in {} carry `active: true`, counted at read \
+                 time — not event-derived, so the declared window does not bear on it",
+                level,
+                habits.len(),
+                super::registers::HABITS_REGISTER_REL
+            ),
+        }),
+    }
 }
 
 /// Fold one derived view and build its report.
@@ -948,6 +1144,8 @@ pub fn report(name: StockName, view: &DerivedView, window: &Window, unit: &str) 
         undated_discharges: view.undated_discharges,
         discharges_of_unheld: view.discharges_of_unheld,
         redundant_discharges: view.redundant_discharges,
+        // A folded stock is judged by its rates, not by a declared ceiling.
+        bound: None,
     }
 }
 

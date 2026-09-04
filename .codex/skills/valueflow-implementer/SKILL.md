@@ -20,4 +20,8 @@ Keep history append-only. Never amend or rewrite an existing commit. If an in-sc
 
 Write the task report using exactly one of five statuses: `DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`, or `HOLD`. Include a mandatory gate-evidence line quoting the gate command and its `EXIT=` line, plus the scoped commits and any concerns. Evidence pasted into the report is the durable witness for transient test states.
 
+## Brief and report frontmatter
+
+Every `task-*-brief.md` carries `gap: <gap-id>` and `actor: agent:<role>@<model>` in YAML frontmatter. Every `task-*-report.md` carries those same fields plus `status: DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED|HOLD` and optional `commits: [sha, ...]`. The PostToolUse observer mints the claim or fulfilment when the file is written (and an observation note for a non-discharging status). The seat's terminal verb is therefore a no-op fallback when the observer already recorded it.
+
 End the seat by executing exactly one terminal valueflow verb. For `DONE` or `DONE_WITH_CONCERNS`, execute `epr flow fulfill --on <gap-id> --report <path> --status <DONE|DONE_WITH_CONCERNS> --as agent:implementer@<model>`. For `NEEDS_CONTEXT`, `BLOCKED`, or `HOLD`, execute `epr flow note --on <gap-id> --kind observation --reason '<status and blocker>' --as agent:implementer@<model>`. Never execute both.

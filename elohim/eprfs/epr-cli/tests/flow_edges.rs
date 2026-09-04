@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
-use elohim_epr_cli::flow::{claim, context, fulfill, ledger, note, project, seal, walk};
+use elohim_epr_cli::flow::{claim, context, fulfill, ledger, note, project, seal, stocks, walk};
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use tempfile::TempDir;
 
@@ -525,6 +525,12 @@ recipes:
 "#,
     );
 
+    // The covenant is what the WIP fence is scoped to — the document that declares the limit.
+    write(
+        root,
+        ".epr-meta/habits-covenant.md",
+        "# Habits covenant\n\nMax 2 active. Flips require evidence.\n",
+    );
     write(
         root,
         ".epr-meta/dev-system-equilibrium.habit.md",
@@ -1321,4 +1327,157 @@ fn a_ledger_on_an_atom_with_no_history_is_empty_rather_than_an_error() {
         result.entries.is_empty(),
         "no history is an empty ledger, not a refusal"
     );
+}
+
+// ── the WIP fence as a bounded commitment ────────────────────────────────────────────────
+
+fn write_register(root: &Path, active: usize) {
+    let mut yaml = String::from("version: 1\nhabits:\n");
+    for i in 0..3 {
+        yaml.push_str(&format!(
+            "  - id: habit-{i}\n    status: red\n    active: {}\n    checks: []\n    refs: []\n",
+            i < active
+        ));
+    }
+    write(root, "genesis/manifests/habits.yaml", &yaml);
+}
+
+fn fence_reading(root: &Path) -> stocks::StockReport {
+    let window = stocks::parse_window("2026-08-29..2026-09-05", stocks::Period::Day)
+        .expect("a declared window");
+    let outcome =
+        stocks::stocks(root, &window, &[stocks::StockName::ActiveHabits]).expect("stocks runs");
+    outcome.stocks.into_iter().next().expect("one stock")
+}
+
+/// The fence is a PROMISE, not a rule in a script: `epr flow project` mints one Active
+/// commitment carrying the bound, and the stock is judged against that commitment's own Bound.
+#[test]
+fn the_wip_fence_is_projected_as_one_bounded_commitment_and_is_idempotent() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let recipes = root.join(".claude/epr-meta/recipes.yaml");
+
+    let fences: Vec<_> = records(root)
+        .into_iter()
+        .filter_map(|(cid, record)| match record {
+            FlowRecord::Commitment(c)
+                if c.resource_spec.classified_as.first().map(String::as_str)
+                    == Some("register:wip-fence") =>
+            {
+                Some((cid, c))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(fences.len(), 1, "exactly one fence");
+    let (_, fence) = &fences[0];
+    assert_eq!(fence.provider.0, "tool:habits-register");
+    assert_eq!(
+        fence.resource_spec.classified_as,
+        vec![
+            "register:wip-fence".to_string(),
+            "habit:attention".to_string()
+        ]
+    );
+    let bound = fence.bound.as_ref().expect("the fence IS its bound");
+    assert_eq!(bound.limit, 2.0);
+    assert_eq!(bound.unit, "active-habit");
+    assert_eq!(bound.threshold_pct, 50.0);
+    // A ceiling and a declared source are the v1 DEFAULTS and must be encoded as absent —
+    // `Bound::validate` refuses the redundant spellings, because one meaning with two encodings
+    // gives one promise two addresses.
+    assert!(bound.sense.is_none() && bound.source.is_none());
+    assert!(bound.validate().is_ok());
+
+    // Re-projecting appends nothing: identity is the atom address.
+    project::project(root, &recipes).expect("re-project");
+    assert_eq!(
+        records(root)
+            .into_iter()
+            .filter(|(_, r)| matches!(r, FlowRecord::Commitment(c)
+                if c.resource_spec.classified_as.first().map(String::as_str)
+                    == Some("register:wip-fence")))
+            .count(),
+        1,
+        "the fence is idempotent by atom CID"
+    );
+}
+
+#[test]
+fn the_active_habits_level_is_judged_against_the_fence_band_and_check_refuses_over_it() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+
+    // Zero active: inside the band, nothing signalled.
+    write_register(root, 0);
+    let report = fence_reading(root);
+    assert_eq!(report.verdict.word(), "WITHIN-BOUND");
+    assert!(
+        report.verdict.is_equilibrium(),
+        "--check passes inside the band"
+    );
+    let bound = report
+        .bound
+        .as_ref()
+        .expect("a bounded stock carries its reading");
+    assert_eq!(bound.level, 0.0);
+    assert_eq!(bound.limit, 2.0);
+    assert_eq!(bound.band_edge, 1.0);
+    assert!(bound.signal.is_none());
+    assert!(
+        bound.level_basis.contains("projected"),
+        "the level is read from the register, not folded from events; the basis must say so: {}",
+        bound.level_basis
+    );
+    assert!(
+        report.measures.is_none(),
+        "a projected level has no inflow or outflow to report, and inventing a rate is the \
+         over-claim this whole vocabulary exists to prevent"
+    );
+
+    // One active: the band edge — the signal BEFORE the line. Still not a breach.
+    write_register(root, 1);
+    let report = fence_reading(root);
+    assert_eq!(report.verdict.word(), "AT-BAND-EDGE");
+    assert!(
+        report.verdict.is_equilibrium(),
+        "an approach warns; it does not refuse"
+    );
+    assert_eq!(
+        report.bound.as_ref().unwrap().signal.as_deref(),
+        Some("algedonic-approach")
+    );
+
+    // Two and three: the fabric's ceiling is INCLUSIVE (`stock >= limit`), so a limit of 2.0
+    // breaches AT two. See the report's finding on this.
+    for active in [2, 3] {
+        write_register(root, active);
+        let report = fence_reading(root);
+        assert_eq!(report.verdict.word(), "OVER-BOUND", "{active} active");
+        assert!(
+            !report.verdict.is_equilibrium(),
+            "--check must exit non-zero at {active} active"
+        );
+        assert_eq!(
+            report.bound.as_ref().unwrap().signal.as_deref(),
+            Some("algedonic-breach")
+        );
+        assert_eq!(report.bound.as_ref().unwrap().level, active as f64);
+    }
+}
+
+#[test]
+fn an_unreadable_register_or_a_missing_fence_refuses_rather_than_reading_zero() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+
+    std::fs::remove_file(root.join("genesis/manifests/habits.yaml")).unwrap();
+    let report = fence_reading(root);
+    assert_eq!(
+        report.verdict.word(),
+        "REFUSED",
+        "an absent register is not a stock of zero"
+    );
+    assert!(!report.verdict.is_equilibrium());
 }

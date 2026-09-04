@@ -27,6 +27,10 @@ Each verb is one command or one dispatch. Do not combine verbs into an opaque sc
 6. **Rule.** Record a binding decision once with `epr flow note --on <gap-id|plan> --kind ruling --reason '...'`.
 7. **Ratchet.** Append one evidence delta line to the habit atom, then re-project the habit register once.
 
+## Brief and report frontmatter
+
+Every `task-*-brief.md` carries `gap: <gap-id>` and `actor: agent:<role>@<model>` in YAML frontmatter. Every `task-*-report.md` carries those same fields plus `status: DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED|HOLD` and optional `commits: [sha, ...]`. The PostToolUse observer mints the claim or fulfilment when the file is written (and an observation note for a non-discharging status), so a seat's terminal verb becomes a no-op fallback when the observer already recorded it.
+
 ## Do not
 
 - Do not restate constants from the brief, plan, rulings, or repository governance in a dispatch prompt. Pass their addresses and let the seat read them.

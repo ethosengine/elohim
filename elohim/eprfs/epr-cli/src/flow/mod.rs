@@ -646,8 +646,10 @@ fn usage() -> String {
      (omit --session to fall back to CLAUDE_SESSION_ID/ELOHIM_SESSION_ID; \
      an agent-attributed note carries steward:<git-author-email> as its last slot)\n  \
      | stocks --window START..END --per <second|minute|hour|day|week> \
-     [--stock commitments] [--check] [--json] [--root DIR] \
-     (--check exits non-zero when a stock is filling OR when nothing could be measured)\n>"
+     [--stock commitments|active-habits] [--check] [--json] [--root DIR] \
+     (--check exits non-zero when a stock is filling, when a bounded stock is over its limit, \
+     OR when nothing could be measured; active-habits is a PROJECTED level read from \
+     genesis/manifests/habits.yaml and judged against the WIP fence commitment's Bound)\n>"
         .to_string()
 }
 

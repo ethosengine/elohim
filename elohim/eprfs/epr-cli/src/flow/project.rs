@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    atom_cid, AgentRef, Commitment, CommitmentState, FlowEvent, FlowRecord, FlowStore, Intent,
-    Magnitude, PinnedRef, Process, ProcessSpec, ReaVerb, ResourceSpec, SidecarFlowStore,
+    atom_cid, AgentRef, Bound, Commitment, CommitmentState, FlowEvent, FlowRecord, FlowStore,
+    Intent, Magnitude, PinnedRef, Process, ProcessSpec, ReaVerb, ResourceSpec, SidecarFlowStore,
 };
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +18,10 @@ use super::{
     body_cid, body_cid_of_file, cite_path, parse_frontmatter, producing_commit, rel_to_root,
     repo_agent, repo_scope_atom, FlowResult, Labels, REPO_AGENT,
 };
+
+/// What the WIP fence's ceiling is denominated in. Shared with the stock that is judged against
+/// it, so the declaration and the measurement can never name two different things.
+pub const WIP_FENCE_UNIT: &str = "active-habit";
 
 /// Stages whose artifacts are content-addressed doc/scenario resources.
 const RESOURCE_STAGES: &[&str] = &[
@@ -122,6 +126,11 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
     for recipe in &registry.recipes {
         derive_recipe(root, recipe, &repo_scope, &mut deriv)?;
     }
+
+    // The STANDARD plane. Not a recipe stage: the habit register is one file at one path and is
+    // read whether or not any recipe names it, because the WIP fence is a property of the
+    // repository's attention rather than of any one value chain.
+    derive_wip_fence(root, &mut deriv)?;
 
     // Dedupe against the existing sidecar, then append the new records.
     let mut store = SidecarFlowStore::open(root)?;
@@ -644,6 +653,68 @@ fn name_slug(name: &str) -> Option<String> {
     } else {
         Some(trimmed.to_string())
     }
+}
+
+/// The WIP fence, minted as ONE bounded `Commitment` (spec §3 and §12).
+///
+/// The covenant says max two habits may be `active` at once. That was a number a human
+/// remembered; here it becomes a PROMISE with a declared ceiling, so attention allocation is
+/// measured by the same fabric that measures everything else rather than by recollection.
+///
+/// Its scope is the covenant atom itself — the document that declares the fence — so the
+/// commitment hangs off the thing it is accountable to. Nothing mints if either the covenant or
+/// the register is absent: a fence declared over a register that does not exist would be a
+/// promise about nothing.
+///
+/// `sense` and `source` are deliberately `None`. `Ceiling` and `Declared` ARE the v1 defaults,
+/// and `Bound::validate` refuses their redundant explicit spellings, because one meaning with
+/// two encodings gives one promise two content addresses.
+fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
+    let covenant_rel = ".epr-meta/habits-covenant.md";
+    let Some(scope_cid) = body_cid_of_file(&root.join(covenant_rel)) else {
+        return Ok(());
+    };
+    // Reading the register is the precondition, not an input to the promise: the fence's LIMIT
+    // is declared by the covenant, and the register is what will be counted against it.
+    if super::registers::read_habits(root).is_err() {
+        return Ok(());
+    }
+    deriv.label(&scope_cid, covenant_rel);
+
+    let bound = Bound {
+        limit: 2.0,
+        unit: WIP_FENCE_UNIT.to_string(),
+        threshold_pct: 50.0,
+        sense: None,
+        source: None,
+    };
+    bound.validate()?;
+
+    let commitment = Commitment {
+        action: ReaVerb::Produce,
+        provider: AgentRef("tool:habits-register".to_string()),
+        receiver: repo_agent(),
+        resource_spec: ResourceSpec {
+            classified_as: vec![
+                "register:wip-fence".to_string(),
+                "habit:attention".to_string(),
+            ],
+            quantity: None,
+        },
+        in_scope_of: scope_cid,
+        valid_from: None,
+        valid_until: None,
+        state: CommitmentState::Active,
+        satisfies: Vec::new(),
+        bound: Some(bound),
+    };
+    let cid = atom_cid(&commitment)?;
+    deriv.stage_record(
+        FlowRecord::Commitment(commitment),
+        cid,
+        "commitment:wip-fence".to_string(),
+    );
+    Ok(())
 }
 
 fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResult<()> {
