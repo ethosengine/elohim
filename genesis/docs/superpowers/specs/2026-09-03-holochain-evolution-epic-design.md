@@ -87,7 +87,7 @@ And the crux, named last:
 > coupling.
 
 Three planes fall out of those sentences, and each has a home below: **notarization** (§2–§3),
-**authority, the common language, and the cryptographic coupling** (§4, §4.1), **bridge** (§5).
+**authority, the common language, and the cryptographic coupling** (§4, §4.1), **bridge** (§5, §5.1 across many versions and branches).
 §9 is the fork lane.
 
 ## 1. Ground truth this spec stands on (grounded 2026-09-03, four readers)
@@ -323,6 +323,59 @@ it never judges them and holds no authority. Nothing else moves onto a chain.
 - A dual-cell peer's storage runs a **bridge sweep** (the reconcile controller, both cells' signals): new v1 records → held-carry into v2 (§2.2); new v2 records → held-carry into v1 **iff v1 has the witness type** (§2.3; not in the first rehearsal — honest absence, measured at Station 6).
 - Laggards (`lag-within-window`) keep authoring on v1 and keep seeing everything, because the household's dual-cell peers mirror. A `declared fork` is a v1 chain that closes toward a DNA not named in any notarized migration commitment (a branch without a bridge map) — the storage plane sees both networks and files it (the out-of-band observer upstream says validation cannot be). `silent staleness` past `sunset` is healed by the ordinary adoption loop.
 - Storage's role→cell map becomes `role -> {v1: CellId, v2: CellId, authoring, reading}`; every `call_zome` for the role targets `authoring`; the bridge sweep reads `reading`. The runtime passport publishes it, and `version-matrix --observed` shows the window fleet-wide.
+
+### 5.1 Many versions, many branches — the lineage graph IS the bridge, verification is graded
+
+The operator's question (2026-09-04): *v1 talking to v2 talking to v3 and back — how do we afford
+diversity without fragmentation?* The answer is that versions are not islands but nodes of ONE
+lineage graph under a root, and that fidelity across an edge is a declared grade, not a yes/no.
+
+**The graph.** Every DNA declares `lineage` (ancestors), `constitution_root`, and the carry
+recipes on its edges: a FORWARD recipe (parent-shaped record → own shape, deterministic, in its
+own integrity zome) and a REVERSE recipe (own shape → parent shape). A witness carries a fact's
+original proof (§2) plus the lineage evidence the receiver needs to accept it: for an ancestor,
+nothing more (the hash is in the receiver's `lineage`); for a descendant or a sibling, the roster's
+notarized commitment that declared that version under the same root, embedded with its k-of-n
+signatures (§4.1) — the same check every validator already runs. So **v3 accepts a v1 fact directly**
+(v1 ∈ lineage(v3)) without hopping through v2, and **v1 accepts a v3 fact** it could not have known
+about, because the commitment that made v3 a descendant verifies in isolation.
+
+**The grade.** Three levels, declared on the projected record like reach and stakes:
+
+| Grade | The receiver can check | When |
+|---|---|---|
+| **verified** | original signature + action hash + `transform_recipe(carried_entry) == own_entry` re-run in its own validation | every forward hop along ancestry (the receiver holds the recipe) |
+| **authentic** | original signature + action hash + the lineage commitment; the projection into its own shape is the COURIER's attestation (revocable, standing-bearing) | every backward hop and every sibling hop (the receiver cannot hold a recipe written after it was packed) |
+| **foreign** | signature only; no shared root | a different `constitution_root` — no automatic bridge; reconciliation is a commitment signed under BOTH roots (a treaty, not a carry) |
+
+A laggard on v1 therefore sees the future's facts as genuinely authored, with the courier answerable
+for the shaping — never nothing, never a forgery.
+
+**Routing.** Two versions under one root exchange facts through their **nearest common ancestor**:
+reverse recipes up to it, forward recipes down from it. A bespoke branch B (from v2) and the commons
+v3 (from v2) meet at v2's shape. The lineage graph with recipes on its edges is a routing graph for
+facts; the cost and the grade of any path are known before it is walked — the common language, §4,
+made computable.
+
+**What keeps it from balkanizing** (structural, not exhortation): one root makes every branch family,
+and leaving the root is a declared secession — legitimate, outside the bridge; the commons head is the
+branch whose path carries the widest-reach notarization, so branches compete by earning, not by
+stranding; **bridge stewardship** is a commitment the elohim can name (`replicates-content`'s shape:
+enough dual-cell peers per reach that no live version lacks a courier); silent staleness past a sunset
+is gated out of participation roles, never cut off from reading; and every DNA carries the witness
+type, `lineage` and `constitution_root` from its next change onward, so no version is born mute again.
+
+**Holochain note.** If 0.8 ships chain continuation (§9), versions of ONE network stop needing carry —
+validation dispatches per action. Branches still do: a branch is a different network hash by
+definition. The graded bridge stays necessary for diversity in the best upstream outcome.
+
+**Seam for the story** (story-maintainer form): chain happ-lineage-migration / between Station 6
+(one hop, forward, honest about direction) → the epic's "any two versions under one root can talk"
+/ missing node: Stations 11–13 — v1 accepts a v3 fact as *authentic* via the embedded descent
+commitment; a sibling branch and the commons exchange through their common ancestor; a foreign-root
+fact is refused as `RootMismatch` and reconciled only by a two-root commitment / current state:
+designed here, not yet in the feature (the feature is READY at Stations 1–10; these are added after
+Station 6 is green, not before).
 
 ## 6. What changes, by seam (bounded, named)
 
