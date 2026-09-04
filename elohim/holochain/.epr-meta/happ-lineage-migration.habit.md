@@ -156,3 +156,11 @@ run never reaches it): `verify_path` compares roots only when `inst.constitution
 passport does not expose one yet (verify.rs:136-138) — so `root_mismatch` cannot fire on a live peer.
 Station 10 needs a machine-readable council roster (the story declares one in prose; nothing on the
 substrate holds it) and a per-role constitution root on the passport.
+
+DELTA 2026-09-04 (the deliverable's ONE-RUN receipt:
+`genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r15.{log,json}` — Stations
+1, 2, 3, 4 and 9 in a single cucumber process, 5 scenarios / 55 steps, ALL PASSED, 6m44s, on the
+three-peer 0.7 household mesh, conductors untouched). Five of the seven MVP stations are measured
+green; Stations 5 and 10 are red and BLOCKED with their gaps named in the DELTA above. Status stays
+RED — it is the controller's to flip, and two stations of the seven are still unmeasurable on this
+substrate.
