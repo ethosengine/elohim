@@ -12,7 +12,7 @@
 //! - **all-green**, discharged, and the LATEST event associated with the commitment — ordered
 //!   by `occurred_at` (RFC3339), tie-broken by sidecar append order, mirroring
 //!   `.claude/scripts/saga-status.py`'s `index_flow_state`/`_sort_key` EXACTLY (see
-//!   `commitment_latest_event` below) — is a `Dismiss` → **regression re-commitment**: append a
+//!   `read::commitment_latest_event`) — is a `Dismiss` → **regression re-commitment**: append a
 //!   fresh `Produce` `FlowEvent` (unit `green-run`) re-fulfilling it, counted `refulfilled` —
 //!   distinct from `fulfilled_new` (a first-ever fulfillment) and `already_fulfilled`
 //!   (steady-state, nothing to do). Without this, a chapter that regresses once (a red run
@@ -47,11 +47,9 @@
 //! re-examining the atom-CID dedupe — the state-machine already advanced. `--dry-run` runs the
 //! full matching pass and skips only the append.
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use chrono::DateTime;
 use cid::Cid;
 use elohim_epr_rea::{
     AgentRef, CommitmentState, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb,
@@ -59,6 +57,7 @@ use elohim_epr_rea::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::read::{commitment_latest_event, is_strictly_newer};
 use super::{body_cid_of_file, repo_agent, repo_scope_atom, FlowError, FlowResult};
 
 /// The synthetic CI agent standing in for the a2o run that observed the verdict.
@@ -404,124 +403,6 @@ pub fn fulfill(
     }
 
     Ok(summary)
-}
-
-/// A comparable key for an `occurred_at` (RFC3339) string: parses when possible, falls back
-/// to raw-string comparison on failure — the exact fallback `saga-status.py`'s `_sort_key`
-/// uses (still monotonic for same-precision UTC `Z` timestamps, per its own comment). Cross-
-/// variant comparisons (one side parsed, the other raw because it failed to parse) fall back
-/// to comparing the two ORIGINAL strings — never panics, never picks an arbitrary ordering.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum OccurredAtKey {
-    Parsed(DateTime<chrono::FixedOffset>),
-    Raw(String),
-}
-
-impl OccurredAtKey {
-    fn parse(occurred_at: &str) -> Self {
-        match DateTime::parse_from_rfc3339(occurred_at) {
-            Ok(dt) => OccurredAtKey::Parsed(dt),
-            Err(_) => OccurredAtKey::Raw(occurred_at.to_string()),
-        }
-    }
-
-    fn raw(&self) -> String {
-        match self {
-            OccurredAtKey::Parsed(dt) => dt.to_rfc3339(),
-            OccurredAtKey::Raw(s) => s.clone(),
-        }
-    }
-}
-
-impl PartialOrd for OccurredAtKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OccurredAtKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (OccurredAtKey::Parsed(a), OccurredAtKey::Parsed(b)) => a.cmp(b),
-            (OccurredAtKey::Raw(a), OccurredAtKey::Raw(b)) => a.cmp(b),
-            // Mixed parse success — one side failed to parse. Fall back to comparing the
-            // original strings rather than guessing an ordering across variants.
-            (a, b) => a.raw().cmp(&b.raw()),
-        }
-    }
-}
-
-/// Is `a` (an `occurred_at`/`generated_at` RFC3339 string) STRICTLY newer than `b`, by the
-/// same comparison rule as `OccurredAtKey`?
-fn is_strictly_newer(a: &str, b: &str) -> bool {
-    OccurredAtKey::parse(a) > OccurredAtKey::parse(b)
-}
-
-/// The `(action, occurred_at)` of the LATEST event associated with a commitment, ordered by
-/// `occurred_at` timestamp and tie-broken by sidecar append order — mirroring
-/// `saga-status.py`'s `index_flow_state`/`_sort_key` EXACTLY (same two-pass association scan,
-/// same tagged-list-then-stable-sort shape), so the two tools can never disagree on "latest".
-/// Append order ALONE (the pre-fix behavior) diverges under replay/backfill: a delayed report
-/// can append after a chronologically newer event and would then read as "latest" by position
-/// even though it isn't by time (module doc above) — that's the bug this closes.
-///
-/// An event is "associated" the same way `saga-status.py` associates one: a `Produce` naming
-/// `commit_cid` directly in its `fulfills`, or a `Dismiss` whose `resource` matches the
-/// resource FIRST learned (in append order) from such a `Produce` (Dismiss events carry an
-/// empty `fulfills` — see the module doc). Returns `None` if the commitment has no associated
-/// events at all (never called on an undischarged commitment in practice, since callers gate
-/// on the `discharged` set first).
-fn commitment_latest_event(
-    records: &[(Cid, FlowRecord)],
-    commit_cid: &Cid,
-) -> Option<(ReaVerb, String)> {
-    let mut resource: Option<Cid> = None;
-    let mut produce_ts: Vec<String> = Vec::new();
-    for (_, record) in records {
-        let FlowRecord::Event(e) = record else {
-            continue;
-        };
-        if e.action == ReaVerb::Produce && e.fulfills.contains(commit_cid) {
-            if resource.is_none() {
-                resource = Some(e.resource);
-            }
-            produce_ts.push(e.occurred_at.clone());
-        }
-    }
-
-    let mut dismiss_ts: Vec<String> = Vec::new();
-    if let Some(resource) = resource {
-        for (_, record) in records {
-            let FlowRecord::Event(e) = record else {
-                continue;
-            };
-            if e.action == ReaVerb::Dismiss && e.resource == resource {
-                dismiss_ts.push(e.occurred_at.clone());
-            }
-        }
-    }
-
-    if produce_ts.is_empty() {
-        return None;
-    }
-
-    // Tagged in the same order saga-status builds it: all Produce timestamps (in the order
-    // encountered), THEN all Dismiss timestamps (in the order encountered) — a stable sort by
-    // time then preserves that relative order among exact ties.
-    let mut tagged: Vec<(OccurredAtKey, ReaVerb, String)> = produce_ts
-        .into_iter()
-        .map(|t| (OccurredAtKey::parse(&t), ReaVerb::Produce, t))
-        .chain(
-            dismiss_ts
-                .into_iter()
-                .map(|t| (OccurredAtKey::parse(&t), ReaVerb::Dismiss, t)),
-        )
-        .collect();
-    tagged.sort_by(|a, b| a.0.cmp(&b.0));
-
-    tagged
-        .pop()
-        .map(|(_, verb, occurred_at)| (verb, occurred_at))
 }
 
 /// Stage a freshly-built event for append unless its atom CID is already present (either in

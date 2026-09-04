@@ -67,22 +67,22 @@ use super::{
 /// `elohim_epr_rea::stock::count_in` filters `Magnitude::Count{unit}` by exact string match, so
 /// a note can never be mistaken for an artifact, a green-run, or a token by a stock that names
 /// one of those units.
-const NOTE_UNIT: &str = "run-note";
+pub(crate) const NOTE_UNIT: &str = "run-note";
 
 /// Prefix on the `classified_as` slot carrying the authored body, so a reader can tell an
 /// authored string from a tag or a subject at a glance (slots 0 and 1 are the established
 /// tag-then-subject convention; everything after them is this leg's, and is prefixed).
-const REASON_SLOT_PREFIX: &str = "reason:";
+pub(crate) const REASON_SLOT_PREFIX: &str = "reason:";
 
 /// Prefix on the optional consequence slot — the second half of a failed approach.
-const SWITCHED_TO_SLOT_PREFIX: &str = "switched-to:";
+pub(crate) const SWITCHED_TO_SLOT_PREFIX: &str = "switched-to:";
 
 /// Prefix on the optional audit-outcome slot — a `verdict` note's whole point.
 ///
 /// Positioned AFTER `reason:`/`switched-to:` and BEFORE `steward:` (which stays last): the slot
 /// vocabulary is positional and ADDITIVE, so a note that carries no verdict emits exactly the
 /// slot vector it emitted before this const existed and keeps its content address.
-const VERDICT_SLOT_PREFIX: &str = "verdict:";
+pub(crate) const VERDICT_SLOT_PREFIX: &str = "verdict:";
 
 /// The two admissible audit outcomes. Closed for the same reason [`NoteKind`] is: a verdict is
 /// read by whoever decides whether a delivery stands, and a third spelling of "yes" would
@@ -95,7 +95,7 @@ const VERDICT_CHANGES_REQUESTED: &str = "changes-requested";
 /// LAST on purpose, and appended only on the agent-attributed arms: readers index the leading
 /// slots positionally (tag, subject, reason, then the optional consequence), so a steward slot
 /// inserted anywhere earlier would renumber a vocabulary other legs already read.
-const STEWARD_SLOT_PREFIX: &str = "steward:";
+pub(crate) const STEWARD_SLOT_PREFIX: &str = "steward:";
 
 /// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
 /// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
