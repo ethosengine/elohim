@@ -3,9 +3,10 @@
  * (@concern:runtime-upgrade-propagation — habit
  * elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md).
  *
- * Stations 1-5 are wired for real against the household mesh by COMPOSING the
- * two ceremony drivers plus the storage HTTP admin surfaces the r2 receipt
- * (genesis/a2o/reports/release-ceremony/2026-09-01/transcript.md) proved live:
+ * Stations 1-5 and 9 are wired for real against the household mesh by
+ * COMPOSING the two ceremony drivers plus the storage HTTP admin surfaces the
+ * r2 receipt (genesis/a2o/reports/release-ceremony/2026-09-01/transcript.md)
+ * proved live:
  *
  *   T1  scripts/epr-release-package.ts   — package the coordinator artifact
  *   T2  scripts/release-ceremony.ts      — channel create / publish / promote
@@ -13,11 +14,17 @@
  *   T4  runtime-config.toml + POST <peer>/admin/runtime-config/reload
  *                                        — follow/canary/apply mode switches
  *
+ * Station 9 composes exactly those same four rails on exactly the same
+ * run-owned channel — it is the SECOND release on it, not a second channel —
+ * and adds no fifth rail: `--lineage-parent` and `--inherit-discipline-from`
+ * are T1 flags, `--adoption-url` is a T2 flag, and every assertion is read
+ * off T3.
+ *
  * `scripts/release-attestation-probe.ts` (T5, the cross-peer builder-exclusion
- * proof) belongs to station 9 — outside this file's scope — so it is never
- * invoked here; the attestation evidence stations 3-4 need is read straight
- * off `/admin/adoption`'s own `attestations` block, exactly as the r2
- * transcript's "Station 5 (r2) — verdicts" did.
+ * proof) is a standalone diagnostic, never invoked here; the attestation
+ * evidence stations 3-4 and 9 need is read straight off `/admin/adoption`'s
+ * own `attestations` block, exactly as the r2 transcript's
+ * "Station 5 (r2) — verdicts" did.
  *
  * ## One channel, two tiers — plus a genuine second channel
  *
@@ -176,6 +183,45 @@ function candidateHapp(): string {
   return minted.happPath;
 }
 
+/** Station 9's manifest — the SECOND fix, published on the SAME channel. */
+const SECOND_MANIFEST_PATH = path.join(REPORT_DIR, `a2o-runtime-upgrade-${RUN_STAMP}-second.json`);
+
+/**
+ * Station 9's marker payload. It differs from `CHANNEL_ID` (the first
+ * candidate's marker) by exactly one suffix, which is enough: the marker
+ * rides a trailing wasm custom section, so a different payload is different
+ * coordinator bytes, a different `WasmHash`, and therefore a candidate
+ * distinct from BOTH the baseline and the first fix. Without that, Station 9
+ * would "converge" onto bytes the household already runs and prove nothing.
+ */
+const SECOND_CANDIDATE_MARKER = `${CHANNEL_ID}#second-fix`;
+
+/**
+ * The second coordinator-only candidate — matthew's next fix, built ON TOP of
+ * the one the household runs. Minted from the same `BASELINE_HAPP` integrity
+ * bytes (the DNA lineage never moves) with the marker above.
+ */
+function secondCandidateHapp(): string {
+  const minted = mintCoordinatorCandidate(
+    BASELINE_HAPP,
+    REPORT_DIR,
+    RUN_STAMP,
+    SECOND_CANDIDATE_MARKER,
+    'second'
+  );
+  ceremony().secondCandidateWasmSha256 ??= minted.coordinatorWasmSha256;
+  return minted.happPath;
+}
+
+/**
+ * The convergence window Station 5 polls the fleet within — named, rather
+ * than repeated as literals, because Station 9 asserts its second fix
+ * converges "within the same convergence window the first fix needed" and
+ * that claim is only honest if both stations are bounded by the SAME budget.
+ */
+const FLEET_ADOPTION_CONVERGE_BUDGET_MS = 240_000;
+const FLEET_PASSPORT_CONVERGE_BUDGET_MS = 120_000;
+
 /**
  * THE household's own adoption discipline: one attester (james), a 30-second
  * soak. It is registered on the channel at `channel create --discipline` and
@@ -239,6 +285,15 @@ const FLAG_CHANNEL_ID = '--channel-id';
 const FLAG_APPLIES_TO_FROM = '--applies-to-from';
 const FLAG_SOAK_SECS = '--soak-secs';
 const FLAG_ATTESTATION_THRESHOLD = '--attestation-threshold';
+// Station 9's packaging call site uses the constants rather than the literals
+// the five older call sites share, so those stay at five occurrences and this
+// file's `sonarjs/no-duplicate-string` gate does not move.
+const FLAG_PEER = '--peer';
+const FLAG_NOTES = '--notes';
+const FLAG_OUT = '--out';
+const FLAG_LINEAGE_PARENT = '--lineage-parent';
+const FLAG_INHERIT_DISCIPLINE_FROM = '--inherit-discipline-from';
+const FLAG_ADOPTION_URL = '--adoption-url';
 
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
@@ -339,6 +394,26 @@ interface RevertResult {
   releaseCid: string;
   canonical?: boolean;
   secondPeerVerification?: unknown;
+}
+
+/**
+ * The `adoptionDiscipline` block of a packaged release manifest, read back off
+ * disk. `inheritedFrom` is `epr-release-package.ts`'s additive marker naming
+ * the head record the discipline was copied from — present exactly when
+ * `--inherit-discipline-from` supplied at least one field.
+ */
+interface ManifestAdoptionDiscipline {
+  soakSecs?: number;
+  attestationThreshold?: number;
+  canaryOrder?: string[];
+  inheritedFrom?: string;
+}
+
+/** The fields of a packaged manifest Station 9 reads back for verification. */
+interface SecondManifestFile {
+  channelId?: string;
+  envelope?: { lineageParentCid?: string | null };
+  adoptionDiscipline?: ManifestAdoptionDiscipline;
 }
 
 /** One cell of the station 8 observed matrix — always a RECORDED read, never a fresh one. */
@@ -444,6 +519,41 @@ interface CeremonyState {
 
   // Station 8 — the observed matrix, assembled only from recorded reads.
   observedMatrix?: MatrixRow[];
+
+  // Station 9 — the channel is long-lived: the NEXT release rides the same
+  // head instead of minting a new channel.
+  /**
+   * The channel's EARNED head at the moment Station 9 starts, read from every
+   * peer's own `/admin/adoption` (never assumed to be `releaseCid`): after
+   * Stations 1-5 that is the promoted first fix, and if Station 6's revert ran
+   * in the same process it is the revert target. Either way it is "the one the
+   * household runs", which is what the second fix is built on top of and names
+   * as its lineage parent.
+   */
+  station9ParentCid?: string;
+  /** Each peer's row proving it had ADOPTED that head before the publish. */
+  station9ParentRows: Partial<Record<PeerName, AdoptionChannelRow>>;
+  secondCandidateWasmSha256?: string;
+  secondCandidateBytes?: Buffer;
+  secondCandidateSha256?: string;
+  /** The discipline the packaged second manifest actually carries, read back off disk. */
+  secondDiscipline?: ManifestAdoptionDiscipline;
+  secondReleaseCid?: string;
+  secondPublishTier?: string;
+  secondPublishedAt?: number;
+  /** matthew's + jessica's rows swept AFTER the publish, still on the earned head. */
+  secondStagedRows: Partial<Record<PeerName, AdoptionChannelRow>>;
+  secondCanaryRow?: AdoptionChannelRow;
+  /** The second candidate's REAL installed hashes, read off james's passport after his apply. */
+  secondCandidateWasmHashes?: Record<string, string>;
+  secondAttestationRow?: AdoptionChannelRow;
+  secondAttestationTimestamp?: number;
+  secondPromoteResult?: PromoteResult;
+  secondPromotedAt?: number;
+  secondFleetRows: Partial<Record<PeerName, FleetPeerResult>>;
+  secondFleetConvergeMs?: number;
+  /** james's post-promotion row — the `alreadyCurrent` proof. */
+  jamesAlreadyCurrentRow?: AdoptionChannelRow;
 }
 
 let state: CeremonyState | undefined;
@@ -461,6 +571,9 @@ function ceremony(): CeremonyState {
     personalChannelFollowed: false,
     personalReleaseCidByStation: {},
     personalRowsByStation: {},
+    station9ParentRows: {},
+    secondStagedRows: {},
+    secondFleetRows: {},
   };
   return state;
 }
@@ -1554,7 +1667,7 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
     const { row } = await pollAdoption(
       world,
       peer,
-      240_000,
+      FLEET_ADOPTION_CONVERGE_BUDGET_MS,
       r => r.appliedRelease?.cid === c.releaseCid
     );
     const snapshot = before.get(peer);
@@ -1573,7 +1686,7 @@ async function ensureFleetConverged(world: E2EWorld): Promise<void> {
       world,
       peer,
       c.candidateWasmHashes,
-      120_000
+      FLEET_PASSPORT_CONVERGE_BUDGET_MS
     );
     // eslint-disable-next-line no-console
     console.log(
@@ -2103,6 +2216,403 @@ function buildObservedMatrix(): MatrixRow[] {
 }
 
 // ---------------------------------------------------------------------------
+// Station 9 — the channel is LONG-LIVED: the next fix rides the same head.
+//
+// Two seams close here, and the fixture must not paper over either:
+//
+//   1. PUBLISH OVER AN EARNED HEAD. Until now the ceremony driver refused it
+//      outright, so every release needed a fresh channel — which is why
+//      `CHANNEL_ID` is minted per run. This station publishes the SECOND fix
+//      on the SAME run-owned channel Stations 1-8 used, admitted because
+//      matthew's own runtime already runs that channel's earned head and the
+//      manifest names it as `envelope.lineageParentCid`.
+//   2. A PEER ALREADY RUNNING THE BYTES IS CURRENT, NOT REFUSED. james, the
+//      canary, applied the candidate before the promotion; once it becomes the
+//      earned head his controller must report `alreadyCurrent`, never
+//      `coordinator_lineage_mismatch` (a release binds what it SUPERSEDES, and
+//      james already superseded it).
+//
+// THE PARENT IS READ, NEVER ASSUMED. "The one the household runs" is whatever
+// every peer's own `/admin/adoption` reports as an EARNED `resolvedHead` it has
+// also APPLIED — the promoted first fix after Stations 1-5, or Station 6's
+// revert target if that station ran in the same process. `ensureSecondFixBaseline`
+// reads it; nothing here assumes `releaseCid`.
+//
+// THE DISCIPLINE IS INHERITED, NEVER RETYPED. The manifest is packaged with
+// `--inherit-discipline-from <matthew>`, so the threshold it carries is the
+// household's own registered one (a single attester) rather than a default —
+// the story's "not a default matthew never typed."
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the channel's current EARNED head and proves every peer has ADOPTED
+ * it — the story's "the household has converged on the earned head … and
+ * matthew's own runtime has adopted it," taken from each runtime's own report
+ * rather than from the ceremony's memory of what it promoted.
+ */
+async function ensureSecondFixBaseline(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureFleetConverged(world);
+  if (c.station9ParentCid) return;
+
+  for (const peer of PEER_NAMES) {
+    const { row } = await pollAdoption(
+      world,
+      peer,
+      FLEET_ADOPTION_CONVERGE_BUDGET_MS,
+      r =>
+        r.resolvedHead !== null &&
+        r.resolvedHead?.tier === 'earned' &&
+        typeof r.resolvedHead.cid === 'string' &&
+        r.appliedRelease?.cid === r.resolvedHead.cid
+    );
+    c.station9ParentRows[peer] = row;
+  }
+  const heads = new Set(PEER_NAMES.map(peer => c.station9ParentRows[peer]?.resolvedHead?.cid));
+  assert.equal(
+    heads.size,
+    1,
+    `peers disagree on the channel's earned head before the second fix: ${JSON.stringify([...heads])}`
+  );
+  const head = c.station9ParentRows.matthew?.resolvedHead?.cid;
+  assert.ok(head, "matthew's runtime reports no earned head to build the second fix on");
+  c.station9ParentCid = head;
+  // eslint-disable-next-line no-console
+  console.log(
+    `[station9] the household runs earned head ${head} on ${CHANNEL_ID}; every peer's own ` +
+      'adoption row reports it applied — this is what the second fix builds on'
+  );
+}
+
+/**
+ * Mints the SECOND coordinator-only candidate and proves it is genuinely a
+ * different artifact from the first: same integrity bytes (the DNA lineage
+ * never moves), a different marker, therefore a different coordinator wasm.
+ * A second candidate that hashed the same as the first would make Station 9's
+ * whole convergence unobservable.
+ */
+function ensureSecondFixBuilt(): void {
+  const c = ceremony();
+  const candidatePath = secondCandidateHapp();
+  assert.ok(existsSync(candidatePath), `second candidate bundle missing: ${candidatePath}`);
+  c.secondCandidateBytes = readFileSync(candidatePath);
+  c.secondCandidateSha256 = createHash('sha256').update(c.secondCandidateBytes).digest('hex');
+  if (c.candidateWasmSha256) {
+    assert.notEqual(
+      c.secondCandidateWasmSha256,
+      c.candidateWasmSha256,
+      'the second fix minted the SAME coordinator wasm as the first — a candidate the household ' +
+        'already runs cannot demonstrate anything about the next release'
+    );
+  }
+}
+
+/**
+ * Packages the second fix with the earned head as its lineage parent and the
+ * channel's own discipline inherited, then publishes it on the SAME channel.
+ * A refusal here is the seam itself: the driver's typed `not_adopted` /
+ * `lineage_parent_mismatch`, or the zome's earned-head guard.
+ */
+async function ensureSecondPublished(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondFixBaseline(world);
+  ensureSecondFixBuilt();
+  if (c.secondReleaseCid) return;
+
+  const parentCid = c.station9ParentCid;
+  assert.ok(parentCid, 'no earned head recorded — run the station 9 baseline first');
+  const matthewUrl = peerUrl(world, 'matthew');
+  mkdirSync(REPORT_DIR, { recursive: true });
+
+  const packaged = runDriver(
+    EPR_RELEASE_PACKAGE_SCRIPT,
+    [
+      FLAG_ARTIFACT,
+      secondCandidateHapp(),
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_CHANNEL_ID,
+      CHANNEL_ID,
+      FLAG_APPLIES_TO_FROM,
+      matthewUrl,
+      // What this release builds ON: the channel's standing earned head. The
+      // driver refuses the publish outright without it.
+      FLAG_LINEAGE_PARENT,
+      parentCid,
+      // NOT --soak-secs/--attestation-threshold: the discipline is the
+      // household's own, read off the channel — the story's whole point.
+      FLAG_INHERIT_DISCIPLINE_FROM,
+      matthewUrl,
+      FLAG_PEER,
+      matthewUrl,
+      FLAG_NOTES,
+      "a2o station 9: matthew's next fix, on the same long-lived commons channel",
+      FLAG_OUT,
+      SECOND_MANIFEST_PATH,
+    ],
+    60_000
+  );
+  assert.equal(
+    packaged.status,
+    0,
+    `second-fix package failed (exit ${packaged.status}):\n--- stdout ---\n${packaged.stdout.trim()}\n--- stderr ---\n${packaged.stderr.trim()}`
+  );
+  assert.ok(
+    existsSync(SECOND_MANIFEST_PATH),
+    `second manifest not written to ${SECOND_MANIFEST_PATH}`
+  );
+
+  const manifest = JSON.parse(readFileSync(SECOND_MANIFEST_PATH, 'utf8')) as SecondManifestFile;
+  assert.equal(
+    manifest.channelId,
+    CHANNEL_ID,
+    'the second fix was packaged on a different channel'
+  );
+  assert.equal(
+    manifest.envelope?.lineageParentCid,
+    parentCid,
+    `the second fix declares lineageParentCid ${String(manifest.envelope?.lineageParentCid)}, not the ` +
+      `earned head ${parentCid} the household runs`
+  );
+  c.secondDiscipline = manifest.adoptionDiscipline;
+  // eslint-disable-next-line no-console
+  console.log(
+    `[station9] second manifest ${SECOND_MANIFEST_PATH}: lineageParentCid=${parentCid} ` +
+      `adoptionDiscipline=${JSON.stringify(c.secondDiscipline)}`
+  );
+
+  const bytes = c.secondCandidateBytes;
+  const sha256 = c.secondCandidateSha256;
+  assert.ok(bytes && sha256, 'no second-candidate bytes recorded');
+  for (const peer of PEER_NAMES.filter(name => name !== 'matthew')) {
+    const putStatus = await putBlobRaw(peerUrl(world, peer), sha256, bytes);
+    assert.ok(
+      putStatus === 200 || putStatus === 201,
+      `PUT second-fix blob to ${peer} returned ${putStatus}`
+    );
+  }
+
+  c.secondPublishedAt = Date.now();
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, [
+    'publish',
+    SECOND_MANIFEST_PATH,
+    // matthew's own controller receipt is the ADOPTED half of the driver's
+    // admission pre-flight; his conductor answers the election half.
+    FLAG_ADOPTION_URL,
+    matthewUrl,
+  ]);
+  assert.equal(
+    published.status,
+    0,
+    `publishing the second fix over the earned head was REFUSED (exit ${published.status}):\n` +
+      `--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(parsed.releaseCid, `second publish missing releaseCid: ${JSON.stringify(parsed)}`);
+  c.secondReleaseCid = parsed.releaseCid;
+  c.secondPublishTier = parsed.tier;
+}
+
+/**
+ * Records matthew's and jessica's rows from a sweep that happened AFTER the
+ * second fix was published — the honest way to say "keeps running the earned
+ * head while it resolves the staged second fix": their own controllers looked
+ * again, with the candidate on the DHT, and still report the earned head as
+ * resolved and applied. The assertion itself lives in the Then, so a failure
+ * reads as a wrong head rather than as a timeout.
+ */
+async function ensureSecondStagedBeneathEarned(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondPublished(world);
+  if (c.secondStagedRows.matthew && c.secondStagedRows.jessica) return;
+  const publishedAt = c.secondPublishedAt ?? Date.now();
+  for (const peer of ['matthew', 'jessica'] as PeerName[]) {
+    const { row } = await pollAdoption(
+      world,
+      peer,
+      FLEET_ADOPTION_CONVERGE_BUDGET_MS,
+      r => typeof r.lastCheckedAt === 'number' && r.lastCheckedAt * 1000 > publishedAt
+    );
+    c.secondStagedRows[peer] = row;
+  }
+}
+
+/**
+ * james, still the canary from Station 3, applies the staged second fix. His
+ * `/version` passport — not `appliedRelease.cid` — is the ground truth for
+ * what the conductor actually swapped in, exactly as Station 3 established it.
+ */
+async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondStagedBeneathEarned(world);
+  if (c.secondCanaryRow) return;
+
+  const pidBefore = readPid('james');
+  const { row } = await pollAdoption(
+    world,
+    'james',
+    300_000,
+    r => r.appliedRelease?.cid === c.secondReleaseCid || r.verdict?.state === 'refused'
+  );
+  assert.notEqual(
+    row.verdict?.state,
+    'refused',
+    `james's canary apply of the second fix was REFUSED: ${JSON.stringify(row.verdict)}`
+  );
+  c.secondCanaryRow = row;
+
+  const roles = await readRoles(world, 'james');
+  c.secondCandidateWasmHashes = lamadRole(roles)?.coordinatorWasmHashes;
+  assert.ok(
+    c.secondCandidateWasmHashes && Object.keys(c.secondCandidateWasmHashes).length > 0,
+    "james's passport reports no lamad coordinatorWasmHashes after applying the second fix"
+  );
+  assert.notDeepEqual(
+    wasmHashValues(c.secondCandidateWasmHashes),
+    wasmHashValues(c.candidateWasmHashes),
+    'james runs the same coordinator wasm after the second fix as after the first — the second ' +
+      'candidate had no observable effect'
+  );
+  assert.equal(
+    readPid('james'),
+    pidBefore,
+    `james's conductor PID changed applying the second fix (${pidBefore} -> ${readPid('james')})`
+  );
+  // eslint-disable-next-line no-console
+  console.log(
+    `[station9] james applied the second fix ${c.secondReleaseCid}: lamad ` +
+      `coordinatorWasmHashes=${JSON.stringify(c.secondCandidateWasmHashes)}`
+  );
+}
+
+/**
+ * Waits for a qualifying attestation SWEPT AFTER james's own soak on the
+ * second fix elapsed. The `/admin/adoption` row carries one attestation block
+ * per channel, not per release, so "swept after this candidate's soak could
+ * have completed" is the observable bound that keeps the first fix's evidence
+ * from being read as the second's.
+ */
+async function ensureSecondAttested(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondCanaryApplied(world);
+  if (c.secondAttestationRow) return;
+
+  const soakDoneAt = Date.now() + SOAK_SECS * 1000;
+  const budgetMs = Math.max((SOAK_SECS + 65) * 1000, 90_000);
+  const deadline = Date.now() + budgetMs;
+  let lastRow: AdoptionChannelRow | undefined;
+  while (Date.now() < deadline) {
+    const report = await getAdoptionReport(world, 'matthew');
+    lastRow = findChannelRow(report, CHANNEL_ID);
+    const sweptAt = (lastRow?.lastCheckedAt ?? 0) * 1000;
+    if ((lastRow?.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD && sweptAt > soakDoneAt) {
+      c.secondAttestationRow = lastRow;
+      c.secondAttestationTimestamp = Date.now();
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10_000));
+  }
+  assert.fail(
+    `no qualifying attestation for the second fix on ${CHANNEL_ID} within ${budgetMs}ms; ` +
+      `last row: ${JSON.stringify(lastRow)}`
+  );
+}
+
+/** The promotion ceremony for the second fix — Station 4's verb, same channel. */
+async function ensureSecondPromoted(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondAttested(world);
+  if (c.secondPromotedAt !== undefined) return;
+  assert.ok(c.secondReleaseCid, 'no second releaseCid to promote');
+  const promoted = runDriver(
+    RELEASE_CEREMONY_SCRIPT,
+    ['promote', CHANNEL_ID, c.secondReleaseCid],
+    60_000
+  );
+  assert.equal(
+    promoted.status,
+    0,
+    `second promote failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`
+  );
+  const parsed = extractJson<PromoteResult>(promoted.stdout);
+  assert.equal(
+    parsed.tier,
+    'earned',
+    `second promote did not declare earned: ${JSON.stringify(parsed)}`
+  );
+  c.secondPromoteResult = parsed;
+  c.secondPromotedAt = Date.now();
+}
+
+/**
+ * matthew and jessica converge on the second fix — bounded by the SAME
+ * budgets Station 5 used (`FLEET_*_CONVERGE_BUDGET_MS`), which is what makes
+ * "within the same convergence window the first fix needed" a measured claim
+ * rather than a hopeful one.
+ */
+async function ensureSecondFleetConverged(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondPromoted(world);
+  if (c.secondFleetConvergeMs !== undefined) return;
+
+  const before = new Map<PeerName, { pid: string; health: number }>();
+  for (const peer of ['matthew', 'jessica'] as PeerName[]) {
+    before.set(peer, { pid: readPid(peer), health: await readBlobTotal(world, peer) });
+  }
+
+  const start = Date.now();
+  for (const peer of ['matthew', 'jessica'] as PeerName[]) {
+    const { row } = await pollAdoption(
+      world,
+      peer,
+      FLEET_ADOPTION_CONVERGE_BUDGET_MS,
+      r => r.appliedRelease?.cid === c.secondReleaseCid
+    );
+    const snapshot = before.get(peer);
+    assert.ok(snapshot, `no before-snapshot captured for ${peer}`);
+    const { observed, elapsedMs } = await pollLamadWasmHashMatch(
+      world,
+      peer,
+      c.secondCandidateWasmHashes,
+      FLEET_PASSPORT_CONVERGE_BUDGET_MS
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station9] ${peer}: appliedRelease.cid=${row.appliedRelease?.cid} lamad ` +
+        `coordinatorWasmHashes=${JSON.stringify(observed)} — matched after ${elapsedMs}ms of ` +
+        'passport polling past the appliedRelease.cid match'
+    );
+    c.secondFleetRows[peer] = {
+      row,
+      pidBefore: snapshot.pid,
+      pidAfter: readPid(peer),
+      healthBefore: snapshot.health,
+      healthAfter: await readBlobTotal(world, peer),
+    };
+  }
+  c.secondFleetConvergeMs = Date.now() - start;
+}
+
+/**
+ * james's post-promotion row: the earned head is now the release he already
+ * applied as canary, so his controller reports it applied and
+ * `alreadyCurrent` — never a lineage refusal for running the very bytes the
+ * release carries.
+ */
+async function ensureJamesAlreadyCurrent(world: E2EWorld): Promise<void> {
+  const c = ceremony();
+  await ensureSecondFleetConverged(world);
+  if (c.jamesAlreadyCurrentRow) return;
+  const { row } = await pollAdoption(
+    world,
+    'james',
+    FLEET_ADOPTION_CONVERGE_BUDGET_MS,
+    r => r.resolvedHead?.cid === c.secondReleaseCid && r.resolvedHead?.tier === 'earned'
+  );
+  c.jamesAlreadyCurrentRow = row;
+}
+
+// ---------------------------------------------------------------------------
 // Background — documentary declarations plus the one real precondition
 // (peers following CHANNEL_ID in `observe` mode) they collectively describe.
 // ---------------------------------------------------------------------------
@@ -2410,30 +2920,42 @@ Then('the release becomes the earned head of channel {string}', function (channe
   );
 });
 
-Then("the promotion names james's attestation as the evidence it rests on", function () {
-  const c = ceremony();
-  assert.ok(c.attestationRow && c.attestationTimestamp, 'no attestation captured before promote');
-  assert.ok(c.promotedAt, 'no promote timestamp captured');
-  // No surface names an attestation by peer (the same honest bound
-  // steps/delivery/acquisition-pins.steps.ts documents for blob provenance),
-  // so this checks what IS observable: evidence existed strictly before the
-  // declaration rested on it, met the declared threshold, and james was the
-  // only peer ever placed in canary mode — the only follower who could have
-  // produced it.
-  assert.ok(
-    c.attestationTimestamp < c.promotedAt,
-    'promotion timestamp is not after the attestation it is supposed to rest on'
-  );
-  assert.ok(
-    (c.attestationRow.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD,
-    `promotion ran with only ${String(c.attestationRow.attestations?.qualifying)}/${ATTESTATION_THRESHOLD} qualifying attestations`
-  );
-  assert.equal(
-    CANARY_PEER,
-    'james',
-    'james is the only peer this run ever switched to canary mode'
-  );
-});
+Then(
+  "the promotion names james's attestation as the evidence it rests on — the single attester the commons channel's discipline asks for",
+  function () {
+    const c = ceremony();
+    assert.ok(c.attestationRow && c.attestationTimestamp, 'no attestation captured before promote');
+    assert.ok(c.promotedAt, 'no promote timestamp captured');
+    // No surface names an attestation by peer (the same honest bound
+    // steps/delivery/acquisition-pins.steps.ts documents for blob provenance),
+    // so this checks what IS observable: evidence existed strictly before the
+    // declaration rested on it, met the declared threshold, and james was the
+    // only peer ever placed in canary mode — the only follower who could have
+    // produced it.
+    assert.ok(
+      c.attestationTimestamp < c.promotedAt,
+      'promotion timestamp is not after the attestation it is supposed to rest on'
+    );
+    assert.ok(
+      (c.attestationRow.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD,
+      `promotion ran with only ${String(c.attestationRow.attestations?.qualifying)}/${ATTESTATION_THRESHOLD} qualifying attestations`
+    );
+    // "the single attester the commons channel's DISCIPLINE asks for": the
+    // count was measured against the household's own registered threshold, not
+    // against a number the packager defaulted.
+    assert.equal(
+      c.attestationRow.attestations?.threshold,
+      ATTESTATION_THRESHOLD,
+      `the channel counted against threshold ${String(c.attestationRow.attestations?.threshold)}, not ` +
+        `the household's registered single attester (${ATTESTATION_THRESHOLD})`
+    );
+    assert.equal(
+      CANARY_PEER,
+      'james',
+      'james is the only peer this run ever switched to canary mode'
+    );
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Station 5 — fleet convergence, nobody restarts, nobody is asked.
@@ -2921,6 +3443,247 @@ Then(
         `matrix row for ${row.peer}/${row.station} carries no readAt — cannot have been read from the runtime`
       );
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Station 9 — the next fix rides the same channel; a peer already running the
+// bytes is current, not refused.
+// ---------------------------------------------------------------------------
+
+Given(
+  "the household has converged on the earned head of channel {string} and matthew's own runtime has adopted it",
+  { timeout: 900_000 },
+  async function (this: E2EWorld, channelName: string) {
+    assert.equal(
+      channelName,
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
+    );
+    await ensureSecondFixBaseline(this);
+  }
+);
+
+Given(
+  'matthew has built a second coordinator fix on top of the one the household runs',
+  { timeout: 120_000 },
+  function () {
+    ensureSecondFixBuilt();
+  }
+);
+
+When(
+  'matthew publishes the second fix as a release manifest on the same channel {string}',
+  { timeout: 400_000 },
+  async function (this: E2EWorld, channelName: string) {
+    assert.equal(
+      channelName,
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
+    );
+    await ensureSecondPublished(this);
+  }
+);
+
+Then(
+  "the publish is admitted because matthew's runtime already runs the channel's earned head, and the second fix is declared staging beneath that earned head",
+  function () {
+    const c = ceremony();
+    assert.ok(
+      c.secondReleaseCid,
+      'the second fix was never published — the publish step must run first'
+    );
+    assert.equal(
+      c.secondPublishTier,
+      'staging',
+      `the second fix was declared "${String(c.secondPublishTier)}", not staging beneath the earned head`
+    );
+    // Admitted ON the same channel, not on a fresh one: the whole seam.
+    const parentRow = c.station9ParentRows.matthew;
+    assert.ok(parentRow, 'no pre-publish adoption row recorded for matthew');
+    assert.equal(
+      parentRow.appliedRelease?.cid,
+      c.station9ParentCid,
+      "matthew's own runtime had not applied the earned head it published over: " +
+        JSON.stringify(parentRow.appliedRelease)
+    );
+    assert.notEqual(
+      c.secondReleaseCid,
+      c.station9ParentCid,
+      'the second fix and the earned head are the same release — nothing was published'
+    );
+  }
+);
+
+Then(
+  "the release manifest carries the commons channel's attestation discipline, inherited from the head — a single attester — not a default matthew never typed",
+  function () {
+    const c = ceremony();
+    const discipline = c.secondDiscipline;
+    assert.ok(discipline, 'no adoption discipline read back from the second manifest');
+    assert.equal(
+      discipline.attestationThreshold,
+      ATTESTATION_THRESHOLD,
+      `the second fix declares attestationThreshold ${String(discipline.attestationThreshold)}, not the ` +
+        `household's single attester (${ATTESTATION_THRESHOLD}) — a discipline nobody registered`
+    );
+    assert.equal(
+      discipline.soakSecs,
+      SOAK_SECS,
+      `the second fix declares soakSecs ${String(discipline.soakSecs)}, not the household's ${SOAK_SECS}`
+    );
+    // The packager's own marker: this discipline was COPIED from the channel,
+    // not retyped by the ceremony. Its absence would mean the numbers happened
+    // to match while still being typed in by hand.
+    assert.equal(
+      discipline.inheritedFrom,
+      c.station9ParentCid,
+      `the second fix's discipline names inheritedFrom ${String(discipline.inheritedFrom)}, not the ` +
+        `channel head ${String(c.station9ParentCid)} it should have been inherited from`
+    );
+  }
+);
+
+Then(
+  "every peer's runtime keeps running the earned head while it resolves the staged second fix",
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    await ensureSecondStagedBeneathEarned(this);
+    const c = ceremony();
+    for (const peer of ['matthew', 'jessica'] as PeerName[]) {
+      const row = c.secondStagedRows[peer];
+      assert.ok(row, `no post-publish adoption row captured for ${peer}`);
+      assert.equal(
+        row.resolvedHead?.tier,
+        'earned',
+        `${peer} resolves tier "${String(row.resolvedHead?.tier)}" while the second fix is only staged`
+      );
+      assert.equal(
+        row.resolvedHead?.cid,
+        c.station9ParentCid,
+        `${peer} moved off the earned head onto ${JSON.stringify(row.resolvedHead)} before any promotion`
+      );
+      assert.equal(
+        row.appliedRelease?.cid,
+        c.station9ParentCid,
+        `${peer} is no longer RUNNING the earned head: ${JSON.stringify(row.appliedRelease)}`
+      );
+    }
+  }
+);
+
+When(
+  'james, the canary, adopts and attests the staged second fix and matthew runs the promotion ceremony on that evidence, following the same ceremony Stations 3–4 proved for the first fix',
+  { timeout: 700_000 },
+  async function (this: E2EWorld) {
+    await ensureSecondPromoted(this);
+  }
+);
+
+Then(
+  "the second fix becomes the earned head of channel {string}, james's attestation meeting the same single-attester discipline the first fix met",
+  function (channelName: string) {
+    assert.equal(
+      channelName,
+      STORY_COMMONS_CHANNEL_NAME,
+      `unexpected commons channel name: ${channelName}`
+    );
+    const c = ceremony();
+    assert.ok(c.secondPromoteResult, 'no second promote result — run the promotion step first');
+    assert.equal(
+      c.secondPromoteResult.tier,
+      'earned',
+      `the second promote declared "${c.secondPromoteResult.tier}", not earned`
+    );
+    assert.ok(
+      c.secondAttestationRow && c.secondAttestationTimestamp && c.secondPromotedAt,
+      'no attestation captured before the second promotion'
+    );
+    assert.ok(
+      c.secondAttestationTimestamp < c.secondPromotedAt,
+      'the second promotion is not after the attestation it is supposed to rest on'
+    );
+    assert.ok(
+      (c.secondAttestationRow.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD,
+      `the second promotion ran with ${String(c.secondAttestationRow.attestations?.qualifying)}/` +
+        `${ATTESTATION_THRESHOLD} qualifying attestations`
+    );
+    assert.equal(
+      c.secondAttestationRow.attestations?.threshold,
+      ATTESTATION_THRESHOLD,
+      `the channel counted against threshold ${String(c.secondAttestationRow.attestations?.threshold)}, ` +
+        `not the single attester the first fix met`
+    );
+  }
+);
+
+Then(
+  "matthew's and jessica's runtimes converge on the second fix without any device restarting, within the same convergence window the first fix needed",
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    await ensureSecondFleetConverged(this);
+    const c = ceremony();
+    for (const peer of ['matthew', 'jessica'] as PeerName[]) {
+      const result = c.secondFleetRows[peer];
+      assert.ok(result, `no second-fix convergence row captured for ${peer}`);
+      assert.equal(
+        result.row.appliedRelease?.cid,
+        c.secondReleaseCid,
+        `${peer} has not applied the second fix: ${JSON.stringify(result.row)}`
+      );
+      assert.ok(result.pidAfter.length > 0, `${peer}'s conductor PID could not be read`);
+      assert.equal(
+        result.pidAfter,
+        result.pidBefore,
+        `${peer}'s conductor PID changed on the second fix (${result.pidBefore} -> ${result.pidAfter})`
+      );
+    }
+    // The window is the same by construction — both stations poll under
+    // FLEET_ADOPTION_CONVERGE_BUDGET_MS + FLEET_PASSPORT_CONVERGE_BUDGET_MS —
+    // so this reports the two measured durations rather than inventing a
+    // ratio the story never claimed.
+    assert.ok(
+      c.secondFleetConvergeMs !== undefined && c.fleetConvergeMs !== undefined,
+      'missing a convergence measurement for one of the two fixes'
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[station9] fleet convergence: first fix ${c.fleetConvergeMs}ms, second fix ` +
+        `${c.secondFleetConvergeMs}ms (same budget: ${FLEET_ADOPTION_CONVERGE_BUDGET_MS}ms adoption + ` +
+        `${FLEET_PASSPORT_CONVERGE_BUDGET_MS}ms passport per peer)`
+    );
+  }
+);
+
+Then(
+  "james's runtime — already running the second fix's bytes from his canary adoption — reports the earned head applied and current, never refused on lineage grounds",
+  { timeout: 400_000 },
+  async function (this: E2EWorld) {
+    await ensureJamesAlreadyCurrent(this);
+    const c = ceremony();
+    const row = c.jamesAlreadyCurrentRow;
+    assert.ok(row, 'no post-promotion adoption row captured for james');
+    assert.equal(
+      row.appliedRelease?.cid,
+      c.secondReleaseCid,
+      `james reports appliedRelease ${JSON.stringify(row.appliedRelease)}, not the second fix`
+    );
+    assert.notEqual(
+      row.verdict?.state,
+      'refused',
+      `james's runtime REFUSED the release it already runs: ${JSON.stringify(row.verdict)}`
+    );
+    assert.notEqual(
+      row.verdict?.refusal?.reason,
+      'coordinator_lineage_mismatch',
+      `james was refused on lineage grounds for running the very bytes the release carries: ` +
+        JSON.stringify(row.verdict?.refusal)
+    );
+    assert.equal(
+      row.verdict?.alreadyCurrent,
+      true,
+      `james's verdict does not report alreadyCurrent: ${JSON.stringify(row.verdict)}`
+    );
   }
 );
 

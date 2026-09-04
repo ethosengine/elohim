@@ -88,8 +88,17 @@ export interface MintedCandidate {
   coordinatorWasmSha256: string;
 }
 
-/** Memoized per-process — every scenario in one run shares the same candidate. */
-let cached: MintedCandidate | undefined;
+/**
+ * Memoized per-process, keyed by MARKER PAYLOAD — every scenario in one run
+ * shares the candidate for a given marker, and a run that needs a SECOND,
+ * distinct candidate (Station 9's next fix on the same long-lived channel)
+ * mints it by asking for a different marker. Keying the cache on the marker
+ * rather than a single slot is what makes that possible: a lone `cached`
+ * would have handed the second request the first candidate's bytes, whose
+ * coordinator wasm hash the household already runs, so the second fix would
+ * have been a no-op apply with nothing to observe.
+ */
+const cache = new Map<string, MintedCandidate>();
 
 function runHc(args: string[], cwd?: string): string {
   try {
@@ -193,23 +202,28 @@ function assembleCandidateHappDir(happDir: string): void {
 }
 
 /**
- * Mints (and memoizes) this run's coordinator-only candidate. `markerPayload`
- * is baked into the coordinator wasm's trailing custom section so every run
- * — and every distinct channel within a run — produces a wasm hash nobody
- * has installed yet.
+ * Mints (and memoizes) a coordinator-only candidate. `markerPayload` is baked
+ * into the coordinator wasm's trailing custom section so every run — and
+ * every distinct channel or CANDIDATE within a run — produces a wasm hash
+ * nobody has installed yet. `variantLabel` only names the scratch directory,
+ * so two candidates of one run keep their own unpacked bytes on disk;
+ * identity comes from the marker.
  */
 export function mintCoordinatorCandidate(
   baselineHapp: string,
   reportDir: string,
   runStamp: string,
-  markerPayload: string
+  markerPayload: string,
+  variantLabel?: string
 ): MintedCandidate {
-  if (cached) return cached;
+  const memo = cache.get(markerPayload);
+  if (memo) return memo;
   if (!existsSync(baselineHapp)) {
     throw new Error(`revert-target/baseline bundle missing: ${baselineHapp}`);
   }
 
-  const scratchDir = path.join(reportDir, `candidate-${runStamp}`);
+  const variantSuffix = variantLabel ? `-${variantLabel}` : '';
+  const scratchDir = path.join(reportDir, `candidate-${runStamp}${variantSuffix}`);
   mkdirSync(scratchDir, { recursive: true });
 
   const { integrityWasm, coordinatorWasm } = extractInstalledLamadZomes(baselineHapp, scratchDir);
@@ -244,6 +258,7 @@ export function mintCoordinatorCandidate(
   console.log(
     `[coordinator-candidate] run ${runStamp}: packed candidate .happ=${candidateHappPath} sha256=${sha256}`
   );
-  cached = { happPath: candidateHappPath, sha256, coordinatorWasmSha256 };
-  return cached;
+  const minted: MintedCandidate = { happPath: candidateHappPath, sha256, coordinatorWasmSha256 };
+  cache.set(markerPayload, minted);
+  return minted;
 }
