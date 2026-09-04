@@ -285,4 +285,4 @@ kitsune2 wire all moved and no vehicle carries data across that. Stations, entry
 in `2026-09-03-lineage-crossing-migration-rna.md` (this arc's next rung; RNA = old+new conductors under the ark, the
 storage P2P plane as the cross-line bridge, a migrate-from recipe in the release manifest before data is held, a
 Mishpat commitment with revert). Cycle-time row for the big-bang line change: pushed 16:5xZ → conductors on 0.7 with
-fresh genesis on the wiped fleet (fill in when edge ≥#1428 lands); seven CI rounds on dispatch defects, zero on the substrate.
+fresh genesis on the wiped fleet at 2026-09-04 00:3xZ ≈ 7.7 h wall clock, of which ~5.5 h were seven CI dispatch rounds and ~1 h the operator wipe; substrate work: 0; seven CI rounds on dispatch defects, zero on the substrate.

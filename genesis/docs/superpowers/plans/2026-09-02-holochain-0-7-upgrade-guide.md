@@ -673,7 +673,15 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
 - [x] **F4 (DONE 2026-09-03 21:xxZ, edge #1426: storage image FROM `conductor-25dd2d0be144` + `elohim-happ:dev-latest` = 0.7 (#1427), `iroh-relay:1.0.3-dev-latest` pushed; the alpha rollout waits on pods that cannot be ready until F5 step 2 wipes the 0.6 databases — the rollout timeout is expected): Land on dev.** Fast-forward `upgrade/holochain-0.7` → `dev`, push once. Dispatch order
   is conductor → dna → edge (the orchestrator does it; do not hand-trigger). The edge build's
   DNA Hash Guard prints `DNA-HASH <role> <hash>` matching F1's baseline.
-- [ ] **F5: Fleet ceremony — operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
+- [x] **F5 DONE 2026-09-04 00:3xZ — the alpha fleet runs holochain 0.7.0 on fresh genesis.** Operator wiped all seven
+  `holochain-data-*` (`databases/`, `ks/`) and `storage-data-*` volumes with every StatefulSet at 0 replicas (22:5xZ);
+  edge #1428 (dispatched 23:0xZ from 03c603f96) applied the manifests, rolled 7 storage + 7 conductor StatefulSets
+  (14 "rolling update complete") onto `conductor-25dd2d0be144` + the 0.7 hApp, both doorways rolled. Probes at
+  00:33Z: `doorway-alpha.elohim.host` and `elohim.host` `/health` → `peerCount 6, caughtUp true, converged true`;
+  `/db/p2p/conductor-diagnostics` on both → 35 agents = 7 peers × 5 DNA spaces, agent URLs homed on BOTH
+  `relay.alpha.elohim.host` and `relay.elohim.host` — the D2 measure (cross-relay preflight patch) holds on the
+  live fleet. No env flags were needed (wiped conductors first-install). Re-seed = `[build:genesis]` push after
+  #1428 ends. Operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
   (the sequenced, step-by-step form of everything below, with the probes and the rollback). Summary (from
   `project_alpha_dna_migration_2026_09_02`):**
   **Operator authorization 2026-09-03: wipe the WHOLE fleet clean for this upgrade** — every alpha
