@@ -23,7 +23,7 @@ use cid::Cid;
 use elohim_epr_rea::{CommitmentState, FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
 
-use super::read::{commitment_latest_event, notes_on, NoteView};
+use super::read::{commitment_latest_event, notes_across, NoteSource, NoteView};
 use super::registers::{self, GateView, HabitEntry};
 use super::walk::{self, EdgeView};
 use super::{body_cid_of_file, confine_under, rel_to_root, short_cid, FlowError, FlowResult};
@@ -194,7 +194,34 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
         None => scoped_from_records(&cid, &records),
     };
 
-    let notes = notes_on(&records, &cid, notes);
+    // Section 4. The atom's own notes, PLUS the notes recorded on the commitments scoped by it.
+    // A review seat records its verdict ON the commitment it reviewed, so a screen that showed
+    // only the atom's own notes would miss exactly the record the seat left — which is what the
+    // first dogfood run found. Discharged commitments are included too: the window decides what
+    // fits, not the state of the promise, because a verdict does not stop being the verdict when
+    // the work it judged is done.
+    let mut sources = vec![NoteSource {
+        resource: cid,
+        via: None,
+    }];
+    for (record_cid, record) in &records {
+        if let FlowRecord::Commitment(commitment) = record {
+            if commitment.in_scope_of == cid {
+                sources.push(NoteSource {
+                    resource: *record_cid,
+                    via: Some(
+                        commitment
+                            .resource_spec
+                            .classified_as
+                            .get(1)
+                            .cloned()
+                            .unwrap_or_else(|| short_cid(record_cid)),
+                    ),
+                });
+            }
+        }
+    }
+    let notes = notes_across(&records, &sources, notes);
 
     let seals = walked.as_ref().map(|result| Seals {
         edges: result.edges.outgoing.clone(),
@@ -569,10 +596,16 @@ impl ContextResult {
                 .as_ref()
                 .map(|v| format!(" [{v}]"))
                 .unwrap_or_default();
+            let via = note
+                .via
+                .as_ref()
+                .map(|v| format!(" via {v}"))
+                .unwrap_or_default();
             println!(
-                "    • {}{} — {}",
+                "    • {}{}{} — {}",
                 note.kind,
                 verdict,
+                via,
                 note.reason.as_deref().unwrap_or("")
             );
         }

@@ -165,9 +165,27 @@ pub struct NoteView {
     pub verdict: Option<String>,
     pub steward: Option<String>,
     pub occurred_at: String,
+    /// The commitment this note was recorded ON, when it has been rolled up onto a different
+    /// atom's screen. `None` for a note on the atom itself. Omitted rather than null so an
+    /// un-rolled note's payload is byte-identical to the one emitted before this field existed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
     /// Slots this parser did not recognise, carried through verbatim. The vocabulary is
     /// additive, so a future slot must surface as unknown rather than vanish from the render.
     pub extra: Vec<String>,
+}
+
+/// One place to look for notes, plus the marker to stamp on whatever is found there.
+///
+/// A screen for an atom needs notes from more than one address: its own, and those of the
+/// commitments scoped by it, because a review seat records its verdict ON the commitment it
+/// reviewed. Looking each address up separately and concatenating would order each list
+/// correctly and the merge wrongly, so every source is folded in ONE pass with ONE sort.
+#[derive(Debug, Clone)]
+pub struct NoteSource {
+    pub resource: Cid,
+    /// The marker a rolled-up note carries. `None` for the atom itself.
+    pub via: Option<String>,
 }
 
 /// The notes standing on one atom: `Cite` events whose `resource` is `resource_cid` and whose
@@ -176,12 +194,29 @@ pub struct NoteView {
 /// The unit test is the selector, not the verb alone: `Cite` is a general reference verb, and
 /// a future citing leg with a different unit must not appear in a note render.
 pub fn notes_on(records: &[(Cid, FlowRecord)], resource_cid: &Cid, limit: usize) -> Vec<NoteView> {
+    notes_across(
+        records,
+        &[NoteSource {
+            resource: *resource_cid,
+            via: None,
+        }],
+        limit,
+    )
+}
+
+/// The notes standing on ANY of several addresses, newest first across the merged set,
+/// truncated to `limit`. Each note carries the `via` marker of the source it was found at.
+pub fn notes_across(
+    records: &[(Cid, FlowRecord)],
+    sources: &[NoteSource],
+    limit: usize,
+) -> Vec<NoteView> {
     let mut matched: Vec<(OccurredAtKey, usize, NoteView)> = Vec::new();
     for (index, (cid, record)) in records.iter().enumerate() {
         let FlowRecord::Event(event) = record else {
             continue;
         };
-        if event.action != ReaVerb::Cite || &event.resource != resource_cid {
+        if event.action != ReaVerb::Cite {
             continue;
         }
         let Magnitude::Count { unit, .. } = &event.quantity else {
@@ -190,11 +225,15 @@ pub fn notes_on(records: &[(Cid, FlowRecord)], resource_cid: &Cid, limit: usize)
         if unit != NOTE_UNIT {
             continue;
         }
-        matched.push((
-            OccurredAtKey::parse(&event.occurred_at),
-            index,
-            note_view(cid, event),
-        ));
+        let Some(source) = sources
+            .iter()
+            .find(|source| source.resource == event.resource)
+        else {
+            continue;
+        };
+        let mut view = note_view(cid, event);
+        view.via.clone_from(&source.via);
+        matched.push((OccurredAtKey::parse(&event.occurred_at), index, view));
     }
     // Ascending by (time, append order), then reversed: newest first with the LAST-appended
     // note of an exact timestamp tie leading, which is the order a session authored them in.
@@ -218,6 +257,7 @@ fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
         verdict: None,
         steward: None,
         occurred_at: event.occurred_at.clone(),
+        via: None,
         extra: Vec::new(),
     };
     for slot in event.classified_as.iter().skip(2) {

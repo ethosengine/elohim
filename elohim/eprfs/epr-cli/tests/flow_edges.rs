@@ -1087,6 +1087,76 @@ fn a_content_address_target_skips_the_path_only_sections_and_says_why() {
 
 // ── context sections 6 and 7: the covering habit and the owning gate ─────────────────────
 
+/// A review seat records its verdict ON THE COMMITMENT it reviewed. Notes are resource-scoped,
+/// so before this roll-up the plan's own one screen missed exactly that record — the dogfood
+/// finding this test exists for.
+#[test]
+fn a_verdict_on_a_commitment_rolls_up_onto_the_plan_it_is_scoped_to() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let commitment = claimed(root, "epic#1", &implementer);
+
+    note::note(
+        root,
+        &commitment,
+        "verdict",
+        "the gate line is present and the diff conforms",
+        None,
+        Some("approved"),
+        &actor("agent:reviewer@claude-opus-5"),
+    )
+    .expect("a verdict on the commitment");
+    note::note(
+        root,
+        "plans/epic.md",
+        "ruling",
+        "accepted, ship it",
+        None,
+        None,
+        &NoteActor::default(),
+    )
+    .expect("a ruling on the plan itself");
+
+    let result = context::context(root, "plans/epic.md").expect("context runs");
+    assert_eq!(
+        result.notes.len(),
+        2,
+        "the plan's own note and its commitment's note are one merged, newest-first set"
+    );
+
+    let verdict = result
+        .notes
+        .iter()
+        .find(|n| n.kind == "run:verdict")
+        .expect("the review seat's own record reaches the plan's screen");
+    assert_eq!(verdict.verdict.as_deref(), Some("approved"));
+    assert_eq!(
+        verdict.via.as_deref(),
+        Some("epic#1"),
+        "and says which commitment it came via, so the marker is not a guess"
+    );
+
+    let ruling = result
+        .notes
+        .iter()
+        .find(|n| n.kind == "run:ruling")
+        .expect("the plan's own note is still there");
+    assert!(
+        ruling.via.is_none(),
+        "a note on the atom itself carries no via marker"
+    );
+
+    // The merged set still obeys the window.
+    assert_eq!(
+        context::context_with(root, "plans/epic.md", 1)
+            .expect("context runs")
+            .notes
+            .len(),
+        1
+    );
+}
+
 #[test]
 fn context_names_the_covering_habit_and_the_owning_gate_for_a_path() {
     let dir = valueflow_fixture();
