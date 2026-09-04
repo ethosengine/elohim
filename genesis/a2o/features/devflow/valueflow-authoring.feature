@@ -18,9 +18,16 @@ Feature: A task moves through one readable valueflow from claim to verdict
   So that I can see who owns a task, whether it was actually discharged, which
   decisions govern it, and how to verify nearby work before I dispatch again.
 
-  # Vocabulary for a reader who has only this file:
+  # Vocabulary for a reader who has only this file. Every command named below
+  # (claim, fulfill, context, project) is a subcommand of the `epr` CLI —
+  # `epr flow claim`, `epr flow fulfill`, `epr flow context`, `epr flow
+  # project` — so `@requires:epr-cli` names one binary, not a family of tools.
   #
   #   gap id       — the stable id of one work item decomposed from a plan.
+  #   projected plan — a plan document whose checkbox tasks have been
+  #                  decomposed into gap items and projected into the
+  #                  valueflow by `epr flow project`, so each task exists as
+  #                  an intent an implementer can claim.
   #   commitment   — the still-open promise minted when an actor claims that
   #                  gap; its provider is the incumbent actor.
   #   discharge    — a fulfillment event that names the commitment and closes
@@ -38,14 +45,18 @@ Feature: A task moves through one readable valueflow from claim to verdict
 
   Scenario: A gap can have one incumbent claim, never two
     Given a scratch repository whose projected plan contains an unclaimed gap item
+    And two implementers with distinct actor identities are present
     When an implementer claims that gap with a task brief and an actor identity
     Then the valueflow holds exactly one open commitment for that gap
     And that commitment names the claiming actor as its provider
-    When another actor attempts to claim the same gap
+    When the other implementer, a distinct actor identity, attempts to claim the same gap
     Then the second claim is refused with a non-zero exit status
     And the refusal names the incumbent actor
     And the valueflow still holds exactly one commitment for that gap
 
+  # Records are content-addressed, so re-running a fulfilment against the same
+  # commitment must not double-count the drain that the equilibrium habit
+  # measures — "exactly once" is what keeps that measurement honest.
   Scenario: Only a discharging report closes its claimed commitment
     Given two gap items in a scratch repository are claimed as open commitments
     When the first commitment receives a task report with status "DONE"
@@ -69,4 +80,5 @@ Feature: A task moves through one readable valueflow from claim to verdict
     Then the habit section names the covering habit, its status, active flag, and first check
     And the gate section names the declared "just gate" command that owns the file
     And the gate section includes any Cargo target directory and Rust flags declared by that project
+    And the gate section is sufficient to run the verification command without guessing the build configuration
     And neither the habit nor the gate is guessed when its register has no matching declaration
