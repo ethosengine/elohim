@@ -4,12 +4,13 @@ id: repo-root-governance
 root: true
 purpose: >
   The repo-root constitutional base. Carries the build-time ci-trigger: leg (the cross-cutting
-  CI-ignore set, projected into the flat .ci-ignore), and four author-time rules: the repo-wide
+  CI-ignore set, projected into the flat .ci-ignore), and author-time rules including the repo-wide
   binding of the source-file-LoC-ceiling policy (observation tier — never blocks) and the
   governance-escalation-ladder (the agency charter — definitions live in the policy registry,
-  .claude/epr-meta/policies.yaml), the brand-vocabulary boundary lint, plus a context-blind README
-  review obligation. It anchors the cascade and hosts the ignores and basename-wide rules that
-  cannot decentralize, plus the subtree/orchestrator exact-path entries kept inline for the first cut.
+  .claude/epr-meta/policies.yaml), the brand-vocabulary boundary lint, a context-blind README review
+  obligation, and three developer-valueflow authoring signals. It anchors the cascade and hosts the
+  ignores and basename-wide rules that cannot decentralize, plus the subtree/orchestrator exact-path
+  entries kept inline for the first cut.
 rules:
   - id: rs-loc-ceiling
     policy: source-file-loc-ceiling@1
@@ -43,6 +44,37 @@ rules:
       hc-dev-orchestrator skill, and the census ledger. Native-cargo recipes MUST set
       CARGO_TARGET_DIR at the cargo-pool slot (the disk-guard denies plain native cargo) —
       the pre-2026-08 root justfile drifted exactly here.
+  - id: brief-is-a-claim
+    class: inject
+    when: { write: ".superpowers/sdd/**/task-*-brief.md" }
+    why: >
+      A dispatched task brief is a claim on promised work. Record that act with
+      `epr flow claim --on <gap-id> --as agent:implementer@<model> --brief <this file>` so the
+      implementer's commitment is durable and attributable instead of existing only in orchestration
+      prose.
+    retire-when: >
+      when the authoring surface records every task-brief dispatch as a claim by construction before
+      the brief can be written
+  - id: report-is-a-fulfilment
+    class: inject
+    when: { write: ".superpowers/sdd/**/task-*-report.md" }
+    why: >
+      A completed task report discharges promised work. Record that act with
+      `epr flow fulfill --on <gap-id> --report <this file> --status <DONE|DONE_WITH_CONCERNS>` so
+      completion changes the commitment stock instead of remaining an unjoined report artifact.
+    retire-when: >
+      when the authoring surface records every discharging task report as a fulfillment by
+      construction before the report can be written
+  - id: rulings-are-notes
+    class: inject
+    when: { write: ".superpowers/sdd/**/progress.md" }
+    why: >
+      A ruling belongs in the valueflow record: use
+      `epr flow note --on <gap-id|plan> --kind ruling --reason '...'`. The progress file is a
+      projection and never the record, so do not leave a binding decision only as prose here.
+    retire-when: >
+      when progress projections are rendered entirely from ruling notes and cannot be authored as a
+      competing decision record
   - id: readme-blind-reader-review
     class: inject
     when: { write: "README*.md" }
@@ -103,6 +135,13 @@ compatibility exemption while the protocol is still in development: role names, 
 ids, discriminators, and wire literals should be renamed too. The rule is net-new-only and never
 blocks, so cleanup can proceed as each existing surface is touched without turning legacy vocabulary
 into a maintenance toll.
+
+## Developer-valueflow authoring — briefs, reports, and rulings (inject class)
+
+The three authoring signals keep orchestration artifacts joined to the valueflow they change: a task
+brief claims a commitment, a discharging task report fulfils it, and a progress-file ruling is first
+recorded as a ruling note. The files remain useful projections for people, but none is the durable
+record of the act it describes.
 
 ## readme-blind-reader-review — newcomer legibility (inject class)
 
