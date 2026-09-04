@@ -125,9 +125,15 @@ manifests, 2026-09-04).
 
 - `Verify Target Health` gated on the site root, which is 503 until the seed exists (fixed: `/health`, 83ae73bda).
 - `Seed Conductor Identities` reported `[C] Conflict` for matthew: his conductor already embodied a UUID human id
-  (`5f27bc9b-…`) before the seeder reached it — something creates a Human on first contact with an empty conductor
-  (doorway A's zome caller or storage's identity fill). One agent = one Human, so on a fresh genesis the seeder must
-  run before any self-heal, or the self-heal must use `SELF_HUMAN_ID`. Operator attention per the seeder's own doc.
+  (`5f27bc9b-…`) before the seeder's identities leg reached it. Loki names the author: doorway A's
+  `auth_routes` — "Doorway: created Holochain identity via imagodei zome: 5f27bc9b… (display_name=Matthew)" at
+  03:35:29Z during the Seed Database stage's account seeding, then the SAME human_id and action hash reported as
+  "created" for Bub, Charlie, … (the hosted path is create-or-return on the conductor's single Human, logged as a
+  create). One agent = one Human, so the CI pipeline's order (Seed Database → accounts through the doorway → THEN
+  Seed Substrate → conductor identities) embodies matthew's conductor with a doorway-minted UUID first; the household
+  prologue already runs "Conductor Identities cast BEFORE Seed Humans" for exactly this reason — the genesis
+  Jenkinsfile needs the same order, and the doorway's hosted create should refuse (not echo) when the conductor
+  already embodies a different human.
 - `stakes seed adam: HTTP 403` — adam's storage runs with `ALLOW_SEED_NETWORK_STAKES` off (posture, not a bug; the
   manifest seeded on matthew + jessica).
 - The landing and lamad-spa rows seed with `blobHash: null` / `serverBlobHash: null`: the SPA bundles are staged by
