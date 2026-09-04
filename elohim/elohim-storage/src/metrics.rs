@@ -5846,12 +5846,12 @@ mod tests {
         let families = REGISTRY.gather();
         let f = families
             .iter()
-            .find(|f| f.get_name() == "elohim_app_deliverability_verdict_total")
+            .find(|f| f.name() == "elohim_app_deliverability_verdict_total")
             .expect("counter registered");
         let m = f.get_metric().iter().find(|m| {
             m.get_label()
                 .iter()
-                .any(|l| l.get_name() == "verdict" && l.get_value() == "broken")
+                .any(|l| l.name() == "verdict" && l.value() == "broken")
         });
         assert!(m.is_some(), "verdict label present");
     }
@@ -5869,16 +5869,16 @@ mod tests {
         let families = REGISTRY.gather();
         let f = families
             .iter()
-            .find(|f| f.get_name() == "elohim_app_deliverability_verdict_total")
+            .find(|f| f.name() == "elohim_app_deliverability_verdict_total")
             .expect("counter registered");
         let m = f.get_metric().iter().find(|m| {
             let labels = m.get_label();
             labels
                 .iter()
-                .any(|l| l.get_name() == "verdict" && l.get_value() == "broken")
+                .any(|l| l.name() == "verdict" && l.value() == "broken")
                 && labels
                     .iter()
-                    .any(|l| l.get_name() == "reason" && l.get_value() == "invalid-zip")
+                    .any(|l| l.name() == "reason" && l.value() == "invalid-zip")
         });
         assert!(
             m.is_some(),
