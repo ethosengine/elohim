@@ -76,7 +76,7 @@ const UNPROJECTED_STATE: &str = "proposed";
 /// does not declare one. One is the floor, never zero — a `required_signatures`
 /// of zero would make the quorum check in `verify_path` vacuous, which is the
 /// one value a defaulting rule must not be able to produce.
-const DEFAULT_REQUIRED_SIGNATURES: usize = 1;
+pub(super) const DEFAULT_REQUIRED_SIGNATURES: usize = 1;
 
 /// Fetch the evidence for a manifest's `adoptionDiscipline.path`.
 ///

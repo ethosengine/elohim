@@ -55,6 +55,7 @@ use std::path::PathBuf;
 
 use seam_contracts::Answer;
 
+use super::path_evidence::DEFAULT_REQUIRED_SIGNATURES;
 use super::{
     AdoptionRefusal, Artifact, ArtifactClass, HeadTier, PathEvidence, RefusalReason,
     ReleaseManifest, RoleBinding, RosterEvidence, VerifiedRelease, RELEASE_MANIFEST_KIND,
@@ -864,10 +865,18 @@ pub fn verify_path(
             format!("path {} is {}, not active", ev.commitment_cid, ev.state),
         ));
     }
-    if ev.signatures < ev.required_signatures {
+    // FLOORED AT THE USE SITE as well as at the parse site. `evidence_from`
+    // floors what it parses, but a `PathEvidence` can also arrive
+    // DESERIALIZED — from an older peer, from a cached verdict — and such a
+    // value never passed through that parse. `0 of 0` satisfies every
+    // comparison below, so an unfloored zero arriving by any route would mint
+    // a path needing no signature at all. The floor is cheap; the assumption
+    // that every construction site went through the parser is not.
+    let required_signatures = ev.required_signatures.max(DEFAULT_REQUIRED_SIGNATURES);
+    if ev.signatures < required_signatures {
         return Err(refuse(
             RefusalReason::QuorumUnmet,
-            format!("{} of {} signatures", ev.signatures, ev.required_signatures),
+            format!("{} of {} signatures", ev.signatures, required_signatures),
         ));
     }
 
@@ -896,9 +905,20 @@ pub fn verify_path(
             // none — is not this constitution's electorate. Without this, a
             // forger needed only to mint any roster at all; with it, the roster
             // has to at least agree with the root the path claims.
-            if !ev.constitution_root.is_empty()
-                && constitution_root.as_deref() != Some(ev.constitution_root.as_str())
-            {
+            //
+            // A PATH that declares no root has nothing to compare the roster
+            // against, so this arm is SKIPPED — and said out loud, exactly as
+            // `root: undeclared` is below. Skipping is not passing: the
+            // electorate went unbound, and a silent pass would read as though
+            // it had been checked.
+            if ev.constitution_root.is_empty() {
+                tracing::info!(
+                    roster_cid = %ev.roster_cid,
+                    commitment_cid = %ev.commitment_cid,
+                    "release-adoption: root: undeclared on the path — the roster's own root is \
+                     not compared, so the electorate is UNBOUND (the check is skipped, not passed)"
+                );
+            } else if constitution_root.as_deref() != Some(ev.constitution_root.as_str()) {
                 return Err(refuse(
                     RefusalReason::RootMismatch,
                     format!(
@@ -959,13 +979,13 @@ pub fn verify_path(
         .map(String::as_str)
         .filter(|s| members.iter().any(|m| m == *s))
         .collect();
-    if on_roster.len() < ev.required_signatures {
+    if on_roster.len() < required_signatures {
         return Err(refuse(
             RefusalReason::QuorumUnmet,
             format!(
                 "{} of {} distinct signatures from roster {}",
                 on_roster.len(),
-                ev.required_signatures,
+                required_signatures,
                 ev.roster_cid
             ),
         ));
@@ -1297,6 +1317,10 @@ mod tests {
             "release-manifest-storage-binary.json",
             "release-manifest-happ-bundle.json",
             "release-manifest-envelope-broken.json",
+            // **Task 17b.** The lineage shape, and the ONLY fixture carrying
+            // `roleBinding.constitutionRoot` — without it the mirror-vs-schema
+            // test would agree about a field neither side ever saw.
+            "release-manifest-happ-lineage.json",
         ]
         .into_iter()
         .map(|n| (n, fixture(n)))
@@ -1362,11 +1386,31 @@ mod tests {
                 validator.is_valid(&body),
                 "fixture {name} does not satisfy T1's schema"
             );
-            assert!(
-                verify_shape(&body).is_ok(),
-                "fixture {name} satisfies the schema but the Rust mirror refused it — the \
-                 mirror has drifted from `elohim/rakia/schemas/v1/release-manifest.schema.json`"
-            );
+            let manifest = verify_shape(&body).unwrap_or_else(|e| {
+                panic!(
+                    "fixture {name} satisfies the schema but the Rust mirror refused it ({e}) — \
+                     the mirror has drifted from \
+                     `elohim/rakia/schemas/v1/release-manifest.schema.json`"
+                )
+            });
+
+            // **Task 17b.** Agreement is not just "both sides accept the
+            // bytes" — the field has to LAND. A `#[serde(default)]` Option
+            // deserializes to `None` just as happily from a document that
+            // omits it as from one that spells it wrong, so the lineage
+            // fixture asserts the value actually arrived on the binding.
+            if name == "release-manifest-happ-lineage.json" {
+                let binding = &manifest.applies_to.roles["node_registry"];
+                assert_eq!(
+                    binding.constitution_root.as_deref(),
+                    body["appliesTo"]["roles"]["node_registry"]["constitutionRoot"].as_str(),
+                    "roleBinding.constitutionRoot must deserialize onto RoleBinding — a silent \
+                     None here is exactly the drift this test exists to catch"
+                );
+                assert!(binding.constitution_root.is_some());
+                assert!(binding.migrate_from.is_some());
+                assert!(binding.lineage.as_ref().is_some_and(|l| !l.is_empty()));
+            }
         }
     }
 
@@ -1463,7 +1507,13 @@ mod tests {
     /// The DNA hash a `happ-lineage` release crosses TO.
     const V2_NR: &str = "uhC0knBUbHoWC8FJowoRoWD8s7bA16J7PglOU3shVv5UTG79BG16Q";
     /// The one notarized commitment [`lineage_manifest`]'s path names.
-    const LINEAGE_PATH_CID: &str = "uhCkkLineagePathCommitment";
+    /// `uhCEk`, not `uhCkk`: a commitment's CID is its ENTRY hash, and this
+    /// fixture spelled it with an ACTION-hash prefix. Harmless here (nothing
+    /// in `verify_path` decodes it) but a fixture that does not look like the
+    /// thing it stands for is how the next reader learns the wrong shape —
+    /// `path_evidence`'s own fixture had to become a real entry hash for
+    /// exactly this reason.
+    const LINEAGE_PATH_CID: &str = "uhCEkLineagePathCommitment";
     /// The constitutional root both [`lineage_manifest`]'s installed role and
     /// [`path_evidence_ok`] agree on by default.
     const LINEAGE_ROOT: &str = "bafyLineageConstitutionRoot";
@@ -1954,13 +2004,91 @@ mod tests {
             RefusalReason::QuorumUnmet
         );
 
+        // The ROOT arm, measured on the INSTALLED comparison — which is what
+        // this test used to claim and did not do. Mutating only
+        // `ev.constitution_root` makes the ROSTER's root disagree first, and
+        // the roster arm runs earlier, so the refusal came from the roster
+        // while the assertion said `RootMismatch` either way. Moving the
+        // roster's root along with the path's leaves the per-role installed
+        // comparison as the only thing left to refuse.
         ev.signatures = 1;
         ev.constitution_root = "bafyOTHERConstitutionRoot".to_string();
-        assert_eq!(
-            verify_path(&m, &inst, &Answer::Present(ev))
-                .unwrap_err()
-                .reason_code(),
-            RefusalReason::RootMismatch
+        ev.roster = RosterEvidence::Read {
+            members: vec![ROSTER_MEMBER.to_string()],
+            constitution_root: Some("bafyOTHERConstitutionRoot".to_string()),
+        };
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::RootMismatch);
+        assert!(
+            r.detail.contains("running under installed") && r.detail.contains(LINEAGE_ROOT),
+            "the refusal must come from the INSTALLED root comparison and say so — otherwise \
+             this test is measuring the roster arm; got {:?}",
+            r.detail
+        );
+    }
+
+    /// **The roster-root arm, kept separate on purpose.** Same mutation, but
+    /// with the roster left on the ORIGINAL root — so what refuses is the
+    /// electorate disagreeing with the path, before the installed comparison
+    /// is ever reached. Two arms, two tests: a single test mutating one field
+    /// cannot tell you which one fired.
+    #[test]
+    fn the_roster_root_arm_refuses_before_the_installed_one() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.constitution_root = "bafyOTHERConstitutionRoot".to_string();
+        // `path_evidence_ok`'s roster still declares LINEAGE_ROOT.
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::RootMismatch);
+        assert!(
+            r.detail.contains(&format!("roster {LINEAGE_ROSTER_CID}")),
+            "the roster arm must name the ROSTER, not the installed role; got {:?}",
+            r.detail
+        );
+        assert!(
+            !r.detail.contains("running under installed"),
+            "the roster arm runs FIRST — reaching the installed comparison here would mean the \
+             electorate check was skipped; got {:?}",
+            r.detail
+        );
+    }
+
+    /// **Item 4 — the floor at the USE site.** `evidence_from` floors what it
+    /// parses, but a `PathEvidence` can also arrive DESERIALIZED (an older
+    /// peer, a cached verdict) having never passed through that parser. This
+    /// hand-builds exactly such a value: `required_signatures: 0` with zero
+    /// signatures, which `0 of 0` would otherwise sail straight through.
+    #[test]
+    fn a_hand_built_zero_quorum_is_floored_at_the_use_site() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let ev = PathEvidence {
+            commitment_cid: LINEAGE_PATH_CID.to_string(),
+            state: "active".to_string(),
+            revoked_at: None,
+            from_dna_hash: INSTALLED_NR.to_string(),
+            to_dna_hash: V2_NR.to_string(),
+            constitution_root: LINEAGE_ROOT.to_string(),
+            signatures: 0,
+            // NEVER floored by any parser — this value was deserialized, not
+            // built by `evidence_from`.
+            required_signatures: 0,
+            roster_cid: LINEAGE_ROSTER_CID.to_string(),
+            signers: vec![],
+            roster: RosterEvidence::Read {
+                members: vec![ROSTER_MEMBER.to_string()],
+                constitution_root: Some(LINEAGE_ROOT.to_string()),
+            },
+        };
+        let r = verify_path(&m, &inst, &Answer::Present(ev)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::QuorumUnmet);
+        assert!(
+            r.detail.contains("0 of 1 signatures"),
+            "the use site must report the FLOOR, not the body's zero; got {:?}",
+            r.detail
         );
     }
 

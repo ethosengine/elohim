@@ -475,6 +475,16 @@ impl InstalledRealitySource for PassportInstalledReality {
                 // opened. `HttpServer`'s own `/version` handler (the wired
                 // path) supplies the real snapshot via `with_lineage_roles`.
                 lineage: std::collections::BTreeMap::new(),
+                // **Task 12's field, filled by the same rule as `lineage`
+                // above** — this source holds no `LineageBridge` any more than
+                // it holds a `LineageRoles`, and the field's own doc says an
+                // unwired node reports an empty sweep. Not a placeholder: a
+                // narrow conductor-inventory leg has nothing to sweep, and the
+                // wired `/version` path is where the real snapshot belongs.
+                // If Task 12 wants the adoption controller to carry sweep
+                // observations, that is a bridge handle threaded to here, not
+                // a value invented at this call site.
+                sweep: std::collections::BTreeMap::new(),
             },
         )
         .await;

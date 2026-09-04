@@ -1480,21 +1480,37 @@ mod tests {
     /// which is how a writer and a reader drift into two different ideas of the
     /// same map.
     ///
-    /// `YamlProperties` wraps a private yaml value and is not constructible
-    /// here without going through serde, so the encode step mirrors what
-    /// `install_lineage` does: JSON in, msgpack out, the way
-    /// `SerializedBytes` stores it.
+    /// The encode step runs the REAL conversion `install_lineage` performs —
+    /// `serde_json::Value` → `YamlProperties` → `SerializedBytes` — rather
+    /// than a hand-rolled `rmp_serde::to_vec_named`. Encoding the JSON value
+    /// directly would only prove `rmp_serde` agrees with itself and would
+    /// leave the actual encoder (the one whose bytes the conductor stores)
+    /// unmeasured.
     #[test]
     fn install_properties_round_trip_to_the_passport_decoder() {
         use crate::runtime_passport::constitution_root_from_properties;
+        use holochain_types::prelude::SerializedBytes;
 
         let lineage = vec![DnaHash::from_raw_32(vec![0x42; 32])];
         let root = "bafyLineageConstitutionRoot";
 
+        // The REAL conversion, not a stand-in. `install_lineage` hands the
+        // JSON to `YamlProperties`, and the conductor stores the
+        // `SerializedBytes` that type produces — so the round trip has to run
+        // through BOTH, or it only proves `rmp_serde` agrees with itself while
+        // the actual encoder (yaml value → SerializedBytes) goes unmeasured.
+        fn install_bytes(props: serde_json::Value) -> Vec<u8> {
+            let yaml: YamlProperties =
+                serde_json::from_value(props).expect("properties become YamlProperties");
+            let sb = SerializedBytes::try_from(yaml)
+                .expect("YamlProperties serializes exactly as the conductor stores it");
+            sb.bytes().clone()
+        }
+
         let with_root = lineage_properties_json(&lineage, Some(root));
         assert_eq!(with_root["constitution_root"], root);
         assert_eq!(with_root["lineage"][0], lineage[0].to_string());
-        let encoded = rmp_serde::to_vec_named(&with_root).expect("encode properties");
+        let encoded = install_bytes(with_root);
         assert_eq!(
             constitution_root_from_properties(&encoded).as_deref(),
             Some(root),
@@ -1510,7 +1526,7 @@ mod tests {
             without.get("constitution_root").is_none(),
             "an undeclared root omits the key rather than writing a null"
         );
-        let encoded = rmp_serde::to_vec_named(&without).expect("encode properties");
+        let encoded = install_bytes(without.clone());
         assert!(constitution_root_from_properties(&encoded).is_none());
         // The lineage the integrity zome validates against is unchanged by
         // either shape — the root rides ALONGSIDE it, never instead of it.

@@ -1,0 +1,58 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:happ:elohim:commons",
+  "artifactClass": "happ-lineage",
+  "artifacts": [
+    {
+      "blobCid": "bafkreie7bmyi6srdkummlem5rmxh4nqfg4suwdxkkppwa5yvvyy2dcrvie",
+      "bytes": 10897977,
+      "sha256": "9f0b308f4a235518c5919d8b2e7e360537254b0eea53df607715ae31a18a3541",
+      "filename": "elohim-node-registry-v2.happ",
+      "mimeType": "application/octet-stream"
+    }
+  ],
+  "appliesTo": {
+    "roles": {
+      "node_registry": {
+        "dnaHash": "uhC0knBUbHoWC8FJowoRoWD8s7bA16J7PglOU3shVv5UTG79BG16Q",
+        "coordinatorWasmHashes": ["uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"],
+        "coordinatorZomes": {
+          "node_registry_coordinator": "uhCokeC1VgvabQ8DsrdmLxC_VA2tTMMpQGOPNn58AhjFGFb9hsPx0"
+        },
+        "migrateFrom": "uhC0kqjFQkI5pz0V5u8jMqAu0LsTI-2MkMMYUMajUsYHNlCkvU-9n",
+        "lineage": ["uhC0kqjFQkI5pz0V5u8jMqAu0LsTI-2MkMMYUMajUsYHNlCkvU-9n"],
+        "constitutionRoot": "bafyreihqrsr5qhs4kjxlmn5qkzlfvbqbpnr4c7hqzq4qy6xg3xhqvj4sxq"
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [0],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "root@workspace836e1cb3b3d7457c-b6c4c4686-lk6g8",
+    "toolchain": "hc 0.7 pack / holochain 0.7",
+    "buildInfo": {
+      "bundle": "elohim-node-registry-v2.happ",
+      "source": "elohim/holochain/dna/node-registry",
+      "packedBy": "hc pack"
+    },
+    "builtFrom": {
+      "gitCommit": "b7cd6d88b6cddc0804356c0acbdf001b9ff27c4b",
+      "gitBranch": "dev",
+      "dirty": true
+    }
+  },
+  "declaredReach": "commons",
+  "adoptionDiscipline": {
+    "soakSecs": 900,
+    "attestationThreshold": 2,
+    "canaryOrder": ["matthew", "jessica", "james"],
+    "path": {
+      "commitmentCid": "uhCEkfn5-fn5-fn5-fn5-fn5-fn5-fn5-fn5-fn5-fn5-fn5-fn4G"
+    }
+  },
+  "notes": "The rung-6 crossing shape: one role, migrateFrom on the installed v1 hash, that hash in lineage, a notarized migrates-lineage path, and the constitutionRoot the crossing is notarized under (epic Task 17b). The root is the FALLBACK verify_path checks against when the adopting peer's installed v1 cell declares none, which is every cell installed before the property existed."
+}
