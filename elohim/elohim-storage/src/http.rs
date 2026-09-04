@@ -317,6 +317,14 @@ pub struct HttpServer {
     p2p_handle: Option<crate::p2p::P2PHandle>,
     /// Extraction cache for HTML5 app files (None = disabled)
     extraction_cache: Option<Arc<ExtractionCache>>,
+    /// Deliverability verdict per canonical blob hash — a memo of a pure
+    /// derivation (app_deliverability), re-derived on the next extraction if
+    /// absent. Process-lifetime; persistence is slice 2.
+    deliverability_memo: Arc<
+        tokio::sync::RwLock<
+            std::collections::HashMap<String, crate::app_deliverability::DeliverabilityVerdict>,
+        >,
+    >,
     /// T7 (head-plane trust-gradient program): process-lifetime
     /// verification-memo store, wired once at startup via
     /// [`Self::with_memo_store`] and cloned into the per-request
@@ -567,6 +575,36 @@ fn content_address_header(blob_hash: &str) -> String {
     } else {
         blob_hash.to_string()
     }
+}
+
+/// Stamp the peer's deliverability verdict on an app surface. Additive: a
+/// consumer that does not know the header sees no change.
+fn with_deliverability_headers(
+    mut builder: hyper::http::response::Builder,
+    verdict: &crate::app_deliverability::DeliverabilityVerdict,
+) -> hyper::http::response::Builder {
+    builder = builder.header("X-Deliverability", verdict.header_value());
+    if let Some(reason) = verdict.reason_value() {
+        builder = builder.header("X-Deliverability-Reason", reason);
+    }
+    builder
+}
+
+/// Memo hit, or the honest `NotJudged(NotHeld)` absence — never a silent
+/// default to `Boots`.
+async fn deliverability_lookup(
+    memo: &Arc<
+        tokio::sync::RwLock<
+            std::collections::HashMap<String, crate::app_deliverability::DeliverabilityVerdict>,
+        >,
+    >,
+    blob_hash: &str,
+) -> crate::app_deliverability::DeliverabilityVerdict {
+    memo.read().await.get(blob_hash).cloned().unwrap_or(
+        crate::app_deliverability::DeliverabilityVerdict::NotJudged(
+            crate::app_deliverability::NotJudgedWhy::NotHeld,
+        ),
+    )
 }
 
 /// Fix B syncing-status JSON body for the `GET /blob/{hash}` route: the
@@ -893,6 +931,9 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             p2p_handle: None,
             extraction_cache: None,
+            deliverability_memo: Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
             memo_store: None,
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
@@ -8958,6 +8999,8 @@ impl HttpServer {
             builder = builder
                 .header("X-Blob-Hash", hash.as_str())
                 .header("X-Content-Address", content_address_header(hash));
+            let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
+            builder = with_deliverability_headers(builder, &verdict);
         }
         if let Some(ref slug) = resolved_slug {
             builder = builder.header("X-Content-Slug", slug.as_str());
@@ -9068,6 +9111,8 @@ impl HttpServer {
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
                         .header("X-Cache", "HIT")
                         .header("X-Content-Address", content_address_header(hash));
+                    let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
+                    builder = with_deliverability_headers(builder, &verdict);
                     if let Some(ref slug) = resolved_slug {
                         builder = builder
                             .header("X-Slug", slug.as_str())
@@ -9092,6 +9137,8 @@ impl HttpServer {
                             .header("X-Cache", "HIT")
                             .header("X-SPA-Fallback", "1")
                             .header("X-Content-Address", content_address_header(hash));
+                        let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
+                        builder = with_deliverability_headers(builder, &verdict);
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
                                 .header("X-Slug", slug.as_str())
@@ -9133,6 +9180,8 @@ impl HttpServer {
                         .header("X-Cache", "HIT-COALESCED");
                     if let Some(ref hash) = cached_blob_hash {
                         builder = builder.header("X-Content-Address", content_address_header(hash));
+                        let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
+                        builder = with_deliverability_headers(builder, &verdict);
                     }
                     if let Some(ref slug) = resolved_slug {
                         builder = builder
@@ -9158,6 +9207,9 @@ impl HttpServer {
                         if let Some(ref hash) = cached_blob_hash {
                             builder =
                                 builder.header("X-Content-Address", content_address_header(hash));
+                            let verdict =
+                                deliverability_lookup(&self.deliverability_memo, hash).await;
+                            builder = with_deliverability_headers(builder, &verdict);
                         }
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
@@ -9355,6 +9407,12 @@ impl HttpServer {
             Ok(a) => a,
             Err(e) => {
                 warn!(error = %e, "Invalid ZIP archive");
+                self.deliverability_memo.write().await.insert(
+                    blob_hash.clone(),
+                    crate::app_deliverability::DeliverabilityVerdict::Broken(
+                        crate::app_deliverability::BrokenReason::InvalidZip,
+                    ),
+                );
                 return Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -9400,6 +9458,22 @@ impl HttpServer {
             }
         }
 
+        // The peer judges the head it holds — once per hash, inside the walk
+        // that already read every entry (spec 2026-09-05 §2.2).
+        let verdict = crate::app_deliverability::judge_deliverability(&all_files);
+        tracing::info!(
+            target: "storage::deliverability",
+            blob_hash = %blob_hash,
+            slug = ?resolved_slug,
+            verdict = verdict.header_value(),
+            reason = ?verdict.reason_value(),
+            "app head judged"
+        );
+        self.deliverability_memo
+            .write()
+            .await
+            .insert(blob_hash.clone(), verdict.clone());
+
         // Cache the extracted files (non-fatal if caching fails)
         if let Some(ref cache) = self.extraction_cache {
             if let Err(e) = cache.put_app(cache_key, &blob_hash, all_files).await {
@@ -9431,6 +9505,7 @@ impl HttpServer {
                             .header("X-Cache", "MISS")
                             .header("X-SPA-Fallback", "1")
                             .header("X-Content-Address", content_address_header(&blob_hash));
+                        builder = with_deliverability_headers(builder, &verdict);
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
                                 .header("X-Slug", slug.as_str())
@@ -9467,6 +9542,7 @@ impl HttpServer {
             .header(header::CACHE_CONTROL, "public, max-age=3600")
             .header("X-Cache", "MISS")
             .header("X-Content-Address", content_address_header(&blob_hash));
+        builder = with_deliverability_headers(builder, &verdict);
         if let Some(ref slug) = resolved_slug {
             builder = builder
                 .header("X-Slug", slug.as_str())
@@ -17679,6 +17755,50 @@ mod apps_resolver_heal_tests {
         );
         assert!(!is_content_address("baf"));
         assert!(!is_content_address(""));
+    }
+
+    /// The wire vocabulary a consumer (doorway, agent, human) reads off any
+    /// `/apps/` surface: `X-Deliverability: boots|broken|not-judged`, with an
+    /// `X-Deliverability-Reason` present only for the non-boots verdicts.
+    #[test]
+    fn deliverability_headers_carry_the_wire_vocabulary() {
+        use crate::app_deliverability::{BrokenReason, DeliverabilityVerdict};
+        let b = Response::builder();
+        let resp = with_deliverability_headers(
+            b,
+            &DeliverabilityVerdict::Broken(BrokenReason::MissingAsset("main-EAKNZDUP.js".into())),
+        )
+        .body(Full::new(Bytes::new()))
+        .unwrap();
+        assert_eq!(resp.headers().get("X-Deliverability").unwrap(), "broken");
+        assert_eq!(
+            resp.headers().get("X-Deliverability-Reason").unwrap(),
+            "missing-asset:main-EAKNZDUP.js"
+        );
+        let ok = with_deliverability_headers(Response::builder(), &DeliverabilityVerdict::Boots)
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        assert_eq!(ok.headers().get("X-Deliverability").unwrap(), "boots");
+        assert!(ok.headers().get("X-Deliverability-Reason").is_none());
+    }
+
+    /// A hash the walk has never judged reads honestly as not-judged/not-held
+    /// (never a silent default to boots); a memoised verdict is a hit.
+    #[tokio::test]
+    async fn an_unjudged_hash_reads_not_judged_not_held() {
+        use crate::app_deliverability::{DeliverabilityVerdict, NotJudgedWhy};
+        use std::collections::HashMap;
+        let memo: Arc<tokio::sync::RwLock<HashMap<String, DeliverabilityVerdict>>> =
+            Default::default();
+        let v = deliverability_lookup(&memo, "sha256-deadbeef").await;
+        assert_eq!(v, DeliverabilityVerdict::NotJudged(NotJudgedWhy::NotHeld));
+        memo.write()
+            .await
+            .insert("sha256-deadbeef".into(), DeliverabilityVerdict::Boots);
+        assert_eq!(
+            deliverability_lookup(&memo, "sha256-deadbeef").await,
+            DeliverabilityVerdict::Boots
+        );
     }
 
     /// Both spellings of ONE content address normalize to the same canonical
