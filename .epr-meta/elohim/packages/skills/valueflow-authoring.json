@@ -1,0 +1,78 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "SkillPackage",
+  "metadata": {
+    "id": "valueflow-authoring",
+    "name": "valueflow-authoring",
+    "version": "1.0.0",
+    "description": "Orchestrate developer work as an explicit REA valueflow: intend, claim, produce, verify, fulfil, rule, and ratchet, with one command per verb and durable actor attribution.",
+    "triggerDescription": "Use when orchestrating a planned development task through claim, implementation, review, fulfilment, ruling, and habit ratchet without losing the valueflow record.",
+    "runtimeTargets": [
+      "claude",
+      "codex",
+      "antigravity"
+    ],
+    "sourceRuntime": "elohim-agent",
+    "assetRefs": [],
+    "author": "elohim-protocol",
+    "governance": {
+      "eprRef": "epr:elohim-agent/skills/valueflow-authoring",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "master": "package",
+    "composedBy": "codex-gpt-5"
+  },
+  "instructions": {
+    "format": "markdown",
+    "body": "\n# Valueflow Authoring\n\nTreat the REA authorship loop as the development process itself: intend, claim, produce, verify, fulfil, rule, ratchet. The protocol verbs are the only designed friction; do not surround them with duplicate ledgers or prose that has to be reconciled later. Keep the standing WIP fence: at most two habits may be active at once.\n\nThere is no parameter ABI. The brief path, commitment, rulings in force, and base commit are the parameters. Pass them in every dispatch using this exact shape:\n\n`Invoke skill X. Brief: <path>. Commitment: <gap-id>. Rulings in force: ... Base: <sha>.`\n\n## Method\n\nEach verb is one command or one dispatch. Do not combine verbs into an opaque script.\n\n1. **Intend.** Decompose the plan into gap items, then run `epr flow project` once so those intents enter the valueflow.\n2. **Claim.** Run `epr flow claim --on <gap-id> --as agent:implementer@<model> --brief <path>` once.\n3. **Produce.** Dispatch one implementer with the `valueflow-implementer` skill and the exact dispatch prompt shape above.\n4. **Verify.** Dispatch one reviewer with the `valueflow-reviewer` skill, the same brief and commitment, the rulings in force, and the base SHA.\n5. **Fulfil.** For a discharging status, run `epr flow fulfill --on <gap-id> --report <path> --status <DONE|DONE_WITH_CONCERNS>` once.\n6. **Rule.** Record a binding decision once with `epr flow note --on <gap-id|plan> --kind ruling --reason '...'`.\n7. **Ratchet.** Append one evidence delta line to the habit atom, then re-project the habit register once.\n\n## Do not\n\n- Do not restate constants from the brief, plan, rulings, or repository governance in a dispatch prompt. Pass their addresses and let the seat read them.\n- Do not write rulings only as prose in a progress file or report. The ruling note is the record; prose is a projection.\n- Do not exceed the WIP fence to make dispatch easier.\n- Do not invent a parameter ABI around the prompt shape.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/skills/valueflow-authoring/SKILL.md",
+      "frontmatter": {
+        "name": "valueflow-authoring",
+        "description": "Orchestrate developer work as an explicit REA valueflow: intend, claim, produce, verify, fulfil, rule, and ratchet, with one command per verb and durable actor attribution.",
+        "metadata": {
+          "author": "elohim-protocol",
+          "version": "1.0.0",
+          "sourceRuntime": "elohim-agent",
+          "packageKind": "SkillPackage"
+        }
+      }
+    },
+    "codex": {
+      "path": ".codex/skills/valueflow-authoring/SKILL.md",
+      "frontmatter": {
+        "name": "valueflow-authoring",
+        "description": "Orchestrate developer work as an explicit REA valueflow: intend, claim, produce, verify, fulfil, rule, and ratchet, with one command per verb and durable actor attribution.",
+        "metadata": {
+          "runtime": "codex",
+          "sourceRuntime": "elohim-agent",
+          "sourcePath": ".epr-meta/elohim/packages/skills/valueflow-authoring.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/valueflow-authoring"
+      }
+    },
+    "antigravity": {
+      "path": ".agents/skills/valueflow-authoring/SKILL.md",
+      "frontmatter": {
+        "name": "valueflow-authoring",
+        "description": "Orchestrate developer work as an explicit REA valueflow: intend, claim, produce, verify, fulfil, rule, and ratchet, with one command per verb and durable actor attribution.",
+        "metadata": {
+          "runtime": "antigravity",
+          "sourceRuntime": "elohim-agent",
+          "master": "package",
+          "sourcePath": ".epr-meta/elohim/packages/skills/valueflow-authoring.json",
+          "packageKind": "SkillPackage"
+        },
+        "governance": "epr:elohim-agent/skills/valueflow-authoring"
+      }
+    }
+  }
+}
