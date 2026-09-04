@@ -58,3 +58,17 @@ errors; tree-wide eslint returns 136 errors / 348 warnings. Two of the tsc/eslin
 gate already carries. Pre-push runs `genesis/a2o`'s gate, so a push from this tree currently needs
 the CI backstop rather than a clean local gate. No dedicated quality-debt cluster was found for
 `genesis/a2o`; capturing here until one exists or this item graduates a fix shift.
+
+## 4. A row never answers "has this staged candidate been attested" — controller observability gap
+
+With a candidate staged BENEATH an earned head (story Station 9; controller `86445bd08`), no `/admin/adoption`
+row carries the candidate's attestation evidence: apply-mode rows resolve the earned WINNER and take the
+idempotence exit (no threshold read), and the canary's row — which does resolve the candidate — goes quiet the
+moment it has applied it (same exit, zero conductor calls), so its `attestations` stays `null` even after its own
+controller authored the soak attestation (james, 09:31:36Z, run `shift-it6-20260904T091619Z`). On a fresh channel
+Station 4 was covered only as a side effect: the candidate IS the winner there, and matthew's waiting row verifies
+it every sweep. The fixture now reads the evidence by cid through the conductor (`release-ceremony.ts attestations
+<cid>`, `312d4f05d`, mirroring `release_attestation::classify/tally`). Cure candidates: (a) the canary's row keeps a
+`candidateEvidence` block refreshed on each sweep while its applied release is a staging candidate (one bounded
+threshold read per sweep); (b) a storage route `GET /admin/adoption/evidence/{releaseCid}` composing the same read.
+Storage-only, coordinator-hash-neutral. Source: shift 2026-09-04T05-20-rung5-long-lived-channel-0-7-mesh, iteration 6.
