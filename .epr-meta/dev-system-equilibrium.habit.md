@@ -29,6 +29,23 @@ retire-when: >
   held a full quarter with no operator override. A system actually in equilibrium does not
   need a weekly reader.
 ---
+DELTA 2026-09-05 (first task-level fulfilments via epr flow claim/fulfill;
+event, not a rate; no status flip): valueflow-authoring Task 11 dogfooded
+the new verbs against the Holochain Evolution Epic MVP plan — decompose
+re-ran (20 gap-items), then three landed epic tasks were claimed and
+fulfilled as agent:implementer@claude-opus-5 (Task 16 roster check,
+825a090df + fix 4425bb6fb; Task 17 constitution_root, 10cb3dc00; Task 18
+export_held_records, 4fe69b918); no tool:decompose-claim commitment held
+any of the three intents, so --supersede was never exercised. Stock
+reading over 2026-08-29..2026-09-05 --per day --stock commitments,
+identical window/flags before and after: BEFORE level 614, inflow
+3.286/day, outflow 0.000/day, FILLING; AFTER level 616, inflow 4.000/day,
+outflow 0.429/day, FILLING. Outflow moved (0.000 -> 0.429/day, 3 consume
+events newly witnessed in the window) — this is the event this habit
+exists to witness becoming visible, not evidence of a sustained rate:
+three fulfilments in one authoring session, not a drain the stock can
+count on. Habit remains RED; equilibrium is unproven and the check stays
+FILLING.
 DELTA 2026-08-16 (developer CLI drain; no status flip): the committed
 command stock fell 362→322 while its public surface converged to eight
 root verbs; 32 local gates now have one manifest-declared detector and
