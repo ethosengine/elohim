@@ -318,7 +318,16 @@ pub async fn staged_target_coordinators(
     use seam_contracts::Answer;
 
     match manifest.artifact_class {
-        ArtifactClass::CoordinatorBundle | ArtifactClass::HappBundle => {}
+        // **Rung 6.** A `happ-lineage` binding carries `coordinatorWasmHashes`
+        // in exactly the same shape as `coordinator-bundle`/`happ-bundle` —
+        // it is a coordinator crossing, so "already runs the target bytes"
+        // is answerable for it the same way. No apply vehicle routes this
+        // class yet (a separate, later concern); this only decides whether
+        // the by-bytes convergence exit CAN fire, never whether anything
+        // applies.
+        ArtifactClass::CoordinatorBundle
+        | ArtifactClass::HappBundle
+        | ArtifactClass::HappLineage => {}
         // A config or binary release installs no coordinator wasm; "already
         // current by coordinator bytes" is not a question it can answer.
         ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary => return Answer::Absent,

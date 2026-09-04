@@ -1199,6 +1199,12 @@ impl AdoptionController {
             attestations: attestations.as_ref(),
             tier: resolved.tier,
             target_coordinators: &target_coordinators,
+            // **Rung 6.** No caller fetches migrates-lineage path evidence
+            // yet — that fetch site is a later task's. `verify_path` is a
+            // no-op for every artifact class this sweep can see today, so
+            // `Answer::Absent` here changes nothing about this sweep's
+            // behavior.
+            path: Answer::Absent,
         }) {
             // ALREADY CURRENT BY BYTES: this peer runs exactly what the release
             // would install. Never a refusal — and routed through the SAME mode

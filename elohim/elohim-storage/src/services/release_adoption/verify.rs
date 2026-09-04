@@ -56,8 +56,8 @@ use std::path::PathBuf;
 use seam_contracts::Answer;
 
 use super::{
-    AdoptionRefusal, Artifact, HeadTier, RefusalReason, ReleaseManifest, VerifiedRelease,
-    RELEASE_MANIFEST_KIND,
+    AdoptionRefusal, Artifact, ArtifactClass, HeadTier, PathEvidence, RefusalReason,
+    ReleaseManifest, VerifiedRelease, RELEASE_MANIFEST_KIND,
 };
 use crate::services::release_attestation::QualifyingEvidence;
 
@@ -82,6 +82,13 @@ pub struct InstalledRole {
     pub dna_hash: String,
     /// zome name → wasm hash, exactly the shape the runtime passport reports.
     pub coordinator_zomes: BTreeMap<String, String>,
+    /// **Rung 6.** The constitutional root this role's DNA declares, when the
+    /// passport exposes one. `None` when the role declares no root — which is
+    /// every role today (`HappRolePassport` carries no such field yet); wired
+    /// through as `None` at [`InstalledReality::from_happ_passport`] rather
+    /// than invented here. [`verify_path`] only compares roots when this is
+    /// `Some` — a role with no declared root imposes no root constraint.
+    pub constitution_root: Option<String>,
 }
 
 impl InstalledRole {
@@ -126,6 +133,9 @@ impl InstalledReality {
                     role: role.role.clone(),
                     dna_hash: role.dna_hash.clone(),
                     coordinator_zomes: role.coordinator_wasm_hashes.clone(),
+                    // The runtime passport does not expose a per-role
+                    // constitution root yet — every role declares none.
+                    constitution_root: None,
                 },
             );
         }
@@ -354,6 +364,32 @@ pub fn verify_shape(body: &serde_json::Value) -> Result<ReleaseManifest, Adoptio
                 }
             }
         }
+        // **Rung 6.** `migrateFrom` and `lineage` are cross-field agreement
+        // the vendored schema mirror does not pin (see module docs — it is
+        // OPEN by design). Enforced here rather than left as an implicit
+        // manifest-author convention: a `happ-lineage` release whose
+        // `migrateFrom` names a hash absent from its own `lineage` chain
+        // could never establish [`ArtifactClass::HappLineage`]'s crossing_ok
+        // in [`verify_envelope`] for THAT hash — better to refuse it at shape
+        // time, naming the role, than let it silently fall through to a
+        // `dna_lineage_mismatch` that gives no hint why.
+        if manifest.artifact_class == ArtifactClass::HappLineage {
+            if let Some(from) = &binding.migrate_from {
+                let in_lineage = binding
+                    .lineage
+                    .as_ref()
+                    .is_some_and(|l| l.iter().any(|h| h == from));
+                if !in_lineage {
+                    return Err(refuse(
+                        RefusalReason::ManifestSchemaInvalid,
+                        format!(
+                            "appliesTo.roles.{role}.migrateFrom '{from}' is not a member of its \
+                             own lineage chain"
+                        ),
+                    ));
+                }
+            }
+        }
     }
     if manifest.envelope.wire_epochs.is_empty() {
         return Err(refuse(
@@ -493,16 +529,34 @@ pub fn verify_envelope(
         // THE DNA LINE. `update_coordinators` matches integrity dependencies by
         // NAME, so a cross-lineage bundle would splice coordinators onto
         // integrity zomes they were never compiled against. This is
-        // `happ_manager::lineage_mismatch_error`'s refusal, moved to verify time.
+        // `happ_manager::lineage_mismatch_error`'s refusal, moved to verify
+        // time. **Rung 6 (2026-09-04):** a `happ-lineage` release may cross
+        // this line — but ONLY by declaring the installed hash as BOTH its
+        // `migrateFrom` and a member of its `lineage` chain. Declaring intent
+        // is not evidence: [`verify_path`] still has to find a notarized,
+        // unrevoked, quorum-met commitment naming this exact crossing before
+        // the release is verified — this check just lets the manifest SAY it
+        // wants to cross, structurally refusing every other class the same
+        // as before.
         if binding.dna_hash != installed_role.dna_hash {
-            return Err(refuse(
-                RefusalReason::DnaLineageMismatch,
-                format!(
-                    "role '{role}': release binds DNA {} but this peer runs {} — crossing the \
-                     DNA line is rung 6's migration ceremony, structurally refused here",
-                    binding.dna_hash, installed_role.dna_hash
-                ),
-            ));
+            let crossing_ok = manifest.artifact_class == ArtifactClass::HappLineage
+                && binding.migrate_from.as_deref() == Some(installed_role.dna_hash.as_str())
+                && binding
+                    .lineage
+                    .as_ref()
+                    .is_some_and(|l| l.iter().any(|h| h == &installed_role.dna_hash));
+            if !crossing_ok {
+                return Err(refuse(
+                    RefusalReason::DnaLineageMismatch,
+                    format!(
+                        "role '{role}': release binds DNA {} but this peer runs {} — crossing \
+                         the DNA line needs a happ-lineage release whose migrateFrom names the \
+                         installed hash and whose lineage contains it (spec \
+                         2026-09-03-holochain-evolution-epic-design §4)",
+                        binding.dna_hash, installed_role.dna_hash
+                    ),
+                ));
+            }
         }
 
         // The coordinator-wasm (SUPERSEDES) leg is deliberately NOT here — see
@@ -671,6 +725,124 @@ pub fn verify_lineage(
 }
 
 // ---------------------------------------------------------------------------
+// Path — rung 6's notarized crossing, checked before the threshold
+// ---------------------------------------------------------------------------
+
+/// **Rung 6.** Verify the notarized migrates-lineage commitment a
+/// `happ-lineage` release crosses the DNA line under.
+///
+/// A no-op — `Ok(())` — for every artifact class but [`ArtifactClass::HappLineage`];
+/// every other class never touches `adoptionDiscipline.path`, so there is
+/// nothing for this check to do on their behalf. `path` is caller-fetched
+/// evidence (module docs: this module does no I/O), typed [`Answer`] for the
+/// same C4 reason every other floor input is: `Answer::Absent` means "not
+/// notarized (yet)", never "refused"; `Answer::Unreachable` means this peer's
+/// own conductor could not answer, which establishes nothing about the
+/// commitment either way.
+pub fn verify_path(
+    manifest: &ReleaseManifest,
+    installed: &InstalledReality,
+    path: &Answer<PathEvidence>,
+) -> Result<(), AdoptionRefusal> {
+    if manifest.artifact_class != ArtifactClass::HappLineage {
+        return Ok(());
+    }
+    let wanted = manifest.adoption_discipline.path.as_ref().ok_or_else(|| {
+        refuse(
+            RefusalReason::ManifestSchemaInvalid,
+            "artifactClass is happ-lineage without adoptionDiscipline.path — a lineage release \
+             with no notarized commitment to cross under is not a legal manifest",
+        )
+    })?;
+
+    let ev = match path {
+        Answer::Present(ev) => ev,
+        // C4: not notarized YET is not the same as refused. The commitment
+        // may simply not have replicated to this peer's conductor.
+        Answer::Absent => {
+            return Err(refuse(
+                RefusalReason::PathNotNotarized,
+                format!(
+                    "no migrates-lineage commitment {} is notarized on this peer's conductor",
+                    wanted.commitment_cid
+                ),
+            ));
+        }
+        // C4: this peer could not read the commitment at all — a fact about
+        // us, not about the commitment. Not the same refusal as "read it and
+        // it did not match."
+        Answer::Unreachable => {
+            return Err(refuse(
+                RefusalReason::ConductorUnavailable,
+                "path evidence unreadable — establishes nothing in either direction (C4)",
+            ));
+        }
+    };
+
+    if ev.commitment_cid != wanted.commitment_cid {
+        return Err(refuse(
+            RefusalReason::PathNotNotarized,
+            format!(
+                "commitment {} is not the manifest's path {}",
+                ev.commitment_cid, wanted.commitment_cid
+            ),
+        ));
+    }
+    if ev.revoked_at.is_some() {
+        return Err(refuse(
+            RefusalReason::PathRevoked,
+            format!(
+                "path {} revoked at {}",
+                ev.commitment_cid,
+                ev.revoked_at.clone().unwrap()
+            ),
+        ));
+    }
+    if ev.state != "active" {
+        return Err(refuse(
+            RefusalReason::PathNotNotarized,
+            format!("path {} is {}, not active", ev.commitment_cid, ev.state),
+        ));
+    }
+    if ev.signatures < ev.required_signatures {
+        return Err(refuse(
+            RefusalReason::QuorumUnmet,
+            format!("{} of {} signatures", ev.signatures, ev.required_signatures),
+        ));
+    }
+
+    for (role, binding) in &manifest.applies_to.roles {
+        let Some(inst) = installed.roles.get(role) else {
+            // Already refused as RoleNotInstalled by verify_envelope, which
+            // runs before this in `verify`. Nothing further to say here.
+            continue;
+        };
+        if ev.from_dna_hash != inst.dna_hash || ev.to_dna_hash != binding.dna_hash {
+            return Err(refuse(
+                RefusalReason::PathNotNotarized,
+                format!(
+                    "path {} names {}→{}, release is {}→{}",
+                    ev.commitment_cid,
+                    ev.from_dna_hash,
+                    ev.to_dna_hash,
+                    inst.dna_hash,
+                    binding.dna_hash
+                ),
+            ));
+        }
+        if let Some(root) = inst.constitution_root.as_deref() {
+            if root != ev.constitution_root {
+                return Err(refuse(
+                    RefusalReason::RootMismatch,
+                    format!("path root {} ≠ installed root {root}", ev.constitution_root),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Threshold — read through T5, never re-derived
 // ---------------------------------------------------------------------------
 
@@ -820,6 +992,15 @@ pub struct VerifyInput<'a> {
     /// no coordinators, `Answer::Unreachable` when the bytes could not be read.
     /// Read only by [`already_runs_target`]; absence never takes the exit.
     pub target_coordinators: &'a Answer<TargetCoordinators>,
+    /// **Rung 6 (2026-09-04).** Caller-fetched evidence for the manifest's
+    /// `adoptionDiscipline.path` commitment — this module does no I/O (module
+    /// docs), so the fetch lives entirely on the caller's side. Read only by
+    /// [`verify_path`], and only when `manifest.artifactClass` is
+    /// `happ-lineage`; every other class ignores it. `Answer::Absent` for
+    /// every existing caller today (the fetch site is a later task's), which
+    /// is exactly what `verify_path` needs to be a no-op for the four
+    /// existing artifact classes.
+    pub path: Answer<PathEvidence>,
 }
 
 /// What the floor decided. Two ways to pass, and they are not the same fact.
@@ -864,6 +1045,19 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
 
     verify_envelope(&manifest, input.installed)?;
     verify_lineage(&manifest, input.lineage)?;
+
+    // **Rung 6.** `verify_envelope` above already required `input.installed`
+    // to be `Answer::Present` (any other answer is a refusal it already
+    // returned), so this match is exhaustive-but-unreachable on the other two
+    // arms rather than a second unwrap of an already-proven fact.
+    let installed_reality = match input.installed {
+        Answer::Present(reality) => reality,
+        Answer::Absent | Answer::Unreachable => {
+            unreachable!("verify_envelope already required Answer::Present or returned Err")
+        }
+    };
+    verify_path(&manifest, installed_reality, &input.path)?;
+
     // The threshold gates PROMOTION (an EARNED head), never staging adoption
     // — a STAGING head's evidence is read and reported elsewhere (the
     // sweep's `attestations` field on `/admin/adoption`), never enforced
@@ -895,8 +1089,10 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
 
 #[cfg(test)]
 mod tests {
+    use super::super::{AppliesTo, RoleBinding};
     use super::*;
     use crate::runtime_passport::{HappPassport, HappRolePassport};
+    use crate::services::release_attestation::PathRef;
     use std::path::Path;
 
     const FIXTURE_DIR: &str = "../../genesis/a2o/scripts/__tests__/fixtures";
@@ -1061,6 +1257,257 @@ mod tests {
             &binding.coordinator_wasm_hashes[0],
         );
         verify_envelope(&manifest, &installed).expect("the peer this release was cut for");
+    }
+
+    // -------------------------------------------------------------------
+    // Rung 6 — the happ-lineage positive branch and verify_path (Task 4)
+    //
+    // No `happ-lineage` fixture is committed on disk (Task 3 landed the
+    // schema, not a packager fixture for it), so `manifest_for` is the one
+    // builder in this module that returns a struct literal rather than a
+    // disk fixture — it still starts from a REAL fixture (the coordinator-
+    // bundle one) so every field this suite does not care about
+    // (provenance, envelope, artifacts) stays schema-legal.
+    // -------------------------------------------------------------------
+
+    /// A DNA hash this peer runs before crossing. Distinct from [`V2_NR`].
+    const INSTALLED_NR: &str = "uhC0kiK2ZWeqhFWCEPyYngFb51yBMWXaSCrUZoL8g5ubbbPIa84yR";
+    /// The DNA hash a `happ-lineage` release crosses TO.
+    const V2_NR: &str = "uhC0knBUbHoWC8FJowoRoWD8s7bA16J7PglOU3shVv5UTG79BG16Q";
+    /// The one notarized commitment [`lineage_manifest`]'s path names.
+    const LINEAGE_PATH_CID: &str = "uhCkkLineagePathCommitment";
+    /// The constitutional root both [`lineage_manifest`]'s installed role and
+    /// [`path_evidence_ok`] agree on by default.
+    const LINEAGE_ROOT: &str = "bafyLineageConstitutionRoot";
+
+    /// A manifest of `class`, with one role (`node_registry`) bound to
+    /// [`V2_NR`] and no `migrateFrom`/`lineage` declared yet — the caller
+    /// mutates those for the case under test, exactly as
+    /// `m.applies_to.roles.get_mut("node_registry")` does in the tests below.
+    fn manifest_for(class: ArtifactClass) -> ReleaseManifest {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let mut m = verify_shape(&body).unwrap();
+        m.artifact_class = class;
+        let mut roles = BTreeMap::new();
+        roles.insert(
+            "node_registry".to_string(),
+            RoleBinding {
+                dna_hash: V2_NR.to_string(),
+                coordinator_wasm_hashes: vec![TARGET_WASM.to_string()],
+                coordinator_zomes: None,
+                migrate_from: None,
+                lineage: None,
+            },
+        );
+        m.applies_to = AppliesTo { roles };
+        m
+    }
+
+    /// A `happ-lineage` manifest whose `node_registry` binding declares the
+    /// crossing FROM [`INSTALLED_NR`] (both `migrateFrom` and `lineage`) TO
+    /// [`V2_NR`], with `adoptionDiscipline.path` naming [`LINEAGE_PATH_CID`]
+    /// — exactly the manifest [`path_evidence_ok`] is evidence FOR.
+    fn lineage_manifest() -> ReleaseManifest {
+        let mut m = manifest_for(ArtifactClass::HappLineage);
+        {
+            let binding = m.applies_to.roles.get_mut("node_registry").unwrap();
+            binding.migrate_from = Some(INSTALLED_NR.to_string());
+            binding.lineage = Some(vec![INSTALLED_NR.to_string()]);
+        }
+        m.adoption_discipline.path = Some(PathRef {
+            commitment_cid: LINEAGE_PATH_CID.to_string(),
+        });
+        m
+    }
+
+    /// This peer's installed reality for one `role`, running DNA `dna` —
+    /// built directly (not through [`installed_from`]'s `HappPassport`
+    /// round-trip) because [`verify_path`]'s root check needs an installed
+    /// role that DOES declare a `constitutionRoot`, which the runtime
+    /// passport does not expose yet (see [`InstalledRole::constitution_root`]
+    /// docs). Returns the unwrapped reality — [`verify_path`] takes
+    /// `&InstalledReality`, never an `Answer`.
+    fn installed_with(role: &str, dna: &str) -> InstalledReality {
+        let mut roles = BTreeMap::new();
+        roles.insert(
+            role.to_string(),
+            InstalledRole {
+                role: role.to_string(),
+                dna_hash: dna.to_string(),
+                coordinator_zomes: [("node_registry_zome".to_string(), TARGET_WASM.to_string())]
+                    .into_iter()
+                    .collect(),
+                constitution_root: Some(LINEAGE_ROOT.to_string()),
+            },
+        );
+        InstalledReality {
+            app_id: "elohim".to_string(),
+            roles,
+        }
+    }
+
+    /// Evidence that makes [`verify_path`] PASS for [`lineage_manifest`]
+    /// against `installed_with("node_registry", INSTALLED_NR)` — the same
+    /// commitment, active, unrevoked, quorum exactly met (1 of 1, so a single
+    /// mutation to `signatures` alone can swing the quorum check), and the
+    /// crossing/root the manifest and installed reality actually declare.
+    fn path_evidence_ok() -> PathEvidence {
+        PathEvidence {
+            commitment_cid: LINEAGE_PATH_CID.to_string(),
+            state: "active".to_string(),
+            revoked_at: None,
+            from_dna_hash: INSTALLED_NR.to_string(),
+            to_dna_hash: V2_NR.to_string(),
+            constitution_root: LINEAGE_ROOT.to_string(),
+            signatures: 1,
+            required_signatures: 1,
+        }
+    }
+
+    /// **Task 4 deliverable, positive half.** A `happ-lineage` release whose
+    /// binding names the installed hash as both `migrateFrom` and a member of
+    /// `lineage` is NOT a `dna_lineage_mismatch` — the declaration alone is
+    /// enough for `verify_envelope` to let it through; the notarized evidence
+    /// is [`verify_path`]'s job, checked separately.
+    #[test]
+    fn happ_lineage_positive_branch_accepts_migrate_from_equal_to_installed() {
+        let mut m = manifest_for(ArtifactClass::HappLineage);
+        {
+            let binding = m.applies_to.roles.get_mut("node_registry").unwrap();
+            binding.migrate_from = Some(INSTALLED_NR.to_string());
+            binding.dna_hash = V2_NR.to_string();
+            binding.lineage = Some(vec![INSTALLED_NR.to_string()]);
+        }
+        let installed = installed_with("node_registry", INSTALLED_NR);
+        assert!(verify_envelope(&m, &Answer::Present(installed)).is_ok());
+    }
+
+    /// **Task 4 deliverable, negative half.** `migrateFrom` naming a hash
+    /// this peer does NOT run is the ordinary DNA-line refusal — a
+    /// `happ-lineage` release does not get a free pass, it gets a NARROWER
+    /// one.
+    #[test]
+    fn happ_lineage_refuses_when_migrate_from_is_not_installed() {
+        let mut m = manifest_for(ArtifactClass::HappLineage);
+        m.applies_to
+            .roles
+            .get_mut("node_registry")
+            .unwrap()
+            .migrate_from =
+            Some("uhC0kNotTheInstalledHashAtAll00000000000000000000000".to_string());
+        let r = verify_envelope(
+            &m,
+            &Answer::Present(installed_with("node_registry", INSTALLED_NR)),
+        )
+        .unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::DnaLineageMismatch);
+    }
+
+    // `coordinator_bundle_still_refuses_dna_line`: the existing
+    // `the_envelope_broken_fixture_refuses_on_the_dna_line` test above is
+    // exactly this case (a `coordinator-bundle` release with a foreign DNA
+    // hash, still refused) — `crossing_ok` is `false` by construction for
+    // any class but `HappLineage`, so it needed no change and is left
+    // unchanged per the brief.
+
+    /// No evidence at all is `path_not_notarized`, never absence read as
+    /// "refused" — C4: the commitment may simply not have replicated yet.
+    #[test]
+    fn verify_path_absent_is_path_not_notarized() {
+        let m = lineage_manifest();
+        let r = verify_path(
+            &m,
+            &installed_with("node_registry", INSTALLED_NR),
+            &Answer::Absent,
+        )
+        .unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::PathNotNotarized);
+    }
+
+    /// One evidence value, mutated one field at a time: revoked (terminal),
+    /// quorum unmet (substrate lag), root mismatch (a declaration only a new
+    /// release cures). Each assertion checks the NAMED reason, not merely
+    /// `is_err()` — a wrong reason here would still turn the test green.
+    #[test]
+    fn verify_path_revoked_quorum_root() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+
+        let mut ev = path_evidence_ok();
+        ev.revoked_at = Some("2026-09-04T00:00:00Z".to_string());
+        assert_eq!(
+            verify_path(&m, &inst, &Answer::Present(ev.clone()))
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::PathRevoked
+        );
+
+        ev.revoked_at = None;
+        ev.signatures = 0;
+        assert_eq!(
+            verify_path(&m, &inst, &Answer::Present(ev.clone()))
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::QuorumUnmet
+        );
+
+        ev.signatures = 1;
+        ev.constitution_root = "bafyOTHERConstitutionRoot".to_string();
+        assert_eq!(
+            verify_path(&m, &inst, &Answer::Present(ev))
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::RootMismatch
+        );
+    }
+
+    /// The baseline evidence actually PASSES — without this, the four
+    /// refusal tests above would only prove that `verify_path` refuses
+    /// everything, the same packaging-is-not-verification gap
+    /// `the_matching_peer_accepts_the_same_envelope` exists to close for the
+    /// envelope check.
+    #[test]
+    fn verify_path_accepts_the_matching_evidence() {
+        let m = lineage_manifest();
+        let inst = installed_with("node_registry", INSTALLED_NR);
+        verify_path(&m, &inst, &Answer::Present(path_evidence_ok()))
+            .expect("evidence cut for exactly this crossing");
+    }
+
+    /// A `happ-lineage` manifest whose `adoptionDiscipline.path` is absent is
+    /// not a legal manifest — refused at `verify_path` time (the vendored
+    /// schema mirror is OPEN by design and does not itself pin this).
+    #[test]
+    fn happ_lineage_without_a_declared_path_is_schema_invalid() {
+        let m = manifest_for(ArtifactClass::HappLineage);
+        // `manifest_for` does not set `adoptionDiscipline.path` — confirm the
+        // fixture matches the assumption this test is making.
+        assert!(m.adoption_discipline.path.is_none());
+        let r = verify_path(
+            &m,
+            &installed_with("node_registry", INSTALLED_NR),
+            &Answer::Absent,
+        )
+        .unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::ManifestSchemaInvalid);
+    }
+
+    /// **The cross-field check `verify_shape` enforces (the brief's "enforce
+    /// in Rust what the schema cannot").** A `happ-lineage` binding whose
+    /// `migrateFrom` names a hash absent from its own `lineage` chain is
+    /// refused at shape time, naming the role — never silently accepted only
+    /// to fail `crossing_ok` later with no hint why.
+    #[test]
+    fn migrate_from_must_be_a_member_of_its_own_lineage() {
+        let mut m = manifest_for(ArtifactClass::HappLineage);
+        {
+            let binding = m.applies_to.roles.get_mut("node_registry").unwrap();
+            binding.migrate_from = Some(INSTALLED_NR.to_string());
+            binding.lineage = Some(vec![V2_NR.to_string()]); // does NOT contain INSTALLED_NR
+        }
+        let body = serde_json::to_value(&m).expect("manifest re-serializes");
+        let r = verify_shape(&body).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::ManifestSchemaInvalid);
     }
 
     /// **C4 / DoD arm 4 — honest absence.** An unreadable passport is
@@ -1287,6 +1734,7 @@ mod tests {
                         coordinator_zomes: [("content_store".to_string(), TARGET_WASM.to_string())]
                             .into_iter()
                             .collect(),
+                        constitution_root: None,
                     },
                 ),
                 (
@@ -1297,6 +1745,7 @@ mod tests {
                         coordinator_zomes: [("identity".to_string(), THIRD_WASM.to_string())]
                             .into_iter()
                             .collect(),
+                        constitution_root: None,
                     },
                 ),
             ]
@@ -1525,6 +1974,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect_err("wrong channel");
         assert_eq!(refusal.reason_code(), RefusalReason::ChannelIdMismatch);
@@ -1566,6 +2016,7 @@ mod tests {
             attestations: Some(&evidence),
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect("every arm passes");
         let verified = expect_verified(verified);
@@ -1616,6 +2067,7 @@ mod tests {
             attestations: Some(&unmet),
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect_err("an EARNED head with an unmet threshold is still refused");
         assert_eq!(earned_refused.reason_code(), RefusalReason::ThresholdUnmet);
@@ -1630,6 +2082,7 @@ mod tests {
             attestations: Some(&unmet),
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect("the SAME unmet evidence never refuses a STAGING head");
         assert_eq!(
@@ -1649,6 +2102,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect_err("unchecked is not a pass on an EARNED head");
         assert_eq!(
@@ -1666,6 +2120,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
+            path: Answer::Absent,
         })
         .expect("an unread threshold never gates a STAGING head either");
     }

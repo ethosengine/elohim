@@ -404,6 +404,23 @@ pub struct ChannelAdoptionDiscipline {
     /// Canary ordering — carried through for T3; not read by this module.
     #[serde(default)]
     pub canary_order: Vec<String>,
+    /// **Rung 6.** The notarized migrates-lineage commitment a `happ-lineage`
+    /// release crosses the DNA line under. `None` for every other artifact
+    /// class; required for `happ-lineage` —
+    /// `crate::services::release_adoption::verify::verify_path` refuses
+    /// `ManifestSchemaInvalid` on a `happ-lineage` release that omits it.
+    #[serde(default)]
+    pub path: Option<PathRef>,
+}
+
+/// A pointer at the one notarized commitment `adoptionDiscipline.path` names.
+/// The evidence itself (`PathEvidence`) is fetched by the caller and never
+/// held here — this struct rides the manifest; the evidence rides the
+/// `VerifyInput`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PathRef {
+    pub commitment_cid: String,
 }
 
 impl ChannelAdoptionDiscipline {
@@ -1012,6 +1029,7 @@ mod tests {
             soak_secs: 1800,
             attestation_threshold: threshold,
             canary_order: vec![],
+            path: None,
         }
         .for_release(builder)
     }

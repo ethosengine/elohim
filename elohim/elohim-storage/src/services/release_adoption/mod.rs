@@ -160,6 +160,13 @@ pub enum ArtifactClass {
     StorageBinary,
     /// → the install path for already-joined or re-installing peers.
     HappBundle,
+    /// **Rung 6.** Crosses the DNA line under a notarized migrates-lineage
+    /// commitment (`adoptionDiscipline.path`) — the one class
+    /// [`crate::services::release_adoption::verify::verify_envelope`] does
+    /// NOT refuse on `dnaLineageMismatch` for a matching `migrateFrom`, and
+    /// the only class [`crate::services::release_adoption::verify::verify_path`]
+    /// does anything for.
+    HappLineage,
 }
 
 impl ArtifactClass {
@@ -169,6 +176,7 @@ impl ArtifactClass {
             ArtifactClass::ConfigEpr => "config-epr",
             ArtifactClass::StorageBinary => "storage-binary",
             ArtifactClass::HappBundle => "happ-bundle",
+            ArtifactClass::HappLineage => "happ-lineage",
         }
     }
 }
@@ -197,7 +205,9 @@ pub struct Artifact {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleBinding {
-    /// Crossing this line is rung 6's migration ceremony — refused at verify.
+    /// Crossing this line is rung 6's migration ceremony — refused at verify,
+    /// UNLESS the release is [`ArtifactClass::HappLineage`] and names this
+    /// installed hash in both `migrateFrom` and `lineage`.
     pub dna_hash: String,
     /// The role's coordinator wasm hashes, sorted. The NORMATIVE field.
     pub coordinator_wasm_hashes: Vec<String>,
@@ -206,6 +216,19 @@ pub struct RoleBinding {
     /// is cross-checked against it rather than trusted alongside it.
     #[serde(default)]
     pub coordinator_zomes: Option<std::collections::BTreeMap<String, String>>,
+    /// **Rung 6.** The DNA hash this role's binding is a MIGRATION from — only
+    /// meaningful on a [`ArtifactClass::HappLineage`] release. Must be a member
+    /// of `lineage` (enforced at [`verify::verify_shape`]-adjacent time in
+    /// [`verify::verify_envelope`], since it is a cross-field agreement the
+    /// vendored schema mirror does not itself pin). `None` for every other
+    /// class.
+    #[serde(default)]
+    pub migrate_from: Option<String>,
+    /// **Rung 6.** The full chain of DNA hashes this binding accepts crossing
+    /// FROM — the notarized path evidence's `fromDnaHash`/`toDnaHash` pair
+    /// must land on this chain. `None` for every class but `happ-lineage`.
+    #[serde(default)]
+    pub lineage: Option<Vec<String>>,
 }
 
 /// Role name → the installed reality this release binds to.
@@ -227,6 +250,38 @@ pub struct Envelope {
     pub lineage_parent_cid: Option<String>,
     /// The `serde(default)` additive-wire floor assertion.
     pub additive_only: bool,
+}
+
+/// **Rung 6.** Evidence for one notarized migrates-lineage commitment — what a
+/// caller fetches off THIS peer's conductor and hands to
+/// [`verify::verify_path`] as `Answer<PathEvidence>`. This module does no I/O
+/// (module docs): the fetch site is the caller's, not this one's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PathEvidence {
+    /// The commitment's own CID — cross-checked against
+    /// `adoptionDiscipline.path.commitmentCid`.
+    pub commitment_cid: String,
+    /// The commitment's mishpat lifecycle state (`"active"` | `"proposed"` |
+    /// …). Only `"active"` establishes a path.
+    pub state: String,
+    /// Set once the commitment is revoked — terminal, independent of `state`.
+    #[serde(default)]
+    pub revoked_at: Option<String>,
+    /// The DNA hash the path migrates FROM — cross-checked against this
+    /// peer's installed hash for the role.
+    pub from_dna_hash: String,
+    /// The DNA hash the path migrates TO — cross-checked against the
+    /// release's binding for the role.
+    pub to_dna_hash: String,
+    /// The constitutional root the path was notarized under — cross-checked
+    /// against the installed role's own `constitutionRoot` when the peer
+    /// declares one.
+    pub constitution_root: String,
+    /// Signatures the commitment carries today.
+    pub signatures: usize,
+    /// Signatures the commitment's discipline requires.
+    pub required_signatures: usize,
 }
 
 /// Where the artifact came from.
@@ -562,6 +617,30 @@ pub enum RefusalReason {
     /// routes to (no artifact at all, or a payload the vehicle cannot parse).
     /// Terminal — the bytes verified, so they will not become different.
     ApplyPayloadUnusable,
+
+    // ── rung 6: crossing the DNA line under a notarized path ───────────────
+    //
+    // All four belong to [`DecisionArm::Verify`] — [`verify::verify_path`]
+    // runs in the verify arm, right after [`verify::verify_lineage`] and
+    // before [`verify::verify_threshold`].
+    /// No migrates-lineage commitment evidence was supplied for this peer
+    /// (`Answer::Absent`), the supplied evidence names a different commitment
+    /// than `adoptionDiscipline.path.commitmentCid`, the commitment is not
+    /// `active`, or its `fromDnaHash`/`toDnaHash` do not match this peer's
+    /// installed hash and the release's binding. **Not** absence of the
+    /// commitment on the DHT — it may simply not have notarized yet.
+    PathNotNotarized,
+    /// The commitment WAS notarized and IS the manifest's named path, but has
+    /// since been revoked. Terminal: a revoked path stays revoked; only a new
+    /// commitment (and a new release naming it) reopens the crossing.
+    PathRevoked,
+    /// The commitment has fewer signatures than its discipline requires.
+    /// Substrate catching up — a later sweep may see more signatures land.
+    QuorumUnmet,
+    /// The path's notarized `constitutionRoot` disagrees with this peer's own
+    /// installed root. Terminal for this release: only a release whose path
+    /// was notarized under the peer's actual root can cross.
+    RootMismatch,
 }
 
 impl ReasonLabel for RefusalReason {
@@ -595,6 +674,10 @@ impl ReasonLabel for RefusalReason {
         RefusalReason::ConfigKnobBootOnly,
         RefusalReason::RuntimeConfigUnwatched,
         RefusalReason::ApplyPayloadUnusable,
+        RefusalReason::PathNotNotarized,
+        RefusalReason::PathRevoked,
+        RefusalReason::QuorumUnmet,
+        RefusalReason::RootMismatch,
     ];
 
     fn label(&self) -> &'static str {
@@ -628,6 +711,10 @@ impl ReasonLabel for RefusalReason {
             RefusalReason::ConfigKnobBootOnly => "config_knob_boot_only",
             RefusalReason::RuntimeConfigUnwatched => "runtime_config_unwatched",
             RefusalReason::ApplyPayloadUnusable => "apply_payload_unusable",
+            RefusalReason::PathNotNotarized => "path_not_notarized",
+            RefusalReason::PathRevoked => "path_revoked",
+            RefusalReason::QuorumUnmet => "quorum_unmet",
+            RefusalReason::RootMismatch => "root_mismatch",
         }
     }
 }
@@ -660,7 +747,11 @@ impl RefusalReason {
             | RefusalReason::LineageUnverifiable
             | RefusalReason::ThresholdUnchecked
             | RefusalReason::ThresholdUnmet
-            | RefusalReason::ThresholdEvidenceDegraded => DecisionArm::Verify,
+            | RefusalReason::ThresholdEvidenceDegraded
+            | RefusalReason::PathNotNotarized
+            | RefusalReason::PathRevoked
+            | RefusalReason::QuorumUnmet
+            | RefusalReason::RootMismatch => DecisionArm::Verify,
 
             RefusalReason::NoVehicleForClass
             | RefusalReason::ApplyNotPermitted
@@ -692,6 +783,16 @@ impl RefusalReason {
                 | RefusalReason::ThresholdUnmet
                 | RefusalReason::ThresholdEvidenceDegraded
                 | RefusalReason::ConductorUnavailable
+                // Rung 6's transient half. `path_not_notarized` covers "no
+                // evidence yet" — the commitment may simply not have
+                // replicated to this peer's conductor, exactly the same
+                // substrate-lag story as `artifact_unavailable`.
+                // `quorum_unmet` is substrate catching up: more signatures
+                // may land by the next sweep. `path_revoked` and
+                // `root_mismatch` are declarations that stay true absent a
+                // NEW commitment/release, so they are terminal below.
+                | RefusalReason::PathNotNotarized
+                | RefusalReason::QuorumUnmet
                 // The apply arm's transient half. `deferred_backpressure` is
                 // transient BY DEFINITION (it is a statement about us, not the
                 // release); `apply_failed` because the mechanism may work next
@@ -802,6 +903,10 @@ mod tests {
             "config_knob_boot_only",
             "runtime_config_unwatched",
             "apply_payload_unusable",
+            "path_not_notarized",
+            "path_revoked",
+            "quorum_unmet",
+            "root_mismatch",
         ]);
         assert_reason_labels_stable::<DecisionArm>(&["watch", "fetch", "verify", "apply"]);
     }
