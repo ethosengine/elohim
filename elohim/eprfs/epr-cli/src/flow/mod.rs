@@ -282,12 +282,13 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     })?;
     let kind = take_opt(&rest, "--kind")?.ok_or_else(|| {
         FlowError::InvalidArguments(
-            "note needs --kind failed-approach|correction|observation".into(),
+            "note needs --kind failed-approach|correction|observation|ruling|verdict".into(),
         )
     })?;
     let reason = take_opt(&rest, "--reason")?
         .ok_or_else(|| FlowError::InvalidArguments("note needs --reason <text>".into()))?;
     let switched_to = take_opt(&rest, "--switched-to")?;
+    let verdict = take_opt(&rest, "--verdict")?;
     let actor = note::NoteActor {
         as_ref: take_opt(&rest, "--as")?,
         session: resolve_session(take_opt(&rest, "--session")?),
@@ -298,6 +299,7 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
         &kind,
         &reason,
         switched_to.as_deref(),
+        verdict.as_deref(),
         &actor,
     )?;
     if opts.json {
@@ -444,8 +446,9 @@ fn usage() -> String {
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
      | note --on <commitment-cid-or-path> \
-     --kind failed-approach|correction|observation \
+     --kind failed-approach|correction|observation|ruling|verdict \
      --reason <text> [--switched-to <text>] \
+     [--verdict approved|changes-requested (required by --kind verdict, refused on every other kind)] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
      (omit --session to fall back to CLAUDE_SESSION_ID/ELOHIM_SESSION_ID; \
      an agent-attributed note carries steward:<git-author-email> as its last slot)\n  \

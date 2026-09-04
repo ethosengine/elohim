@@ -77,6 +77,19 @@ const REASON_SLOT_PREFIX: &str = "reason:";
 /// Prefix on the optional consequence slot — the second half of a failed approach.
 const SWITCHED_TO_SLOT_PREFIX: &str = "switched-to:";
 
+/// Prefix on the optional audit-outcome slot — a `verdict` note's whole point.
+///
+/// Positioned AFTER `reason:`/`switched-to:` and BEFORE `steward:` (which stays last): the slot
+/// vocabulary is positional and ADDITIVE, so a note that carries no verdict emits exactly the
+/// slot vector it emitted before this const existed and keeps its content address.
+const VERDICT_SLOT_PREFIX: &str = "verdict:";
+
+/// The two admissible audit outcomes. Closed for the same reason [`NoteKind`] is: a verdict is
+/// read by whoever decides whether a delivery stands, and a third spelling of "yes" would
+/// partition that read.
+const VERDICT_APPROVED: &str = "approved";
+const VERDICT_CHANGES_REQUESTED: &str = "changes-requested";
+
 /// Prefix on the final slot naming the human whose key signs the tree the note was written in.
 ///
 /// LAST on purpose, and appended only on the agent-attributed arms: readers index the leading
@@ -105,6 +118,14 @@ pub enum NoteKind {
     Correction,
     /// Something worth knowing that reverses nothing.
     Observation,
+    /// A CONTROL decision — accept, defer, order a fix round, hold (VSM System 3 and System 5).
+    /// The `--reason` text IS the ruling; there is no separate outcome vocabulary, because a
+    /// control decision's content is precisely what cannot be enumerated in advance.
+    Ruling,
+    /// An AUDIT outcome — a review seat's verdict on a delivery (VSM System 3*). Unlike every
+    /// other kind it carries a closed outcome value alongside its reason, because "was this
+    /// accepted" must be readable without parsing prose.
+    Verdict,
 }
 
 impl NoteKind {
@@ -114,9 +135,11 @@ impl NoteKind {
             "failed-approach" => Ok(NoteKind::FailedApproach),
             "correction" => Ok(NoteKind::Correction),
             "observation" => Ok(NoteKind::Observation),
+            "ruling" => Ok(NoteKind::Ruling),
+            "verdict" => Ok(NoteKind::Verdict),
             other => Err(FlowError::InvalidArguments(format!(
                 "unknown note kind `{other}` — the vocabulary is closed: \
-                 failed-approach|correction|observation"
+                 failed-approach|correction|observation|ruling|verdict"
             ))),
         }
     }
@@ -127,8 +150,76 @@ impl NoteKind {
             NoteKind::FailedApproach => "run:failed-approach",
             NoteKind::Correction => "run:correction",
             NoteKind::Observation => "run:observation",
+            NoteKind::Ruling => "run:ruling",
+            NoteKind::Verdict => "run:verdict",
         }
     }
+}
+
+/// Resolve `--verdict` against `--kind`, refusing both mismatches rather than defaulting either.
+///
+/// Two refusals, and they are the same refusal seen from each side. `--kind verdict` with no
+/// outcome would mint an audit record that records no outcome; `--verdict` on any other kind
+/// would attach an audit outcome to a record nobody reads one from — a slot that is silently
+/// ignored is worse than one that is refused, because it reads as evidence.
+fn resolve_verdict(kind: NoteKind, verdict: Option<&str>) -> FlowResult<Option<String>> {
+    match (kind, verdict) {
+        (NoteKind::Verdict, Some(raw)) => {
+            let value = non_empty(raw, "--verdict")?;
+            if value == VERDICT_APPROVED || value == VERDICT_CHANGES_REQUESTED {
+                Ok(Some(value.to_string()))
+            } else {
+                Err(FlowError::InvalidArguments(format!(
+                    "unknown --verdict `{value}` — the outcome vocabulary is closed: \
+                     {VERDICT_APPROVED}|{VERDICT_CHANGES_REQUESTED}"
+                )))
+            }
+        }
+        (NoteKind::Verdict, None) => Err(FlowError::InvalidArguments(format!(
+            "--kind verdict needs --verdict {VERDICT_APPROVED}|{VERDICT_CHANGES_REQUESTED} — \
+             an audit record that names no outcome is not a verdict"
+        ))),
+        (other, Some(_)) => Err(FlowError::InvalidArguments(format!(
+            "--verdict belongs to --kind verdict alone; got --kind with tag `{}` — \
+             a verdict slot on any other kind is read by nobody",
+            other.tag()
+        ))),
+        (_, None) => Ok(None),
+    }
+}
+
+/// The positional `classified_as` slot vector for one note.
+///
+/// One place builds it, so the record and every reader share a single definition of the order:
+/// tag, subject, `reason:`, optional `switched-to:`, optional `verdict:`, optional `steward:`
+/// LAST. The order is ADDITIVE — a note that carries no verdict emits the same vector it always
+/// did, which is what keeps every existing note's content address where it is.
+fn note_slots(
+    kind: NoteKind,
+    subject: &str,
+    reason: &str,
+    switched_to: Option<&str>,
+    verdict: Option<&str>,
+    steward: Option<&str>,
+) -> Vec<String> {
+    let mut slots = Vec::with_capacity(
+        3 + usize::from(switched_to.is_some())
+            + usize::from(verdict.is_some())
+            + usize::from(steward.is_some()),
+    );
+    slots.push(kind.tag().to_string());
+    slots.push(subject.to_string());
+    slots.push(format!("{REASON_SLOT_PREFIX}{reason}"));
+    if let Some(switched) = switched_to {
+        slots.push(format!("{SWITCHED_TO_SLOT_PREFIX}{switched}"));
+    }
+    if let Some(value) = verdict {
+        slots.push(format!("{VERDICT_SLOT_PREFIX}{value}"));
+    }
+    if let Some(steward) = steward {
+        slots.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
+    }
+    slots
 }
 
 /// Who the caller says is acting, as the CLI shell resolved it.
@@ -161,6 +252,10 @@ pub struct NoteOutcome {
     pub resource: String,
     pub reason: String,
     pub switched_to: Option<String>,
+    /// The audit outcome, present only on a `verdict` note. Omitted rather than null so every
+    /// pre-verdict payload is byte-identical to the one it emitted before this field existed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
     /// The claimed identity this note was attributed to, absent when it stayed with the commit
     /// author. Omitted rather than null so an unattributed note's payload is byte-identical to
     /// the one it emitted before this field existed — the additive discipline
@@ -191,6 +286,9 @@ impl NoteOutcome {
         println!("        reason: {}", self.reason);
         if let Some(switched) = &self.switched_to {
             println!("        switched to: {switched}");
+        }
+        if let Some(verdict) = &self.verdict {
+            println!("        verdict: {verdict}");
         }
         if let Some(actor) = &self.actor {
             println!("        actor: {actor}");
@@ -224,6 +322,7 @@ pub fn note(
     kind: &str,
     reason: &str,
     switched_to: Option<&str>,
+    verdict: Option<&str>,
     actor: &NoteActor,
 ) -> FlowResult<NoteOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
@@ -234,6 +333,7 @@ pub fn note(
     let switched_to = switched_to
         .map(|s| non_empty(s, "--switched-to"))
         .transpose()?;
+    let verdict = resolve_verdict(kind, verdict)?;
     let named = named_identity(actor.as_ref.as_deref())?;
 
     let mut store = SidecarFlowStore::open(root)?;
@@ -252,20 +352,16 @@ pub fn note(
 
     let attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
 
-    // Tag first, subject second, authored body after, steward last — see
-    // `FlowEvent::classified_as` and `STEWARD_SLOT_PREFIX`.
-    let mut classified_as = Vec::with_capacity(
-        3 + usize::from(switched_to.is_some()) + usize::from(attribution.steward.is_some()),
+    // Tag first, subject second, authored body after, verdict next, steward last — see
+    // `note_slots`, `FlowEvent::classified_as` and `STEWARD_SLOT_PREFIX`.
+    let classified_as = note_slots(
+        kind,
+        &label,
+        reason,
+        switched_to,
+        verdict.as_deref(),
+        attribution.steward.as_deref(),
     );
-    classified_as.push(kind.tag().to_string());
-    classified_as.push(label.clone());
-    classified_as.push(format!("{REASON_SLOT_PREFIX}{reason}"));
-    if let Some(switched) = &switched_to {
-        classified_as.push(format!("{SWITCHED_TO_SLOT_PREFIX}{switched}"));
-    }
-    if let Some(steward) = &attribution.steward {
-        classified_as.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
-    }
 
     let event = FlowEvent {
         // `Cite`, never `Produce`: a note produces no resource and discharges no promise — it
@@ -299,6 +395,7 @@ pub fn note(
         resource: resource.to_string(),
         reason: reason.to_string(),
         switched_to: switched_to.map(str::to_string),
+        verdict: verdict.clone(),
         actor: attribution.actor.clone(),
         steward: attribution.steward.clone(),
         occurred_at,
@@ -578,6 +675,106 @@ mod tests {
             "agent:scribe@opus-5"
         );
         assert_eq!(claimed.steward.as_deref(), Some("author@example.test"));
+    }
+
+    #[test]
+    fn ruling_and_verdict_join_the_closed_vocabulary_with_distinct_run_tags() {
+        assert_eq!(NoteKind::parse("ruling").unwrap(), NoteKind::Ruling);
+        assert_eq!(NoteKind::parse(" verdict ").unwrap(), NoteKind::Verdict);
+        assert_eq!(NoteKind::Ruling.tag(), "run:ruling");
+        assert_eq!(NoteKind::Verdict.tag(), "run:verdict");
+        let err = NoteKind::parse("adjudication").expect_err("the vocabulary stays closed");
+        assert!(
+            err.to_string().contains("ruling") && err.to_string().contains("verdict"),
+            "the refusal must name the whole legal set; got: {err}"
+        );
+    }
+
+    #[test]
+    fn a_verdict_kind_requires_the_flag_and_the_flag_requires_the_verdict_kind() {
+        // The two accepted values, and nothing else.
+        assert_eq!(
+            resolve_verdict(NoteKind::Verdict, Some(" approved ")).unwrap(),
+            Some("approved".to_string())
+        );
+        assert_eq!(
+            resolve_verdict(NoteKind::Verdict, Some("changes-requested")).unwrap(),
+            Some("changes-requested".to_string())
+        );
+        let bad = resolve_verdict(NoteKind::Verdict, Some("lgtm"))
+            .expect_err("a third verdict value is refused, never defaulted");
+        assert!(
+            bad.to_string().contains("approved") && bad.to_string().contains("changes-requested"),
+            "the refusal must name both legal values; got: {bad}"
+        );
+
+        // `--kind verdict` with no `--verdict` is refused, naming the flag and the kind.
+        let missing = resolve_verdict(NoteKind::Verdict, None)
+            .expect_err("an audit outcome with no outcome is not a verdict");
+        assert!(missing.to_string().contains("--verdict"));
+        assert!(missing.to_string().contains("verdict"));
+
+        // `--verdict` on any other kind is refused rather than silently carried.
+        for kind in [
+            NoteKind::FailedApproach,
+            NoteKind::Correction,
+            NoteKind::Observation,
+            NoteKind::Ruling,
+        ] {
+            let err = resolve_verdict(kind, Some("approved"))
+                .expect_err("--verdict belongs to --kind verdict alone");
+            assert!(err.to_string().contains("--verdict"));
+            assert!(
+                err.to_string().contains(kind.tag()),
+                "the refusal must name the kind it was given; got: {err}"
+            );
+            assert_eq!(resolve_verdict(kind, None).unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn the_verdict_slot_is_positional_and_additive_after_reason_before_steward() {
+        let slots = note_slots(
+            NoteKind::Verdict,
+            "genesis/plan.md",
+            "the gate line is present and the diff conforms",
+            Some("a different approach"),
+            Some("approved"),
+            Some("author@example.test"),
+        );
+        assert_eq!(
+            slots,
+            vec![
+                "run:verdict".to_string(),
+                "genesis/plan.md".to_string(),
+                "reason:the gate line is present and the diff conforms".to_string(),
+                "switched-to:a different approach".to_string(),
+                "verdict:approved".to_string(),
+                "steward:author@example.test".to_string(),
+            ]
+        );
+    }
+
+    /// The additive discipline, pinned: with no verdict the slot vector is BYTE-IDENTICAL to
+    /// the one the pre-verdict encoder emitted, so every existing note keeps its address.
+    #[test]
+    fn a_note_without_a_verdict_keeps_its_pre_verdict_slots() {
+        assert_eq!(
+            note_slots(
+                NoteKind::FailedApproach,
+                "genesis/plan.md",
+                "Tried Tsit5, the system is too stiff",
+                Some("Kvaerno5"),
+                None,
+                None,
+            ),
+            vec![
+                "run:failed-approach".to_string(),
+                "genesis/plan.md".to_string(),
+                "reason:Tried Tsit5, the system is too stiff".to_string(),
+                "switched-to:Kvaerno5".to_string(),
+            ]
+        );
     }
 
     /// Pinned so canonical dag-cbor encoding of a note `FlowEvent` can never silently drift

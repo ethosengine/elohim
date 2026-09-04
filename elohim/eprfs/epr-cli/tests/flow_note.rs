@@ -118,6 +118,7 @@ fn a_note_appends_exactly_one_record_that_round_trips_with_its_cid_reverified() 
         "correction",
         "the doorway probe is per-doorway, not matthew-only",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect("note runs");
@@ -165,6 +166,7 @@ fn a_failed_approach_carries_its_consequence_in_a_fourth_slot() {
         "failed-approach",
         "Tried Tsit5 for the perturbation ODE, system is too stiff",
         Some("Kvaerno5"),
+        None,
         &NoteActor::default(),
     )
     .expect("note runs");
@@ -186,6 +188,7 @@ fn an_identical_note_appended_twice_is_one_record() {
         "observation",
         "same body",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect("first");
@@ -195,6 +198,7 @@ fn an_identical_note_appended_twice_is_one_record() {
         FEATURE,
         "observation",
         "same body",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -212,6 +216,7 @@ fn an_identical_note_appended_twice_is_one_record() {
         FEATURE,
         "observation",
         "different body",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -235,6 +240,7 @@ fn an_unresolvable_target_appends_nothing_and_is_unknown_resource() {
         "correction",
         "why",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect_err("an unresolvable --on must refuse");
@@ -248,6 +254,7 @@ fn an_unresolvable_target_appends_nothing_and_is_unknown_resource() {
         &stranger.to_string(),
         "correction",
         "why",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -275,6 +282,7 @@ fn a_known_atom_cid_resolves_without_a_path() {
         "correction",
         "scoped to the commitment itself",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect("a known commitment CID resolves");
@@ -299,6 +307,7 @@ fn an_empty_reason_is_refused_before_the_store_is_opened() {
         "correction",
         "   \n\t ",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect_err("an empty --reason must refuse");
@@ -317,6 +326,7 @@ fn an_empty_reason_is_refused_before_the_store_is_opened() {
         FEATURE,
         "regression",
         "real text",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -339,6 +349,7 @@ fn the_outcome_carries_the_appended_records_cid() {
         FEATURE,
         "observation",
         "json consumers read this",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -384,6 +395,7 @@ fn a_note_never_discharges_its_commitment() {
         "correction",
         "this must not retire the chapter",
         Some("a different approach"),
+        None,
         &NoteActor::default(),
     )
     .expect("note runs");
@@ -414,6 +426,7 @@ fn a_named_identity_provides_the_note_and_keeps_the_steward_in_the_last_slot() {
         FEATURE,
         "correction",
         "the salvage join reads the wrong pillar",
+        None,
         None,
         &NoteActor {
             as_ref: Some(CLAIMED.to_string()),
@@ -452,6 +465,7 @@ fn the_steward_slot_stays_last_even_when_a_consequence_precedes_it() {
         "failed-approach",
         "Tried the household-blind XOR salvage",
         Some("diversity-first multi-pass"),
+        None,
         &NoteActor {
             as_ref: Some(CLAIMED.to_string()),
             session: None,
@@ -483,6 +497,7 @@ fn a_malformed_identity_refuses_and_never_falls_back_to_the_git_author() {
         FEATURE,
         "correction",
         "real text",
+        None,
         None,
         &NoteActor {
             as_ref: Some("scribe@opus-5".to_string()),
@@ -516,6 +531,7 @@ fn a_registered_session_claim_provides_the_note_without_naming_it() {
         "observation",
         "the sidecar answered for this run",
         None,
+        None,
         &NoteActor {
             as_ref: None,
             session: Some(session.to_string()),
@@ -545,6 +561,7 @@ fn a_session_that_claimed_nothing_falls_through_to_the_author_arm_without_failin
         "observation",
         "same body either way",
         None,
+        None,
         &NoteActor::default(),
     )
     .expect("the author arm runs");
@@ -554,6 +571,7 @@ fn a_session_that_claimed_nothing_falls_through_to_the_author_arm_without_failin
         FEATURE,
         "observation",
         "same body either way",
+        None,
         None,
         &NoteActor {
             as_ref: None,
@@ -582,6 +600,7 @@ fn a_session_that_claimed_nothing_falls_through_to_the_author_arm_without_failin
         "observation",
         "same body either way",
         None,
+        None,
         &NoteActor {
             as_ref: None,
             session: Some("session-nobody-claimed".to_string()),
@@ -601,6 +620,7 @@ fn an_unattributed_note_carries_no_steward_slot_and_omits_both_payload_keys() {
         FEATURE,
         "observation",
         "the arm this leg has always had",
+        None,
         None,
         &NoteActor::default(),
     )
@@ -636,6 +656,7 @@ fn a_target_outside_the_repo_root_is_refused_rather_than_written_against() {
         "../outside.md",
         "observation",
         "escape attempt",
+        None,
         None,
         &NoteActor::default(),
     )
