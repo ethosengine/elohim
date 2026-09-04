@@ -216,13 +216,7 @@ pub fn notes_across(
         let FlowRecord::Event(event) = record else {
             continue;
         };
-        if event.action != ReaVerb::Cite {
-            continue;
-        }
-        let Magnitude::Count { unit, .. } = &event.quantity else {
-            continue;
-        };
-        if unit != NOTE_UNIT {
+        if !is_note(event) {
             continue;
         }
         let Some(source) = sources
@@ -246,7 +240,20 @@ pub fn notes_across(
         .collect()
 }
 
-fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
+/// Is this event a NOTE? The unit is the selector, not the verb alone: `Cite` is a general
+/// reference verb, and a future citing leg with a different unit must not be read as a note.
+///
+/// Public because `ledger` asks the same question, and two answers to "is this a note" is how a
+/// record starts appearing on one screen and not another.
+pub fn is_note(event: &elohim_epr_rea::FlowEvent) -> bool {
+    if event.action != ReaVerb::Cite {
+        return false;
+    }
+    matches!(&event.quantity, Magnitude::Count { unit, .. } if unit == NOTE_UNIT)
+}
+
+/// One note's positional slots, parsed back out. Public for the same reason [`is_note`] is.
+pub fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
     let mut view = NoteView {
         cid: cid.to_string(),
         kind: event.classified_as.first().cloned().unwrap_or_default(),

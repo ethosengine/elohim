@@ -11,6 +11,7 @@ pub mod context;
 pub mod edges;
 pub mod fulfill;
 pub mod governor;
+pub mod ledger;
 pub mod note;
 pub mod project;
 pub mod read;
@@ -150,6 +151,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "hold" => run_hold(&args[1..]),
         "claim" => run_claim(&args[1..]),
         "context" => run_context(&args[1..]),
+        "ledger" => run_ledger(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
@@ -232,6 +234,30 @@ fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
         outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow ledger <path|cid>` — the FORWARD read, whose human output is markdown a caller
+/// pastes into a document. One positional argument for the same reason `context` has one.
+fn run_ledger(args: &[String]) -> FlowResult<ExitCode> {
+    let Some(target) = args.first().filter(|a| !a.starts_with("--")) else {
+        return Err(FlowError::InvalidArguments(
+            "usage: epr flow ledger <path|cid> [--json] [--root DIR]".into(),
+        ));
+    };
+    let target = target.clone();
+    let (opts, rest) = parse_global(&args[1..])?;
+    if let Some(other) = rest.first() {
+        return Err(FlowError::InvalidArguments(format!(
+            "unknown ledger argument `{other}`"
+        )));
+    }
+    let result = ledger::ledger(&opts.root, &target)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        result.render();
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -601,6 +627,9 @@ fn usage() -> String {
      | context <path|cid> [--notes N] [--json] [--root DIR] \
      (identity · intents · commitments · notes · seals · habit · gate · governance on one screen; \
      a bare cid skips the path-only sections and says so)\n  \
+     | ledger <path|cid> [--json] [--root DIR] \
+     (the FORWARD read — claims, fulfilments and notes oldest first, rendered as markdown a \
+     status section is pasted from rather than retyped)\n  \
      | claim --on <intent-cid|gap-id|path> [--as agent:<role>@<model>] [--brief <path>] \
      [--serves <habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
      (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \

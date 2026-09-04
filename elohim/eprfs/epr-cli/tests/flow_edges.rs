@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
-use elohim_epr_cli::flow::{claim, context, fulfill, note, project, seal, walk};
+use elohim_epr_cli::flow::{claim, context, fulfill, ledger, note, project, seal, walk};
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use tempfile::TempDir;
 
@@ -1222,5 +1222,103 @@ fn a_habit_atom_renders_as_a_scope_with_the_work_accounted_to_it() {
     assert_eq!(
         scope.open_commitments[0].habit.as_deref(),
         Some("dev-system-equilibrium")
+    );
+}
+
+// ── ledger: the projection that makes progress.md and a status section generated ─────────
+
+/// A ledger reads FORWARD. Everything else in this family answers "what stands now"; this one
+/// answers "what happened, in order" — which is the only shape a pasted status section can have.
+#[test]
+fn the_ledger_lists_claim_fulfilment_and_notes_in_order_with_the_via_marker() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let commitment = claimed(root, "epic#1", &implementer);
+
+    let commits = vec!["825a090df".to_string()];
+    fulfill::fulfill_on(
+        root,
+        &fulfill::FulfillOnRequest {
+            commits: &commits,
+            ..fulfil_request("epic#1", "DONE", &implementer)
+        },
+    )
+    .expect("a DONE report discharges");
+
+    note::note(
+        root,
+        "plans/epic.md",
+        "ruling",
+        "accepted, ship it",
+        None,
+        None,
+        &NoteActor::default(),
+    )
+    .expect("a ruling on the plan");
+    note::note(
+        root,
+        &commitment,
+        "verdict",
+        "the gate line is present",
+        None,
+        Some("approved"),
+        &actor("agent:reviewer@claude-opus-5"),
+    )
+    .expect("a verdict on the commitment");
+
+    let result = ledger::ledger(root, "plans/epic.md").expect("ledger runs");
+    assert_eq!(result.label, "plans/epic.md");
+
+    let kinds: Vec<&str> = result.entries.iter().map(|e| e.kind.as_str()).collect();
+    assert_eq!(
+        kinds,
+        vec!["claim", "fulfilment", "ruling", "verdict"],
+        "oldest first — a ledger reads forward, unlike every other reader in this family"
+    );
+
+    let claim_entry = &result.entries[0];
+    assert_eq!(claim_entry.actor, "agent:implementer@claude-opus-5");
+    assert_eq!(claim_entry.gap_id.as_deref(), Some("epic#1"));
+
+    let fulfilment = &result.entries[1];
+    assert_eq!(fulfilment.status.as_deref(), Some("DONE"));
+    assert_eq!(fulfilment.commits, vec!["825a090df".to_string()]);
+    assert!(
+        fulfilment.report.is_some(),
+        "the evidence is carried by address"
+    );
+
+    let ruling = &result.entries[2];
+    assert!(
+        ruling.via.is_none(),
+        "a note on the atom itself has no via marker"
+    );
+    assert_eq!(ruling.reason.as_deref(), Some("accepted, ship it"));
+
+    let verdict = &result.entries[3];
+    assert_eq!(verdict.verdict.as_deref(), Some("approved"));
+    assert_eq!(
+        verdict.via.as_deref(),
+        Some("epic#1"),
+        "a record made on a commitment says which one"
+    );
+    assert_eq!(verdict.actor, "agent:reviewer@claude-opus-5");
+
+    // Every entry carries the date its record was dated by, never a wall clock.
+    assert!(result
+        .entries
+        .iter()
+        .all(|e| e.occurred_at.len() >= 10 && e.occurred_at.starts_with("20")));
+}
+
+#[test]
+fn a_ledger_on_an_atom_with_no_history_is_empty_rather_than_an_error() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let result = ledger::ledger(root, "plans/solo.md").expect("ledger runs");
+    assert!(
+        result.entries.is_empty(),
+        "no history is an empty ledger, not a refusal"
     );
 }
