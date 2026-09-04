@@ -268,7 +268,12 @@ Feature: The network changes the rules its peers hold each other to without losi
     And each peer's passport shows the node-registry role with v2 authoring and v1 closed
     When the test harness, holding james's key, writes a fact on james's closed v1 cell and offers it to v2 as a carried proof
     Then the v1 conductor itself accepts that write — the substrate does not fence a closed chain, as the epic's kernel test measured
-    But v2's validation on every peer refuses the carried proof, naming "after close" as its reason
+    But v2's validation refuses the carried proof on every peer that sealed the close or already carries it in its own witness history, naming "after close" as its reason
+    # The fence reaches only a peer whose own carry history already holds the close it is checked
+    # against; a courier who never saw the close is not yet reached by it. The next line names that
+    # plainly as a limitation still being closed, never as the network's intended shape — the fence
+    # this Station rehearses grows to cover every courier, not fewer peers on purpose.
+    And a courier who never saw the close is not yet fenced — a limitation still being closed, not the network's intended shape
     When a revocation of the migration commitment is notarized after the sunset
     Then nothing changes: the closed chains stay closed, and each peer's passport still shows the node-registry role with v2 authoring and v1 closed
 

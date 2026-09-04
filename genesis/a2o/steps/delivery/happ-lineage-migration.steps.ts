@@ -82,11 +82,16 @@
  *   release with a placeholder commitment cid — never checked against
  *   anything on the wire before Station 2 mints a REAL one (which today
  *   never actually lands either — see the caveat above again).
- * - `FIXTURE_CONSTITUTION_ROOT` / `FIXTURE_ROSTER_CID`: Station 2's
- *   `migrates-lineage` payload needs SOME values here, but the notarization
- *   is expected to be refused before either field is ever checked (empty
- *   `signatures` fails `validate_lineage_signatures`'s "non-empty array"
- *   requirement first — see `attemptMigrationNotarization`'s own comment).
+ * - `FIXTURE_CONSTITUTION_ROOT`: the root every real (Task 16/17) roster and
+ *   passport in this run is minted/read under. Station 10's second negative
+ *   arm names a DIFFERENT, made-up root on purpose — see its own comment.
+ *   Station 10's ROSTER is no longer a placeholder: `ensureRealRoster` (below)
+ *   mints a real `author-lens` commitment (`lineage-commitments.ts`'s
+ *   `mintRoster`) whose entry hash is a genuinely addressable `roster_cid` —
+ *   `verify_path`'s roster check (Task 16) reads it for real, which is what
+ *   makes Station 10's two refusals ("signer … is not on roster …",
+ *   `root_mismatch`) the actual roster/root checks rather than the earlier
+ *   "roster … is not an address" terminal refusal a slug always produced.
  *
  * ## Run-scoped channel, one channel only (Part 1's scope)
  *
@@ -147,6 +152,7 @@ import {
   buildMigratesLineagePayload,
   buildRevocationPayload,
   buildSunsetsLineagePayload,
+  mintRoster,
   notarizeMigration,
   notarizeSunset,
   revokeMigration,
@@ -322,10 +328,10 @@ async function unnotarizedPathCid(): Promise<string> {
   return unnotarizedPathCommitmentCid;
 }
 
-/** See module doc "Placeholder values" — never actually checked because the notarization
- * attempt below is refused earlier, on the empty `signatures` array. */
+/** See module doc "Placeholder values". Station 10's real roster is minted
+ * under exactly this root (`ensureRealRoster`), so every real (non-negative)
+ * path in this run is notarized under it too. */
 const FIXTURE_CONSTITUTION_ROOT = 'a2o-fixture-constitution-root';
-const FIXTURE_ROSTER_CID = 'a2o-fixture-bootstrap-steward-roster';
 
 /** How long a single peer's `/admin/adoption` poll waits for its predicate, and how often it
  * re-reads while waiting. Mirrors the "unreachable ≠ absent, keep retrying" discipline
@@ -1052,6 +1058,16 @@ interface LineageState {
   /** Station 10: the channel and release the current negative arm published. */
   station10Channel?: string;
   station10ReleaseCid?: string;
+  /** Station 10 arm 1 (off-roster signer): the signer's own agent key, base64 —
+   * the exact string the refusal detail ("signer … is not on roster …") must
+   * name. */
+  station10SignerAgent?: string;
+  /** Station 10 (and Station 2): the REAL roster commitment's entry hash, minted
+   * once per run by `ensureRealRoster` — see that function's own doc. */
+  rosterCid?: string;
+  /** The roster's one member — matthew's mishpat-cell agent key, the bootstrap
+   * steward standing in for the council, as the story's own vocabulary names it. */
+  rosterMemberAgent?: string;
   /** Stations 5/6: jessica's own agent key, base64, and her v1 chain as she
    * herself reports it — captured BEFORE any sweep touches it, re-read after
    * to prove her own chain was never written to by anyone but her. */
@@ -1492,6 +1508,40 @@ async function captureFreshReconcile(): Promise<void> {
 }
 
 /**
+ * Station 10's real roster, minted ONCE per run and reused by every path
+ * notarized in it — Station 2's happy path (whose signer, matthew, must be
+ * ON the roster) and both of Station 10's negative arms (one signed OFF it,
+ * one signed ON it but under a root the roster itself does not declare).
+ *
+ * Minted with exactly ONE member — matthew's own mishpat-cell agent key —
+ * under `FIXTURE_CONSTITUTION_ROOT`: the story's own Given for Station 10
+ * ("the household's declared council roster … is the bootstrap steward's
+ * key alone"), now an actual commitment `verify_path`'s roster check (Task
+ * 16) reads, rather than a sentence with nothing behind it.
+ */
+async function ensureRealRoster(): Promise<string> {
+  const c = lineage();
+  if (c.rosterCid) return c.rosterCid;
+  const rail = await connectRoleConductor('matthew', MISHPAT_ROLE, MISHPAT_ZOME);
+  try {
+    c.rosterMemberAgent = rail.agent;
+    const result = await mintRoster({
+      conductor: rail,
+      actingPeer: 'matthew',
+      members: [rail.agent],
+      constitutionRoot: FIXTURE_CONSTITUTION_ROOT,
+    });
+    c.rosterCid = result.cid;
+  } finally {
+    await rail.close();
+  }
+  console.error(
+    `[happ-lineage-migration] roster minted: ${c.rosterCid} (one member: matthew/${c.rosterMemberAgent})`
+  );
+  return c.rosterCid;
+}
+
+/**
  * Station 2's second half: the elohim notarize the path, then the release is
  * re-published naming it.
  *
@@ -1529,13 +1579,14 @@ async function notarizeMigrationPath(): Promise<void> {
   assert.ok(c.v1DnaHash && c.v2DnaHash, 'v1/v2 dna hashes not captured');
   const opensAt = new Date();
   const revertUntil = new Date(opensAt.getTime() + 24 * 60 * 60 * 1000);
+  const rosterCid = await ensureRealRoster();
   const payload = buildMigratesLineagePayload({
     role: NODE_REGISTRY_ROLE,
     fromDnaHash: c.v1DnaHash,
     toDnaHash: c.v2DnaHash,
     releaseCid: c.releaseCid,
     constitutionRoot: FIXTURE_CONSTITUTION_ROOT,
-    rosterCid: FIXTURE_ROSTER_CID,
+    rosterCid,
     evidence: { soak: [], forecast: null, deliberation: null },
     window: { opensAt: opensAt.toISOString(), revertUntil: revertUntil.toISOString() },
     requiredSignatures: 1,
@@ -1769,13 +1820,46 @@ Then(
         'applied',
         `${peer} installed v2 (verdict.state=applied)`
       );
-      const reason = row.verdict?.refusal?.reason;
+      const refusal = row.verdict?.refusal;
+      const reason = refusal?.reason;
       assert.ok(reason, `${peer} carries no refusal reason: ${JSON.stringify(row.verdict)}`);
       assert.equal(
         storyReasonLabel(reason),
         expectedReason,
         `${peer} refused with "${reason}" (-> "${storyReasonLabel(reason)}"), story names "${expectedReason}"`
       );
+      // Station 10 alone (`c.station10Channel` is set only by its two negative
+      // arms — see `notarizeAndPublishAs`'s callers) — asserts the EXACT
+      // refusal DETAIL, not just the reason code. `ensureRealRoster` mints a
+      // real, addressable roster commitment, so `verify_path`'s roster check
+      // (Task 16) actually runs the roster/root comparison rather than
+      // terminating early on "roster … is not an address" (the refusal an
+      // unaddressable slug always produced, whatever the story's own arm
+      // claimed to be testing).
+      if (c.station10Channel) {
+        const detail = refusal?.detail ?? '';
+        assert.ok(
+          !detail.toLowerCase().includes('is not an address'),
+          `${peer}'s refusal detail still reads "is not an address" — roster_cid ${c.rosterCid} ` +
+            `is not being read as a real, addressable roster: ${detail}`
+        );
+        if (expectedReason === 'quorum unmet') {
+          assert.ok(c.station10SignerAgent, 'no off-roster signer agent captured');
+          assert.ok(c.rosterCid, 'no real roster cid captured');
+          assert.ok(
+            detail.includes(c.station10SignerAgent) && detail.includes(c.rosterCid),
+            `${peer}'s quorum_unmet detail does not read "signer ${c.station10SignerAgent} is not ` +
+              `on roster ${c.rosterCid}": ${detail}`
+          );
+        } else if (expectedReason === 'root mismatch') {
+          assert.ok(c.rosterCid, 'no real roster cid captured');
+          assert.ok(
+            detail.includes(c.rosterCid) && detail.includes(FIXTURE_CONSTITUTION_ROOT),
+            `${peer}'s root_mismatch detail does not name roster ${c.rosterCid} and its declared ` +
+              `root "${FIXTURE_CONSTITUTION_ROOT}": ${detail}`
+          );
+        }
+      }
     }
   }
 );
@@ -1842,13 +1926,17 @@ Then('no peer asked anyone in the household anything', function (this: E2EWorld)
 // carry the close into v2 as a witness), `get_closes_for` (the coordinator's
 // own read index for "has this author's chain been sealed?"), and the
 // integrity zome's `refuse_carried_after_close` rule, whose refusal contains
-// the literal words "after close" (Station 8's Thens read all three
-// directly). That rule is real but NARROW: it reads the CALLING agent's own
-// earlier witnesses for the same lineage, never a DHT-wide index, so it
-// reliably catches a peer self-carrying their OWN post-close fact but not
-// (yet) a courier carrying someone ELSE's — a hole the rule's own source
-// comment names, not one this file invented; see the relevant Then's comment
-// for exactly which peers it reaches today.
+// the literal words "after close" (Station 8's Thens read the whole
+// per-peer refusal map directly). That rule is real but NARROW: it reads the
+// CALLING agent's own earlier witnesses for the same lineage, never a
+// DHT-wide index, so it reliably catches a peer self-carrying their OWN
+// post-close fact but not (yet) a courier carrying someone ELSE's — a hole
+// the rule's own source comment names, not one this file invented. The
+// story (and this file's two Thens after the fact) now say so explicitly:
+// one Then asserts the fence for the peer it actually reaches (james, the
+// self-carrying author), the other asserts the NAMED gap for the couriers it
+// does not (matthew, jessica) — see `STATION_8_FENCED_PEERS` and its two
+// Thens for exactly which peers each one reaches today.
 //
 // NOT landed, as of this reading (`elohim-storage/src`, grepped 2026-09-04):
 // no production call site reaches `LineageRoles::revert` or
@@ -3453,31 +3541,34 @@ Then(
   }
 );
 
+/**
+ * The peers whose v2 chain, in THIS Station's world, already holds a
+ * witness for the SAME close the post-close proof carries — james's own,
+ * since the proof is james's post-close fact and every peer sealed only its
+ * OWN close (the "each peer carries its own close into v2" Then, earlier in
+ * this Station). This is a fixed fact of Station 8's fixture, not a
+ * discovery this file re-derives per run: only the AUTHOR of the sealed
+ * close (james) has ever carried a witness naming it.
+ */
+const STATION_8_FENCED_PEERS: PeerName[] = ['james'];
+
 Then(
-  "v2's validation on every peer refuses the carried proof, naming {string} as its reason",
+  "v2's validation refuses the carried proof on every peer that sealed the close or already carries it in its own witness history, naming {string} as its reason",
   function (this: E2EWorld, storyReason: string) {
     // MEASURED FROM THE SOURCE (`refuse_carried_after_close`,
-    // node_registry_integrity/src/lib.rs — Task 14a, in the working tree as
-    // of this dispatch): the rule refuses a proof authored by agent A at
-    // action_seq S when the CALLING agent's OWN earlier witnesses (for the
-    // same lineage) already carry a `CloseChain` for A at a lower seq —
-    // walked via `must_get_agent_activity` from the CALLER's own chain,
-    // never a DHT-wide index. james self-carries his own post-close fact
-    // into his OWN v2 cell, whose earlier seal witness already names his
-    // own close — the case this rule exists to catch, and its refusal
-    // (containing the literal words "after close") is real and strict.
-    // matthew and jessica carry the SAME proof as COURIERS whose own v2
-    // chains have never recorded JAMES's close (only their own) — the
-    // source's own comment names this precisely as a real, undecided-by-HDI
-    // hole: "a COURIER that never sealed and never carried the close cannot
-    // be refused by any deterministic HDI rule ... That hole is named, not
-    // hidden," left for leg (i) of the fence (the storage-side v1-cell
-    // disable, Task 14b, not yet landed). This Then still asserts the
-    // story's literal claim for all three peers, so a live run tells the
-    // truth about which peers the landed rule reaches today.
+    // node_registry_integrity/src/lib.rs — Task 14a): the rule refuses a
+    // proof authored by agent A at action_seq S when the CALLING agent's OWN
+    // earlier witnesses (for the same lineage) already carry a `CloseChain`
+    // for A at a lower seq — walked via `must_get_agent_activity` from the
+    // CALLER's own chain, never a DHT-wide index. james self-carries his own
+    // post-close fact into his OWN v2 cell, whose earlier seal witness
+    // already names his own close — the ONE peer `STATION_8_FENCED_PEERS`
+    // names, and the case this rule exists to catch. Its refusal (containing
+    // the literal words "after close") is real and strict — asserted here,
+    // never merely hoped for.
     const refusals = lineage().postCloseWitnessRefusals;
     assert.ok(refusals, 'no post-close witness attempt was made — run the previous When first');
-    for (const peer of PEER_NAMES) {
+    for (const peer of STATION_8_FENCED_PEERS) {
       const refusal: string | null | undefined = refusals[peer];
       assert.ok(
         refusal,
@@ -3487,6 +3578,36 @@ Then(
         refusal.toLowerCase().includes('close'),
         `${peer} refused, but not evidently for "${storyReason}" (no "close" in the refusal ` +
           `text): ${refusal}`
+      );
+    }
+  }
+);
+
+Then(
+  "a courier who never saw the close is not yet fenced — a limitation still being closed, not the network's intended shape",
+  function (this: E2EWorld) {
+    // The literal, honest state of the substrate today: matthew and jessica
+    // carry james's post-close proof as COURIERS whose own v2 chains have
+    // never recorded JAMES's close (only their own, unrelated one) —
+    // `refuse_carried_after_close`'s own source comment names this
+    // precisely: "a COURIER that never sealed and never carried the close
+    // cannot be refused by any deterministic HDI rule ... That hole is
+    // named, not hidden" — left for Task 23 (G6, "the after-close fence
+    // reaches every courier"). This Then asserts the CURRENT, narrower
+    // reality — both couriers' proofs are ACCEPTED, not refused — so that
+    // when Task 23 lands and closes the hole, THIS assertion (not a silent
+    // pass elsewhere) is what breaks and tells the maintainer the story's
+    // "not yet fenced" line is now stale and must flip.
+    const refusals = lineage().postCloseWitnessRefusals;
+    assert.ok(refusals, 'no post-close witness attempt was made — run the previous When first');
+    const couriers = PEER_NAMES.filter(peer => !STATION_8_FENCED_PEERS.includes(peer));
+    for (const peer of couriers) {
+      assert.equal(
+        refusals[peer],
+        null,
+        `${peer} (a courier who never carried james's own close) was refused ` +
+          `"${String(refusals[peer])}" — Task 23's cross-courier fence appears to have landed; ` +
+          'update this Then (and the story\'s "not yet fenced" line) to expect refusal here too.'
       );
     }
   }
@@ -3829,13 +3950,14 @@ async function notarizeAndPublishAs(opts: {
   assert.ok(c.releaseCid, 'no Station 1 release to name');
   const opensAt = new Date();
   const revertUntil = new Date(opensAt.getTime() + 24 * 60 * 60 * 1000);
+  const rosterCid = await ensureRealRoster();
   const payload = buildMigratesLineagePayload({
     role: NODE_REGISTRY_ROLE,
     fromDnaHash: c.v1DnaHash as string,
     toDnaHash: c.v2DnaHash as string,
     releaseCid: c.releaseCid,
     constitutionRoot: opts.constitutionRoot,
-    rosterCid: FIXTURE_ROSTER_CID,
+    rosterCid,
     evidence: { soak: [], forecast: null, deliberation: null },
     window: { opensAt: opensAt.toISOString(), revertUntil: revertUntil.toISOString() },
     requiredSignatures: 1,
@@ -3912,14 +4034,15 @@ async function captureStation10Verdict(channel: string, releaseCid: string): Pro
 Given(
   "the household's declared council roster for the node-registry role is the bootstrap steward's key alone",
   function (this: E2EWorld) {
-    // Declared, not established — and THAT is the measurement. There is no
-    // machine-readable roster anywhere on this substrate: `verify_path` reads
-    // only the COUNT of a commitment's signatures against its own
-    // `required_signatures`, and the mishpat validator
-    // (`validate_lineage_signatures`) verifies each signature against its own
-    // claimed agent key and never reads `roster_cid` at all. So "the roster is
-    // the steward's key alone" is a sentence in the story with no enforcement
-    // point, which is exactly what the next two steps measure.
+    // Declared AND, since Task 16/17, ESTABLISHED: `ensureRealRoster` (below,
+    // called by the two Whens that follow) mints a REAL `author-lens`
+    // commitment naming exactly one member — matthew's own mishpat-cell agent
+    // key, the household's bootstrap steward standing in for the council, as
+    // the story's own vocabulary paragraph says. `verify_path`'s roster check
+    // reads that commitment's `members`/`constitution_root` through this
+    // peer's OWN conductor (never the body's say-so) and refuses a signer or
+    // a root the roster does not hold — which is exactly what the next two
+    // Whens/Thens measure.
     lineage();
   }
 );
@@ -3944,6 +4067,7 @@ When(
     });
     c.station10Channel = offRosterChannelId();
     c.station10ReleaseCid = published.releaseCid;
+    c.station10SignerAgent = published.signerAgent;
   }
 );
 

@@ -276,6 +276,59 @@ export function buildSunsetsLineagePayload(input: SunsetsLineageInput): SunsetsL
   };
 }
 
+// ---------------------------------------------------------------------------
+// Station 10's real roster — an `author-lens` commitment, not a lineage one
+// ---------------------------------------------------------------------------
+
+export interface MintRosterInput {
+  /** Agent strings (base64 `AgentPubKey`, `u`-prefixed) — the earned electorate. */
+  members: string[];
+  constitutionRoot: string;
+  /** Only presence/non-emptiness is validated (`validate_author_lens`) — any
+   * stable fixture-scoped slug satisfies the contract. */
+  governsEpr?: string;
+  school?: string;
+}
+
+export interface RosterMintPayload {
+  action: 'author-lens';
+  governs_epr: string;
+  school: string;
+  role: 'floor';
+  rule: Record<string, never>;
+  telos: Record<string, never>;
+  members: string[];
+  constitution_root: string;
+}
+
+const DEFAULT_ROSTER_GOVERNS_EPR = 'a2o-happ-lineage-migration-roster';
+const DEFAULT_ROSTER_SCHOOL = 'a2o-fixture';
+
+/**
+ * Builds an `author-lens` payload, `role: "floor"`, whose `rule`/`telos` are
+ * `{}` — `validate_author_lens` (`elohim/holochain/dna/mishpat/zomes/mishpat/
+ * src/commitments.rs`) only checks that both fields ARE objects, never that
+ * they hold anything in particular, so an empty bounds body satisfies the
+ * arm. `members`/`constitution_root` are extra fields the validator never
+ * reads — but `verify_path`'s own `read_roster`
+ * (`elohim/elohim-storage/src/services/release_adoption/path_evidence.rs`)
+ * reads them off ANY commitment body at the cid a path names as its
+ * `roster_cid`, which is what makes this payload a real, gossip-checkable
+ * roster rather than a slug nothing on the DHT ever resolves.
+ */
+export function buildRosterMintPayload(input: MintRosterInput): RosterMintPayload {
+  return {
+    action: 'author-lens',
+    governs_epr: input.governsEpr ?? DEFAULT_ROSTER_GOVERNS_EPR,
+    school: input.school ?? DEFAULT_ROSTER_SCHOOL,
+    role: 'floor',
+    rule: {},
+    telos: {},
+    members: input.members,
+    constitution_root: input.constitutionRoot,
+  };
+}
+
 export interface RevocationExtra {
   /** Present only when the target is itself a lineage commitment. */
   targetAction?: 'migrates-lineage' | 'sunsets-lineage';
@@ -432,6 +485,52 @@ export async function notarizeMigration(opts: {
     opts.payload,
     opts.signedAt ?? new Date().toISOString(),
     extern
+  );
+}
+
+/**
+ * Mints Station 10's real roster commitment (see `buildRosterMintPayload`'s
+ * own doc for the arm and why `{}` bounds satisfy it) and returns its ENTRY
+ * hash — `roster_cid` in a `migrates-lineage` payload names a commitment by
+ * that same hash everywhere else on this substrate
+ * (`project_mishpat_commitment_cid_is_entry_hash`), so this is the value a
+ * caller drops straight into `MigratesLineageInput.rosterCid`.
+ *
+ * Submitted through the PLAIN `create_commitment` extern, NEVER the
+ * self-signing `create_lineage_commitment` one `notarizeMigration` defaults
+ * to: `create_lineage_commitment` requires `payload_json.signing_payload_cid`
+ * to be a non-empty string UNCONDITIONALLY, before it ever reads `action`
+ * (`commitments.rs`, `create_lineage_commitment`'s first checks) — an
+ * `author-lens` body carries no such field and would be refused by that
+ * check before `validate_author_lens` ever ran. `author-lens` needs no
+ * signature at all, so the plain extern is also the CORRECT rail, not merely
+ * the one that does not error.
+ */
+export async function mintRoster(opts: {
+  conductor: ConductorRail;
+  actingPeer: string;
+  members: string[];
+  constitutionRoot: string;
+  governsEpr?: string;
+  school?: string;
+  signedAt?: string;
+}): Promise<NotarizeResult> {
+  const payload = buildRosterMintPayload({
+    members: opts.members,
+    constitutionRoot: opts.constitutionRoot,
+    governsEpr: opts.governsEpr,
+    school: opts.school,
+  });
+  console.error(
+    `[lineage-commitments] ${opts.actingPeer} minting roster (author-lens, role: floor) — ` +
+      `${opts.members.length} member(s) under root "${opts.constitutionRoot}"`
+  );
+  return createCommitment(
+    opts.conductor,
+    'author-lens',
+    payload,
+    opts.signedAt ?? new Date().toISOString(),
+    PLAIN_EXTERN
   );
 }
 
