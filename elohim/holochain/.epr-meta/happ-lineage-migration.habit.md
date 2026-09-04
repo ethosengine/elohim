@@ -48,3 +48,20 @@ EXIT=0, re-run by the chief): the remote agent-activity authority applies Action
 post-close action (seq close+1) and issues a warrant — but the tail after it validates again and the post-close record
 stays fetchable locally and over the network. The sunset fence is ours (v1 cell disabled + v2 refuses carried facts after
 the close, Station 8); the warrant is read as evidence. De-risk pass complete; the MVP plan is the execution surface.
+
+DELTA 2026-09-04 (Station 1 GREEN on the household mesh — the FIRST station measured live; receipt
+`genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r3.{log,json}`, run stamp
+20260904123730, 1 scenario / 9 steps passed, 2m18s, three peers matthew:8090 jessica:8091 james:8092
+on the 0.7 mesh): a `happ-lineage` release naming `migrateFrom = uhC0kNpWca3k…` (the INSTALLED v1
+node_registry hash, read from each peer's own `/version` passport) and installing v2
+(`uhC0kEKiIscIk5BDdethLGMFGLnvSvP2gRP5o74v0vAvoRnEzbiJ1`) is admitted by every peer's own verify —
+none of the three names `dna_lineage_mismatch`, all three reach the PATH arm — while the same v2 with
+no parent named is refused by all three with `dna_lineage_mismatch` → "lineage mismatch", the story's
+own words. TWO MEASURED FACTS: (1) the story's literal channel name
+`runtime:lineage:node_registry:commons` is NOT a legal channel id — the manifest schema's `channelId`
+pattern has no underscore, so packaging refuses before anything reaches the mesh; the run-scoped id
+spells the role with a hyphen. (2) the positive branch's live refusal today is `conductor_unavailable`,
+not `path_not_notarized`: Station 1's placeholder path-commitment cid is not a decodable EntryHash, so
+`fetch_path_evidence`'s `get_commitment` errors and answers `Unreachable` — C4 working exactly as
+designed (a read failure is never fabricated into an absence). `verify_envelope` runs before
+`verify_path` (verify.rs:1046 then :1059), so reaching that arm at all IS the admissibility proof.

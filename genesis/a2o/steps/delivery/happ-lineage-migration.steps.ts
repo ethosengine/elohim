@@ -156,7 +156,22 @@ const RUN_STAMP =
 /** The story's own channel name (Background's `{string}` literal) — never acted on directly;
  * see module doc "Run-scoped channel, one channel only". */
 const STORY_CHANNEL_NAME = 'runtime:lineage:node_registry:commons';
-const CHANNEL_ID = `runtime:lineage:node_registry:a2o-${RUN_STAMP}`;
+/**
+ * MEASURED 2026-09-04 (Station 1, run r1): the STORY's channel name
+ * "runtime:lineage:node_registry:commons" is not a legal channel id — the
+ * release-manifest schema's `channelId` pattern is
+ * `^runtime:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$`
+ * (`is_channel_id` in elohim-storage's `release_adoption::verify` enforces the
+ * same shape), and an UNDERSCORE is not in that alphabet. Packaging refused
+ * with `schema: /channelId must match pattern …` before anything reached the
+ * mesh. The run-scoped id therefore spells the role with a HYPHEN. This is a
+ * substitution of the same behavioural role the module doc already documents
+ * (the Background asserts the STORY name against `STORY_CHANNEL_NAME` and acts
+ * on `CHANNEL_ID`), plus one measured fact for the ledger: the story's literal
+ * channel name would have to be `runtime:lineage:node-registry:commons` to be
+ * publishable at all.
+ */
+const CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}`;
 
 const REPORT_DIR = path.join(
   A2O_ROOT,
@@ -208,14 +223,22 @@ const FIXTURE_ROSTER_CID = 'a2o-fixture-bootstrap-steward-roster';
 
 /** How long a single peer's `/admin/adoption` poll waits for its predicate, and how often it
  * re-reads while waiting. Mirrors the "unreachable ≠ absent, keep retrying" discipline
- * `runtime-upgrade-propagation.steps.ts`'s own `pollAdoption` documents. */
-const RECONCILE_POLL_TIMEOUT_MS = 60_000;
+ * `runtime-upgrade-propagation.steps.ts`'s own `pollAdoption` documents.
+ *
+ * MEASURED 2026-09-04 (run r2): 60s is NOT enough. A release published on
+ * matthew has to gossip to the other two peers AND be picked up by their own
+ * 60s controller sweep before their `/admin/adoption` row can name it — jessica
+ * was still resolving the CHANNEL ROOT (`tier: "none"`, "carries no release
+ * manifest yet") at the 60s mark. This is the same budget rung 5 arrived at for
+ * exactly this convergence (`FLEET_ADOPTION_CONVERGE_BUDGET_MS = 240_000` in
+ * `runtime-upgrade-propagation.steps.ts`). */
+const RECONCILE_POLL_TIMEOUT_MS = 240_000;
 const RECONCILE_POLL_INTERVAL_MS = 10_000;
 
-/** Station 2's second-half Then is KNOWN RED today (module doc "The verify_path caveat") — a
- * distinct, shorter budget so a future live run of this file does not burn extra wall-clock on
- * an assertion that cannot pass yet. */
-const ADOPTABLE_RED_POLL_TIMEOUT_MS = 120_000;
+/** Station 2's second-half Then ("adoptable") needs the notarized commitment to
+ * gossip to every peer's conductor AND that peer's next sweep to read it, on
+ * top of the release convergence above — so it gets its own, longer budget. */
+const ADOPTABLE_RED_POLL_TIMEOUT_MS = 300_000;
 
 // ---------------------------------------------------------------------------
 // Conductor rail — role/zome-parameterized, see module doc "Conductor rail"
@@ -1060,7 +1083,7 @@ async function assertRefusedWithReason(
 
 When(
   'matthew publishes a lineage release for the node-registry role whose manifest migrates from v1 and installs v2',
-  { timeout: 180_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld) {
     await ensureStation1Published();
   }
@@ -1068,7 +1091,7 @@ When(
 
 Then(
   "every peer's runtime verifies that release locally and reports it admissible, naming v1 as the parent its bridge map recognises",
-  { timeout: 90_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld) {
     await assertStation1Admissible();
   }
@@ -1076,7 +1099,7 @@ Then(
 
 When(
   'matthew publishes a second release that installs v2 without naming what it migrates from',
-  { timeout: 180_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld) {
     await ensureStation1NegativePublished();
   }
@@ -1084,7 +1107,7 @@ When(
 
 Then(
   "every peer's runtime refuses it, each naming {string} as its reason",
-  { timeout: 90_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld, expectedReason: string) {
     await assertRefusedWithReason(lineage().negativeReleaseCid, expectedReason);
   }
@@ -1190,7 +1213,7 @@ async function assertStation2AdoptableRed(): Promise<void> {
 
 Given(
   'the lineage release is earned on its channel',
-  { timeout: 300_000 },
+  { timeout: 420_000 },
   async function (this: E2EWorld) {
     await ensureStation2Earned();
   }
@@ -1204,7 +1227,7 @@ Given('no migration commitment names it', function (this: E2EWorld) {
   );
 });
 
-When("each peer's runtime next reconciles", { timeout: 90_000 }, async function (this: E2EWorld) {
+When("each peer's runtime next reconciles", { timeout: 300_000 }, async function (this: E2EWorld) {
   await captureFreshReconcile();
 });
 
@@ -1244,7 +1267,7 @@ When(
 
 Then(
   "each peer's runtime reads that commitment through its own conductor, not from the release, and reports the release adoptable",
-  { timeout: 150_000 },
+  { timeout: 360_000 },
   async function (this: E2EWorld) {
     // KNOWN RED as of this dispatch (2026-09-04) — do not "fix" by loosening the assertion.
     // Two independent, named gaps (module doc "The verify_path caveat" and
