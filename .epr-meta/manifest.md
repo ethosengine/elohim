@@ -46,7 +46,7 @@ rules:
       the pre-2026-08 root justfile drifted exactly here.
   - id: brief-is-a-claim
     class: inject
-    when: { write: ".superpowers/sdd/**/task-*-brief.md" }
+    when: { write: "task-*-brief.md" }
     route-to: { dest: "epr flow claim" }
     why: >
       A dispatched task brief is a claim on promised work. Record that act with
@@ -58,7 +58,7 @@ rules:
       the brief can be written
   - id: report-is-a-fulfilment
     class: inject
-    when: { write: ".superpowers/sdd/**/task-*-report.md" }
+    when: { write: "task-*-report.md" }
     route-to: { dest: "epr flow fulfill" }
     why: >
       A completed task report discharges promised work. Record that act with
@@ -69,7 +69,7 @@ rules:
       construction before the report can be written
   - id: rulings-are-notes
     class: inject
-    when: { write: ".superpowers/sdd/**/progress.md" }
+    when: { write: "progress.md" }
     route-to: { dest: "epr flow note --kind ruling" }
     why: >
       A ruling belongs in the valueflow record: use
