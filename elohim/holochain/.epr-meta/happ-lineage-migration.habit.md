@@ -123,3 +123,36 @@ can read is not a proof. (3) At any tier above staging the floor enforces the at
 for EVERY mode, canary included — so an earned-first ordering is circular (the canary cannot adopt
 what it must first attest) and the canary necessarily acts at `staging`, which is rung 5's ceremony
 unchanged.
+
+DELTA 2026-09-04 (Station 9 GREEN on the household mesh; receipt
+`genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r13.{log,json}`, 11/11, 44s):
+all three peers dual-celled first (carried 261/261 matthew, 135/135 jessica, 141/141 james), then the
+forgery committed through EACH peer's own v2 cell under that peer's own key — a harder test than the
+story's fourth peer, because the refusal has to come from v2's validation and not from the network
+declining a stranger. Both arms refused on all three, in v2's own words: one byte of a REAL signature
+over a REAL action flipped gives "NotarizationWitness proof 0: carried signature does not verify
+against the action's signer uhCAk…" (the story's "signature invalid"), and a REAL, VALID proof under
+a parent DNA hash this v2 never declared gives "NotarizationWitness lineage_dna_hash uhC0k0dHR… is
+not declared in this DNA's lineage property" (the story's "lineage unrecognized"). All 141
+honestly-carried records still answer a witness afterwards.
+
+DELTA 2026-09-04 (Stations 5 and 10 RED, BLOCKED, with the gaps named; Station 10's receipt is
+`cucumber-stations-mvp-r14.{log,json}`, 9 passed / 1 failed, 2m02s):
+STATION 5 (held-carry) is not implementable against this substrate. `export_records` is
+`query(ChainQueryFilter…)` — the CALLING agent's own chain, local by construction — so james's v1
+cell can only ever export james's records, and `carry_from`'s held-carry branch is unreachable from
+the only caller that exists. There is no bridge sweep in elohim-storage (grepped). It needs a v1
+extern that exports ANOTHER agent's records off the DHT plus a sweep caller: zome-side, so a BLOCKED
+report rather than an edit.
+STATION 10 reds on both arms for two named absences. Arm 1, MEASURED LIVE: a `migrates-lineage`
+commitment notarized through JESSICA's mishpat cell — a household peer, not the bootstrap steward, so
+off the declared roster — was accepted by every peer (`{"state":"ok","ok":true}`). THERE IS NO ROSTER
+CHECK ANYWHERE: `verify_path` compares only the COUNT of `signatures` against `required_signatures`,
+and `validate_lineage_signatures` verifies each signature against its own claimed key and never reads
+`roster_cid`. `quorum_unmet` is additionally unreachable from any commitment mishpat will create,
+because that validator refuses an under-quorum payload at commit. Arm 2, measured from the code (the
+run never reaches it): `verify_path` compares roots only when `inst.constitution_root` is `Some`, and
+`InstalledReality::from_happ_passport` sets it `None` for every role with its own comment saying the
+passport does not expose one yet (verify.rs:136-138) — so `root_mismatch` cannot fire on a live peer.
+Station 10 needs a machine-readable council roster (the story declares one in prose; nothing on the
+substrate holds it) and a per-role constitution root on the passport.

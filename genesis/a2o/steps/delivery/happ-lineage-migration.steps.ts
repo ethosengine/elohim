@@ -986,6 +986,9 @@ interface LineageState {
   /** Station 9: each peer's v2 refusal text for the forgery just attempted
    * (`null` means that peer ACCEPTED it, which is the failure). */
   witnessRefusals?: Partial<Record<PeerName, string | null>>;
+  /** Station 10: the channel and release the current negative arm published. */
+  station10Channel?: string;
+  station10ReleaseCid?: string;
   lastRows: Partial<Record<PeerName, AdoptionChannelRow>>;
   lastRawText: Partial<Record<PeerName, string>>;
   backgroundPids: Partial<Record<PeerName, string>>;
@@ -1566,7 +1569,16 @@ Given('no migration commitment names it', function (this: E2EWorld) {
   );
 });
 
-When("each peer's runtime next reconciles", { timeout: 300_000 }, async function (this: E2EWorld) {
+When("each peer's runtime next reconciles", { timeout: 400_000 }, async function (this: E2EWorld) {
+  const c = lineage();
+  // Station 10 publishes each of its two negative arms onto its OWN channel, so
+  // "next reconciles" there means "reconciles THAT channel" — reading the
+  // Station 1 channel's row instead would let a refusal from a different
+  // release stand in for the one under test.
+  if (c.station10Channel && c.station10ReleaseCid) {
+    await captureStation10Verdict(c.station10Channel, c.station10ReleaseCid);
+    return;
+  }
   await captureFreshReconcile();
 });
 
@@ -2627,30 +2639,207 @@ Then(
 
 // ── Station 10 — a commitment the roster did not hold is refused by every peer's own verification, whatever it claims ──
 
+/**
+ * Station 10's two negative paths, each published onto its OWN fresh channel so
+ * the two refusals cannot be confused with one another (and so neither has to
+ * publish over an earned head — see `notarizedChannelId`).
+ */
+function offRosterChannelId(): string {
+  return `${channelId()}-offroster`;
+}
+function wrongRootChannelId(): string {
+  return `${channelId()}-wrongroot`;
+}
+function offRosterManifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-offroster.json`);
+}
+function wrongRootManifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-wrongroot.json`);
+}
+
+/**
+ * Notarize a `migrates-lineage` commitment through ONE named peer's own mishpat
+ * cell and publish a release naming it on a fresh channel.
+ *
+ * `signer` is the peer whose agent key ends up in the commitment's `signatures`
+ * array — `create_lineage_commitment` signs with the CALLING agent's key and
+ * accepts no other, which is exactly what makes "signed by a key that is not on
+ * the roster" expressible at all: the harness cannot forge the steward's
+ * signature, so it signs as somebody else.
+ */
+async function notarizeAndPublishAs(opts: {
+  signer: PeerName;
+  constitutionRoot: string;
+  channel: string;
+  out: string;
+  label: string;
+}): Promise<{ commitmentCid: string; releaseCid: string; signerAgent: string }> {
+  const c = lineage();
+  assert.ok(c.releaseCid, 'no Station 1 release to name');
+  const opensAt = new Date();
+  const revertUntil = new Date(opensAt.getTime() + 24 * 60 * 60 * 1000);
+  const payload = buildMigratesLineagePayload({
+    role: NODE_REGISTRY_ROLE,
+    fromDnaHash: c.v1DnaHash as string,
+    toDnaHash: c.v2DnaHash as string,
+    releaseCid: c.releaseCid,
+    constitutionRoot: opts.constitutionRoot,
+    rosterCid: FIXTURE_ROSTER_CID,
+    evidence: { soak: [], forecast: null, deliberation: null },
+    window: { opensAt: opensAt.toISOString(), revertUntil: revertUntil.toISOString() },
+    requiredSignatures: 1,
+    signatures: [],
+  });
+
+  const rail = await connectRoleConductor(opts.signer, MISHPAT_ROLE, MISHPAT_ZOME);
+  let commitmentCid: string;
+  let signerAgent: string;
+  try {
+    const result = await notarizeMigration({
+      conductor: rail,
+      actingPeer: opts.signer,
+      payload,
+    });
+    commitmentCid = result.cid;
+    signerAgent = rail.agent;
+  } finally {
+    await rail.close();
+  }
+
+  await followChannel(opts.channel);
+  ensureChannelCreated(opts.channel);
+  const minted = await mintLineageCandidate({
+    role: NODE_REGISTRY_ROLE,
+    v1DnaHash: c.v1DnaHash as string,
+    v2DnaHash: c.v2DnaHash as string,
+    pathCommitmentCid: commitmentCid,
+    channelId: opts.channel,
+    storageBaseUrl: directPeerUrl('matthew'),
+    out: opts.out,
+    discipline: {
+      soakSecs: SOAK_SECS,
+      attestationThreshold: ATTESTATION_THRESHOLD,
+      canary: CANARY_PEER,
+    },
+  });
+  assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', opts.out], 180_000);
+  assert.equal(
+    published.status,
+    0,
+    `publish (${opts.label}) failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  console.error(
+    `[happ-lineage-migration] Station 10 (${opts.label}): commitment ${commitmentCid} signed by ` +
+      `${opts.signer} (${signerAgent}) under root "${opts.constitutionRoot}"; release ` +
+      `${parsed.releaseCid} on ${opts.channel} (tier ${parsed.tier})`
+  );
+  return { commitmentCid, releaseCid: parsed.releaseCid, signerAgent };
+}
+
+/** Capture every peer's verdict on one of Station 10's channels. */
+async function captureStation10Verdict(channel: string, releaseCid: string): Promise<void> {
+  const c = lineage();
+  const results = await pollAllPeers(
+    (_peer, row) => row.resolvedHead?.cid === releaseCid && row.verdict !== null,
+    RECONCILE_POLL_TIMEOUT_MS,
+    channel
+  );
+  for (const peer of PEER_NAMES) {
+    const result = results[peer];
+    assert.ok(result, `no verdict observed for ${peer} on ${channel}`);
+    c.lastRows[peer] = result.row;
+    c.lastRawText[peer] = result.rawText;
+    console.error(
+      `[happ-lineage-migration] Station 10 verdict on ${peer}: state=${result.row.verdict?.state}, ` +
+        `refusal.reason=${result.row.verdict?.refusal?.reason ?? '(none)'}`
+    );
+  }
+}
+
 Given(
   "the household's declared council roster for the node-registry role is the bootstrap steward's key alone",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    // Declared, not established — and THAT is the measurement. There is no
+    // machine-readable roster anywhere on this substrate: `verify_path` reads
+    // only the COUNT of a commitment's signatures against its own
+    // `required_signatures`, and the mishpat validator
+    // (`validate_lineage_signatures`) verifies each signature against its own
+    // claimed agent key and never reads `roster_cid` at all. So "the roster is
+    // the steward's key alone" is a sentence in the story with no enforcement
+    // point, which is exactly what the next two steps measure.
+    lineage();
   }
 );
 
 When(
   'the test harness records a migration commitment naming that release, signed by a key that is not on the roster',
-  function () {
-    return 'pending';
+  { timeout: 600_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    await ensureStation2Earned();
+    // jessica's own mishpat cell signs. She is a household peer, not the
+    // bootstrap steward, so her key is off the declared roster — and
+    // `create_lineage_commitment` signs with the CALLING agent's key and takes
+    // no other, so this is the only honest way to express "signed by a key that
+    // is not on the roster": sign as somebody who is not the steward.
+    const published = await notarizeAndPublishAs({
+      signer: 'jessica',
+      constitutionRoot: FIXTURE_CONSTITUTION_ROOT,
+      channel: offRosterChannelId(),
+      out: offRosterManifestPath(),
+      label: 'off-roster signer',
+    });
+    c.station10Channel = offRosterChannelId();
+    c.station10ReleaseCid = published.releaseCid;
   }
 );
 
 When(
   "the harness records a migration commitment naming that release, signed by the steward's key but under a constitution root the v2 DNA does not declare",
-  function () {
-    return 'pending';
+  { timeout: 600_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    await ensureStation2Earned();
+    const published = await notarizeAndPublishAs({
+      signer: 'matthew',
+      constitutionRoot: 'a2o-fixture-constitution-root-THE-V2-DNA-DOES-NOT-DECLARE',
+      channel: wrongRootChannelId(),
+      out: wrongRootManifestPath(),
+      label: 'wrong constitution root',
+    });
+    c.station10Channel = wrongRootChannelId();
+    c.station10ReleaseCid = published.releaseCid;
   }
 );
 
 Then(
   'the release itself is still earned and still admissible — only the path was refused',
-  function () {
-    return 'pending';
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    // The Station 1 release on `channelId()` is the earned one; it is still
+    // earned, and still admissible in the same sense Station 1 established —
+    // no peer names `dna_lineage_mismatch`, so every peer's verification still
+    // recognises the bridge map. Only the PATH was in question.
+    const results = await pollAllPeers(
+      (_peer, row) => row.resolvedHead?.cid === c.releaseCid && row.verdict !== null,
+      RECONCILE_POLL_TIMEOUT_MS
+    );
+    for (const peer of PEER_NAMES) {
+      const row = results[peer]?.row;
+      assert.equal(
+        row?.resolvedHead?.tier,
+        'earned',
+        `${peer} no longer resolves the Station 1 release as earned: ${JSON.stringify(row?.resolvedHead)}`
+      );
+      assert.notEqual(
+        row?.verdict?.refusal?.reason,
+        'dna_lineage_mismatch',
+        `${peer} now refuses the release's own bridge map — the path's refusal was allowed to ` +
+          `contaminate admissibility`
+      );
+    }
   }
 );
