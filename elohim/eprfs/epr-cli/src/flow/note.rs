@@ -412,7 +412,7 @@ pub fn note(
 
 /// Reject a blank flag value, naming the flag. An empty `--reason` is the one refusal this leg
 /// makes before it opens the store at all: a note with nothing in it is not an observation.
-fn non_empty<'a>(value: &'a str, flag: &str) -> FlowResult<&'a str> {
+pub(crate) fn non_empty<'a>(value: &'a str, flag: &str) -> FlowResult<&'a str> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Err(FlowError::InvalidArguments(format!(
@@ -423,17 +423,17 @@ fn non_empty<'a>(value: &'a str, flag: &str) -> FlowResult<&'a str> {
 }
 
 /// The resolved answer to "whose act is this note, and whose tree was it written in".
-struct Attribution {
+pub(crate) struct Attribution {
     /// The claimed identity the note is attributed to; `None` leaves it with the commit author.
-    actor: Option<String>,
+    pub(crate) actor: Option<String>,
     /// The git-signing human, carried on the agent arms only.
-    steward: Option<String>,
+    pub(crate) steward: Option<String>,
 }
 
 impl Attribution {
     /// The `provider` slot: the claimed identity when there is one, the commit author otherwise.
     /// One place decides this, so the record and the outcome can never disagree about who acted.
-    fn provider(&self, author: &str) -> String {
+    pub(crate) fn provider(&self, author: &str) -> String {
         self.actor.clone().unwrap_or_else(|| author.to_string())
     }
 
@@ -462,7 +462,7 @@ impl Attribution {
 /// and it must refuse at the same early gate as `--kind` and `--reason` — before the store is
 /// opened. The refusal is `elohim-epr-rea`'s own, verbatim: one parser owns the shape, so the CLI
 /// cannot accept an identity the store would reject, nor the reverse.
-fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>> {
+pub(crate) fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>> {
     match as_ref {
         Some(raw) => {
             let trimmed = non_empty(raw, "--as")?;
@@ -480,7 +480,7 @@ fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>> {
 /// on the author arm with a notice on stderr rather than an error. The note is the durable thing
 /// here; the attribution is an enrichment of it, and an enrichment that can veto its subject is a
 /// dependency in the wrong direction.
-fn resolve_attribution(
+pub(crate) fn resolve_attribution(
     root: &Path,
     named: Option<String>,
     session: Option<&str>,

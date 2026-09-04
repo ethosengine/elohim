@@ -6,12 +6,14 @@
 //! CID (frontmatter excluded, matching the Python cite oracle), all timestamps come from
 //! git, and records are deduped by CID against the existing sidecar before append.
 
+pub mod claim;
 pub mod edges;
 pub mod fulfill;
 pub mod governor;
 pub mod note;
 pub mod project;
 pub mod read;
+pub mod registers;
 pub mod registry;
 pub mod seal;
 pub mod stocks;
@@ -145,6 +147,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "seal" => run_seal(&args[1..]),
         "reseal" => run_reseal(&args[1..]),
         "hold" => run_hold(&args[1..]),
+        "claim" => run_claim(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
@@ -223,6 +226,53 @@ fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
         .ok_or_else(|| FlowError::InvalidArguments("hold needs --reason <text>".into()))?;
     let valid_from = take_opt(&rest, "--valid-from")?;
     let outcome = seal::hold(&opts.root, file, &on, reason, valid_from.as_deref())?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow claim` — the verb by which an actor TAKES one intent.
+///
+/// The whole tail is walked once before any value is read, the way `stocks` does it: `take_opt`
+/// scans for a `--key value` pair and ignores what it does not recognise, so a mistyped
+/// `--supercede` would otherwise read as "no supersede intended" and turn a deliberate takeover
+/// into a duplicate refusal the caller never asked for.
+fn run_claim(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--supersede" => i += 1,
+            "--on" | "--as" | "--brief" | "--serves" | "--session" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown claim argument `{other}`"
+                )))
+            }
+        }
+    }
+    let on = take_opt(&rest, "--on")?.ok_or_else(|| {
+        FlowError::InvalidArguments("claim needs --on <intent-cid|gap-id|path>".into())
+    })?;
+    let brief = take_opt(&rest, "--brief")?;
+    let serves = take_opt(&rest, "--serves")?;
+    let actor = note::NoteActor {
+        as_ref: take_opt(&rest, "--as")?,
+        session: resolve_session(take_opt(&rest, "--session")?),
+    };
+    let outcome = claim::claim(
+        &opts.root,
+        &claim::ClaimRequest {
+            on: &on,
+            brief: brief.as_deref(),
+            serves: serves.as_deref(),
+            supersede: rest.iter().any(|a| a == "--supersede"),
+            actor: &actor,
+        },
+    )?;
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
@@ -445,6 +495,10 @@ fn usage() -> String {
      (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
+     | claim --on <intent-cid|gap-id|path> [--as agent:<role>@<model>] [--brief <path>] \
+     [--serves <habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
+     (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \
+     intent is refused by name unless --supersede)\n  \
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
      | note --on <commitment-cid-or-path> \
      --kind failed-approach|correction|observation|ruling|verdict \

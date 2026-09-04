@@ -6,7 +6,9 @@
 
 use std::path::Path;
 
-use elohim_epr_cli::flow::{seal, walk};
+use elohim_epr_cli::flow::note::NoteActor;
+use elohim_epr_cli::flow::{claim, project, seal, walk};
+use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use tempfile::TempDir;
 
 fn git(root: &Path, args: &[&str]) {
@@ -404,4 +406,298 @@ fn seal_without_governor_on_two_docs_derives_cite_seal_and_goes_stale_on_mutatio
     let s = walk::status(root).expect("status");
     assert_eq!(s.edges_stale, 1, "the derived cite-seal edge is now stale");
     assert_eq!(s.edges_sealed, 0);
+}
+
+// ── valueflow authoring surface (claim · fulfill --on · context) ─────────────────────────
+//
+// Fixture shape follows `flow_note.rs`: a synthetic committed repo, `project`ed once so real
+// `Intent` records exist to claim. Two plans on purpose — `plans/epic.md` scopes TWO gap items
+// so the path arm of `--on` is genuinely ambiguous, and `plans/solo.md` scopes exactly one so
+// the unambiguous path arm has something to resolve.
+
+/// A committed, projected repo carrying two plans, their gap items, a brief, a task report, a
+/// habit register and a gate manifest.
+fn valueflow_fixture() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path();
+
+    write(
+        root,
+        ".claude/epr-meta/recipes.yaml",
+        r#"version: 1
+recipes:
+  - id: valueflow-fixture
+    version: 1
+    description: fixture plans and their gap items
+    stages:
+      - name: plan
+        artifactKind: "doc:plan"
+        paths:
+          - "plans/**/*.md"
+      - name: intent
+        artifactKind: "gap:item"
+        paths:
+          - "gap-items/*.json"
+    edges: []
+"#,
+    );
+    write(
+        root,
+        "plans/epic.md",
+        "---\nid: fixture-epic\n---\n\n# Fixture epic\n\nTwo tasks, both open.\n",
+    );
+    write(
+        root,
+        "gap-items/epic.json",
+        r#"{"doc":"plans/epic.md","items":[{"id":"epic#1","state":"OPEN"},{"id":"epic#2","state":"OPEN"}]}"#,
+    );
+    write(
+        root,
+        "plans/solo.md",
+        "---\nid: fixture-solo\n---\n\n# Fixture solo\n\nOne task.\n",
+    );
+    write(
+        root,
+        "gap-items/solo.json",
+        r#"{"doc":"plans/solo.md","items":[{"id":"solo#1","state":"OPEN"}]}"#,
+    );
+    write(
+        root,
+        "briefs/task-1-brief.md",
+        "# Task 1 brief\n\nDo the first thing, and prove it.\n",
+    );
+    write(
+        root,
+        "reports/task-1-report.md",
+        "# Task 1 report\n\nstatus: DONE. The gate ran and exited zero.\n",
+    );
+    write(
+        root,
+        "genesis/manifests/habits.yaml",
+        "version: 1\nhabits:\n  - id: dev-system-equilibrium\n    status: red\n    active: false\n    checks:\n      - \"epr flow stocks --check (plans/epic.md)\"\n    refs: []\n",
+    );
+    write(
+        root,
+        "build-manifest.json",
+        r#"{
+  "manifestVersion": "1.0",
+  "gate": {
+    "projects": {
+      "fixture": {
+        "dir": "plans",
+        "run": { "kind": "root-just", "cargo": { "targetDir": "/tmp/fixture-target", "rustflags": "" } }
+      }
+    }
+  }
+}
+"#,
+    );
+
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", "valueflow fixture"]);
+
+    let recipes = root.join(".claude/epr-meta/recipes.yaml");
+    project::project(root, &recipes).expect("project runs");
+    dir
+}
+
+fn actor(as_ref: &str) -> NoteActor {
+    NoteActor {
+        as_ref: Some(as_ref.to_string()),
+        session: None,
+    }
+}
+
+fn request<'a>(on: &'a str, actor: &'a NoteActor) -> claim::ClaimRequest<'a> {
+    claim::ClaimRequest {
+        on,
+        brief: None,
+        serves: None,
+        supersede: false,
+        actor,
+    }
+}
+
+fn records(root: &Path) -> Vec<(cid::Cid, FlowRecord)> {
+    SidecarFlowStore::open(root)
+        .expect("sidecar opens")
+        .records()
+        .expect("records read")
+}
+
+fn intent_cid_for(root: &Path, gap_id: &str) -> String {
+    records(root)
+        .into_iter()
+        .find_map(|(cid, record)| match record {
+            FlowRecord::Intent(intent)
+                if intent
+                    .resource_spec
+                    .classified_as
+                    .get(1)
+                    .map(String::as_str)
+                    == Some(gap_id) =>
+            {
+                Some(cid.to_string())
+            }
+            _ => None,
+        })
+        .expect("the projection minted an intent for this gap id")
+}
+
+fn commitments_satisfying(root: &Path, intent_cid: &str) -> usize {
+    records(root)
+        .into_iter()
+        .filter(|(_, record)| match record {
+            FlowRecord::Commitment(c) => c.satisfies.iter().any(|s| s.to_string() == intent_cid),
+            _ => false,
+        })
+        .count()
+}
+
+#[test]
+fn a_claim_mints_exactly_one_commitment_and_the_second_is_refused_until_superseded() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let intent = intent_cid_for(root, "epic#1");
+    let implementer = actor("agent:implementer@claude-opus-5");
+
+    let outcome = claim::claim(root, &request("epic#1", &implementer)).expect("claim runs");
+    assert!(outcome.appended, "a first claim appends its commitment");
+    assert_eq!(outcome.intent, intent);
+    assert_eq!(outcome.gap_id, "epic#1");
+    assert_eq!(outcome.provider, "agent:implementer@claude-opus-5");
+    assert_eq!(
+        outcome.steward.as_deref(),
+        Some("author@example.test"),
+        "an agent-provided claim always carries the tree's signer"
+    );
+    assert!(outcome.superseded_by.is_empty());
+    assert_eq!(
+        commitments_satisfying(root, &intent),
+        1,
+        "exactly one commitment satisfies the intent"
+    );
+
+    // Re-running the SAME claim against the SAME tree is a no-op, not a second claimant.
+    let again = claim::claim(root, &request("epic#1", &implementer)).expect("re-claim runs");
+    assert!(!again.appended, "identity is the atom address");
+    assert_eq!(commitments_satisfying(root, &intent), 1);
+
+    // A DIFFERENT actor is refused, and the refusal names the incumbent.
+    let reviewer = actor("agent:reviewer@claude-opus-5");
+    let err = claim::claim(root, &request("epic#1", &reviewer))
+        .expect_err("a standing claim is not silently duplicated");
+    assert!(
+        err.to_string().contains("agent:implementer@claude-opus-5"),
+        "the refusal must name the incumbent; got: {err}"
+    );
+    assert!(err.to_string().contains("--supersede"));
+    assert_eq!(commitments_satisfying(root, &intent), 1, "nothing appended");
+
+    // `--supersede` takes it over and reports what it took.
+    let taken = claim::claim(
+        root,
+        &claim::ClaimRequest {
+            supersede: true,
+            ..request("epic#1", &reviewer)
+        },
+    )
+    .expect("supersede runs");
+    assert!(taken.appended);
+    assert_eq!(
+        taken.superseded_by.len(),
+        1,
+        "taking a task over is possible, never silent"
+    );
+    assert_eq!(commitments_satisfying(root, &intent), 2);
+}
+
+#[test]
+fn on_resolves_an_address_a_gap_id_and_a_path_and_refuses_an_ambiguous_path() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+
+    // (1) a content address
+    let address = intent_cid_for(root, "epic#2");
+    let by_address = claim::claim(root, &request(&address, &implementer)).expect("address arm");
+    assert_eq!(by_address.gap_id, "epic#2");
+
+    // (2) a gap id — already covered above; (3) a path that scopes exactly one intent
+    let by_path = claim::claim(root, &request("plans/solo.md", &implementer)).expect("path arm");
+    assert_eq!(by_path.gap_id, "solo#1");
+
+    // A path scoping MORE than one intent refuses, naming every candidate.
+    let err = claim::claim(root, &request("plans/epic.md", &implementer))
+        .expect_err("guessing which task an author meant is the one thing a claim must not do");
+    let message = err.to_string();
+    assert!(
+        message.contains("epic#1") && message.contains("epic#2"),
+        "{message}"
+    );
+
+    // A well-formed address that names no record, and a target that is nothing at all.
+    assert!(claim::claim(
+        root,
+        &request(
+            "bafyreibzhpdchthmt3zlnhjjjsll6ji6p6fmhqlarcoymuhiprzof75jbq",
+            &implementer
+        )
+    )
+    .is_err());
+    assert!(claim::claim(root, &request("not-a-thing", &implementer)).is_err());
+}
+
+#[test]
+fn serves_is_checked_against_the_register_and_a_brief_is_carried_by_address() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+
+    let err = claim::claim(
+        root,
+        &claim::ClaimRequest {
+            serves: Some("no-such-habit"),
+            ..request("epic#1", &implementer)
+        },
+    )
+    .expect_err("an unknown habit id is a typo in the accounting");
+    assert!(
+        err.to_string().contains("genesis/manifests/habits.yaml"),
+        "the refusal must name the register file; got: {err}"
+    );
+
+    let outcome = claim::claim(
+        root,
+        &claim::ClaimRequest {
+            brief: Some("briefs/task-1-brief.md"),
+            serves: Some("dev-system-equilibrium"),
+            ..request("epic#1", &implementer)
+        },
+    )
+    .expect("a declared habit and a readable brief are carried");
+    assert_eq!(outcome.habit.as_deref(), Some("dev-system-equilibrium"));
+    let brief = outcome.brief.expect("the brief is carried by address");
+
+    let slots: Vec<String> = records(root)
+        .into_iter()
+        .find_map(|(cid, record)| match record {
+            FlowRecord::Commitment(c) if cid.to_string() == outcome.commitment_cid => {
+                Some(c.resource_spec.classified_as)
+            }
+            _ => None,
+        })
+        .expect("the commitment landed");
+    assert_eq!(
+        slots,
+        vec![
+            "gap:claimed".to_string(),
+            "epic#1".to_string(),
+            format!("brief:{brief}"),
+            "habit:dev-system-equilibrium".to_string(),
+            "steward:author@example.test".to_string(),
+        ],
+        "slot order is positional: tag, subject, brief, habit, steward LAST"
+    );
 }
