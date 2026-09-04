@@ -618,8 +618,20 @@ impl ContextResult {
         }
 
         match &self.gate {
+            // A tie names every candidate. The reader picks; this render never does.
+            Some(gate) if !gate.ambiguous.is_empty() => {
+                let names: Vec<String> = gate
+                    .ambiguous
+                    .iter()
+                    .map(|name| format!("just gate {name}"))
+                    .collect();
+                println!("\n  GATE — ambiguous: {}", names.join(" | "));
+            }
             Some(gate) => {
-                println!("\n  GATE — {}", gate.command);
+                println!(
+                    "\n  GATE — {}",
+                    gate.command.as_deref().unwrap_or("(unnamed)")
+                );
                 if let Some(dir) = &gate.target_dir {
                     println!(
                         "    CARGO_TARGET_DIR={dir}  RUSTFLAGS=\"{}\"",

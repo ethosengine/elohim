@@ -1020,8 +1020,9 @@ fn context_names_the_covering_habit_and_the_owning_gate_for_a_path() {
     let gate = result
         .gate
         .expect("build-manifest.json declares a gate for plans/");
-    assert_eq!(gate.project, "fixture");
-    assert_eq!(gate.command, "just gate fixture");
+    assert_eq!(gate.project.as_deref(), Some("fixture"));
+    assert_eq!(gate.command.as_deref(), Some("just gate fixture"));
+    assert!(gate.ambiguous.is_empty(), "one project, no tie");
     assert_eq!(gate.target_dir.as_deref(), Some("/tmp/fixture-target"));
     assert_eq!(gate.rustflags.as_deref(), Some(""));
 
