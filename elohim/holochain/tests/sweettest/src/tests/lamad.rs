@@ -114,6 +114,22 @@ struct UpdateContentInput {
     pub title: Option<String>,
 }
 
+/// Mirrors `lamad_types::UpdateContentInput` WITH the `metadata_json` patch —
+/// how the release ceremony authors a release VERSION (it writes the release
+/// manifest onto the version's metadata, then declares that version's action).
+///
+/// A SEPARATE mirror for the same reason the `DeclareCanonicalHead*` family is
+/// split: every existing call keeps sending the narrower shape, so those calls
+/// stay a live proof that the omitted key still decodes via `#[serde(default)]`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UpdateContentWithMetadataInput {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_json: Option<String>,
+}
+
 /// Mirrors `content_store::DeclareContentHeadInput` (notary-authority Leg 1).
 /// The zome field is `Option<ActionHashB64>` (string-wire-safe); this mirror
 /// carries `Option<String>` and passes the canonical base64 form so the
@@ -165,11 +181,20 @@ struct DeclareCanonicalHeadAdoptInput {
 /// Mirrors `content_store::CanonicalElectionOutput`. `winner_target` is `String`
 /// because the zome field is `ActionHashB64`, which serializes as a canonical
 /// base64 STRING (a raw-bytes `ActionHash` would fail to deserialize it).
+///
+/// `staging_candidate*` are the long-lived-channel fields: the STAGING
+/// declaration standing beneath an EARNED winner. `#[serde(default)]` mirrors
+/// the zome's own attribute — a pre-candidate coordinator omits the keys and
+/// they read as "no candidate".
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CanonicalElectionOutput {
     pub winner_target: String,
     pub canonical_declared_at: Timestamp,
     pub canonical_earned: bool,
+    #[serde(default)]
+    pub staging_candidate: Option<String>,
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<Timestamp>,
 }
 
 /// Mirrors `content_store::GetRecordForActionInput` — the SOURCE half of
@@ -203,6 +228,17 @@ struct ContentHeadOutput {
     pub declared_at: Timestamp,
     pub supersedes: Option<ActionHash>,
     pub content: WireContent,
+    /// Election tier behind the answer — `None` on the root-author fallback and
+    /// on the declare paths (which have written no link they can read back).
+    #[serde(default)]
+    pub canonical_earned: Option<bool>,
+    /// The STAGING declaration standing beneath an EARNED winner (`ActionHashB64`
+    /// on the wire ⇒ `String` here). This is the field the storage controller
+    /// reads to canary a candidate on a long-lived channel.
+    #[serde(default)]
+    pub staging_candidate: Option<String>,
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<Timestamp>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1249,6 +1285,242 @@ async fn earned_head_guard_and_scaffold_over_scaffold() -> Result<()> {
     assert!(
         format!("{:?}", refused.unwrap_err()).contains("earned head is protected"),
         "guard error must contain the HTTP-mappable 'earned head is protected' substring"
+    );
+
+    Ok(())
+}
+
+/// A release-manifest `metadata_json` naming `parent_cid` as the version's
+/// lineage parent — the shape `genesis/a2o/scripts/epr-release-package.ts` cuts
+/// and `release-ceremony.ts` writes onto the authored release version. Only the
+/// fields the zome's admission actually reads matter; the rest is carried so the
+/// fixture looks like a real manifest rather than a minimal probe.
+fn release_manifest_metadata(parent_cid: &str) -> String {
+    format!(
+        r#"{{"kind":"release-manifest","publishedAt":"2026-09-04T00:00:00.000Z",
+            "manifest":{{"envelope":{{"wireEpochs":[1],"lineageParentCid":"{parent_cid}","additiveOnly":true}},
+            "adoptionDiscipline":{{"soakSecs":900,"attestationThreshold":2}}}}}}"#
+    )
+}
+
+/// A LONG-LIVED CHANNEL TAKES A SECOND CANDIDATE (rung-5 seam, story station 9).
+///
+/// The defect this closes: a channel that had earned a head could never receive
+/// another candidate. The staging declare was refused outright over an earned
+/// head, and the election answered with ONE winner plus one tier bit — so a
+/// canary looking at a promoted channel saw the head it already ran and nothing
+/// to canary. Publishing a second release meant either crowning it earned
+/// without soak, or minting a fresh channel per release.
+///
+/// The cure keeps the single winner (earned-beats-staging at resolve IS the
+/// partition guard) and adds a SUBORDINATE candidate beneath it, admitted only
+/// on proof of lineage. This test drives the whole arc against a live conductor:
+///
+///   a. EARNED head E stands on the channel.
+///   b. A staging declaration S1 whose release manifest names E as its
+///      `envelope.lineageParentCid` is ADMITTED — the admission that did not
+///      exist before.
+///   c. The election still elects E (earned) and now ALSO reports S1 as
+///      `staging_candidate`; `resolve_content_head_local` carries the same pair
+///      to the storage controller.
+///   d. A staging declaration naming a DIFFERENT parent is REFUSED, with the
+///      verbatim "earned head is protected" message the storage classifier
+///      keys on — the admission is one narrow door, not an open guard.
+///   e. Promoting S1 with `declare_earned_canonical_head` makes S1 the winner
+///      and empties the candidate slot. That is how a head MOVES.
+///
+/// Single agent, single conductor: every act here is authored locally and the
+/// election reads the local link set, so there is no gossip to wait on and no
+/// cross-peer race. The convergence properties of the election itself are
+/// already proven by the two-conductor tests above; what is new here is the
+/// candidate, which is a pure function of one link set.
+#[tokio::test(flavor = "multi_thread")]
+async fn long_lived_channel_takes_a_second_candidate_beneath_its_earned_head() -> Result<()> {
+    let (mut conductor, a1) = single_agent_conductor().await?;
+    // a1 is BOTH the root author and the bootstrap steward (progenitor), so the
+    // earned-tier gate passes on either arm — this test is about the candidate,
+    // not about who may promote.
+    let dna_file = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+    let zome = cell.zome("content_store");
+
+    let channel = unique_id("long-lived-channel");
+
+    // --- (a) The channel earns a head. This is the state that used to be
+    // terminal for candidacy.
+    let v0: ContentOutput = conductor
+        .call(&zome, "create_content", test_content(&channel))
+        .await;
+    let e_action = v0.action_hash.clone();
+    let e_cid = ActionHashB64::from(e_action.clone()).to_string();
+    let earned: ContentHeadOutput = conductor
+        .call(
+            &zome,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: channel.clone(),
+                head_action_hash: e_cid.clone(),
+            },
+        )
+        .await;
+    assert_eq!(earned.head_action_hash, e_action, "E is the earned head");
+
+    // --- (b) The next release: a version whose manifest names E as its lineage
+    // parent, declared STAGING. Before the admission this call was refused.
+    let s1: ContentOutput = conductor
+        .call(
+            &zome,
+            "update_content",
+            UpdateContentWithMetadataInput {
+                id: channel.clone(),
+                title: Some("release 2".to_string()),
+                metadata_json: Some(release_manifest_metadata(&e_cid)),
+            },
+        )
+        .await;
+    let s1_action = s1.action_hash.clone();
+    let s1_cid = ActionHashB64::from(s1_action.clone()).to_string();
+
+    let admitted: ContentHeadOutput = conductor
+        .call(
+            &zome,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: channel.clone(),
+                head_action_hash: s1_cid.clone(),
+            },
+        )
+        .await;
+    assert_eq!(
+        admitted.head_action_hash, s1_action,
+        "a staging declaration whose manifest names the EARNED head as its \
+         lineage parent is ADMITTED over that earned head"
+    );
+
+    // --- (c) The election: E still WINS, S1 stands beneath it as the candidate.
+    let election: Option<CanonicalElectionOutput> = conductor
+        .call(&zome, "resolve_canonical_election", channel.clone())
+        .await;
+    let election = election.expect("the channel has an election");
+    assert_eq!(
+        election.winner_target, e_cid,
+        "ADMITTING A CANDIDATE MUST NOT MOVE THE HEAD — tier precedence still \
+         elects the earned declaration"
+    );
+    assert!(election.canonical_earned, "the winner is the earned tier");
+    assert_eq!(
+        election.staging_candidate.as_deref(),
+        Some(s1_cid.as_str()),
+        "the admitted staging declaration is reported as the candidate"
+    );
+    let candidate_at = election
+        .staging_candidate_declared_at
+        .expect("a candidate carries the clock it is ordered by");
+    assert!(
+        candidate_at > election.canonical_declared_at,
+        "the candidate postdates the earned head it stands beneath ({candidate_at:?} vs {:?})",
+        election.canonical_declared_at
+    );
+
+    // The same pair reaches the storage controller through the head read it
+    // actually calls — a candidate visible only to `resolve_canonical_election`
+    // would never reach the canary.
+    let head: Option<ContentHeadOutput> = conductor
+        .call(&zome, "resolve_content_head_local", channel.clone())
+        .await;
+    let head = head.expect("the head resolves locally");
+    assert_eq!(
+        head.head_action_hash, e_action,
+        "the resolved head is still E"
+    );
+    assert_eq!(head.canonical_earned, Some(true));
+    assert_eq!(
+        head.staging_candidate.as_deref(),
+        Some(s1_cid.as_str()),
+        "resolve_content_head_local carries the candidate to storage"
+    );
+    assert_eq!(head.staging_candidate_declared_at, Some(candidate_at));
+
+    // --- (d) The door is NARROW. A staging declaration whose manifest names a
+    // different parent is refused, verbatim — including AFTER a candidate has
+    // already been admitted (the guard keys off the earned WINNER, not the
+    // newest link, so one admission does not prop the gate open).
+    let decoy = unique_id("unrelated-content");
+    let decoy_root: ContentOutput = conductor
+        .call(&zome, "create_content", test_content(&decoy))
+        .await;
+    let foreign_cid = ActionHashB64::from(decoy_root.action_hash).to_string();
+
+    let s2: ContentOutput = conductor
+        .call(
+            &zome,
+            "update_content",
+            UpdateContentWithMetadataInput {
+                id: channel.clone(),
+                title: Some("release 3, wrong lineage".to_string()),
+                metadata_json: Some(release_manifest_metadata(&foreign_cid)),
+            },
+        )
+        .await;
+    let refused: std::result::Result<ContentHeadOutput, _> = conductor
+        .call_fallible(
+            &zome,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: channel.clone(),
+                head_action_hash: ActionHashB64::from(s2.action_hash).to_string(),
+            },
+        )
+        .await;
+    let error = format!(
+        "{:?}",
+        refused.expect_err("a staging declare naming a foreign lineage parent must be refused")
+    );
+    assert!(
+        error.contains("earned head is protected"),
+        "the refusal must stay VERBATIM — the storage classifier keys on this \
+         substring; got: {error}"
+    );
+
+    // The refused declaration wrote nothing: the candidate is still S1.
+    let unchanged: Option<CanonicalElectionOutput> = conductor
+        .call(&zome, "resolve_canonical_election", channel.clone())
+        .await;
+    let unchanged = unchanged.expect("election still resolves");
+    assert_eq!(unchanged.winner_target, e_cid);
+    assert_eq!(unchanged.staging_candidate.as_deref(), Some(s1_cid.as_str()));
+
+    // --- (e) PROMOTION moves the head. Declaring S1 earned crowns it and
+    // empties the candidate slot — S1 does not remain a candidate beneath
+    // itself.
+    let promoted: ContentHeadOutput = conductor
+        .call(
+            &zome,
+            "declare_earned_canonical_head",
+            DeclareCanonicalHeadInput {
+                id: channel.clone(),
+                head_action_hash: s1_cid.clone(),
+            },
+        )
+        .await;
+    assert_eq!(promoted.head_action_hash, s1_action);
+
+    let after: Option<CanonicalElectionOutput> = conductor
+        .call(&zome, "resolve_canonical_election", channel.clone())
+        .await;
+    let after = after.expect("election resolves after promotion");
+    assert_eq!(
+        after.winner_target, s1_cid,
+        "a NEWER earned declaration beats the older earned one — this is how \
+         promotion moves the head"
+    );
+    assert!(after.canonical_earned);
+    assert!(
+        after.staging_candidate.is_none(),
+        "the promoted candidate is the head now, not a candidate beneath it"
     );
 
     Ok(())
