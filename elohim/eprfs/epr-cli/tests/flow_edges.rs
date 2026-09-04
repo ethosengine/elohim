@@ -493,6 +493,12 @@ recipes:
 "#,
     );
 
+    write(
+        root,
+        ".epr-meta/dev-system-equilibrium.habit.md",
+        "---\nid: dev-system-equilibrium\nstatus: red\n---\n\nThe evidence ledger.\n",
+    );
+
     git(root, &["init", "-q"]);
     git(root, &["add", "-A"]);
     git(root, &["commit", "-q", "-m", "valueflow fixture"]);
@@ -990,4 +996,73 @@ fn a_content_address_target_skips_the_path_only_sections_and_says_why() {
         "bafyreibzhpdchthmt3zlnhjjjsll6ji6p6fmhqlarcoymuhiprzof75jbq"
     )
     .is_err());
+}
+
+// ── context sections 6 and 7: the covering habit and the owning gate ─────────────────────
+
+#[test]
+fn context_names_the_covering_habit_and_the_owning_gate_for_a_path() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+
+    let result = context::context(root, "plans/epic.md").expect("context runs");
+
+    let covering = result
+        .habits
+        .iter()
+        .find(|h| h.id == "dev-system-equilibrium")
+        .expect("the register's check names this path");
+    assert_eq!(covering.status, "red");
+    assert!(!covering.active);
+    assert_eq!(covering.source, "register");
+    assert!(covering.first_check.is_some());
+
+    let gate = result
+        .gate
+        .expect("build-manifest.json declares a gate for plans/");
+    assert_eq!(gate.project, "fixture");
+    assert_eq!(gate.command, "just gate fixture");
+    assert_eq!(gate.target_dir.as_deref(), Some("/tmp/fixture-target"));
+    assert_eq!(gate.rustflags.as_deref(), Some(""));
+
+    // A path no gate project declares is an honest absence, never a guessed command.
+    let uncovered = context::context(root, "briefs/task-1-brief.md").expect("context runs");
+    assert!(uncovered.gate.is_none());
+    assert!(uncovered.habit_scope.is_none());
+}
+
+#[test]
+fn a_habit_atom_renders_as_a_scope_with_the_work_accounted_to_it() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+
+    claim::claim(
+        root,
+        &claim::ClaimRequest {
+            serves: Some("dev-system-equilibrium"),
+            ..request("epic#1", &implementer)
+        },
+    )
+    .expect("a claim that serves the habit");
+
+    let result = context::context(root, ".epr-meta/dev-system-equilibrium.habit.md")
+        .expect("a habit atom is a legal target");
+    let scope = result
+        .habit_scope
+        .expect("a .habit.md target renders the habit as a scope");
+    assert_eq!(scope.id, "dev-system-equilibrium");
+    assert_eq!(scope.status, "red");
+    assert!(!scope.active);
+    assert_eq!(scope.checks.len(), 1);
+    assert_eq!(
+        scope.open_commitments.len(),
+        1,
+        "the claim carrying habit:<id> is the work accounted to the standard"
+    );
+    assert_eq!(scope.open_commitments[0].gap_id.as_deref(), Some("epic#1"));
+    assert_eq!(
+        scope.open_commitments[0].habit.as_deref(),
+        Some("dev-system-equilibrium")
+    );
 }

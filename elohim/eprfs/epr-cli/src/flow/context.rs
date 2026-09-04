@@ -24,6 +24,7 @@ use elohim_epr_rea::{CommitmentState, FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
 
 use super::read::{commitment_latest_event, notes_on, NoteView};
+use super::registers::{self, GateView, HabitEntry};
 use super::walk::{self, EdgeView};
 use super::{body_cid_of_file, confine_under, rel_to_root, short_cid, FlowError, FlowResult};
 
@@ -80,6 +81,34 @@ pub struct Seals {
     pub stale_downstream: usize,
 }
 
+/// Section 6 — a habit that covers this atom. A habit is the STANDARD the work is accounted to
+/// (spec §3), so what a reader needs from it is where it stands and what would prove it.
+#[derive(Debug, Serialize)]
+pub struct HabitView {
+    pub id: String,
+    pub status: String,
+    pub active: bool,
+    pub first_check: Option<String>,
+    /// Where the coverage claim came from: the generated register, or a `.epr-meta` declaration
+    /// in an ancestor directory (which names the file).
+    pub source: String,
+}
+
+/// The habit-as-scope render, used when the target IS a habit atom. A habit's own screen is not
+/// the same screen as a file's: what is open ON it is the work accounted TO it.
+#[derive(Debug, Serialize)]
+pub struct HabitScope {
+    pub id: String,
+    pub status: String,
+    pub active: bool,
+    pub checks: Vec<String>,
+    /// The specs and plans the register says name this habit.
+    pub refs: Vec<String>,
+    /// Undischarged commitments carrying this habit's `habit:<id>` slot, wherever they are
+    /// scoped — the work accounted to the standard.
+    pub open_commitments: Vec<ContextCommitment>,
+}
+
 /// Section 8 — the governance already computed by `epr explain`, reused rather than duplicated.
 #[derive(Debug, Serialize)]
 pub struct Governance {
@@ -101,6 +130,10 @@ pub struct ContextResult {
     pub commitments: Vec<ContextCommitment>,
     pub notes: Vec<NoteView>,
     pub seals: Option<Seals>,
+    pub habits: Vec<HabitView>,
+    pub gate: Option<GateView>,
+    /// Present only when the target is itself a `.habit.md` atom.
+    pub habit_scope: Option<HabitScope>,
     pub governance: Option<Governance>,
     /// One line saying why the path-only sections are absent, when they are.
     pub scope_note: Option<String>,
@@ -168,6 +201,21 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
         stale_downstream: result.frontier.stale_edges.len(),
     });
 
+    // Sections 6 and 7. The register is a GENERATED projection and is read as data; a missing
+    // one is an honest empty section rather than a refusal, because `context` must still answer
+    // for a repository that carries no habit register at all.
+    let register = registers::read_habits(root).unwrap_or_default();
+    let habits = path
+        .as_deref()
+        .map(|rel| habits_for(root, rel, &register))
+        .unwrap_or_default();
+    let gate = path
+        .as_deref()
+        .and_then(|rel| registers::gate_for_path(root, rel));
+    let habit_scope = path
+        .as_deref()
+        .and_then(|rel| habit_scope_for(rel, &register, &records));
+
     let governance = path.as_deref().and_then(|rel| governance_for(root, rel));
 
     let scope_note = path.is_none().then(|| {
@@ -186,6 +234,9 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
         commitments,
         notes,
         seals,
+        habits,
+        gate,
+        habit_scope,
         governance,
         scope_note,
     })
@@ -326,6 +377,130 @@ fn load_label(root: &Path, cid: &Cid) -> Vec<String> {
     labels.get(&cid.to_string()).cloned().into_iter().collect()
 }
 
+/// The habits covering `rel`, in the spec's order: the register's own coverage claim first
+/// (any entry whose `checks:` or `refs:` mention the path), then any habit DECLARED in the
+/// nearest ancestor `.epr-meta` directory as `<id>.habit.md`.
+///
+/// The declaration arm reads only the file NAME and takes status, active and checks from the
+/// register, which is that atom's own projection. Parsing the atom's frontmatter here would put
+/// a second reader of the habit declaration in the tree, and two readers of one declaration is
+/// how a projection acquires a rival.
+fn habits_for(root: &Path, rel: &str, register: &[HabitEntry]) -> Vec<HabitView> {
+    let mut views: Vec<HabitView> = registers::habits_covering(register, rel)
+        .into_iter()
+        .map(|habit| habit_view(&habit, "register".to_string()))
+        .collect();
+
+    let mut dir = std::path::PathBuf::from(rel);
+    if !dir.pop() {
+        dir = std::path::PathBuf::new();
+    }
+    loop {
+        let meta_rel = dir.join(".epr-meta");
+        if let Ok(entries) = std::fs::read_dir(root.join(&meta_rel)) {
+            let mut declared: Vec<String> = entries
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    name.strip_suffix(".habit.md").map(str::to_string)
+                })
+                .collect();
+            declared.sort();
+            if !declared.is_empty() {
+                for id in declared {
+                    if views.iter().any(|view| view.id == id) {
+                        continue;
+                    }
+                    let source = meta_rel
+                        .join(format!("{id}.habit.md"))
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    match register.iter().find(|habit| habit.id == id) {
+                        Some(habit) => views.push(habit_view(habit, source)),
+                        None => views.push(HabitView {
+                            id,
+                            status: "unprojected".to_string(),
+                            active: false,
+                            first_check: None,
+                            source,
+                        }),
+                    }
+                }
+                // The NEAREST ancestor that declares habits owns the declaration arm; a further
+                // ancestor's habits govern a wider concern than this atom.
+                break;
+            }
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    views
+}
+
+fn habit_view(habit: &HabitEntry, source: String) -> HabitView {
+    HabitView {
+        id: habit.id.clone(),
+        status: habit.status.clone(),
+        active: habit.active,
+        first_check: habit.checks.first().cloned(),
+        source,
+    }
+}
+
+/// When the target IS a habit atom, the habit renders as a SCOPE: what it holds itself to, and
+/// what work is accounted to it.
+fn habit_scope_for(
+    rel: &str,
+    register: &[HabitEntry],
+    records: &[(Cid, FlowRecord)],
+) -> Option<HabitScope> {
+    let file = rel.rsplit('/').next()?;
+    let id = file.strip_suffix(".habit.md")?.to_string();
+    let habit = register.iter().find(|habit| habit.id == id);
+    let slot = format!("habit:{id}");
+
+    let discharged: std::collections::HashSet<Cid> = records
+        .iter()
+        .filter_map(|(_, record)| match record {
+            FlowRecord::Event(e) => Some(e.fulfills.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+
+    let open_commitments = records
+        .iter()
+        .filter_map(|(cid, record)| match record {
+            FlowRecord::Commitment(c)
+                if matches!(c.state, CommitmentState::Proposed | CommitmentState::Active)
+                    && !discharged.contains(cid)
+                    && c.resource_spec.classified_as.iter().any(|s| s == &slot) =>
+            {
+                Some(commitment_row(
+                    &cid.to_string(),
+                    &c.provider.0,
+                    &format!("{:?}", c.state),
+                    &c.resource_spec.classified_as,
+                    records,
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+
+    Some(HabitScope {
+        id,
+        status: habit
+            .map(|h| h.status.clone())
+            .unwrap_or_else(|| "unprojected".to_string()),
+        active: habit.is_some_and(|h| h.active),
+        checks: habit.map(|h| h.checks.clone()).unwrap_or_default(),
+        refs: habit.map(|h| h.refs.clone()).unwrap_or_default(),
+        open_commitments,
+    })
+}
+
 /// Section 8, best effort. An unreadable authority index or cascade yields `None` — the honest
 /// absence — rather than an error: a governance line is an enrichment of the screen, and an
 /// enrichment that can veto its subject is a dependency in the wrong direction.
@@ -415,6 +590,44 @@ impl ContextResult {
                 print_more(seals.edges.len());
             }
             None => println!("\n  SEALS (not computed — no path)"),
+        }
+
+        if let Some(scope) = &self.habit_scope {
+            println!(
+                "\n  HABIT SCOPE — {} [{}{}] · {} check(s) · {} open commitment(s)",
+                scope.id,
+                scope.status,
+                if scope.active { ", active" } else { "" },
+                scope.checks.len(),
+                scope.open_commitments.len()
+            );
+            for check in scope.checks.iter().take(RENDER_ROWS) {
+                println!("    check: {check}");
+            }
+        } else {
+            match self.habits.first() {
+                Some(habit) => println!(
+                    "\n  HABIT — {} [{}{}] ({})",
+                    habit.id,
+                    habit.status,
+                    if habit.active { ", active" } else { "" },
+                    habit.source
+                ),
+                None => println!("\n  HABIT (no habit in the register names this path)"),
+            }
+        }
+
+        match &self.gate {
+            Some(gate) => {
+                println!("\n  GATE — {}", gate.command);
+                if let Some(dir) = &gate.target_dir {
+                    println!(
+                        "    CARGO_TARGET_DIR={dir}  RUSTFLAGS=\"{}\"",
+                        gate.rustflags.as_deref().unwrap_or("")
+                    );
+                }
+            }
+            None => println!("\n  GATE (no gate project covers this path)"),
         }
 
         match &self.governance {

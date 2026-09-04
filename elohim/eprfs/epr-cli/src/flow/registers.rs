@@ -1,12 +1,14 @@
-//! Readers over the repository's GENERATED registers.
+//! Readers over the repository's GENERATED registers — the habit register and the gate
+//! projects declared in `build-manifest.json`.
 //!
-//! `genesis/manifests/habits.yaml` is a projection that something else owns — it is written by
-//! `.claude/scripts/habits-project.py` from the `.epr-meta` habit atoms. Nothing here ever
-//! writes it. Reading a generated file and then editing it is how a projection acquires a
-//! second author, and a register with two authors is no longer a register.
+//! Both files are projections that something else owns: `genesis/manifests/habits.yaml` is
+//! written by `.claude/scripts/habits-project.py` from the `.epr-meta` habit atoms, and each
+//! `build-manifest.json` is the pipeline's own declaration. Nothing here ever writes either
+//! one. Reading a generated file and then editing it is how a projection acquires a second
+//! author, and a register with two authors is no longer a register.
 //!
-//! This is the first Rust reader of that file. It deserializes only the fields a reader needs,
-//! so a field added to the register does not break this one.
+//! These are the first Rust readers of both files. They deserialize only the fields a reader
+//! needs, so a field added to either register does not break this one.
 
 use std::path::{Path, PathBuf};
 
@@ -16,6 +18,9 @@ use super::{FlowError, FlowResult};
 
 /// The generated habit register, relative to the repository root.
 pub const HABITS_REGISTER_REL: &str = "genesis/manifests/habits.yaml";
+
+/// The per-project pipeline manifest whose `gate.projects` says how a tree is gated.
+pub const BUILD_MANIFEST_NAME: &str = "build-manifest.json";
 
 #[derive(Debug, Deserialize)]
 struct HabitRegister {
@@ -60,20 +65,156 @@ pub fn read_habits(root: &Path) -> FlowResult<Vec<HabitEntry>> {
     Ok(register.habits)
 }
 
+/// The habits whose `checks:` or `refs:` mention `rel_path` — the register's own statement that
+/// this file's behaviour is covered by that standard.
+///
+/// Substring matching, deliberately: a check is a runnable command line and a ref is a prose
+/// locator, so neither is a structured path field that could be compared exactly.
+pub fn habits_covering(habits: &[HabitEntry], rel_path: &str) -> Vec<HabitEntry> {
+    if rel_path.is_empty() {
+        return Vec::new();
+    }
+    habits
+        .iter()
+        .filter(|habit| {
+            habit
+                .checks
+                .iter()
+                .chain(habit.refs.iter())
+                .any(|line| line.contains(rel_path))
+        })
+        .cloned()
+        .collect()
+}
+
+/// A `gate.projects` entry: what `just gate <name>` actually runs for a tree.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateCargo {
+    #[serde(default)]
+    pub target_dir: Option<String>,
+    #[serde(default)]
+    pub rustflags: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GateRun {
+    #[serde(default)]
+    cargo: Option<GateCargo>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GateProject {
+    #[serde(default)]
+    dir: String,
+    #[serde(default)]
+    run: Option<GateRun>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GateSection {
+    #[serde(default)]
+    projects: std::collections::BTreeMap<String, GateProject>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BuildManifest {
+    #[serde(default)]
+    gate: Option<GateSection>,
+}
+
+/// The gate that owns a path: project name, the command to run it, and the cargo environment
+/// the manifest declares.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct GateView {
+    pub project: String,
+    pub command: String,
+    pub target_dir: Option<String>,
+    pub rustflags: Option<String>,
+    /// The manifest this was read from, repo-relative — so a reader can check the claim.
+    pub manifest: String,
+}
+
+/// Walk up from `rel_path`'s directory to the nearest `build-manifest.json`, then select the
+/// `gate.projects` entry whose `dir` is a prefix of `rel_path`.
+///
+/// `None` is an honest "no gate project covers this path". The alternative — returning the
+/// nearest project regardless of its `dir` — would print a gate command that does not gate the
+/// file, which is worse than printing nothing, because it would be followed.
+pub fn gate_for_path(root: &Path, rel_path: &str) -> Option<GateView> {
+    let mut dir = PathBuf::from(rel_path);
+    // A path names a file; start the walk at its directory. An empty relative path means the
+    // repository root itself, where the walk is a single look.
+    if !dir.pop() {
+        dir = PathBuf::new();
+    }
+    loop {
+        let manifest_rel = dir.join(BUILD_MANIFEST_NAME);
+        let manifest_abs = root.join(&manifest_rel);
+        if manifest_abs.is_file() {
+            if let Some(view) = gate_in_manifest(&manifest_abs, &manifest_rel, rel_path) {
+                return Some(view);
+            }
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+fn gate_in_manifest(manifest_abs: &Path, manifest_rel: &Path, rel_path: &str) -> Option<GateView> {
+    let text = std::fs::read_to_string(manifest_abs).ok()?;
+    let manifest: BuildManifest = serde_json::from_str(&text).ok()?;
+    let projects = manifest.gate?.projects;
+    // Longest declared `dir` first: a nested project is more specific than the tree that
+    // contains it, and the more specific gate is the one that runs the file.
+    let mut candidates: Vec<(&String, &GateProject)> = projects
+        .iter()
+        .filter(|(_, project)| path_is_under(rel_path, &project.dir))
+        .collect();
+    candidates.sort_by_key(|(_, project)| std::cmp::Reverse(project.dir.len()));
+    let (name, project) = candidates.first()?;
+    let cargo = project.run.as_ref().and_then(|run| run.cargo.clone());
+    Some(GateView {
+        project: (*name).clone(),
+        command: format!("just gate {name}"),
+        target_dir: cargo.as_ref().and_then(|c| c.target_dir.clone()),
+        rustflags: cargo.as_ref().and_then(|c| c.rustflags.clone()),
+        manifest: manifest_rel.to_string_lossy().replace('\\', "/"),
+    })
+}
+
+/// Is `rel_path` inside the declared `dir`? An empty `dir` is the repository root and covers
+/// everything; otherwise the match is on a path BOUNDARY, never a bare prefix, so
+/// `elohim/eprfs` never claims `elohim/eprfs-extra`.
+fn path_is_under(rel_path: &str, dir: &str) -> bool {
+    let dir = dir.trim_end_matches('/');
+    if dir.is_empty() || dir == "." {
+        return true;
+    }
+    rel_path == dir || rel_path.starts_with(&format!("{dir}/"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    /// A fixture register under a temp dir. The live repository is never read: a test that
-    /// asserted against the real register would fail the day someone legitimately re-projected
-    /// it.
+    fn write(root: &Path, rel: &str, contents: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
+
+    /// A fixture register and a fixture manifest, both under a temp dir. The live repository is
+    /// never read: a test that asserted against the real register would fail the day someone
+    /// legitimately re-projected it.
     fn fixture() -> TempDir {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join(HABITS_REGISTER_REL);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(
-            path,
+        let root = dir.path();
+        write(
+            root,
+            HABITS_REGISTER_REL,
             r#"version: 1
 habits:
   - id: dev-system-equilibrium
@@ -90,8 +231,26 @@ habits:
       - "a2o @concern:epr-atom-home"
     refs: []
 "#,
-        )
-        .unwrap();
+        );
+        write(
+            root,
+            "elohim/eprfs/build-manifest.json",
+            r#"{
+  "manifestVersion": "1.0",
+  "gate": {
+    "projects": {
+      "eprfs": {
+        "dir": "elohim/eprfs",
+        "run": {
+          "kind": "root-just",
+          "cargo": { "targetDir": "/tmp/eprfs-gate-target", "rustflags": "" }
+        }
+      }
+    }
+  }
+}
+"#,
+        );
         dir
     }
 
@@ -115,5 +274,41 @@ habits:
             err.to_string().contains(HABITS_REGISTER_REL),
             "the refusal must name the register file; got: {err}"
         );
+    }
+
+    #[test]
+    fn covering_habits_are_the_ones_whose_checks_or_refs_name_the_path() {
+        let dir = fixture();
+        let habits = read_habits(dir.path()).expect("register reads");
+        let covering = habits_covering(&habits, "elohim/eprfs/epr-cli/src/flow/stocks.rs");
+        assert_eq!(covering.len(), 1);
+        assert_eq!(covering[0].id, "dev-system-equilibrium");
+        assert!(habits_covering(&habits, "app/elohim-app/src/main.ts").is_empty());
+        assert!(habits_covering(&habits, "").is_empty());
+    }
+
+    #[test]
+    fn the_gate_is_the_nearest_manifest_entry_whose_dir_covers_the_path() {
+        let dir = fixture();
+        let gate = gate_for_path(dir.path(), "elohim/eprfs/epr-cli/src/flow/claim.rs")
+            .expect("the eprfs gate covers this path");
+        assert_eq!(gate.project, "eprfs");
+        assert_eq!(gate.command, "just gate eprfs");
+        assert_eq!(gate.target_dir.as_deref(), Some("/tmp/eprfs-gate-target"));
+        assert_eq!(gate.rustflags.as_deref(), Some(""));
+        assert_eq!(gate.manifest, "elohim/eprfs/build-manifest.json");
+    }
+
+    #[test]
+    fn a_path_no_gate_project_declares_returns_none_rather_than_a_guess() {
+        let dir = fixture();
+        assert!(
+            gate_for_path(dir.path(), "app/elohim-app/src/main.ts").is_none(),
+            "a gate command that does not gate the file is worse than none"
+        );
+        // A sibling directory that merely shares a name PREFIX is not under the project.
+        assert!(!path_is_under("elohim/eprfs-extra/x.rs", "elohim/eprfs"));
+        assert!(path_is_under("elohim/eprfs/x.rs", "elohim/eprfs"));
+        assert!(path_is_under("anything", ""));
     }
 }
