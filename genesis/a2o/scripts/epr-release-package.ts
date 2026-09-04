@@ -142,6 +142,11 @@ happ-lineage (spec 2026-09-03-holochain-evolution-epic-design §4):
                                 to every role named by --migrate-from
   --path-commitment <cid>       the migrates-lineage commitment (entry hash, uhCEk…) that
                                 notarizes this path; required when --artifact-class is happ-lineage
+  --constitution-root <root>    the constitution the crossing is notarized under; applied to every
+                                role named by --migrate-from. Checked against the adopting peer's
+                                INSTALLED v1 root when that cell declares one, and against this
+                                declaration when it does not. Omitted on both sides, the root check
+                                is skipped and the receipt says so (root: undeclared).
 
 Blob plane:
   --peer <url>                  storage peer for the blob PUT (default: ${DEFAULT_PEER})
@@ -248,6 +253,8 @@ interface Options {
   lineage: string[];
   /** The notarized migrates-lineage commitment (entry hash) for a happ-lineage release. */
   pathCommitment: string | null;
+  /** The constitution the crossing is notarized under, applied to every role named in `migrateFrom`. */
+  constitutionRoot: string | null;
   peer: string;
   agentId: string;
   put: boolean;
@@ -284,6 +291,7 @@ const LINEAGE_FLAGS = {
   '--migrate-from': 'migrateFrom',
   '--lineage': 'lineage',
   '--path-commitment': 'pathCommitment',
+  '--constitution-root': 'constitutionRoot',
 } as const satisfies Record<string, keyof Options>;
 
 function requiredValue(args: string[], index: number, flag: string): string {
@@ -368,6 +376,7 @@ function parseArgs(argv: string[]): Options {
     migrateFrom: {},
     lineage: [],
     pathCommitment: null,
+    constitutionRoot: null,
     peer: parseHttpUrl(process.env['RELEASE_PEER_URL'] ?? DEFAULT_PEER, '--peer'),
     agentId: DEFAULT_AGENT_ID,
     put: true,
@@ -477,7 +486,8 @@ function parseArgs(argv: string[]): Options {
       // separate cases would push this switch past the 30-case lint ceiling.
       case '--migrate-from':
       case '--lineage':
-      case '--path-commitment': {
+      case '--path-commitment':
+      case '--constitution-root': {
         const value = requiredValue(argv, index, arg);
         const field = LINEAGE_FLAGS[arg];
         if (field === 'migrateFrom') {
@@ -490,6 +500,8 @@ function parseArgs(argv: string[]): Options {
               .map(entry => entry.trim())
               .filter(entry => entry.length > 0)
           );
+        } else if (field === 'constitutionRoot') {
+          options.constitutionRoot = value;
         } else {
           options.pathCommitment = value;
         }
@@ -563,6 +575,13 @@ interface RoleBinding {
   migrateFrom?: string;
   /** happ-lineage only: the ancestry the v2 DNA properties declare. */
   lineage?: string[];
+  /**
+   * happ-lineage only: the constitution this crossing is notarized under — the
+   * same root the path's migrates-lineage commitment carries (epic §4.1).
+   * `verify_path` checks the path against the peer's INSTALLED v1 root when
+   * that cell declares one, and against THIS declaration when it does not.
+   */
+  constitutionRoot?: string;
 }
 
 interface ReleaseManifest {
@@ -841,6 +860,7 @@ function applyLineageBindings(
       ...existing,
       migrateFrom,
       ...(options.lineage.length > 0 ? { lineage: options.lineage } : {}),
+      ...(options.constitutionRoot ? { constitutionRoot: options.constitutionRoot } : {}),
     };
   }
   return { roles };

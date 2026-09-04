@@ -14,8 +14,8 @@
  * implementation shape rather than the CLI contract these flags are part of.
  */
 
-import { execFileSync } from 'node:child_process';
 import { strict as assert } from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -51,7 +51,7 @@ function loadSchema(): JsonObject {
 function validateManifest(manifest: unknown): { ok: boolean; errors: string[] } {
   const ajv = new AjvCtor({ strict: false, allErrors: true });
   const validate = ajv.compile(loadSchema());
-  const ok = validate(manifest) as boolean;
+  const ok = validate(manifest);
   const errors = (validate.errors ?? []).map(
     error => `${error.instancePath || '/'} ${error.message ?? 'invalid'}`
   );
@@ -146,6 +146,15 @@ void describe('release-manifest schema — happ-lineage artifactClass', () => {
     assert.equal(result.ok, false);
   });
 
+  void it('rejects an empty roleBinding.constitutionRoot', () => {
+    // `minLength: 1` on purpose: an empty root is not "undeclared", it is a
+    // root nothing can equal, which would refuse every crossing under it.
+    const m = baseManifest();
+    const roles = (m['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    (roles['node_registry'] as JsonObject)['constitutionRoot'] = '';
+    assert.equal(validateManifest(m).ok, false);
+  });
+
   void it('rejects roleBinding.lineage with zero items', () => {
     const m = baseManifest();
     const roles = (m['appliesTo'] as JsonObject)['roles'] as JsonObject;
@@ -205,11 +214,19 @@ function happLineageArgs(artifactPath: string, extra: string[] = []): string[] {
   ];
 }
 
+const CONSTITUTION_ROOT = 'bafyLineageConstitutionRootForThePackagerSpec';
+
+/**
+ * The notarized-path + emit flags every packager case here shares. Hoisted so
+ * the three call sites name one array rather than repeating the same four
+ * literals — which is also what keeps `sonarjs/no-duplicate-string` quiet as
+ * cases are added.
+ */
+const NOTARIZED_EMIT_ARGS = ['--path-commitment', PATH_COMMITMENT_CID, '--compact', '--strict'];
+
 void describe('epr-release-package.ts CLI — happ-lineage flags', () => {
   void it('assembles a manifest with migrateFrom/lineage/path that passes schema + --strict', () => {
-    const stdout = runPackager(
-      happLineageArgs(tempArtifact(), ['--path-commitment', PATH_COMMITMENT_CID, '--compact', '--strict'])
-    );
+    const stdout = runPackager(happLineageArgs(tempArtifact(), NOTARIZED_EMIT_ARGS));
     const manifest = JSON.parse(stdout) as JsonObject;
     const result = validateManifest(manifest);
     assert.equal(result.ok, true, result.errors.join('\n'));
@@ -221,6 +238,32 @@ void describe('epr-release-package.ts CLI — happ-lineage flags', () => {
     assert.deepEqual((manifest['adoptionDiscipline'] as JsonObject)['path'], {
       commitmentCid: PATH_COMMITMENT_CID,
     });
+  });
+
+  void it('--constitution-root lands on every crossing role and passes schema + --strict', () => {
+    const stdout = runPackager(
+      happLineageArgs(tempArtifact(), [
+        ...NOTARIZED_EMIT_ARGS,
+        '--constitution-root',
+        CONSTITUTION_ROOT,
+      ])
+    );
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const result = validateManifest(manifest);
+    assert.equal(result.ok, true, result.errors.join('\n'));
+
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.equal((roles['node_registry'] as JsonObject)['constitutionRoot'], CONSTITUTION_ROOT);
+  });
+
+  void it('omits constitutionRoot entirely when the flag is not given', () => {
+    // Undeclared is a real state, not an empty string: with no installed root
+    // either, verify_path skips the root check and says `root: undeclared`.
+    // An empty-string field would be a root nothing can equal.
+    const stdout = runPackager(happLineageArgs(tempArtifact(), NOTARIZED_EMIT_ARGS));
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.equal('constitutionRoot' in (roles['node_registry'] as JsonObject), false);
   });
 
   void it('refuses to package a happ-lineage release without --path-commitment', () => {
