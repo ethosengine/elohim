@@ -3367,3 +3367,89 @@ decisionPoints:
       presence. Every such grant emits DEBUG with commitment id, provider, and ward. Close this
       gap when projection ordering can make anchor presence an invariant without withholding a
       freshly notarized custodian during convergence.
+  - name: judge_deliverability
+    kind: verdict-fn
+    sourceLocation:
+      file: src/app_deliverability.rs
+      modulePath: app_deliverability::judge_deliverability
+      line: 92
+    summary: >
+      Pure derivation of a bundle's deliverability from its extracted entries: Boots iff an
+      index.html is present and every same-origin script/stylesheet it names is held by the
+      bundle; Broken(MissingAsset|InvalidZip|NoIndex) otherwise; NotJudged(NotHeld) is the
+      honest-absence arm the callers use when the bytes are not local. Runs inside the
+      extraction walk (no extra I/O), memoised per canonical blob hash. Born from the
+      2026-09-04 blank landing (spec 2026-09-05 EPR-app delivery verdict §2).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Plane stated: peer-hoster dataplane (T2). The doorway never computes this; it
+          relays the peer's answer as headers.
+      - id: C4
+        status: answered
+        justification: >
+          NotJudged(NotHeld) is distinct from Broken on every surface; absence of bytes
+          is never read as a broken bundle.
+      - id: C5
+        status: answered
+        justification: >
+          Any receiver re-derives the verdict from the bytes; no forwarded claim is trusted.
+      - id: C6a
+        status: answered
+        justification: >
+          One judgement per canonical hash, inside a walk that already reads every entry;
+          memoised for the process lifetime.
+      - id: C8
+        status: answered
+        justification: >
+          Typed verdict + reason on the wire and counted
+          (elohim_app_deliverability_verdict_total{verdict,reason}).
+      - id: C10
+        status: answered
+        justification: >
+          Additive headers only; a consumer that does not know X-Deliverability sees no
+          change (verify-projected-head.sh's SKIP idiom for absent fields).
+      - id: C1
+        status: n-a
+        justification: no election or self-nomination is involved.
+      - id: C2
+        status: n-a
+        justification: no authority is granted or revoked by the verdict.
+      - id: C3
+        status: answered
+        justification: a verdict never blocks a serve; Broken is reported, the bytes still flow.
+      - id: C6b
+        status: answered
+        justification: idempotent — the same entries always yield the same verdict.
+      - id: C7
+        status: answered
+        justification: the header advertises exactly the verdict the peer serves by.
+      - id: C9
+        status: n-a
+        justification: no identity lineage is touched.
+      - id: C11
+        status: n-a
+        justification: not a backpressure source; it adds no I/O.
+      - id: C12
+        status: n-a
+        justification: the verdict is public per head; the reach-gated diagnostic is slice 4.
+      - id: C13
+        status: n-a
+        justification: no authority tier is introduced by this predicate.
+      - id: C14
+        status: n-a
+        justification: the witnessed-transition graduation is held (spec §8).
+    contractTests:
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: a_bundle_whose_index_names_only_held_assets_boots
+        kind: unit
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: a_bundle_whose_index_names_a_missing_entry_script_is_broken_and_names_it
+        kind: unit
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: a_bundle_with_no_index_is_broken_no_index
+        kind: unit
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: shell_asset_refs_keeps_only_same_origin_relative_scripts_and_stylesheets
+        kind: unit

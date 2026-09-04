@@ -52,6 +52,7 @@ pub mod generated_enums;
 pub mod api;
 
 // Core modules (always available)
+pub mod app_deliverability; // Pure deliverability verdict over a bundle's extracted entries
 pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
