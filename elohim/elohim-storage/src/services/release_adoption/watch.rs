@@ -727,6 +727,131 @@ impl AdoptionController {
         }
     }
 
+    /// Resolve the STAGING CANDIDATE's own `ContentHeadWire` — the two-call
+    /// serve+prove pair, aimed at the declaration standing beneath an earned
+    /// head (see [`classify_candidate_follow`]).
+    ///
+    /// `resolve_content_head_local` answers the WINNER's record, so the
+    /// candidate's release manifest, author and `supersedes` are simply not in
+    /// that answer. They have to be read separately, and they are read the ONLY
+    /// way that keeps the bytes bound to the action the election named:
+    ///
+    ///   1. `get_record_for_action` — this conductor SERVES the record it holds
+    ///      for the candidate action.
+    ///   2. `validate_carried_head_record` — the wasm side PROVES those bytes:
+    ///      action-hash binding, author signature, entry↔action binding, and the
+    ///      TARGET-ID GATE (the Content must belong to THIS channel).
+    ///
+    /// Storage synthesizes nothing. A one-call `get_content` would have been
+    /// cheaper, but `ContentOutput` carries no `supersedes`, so the controller
+    /// would have had to assert a lineage edge instead of reading one — and
+    /// `verify_lineage` is precisely the floor that edge feeds.
+    ///
+    /// ## Bounded on the WASM side, not by a caller timeout
+    ///
+    /// Both externs are O(1) in-wasm work decided BEFORE the call is made:
+    /// `get_record_for_action` is a single local `get` on ONE action (no chain
+    /// walk, no link gather), and `validate_carried_head_record` is pure crypto
+    /// over bytes the caller supplied — it touches the DHT not at all. So there
+    /// is no caller-side deadline here and there must not be one: a timeout
+    /// would abandon a conductor that keeps running, which is the failure this
+    /// crate's `conductor-call-is-uncancellable` rule names. `Background`
+    /// admission is the bound that belongs to us — a sweep must never occupy
+    /// the lane a person is standing in.
+    ///
+    /// This call pair is paid ONLY when a canary sees a candidate it has not
+    /// already applied; on a converged canary the classifier returns
+    /// `AlreadyApplied` and nothing here runs.
+    ///
+    /// Every failure returns `None`, and `None` means "keep following the
+    /// winner" — a canary that cannot read the candidate does exactly what it
+    /// does today, never a guess.
+    async fn resolve_candidate_head(
+        &self,
+        channel_id: &str,
+        candidate_cid: &str,
+    ) -> Option<ContentHeadWire> {
+        let hc = self.hc.as_ref()?;
+
+        let served_payload = rmp_serde::to_vec_named(
+            &crate::services::conductor_writes::GetRecordForActionInput {
+                action_hash: candidate_cid.to_string(),
+            },
+        )
+        .ok()?;
+        let served_bytes = match hc
+            .call_zome_timed(
+                "content_store",
+                "get_record_for_action",
+                served_payload,
+                AdmissionClass::Background,
+            )
+            .await
+        {
+            Ok((bytes, _timing)) => bytes,
+            Err(e) => {
+                tracing::debug!(
+                    channel = %channel_id,
+                    candidate = %candidate_cid,
+                    error = %e,
+                    "release-adoption: could not serve the staging candidate's record — the \
+                     canary keeps following the earned winner this sweep"
+                );
+                return None;
+            }
+        };
+        let served = rmp_serde::from_slice::<
+            Option<crate::services::conductor_writes::CarriedRecordWire>,
+        >(&served_bytes)
+        .ok()
+        .flatten()?;
+
+        let proof_payload = rmp_serde::to_vec_named(
+            &crate::services::conductor_writes::ValidateCarriedHeadRecordInput {
+                id: channel_id.to_string(),
+                expected_action_hash: candidate_cid.to_string(),
+                record: Some(served.record),
+            },
+        )
+        .ok()?;
+        let proof_bytes = match hc
+            .call_zome_timed(
+                "content_store",
+                "validate_carried_head_record",
+                proof_payload,
+                AdmissionClass::Background,
+            )
+            .await
+        {
+            Ok((bytes, _timing)) => bytes,
+            Err(e) => {
+                tracing::debug!(
+                    channel = %channel_id,
+                    candidate = %candidate_cid,
+                    error = %e,
+                    "release-adoption: the staging candidate's carried record did not prove \
+                     itself — refusing to follow unproven bytes"
+                );
+                return None;
+            }
+        };
+        let mut proven = rmp_serde::from_slice::<Option<ContentHeadWire>>(&proof_bytes)
+            .ok()
+            .flatten()?;
+
+        // The candidate IS a staging declaration — say so explicitly rather than
+        // letting the prove path's honest `canonical_earned: None` (it holds no
+        // election, and correctly refuses to invent one) read downstream as
+        // `HeadTier::None`, which would put this release under the EARNED
+        // threshold gate it has not had a chance to earn yet.
+        proven.canonical_earned = Some(false);
+        // Nothing stands beneath a candidate. Clearing these keeps the wire from
+        // describing a second hop the election never declared.
+        proven.staging_candidate = None;
+        proven.staging_candidate_declared_at = None;
+        Some(proven)
+    }
+
     /// Read the attestation threshold for a release through T5's rail.
     ///
     /// C1 is a type obligation here, not a remembered step: the only way to
@@ -927,6 +1052,78 @@ impl AdoptionController {
             }
         };
 
+        // Hoisted, because the candidate decision below needs the SAME fact the
+        // C6b exit needs. Guarded by `will_apply` exactly as that exit is, so
+        // `observe` still reads nothing it did not read before.
+        let applied = if will_apply {
+            state::applied_release(&channel.channel_id)
+        } else {
+            None
+        };
+
+        // **LONG-LIVED CHANNEL — the canary follows the CANDIDATE.**
+        //
+        // Placed BEFORE `release_cid` and the C6b exit on purpose: a canary that
+        // applied the candidate must compare `appliedRelease.cid` against the
+        // CANDIDATE. Substituting after the exit would leave it comparing the
+        // earned winner it never applied, and it would re-run the entire check —
+        // threshold read, artifact fetch, verify — every sweep, forever.
+        //
+        // `apply` and `observe` never reach the substitution
+        // (`classify_candidate_follow` returns `Leave`), so their behaviour here
+        // is byte-identical to before.
+        // Decided BEFORE the match, so the borrow of `head` and `applied` is
+        // plainly over before an arm moves either of them.
+        let follow = classify_candidate_follow(
+            channel.mode,
+            &head,
+            applied.as_ref().map(|a| a.cid.as_str()),
+        );
+        let head = match follow {
+            CandidateFollow::Leave => head,
+            // The C6b idempotence rule, applied to the candidate — the SAME rule
+            // as the exit below, on the subject this canary is actually
+            // following. Stated here rather than reached through a
+            // half-substituted wire, and it costs ZERO conductor calls beyond
+            // the resolve, which is the contract C6b is written to keep.
+            CandidateFollow::AlreadyApplied(candidate) => {
+                let applied = applied
+                    .expect("AlreadyApplied is returned only when an applied release was read");
+                return CheckOutcome::Checked {
+                    head: Some(ResolvedHead {
+                        cid: candidate.clone(),
+                        tier: HeadTier::Staging,
+                    }),
+                    verdict: Verdict::Applied {
+                        release_cid: candidate,
+                        vehicle: applied.vehicle,
+                        already_current: true,
+                    },
+                    attestations: None,
+                };
+            }
+            CandidateFollow::Follow(candidate) => {
+                match self
+                    .resolve_candidate_head(&channel.channel_id, &candidate)
+                    .await
+                {
+                    Some(candidate_head) => {
+                        tracing::info!(
+                            channel = %channel.channel_id,
+                            winner = %head.head_action_hash.0,
+                            candidate = %candidate,
+                            "release-adoption: canary follows the staging candidate standing \
+                             beneath the earned head — the winner does not move until promotion"
+                        );
+                        candidate_head
+                    }
+                    // Unreadable candidate: keep the winner. Honest, and the
+                    // next sweep asks again.
+                    None => head,
+                }
+            }
+        };
+
         let release_cid = head.head_action_hash.0.clone();
         let resolved = ResolvedHead {
             cid: release_cid.clone(),
@@ -947,19 +1144,20 @@ impl AdoptionController {
         // is to keep re-deriving the verdict, and an observer that stopped
         // checking a release it once passed would go blind to a peer whose
         // installed reality drifted underneath it.
-        if will_apply {
-            if let Some(applied) = state::applied_release(&channel.channel_id) {
-                if applied.cid == release_cid {
-                    return CheckOutcome::Checked {
-                        head: Some(resolved),
-                        verdict: Verdict::Applied {
-                            release_cid,
-                            vehicle: applied.vehicle,
-                            already_current: true,
-                        },
-                        attestations: None,
-                    };
-                }
+        //
+        // `applied` is the hoisted read above — same value, same `will_apply`
+        // guard, read once instead of twice.
+        if let Some(applied) = applied {
+            if applied.cid == release_cid {
+                return CheckOutcome::Checked {
+                    head: Some(resolved),
+                    verdict: Verdict::Applied {
+                        release_cid,
+                        vehicle: applied.vehicle,
+                        already_current: true,
+                    },
+                    attestations: None,
+                };
             }
         }
 
@@ -1360,6 +1558,77 @@ fn verdict_arm(verdict: &Verdict) -> DecisionArm {
         // not a watch-arm observation.
         Verdict::Applied { .. } | Verdict::Waiting { .. } => DecisionArm::Apply,
         Verdict::Refused { refusal } => refusal.reason_code().arm(),
+    }
+}
+
+/// What this sweep should do about a STAGING candidate standing beneath an
+/// EARNED head — the long-lived-channel decision, made PURE so the four corners
+/// that matter are pinned by a table test rather than by a live conductor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CandidateFollow {
+    /// Leave the resolved winner alone. Every mode but `canary`, every tier but
+    /// `earned`, and an earned head with no candidate beneath it.
+    Leave,
+    /// This canary has ALREADY applied the candidate. Nothing to fetch, nothing
+    /// to verify — the idempotence answer, on the candidate.
+    AlreadyApplied(String),
+    /// Fetch the candidate's own bytes, prove them, and follow it.
+    Follow(String),
+}
+
+/// Decide [`CandidateFollow`] from the three facts that settle it: the mode, the
+/// resolved head, and what this peer has already applied. PURE.
+///
+/// ## Why only `canary`
+///
+/// On a channel that has already earned a head the next release arrives as a
+/// STAGING candidate underneath it (`content_store::select_staging_candidate`),
+/// and the winner does not move until promotion. An `apply` peer must therefore
+/// keep running the EARNED head — that is the entire point of the tier split.
+/// A canary, whose job is to soak the next release before anyone promotes it,
+/// has nothing to soak unless it follows the candidate: on a long-lived channel
+/// the winner is a release it already runs, so a canary that only ever looked at
+/// the winner would report `already_current` forever and the promotion loop
+/// would never close.
+///
+/// This is the SAME act the canary already performs on a fresh channel whose
+/// winner IS staging (`decide_post_verify_action(Canary, Staging, _) => Apply`).
+/// Only where the staging declaration sits in the election differs, which is why
+/// following it needs no new mode, no new verdict, and no new table row.
+///
+/// ## Why `observe` is excluded
+///
+/// An observer reports what the channel elected. The candidate is not elected —
+/// it is queued beneath what was — so an observer that switched subjects would
+/// stop reporting the head its operator is watching.
+fn classify_candidate_follow(
+    mode: AdoptionMode,
+    head: &ContentHeadWire,
+    applied_cid: Option<&str>,
+) -> CandidateFollow {
+    if mode != AdoptionMode::Canary {
+        return CandidateFollow::Leave;
+    }
+    // Only beneath an EARNED winner. A staging winner has no candidate under it
+    // (the zome reports `None` by construction), and `None`/`Some(false)` here
+    // means no election evidence at all — never a licence to guess.
+    if head.canonical_earned != Some(true) {
+        return CandidateFollow::Leave;
+    }
+    let Some(candidate) = head.staging_candidate.as_ref().map(|h| h.0.clone()) else {
+        return CandidateFollow::Leave;
+    };
+    // Defensive: a candidate that IS the winner is not a candidate. The zome
+    // cannot produce this (the candidate is strictly newer than the winner), so
+    // reaching it means the wire lied — and following it would make this peer
+    // verify the head twice under two tiers.
+    if candidate == head.head_action_hash.0 {
+        return CandidateFollow::Leave;
+    }
+    if applied_cid == Some(candidate.as_str()) {
+        CandidateFollow::AlreadyApplied(candidate)
+    } else {
+        CandidateFollow::Follow(candidate)
     }
 }
 
@@ -2222,6 +2491,166 @@ mod tests {
                 "mode={mode:?} tier={tier:?} threshold_met={met}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // LONG-LIVED CHANNEL — the canary follows the candidate.
+    //
+    // `classify_candidate_follow` is the whole decision, so these are the
+    // controller half's contract. Built through `ContentHeadWire`'s real
+    // `Deserialize` impl so a fixture cannot drift from the wire shape.
+    // -----------------------------------------------------------------------
+
+    const WINNER_CID: &str = "uhCkkEarnedWinner000000000000000000000000000000000000";
+    const CANDIDATE_CID: &str = "uhCkkStagingCandidate0000000000000000000000000000000";
+
+    /// A resolved head, optionally EARNED and optionally carrying a candidate.
+    fn head_wire(canonical_earned: Option<bool>, candidate: Option<&str>) -> ContentHeadWire {
+        let mut value = serde_json::json!({
+            "content_id": "runtime:coordinators:elohim:commons",
+            "head_action_hash": WINNER_CID,
+            "declared_at": 1_700_000_000_000_000i64,
+            "canonical": true,
+            "canonical_earned": canonical_earned,
+            "content": {
+                "id": "runtime:coordinators:elohim:commons",
+                "content_type": "concept",
+                "title": "t",
+                "description": "d",
+                "content_format": "markdown",
+                "reach": "commons",
+            },
+        });
+        if let Some(candidate) = candidate {
+            value["staging_candidate"] = serde_json::json!(candidate);
+            value["staging_candidate_declared_at"] = serde_json::json!(1_700_000_001_000_000i64);
+        }
+        serde_json::from_value(value).expect("ContentHeadWire fixture must deserialize")
+    }
+
+    /// THE CASE THIS CHANGE EXISTS FOR. A canary on a channel that already
+    /// earned a head, with an unapplied candidate beneath it, follows the
+    /// candidate — which is what gives it something to soak. Without this the
+    /// canary sees only the release it already runs, reports `already_current`
+    /// forever, and the promotion loop never closes.
+    #[test]
+    fn canary_follows_an_unapplied_candidate_beneath_an_earned_head() {
+        let head = head_wire(Some(true), Some(CANDIDATE_CID));
+        assert_eq!(
+            classify_candidate_follow(AdoptionMode::Canary, &head, None),
+            CandidateFollow::Follow(CANDIDATE_CID.to_string()),
+            "a canary with nothing applied must fetch and follow the candidate"
+        );
+        // Same answer when this peer has applied something ELSE (the earned
+        // winner it is currently running) — that is the ordinary steady state
+        // a new candidate arrives into.
+        assert_eq!(
+            classify_candidate_follow(AdoptionMode::Canary, &head, Some(WINNER_CID)),
+            CandidateFollow::Follow(CANDIDATE_CID.to_string()),
+            "already running the earned winner is not having applied the candidate"
+        );
+    }
+
+    /// The converged canary. Once it HAS applied the candidate, the answer is
+    /// idempotence ON THE CANDIDATE — not a re-run against the earned winner it
+    /// never applied. This is the arm that keeps a soaking canary from paying a
+    /// threshold read, an artifact fetch and a verify on every single sweep.
+    #[test]
+    fn a_canary_that_applied_the_candidate_is_already_current_on_it() {
+        let head = head_wire(Some(true), Some(CANDIDATE_CID));
+        assert_eq!(
+            classify_candidate_follow(AdoptionMode::Canary, &head, Some(CANDIDATE_CID)),
+            CandidateFollow::AlreadyApplied(CANDIDATE_CID.to_string())
+        );
+    }
+
+    /// APPLY AND OBSERVE ARE UNTOUCHED. An `apply` peer must keep running the
+    /// EARNED head — following an unpromoted candidate would adopt a release
+    /// nobody has promoted, which is the exact thing the tier split prevents.
+    /// An observer must keep reporting the head its operator is watching.
+    #[test]
+    fn apply_and_observe_never_follow_a_candidate() {
+        let head = head_wire(Some(true), Some(CANDIDATE_CID));
+        for mode in [AdoptionMode::Apply, AdoptionMode::Observe] {
+            for applied in [None, Some(WINNER_CID), Some(CANDIDATE_CID)] {
+                assert_eq!(
+                    classify_candidate_follow(mode, &head, applied),
+                    CandidateFollow::Leave,
+                    "mode={mode:?} applied={applied:?} must leave the resolved winner alone"
+                );
+            }
+        }
+    }
+
+    /// NO CANDIDATE ⇒ THE PATH IS UNCHANGED, on every tier and in every mode.
+    /// This is the behaviour-identity proof: a fresh channel (staging winner),
+    /// a promoted channel with nothing queued, and a head carrying no election
+    /// evidence at all each behave exactly as they did before the candidate
+    /// existed.
+    #[test]
+    fn no_candidate_leaves_every_mode_on_its_existing_path() {
+        let cases = [
+            // an EARNED winner with nothing queued beneath it
+            head_wire(Some(true), None),
+            // a STAGING winner — the zome reports no candidate by construction
+            head_wire(Some(false), None),
+            // no election evidence at all (root-author fallback, or a
+            // pre-candidate coordinator)
+            head_wire(None, None),
+        ];
+        for head in &cases {
+            for mode in [
+                AdoptionMode::Canary,
+                AdoptionMode::Apply,
+                AdoptionMode::Observe,
+            ] {
+                assert_eq!(
+                    classify_candidate_follow(mode, head, Some(WINNER_CID)),
+                    CandidateFollow::Leave,
+                    "mode={mode:?} earned={:?} must not invent a candidate",
+                    head.canonical_earned
+                );
+            }
+        }
+    }
+
+    /// A candidate reported beneath a STAGING winner is never followed. The zome
+    /// cannot produce it, and following it would give the canary two staging
+    /// answers on one channel with no rule to choose between them.
+    #[test]
+    fn a_candidate_under_a_staging_winner_is_not_followed() {
+        let head = head_wire(Some(false), Some(CANDIDATE_CID));
+        assert_eq!(
+            classify_candidate_follow(AdoptionMode::Canary, &head, None),
+            CandidateFollow::Leave
+        );
+    }
+
+    /// Defensive: a candidate naming the WINNER is not a candidate. Unreachable
+    /// from the zome (the candidate is strictly newer than the winner), so
+    /// reaching it means the wire lied — and following it would verify one head
+    /// twice under two different tiers.
+    #[test]
+    fn a_candidate_equal_to_the_winner_is_not_followed() {
+        let head = head_wire(Some(true), Some(WINNER_CID));
+        assert_eq!(
+            classify_candidate_follow(AdoptionMode::Canary, &head, None),
+            CandidateFollow::Leave
+        );
+    }
+
+    /// The tier the substituted candidate carries is STAGING, and the routing
+    /// that follows from it is `Apply` — the row that makes the canary's follow
+    /// need no new mode and no new table entry. Pins the join between
+    /// `classify_candidate_follow` and `decide_post_verify_action`.
+    #[test]
+    fn a_followed_candidate_routes_through_the_existing_canary_staging_row() {
+        assert_eq!(
+            decide_post_verify_action(AdoptionMode::Canary, HeadTier::Staging, false),
+            PostVerifyAction::Apply,
+            "a followed candidate is verified and applied by the canary, threshold reported \
+             but not enforced — the soak IS the evidence being gathered"
+        );
     }
 
     /// A controller wired with no vehicles refuses an apply channel by NAME
