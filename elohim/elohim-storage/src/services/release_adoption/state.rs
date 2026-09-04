@@ -601,7 +601,18 @@ struct Registry {
     controller_running: Mutex<bool>,
     last_sweep_unix: Mutex<Option<i64>>,
     sweeps: Mutex<u64>,
+    /// **Task 13a.** Every lineage window this process has reverted, newest
+    /// last, bounded at [`MAX_REVERTS_KEPT`]. Keyed by nothing: a revert is an
+    /// EVENT, not a state, and collapsing two reverts of the same role onto
+    /// one row would hide the second.
+    reverts: Mutex<Vec<super::revert::RevertReceipt>>,
 }
+
+/// How many revert receipts `/admin/adoption` keeps. A revert is a rare,
+/// ceremonial event — a peer that has done more than this many in one process
+/// lifetime has a problem the oldest receipt will not explain, and an
+/// unbounded list on a long-lived process is a leak.
+const MAX_REVERTS_KEPT: usize = 32;
 
 static REGISTRY: LazyLock<Registry> = LazyLock::new(|| Registry {
     channels: Mutex::new(BTreeMap::new()),
@@ -609,7 +620,24 @@ static REGISTRY: LazyLock<Registry> = LazyLock::new(|| Registry {
     controller_running: Mutex::new(false),
     last_sweep_unix: Mutex::new(None),
     sweeps: Mutex::new(0),
+    reverts: Mutex::new(Vec::new()),
 });
+
+/// Record one reverted window. Called by the controller's revert sweep after
+/// the vehicle's revert path returns.
+pub fn record_revert(receipt: super::revert::RevertReceipt) {
+    let mut reverts = REGISTRY.reverts.lock().unwrap();
+    reverts.push(receipt);
+    let overflow = reverts.len().saturating_sub(MAX_REVERTS_KEPT);
+    if overflow > 0 {
+        reverts.drain(..overflow);
+    }
+}
+
+/// Every revert this process has performed, oldest first.
+pub fn reverts() -> Vec<super::revert::RevertReceipt> {
+    REGISTRY.reverts.lock().unwrap().clone()
+}
 
 pub fn now_unix() -> i64 {
     SystemTime::now()
@@ -758,6 +786,11 @@ pub fn report_json() -> serde_json::Value {
         },
         "channels": channels,
         "configRefusals": config_refusals,
+        // **Task 13a.** What this peer reverted and why. Always present (an
+        // empty array on a peer that never crossed), because an operator
+        // checking "did my revert land?" must be able to tell an empty list
+        // from a field this build does not have.
+        "reverts": reverts(),
     })
 }
 

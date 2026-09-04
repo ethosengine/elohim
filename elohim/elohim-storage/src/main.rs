@@ -5688,6 +5688,11 @@ async fn async_main(
         // `no_vehicle_for_class`, which is the honest answer, rather than
         // failing at the moment of apply with something that reads like a bug.
         let mut vehicles = apply::ApplyRegistry::new();
+        // Task 13a: the lineage vehicle doubles as the revert seam, so it is
+        // captured here and handed to the controller below.
+        let mut lineage_reverter: Option<
+            std::sync::Arc<dyn elohim_storage::services::release_adoption::revert::LineageReverter>,
+        > = None;
         if let Some(ref admin) = admin_for_adoption {
             vehicles = vehicles
                 .with(std::sync::Arc::new(apply::CoordinatorBundleVehicle::new(
@@ -5705,12 +5710,31 @@ async fn async_main(
             // nor account for. Unregistered, `happ-lineage` refuses
             // `no_vehicle_for_class`, which is the honest answer.
             if let Some(ref registry) = hc_registry_for_http {
-                vehicles = vehicles.with(std::sync::Arc::new(apply::HappLineageVehicle::new(
+                let mut vehicle = apply::HappLineageVehicle::new(
                     admin.clone(),
                     args.app_id.clone(),
                     std::sync::Arc::clone(&lineage_roles),
                     std::sync::Arc::clone(registry),
-                )));
+                );
+                // Task 13a: a revert drops the trailing sweep's cursors for
+                // the reverted role — they are ordinals into a view of the
+                // side app the revert has just disabled.
+                if let Some(ref bridge) = lineage_bridge {
+                    vehicle = vehicle.with_bridge(std::sync::Arc::clone(bridge)
+                        as std::sync::Arc<
+                            dyn elohim_storage::services::release_adoption::revert::RoleSweepState,
+                        >);
+                }
+                // Kept beside the registry rather than only inside it: Task
+                // 13a's revert arm needs the SAME object that opens a window
+                // to close it, so the two halves cannot derive different side
+                // app ids.
+                let vehicle = std::sync::Arc::new(vehicle);
+                lineage_reverter = Some(std::sync::Arc::clone(&vehicle)
+                    as std::sync::Arc<
+                        dyn elohim_storage::services::release_adoption::revert::LineageReverter,
+                    >);
+                vehicles = vehicles.with(vehicle);
             }
         }
         if elohim_storage::runtime_config::config_path().is_some() {
@@ -5824,6 +5848,16 @@ async fn async_main(
                     app_id: args.app_id.clone(),
                 },
             ));
+        }
+        // **Task 13a (Station 7) — the revert arm.** Both halves or neither:
+        // `lineage_roles` names which windows are open, and the lineage
+        // vehicle is the only thing that may close one. Absent a vehicle (no
+        // conductor admin, or no client registry) the arm stays dark, which is
+        // correct — a node that could not have crossed has no window to
+        // revert.
+        if let Some(reverter) = lineage_reverter {
+            controller =
+                controller.with_lineage_revert(std::sync::Arc::clone(&lineage_roles), reverter);
         }
 
         if watch::spawn(controller) {

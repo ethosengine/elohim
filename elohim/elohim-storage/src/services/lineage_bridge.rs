@@ -234,6 +234,15 @@ struct OpenWindow {
     authoring_app_id: String,
 }
 
+/// **Task 13a.** The revert ceremony's view of this ticker: one method, so a
+/// revert can drop a reverted role's cursors without holding — or being able
+/// to reach — anything else about the sweep.
+impl crate::services::release_adoption::revert::RoleSweepState for LineageBridge {
+    fn clear_role(&self, role: &str) {
+        LineageBridge::clear_role(self, role);
+    }
+}
+
 /// The ticker. One tokio task, spawned once at startup, idle while no lineage
 /// window is open.
 pub struct LineageBridge {
@@ -285,6 +294,27 @@ impl LineageBridge {
             .clear();
     }
 
+    /// Forget every neighbour sweep for ONE role — [`reset`](Self::reset)'s
+    /// granularity, narrowed.
+    ///
+    /// **Task 13a.** A revert disables the side app this role's cursors are
+    /// ordinals into, so they must go for exactly the reason the reset route
+    /// clears them: a position with nothing behind it. Only that role's keys
+    /// move — another role's window may still be open, and clearing its
+    /// cursors would restart a walk that is making progress.
+    ///
+    /// Note the doc on `reset` above still holds: the BRIDGE does not decide
+    /// this. `LineageRoles::revert` does not call it either. The revert
+    /// ceremony (`release_adoption::apply::HappLineageVehicle`) calls it,
+    /// which is Task 13's decision to make and is why this method exists
+    /// rather than a hook inside `revert`.
+    pub fn clear_role(&self, role: &str) {
+        self.state
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|(swept_role, _), _| swept_role != role);
+    }
+
     /// The roles with an OPEN lineage window, each paired with BOTH app ids the
     /// sweep needs. Pure over a snapshot, so the idle-tick exit and the app-id
     /// selection are both testable without a conductor.
@@ -310,15 +340,16 @@ impl LineageBridge {
     /// A SUNSET role is excluded by `!closed`: the crossing is over, and a
     /// courier that kept carrying into a closed window would be writing into a
     /// cell the ceremony has already finished with.
+    ///
+    /// The predicate itself now lives on [`LineageRoles::open_windows`] —
+    /// **Task 13a**, because the revert sweep needs the identical answer and
+    /// two copies of a three-clause rule is exactly how the inverted-ids case
+    /// gets re-introduced. This method keeps its own name and its own return
+    /// type (the two app ids, un-collapsed), and adds nothing to the rule.
     fn open_windows(&self) -> Vec<OpenWindow> {
         self.lineage
-            .snapshot()
+            .open_windows()
             .into_iter()
-            .filter(|(_, lineage)| {
-                !lineage.closed
-                    && lineage.reading_app_id == self.base_app_id
-                    && lineage.authoring_app_id != self.base_app_id
-            })
             .map(|(role, lineage)| OpenWindow {
                 role,
                 reading_app_id: lineage.reading_app_id,
@@ -790,7 +821,7 @@ mod tests {
             "a node with no window open sweeps nothing"
         );
 
-        lineage.open_window("node_registry", "elohim@EKiIscIk5BDd");
+        lineage.open_window("node_registry", "elohim@EKiIscIk5BDd", None);
         assert_eq!(
             bridge.open_windows(),
             vec![OpenWindow {
@@ -850,6 +881,48 @@ mod tests {
         assert!(bridge.snapshot().is_empty());
     }
 
+    /// **Task 13a.** A revert clears ONE role's cursors and leaves every other
+    /// role's alone — another window may still be open, and restarting a walk
+    /// that is making progress is not what a revert asks for.
+    #[test]
+    fn clear_role_forgets_one_roles_sweeps_and_no_others() {
+        let bridge = LineageBridge::new(
+            Arc::new(LineageRoles::new("elohim", &["node_registry", "lamad"])),
+            Arc::new(HcClientRegistry::empty()),
+            "elohim",
+        );
+        {
+            let mut state = bridge.state.write().unwrap();
+            for key in [
+                ("node_registry".to_string(), "uhCAkJessica".to_string()),
+                ("node_registry".to_string(), "uhCAkMatthew".to_string()),
+                ("lamad".to_string(), "uhCAkJessica".to_string()),
+            ] {
+                state.insert(
+                    key,
+                    AgentSweep {
+                        carried: 3,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+        assert_eq!(bridge.snapshot().len(), 3);
+
+        bridge.clear_role("node_registry");
+
+        let left: Vec<SweepKey> = bridge.snapshot().into_keys().collect();
+        assert_eq!(
+            left,
+            vec![("lamad".to_string(), "uhCAkJessica".to_string())],
+            "only the reverted role's cursors go"
+        );
+        // Idempotent: a second clear on a role with nothing left is a no-op,
+        // which is what a re-run sweep does after the window is already gone.
+        bridge.clear_role("node_registry");
+        assert_eq!(bridge.snapshot().len(), 1);
+    }
+
     /// **The two app ids an open window carries are DIFFERENT and are never
     /// collapsed.** This is the whole guard behind Minor 1: the sweep asks
     /// `known_agents` of the reading (v1) app and `carry_from` of the authoring
@@ -858,7 +931,7 @@ mod tests {
     #[test]
     fn an_open_windows_two_app_ids_are_never_the_same_cell() {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
-        lineage.open_window("node_registry", "elohim@EKiIscIk5BDd");
+        lineage.open_window("node_registry", "elohim@EKiIscIk5BDd", None);
         let bridge = LineageBridge::new(
             Arc::clone(&lineage),
             Arc::new(HcClientRegistry::empty()),

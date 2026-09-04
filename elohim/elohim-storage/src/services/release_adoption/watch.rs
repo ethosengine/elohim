@@ -48,7 +48,9 @@ use super::state::{
     Verdict,
 };
 use super::verify::{self, FetchedArtifact, InstalledReality, LineageEvidence, VerifyInput};
-use super::{AdoptionRefusal, Artifact, DecisionArm, RefusalReason, RELEASE_MANIFEST_KIND};
+use super::{
+    AdoptionRefusal, Artifact, ArtifactClass, DecisionArm, RefusalReason, RELEASE_MANIFEST_KIND,
+};
 use crate::blob_store::BlobStore;
 use crate::conductor_admission::AdmissionClass;
 use crate::hc_client::HcClient;
@@ -521,6 +523,14 @@ pub struct AdoptionController {
     /// body. `None` leaves that lifecycle at its fail-closed default
     /// (`proposed`), which refuses a crossing rather than assuming one.
     db: Option<crate::db::DbPool>,
+    /// **Task 13a.** The per-role lineage resolver, read by the revert sweep
+    /// to find OPEN windows. `None` on a node that never wired one — the
+    /// revert arm then does nothing at all, which is correct: a node with no
+    /// resolver has no window to revert.
+    lineage: Option<Arc<crate::lineage_roles::LineageRoles>>,
+    /// **Task 13a.** Who performs a revert. In production this is the same
+    /// `HappLineageVehicle` that opened the window.
+    reverter: Option<Arc<dyn super::revert::LineageReverter>>,
     staging_root: PathBuf,
     cached_reality: tokio::sync::Mutex<Option<(i64, Answer<InstalledReality>)>>,
 }
@@ -534,6 +544,8 @@ impl AdoptionController {
             apply: None,
             soak: None,
             db: None,
+            lineage: None,
+            reverter: None,
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
         }
@@ -584,6 +596,23 @@ impl AdoptionController {
     /// so a node that follows no lineage channel pays a `None`.
     pub fn with_db(mut self, db: crate::db::DbPool) -> Self {
         self.db = Some(db);
+        self
+    }
+
+    /// **Task 13a — equip the revert arm (Station 7).**
+    ///
+    /// BOTH halves or neither: the resolver names which windows are open and
+    /// the reverter is the only thing that may close one. Wiring one without
+    /// the other would give a controller that can see a revoked path and do
+    /// nothing about it, which is worse than not looking — so the arm reads
+    /// them as a pair and stays dark unless both are present.
+    pub fn with_lineage_revert(
+        mut self,
+        lineage: Arc<crate::lineage_roles::LineageRoles>,
+        reverter: Arc<dyn super::revert::LineageReverter>,
+    ) -> Self {
+        self.lineage = Some(lineage);
+        self.reverter = Some(reverter);
         self
     }
 
@@ -926,9 +955,142 @@ impl AdoptionController {
 
     /// One sweep over the followed channels. Returns how many channels were
     /// actually checked (skips do not count).
+    /// **Task 13a — the revert arm (Station 7).** Runs at the TOP of every
+    /// sweep, before any channel is checked.
+    ///
+    /// # Why it is its own arm and not part of `check_channel`
+    ///
+    /// The C6b idempotence exit returns `Verdict::Applied` for an
+    /// already-applied release WITHOUT re-running `verify_path` — deliberately,
+    /// because a converged fleet re-deriving the same verdict every minute is
+    /// correct and unaffordable. But that is exactly the state a peer who
+    /// CROSSED is in, so the peers who most need to hear about a revocation are
+    /// the ones `check_channel` has stopped asking on behalf of. This arm asks
+    /// on behalf of the WINDOW instead.
+    ///
+    /// # What it costs when nothing is happening
+    ///
+    /// One `RwLock` read and a filter. [`crate::lineage_roles::LineageRoles::open_windows`]
+    /// returns empty on every peer that has not crossed, and this returns
+    /// before touching the conductor. Crossings are rare and bounded, so the
+    /// steady-state cost of the whole arm is that filter, once per sweep.
+    ///
+    /// The work is bounded BEFORE any conductor call: at most one window's
+    /// worth of reads per open window, and open windows are at most one per
+    /// role (and, at MVP, one per release — `sole_crossing`).
+    async fn sweep_lineage_windows(&self) {
+        self.revert_open_windows(|cid| async move {
+            // (C5) The path, re-read through THIS peer's own conductor — the
+            // same read `verify_path` consumes, so "revoked" means one thing.
+            super::path_evidence::fetch_path_evidence_for_cid(
+                self.hc.as_ref(),
+                self.db.as_ref(),
+                &cid,
+            )
+            .await
+        })
+        .await
+    }
+
+    /// [`sweep_lineage_windows`](Self::sweep_lineage_windows) with the path
+    /// read threaded in, so the arm's control flow — which windows it looks
+    /// at, what it does with an unreadable path, and whether a second pass
+    /// repeats itself — is testable without a conductor. Production passes the
+    /// real C5 read and nothing else differs.
+    async fn revert_open_windows<R, F>(&self, read_path: R)
+    where
+        R: Fn(String) -> F,
+        F: std::future::Future<Output = Answer<super::PathEvidence>>,
+    {
+        // Both halves or nothing — see `with_lineage_revert`.
+        let (Some(lineage), Some(reverter)) = (self.lineage.as_ref(), self.reverter.as_ref())
+        else {
+            return;
+        };
+        let windows = lineage.open_windows();
+        if windows.is_empty() {
+            // THE IDLE EXIT, FIRST AND CHEAPEST. No conductor call.
+            return;
+        }
+
+        for (role, window) in windows {
+            // A window opened with no recorded origin (a fixture, or a build
+            // predating `WindowOrigin`) names no path to re-read and no channel
+            // to re-resolve. Skipping is the honest answer: this arm reverts on
+            // EVIDENCE, and there is none to read.
+            let Some(origin) = window.origin.as_ref() else {
+                tracing::debug!(
+                    role = role.as_str(),
+                    "release-adoption: open lineage window records no origin — nothing to \
+                     re-read, so the revert arm leaves it alone"
+                );
+                continue;
+            };
+
+            let evidence = read_path(origin.path_commitment_cid.clone()).await;
+            let elected_away = self.elected_away_from(origin).await;
+
+            let Some(trigger) = super::revert::revert_decision(&evidence, elected_away) else {
+                continue;
+            };
+
+            match reverter.revert_window(&role, trigger).await {
+                Ok(receipt) => state::record_revert(receipt),
+                // A refusal here is a race the sweep lost (a reset, or a
+                // concurrent revert, between the snapshot and the call), not a
+                // claim about the path — so it is logged and the next sweep
+                // asks again, exactly like every other transient refusal.
+                Err(refusal) => tracing::warn!(
+                    role = role.as_str(),
+                    reason = trigger.label(),
+                    refusal = %refusal.reason,
+                    "release-adoption: revert refused — the window is unchanged and the next \
+                     sweep asks again"
+                ),
+            }
+        }
+    }
+
+    /// Has the channel that opened this window elected AWAY from the release
+    /// that opened it, onto something that is not another crossing?
+    ///
+    /// That is rung 5's remedy reaching rung 6: the ceremony re-elects the
+    /// prior `coordinator-bundle` / `happ-bundle` head, and a window left open
+    /// behind it would keep authoring on v2 under a release nobody elected.
+    ///
+    /// Conservative in every direction that matters. `false` unless this peer
+    /// positively READ an election naming a different, non-lineage release:
+    /// a head it could not resolve, a head whose manifest it could not decode,
+    /// and a head that is another `happ-lineage` crossing all answer `false`,
+    /// because none of them is evidence the household went back.
+    async fn elected_away_from(&self, origin: &crate::lineage_roles::WindowOrigin) -> bool {
+        let Answer::Present(head) = self.resolve_head(&origin.channel_id).await else {
+            return false;
+        };
+        if head.head_action_hash.0 == origin.release_cid {
+            return false;
+        }
+        let Ok(Some(body)) = extract_release_body(&head.content.metadata_json) else {
+            return false;
+        };
+        let Ok(manifest) = verify::verify_shape(&body) else {
+            return false;
+        };
+        // Another crossing is a step FORWARD, not a revert. Only a
+        // non-lineage head re-elected over an open window is the going-back
+        // shape this arm acts on.
+        manifest.artifact_class != ArtifactClass::HappLineage
+    }
+
     pub async fn sweep_once(&self, followed: &FollowedChannels) -> usize {
         let now = state::now_unix();
         state::reconcile_followed(followed);
+
+        // **Task 13a.** The revert arm runs FIRST: a window whose path has
+        // been revoked should stop authoring on v2 before this sweep does
+        // anything else, and the arm costs one lock read on a peer with no
+        // open window.
+        self.sweep_lineage_windows().await;
 
         // BUDGETS FIRST. Everything below is sized before any call is made.
         let mut byte_budget = MAX_ARTIFACT_BYTES_PER_SWEEP;
@@ -2778,5 +2940,222 @@ mod tests {
             unfollowed.transition_log.is_some(),
             "an unfollow landing on a running node must also be answerable from a log line"
         );
+    }
+
+    // ── Task 13a: the revert arm ───────────────────────────────────────────
+
+    use crate::services::release_adoption::revert as adoption_revert;
+    use crate::services::release_adoption::{PathEvidence, RosterEvidence};
+
+    use crate::lineage_roles::{LineageRoles, WindowOrigin};
+    use std::sync::Mutex as StdMutex;
+
+    /// Records what the arm asked it to revert, and reverts for real (so the
+    /// arm's idempotence claim is measured against the same OPEN predicate
+    /// production uses, not a stub that never closes a window).
+    struct FakeReverter {
+        lineage: Arc<LineageRoles>,
+        calls: StdMutex<Vec<(String, adoption_revert::RevertTrigger)>>,
+    }
+
+    impl FakeReverter {
+        fn new(lineage: Arc<LineageRoles>) -> Arc<Self> {
+            Arc::new(Self {
+                lineage,
+                calls: StdMutex::new(Vec::new()),
+            })
+        }
+        fn calls(&self) -> Vec<(String, adoption_revert::RevertTrigger)> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl adoption_revert::LineageReverter for FakeReverter {
+        async fn revert_window(
+            &self,
+            role: &str,
+            trigger: adoption_revert::RevertTrigger,
+        ) -> Result<adoption_revert::RevertReceipt, AdoptionRefusal> {
+            self.calls.lock().unwrap().push((role.to_string(), trigger));
+            self.lineage.revert(role);
+            Ok(adoption_revert::RevertReceipt {
+                role: role.to_string(),
+                lineage_app_id: "elohim@SIDE".to_string(),
+                reason: trigger,
+                path_commitment_cid: Some("uhCEkPATH".to_string()),
+                at: 1_700_000_000,
+                disabled: true,
+                disable_error: None,
+                readopt: adoption_revert::readopt_pending(role),
+            })
+        }
+    }
+
+    fn revert_evidence(state: &str, revoked_at: Option<&str>) -> PathEvidence {
+        PathEvidence {
+            commitment_cid: "uhCEkPATH".to_string(),
+            state: state.to_string(),
+            revoked_at: revoked_at.map(str::to_string),
+            from_dna_hash: "uhC0kFROM".to_string(),
+            to_dna_hash: "uhC0kTO".to_string(),
+            constitution_root: "root".to_string(),
+            signatures: 1,
+            required_signatures: 1,
+            roster_cid: "uhCEkROSTER".to_string(),
+            signers: vec!["uhCAkONE".to_string()],
+            roster: RosterEvidence::NotFound,
+        }
+    }
+
+    fn crossed_window() -> Arc<LineageRoles> {
+        let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
+        lineage.open_window(
+            "node_registry",
+            "elohim@SIDE",
+            Some(WindowOrigin {
+                channel_id: "runtime:coordinators:elohim:lineage".to_string(),
+                release_cid: "uhCkkRELEASE".to_string(),
+                path_commitment_cid: "uhCEkPATH".to_string(),
+            }),
+        );
+        lineage
+    }
+
+    fn controller_with_revert(
+        dir: &std::path::Path,
+        lineage: Arc<LineageRoles>,
+        reverter: Arc<FakeReverter>,
+    ) -> AdoptionController {
+        AdoptionController::new(dir).with_lineage_revert(lineage, reverter)
+    }
+
+    /// **The trigger fires on revoked.** The arm re-reads the path that opened
+    /// the window — NOT the channel, which the C6b exit has stopped asking
+    /// about — and a `revoked` answer reverts the role.
+    #[tokio::test]
+    async fn the_revert_arm_fires_on_a_revoked_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = crossed_window();
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let controller =
+            controller_with_revert(dir.path(), Arc::clone(&lineage), Arc::clone(&reverter));
+
+        controller
+            .revert_open_windows(|cid| {
+                assert_eq!(cid, "uhCEkPATH", "the arm re-reads the WINDOW's own path");
+                async { Answer::Present(revert_evidence("active", Some("2026-09-04T10:00:00Z"))) }
+            })
+            .await;
+
+        assert_eq!(
+            reverter.calls(),
+            vec![(
+                "node_registry".to_string(),
+                adoption_revert::RevertTrigger::PathRevoked
+            )]
+        );
+    }
+
+    /// **…and not on active.** The ordinary state of an open window, swept
+    /// every minute for as long as it stays open, must cost a read and change
+    /// nothing.
+    #[tokio::test]
+    async fn the_revert_arm_leaves_an_active_path_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = crossed_window();
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let controller =
+            controller_with_revert(dir.path(), Arc::clone(&lineage), Arc::clone(&reverter));
+
+        controller
+            .revert_open_windows(|_| async { Answer::Present(revert_evidence("active", None)) })
+            .await;
+
+        assert!(reverter.calls().is_empty());
+        assert_eq!(lineage.app_id_for("node_registry"), "elohim@SIDE");
+    }
+
+    /// **C4 — blindness never reverts.** A path this peer could not read
+    /// establishes nothing, and tearing a peer off v2 because of our own
+    /// outage is the one direction of error that cannot self-heal.
+    #[tokio::test]
+    async fn the_revert_arm_never_reverts_on_an_unreadable_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = crossed_window();
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let controller =
+            controller_with_revert(dir.path(), Arc::clone(&lineage), Arc::clone(&reverter));
+
+        for answer in [Answer::Unreachable, Answer::Absent] {
+            let answer = answer.clone();
+            controller
+                .revert_open_windows(move |_| {
+                    let answer = answer.clone();
+                    async move { answer }
+                })
+                .await;
+        }
+        assert!(reverter.calls().is_empty());
+    }
+
+    /// **Idempotence.** The second sweep finds the window already closed (the
+    /// OPEN predicate excludes the reverted shape) and does nothing — not even
+    /// the path read.
+    #[tokio::test]
+    async fn a_second_sweep_over_an_already_reverted_window_does_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = crossed_window();
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let controller =
+            controller_with_revert(dir.path(), Arc::clone(&lineage), Arc::clone(&reverter));
+
+        let reads = Arc::new(StdMutex::new(0usize));
+        for _ in 0..3 {
+            let reads = Arc::clone(&reads);
+            controller
+                .revert_open_windows(move |_| {
+                    *reads.lock().unwrap() += 1;
+                    async { Answer::Present(revert_evidence("revoked", None)) }
+                })
+                .await;
+        }
+
+        assert_eq!(reverter.calls().len(), 1, "reverted exactly once");
+        assert_eq!(
+            *reads.lock().unwrap(),
+            1,
+            "and the later sweeps did not even read the path — the window is no longer open"
+        );
+    }
+
+    /// A window with no recorded origin names no path to re-read, so the arm
+    /// leaves it alone rather than guessing which commitment authorised it.
+    #[tokio::test]
+    async fn a_window_without_an_origin_is_skipped_by_the_arm() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
+        lineage.open_window("node_registry", "elohim@SIDE", None);
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let controller =
+            controller_with_revert(dir.path(), Arc::clone(&lineage), Arc::clone(&reverter));
+
+        controller
+            .revert_open_windows(|_| async {
+                panic!("a window with no origin must never reach the path read")
+            })
+            .await;
+        assert!(reverter.calls().is_empty());
+    }
+
+    /// A controller with no revert arm wired sweeps exactly as it did before
+    /// Task 13a — no window is looked at, and no path is read.
+    #[tokio::test]
+    async fn an_unequipped_controller_has_no_revert_arm_at_all() {
+        let dir = tempfile::tempdir().unwrap();
+        let controller = AdoptionController::new(dir.path());
+        controller
+            .revert_open_windows(|_| async { panic!("no lineage resolver, no arm") })
+            .await;
     }
 }

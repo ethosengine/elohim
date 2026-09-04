@@ -629,6 +629,27 @@ pub struct HappLineageVehicle {
     base_app_id: String,
     lineage: Arc<crate::lineage_roles::LineageRoles>,
     registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+    /// **Task 13a.** The side-app disable seam the revert path uses. Held as a
+    /// `dyn` so the revert is testable without a conductor — and, more to the
+    /// point, so the revert path CANNOT reach `uninstall_app`: the trait
+    /// declares `disable_app` and nothing else.
+    side_admin: Arc<dyn super::revert::SideAppAdmin>,
+    /// **Task 13a.** The trailing sweep whose cursors a reverted role's window
+    /// leaves dangling. `None` on a node with no bridge wired — the revert
+    /// still runs and says so on the receipt.
+    bridge: Option<Arc<dyn super::revert::RoleSweepState>>,
+}
+
+/// `disable_app` and NOTHING else, over the real conductor. The whole
+/// never-uninstall guarantee of the revert path rests on this impl having no
+/// second method to call.
+#[async_trait::async_trait]
+impl super::revert::SideAppAdmin for holochain_client::AdminWebsocket {
+    async fn disable_app(&self, app_id: &str) -> Result<(), String> {
+        holochain_client::AdminWebsocket::disable_app(self, app_id.to_string())
+            .await
+            .map_err(|e| e.to_string())
+    }
 }
 
 impl HappLineageVehicle {
@@ -642,12 +663,23 @@ impl HappLineageVehicle {
         lineage: Arc<crate::lineage_roles::LineageRoles>,
         registry: Arc<crate::hc_client_registry::HcClientRegistry>,
     ) -> Self {
+        let side_admin: Arc<dyn super::revert::SideAppAdmin> = Arc::new(admin.clone());
         Self {
             admin,
             base_app_id: base_app_id.into(),
             lineage,
             registry,
+            side_admin,
+            bridge: None,
         }
+    }
+
+    /// **Task 13a.** Wire the trailing sweep so a revert can drop the reverted
+    /// role's cursors. Builder-shaped because the bridge is constructed later
+    /// in the boot sequence than the vehicle's other collaborators.
+    pub fn with_bridge(mut self, bridge: Arc<dyn super::revert::RoleSweepState>) -> Self {
+        self.bridge = Some(bridge);
+        self
     }
 
     /// The roles this release actually crosses on — those declaring
@@ -887,7 +919,24 @@ impl ApplyVehicle for HappLineageVehicle {
         // before this line, which is what makes "failure leaves the window
         // closed" a property of the control flow rather than a promise in a
         // comment — and what `sole_crossing` keeps true.
-        self.lineage.open_window(role, &lineage_app_id);
+        // **Task 13a.** The window records what authorised it — the channel,
+        // the release, and the `migrates-lineage` commitment — because after
+        // this apply nothing else survives to name them, and the revert sweep
+        // has to re-read exactly this path every sweep while the window is
+        // open. A manifest with no path never reaches here (`verify_path`
+        // refuses `manifest_schema_invalid` on a `happ-lineage` release that
+        // omits one), so the `map` is a type obligation, not a real branch.
+        let origin = verified
+            .manifest
+            .adoption_discipline
+            .path
+            .as_ref()
+            .map(|p| crate::lineage_roles::WindowOrigin {
+                channel_id: verified.channel_id.clone(),
+                release_cid: verified.release_cid.clone(),
+                path_commitment_cid: p.commitment_cid.clone(),
+            });
+        self.lineage.open_window(role, &lineage_app_id, origin);
         tracing::info!(
             channel = %verified.channel_id,
             release_cid = %verified.release_cid,
@@ -925,6 +974,32 @@ impl ApplyVehicle for HappLineageVehicle {
 
     fn name(&self) -> &'static str {
         LINEAGE_VEHICLE
+    }
+}
+
+/// **Task 13a — the same object that opens a window closes it.**
+///
+/// Deliberately implemented on the vehicle rather than as a standalone
+/// service: the revert has to name the side app id the crossing installed, and
+/// the only way for the two halves to disagree about that is for two different
+/// objects to derive it. Here they read the same [`crate::lineage_roles`]
+/// entry the apply wrote.
+#[async_trait::async_trait]
+impl super::revert::LineageReverter for HappLineageVehicle {
+    async fn revert_window(
+        &self,
+        role: &str,
+        trigger: super::revert::RevertTrigger,
+    ) -> Result<super::revert::RevertReceipt, AdoptionRefusal> {
+        super::revert::perform_revert(
+            self.lineage.as_ref(),
+            self.side_admin.as_ref(),
+            self.bridge.as_deref(),
+            role,
+            trigger,
+            super::state::now_unix(),
+        )
+        .await
     }
 }
 

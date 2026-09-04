@@ -130,6 +130,7 @@ pub mod artifact_pull;
 /// the trailing bridge sweep (Task 12).
 pub mod carry;
 pub mod path_evidence;
+pub mod revert;
 pub mod state;
 pub mod verify;
 pub mod watch;

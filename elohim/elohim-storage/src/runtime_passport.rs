@@ -906,6 +906,7 @@ mod tests {
                 reading_app_id: "elohim".to_string(),
                 authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
                 closed: false,
+                origin: None,
             },
         );
         let view = lineage_view_for(
@@ -941,6 +942,7 @@ mod tests {
                 reading_app_id: "elohim".to_string(),
                 authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
                 closed: false,
+                origin: None,
             },
         );
         let mut sweep = BTreeMap::new();
@@ -1003,6 +1005,7 @@ mod tests {
                 reading_app_id: "elohim".to_string(),
                 authoring_app_id: "elohim".to_string(),
                 closed: true,
+                origin: None,
             },
         );
         let view = lineage_view_for(
@@ -1033,6 +1036,7 @@ mod tests {
                 reading_app_id: "elohim".to_string(),
                 authoring_app_id: "elohim".to_string(),
                 closed: false,
+                origin: None,
             },
         );
         assert!(lineage_view_for(

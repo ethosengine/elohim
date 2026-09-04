@@ -178,8 +178,25 @@ pub async fn fetch_path_evidence(
     let Some(path) = manifest.adoption_discipline.path.as_ref() else {
         return Answer::Absent;
     };
-    let cid = path.commitment_cid.as_str();
+    fetch_path_evidence_for_cid(hc, db, path.commitment_cid.as_str()).await
+}
 
+/// The same read, addressed by the commitment CID alone.
+///
+/// **Task 13a.** The revert sweep re-reads the path that opened a window
+/// EVERY sweep while the window is open, and it has no manifest in hand at
+/// that point — the window's own [`crate::lineage_roles::WindowOrigin`]
+/// records the cid instead. Extracted rather than duplicated so both callers
+/// resolve the lifecycle through the same C5 read (this peer's own conductor,
+/// its own DHT view) and can never disagree about what "revoked" means.
+///
+/// [`fetch_path_evidence`] is unchanged in behaviour: it still applies the
+/// artifact-class and path-presence gates and then delegates here.
+pub async fn fetch_path_evidence_for_cid(
+    hc: Option<&Arc<HcClient>>,
+    db: Option<&DbPool>,
+    cid: &str,
+) -> Answer<PathEvidence> {
     // The path names a commitment that is not an ADDRESS. `mishpat::get_commitment`
     // would answer with a GUEST ERROR (`EntryHash::try_from`), which reads as
     // `conductor_unavailable` — our outage — when the honest finding is that the
