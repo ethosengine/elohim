@@ -5,6 +5,9 @@ status: Draft
 class: protocol-canonical
 context-tier: disclosed
 steward: rust-architect
+serves:
+  - happ-lineage-migration
+  - runtime-upgrade-propagation
 graduation-trigger: the household-mesh a2o receipt for @concern:happ-lineage-migration passes Stations 1–9 on 3 peers with the node_registry rehearsal (v1 → v1+witness), AND the Lane-B spike (§9) has a measured verdict recorded on this spec (an epr flow note or a dated §9 delta), AND the operator records acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible)
 created: 2026-09-03
 domain: D2
@@ -474,6 +477,9 @@ runnable check and its DELTA lines; this table carries the epic-level picture th
 - Lane B (§9) timing: after Station 4 by default.
 
 ### 11.4 Ledger (newest first)
+
+- 2026-09-04 — **baselined on 0.7 at the operator's call** ("avoid rework"): this checkout was 45 commits behind `origin/dev` (the 0.7 push came from another worktree); rebased (6 commits on top, only `habits.yaml` overlapped). The 0.6 probe was stopped before it touched a file and re-dispatched on the 0.7 pins (sweettest holochain 0.7.0 / hdk 0.7 / hdi 0.8). One holochain-0.7 sweettest compile is unavoidable (no compiled 0.7 slot survived) — it is the baseline, not rework. 0.7 binaries persisted at `/projects/.claude-config/tools/{hc-0.7,iroh-relay-1.0.3}` (the other session's scratchpad is volatile). Note for every local proof: locally packed DNA hashes ≠ CI hashes (the local-only `--import-undefined` RUSTFLAGS moves integrity bytes) — the mesh runs local hashes, `dna-hashes.baseline` is CI's; never compare them. The running mesh is still stock 0.6.0 with a 0.6-line storage binary; the 0.7 mesh baseline (storage rebuilt from this tree, `HOLOCHAIN_BIN`=tools/hc-0.7, `MESH_RELAY_BIN`=tools/iroh-relay) is sequenced AFTER the sweettest compile (one cargo at a time under the RAM guard).
+- 2026-09-04 — valueflow minted: `epr flow seal` story → epic (cite-seal) and habit → story (`test:happ-lineage-migration`); projected. Downstream commitments appear once the implementation plan's gap items exist — the plan is the next artifact; a2o reports then `epr flow fulfill` them. `serves:` anchors added to this spec.
 
 - 2026-09-04 — probes A/B/D/D2 dispatched (Opus, Codex); C taken by the chief on the running mesh (note: this workspace's mesh runs **stock 0.6.0**, not the 0.7 line — probe C's finding is about the storage client, which is line-independent; A/B run in sweettest on the dev tree's pins).
 - 2026-09-04 — §5.1 bridge across many versions and branches added (graded verification; routing via nearest common ancestor; Stations 11–13 seam).
