@@ -2446,9 +2446,9 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
 }
 
 /// The LATEST `IdToContent` link for a content id — the newest version's
-/// action — in the same deterministic order `newest_canonical_link` uses:
-/// (link timestamp, create-link action hash), so every peer picks the same
-/// link from an identical set.
+/// action — in the same deterministic order the canonical-head election uses
+/// (`select_canonical_winner`): (link timestamp, create-link action hash), so
+/// every peer picks the same link from an identical set.
 ///
 /// Why this exists (2026-09-02, `release-lineage-probe.ts`): `update_content`
 /// step 6 ADDS a fresh id→action link on every update and never removes the
@@ -2648,6 +2648,26 @@ pub struct ContentHeadOutput {
     /// re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
+    /// The STAGING declaration standing BENEATH an earned winner — the next
+    /// release on this channel awaiting promotion. See
+    /// [`select_staging_candidate`] for the (pure, per-peer identical) rule.
+    ///
+    /// `Some` ONLY when [`Self::canonical_earned`] is `Some(true)` AND a staging
+    /// declaration postdates the winning earned one. `None` everywhere else,
+    /// including — via `serde(default)` — from any pre-candidate coordinator,
+    /// which reads as "no candidate stands beneath this head": the safe default
+    /// (a peer that cannot see a candidate simply keeps following the winner).
+    ///
+    /// This NEVER competes with [`Self::head_action_hash`]. The elected head is
+    /// still the single winner; this is a subordinate fact a canary may act on.
+    #[serde(default)]
+    pub staging_candidate: Option<holo_hash::ActionHashB64>,
+    /// The candidate declaration LINK's notarized DHT timestamp — the same clock
+    /// class as [`Self::canonical_declared_at`], for the same reason (it is the
+    /// one clock two DECLARATIONS can be ordered by). `Some` exactly when
+    /// [`Self::staging_candidate`] is `Some`.
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<Timestamp>,
 }
 
 /// Input for `declare_content_head`. `head_action_hash: None` re-affirms the
@@ -2920,41 +2940,24 @@ fn create_canonical_head_link(id: &str, target: &ActionHash, tag: &[u8]) -> Exte
     Ok(())
 }
 
-/// The newest canonical-head declaration LINK for `id` (by DHT timestamp),
-/// regardless of whether its target Content is retrievable yet. Used by the
-/// earned-head guard to read the CURRENT canonical's provenance — the guard must
-/// protect an earned head even if its target has not gossiped in locally.
-fn newest_canonical_link(id: &str) -> ExternResult<Option<Link>> {
-    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    // STRATEGY = `Local` (2026-08-02). This is a GUARD read on the DECLARE path,
-    // and `GetStrategy::default()` is `Network`: on a conductor whose storage arc
-    // has not reconverged since its last restart (kitsune2 resets every local
-    // agent's current arc to `Empty` on join) it leaves the box and dies on the
-    // 60s `request_timeout_s` — so a corpus-scale canonical declare sweep would
-    // stall on the guard before doing any work. Reading `Local` is SAFE here
-    // because this guard is not the backstop: `select_canonical_winner` enforces
-    // tier precedence at RESOLVE time over the FULL link set (see its doc,
-    // rule 1), so a partitioned peer that cannot see an earned link locally still
-    // cannot displace it — every peer that CAN see the set resolves the earned
-    // head. The guard is the fast, local courtesy refusal; the selector is the
-    // invariant.
-    let mut links = get_links(query, GetStrategy::Local)?;
-    if links.is_empty() {
-        return Ok(None);
-    }
-    // Deterministic order: (timestamp, create-link action hash). A stable sort on
-    // timestamp ALONE resolves ties by per-peer `get_links` arrival order, so two
-    // peers could read a different "newest" link from an identical set; the
-    // create-link-hash tiebreak makes the choice identical on every peer.
-    links.sort_by(|a, b| {
-        a.timestamp
-            .cmp(&b.timestamp)
-            .then_with(|| a.create_link_hash.cmp(&b.create_link_hash))
-    });
-    Ok(links.pop())
-}
+// RETIRED (long-lived-channel candidate): `newest_canonical_link`, the
+// earned-head guard's private "newest declaration by DHT timestamp" read.
+//
+// The guard now asks `select_election` — the SAME arbiter the resolver uses —
+// and keys off the WINNER's tier. On every state reachable before the candidate
+// admission the two are identical: staging-over-earned was refused, so no
+// staging link could ever be newer than an earned one, which makes "newest link
+// is earned" and "the tier-precedence winner is earned" the same predicate.
+//
+// They diverge exactly on the states the admission CREATES. Once a lineage-proven
+// staging candidate sits above the earned head, the newest link is that staging
+// candidate — so a newest-link guard would fall through and admit EVERY later
+// staging declaration with no lineage proof at all, which is the widening this
+// change must not make. The election winner is still earned (tier precedence),
+// so the election-keyed guard keeps demanding proof for each new candidate.
+//
+// One arbiter, one ordering — the discipline `select_canonical_winner` already
+// documents, now including the declare guard.
 
 /// True iff a canonical-head link carries the EARNED provenance marker. An
 /// unmarked/empty or STAGING tag reads as NOT earned (safe default: an unmarked
@@ -2969,6 +2972,7 @@ fn canonical_link_is_earned(link: &Link) -> bool {
 /// Extracting these makes [`select_canonical_winner`] a PURE, unit-testable
 /// function — the tier + deterministic-ordering rules are exercised without a
 /// conductor.
+#[derive(Clone)]
 struct CanonicalCandidate {
     /// True iff the declaration carries the EARNED provenance marker.
     is_earned: bool,
@@ -3041,6 +3045,77 @@ fn select_canonical_winner(candidates: Vec<CanonicalCandidate>) -> Option<Canoni
     })
 }
 
+/// The full outcome of ONE canonical-head election: the single WINNER, plus the
+/// STAGING CANDIDATE standing beneath it when that winner is EARNED.
+///
+/// The election still elects exactly one head — [`select_canonical_winner`]'s
+/// tier precedence is untouched, and it is the partition guard. What this adds
+/// is VISIBILITY of the declaration queued underneath: a long-lived channel that
+/// already carries an earned head can now show the next staging release awaiting
+/// promotion, which is the thing a single winner + one tier bit structurally
+/// could not say (a canary had nothing to canary).
+struct ElectionOutcome {
+    winner: CanonicalCandidate,
+    /// See [`select_staging_candidate`]. `None` when the winner is itself
+    /// staging, or when no staging declaration postdates the earned winner.
+    staging_candidate: Option<CanonicalCandidate>,
+}
+
+/// PURE. The deterministic STAGING candidate standing beneath an EARNED
+/// `winner`: the [`select_canonical_winner`]-arbitrated choice among staging
+/// declarations whose notarized link timestamp is strictly NEWER than the
+/// winning earned declaration's.
+///
+/// ## Why this is safe to add to a single-winner election
+///
+/// It changes NOTHING about who wins. It reports a second, strictly SUBORDINATE
+/// fact off the same link set, computed with the SAME arbiter — so every peer
+/// converges on the same candidate from the same set, exactly as it converges on
+/// the same winner. A peer acting on the candidate (a canary verifying it) is
+/// acting on a declaration the DHT has NOT crowned; promotion is still the
+/// earned-tier verb (`declare_earned_canonical_head`), and until it runs, the
+/// earned head is what every apply-mode peer resolves.
+///
+/// ## Why "newer than the earned winner", not "any staging"
+///
+/// Staging declarations OLDER than the standing earned head are its own
+/// superseded history — the releases this channel already promoted past. Only a
+/// declaration made AFTER the earned head can be a candidate to succeed it.
+/// The comparison is strict (`>`): a staging link sharing the earned winner's
+/// exact timestamp is not newer, and is excluded.
+///
+/// Staging winner ⇒ `None` by construction: there is nothing beneath a staging
+/// winner, because a staging winner IS the head a fresh channel converges on
+/// (the existing behaviour the canary already follows).
+fn select_staging_candidate(
+    candidates: &[CanonicalCandidate],
+    winner: &CanonicalCandidate,
+) -> Option<CanonicalCandidate> {
+    if !winner.is_earned {
+        return None;
+    }
+    select_canonical_winner(
+        candidates
+            .iter()
+            .filter(|c| !c.is_earned && c.timestamp > winner.timestamp)
+            .cloned()
+            .collect(),
+    )
+}
+
+/// PURE. Run the WHOLE election over a candidate set — winner
+/// ([`select_canonical_winner`]) and staging candidate
+/// ([`select_staging_candidate`]) — so every caller reports the same PAIR from
+/// the same link set rather than each re-deriving half of it.
+fn run_election(candidates: Vec<CanonicalCandidate>) -> Option<ElectionOutcome> {
+    let winner = select_canonical_winner(candidates.clone())?;
+    let staging_candidate = select_staging_candidate(&candidates, &winner);
+    Some(ElectionOutcome {
+        winner,
+        staging_candidate,
+    })
+}
+
 /// The winning canonical-head declaration, resolved: the target `Record` PLUS
 /// the ordering and tier the election decided it on.
 ///
@@ -3056,6 +3131,10 @@ struct CanonicalHeadAnswer {
     declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     is_earned: bool,
+    /// The staging declaration standing beneath an EARNED winner, if any — see
+    /// [`select_staging_candidate`]. Carried through so the read path can report
+    /// the candidate WITHOUT a second link gather.
+    staging_candidate: Option<CanonicalCandidate>,
 }
 
 /// Resolve the declared canonical cross-root head record for `id`, if one has
@@ -3093,10 +3172,8 @@ struct CanonicalHeadAnswer {
 /// The link ops are far cheaper to obtain than the target record: they live on
 /// the `canonical_head` StringAnchor authority and gossip as ordinary link ops,
 /// so a conductor missing the CONTENT can still hold the ELECTION.
-fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<CanonicalCandidate>> {
-    Ok(select_canonical_winner(gather_election_candidates(
-        id, strategy,
-    )?))
+fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<ElectionOutcome>> {
+    Ok(run_election(gather_election_candidates(id, strategy)?))
 }
 
 /// The candidate-gathering half of [`select_election`], split out so
@@ -3155,8 +3232,11 @@ fn gather_canonical_head_record(
     id: &str,
     strategy: GetStrategy,
 ) -> ExternResult<Option<CanonicalHeadAnswer>> {
-    let winner = match select_election(id, strategy)? {
-        Some(w) => w,
+    let ElectionOutcome {
+        winner,
+        staging_candidate,
+    } = match select_election(id, strategy)? {
+        Some(o) => o,
         None => return Ok(None),
     };
     // Resolve ONLY the winning declaration's target. If it has not gossiped in
@@ -3174,6 +3254,7 @@ fn gather_canonical_head_record(
             record,
             declared_at: winner.timestamp,
             is_earned: winner.is_earned,
+            staging_candidate,
         })),
         None => Ok(None),
     }
@@ -3390,6 +3471,238 @@ mod canonical_head_selector_tests {
         assert_eq!(w1.timestamp, w2.timestamp);
         assert_eq!(w1.is_earned, w2.is_earned);
         assert_eq!(w1.target, w2.target);
+    }
+
+    // -----------------------------------------------------------------------
+    // STAGING CANDIDATE beneath an earned winner (long-lived channel).
+    //
+    // Same arbiter, same link set, one subordinate answer. These pin the two
+    // things a candidate must be: DETERMINISTIC (every peer names the same one)
+    // and STRICTLY SUBORDINATE (naming one never moves the winner).
+    // -----------------------------------------------------------------------
+
+    /// The headline case: an earned head stands, a NEWER staging declaration
+    /// arrives, and the election reports BOTH — winner still earned, candidate
+    /// is the newer staging. This is the whole point: before this, the newer
+    /// staging declaration was invisible, so a canary had nothing to canary.
+    #[test]
+    fn earned_winner_reports_the_newer_staging_declaration_as_candidate() {
+        let outcome = run_election(vec![
+            cand(true, 100, 1, 10),  // EARNED head
+            cand(false, 300, 3, 30), // staging authored ON TOP of it
+        ])
+        .expect("outcome");
+        assert!(outcome.winner.is_earned, "the earned head still WINS");
+        assert_eq!(outcome.winner.target, ah(10));
+        let candidate = outcome
+            .staging_candidate
+            .expect("a newer staging declaration is a candidate");
+        assert_eq!(candidate.target, ah(30));
+        assert_eq!(candidate.timestamp, Timestamp::from_micros(300));
+        assert!(!candidate.is_earned, "a candidate is staging by definition");
+    }
+
+    /// Staging declarations OLDER than the earned head are that head's own
+    /// superseded history, not candidates to succeed it. Reporting one would
+    /// invite a canary to "advance" onto a release the channel already promoted
+    /// past.
+    #[test]
+    fn staging_older_than_the_earned_head_is_not_a_candidate() {
+        let outcome = run_election(vec![
+            cand(false, 100, 1, 10), // staging BEFORE the earned head
+            cand(true, 200, 2, 20),  // EARNED head
+        ])
+        .expect("outcome");
+        assert_eq!(outcome.winner.target, ah(20));
+        assert!(
+            outcome.staging_candidate.is_none(),
+            "a staging declaration the earned head already superseded is not a candidate"
+        );
+    }
+
+    /// A STAGING winner has no candidate beneath it by construction — it IS the
+    /// head a fresh channel converges on, which is the behaviour the canary
+    /// already follows. Adding a candidate here would give a peer two staging
+    /// answers and no rule to choose between them.
+    #[test]
+    fn staging_winner_has_no_candidate() {
+        let outcome =
+            run_election(vec![cand(false, 100, 1, 10), cand(false, 300, 3, 30)]).expect("outcome");
+        assert!(!outcome.winner.is_earned);
+        assert_eq!(outcome.winner.target, ah(30));
+        assert!(
+            outcome.staging_candidate.is_none(),
+            "nothing stands beneath a staging winner"
+        );
+    }
+
+    /// An earned head with no staging declaration after it: no candidate. The
+    /// quiet steady state of every promoted channel.
+    #[test]
+    fn earned_winner_with_no_newer_staging_has_no_candidate() {
+        let outcome =
+            run_election(vec![cand(true, 100, 1, 10), cand(true, 300, 3, 11)]).expect("outcome");
+        assert_eq!(outcome.winner.target, ah(11));
+        assert!(outcome.staging_candidate.is_none());
+    }
+
+    /// PROMOTION. Once the candidate is declared EARNED, it becomes the winner
+    /// and the candidate slot empties — its own staging declaration is now OLDER
+    /// than the earned declaration crowning it, so it cannot re-report itself as
+    /// a candidate to succeed itself. This is the exact transition the sweettest
+    /// drives end-to-end.
+    #[test]
+    fn promoting_the_candidate_makes_it_the_winner_and_empties_the_candidate() {
+        let before =
+            run_election(vec![cand(true, 100, 1, 10), cand(false, 300, 3, 30)]).expect("outcome");
+        assert_eq!(before.winner.target, ah(10));
+        assert_eq!(before.staging_candidate.expect("candidate").target, ah(30));
+
+        // The earned declaration naming the SAME target, stamped later.
+        let after = run_election(vec![
+            cand(true, 100, 1, 10),
+            cand(false, 300, 3, 30),
+            cand(true, 400, 4, 30), // promotion
+        ])
+        .expect("outcome");
+        assert_eq!(after.winner.target, ah(30), "the candidate is now the head");
+        assert!(after.winner.is_earned);
+        assert!(
+            after.staging_candidate.is_none(),
+            "a promoted candidate does not remain a candidate beneath itself"
+        );
+    }
+
+    /// DETERMINISM — the invariant that makes this safe to act on. Several
+    /// staging declarations postdate the earned head; every peer must name the
+    /// SAME one regardless of `get_links` arrival order, exactly as it does for
+    /// the winner. Newest-wins within the candidate set.
+    #[test]
+    fn the_candidate_is_the_newest_staging_and_is_order_independent() {
+        let mk = || {
+            vec![
+                cand(true, 100, 1, 10),
+                cand(false, 200, 2, 20),
+                cand(false, 400, 4, 40), // newest staging ⇒ the candidate
+                cand(false, 300, 3, 30),
+            ]
+        };
+        let c1 = run_election(mk()).expect("outcome").staging_candidate;
+        let mut reversed = mk();
+        reversed.reverse();
+        let c2 = run_election(reversed).expect("outcome").staging_candidate;
+        assert_eq!(c1.as_ref().expect("candidate").target, ah(40));
+        assert_eq!(
+            c1.expect("candidate").target,
+            c2.expect("candidate").target,
+            "the candidate must not depend on get_links arrival order"
+        );
+    }
+
+    /// Equal timestamps among candidates break on the create-link hash — the
+    /// same tiebreak the winner uses, because it is the same arbiter. Asserts
+    /// order-INDEPENDENCE, not a hard-coded direction.
+    #[test]
+    fn tied_candidates_break_deterministically_on_link_hash() {
+        let mk = || {
+            vec![
+                cand(true, 100, 1, 10),
+                cand(false, 500, 5, 50),
+                cand(false, 500, 8, 80), // same clock, distinct link hash
+            ]
+        };
+        let c1 = run_election(mk()).expect("outcome").staging_candidate;
+        let mut reversed = mk();
+        reversed.reverse();
+        let c2 = run_election(reversed).expect("outcome").staging_candidate;
+        let (c1, c2) = (c1.expect("candidate"), c2.expect("candidate"));
+        assert_eq!(c1.target, c2.target);
+        assert_eq!(c1.link_hash, c2.link_hash);
+    }
+
+    /// A staging declaration sharing the earned winner's EXACT timestamp is not
+    /// NEWER — the comparison is strict. Pins the boundary so a later edit
+    /// cannot silently widen it to `>=`, which would let a simultaneous staging
+    /// write present itself as the successor to the head it tied with.
+    #[test]
+    fn a_staging_declaration_tying_the_earned_clock_is_not_a_candidate() {
+        let outcome =
+            run_election(vec![cand(true, 300, 1, 10), cand(false, 300, 3, 30)]).expect("outcome");
+        assert!(
+            outcome.winner.is_earned,
+            "earned still wins the tie by tier"
+        );
+        assert!(
+            outcome.staging_candidate.is_none(),
+            "equal is not newer — the candidate window is strictly after the earned head"
+        );
+    }
+
+    /// Empty set: no outcome at all (the resolver degrades to the root-author
+    /// election, unchanged).
+    #[test]
+    fn empty_set_has_no_outcome() {
+        assert!(run_election(vec![]).is_none());
+    }
+}
+
+/// [`release_lineage_parent_cid`] over its whole input space. This is the one
+/// pure decision behind the earned-head ADMISSION, so its refusals matter as
+/// much as its acceptance: every unreadable shape must read as "no declared
+/// parent", which the guard turns back into today's verbatim refusal.
+#[cfg(test)]
+mod release_lineage_parent_tests {
+    use super::release_lineage_parent_cid;
+
+    #[test]
+    fn reads_the_lineage_parent_from_a_release_manifest() {
+        let json = r#"{"kind":"release-manifest","publishedAt":"2026-09-04T00:00:00.000Z",
+            "manifest":{"envelope":{"wireEpochs":[1],"lineageParentCid":"uhCkkEARNED","additiveOnly":true}}}"#;
+        assert_eq!(
+            release_lineage_parent_cid(json).as_deref(),
+            Some("uhCkkEARNED")
+        );
+    }
+
+    #[test]
+    fn a_null_lineage_parent_is_no_parent() {
+        // The packager's DEFAULT for a first release on a channel.
+        let json =
+            r#"{"kind":"release-manifest","manifest":{"envelope":{"lineageParentCid":null}}}"#;
+        assert_eq!(release_lineage_parent_cid(json), None);
+    }
+
+    #[test]
+    fn a_missing_lineage_parent_is_no_parent() {
+        let json = r#"{"kind":"release-manifest","manifest":{"envelope":{"additiveOnly":true}}}"#;
+        assert_eq!(release_lineage_parent_cid(json), None);
+    }
+
+    #[test]
+    fn non_release_metadata_is_no_parent() {
+        // Ordinary content metadata must never be readable as a release lineage
+        // claim — otherwise any version could name any head as its parent.
+        assert_eq!(release_lineage_parent_cid("{}"), None);
+        assert_eq!(
+            release_lineage_parent_cid(
+                r#"{"manifest":{"envelope":{"lineageParentCid":"uhCkkX"}}}"#
+            ),
+            None,
+            "the `kind` discriminator is REQUIRED — a bare envelope is not a release manifest"
+        );
+        assert_eq!(
+            release_lineage_parent_cid(
+                r#"{"kind":"something-else","manifest":{"envelope":{"lineageParentCid":"uhCkkX"}}}"#
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn unparsable_or_empty_metadata_is_no_parent() {
+        assert_eq!(release_lineage_parent_cid(""), None);
+        assert_eq!(release_lineage_parent_cid("not json at all"), None);
+        assert_eq!(release_lineage_parent_cid("[1,2,3]"), None);
     }
 }
 
@@ -3815,6 +4128,11 @@ fn build_content_head_output(
         // backfills the ordering on its next heal resolve.
         canonical_declared_at: None,
         canonical_earned: None,
+        // Same rule, same reason: only the canonical branch of
+        // `resolve_content_head_inner` holds an election, so only it can name a
+        // candidate beneath the winner.
+        staging_candidate: None,
+        staging_candidate_declared_at: None,
     })
 }
 
@@ -3839,6 +4157,13 @@ fn resolve_content_head_inner(
         // of guessing from head-action timestamps.
         out.canonical_declared_at = Some(answer.declared_at);
         out.canonical_earned = Some(answer.is_earned);
+        // ...and the candidate standing beneath it, when the winner is earned.
+        // Both fields move together (see `staging_candidate`'s doc): a consumer
+        // reading one without the other could not order the candidate.
+        if let Some(candidate) = answer.staging_candidate {
+            out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target));
+            out.staging_candidate_declared_at = Some(candidate.timestamp);
+        }
         return Ok(Some(out));
     }
     let (root_author, records) = match gather_content_chain(id, strategy)? {
@@ -5375,6 +5700,83 @@ fn declare_canonical_head_inner(
     Ok(out)
 }
 
+/// The release manifest's `envelope.lineageParentCid` carried in a Content
+/// version's `metadata_json` — PURE, total, and unit-testable.
+///
+/// The shape is what `genesis/a2o/scripts/release-ceremony.ts` writes when it
+/// authors a release version (from the manifest `epr-release-package.ts` cut):
+///
+/// ```json
+/// { "kind": "release-manifest",
+///   "manifest": { "envelope": { "lineageParentCid": "uhCkk…" } } }
+/// ```
+///
+/// EVERY other shape — absent metadata, unparsable JSON, a different `kind`, a
+/// missing or null `lineageParentCid` — reads as `None`, "this version declares
+/// no lineage parent". That is the SAFE reading at the one call site: the
+/// earned-head guard refuses on `None`, so a malformed or non-release version
+/// can never talk its way past the guard by being unreadable.
+fn release_lineage_parent_cid(metadata_json: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(metadata_json).ok()?;
+    if value.get("kind").and_then(|k| k.as_str()) != Some("release-manifest") {
+        return None;
+    }
+    value
+        .get("manifest")?
+        .get("envelope")?
+        .get("lineageParentCid")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+/// True iff the declaration in `input` names the CURRENTLY-EARNED election
+/// winner `earned` as its release lineage parent — the ONE admission the
+/// earned-head guard grants (see [`declare_canonical_content_head`]'s
+/// EARNED-HEAD ADMISSION).
+///
+/// ## What this proves, and what it deliberately does not
+///
+/// It proves the declarer AUTHORED ON TOP of the standing earned head: the
+/// target Content version's own notarized manifest names that exact action hash
+/// as `envelope.lineageParentCid`. It does NOT prove the release is good, that
+/// it soaked, or that anyone attested it — those are the verify floor's job on
+/// the storage side, not the zome's. All the zome grants is candidacy.
+///
+/// ## Every unreadable case refuses
+///
+/// An unretrievable target, a target carrying no Content entry, metadata that is
+/// not a release manifest, or a lineage parent naming some OTHER action all
+/// return `false` — and `false` is today's verbatim refusal. So the admission is
+/// strictly additive: no input that is refused today becomes admitted unless it
+/// carries the lineage proof.
+///
+/// The local `get` mirrors [`declare_canonical_head_inner`]'s own target
+/// resolution (local first, carried record on a miss) so the guard and the body
+/// cannot disagree about WHICH bytes the declaration is about.
+fn declares_lineage_over(
+    input: &DeclareCanonicalHeadInput,
+    earned: &CanonicalCandidate,
+) -> ExternResult<bool> {
+    let earned_cid = holo_hash::ActionHashB64::from(earned.target.clone()).to_string();
+
+    let target = ActionHash::from(input.head_action_hash.clone());
+    let record = match get(target.clone(), GetOptions::default())? {
+        Some(record) => record,
+        None => match input.carried_record.as_deref() {
+            // The same evidence the declare body accepts on a local miss, proven
+            // by the same in-wasm validator. A carried record that does not
+            // prove itself errors here exactly as it would there.
+            Some(bytes) => validate_carried_record(&target, bytes)?,
+            None => return Ok(false),
+        },
+    };
+    let content: Content = match record.entry().to_app_option().map_err(|e| wasm_error!(e))? {
+        Some(content) => content,
+        None => return Ok(false),
+    };
+    Ok(release_lineage_parent_cid(&content.metadata_json).as_deref() == Some(earned_cid.as_str()))
+}
+
 /// Declare the CROSS-ROOT canonical head of a content id — the STAGING/scaffold
 /// tier (notary-authority convergence, Model B / Tier-1 steward-declared binding).
 ///
@@ -5402,6 +5804,10 @@ fn declare_canonical_head_inner(
 /// (newest-wins, for demo iteration). Inert today (no earned heads exist); it is
 /// forward-protection that engages the moment the earned path lands.
 ///
+/// EARNED-HEAD ADMISSION (long-lived channel): the guard admits exactly one
+/// shape over an earned head — a target whose release manifest names that earned
+/// head as its lineage parent. See [`declares_lineage_over`].
+///
 /// Errors (Guest): unauthorized declarer; earned-head protected; unknown id
 /// (no content exists); target action not retrievable; or target action carries
 /// no Content entry.
@@ -5416,8 +5822,23 @@ pub fn declare_canonical_content_head(
     // EARNED-HEAD GUARD: the open scaffold may set/replace a STAGING canonical
     // but must never override or impersonate an EARNED one. Scaffold-over-
     // scaffold (current == staging/unmarked) falls through and is allowed.
-    if let Some(current) = newest_canonical_link(&input.id)? {
-        if canonical_link_is_earned(&current) {
+    //
+    // ONE ADMISSION (long-lived channel takes a second candidate): a staging
+    // declaration whose target's release manifest names THIS earned head as its
+    // `envelope.lineageParentCid` is admitted. That declaration is not an
+    // override attempt — it is the next release explicitly authored ON TOP of
+    // the standing earned head, and admitting it is what lets a channel that
+    // already earned a head ever receive a candidate again. It still does not
+    // MOVE the head: `select_canonical_winner`'s tier precedence keeps electing
+    // the earned winner, and the admitted declaration surfaces only as
+    // `staging_candidate` (see `select_staging_candidate`) until
+    // `declare_earned_canonical_head` promotes it.
+    //
+    // The guard asks the ELECTION (one arbiter, one ordering — see the retired
+    // `newest_canonical_link` note), so it keeps demanding lineage proof for
+    // every candidate, not just the first one over the earned head.
+    if let Some(outcome) = select_election(&input.id, GetStrategy::Local)? {
+        if outcome.winner.is_earned && !declares_lineage_over(&input, &outcome.winner)? {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "declare_canonical_content_head: earned head is protected for id '{}' — \
                  the staging scaffold cannot override an earned canonical",
@@ -5580,6 +6001,40 @@ pub struct CanonicalElectionOutput {
     pub canonical_declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     pub canonical_earned: bool,
+    /// The STAGING declaration standing BENEATH an earned winner — the next
+    /// release on this channel awaiting promotion. See
+    /// [`select_staging_candidate`]: a pure function of the same link set, so
+    /// every peer names the SAME candidate.
+    ///
+    /// `Some` only when [`Self::canonical_earned`] is true AND a staging
+    /// declaration postdates the winning earned one; `None` otherwise, and
+    /// `None` via `serde(default)` from any pre-candidate coordinator. It does
+    /// NOT compete with [`Self::winner_target`] — the election still returns one
+    /// winner, and this is the subordinate declaration a canary may verify.
+    #[serde(default)]
+    pub staging_candidate: Option<holo_hash::ActionHashB64>,
+    /// The candidate declaration LINK's notarized DHT timestamp. `Some` exactly
+    /// when [`Self::staging_candidate`] is `Some`.
+    #[serde(default)]
+    pub staging_candidate_declared_at: Option<Timestamp>,
+}
+
+impl CanonicalElectionOutput {
+    /// Project one [`ElectionOutcome`] onto the wire. The ONE place the mapping
+    /// lives, so the four externs that answer an election cannot report
+    /// different subsets of it.
+    fn from_outcome(outcome: &ElectionOutcome) -> Self {
+        Self {
+            winner_target: holo_hash::ActionHashB64::from(outcome.winner.target.clone()),
+            canonical_declared_at: outcome.winner.timestamp,
+            canonical_earned: outcome.winner.is_earned,
+            staging_candidate: outcome
+                .staging_candidate
+                .as_ref()
+                .map(|c| holo_hash::ActionHashB64::from(c.target.clone())),
+            staging_candidate_declared_at: outcome.staging_candidate.as_ref().map(|c| c.timestamp),
+        }
+    }
 }
 
 /// Answer "what did the DHT elect for this id?" WITHOUT needing to serve the
@@ -5625,15 +6080,11 @@ pub struct CanonicalElectionOutput {
 /// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
 #[hdk_extern]
 pub fn resolve_canonical_election(id: String) -> ExternResult<Option<CanonicalElectionOutput>> {
-    let winner = match select_election(&id, GetStrategy::Local)? {
-        Some(w) => w,
+    let outcome = match select_election(&id, GetStrategy::Local)? {
+        Some(o) => o,
         None => return Ok(None),
     };
-    Ok(Some(CanonicalElectionOutput {
-        winner_target: holo_hash::ActionHashB64::from(winner.target),
-        canonical_declared_at: winner.timestamp,
-        canonical_earned: winner.is_earned,
-    }))
+    Ok(Some(CanonicalElectionOutput::from_outcome(&outcome)))
 }
 
 /// Batched, budget-bounded [`resolve_canonical_election`] over many ids in
@@ -5687,11 +6138,9 @@ pub fn resolve_canonical_elections(
             }),
         },
         |id| match select_election(id, GetStrategy::Local) {
-            Ok(winner) => ItemResult::Resolved(winner.map(|w| CanonicalElectionOutput {
-                winner_target: holo_hash::ActionHashB64::from(w.target),
-                canonical_declared_at: w.timestamp,
-                canonical_earned: w.is_earned,
-            })),
+            Ok(outcome) => {
+                ItemResult::Resolved(outcome.as_ref().map(CanonicalElectionOutput::from_outcome))
+            }
             Err(e) => ItemResult::Failed(BatchResolveFailure {
                 reason: classify_wasm_error(&e),
                 phase: BatchResolvePhase::Election,
@@ -5776,10 +6225,11 @@ pub struct CanonicalElectionEvidenceOutput {
 pub fn get_canonical_election_evidence(
     id: String,
 ) -> ExternResult<Option<CanonicalElectionEvidenceOutput>> {
-    let winner = match select_election(&id, GetStrategy::Local)? {
-        Some(w) => w,
+    let outcome = match select_election(&id, GetStrategy::Local)? {
+        Some(o) => o,
         None => return Ok(None),
     };
+    let winner = &outcome.winner;
     // The winning declaration LINK's own Record. A conductor that can see the
     // link in get_links but cannot retrieve its Record answers None — honest
     // absence, the requester degrades exactly as if no evidence were served.
@@ -5794,11 +6244,7 @@ pub fn get_canonical_election_evidence(
         )))
     })?;
     Ok(Some(CanonicalElectionEvidenceOutput {
-        election: CanonicalElectionOutput {
-            winner_target: holo_hash::ActionHashB64::from(winner.target),
-            canonical_declared_at: winner.timestamp,
-            canonical_earned: winner.is_earned,
-        },
+        election: CanonicalElectionOutput::from_outcome(&outcome),
         link_record: bytes,
     }))
 }
@@ -5964,13 +6410,11 @@ pub fn verify_carried_election(
         link_hash: computed,
         target,
     });
-    Ok(
-        select_canonical_winner(candidates).map(|w| CanonicalElectionOutput {
-            winner_target: holo_hash::ActionHashB64::from(w.target),
-            canonical_declared_at: w.timestamp,
-            canonical_earned: w.is_earned,
-        }),
-    )
+    // `run_election`, not `select_canonical_winner` alone: the merged set must
+    // yield the SAME pair (winner + staging candidate) the local read path
+    // yields, or a carried-evidence answer would silently drop a candidate the
+    // caller can see by asking the peer directly.
+    Ok(run_election(candidates).map(|o| CanonicalElectionOutput::from_outcome(&o)))
 }
 
 /// Input for [`validate_carried_head_record`].
