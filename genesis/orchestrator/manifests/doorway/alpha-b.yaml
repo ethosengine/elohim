@@ -173,7 +173,12 @@ spec:
             # the placement directive's intent — two doorways, two genesis
             # peers, two clusters — and removes the cross-WireGuard hop on
             # every read.
-            - "ws://elohim-adam-alpha:4445"
+            # The worker pool's primary APP interface. Since the conductor split (rung 2) the
+            # conductor lives in `elohim-adam-alpha-conductor` (Service 4445 -> container 8445);
+            # the old storage-host address timed out on every attempt ("Connection timed out",
+            # connected_workers 0/4) and the seeder's preflight refused — genesis #1552, 2026-09-04,
+            # the 0.7 fleet's first re-seed. CONDUCTOR_ADMIN_URL below was already repointed.
+            - "ws://elohim-adam-alpha-conductor:4445"
           ports:
             - name: gateway-ws
               containerPort: 8080

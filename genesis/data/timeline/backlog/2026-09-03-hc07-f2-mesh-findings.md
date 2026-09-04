@@ -112,7 +112,16 @@ panics ×20 ("fixture … unreadable") in every edge build — #1423 (0.6, befor
 module. Fix: COPY the two fixture roots into the `check` stage (the path-dep COPY trap), or embed the fixtures with
 `include_str!`.
 
-## 10. Apparatus, fixed on the branch (for the record)
+## 10. Doorway worker pool: one auth token for many conductors — STANDING, exposed on the fresh 0.7 fleet
+
+doorway-alpha-b's pool dials every peer in `CONDUCTOR_URLS` (the seven conductor pods' 8445) but mints its app auth
+token on `CONDUCTOR_ADMIN_URL` (adam's conductor only); a token minted by one conductor is invalid on another, so each
+foreign session is accepted then closed ("Conductor closed connection: None" ×N/min, workers flapping 0↔2). Tokens
+are per-conductor: the pool must mint on each target's admin (`conductorWsHost(...):8444`) or restrict its workers to
+the primary. Separately, both doorways' `--conductor-url` still named the pre-split storage host (fixed in the
+manifests, 2026-09-04).
+
+## 11. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).
