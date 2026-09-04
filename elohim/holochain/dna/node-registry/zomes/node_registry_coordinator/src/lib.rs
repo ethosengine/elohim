@@ -1697,12 +1697,58 @@ pub fn commit_witness(witness: NotarizationWitness) -> ExternResult<ActionHash> 
     Ok(action_hash)
 }
 
+/// Shared `EntryToWitness` link lookup — the extern below and the Task 20
+/// carry-idempotency check (`entry_already_witnessed`) both read the same
+/// index of "which witnesses carry this entry hash".
+#[cfg(feature = "lineage-witness")]
+fn witnesses_for(entry_hash: EntryHash) -> ExternResult<Vec<Link>> {
+    let query = LinkQuery::try_new(entry_hash, LinkTypes::EntryToWitness)?;
+    get_links(query, GetStrategy::default())
+}
+
 /// Every witness carrying a predecessor notarization for this entry hash.
 #[cfg(feature = "lineage-witness")]
 #[hdk_extern]
 pub fn get_witnesses_for(entry_hash: EntryHash) -> ExternResult<Vec<Link>> {
-    let query = LinkQuery::try_new(entry_hash, LinkTypes::EntryToWitness)?;
-    get_links(query, GetStrategy::default())
+    witnesses_for(entry_hash)
+}
+
+/// Whether a [`NotarizationWitness`] already carries `entry_hash` FROM
+/// `lineage_dna_hash` — the held-carry idempotency check (Task 20, epic §7
+/// C6b). A retried held page must not push a second proof (and thus create a
+/// second `EntryToWitness` link) for an entry a previous page already
+/// witnessed from the same predecessor DNA; a different lineage witnessing
+/// the same entry hash is a distinct claim and must not be treated as a
+/// duplicate.
+///
+/// Reads each candidate witness locally (`GetOptions::local()`) — this chain
+/// is checking its OWN prior commits, the same verify-locally-then-serve
+/// discipline `export_held_records` documents above.
+#[cfg(feature = "lineage-witness")]
+fn entry_already_witnessed(
+    entry_hash: &EntryHash,
+    lineage_dna_hash: &DnaHash,
+) -> ExternResult<bool> {
+    for link in witnesses_for(entry_hash.clone())? {
+        let Some(action_hash) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(action_hash, GetOptions::local())? else {
+            continue;
+        };
+        let witness = record.entry().to_app_option::<NotarizationWitness>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "entry_already_witnessed: could not decode NotarizationWitness at {}: {e:?}",
+                record.action_address()
+            )))
+        })?;
+        if let Some(witness) = witness {
+            if &witness.lineage_dna_hash == lineage_dna_hash {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 /// This agent's own chain activity as the local authority sees it.
@@ -1837,8 +1883,12 @@ pub struct CarryInput {
 #[cfg(feature = "lineage-witness")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CarryReceipt {
-    /// How many predecessor records this page carried (== the witness's proof
-    /// count).
+    /// How many predecessor records this page carried. On a first pass this
+    /// equals the witness's proof count; on a RETRY it also counts records
+    /// this chain already carried on an earlier pass (Task 20, epic §7 C6b) —
+    /// those are still `carried` (the content IS here), but pushed no proof
+    /// and authored no witness a second time. `carried == self.already_carried
+    /// + <the witness's proof count>` always holds.
     pub carried: u32,
     /// Resume token for the next page, or `None` when the export THIS PAGE
     /// DREW FROM is exhausted. The caller drives the loop.
@@ -1911,6 +1961,22 @@ pub struct CarryReceipt {
     /// page established.
     #[serde(default)]
     pub v1_observed_head: Option<u32>,
+    /// **Additive.** How many of `carried` were ALREADY carried before this
+    /// page ran — a self-carry whose entry hash was already found on this
+    /// chain (one `query`, checked before `create_entry`), or a held-carry
+    /// whose entry hash already had a `NotarizationWitness` from this
+    /// lineage (`get_witnesses_for`). Task 20, epic §7 C6b: a retried page
+    /// re-creates nothing and authors no second witness for these — they
+    /// contribute to `carried` but not to `self_carried` and get no proof in
+    /// the page's witness. `already_carried == carried` on a page whose
+    /// every record was already carried means the page authored NO witness
+    /// this time (`witness_hash == ""`).
+    ///
+    /// `#[serde(default)]` so a consumer built against the pre-idempotency
+    /// receipt still decodes, reading 0 for a page from a zome that predates
+    /// the field.
+    #[serde(default)]
+    pub already_carried: u32,
 }
 
 /// Pull ONE bounded page from a predecessor cell and witness it here.
@@ -2033,12 +2099,73 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
     }
 
     // (3) self-carry vs held-carry, per §2.1/§2.2.
+    //
+    // Idempotency (Task 20, epic §7 C6b). A retried page must not re-create a
+    // self-carry that already landed, nor commit a second witness proof for
+    // an entry that is already carried — either would leave TWO actions
+    // sharing one entry hash on this chain, or TWO `EntryToWitness` links for
+    // the same predecessor proof.
+    //
+    // Self-carry candidates are checked with ONE chain `query` over the
+    // whole page's entry hashes, not one query per record — a page's records
+    // are a page-bounded batch and the check should cost one round trip, not
+    // `page.records.len()` of them.
+    let self_carry_candidates: HashSet<EntryHash> = if held {
+        HashSet::new()
+    } else {
+        page.records
+            .iter()
+            .filter(|signed| signed.action().author() == &me)
+            .filter_map(|signed| signed.action().entry_hash().cloned())
+            .collect()
+    };
+    let already_on_chain: HashSet<EntryHash> = if self_carry_candidates.is_empty() {
+        HashSet::new()
+    } else {
+        query(
+            ChainQueryFilter::new()
+                .entry_hashes(self_carry_candidates)
+                .include_entries(false),
+        )?
+        .iter()
+        .filter_map(|r| r.action().entry_hash().cloned())
+        .collect()
+    };
+
     let mut proofs: Vec<CarriedProof> = Vec::with_capacity(page.records.len());
     let mut self_carried: u32 = 0;
+    let mut already_carried: u32 = 0;
 
     for (i, signed) in page.records.iter().enumerate() {
         let action = signed.action().clone();
         let carried_entry: Option<Entry> = page.entries.get(i).cloned().flatten();
+
+        // Self-carry, already re-created on this chain by an earlier page: it
+        // IS carried, but `create_entry`ing it again would mint a second
+        // action over the same entry hash, and pushing a proof for it would
+        // commit a second witness. Skip both; count it as already carried.
+        if !held && action.author() == &me {
+            if let Some(entry_hash) = action.entry_hash() {
+                if already_on_chain.contains(entry_hash) {
+                    already_carried = already_carried.saturating_add(1);
+                    continue;
+                }
+            }
+        }
+
+        // Held-carry, already witnessed FROM THIS LINEAGE by an earlier page:
+        // a `NotarizationWitness` already carries a proof for this entry hash
+        // naming this same predecessor DNA. Skip re-proving it — a second
+        // proof would commit a second witness and a second `EntryToWitness`
+        // link for content already witnessed.
+        if held {
+            if let Some(entry_hash) = action.entry_hash() {
+                if entry_already_witnessed(entry_hash, &lineage_dna_hash)? {
+                    already_carried = already_carried.saturating_add(1);
+                    continue;
+                }
+            }
+        }
 
         // Our OWN record: re-create it natively from the SAME bytes. Matching
         // the carried action's app entry-def index and round-tripping through
@@ -2106,8 +2233,11 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         });
     }
 
-    // (4) ONE witness per page.
-    let carried = proofs.len() as u32;
+    // (4) ONE witness per page — but only when the page actually has new
+    // proofs. A page whose every record was already carried authors NO
+    // witness at all (`witness_hash: ""`), which the landed storage decoder
+    // already treats as "no witness this page" — see `witness_hash`'s doc.
+    let carried = proofs.len() as u32 + already_carried;
     let witness_hash = if proofs.is_empty() {
         String::new()
     } else {
@@ -2126,5 +2256,6 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         v1_total: page.total,
         self_carried,
         v1_observed_head: page.observed_head,
+        already_carried,
     })
 }

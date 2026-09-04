@@ -180,6 +180,12 @@ struct CarryReceipt {
     /// carried through so a held receipt is checkable for truncation.
     #[serde(default)]
     v1_observed_head: Option<u32>,
+    /// Task 20 (additive): how many of `carried` were ALREADY carried before
+    /// this page ran (a self-carry entry hash already on this chain, or a
+    /// held-carry entry hash already witnessed from this lineage) — a retry
+    /// re-creates nothing and authors no proof for these.
+    #[serde(default)]
+    already_carried: u32,
 }
 
 /// The properties both node_registry versions read.
@@ -585,6 +591,111 @@ async fn probe_a_carry_from_pulls_one_bounded_page_across_cells() -> Result<()> 
         recreated.action_address(),
         sah1.action_address(),
         "the v2 re-creation is a NEW action — only the entry hash is shared"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// PROBE A (carry idempotency) — Task 20, epic §7 C6b: a retried page commits
+// no duplicate entries and no second witness. Same crossing shape as the
+// carry-drive probe above (`install_crossing()`, one real v1 record,
+// `CarryInput` with no `source` — the pre-Task-18 self-carry shape), but the
+// SAME page is carried twice from the same cursor. This is the retry a driver
+// takes after a crash, a timeout, or simply re-running a page defensively —
+// it must re-create nothing and author no second witness for content this
+// chain already holds.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn probe_a_carry_from_retry_is_idempotent() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash: _,
+        v2_hash: _,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // --- 1. one real v1 record — the fact to carry --------------------------
+    let (_ah1, sah1) = author_and_read_back(&conductor, &z1, "carry-retry-probe", &alice).await;
+    let eh1 = sah1
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+    println!("[probe A/retry] v1 action = {}", sah1.action_address());
+    println!("[probe A/retry] v1 entry  = {eh1}");
+
+    let carry_input = || CarryInput {
+        v1_cell: z1.cell_id().clone(),
+        cursor: None,
+        limit: 16,
+    };
+
+    // --- 2. the first, full carry (Own) — establishes the baseline ----------
+    let first: CarryReceipt = conductor.call(&z2, "carry_from", carry_input()).await;
+    println!("[probe A/retry] first receipt = {first:?}");
+    assert_eq!(first.carried, 1, "the page held exactly one record to carry");
+    assert_eq!(
+        first.self_carried, 1,
+        "the one record is the agent's own — re-created natively on the first pass"
+    );
+    assert_eq!(
+        first.already_carried, 0,
+        "nothing was already carried before the first pass ran"
+    );
+    assert!(
+        !first.witness_hash.is_empty(),
+        "a non-empty first page commits exactly one witness"
+    );
+
+    // --- 3. the SAME page, retried at cursor 0 -------------------------------
+    let retry: CarryReceipt = conductor.call(&z2, "carry_from", carry_input()).await;
+    println!("[probe A/retry] retry receipt = {retry:?}");
+
+    assert_eq!(
+        retry.carried, first.carried,
+        "a retry reports the same `carried` count — the content IS carried, retry or not"
+    );
+    assert_eq!(
+        retry.self_carried, 0,
+        "the retry re-creates NOTHING natively — the entry is already on this chain"
+    );
+    assert_eq!(
+        retry.already_carried, retry.carried,
+        "on a retry every record on the page was already carried"
+    );
+    assert_eq!(
+        retry.witness_hash, "",
+        "a page with zero new proofs authors NO witness — the empty string is the landed \
+         storage decoder's \"no witness this page\" signal"
+    );
+
+    // --- 4. exactly ONE witness link survives the retry ----------------------
+    let links: Vec<Link> = conductor.call(&z2, "get_witnesses_for", eh1.clone()).await;
+    assert_eq!(
+        links.len(),
+        1,
+        "a retried carry_from must not commit a second witness or a second EntryToWitness \
+         link — got {} links",
+        links.len()
+    );
+
+    // --- 5. still exactly ONE re-created record on v2, not two --------------
+    let v2_page: ExportPage = conductor
+        .call(&z2, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    let recreated_count = v2_page
+        .records
+        .iter()
+        .filter(|r| r.action().entry_hash() == Some(&eh1))
+        .count();
+    assert_eq!(
+        recreated_count, 1,
+        "a retried self-carry must not mint a second action over the same entry hash"
     );
 
     Ok(())
@@ -1465,6 +1576,174 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
     assert!(
         msg.contains("Held(self)"),
         "expected the Held(self) refusal, got: {msg}"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// HELD-CARRY RETRY — Task 20, epic §7 C6b: a retried held-carry page must not
+// commit a second witness either. Same two-agent fixture as
+// `held_carry_pulls_a_neighbours_v1_record_into_v2` above (alice holds v1 AND
+// v2 and is the courier; bob holds v1 only and is the author) — the SAME held
+// page is carried twice from the same cursor.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn held_carry_retry_is_idempotent() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+
+    let [(mut ca, alice), (mut cb, bob)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+
+    let v1_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![],
+        constitution_root: None,
+    })?;
+    let v1_dna = load_dna_from_path(&v1_path(), &seed, Some(v1_props)).await?;
+    let v1_hash = v1_dna.dna_hash().clone();
+
+    let v2_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![v1_hash.clone()],
+        constitution_root: None,
+    })?;
+    let v2_dna = load_dna_from_path(&v2_path(), &seed, Some(v2_props)).await?;
+    let v2_hash = v2_dna.dna_hash().clone();
+    assert_ne!(v1_hash, v2_hash);
+
+    // alice: v1 AND v2 (she is the courier). bob: v1 only.
+    let app_a1 = ca
+        .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1_dna.clone()])
+        .await?;
+    let app_a2 = ca
+        .setup_app_for_agent("node-registry-v2", alice.clone(), &[v2_dna])
+        .await?;
+    let app_b1 = cb
+        .setup_app_for_agent("node-registry-v1", bob.clone(), &[v1_dna])
+        .await?;
+
+    let cell_a1 = app_a1.cells().first().expect("alice v1 cell").clone();
+    let cell_b1 = app_b1.cells().first().expect("bob v1 cell").clone();
+    let za1 = cell_a1.zome(ZOME);
+    let za2 = app_a2.cells().first().expect("alice v2 cell").zome(ZOME);
+    let zb1 = cell_b1.zome(ZOME);
+
+    println!("[task20] v1 dna hash = {v1_hash}");
+    println!("[task20] v2 dna hash = {v2_hash}");
+    println!("[task20] alice       = {alice}");
+    println!("[task20] bob         = {bob}");
+
+    // Pay bob's one-time wasm instantiation before any bounded window.
+    let _: Vec<NodeRegistration> = cb.call(&zb1, "get_my_nodes", ()).await;
+
+    // --- 1. BOB authors the fact --------------------------------------------
+    let (_bob_ah, bob_sah) =
+        author_and_read_back(&cb, &zb1, "neighbour-retry-node", &bob).await;
+    let bob_eh = bob_sah
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+    println!("[task20] bob action = {}", bob_sah.action_address());
+    println!("[task20] bob entry  = {bob_eh}");
+
+    await_consistency_s(120, [&cell_a1, &cell_b1])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout on the v1 space: {e}"))?;
+
+    // --- 2. ALICE's v1 cell can SEE bob's chain (Task 18's held view) ------
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let mut held: ExportPage;
+    loop {
+        held = ca
+            .call(
+                &za1,
+                "export_held_records",
+                ExportHeldInput { agent: bob.clone(), cursor: None, limit: 16 },
+            )
+            .await;
+        if held.total == Some(1) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    assert_eq!(
+        held.total,
+        Some(1),
+        "alice's v1 cell must see bob's one app-entry record before the carry can run, got \
+         {:?}",
+        held.total
+    );
+
+    // --- 3. and knows WHOM to ask -------------------------------------------
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let mut agents: Vec<AgentPubKey>;
+    loop {
+        agents = ca.call(&za1, "known_agents", ()).await;
+        if agents.contains(&bob) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    assert!(
+        agents.contains(&bob),
+        "bob must be known before he can be carried, got {agents:?}"
+    );
+
+    let carry_input = || CarryInputHeld {
+        v1_cell: cell_a1.cell_id().clone(),
+        cursor: None,
+        limit: 16,
+        source: CarrySource::Held(bob.clone()),
+    };
+
+    // --- 4. the FIRST held carry: alice's v2 pulls bob's record -------------
+    let first: CarryReceipt = ca.call(&za2, "carry_from", carry_input()).await;
+    println!("[task20] first held receipt = {first:?}");
+    assert_eq!(first.carried, 1, "the page held exactly bob's one record");
+    assert_eq!(first.self_carried, 0, "bob's record is never a self-carry");
+    assert_eq!(
+        first.already_carried, 0,
+        "nothing was already carried before the first pass ran"
+    );
+    assert!(
+        !first.witness_hash.is_empty(),
+        "a non-empty first page commits exactly one witness"
+    );
+
+    // --- 5. the SAME held page, retried at cursor 0 --------------------------
+    let retry: CarryReceipt = ca.call(&za2, "carry_from", carry_input()).await;
+    println!("[task20] retry held receipt = {retry:?}");
+
+    assert_eq!(
+        retry.carried, first.carried,
+        "a held retry reports the same `carried` count — alice already carried what she had \
+         of bob"
+    );
+    assert_eq!(
+        retry.self_carried, 0,
+        "a held-carry is never a self-carry, retried or not"
+    );
+    assert_eq!(
+        retry.already_carried, retry.carried,
+        "on a retry every record on the held page was already witnessed from this lineage"
+    );
+    assert_eq!(
+        retry.witness_hash, "",
+        "a held page with zero new proofs authors NO witness — the empty string is the \
+         landed storage decoder's \"no witness this page\" signal"
+    );
+
+    // --- 6. exactly ONE witness link survives the retry ----------------------
+    let links: Vec<Link> = ca.call(&za2, "get_witnesses_for", bob_eh.clone()).await;
+    assert_eq!(
+        links.len(),
+        1,
+        "a retried held-carry must not commit a second witness or a second EntryToWitness \
+         link — got {} links",
+        links.len()
     );
 
     Ok(())
