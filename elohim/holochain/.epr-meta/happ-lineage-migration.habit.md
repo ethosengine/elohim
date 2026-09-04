@@ -42,3 +42,9 @@ FINDING: close_chain is not a fence (author and single-conductor authority both 
 rewritten (the fence is ours: v1 cell disabled, v2 refuses carried facts after the close); Probe B2 (two conductors)
 opened. Status stays RED: the habit measures the STORY on the household mesh (0 of 10 stations), not the kernel.
 Landing rule: the witness type rides cargo feature `lineage-witness` so the default pack stays on `dna-hashes.baseline`.
+
+DELTA 2026-09-04 (Probe B2, two conductors, `happ_lineage_migration.rs::probe_b2_remote_authority_after_close`, 1 passed,
+EXIT=0, re-run by the chief): the remote agent-activity authority applies ActionAfterChainClose — rejects the FIRST
+post-close action (seq close+1) and issues a warrant — but the tail after it validates again and the post-close record
+stays fetchable locally and over the network. The sunset fence is ours (v1 cell disabled + v2 refuses carried facts after
+the close, Station 8); the warrant is read as evidence. De-risk pass complete; the MVP plan is the execution surface.

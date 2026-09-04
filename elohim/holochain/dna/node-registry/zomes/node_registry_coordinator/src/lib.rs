@@ -1358,3 +1358,44 @@ pub fn my_chain_activity(_: ()) -> ExternResult<AgentActivityStatus> {
         GetOptions::local(),
     )
 }
+
+/// ANOTHER agent's chain activity, as THIS conductor sees it.
+///
+/// Probe B measured the single-conductor case, where the author is its own
+/// agent-activity authority. Probe B2 asks the two-conductor question: does a
+/// REMOTE authority apply `ActionAfterChainClose` to post-close activity?
+/// `my_chain_activity` cannot express it — it always targets `agent_info()`.
+///
+/// `local_only` selects WHOSE verdict is read:
+///   * `true`  → `GetOptions::local()` — this conductor's own authority store,
+///     i.e. what THIS peer validated and integrated. That is the measurement.
+///   * `false` → `GetOptions::network()` — ask the network, which may answer
+///     from the author's own (self-authoring) authority. Reported alongside so
+///     the two views can be told apart.
+#[hdk_extern]
+pub fn agent_activity_of(input: (AgentPubKey, bool)) -> ExternResult<AgentActivityStatus> {
+    let (agent, local_only) = input;
+    let options = if local_only {
+        GetOptions::local()
+    } else {
+        GetOptions::network()
+    };
+    get_agent_activity(agent, ChainQueryFilter::new(), ActivityRequest::Full, options)
+}
+
+/// `get` one record by action hash, with the local/network choice explicit.
+///
+/// Probe B2's second question: after the author's chain is closed and a
+/// post-close action is authored anyway, can a peer still RETRIEVE it? A
+/// network `get` may be answered by the author itself, so the local read is
+/// reported beside it.
+#[hdk_extern]
+pub fn get_record_at(input: (ActionHash, bool)) -> ExternResult<Option<Record>> {
+    let (action_hash, local_only) = input;
+    let options = if local_only {
+        GetOptions::local()
+    } else {
+        GetOptions::network()
+    };
+    get(action_hash, options)
+}

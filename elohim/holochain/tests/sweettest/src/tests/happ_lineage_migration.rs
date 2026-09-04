@@ -18,6 +18,11 @@
 //! when v1 closes its chain toward v2 and v2 records the crossing. Station 8's
 //! only unmeasured Holochain rule.
 //!
+//! **Probe B2** — the REMOTE agent-activity authority. Probe B found that
+//! `close_chain` is not a source-chain guard and that the author's OWN
+//! authority (a single conductor) accepts the post-close write. B2 puts a
+//! second conductor on the same v1 DHT and reads that peer's verdict.
+//!
 //! Artifacts. The `NotarizationWitness` entry type (+ `EntryToWitness` link,
 //! `commit_witness` / `get_witnesses_for` externs) is gated behind the
 //! `lineage-witness` cargo feature (off by default) in
@@ -42,10 +47,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use elohim_sweettest::common::{
-    conductors::{load_dna_from_path, single_agent_conductor},
-    fixtures::{network_seed, node_registration},
+    conductors::{load_dna_from_path, single_agent_conductor, two_agent_conductors_isolated},
+    fixtures::{network_seed, node_registration, NodeRegistration},
 };
-use holochain::sweettest::{SweetConductor, SweetZome};
+use holochain::sweettest::{await_consistency_s, SweetConductor, SweetZome};
 use holochain_types::prelude::*;
 
 const DNA: &str = "node_registry";
@@ -466,6 +471,281 @@ async fn probe_b_late_open_chain_after_v2_has_authored() -> Result<()> {
         "MEASURED CHANGE: the local agent-activity authority now rejects post-close \
          activity (ActionAfterChainClose fires without a remote authority) — \
          update the epic's Station 8"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// PROBE B2 — the REMOTE agent-activity authority, after a close
+//
+// Probe B measured ONE conductor: the author is its own agent-activity
+// authority there, and it accepted the post-close create (`rejected_activity`
+// empty, warrants 0). `ActionAfterChainClose` lives only in
+// `sys_validation_workflow::register_agent_activity`, i.e. on the authority
+// side — so the open question is whether a DIFFERENT conductor, holding
+// alice's v1 agent-activity, refuses it.
+//
+// Shape: alice on conductor A holds v1 AND v2 (the crossing). bob on conductor
+// B holds the SAME v1 DNA (same bundle, same seed, same properties => same DNA
+// hash => same DHT), so he is an authority for alice's v1 activity. Alice
+// closes v1 toward v2, then writes on v1 anyway. We then read bob's verdict.
+//
+// Nothing is asserted that was not measured; the probe's evidence is its
+// `[probe B2]` log lines.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn probe_b2_remote_authority_after_close() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+
+    let (v1_path, v2_path) = (v1_path(), v2_path());
+    assert!(v1_path.exists(), "predecessor DNA not found at {v1_path:?}");
+
+    // --- two conductors on ONE rendezvous, discovery isolated until exchange -
+    let [(mut ca, alice), (mut cb, bob)] = two_agent_conductors_isolated().await?;
+    let seed = network_seed(DNA);
+
+    let v1_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![],
+        constitution_root: None,
+    })?;
+    let v1_dna = load_dna_from_path(&v1_path, &seed, Some(v1_props)).await?;
+    let v1_hash = v1_dna.dna_hash().clone();
+
+    let v2_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![v1_hash.clone()],
+        constitution_root: None,
+    })?;
+    let v2_hash = load_dna_from_path(&v2_path, &seed, Some(v2_props))
+        .await?
+        .dna_hash()
+        .clone();
+    assert_ne!(v1_hash, v2_hash);
+
+    // BOTH conductors hold v1 and ONLY v1. v2 is loaded for its DNA hash alone
+    // — `close_chain(MigrationTarget::Dna(h))` names a successor, it does not
+    // require the successor to be installed, and B2's whole question lives in
+    // the v1 DHT (does the REMOTE v1 agent-activity authority refuse?).
+    //
+    // Installing v2 on alice only would also break the harness:
+    // `SweetConductor::exchange_peer_info` returns true only when EVERY space
+    // across the batch holds an agent info per conductor, so a space that
+    // exists on one conductor alone can never satisfy it (measured: the poll
+    // times out at 30 s with peer info already correctly injected for v1).
+    let app_a1 = ca
+        .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1_dna.clone()])
+        .await?;
+    let app_b1 = cb
+        .setup_app_for_agent("node-registry-v1", bob.clone(), &[v1_dna])
+        .await?;
+
+    let cell_a1 = app_a1.cells().first().expect("alice v1 cell").clone();
+    let cell_b1 = app_b1.cells().first().expect("bob v1 cell").clone();
+    let za1 = cell_a1.zome(ZOME);
+    let zb1 = cell_b1.zome(ZOME);
+
+    println!("[probe B2] v1 dna hash = {v1_hash}");
+    println!("[probe B2] v2 dna hash = {v2_hash}");
+    println!("[probe B2] alice       = {alice}");
+    println!("[probe B2] bob         = {bob}");
+
+    // --- connect the pair ----------------------------------------------------
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("timeout exchanging peer info"))?;
+
+    // Pay bob's one-time wasm instantiation before any bounded window.
+    let _: Vec<NodeRegistration> = cb.call(&zb1, "get_my_nodes", ()).await;
+
+    // --- real history on v1, gossiped to bob ---------------------------------
+    let (pre_hash, _pre) = author_and_read_back(&ca, &za1, "b2-pre-close", &alice).await;
+    println!("[probe B2] pre-close action  = {pre_hash}");
+
+    await_consistency_s(90, [&cell_a1, &cell_b1])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout before the close: {e}"))?;
+
+    // --- alice closes v1 toward v2 -------------------------------------------
+    let close_hash: ActionHash = ca
+        .call_fallible(&za1, "close_chain_for", v2_hash.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("close_chain on v1 was refused: {e:?}"))?;
+    println!("[probe B2] v1 CloseChain     = {close_hash}");
+
+    await_consistency_s(90, [&cell_a1, &cell_b1])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after the close: {e}"))?;
+
+    // --- and writes on v1 anyway ---------------------------------------------
+    let after_close: Result<ActionHash, _> = ca
+        .call_fallible(
+            &za1,
+            "register_node",
+            node_registration("b2-after-close", &alice),
+        )
+        .await;
+    match &after_close {
+        Ok(h) => println!("[probe B2] post-close create ACCEPTED BY THE AUTHOR at {h}"),
+        Err(e) => println!("[probe B2] post-close create refused at author time:\n{e:?}"),
+    }
+    let after_hash = after_close
+        .as_ref()
+        .ok()
+        .cloned()
+        .expect("probe B measured the author accepts a post-close create");
+
+    // --- watch the REMOTE authority (bob), bounded ---------------------------
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    let mut bob_view: Option<AgentActivityStatus>;
+    let mut saw_after_action;
+    loop {
+        let activity: AgentActivityStatus = cb
+            .call(&zb1, "agent_activity_of", (alice.clone(), true))
+            .await;
+        let rejected = !activity.rejected_activity.is_empty();
+        let warranted = !activity.warrants.is_empty();
+        saw_after_action = activity
+            .valid_activity
+            .iter()
+            .any(|(_, h)| h == &after_hash)
+            || activity
+                .rejected_activity
+                .iter()
+                .any(|(_, h)| h == &after_hash);
+        bob_view = Some(activity);
+        // Wait for BOTH the rejection and the warrant: the warrant is authored
+        // asynchronously after the op is rejected, so breaking on the rejection
+        // alone would race the assertions below.
+        if (rejected && warranted) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    let bob_activity = bob_view.expect("polled at least once");
+
+    println!("[probe B2] BOB (remote authority, local read)");
+    println!("[probe B2]   status            = {:?}", bob_activity.status);
+    println!(
+        "[probe B2]   valid_activity    = {:?}",
+        bob_activity.valid_activity
+    );
+    println!(
+        "[probe B2]   rejected_activity = {:?}",
+        bob_activity.rejected_activity
+    );
+    println!(
+        "[probe B2]   warrants          = {}",
+        bob_activity.warrants.len()
+    );
+    println!("[probe B2]   post-close action present in bob's activity = {saw_after_action}");
+
+    // bob's network view, for contrast with his own store
+    let bob_net: Result<AgentActivityStatus, _> = cb
+        .call_fallible(&zb1, "agent_activity_of", (alice.clone(), false))
+        .await;
+    match &bob_net {
+        Ok(a) => println!(
+            "[probe B2]   NETWORK view: status={:?} valid={} rejected={} warrants={}",
+            a.status,
+            a.valid_activity.len(),
+            a.rejected_activity.len(),
+            a.warrants.len()
+        ),
+        Err(e) => println!("[probe B2]   NETWORK view errored:\n{e:?}"),
+    }
+
+    // alice's own authority view, for contrast (this is what probe B measured)
+    let alice_activity: AgentActivityStatus = ca.call(&za1, "my_chain_activity", ()).await;
+    println!(
+        "[probe B2] ALICE (self authority): status={:?} valid={} rejected={} warrants={}",
+        alice_activity.status,
+        alice_activity.valid_activity.len(),
+        alice_activity.rejected_activity.len(),
+        alice_activity.warrants.len()
+    );
+
+    // --- bob's `get` of the post-close entry ---------------------------------
+    let bob_get_local: Result<Option<Record>, _> = cb
+        .call_fallible(&zb1, "get_record_at", (after_hash.clone(), true))
+        .await;
+    match &bob_get_local {
+        Ok(Some(r)) => println!(
+            "[probe B2] bob get(post-close) LOCAL  = SOME (entry present: {})",
+            r.entry().as_option().is_some()
+        ),
+        Ok(None) => println!("[probe B2] bob get(post-close) LOCAL  = NONE"),
+        Err(e) => println!("[probe B2] bob get(post-close) LOCAL  = ERROR\n{e:?}"),
+    }
+    let bob_get_net: Result<Option<Record>, _> = cb
+        .call_fallible(&zb1, "get_record_at", (after_hash.clone(), false))
+        .await;
+    match &bob_get_net {
+        Ok(Some(r)) => println!(
+            "[probe B2] bob get(post-close) NETWORK = SOME (entry present: {})",
+            r.entry().as_option().is_some()
+        ),
+        Ok(None) => println!("[probe B2] bob get(post-close) NETWORK = NONE"),
+        Err(e) => println!("[probe B2] bob get(post-close) NETWORK = ERROR\n{e:?}"),
+    }
+
+    // ------------------------------------------------------------------------
+    // MEASURED (holochain 0.7.0, 2026-09-04). These assertions lock in what the
+    // probe saw, so a toolchain that changes any of it is LOUD, not silent.
+    //
+    //   * the author still accepts the post-close create (probe B, unchanged);
+    //   * the REMOTE agent-activity authority REFUSES it: exactly the action
+    //     whose `prev_action` is the CloseChain lands in `rejected_activity`,
+    //     the chain status flips to `Invalid` at that seq, and a warrant is
+    //     issued. Actions AFTER that one are still `valid_activity` — the rule
+    //     in `sys_validation_workflow::register_agent_activity` fires only on
+    //     the immediate successor of the CloseChain, not on the whole tail.
+    //   * and the record is STILL RETRIEVABLE by `get`: the refusal is an
+    //     agent-activity verdict, not a fetch fence.
+    // ------------------------------------------------------------------------
+    assert!(
+        matches!(bob_activity.status, ChainStatus::Invalid(_)),
+        "MEASURED CHANGE: the remote authority no longer marks alice's chain Invalid \
+         after a post-close write — got {:?}",
+        bob_activity.status
+    );
+    assert!(
+        bob_activity
+            .rejected_activity
+            .iter()
+            .any(|(_, h)| h == &after_hash),
+        "MEASURED CHANGE: the remote authority no longer rejects the post-close action \
+         (ActionAfterChainClose) — rejected_activity = {:?}",
+        bob_activity.rejected_activity
+    );
+    assert!(
+        !bob_activity.warrants.is_empty(),
+        "MEASURED CHANGE: the remote authority no longer warrants post-close activity"
+    );
+    assert!(
+        bob_activity
+            .valid_activity
+            .iter()
+            .all(|(_, h)| h != &after_hash),
+        "the post-close action must not be in BOTH valid and rejected activity"
+    );
+    assert!(
+        matches!(bob_get_local, Ok(Some(_))),
+        "MEASURED CHANGE: the post-close record is no longer retrievable from the \
+         rejecting authority's own store — got {bob_get_local:?}"
+    );
+    assert!(
+        alice_activity.rejected_activity.is_empty() && alice_activity.warrants.is_empty(),
+        "MEASURED CHANGE: the AUTHOR's own authority now rejects its post-close activity \
+         (probe B measured that it does not) — rejected={:?} warrants={}",
+        alice_activity.rejected_activity,
+        alice_activity.warrants.len()
     );
 
     Ok(())
