@@ -3372,7 +3372,7 @@ decisionPoints:
     sourceLocation:
       file: src/app_deliverability.rs
       modulePath: app_deliverability::judge_deliverability
-      line: 92
+      line: 124
     summary: >
       Pure derivation of a bundle's deliverability from its extracted entries: Boots iff an
       index.html is present and every same-origin script/stylesheet it names is held by the
@@ -3452,4 +3452,10 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/app_deliverability.rs
         testName: shell_asset_refs_keeps_only_same_origin_relative_scripts_and_stylesheets
+        kind: unit
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: a_doc_relative_ref_held_only_at_bundle_root_is_broken_for_a_nested_index
+        kind: unit
+      - path: elohim/elohim-storage/src/app_deliverability.rs
+        testName: a_root_relative_ref_resolves_at_the_bundle_root_for_a_nested_index
         kind: unit

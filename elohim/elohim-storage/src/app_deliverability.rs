@@ -55,11 +55,28 @@ impl DeliverabilityVerdict {
     }
 }
 
-/// Same-origin, relative `<script src>` and `<link rel="stylesheet" href>`
-/// references in document order. Skips anything with a scheme or a leading
-/// `//` (CDN), and the doorway-injected `/chrome/` island, which is never part
-/// of a bundle. A leading `/` is treated as bundle-root-relative.
-pub fn shell_asset_refs(index_html: &str) -> Vec<String> {
+/// A same-origin asset reference extracted from a shell document, carrying the
+/// resolution intent the markup expressed: `root_relative` (a leading `/`)
+/// means "resolve against the bundle root", not "resolve against the
+/// document's own directory". The two are NOT interchangeable — a fix for the
+/// 2026-09-04 incident's review round: a doc-relative ref that happens to also
+/// exist at the bundle root must NOT be treated as satisfied by that root
+/// copy (false-positive Boots), and a root-relative ref must NOT be resolved
+/// against a nested index's own directory (false-positive Broken).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssetRef {
+    /// The reference with any leading `/` stripped.
+    pub path: String,
+    /// `true` if the original markup had a leading `/` (bundle-root-relative).
+    /// `false` means document-relative (resolve against the index's own dir).
+    pub root_relative: bool,
+}
+
+/// Same-origin `<script src>` and `<link rel="stylesheet" href>` references in
+/// document order, each tagged with its resolution intent (see [`AssetRef`]).
+/// Skips anything with a scheme or a leading `//` (CDN) or a `data:` URI, and
+/// the doorway-injected `/chrome/` island, which is never part of a bundle.
+pub fn shell_asset_refs(index_html: &str) -> Vec<AssetRef> {
     let mut out = Vec::new();
     for tag in html_tags(index_html) {
         let lower = tag.to_ascii_lowercase();
@@ -78,21 +95,37 @@ pub fn shell_asset_refs(index_html: &str) -> Vec<String> {
         if raw.contains("://") || raw.starts_with("//") || raw.starts_with("data:") {
             continue;
         }
+        let root_relative = raw.starts_with('/');
         let trimmed = raw.trim_start_matches('/');
         if trimmed.starts_with("chrome/") || trimmed.is_empty() {
             continue;
         }
-        out.push(trimmed.to_string());
+        out.push(AssetRef {
+            path: trimmed.to_string(),
+            root_relative,
+        });
     }
     out
 }
 
 /// Judge the extracted entries of one bundle. `entries` is the `(name, bytes)`
 /// list the extraction walk already produces; directories are not included.
+///
+/// Resolution is browser-semantics, not a two-way lookup: a `root_relative`
+/// asset ref (leading `/` in the markup) is checked ONLY against the bundle
+/// root; a document-relative ref is checked ONLY against the index's own
+/// directory. A ref held at the "other" location does not satisfy it — that
+/// would let a nested bundle read as bootable when the browser, resolving the
+/// same markup against the same base URL, would 404.
+///
+/// When more than one `index.html` exists (top-level and/or nested), the
+/// shallowest one (fewest `/` in its path) is the shell; ties at equal depth
+/// are broken by `entries` order (the earlier one wins).
 pub fn judge_deliverability(entries: &[(String, Vec<u8>)]) -> DeliverabilityVerdict {
     let Some((index_name, index_bytes)) = entries
         .iter()
-        .find(|(n, _)| n == "index.html" || n.ends_with("/index.html"))
+        .filter(|(n, _)| n == "index.html" || n.ends_with("/index.html"))
+        .min_by_key(|(n, _)| n.matches('/').count())
     else {
         return DeliverabilityVerdict::Broken(BrokenReason::NoIndex);
     };
@@ -103,11 +136,15 @@ pub fn judge_deliverability(entries: &[(String, Vec<u8>)]) -> DeliverabilityVerd
     let held: HashSet<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
     let index_html = String::from_utf8_lossy(index_bytes);
     for asset in shell_asset_refs(&index_html) {
-        let in_index_dir = format!("{index_dir}{asset}");
-        if held.contains(in_index_dir.as_str()) || held.contains(asset.as_str()) {
+        let resolved = if asset.root_relative {
+            asset.path.clone()
+        } else {
+            format!("{index_dir}{}", asset.path)
+        };
+        if held.contains(resolved.as_str()) {
             continue;
         }
-        return DeliverabilityVerdict::Broken(BrokenReason::MissingAsset(asset));
+        return DeliverabilityVerdict::Broken(BrokenReason::MissingAsset(asset.path));
     }
     DeliverabilityVerdict::Boots
 }
@@ -160,6 +197,20 @@ mod tests {
         (name.to_string(), body.as_bytes().to_vec())
     }
 
+    fn doc_relative(path: &str) -> AssetRef {
+        AssetRef {
+            path: path.to_string(),
+            root_relative: false,
+        }
+    }
+
+    fn root_relative(path: &str) -> AssetRef {
+        AssetRef {
+            path: path.to_string(),
+            root_relative: true,
+        }
+    }
+
     const INDEX: &str = r#"<!doctype html><html><head>
       <link rel="stylesheet" href="styles-7XLYMW2X.css">
       <link rel="icon" href="favicon.ico">
@@ -172,16 +223,42 @@ mod tests {
 
     #[test]
     fn shell_asset_refs_keeps_only_same_origin_relative_scripts_and_stylesheets() {
-        let refs = shell_asset_refs(INDEX);
+        // /chrome/ stays skipped even though it's root-relative; a genuine
+        // root-relative asset (/vendor/lib.js, not under /chrome/) is kept
+        // and tagged root_relative: true.
+        let html = INDEX.replacen(
+            "</head>",
+            r#"<script src="/vendor/lib.js"></script></head>"#,
+            1,
+        );
+        let refs = shell_asset_refs(&html);
         assert_eq!(
             refs,
             vec![
-                "styles-7XLYMW2X.css".to_string(),
-                "polyfills-X2TQPNDQ.js".to_string(),
-                "main-7QFGHX5X.js".to_string(),
+                doc_relative("styles-7XLYMW2X.css"),
+                root_relative("vendor/lib.js"),
+                doc_relative("polyfills-X2TQPNDQ.js"),
+                doc_relative("main-7QFGHX5X.js"),
             ],
-            "icons, CDN scripts and the doorway-injected /chrome/ script are not bundle assets"
+            "icons, CDN scripts and the doorway-injected /chrome/ script are not bundle assets; \
+             a genuine root-relative ref is kept and flagged"
         );
+    }
+
+    #[test]
+    fn data_uri_and_protocol_relative_cdn_refs_are_skipped() {
+        let html = r#"<script src="data:text/javascript;base64,ZmFrZQ=="></script>
+            <script src="//cdn.example/lib.js"></script>
+            <script src="ok.js"></script>"#;
+        let refs = shell_asset_refs(html);
+        assert_eq!(refs, vec![doc_relative("ok.js")]);
+    }
+
+    #[test]
+    fn link_href_before_rel_is_still_collected() {
+        let html = r#"<link href="x.css" rel="stylesheet">"#;
+        let refs = shell_asset_refs(html);
+        assert_eq!(refs, vec![doc_relative("x.css")]);
     }
 
     #[test]
@@ -229,6 +306,77 @@ mod tests {
         let entries = vec![
             entry("browser/index.html", r#"<script src="main-A.js"></script>"#),
             entry("browser/main-A.js", "//m"),
+        ];
+        assert!(matches!(
+            judge_deliverability(&entries),
+            DeliverabilityVerdict::Boots
+        ));
+    }
+
+    #[test]
+    fn a_doc_relative_ref_held_only_at_bundle_root_is_broken_for_a_nested_index() {
+        // A document-relative ref must resolve against the index's OWN
+        // directory only; a same-named file sitting at the bundle root does
+        // not satisfy it (that would be reading a browser's base-URL
+        // resolution wrong).
+        let entries = vec![
+            entry("browser/index.html", r#"<script src="main-A.js"></script>"#),
+            entry("main-A.js", "//m"), // held only at the root, not at browser/
+        ];
+        match judge_deliverability(&entries) {
+            DeliverabilityVerdict::Broken(BrokenReason::MissingAsset(name)) => {
+                assert_eq!(name, "main-A.js");
+            }
+            other => panic!("expected Broken(MissingAsset), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_root_relative_ref_resolves_at_the_bundle_root_for_a_nested_index() {
+        // A root-relative ref (leading `/`) must resolve against the bundle
+        // root even when the index itself is nested.
+        let entries = vec![
+            entry(
+                "browser/index.html",
+                r#"<script src="/main-A.js"></script>"#,
+            ),
+            entry("main-A.js", "//m"),
+        ];
+        assert!(matches!(
+            judge_deliverability(&entries),
+            DeliverabilityVerdict::Boots
+        ));
+    }
+
+    #[test]
+    fn when_multiple_index_html_exist_the_shallowest_wins() {
+        // browser/index.html (depth 1) appears first in entries order, but
+        // the shallower top-level index.html (depth 0) must be the shell.
+        // Proven by making the deep one's asset absent: if the deep index
+        // were (wrongly) chosen, this would report Broken instead of Boots.
+        let entries = vec![
+            entry(
+                "browser/index.html",
+                r#"<script src="missing-if-picked.js"></script>"#,
+            ),
+            entry("index.html", r#"<script src="shallow.js"></script>"#),
+            entry("shallow.js", "//s"),
+        ];
+        assert!(matches!(
+            judge_deliverability(&entries),
+            DeliverabilityVerdict::Boots
+        ));
+    }
+
+    #[test]
+    fn ties_at_equal_depth_are_broken_by_entries_order() {
+        // a/index.html and b/index.html are both depth 1; a/ comes first in
+        // entries order and must win. Proven by making b/'s asset absent: if
+        // b/index.html were (wrongly) chosen, this would report Broken.
+        let entries = vec![
+            entry("a/index.html", r#"<script src="a.js"></script>"#),
+            entry("a/a.js", "//a"),
+            entry("b/index.html", r#"<script src="missing.js"></script>"#),
         ];
         assert!(matches!(
             judge_deliverability(&entries),
