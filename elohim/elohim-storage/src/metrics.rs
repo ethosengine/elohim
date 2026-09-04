@@ -5855,4 +5855,34 @@ mod tests {
         });
         assert!(m.is_some(), "verdict label present");
     }
+
+    /// The `Invalid ZIP archive` arm of `handle_app_request` (http.rs) counts
+    /// `Broken(InvalidZip)` via the shared `count_deliverability` helper —
+    /// `invalid-zip` is one of the counter's four named reason classes and
+    /// must be reachable through the same family, not just memoised.
+    #[test]
+    fn invalid_zip_deliverability_reason_class_is_a_reachable_label_pair() {
+        register_all();
+        APP_DELIVERABILITY_VERDICTS
+            .with_label_values(&["broken", "invalid-zip"])
+            .inc();
+        let families = REGISTRY.gather();
+        let f = families
+            .iter()
+            .find(|f| f.get_name() == "elohim_app_deliverability_verdict_total")
+            .expect("counter registered");
+        let m = f.get_metric().iter().find(|m| {
+            let labels = m.get_label();
+            labels
+                .iter()
+                .any(|l| l.get_name() == "verdict" && l.get_value() == "broken")
+                && labels
+                    .iter()
+                    .any(|l| l.get_name() == "reason" && l.get_value() == "invalid-zip")
+        });
+        assert!(
+            m.is_some(),
+            "(\"broken\", \"invalid-zip\") label pair present"
+        );
+    }
 }

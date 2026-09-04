@@ -590,6 +590,22 @@ fn with_deliverability_headers(
     builder
 }
 
+/// Count one judgement against `elohim_app_deliverability_verdict_total`
+/// (spec 2026-09-05 §5.3). The `reason` label is the reason CLASS — the
+/// segment before the first `:` in `reason_value()` (e.g. `missing-asset`,
+/// not `missing-asset:main-X.js`, which is unbounded) — defaulting to
+/// `"none"` when the verdict carries no reason. Shared by every call site so
+/// the class-derivation logic lives in exactly one place.
+fn count_deliverability(verdict: &crate::app_deliverability::DeliverabilityVerdict) {
+    let reason_class = verdict
+        .reason_value()
+        .map(|r| r.split(':').next().unwrap_or("none").to_string())
+        .unwrap_or_else(|| "none".to_string());
+    crate::metrics::APP_DELIVERABILITY_VERDICTS
+        .with_label_values(&[verdict.header_value(), &reason_class])
+        .inc();
+}
+
 /// Memo hit, or the honest `NotJudged(NotHeld)` absence — never a silent
 /// default to `Boots`.
 async fn deliverability_lookup(
@@ -9407,12 +9423,21 @@ impl HttpServer {
             Ok(a) => a,
             Err(e) => {
                 warn!(error = %e, "Invalid ZIP archive");
-                self.deliverability_memo.write().await.insert(
-                    blob_hash.clone(),
-                    crate::app_deliverability::DeliverabilityVerdict::Broken(
-                        crate::app_deliverability::BrokenReason::InvalidZip,
-                    ),
+                let verdict = crate::app_deliverability::DeliverabilityVerdict::Broken(
+                    crate::app_deliverability::BrokenReason::InvalidZip,
                 );
+                tracing::info!(
+                    target: "storage::deliverability",
+                    blob_hash = %blob_hash,
+                    verdict = "broken",
+                    reason = "invalid-zip",
+                    "app head judged"
+                );
+                count_deliverability(&verdict);
+                self.deliverability_memo
+                    .write()
+                    .await
+                    .insert(blob_hash.clone(), verdict);
                 return Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -9469,13 +9494,7 @@ impl HttpServer {
             reason = ?verdict.reason_value(),
             "app head judged"
         );
-        let reason_class = verdict
-            .reason_value()
-            .map(|r| r.split(':').next().unwrap_or("none").to_string())
-            .unwrap_or_else(|| "none".to_string());
-        crate::metrics::APP_DELIVERABILITY_VERDICTS
-            .with_label_values(&[verdict.header_value(), &reason_class])
-            .inc();
+        count_deliverability(&verdict);
         self.deliverability_memo
             .write()
             .await
