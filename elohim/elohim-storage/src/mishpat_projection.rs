@@ -197,14 +197,30 @@ pub fn parse_commitment_payload(
         // unreachable.
         //
         // A LINEAGE commitment's notarization IS its activation, and that is a
-        // property of this action class rather than a shortcut: the quorum was
-        // verified in-wasm at commit time by `validate_lineage_signatures`
-        // before the entry existed at all, so there is nothing left to accept.
-        // Its only other lifecycle state is REVOKED, which arrives as a
-        // `revokes-commitment` setting `revoked_at` — the field `verify_path`
-        // checks BEFORE it looks at `state`. `delegates-compute` and friends
-        // keep `"proposed"` because they have a real acceptance step this class
-        // does not have.
+        // property of this action class rather than a shortcut: it was created
+        // through the arm the coordinator validates as a lineage commitment,
+        // and there is no separate acceptance step to wait for. Its only other
+        // lifecycle state is REVOKED, which arrives as a `revokes-commitment`
+        // setting `revoked_at` — the field `verify_path` checks BEFORE it looks
+        // at `state`. `delegates-compute` and friends keep `"proposed"` because
+        // they have a real acceptance step this class does not have.
+        //
+        // On the quorum, precisely: `validate_lineage_signatures` runs
+        // AUTHOR-SIDE ONLY, in the authoring conductor's wasm at create time.
+        // Receiving peers do NOT re-verify — mishpat integrity's
+        // `commitment_action_requirements` has no lineage arm, so nothing
+        // re-runs those signature checks on gossip. "Active" here states the
+        // LIFECYCLE, never the quorum's soundness on this peer; the quorum's
+        // own enforcement gap is Station 10's, filed with the roster gap it
+        // shares.
+        //
+        // `action` is the ENTRY's discriminator (`signals.rs` passes
+        // `commitment.action`), never `payload_json`'s second copy of it —
+        // `validate_ratifies_limit_gradient` never pins the two together, so a
+        // body claiming `"action": "migrates-lineage"` under a different entry
+        // action reaches the coordinator unsigned. Keying off the body would
+        // project that forgery ACTIVE. See `release_adoption::path_evidence`'s
+        // `notarized_lineage_state` for the same rule on the read side.
         "migrates-lineage" | "sunsets-lineage" => {
             parse_lineage_commitment(action, &payload, entry_hash, action_hash)
                 .map(CommitmentProjection::Upsert)
@@ -2323,6 +2339,42 @@ mod lineage_projection_tests {
         assert_eq!(row.state, "active");
         assert_eq!(row.valid_from, "2026-09-09T00:00:00Z");
         assert_eq!(row.valid_until, "");
+    }
+
+    /// **The forgery this keying closes.** `parse_commitment_payload` dispatches
+    /// on the ENTRY's action (`signals.rs` passes `commitment.action`), not on
+    /// `payload_json`'s second copy of it. `validate_ratifies_limit_gradient`
+    /// never pins the two together, so a commitment created as
+    /// `ratifies-limit-gradient` whose body declares `"action":
+    /// "migrates-lineage"` is accepted by the coordinator with no signatures at
+    /// all — and projecting THAT as `active` would hand it a migration path.
+    #[test]
+    fn a_forged_body_action_never_projects_active() {
+        let forged = serde_json::json!({
+            "action": "migrates-lineage",
+            "role": "node_registry",
+            "signatures": [],
+            "window": { "opens_at": "2026-09-04T00:00:00Z", "revert_until": "2026-09-05T00:00:00Z" }
+        });
+        let projected = parse_commitment_payload(
+            // What the ENTRY actually is.
+            "ratifies-limit-gradient",
+            &forged.to_string(),
+            "uhCEkFORGED",
+            "uhCkkFORGED",
+        )
+        .expect("projects (via the unknown-action fallback)");
+        let CommitmentProjection::Upsert(row) = projected else {
+            panic!("expected a commitment row");
+        };
+        assert_eq!(
+            row.action, "ratifies-limit-gradient",
+            "the row must record what the ENTRY is, not what its body claims"
+        );
+        assert_eq!(
+            row.state, "proposed",
+            "a body claiming migrates-lineage under another entry action must never project active"
+        );
     }
 
     /// The classes with a real acceptance step are UNTOUCHED — this arm is

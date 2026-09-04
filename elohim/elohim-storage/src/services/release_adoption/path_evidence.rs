@@ -157,20 +157,42 @@ pub async fn fetch_path_evidence(
         // someone else's governance, which is precisely the substitution this
         // module exists to refuse.
         //
-        // For a LINEAGE commitment the entry IS the lifecycle statement: its
-        // quorum was verified in-wasm by `validate_lineage_signatures` before
-        // the entry could exist, and its only other state is REVOKED, which
+        // For a LINEAGE commitment the entry IS the lifecycle statement: it was
+        // created through the arm the mishpat coordinator validates as a
+        // lineage commitment, and its only other state is REVOKED, which
         // arrives as a separate `revokes-commitment` entry. So an absent row on
-        // a lineage action reads ACTIVE from the notarized body, and the row —
+        // a lineage action reads ACTIVE from the notarized entry, and the row —
         // when this peer has one — still governs, including its `revoked_at`.
         //
         // Any OTHER action keeps the old fail-closed default: those classes
         // have a real acceptance step, and absence there genuinely means "not
         // accepted here yet".
-        None => match notarized_lineage_state(&payload) {
+        //
+        // WHICH action, though, is read off the ENTRY (`out.action`) and never
+        // off the body — see [`notarized_lineage_state`] for the forgery that
+        // distinction closes.
+        // OPEN TRUST BOUNDARY, named rather than closed this round: the
+        // `None` in `(state, None)` below is `revoked_at`, and `verify_path`
+        // checks `revoked_at` FIRST — before `state`, before the quorum count.
+        // A revocation projects the same way a commitment does, off the
+        // AUTHOR's post-commit signal, so a `revokes-commitment` reaches only
+        // the peer whose elohim wrote it. On every other peer this arm reads
+        // "no row" and therefore "not revoked", and an elohim's revocation of a
+        // migration path is invisible to the peers it is meant to stop. That is
+        // the SAME hole as Station 10's missing roster check, pointed at the
+        // revert instead of the quorum, and it is why Station 7 (revert before
+        // the sunset) is not yet measurable on the mesh.
+        //
+        // The seam that closes it: read the revocation where every peer can see
+        // it — `mishpat::get_commitment_state_links` through THIS peer's own
+        // conductor, the same C5 rail the commitment body already comes down —
+        // rather than off a projection only the author holds. Filed as Task 13
+        // / Station 7 in the epic's §11.4.
+        None => match notarized_lineage_state(&out.action) {
             Some(state) => {
                 tracing::debug!(
                     commitment_cid = %cid,
+                    entry_action = %out.action,
                     "release-adoption: lineage path has no local projection row — reading the \
                      notarized entry itself as active (the row is an index, not the authority)"
                 );
@@ -258,16 +280,42 @@ fn to_lower_camel(snake: &str) -> String {
     out
 }
 
-/// The lifecycle a LINEAGE commitment body carries on its own, or `None` for
-/// every other action.
+/// The lifecycle a LINEAGE commitment carries on its own, or `None` for every
+/// other action.
 ///
 /// `migrates-lineage` / `sunsets-lineage` are the two actions whose
 /// notarization IS their activation — see the call site for the measurement
 /// that made this necessary, and `mishpat_projection`'s own dispatch arm for
 /// the same rule applied to the row this peer writes when it IS the author.
-fn notarized_lineage_state(payload: &serde_json::Value) -> Option<&'static str> {
-    match payload.get("action").and_then(|v| v.as_str()) {
-        Some("migrates-lineage" | "sunsets-lineage") => Some("active"),
+///
+/// # The argument is the ENTRY's action, never the body's
+///
+/// `entry_action` is `GetCommitmentOutput.action` — the `Commitment` entry's
+/// own discriminator, which is what `mishpat::validate_commitment_payload`
+/// dispatched on when it decided whether this payload had to satisfy
+/// `validate_lineage_signatures` at all. The `payload_json` carries a SECOND
+/// copy of that string, and it is only pinned to the entry's for the arms that
+/// happen to check it: `validate_ratifies_limit_gradient`, for one, never
+/// compares them. So a commitment created as `ratifies-limit-gradient` whose
+/// body declares `"action": "migrates-lineage"` passes the coordinator with no
+/// signatures at all — and reading the BODY here would have handed that forgery
+/// an ACTIVE path on every peer that had not projected a row, which is every
+/// peer but the author. Read the entry. `signals.rs` keys the projection the
+/// same way (`commitment.action`), for the same reason.
+///
+/// # What this does and does not assume about the quorum
+///
+/// AUTHOR-SIDE ONLY. `validate_lineage_signatures` runs in the AUTHORING
+/// conductor's wasm when the entry is created, so a lineage commitment that
+/// EXISTS was quorum-checked by whoever wrote it. Receiving peers do NOT
+/// re-verify: mishpat integrity's `commitment_action_requirements` has no
+/// lineage arm, so nothing re-runs those signature checks on gossip. This
+/// function therefore states the LIFECYCLE ("a lineage commitment is active
+/// unless revoked"), never the quorum's soundness — the quorum's own
+/// enforcement gap is Station 10's, filed with the roster gap it shares.
+fn notarized_lineage_state(entry_action: &str) -> Option<&'static str> {
+    match entry_action {
+        "migrates-lineage" | "sunsets-lineage" => Some("active"),
         _ => None,
     }
 }
@@ -339,23 +387,59 @@ mod tests {
     /// the path on jessica and james with "is proposed, not active" while
     /// matthew — who happened to author it — passed.
     #[test]
-    fn a_lineage_body_carries_its_own_active_state() {
+    fn a_lineage_entry_carries_its_own_active_state() {
         assert_eq!(
-            notarized_lineage_state(&body()),
+            notarized_lineage_state("migrates-lineage"),
             Some("active"),
-            "a notarized migrates-lineage entry IS the activation — its quorum was verified \
-             in-wasm before the entry could exist"
+            "a notarized migrates-lineage entry IS the activation: it went through the arm the \
+             coordinator validates as a lineage commitment, and its only other state is revoked"
         );
-        assert_eq!(
-            notarized_lineage_state(&serde_json::json!({ "action": "sunsets-lineage" })),
-            Some("active")
-        );
+        assert_eq!(notarized_lineage_state("sunsets-lineage"), Some("active"));
         // Every class with a real acceptance step keeps the fail-closed default.
+        assert_eq!(notarized_lineage_state("delegates-compute"), None);
+        assert_eq!(notarized_lineage_state(""), None);
+    }
+
+    /// **The forgery this keying closes.** `mishpat::validate_commitment_payload`
+    /// dispatches on the ENTRY's `action`, and only some arms pin the body's
+    /// second copy of that string to it — `validate_ratifies_limit_gradient`
+    /// does not. So a commitment created as `ratifies-limit-gradient`, whose
+    /// `payload_json` declares `"action": "migrates-lineage"`, is accepted by
+    /// the coordinator carrying NO signatures whatsoever. Keying off the body
+    /// would have handed exactly that forgery an ACTIVE migration path on every
+    /// peer without a projection row — which, until a revocation projects, is
+    /// every peer but the author.
+    #[test]
+    fn a_forged_body_action_never_makes_a_path() {
+        let forged_body = serde_json::json!({
+            "action": "migrates-lineage",
+            "role": "node_registry",
+            "from_dna_hash": "uhC0kINSTALLED",
+            "to_dna_hash": "uhC0kV2NODEREG",
+            "signatures": [],
+        });
         assert_eq!(
-            notarized_lineage_state(&serde_json::json!({ "action": "delegates-compute" })),
-            None
+            forged_body.get("action").and_then(|v| v.as_str()),
+            Some("migrates-lineage"),
+            "the fixture must really carry the forged claim, or this test pins nothing"
         );
-        assert_eq!(notarized_lineage_state(&serde_json::json!({})), None);
+        // The ENTRY says what it actually is, and that is what decides.
+        assert_eq!(
+            notarized_lineage_state("ratifies-limit-gradient"),
+            None,
+            "a body that CLAIMS migrates-lineage under a different entry action must never read \
+             as a lineage path — no row plus this None is UNPROJECTED_STATE, i.e. \
+             path_not_notarized, never active"
+        );
+        // And the refusal it produces is the fail-closed one, not a path.
+        let ev = evidence_from(
+            "uhCEkForgedPath",
+            &forged_body,
+            UNPROJECTED_STATE.to_string(),
+            None,
+        );
+        assert_eq!(ev.state, "proposed");
+        assert_ne!(ev.state, "active");
     }
 
     /// A migrates-lineage commitment body in the shape the NOTARIZING side
