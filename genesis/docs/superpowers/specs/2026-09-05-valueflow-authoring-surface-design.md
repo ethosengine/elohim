@@ -41,6 +41,18 @@ the protocol's process, not a description of it. The lowest-level home for the l
 governance layer that says where authoring happens, then native skill packages projected to
 every runtime.
 
+**Why the friction sits where it sits (operator, 2026-09-05).** Friction is purposeful exactly
+where a standard is held against individual bias: the seal, the review seat, the evidence-only
+status flip, the notarized path, and the floor and ceiling bounds a scope declares on a stock.
+Those are the places where one actor's perception could otherwise hijack the whole, so the
+protocol makes them cost attention, witness and evidence on purpose. Everything else must be
+frictionless, and not as a convenience: the marginal cost of applied knowledge trends toward
+zero, and the substrate's performance edge is what lets the sensing (the learning pillar's
+mastery paths, the psychometric instruments that read the perceived and ideal curves, the
+register that reads reality) run continuously enough for policy to follow the readings. Slow
+sensing is stale policy. So the verbs stay expensive and the surround (tool discovery, prompt
+assembly, ledger duplication, context re-derivation) is driven toward zero.
+
 Five frictions were measured while running the Holochain Evolution Epic between 2026-09-03 and
 2026-09-05. Each one is a hole this slice fills.
 
