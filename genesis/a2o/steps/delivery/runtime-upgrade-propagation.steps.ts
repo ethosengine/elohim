@@ -749,6 +749,57 @@ function readPid(peer: PeerName): string {
   }
 }
 
+/**
+ * The cid a NON-FIRST release on a channel must name as its lineage parent.
+ *
+ * Measured on the 0.7 mesh (run 20260904053436): the 0.7 bundle's
+ * `content_store` ORDERS a channel's release chain (the 2026-09-02 newest-link
+ * fix), so a later release whose `envelope.lineageParentCid` is null no longer
+ * agrees with what the chain says it supersedes — every peer refused Station
+ * 6's revert and Station 7's personal rebase with
+ * `lineage_parent_mismatch: envelope declares None but the channel's release
+ * chain supersedes Some(<prior head>)`. The FIRST release on a channel is
+ * unaffected (there is nothing to supersede yet), which is why Stations 1-5
+ * and the teardown ceremonies — each the first release on a freshly created
+ * channel — passed in that same run.
+ *
+ * Read live from a peer that FOLLOWS the channel (`resolvedHead.cid` on its
+ * own `/admin/adoption`), falling back to the cid this fixture already holds
+ * from its own publish/promote. A disagreement between the two is logged, not
+ * silently resolved: the live read wins, because the chain the zome checks
+ * against is the one the peer resolved.
+ */
+async function currentHeadCidFor(
+  world: E2EWorld,
+  peer: PeerName,
+  channelId: string,
+  fallbackCid: string | undefined,
+  label: string
+): Promise<string> {
+  let observed: string | undefined;
+  try {
+    const report = await getAdoptionReport(world, peer);
+    observed = findChannelRow(report, channelId)?.resolvedHead?.cid;
+  } catch {
+    // Transient unreachability — fall back to the cid we already hold rather
+    // than package a null parent, which is the very refusal this closes.
+  }
+  const cid = observed ?? fallbackCid;
+  assert.ok(
+    cid,
+    `${label}: no current head cid for channel ${channelId} — neither ${peer}'s own adoption row ` +
+      "nor this run's own record has one, so the release cannot name what it supersedes"
+  );
+  if (observed && fallbackCid && observed !== fallbackCid) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ⚠️  ${label}: ${peer} resolves head ${observed} for ${channelId} while this run last ` +
+        `recorded ${fallbackCid} — packaging against the peer's live head`
+    );
+  }
+  return cid;
+}
+
 async function putBlobRaw(baseUrl: string, sha256: string, bytes: Buffer): Promise<number> {
   const { statusCode } = await request(`${baseUrl}/blob/sha256-${sha256}`, {
     method: 'PUT',
@@ -1268,6 +1319,12 @@ async function runOneTeardown(
       '0',
       FLAG_ATTESTATION_THRESHOLD,
       '0',
+      // No --lineage-parent, deliberately: `teardownChannelId` was created two
+      // statements ago, so this is the channel's FIRST release and there is
+      // nothing for the chain to say it supersedes. Only a NON-first release
+      // needs one — see `currentHeadCidFor`. (Measured: the 20260904053436 run's
+      // teardown converged with a null parent while its Station 6 revert, the
+      // second release on ITS channel, was refused.)
       '--peer',
       repPeerUrl,
       '--notes',
@@ -1462,6 +1519,10 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
       CHANNEL_ID,
       FLAG_APPLIES_TO_FROM,
       matthewUrl,
+      // No --lineage-parent: this is the FIRST release on CHANNEL_ID (minted
+      // per run), so the chain has nothing for it to supersede. Station 6's
+      // revert and Station 9's second fix are the non-first releases that do
+      // need one — see `currentHeadCidFor`.
       FLAG_SOAK_SECS,
       String(SOAK_SECS),
       FLAG_ATTESTATION_THRESHOLD,
@@ -1799,6 +1860,19 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
         `${matthewWasmConvergeMs}ms of polling)`
     );
 
+    // What the revert SUPERSEDES on this channel — the promoted first fix,
+    // still the earned head at this moment. Without it the manifest declares
+    // lineageParentCid null and every peer refuses `lineage_parent_mismatch`
+    // (see `currentHeadCidFor`); this is the channel's SECOND release, not its
+    // first, so the chain has something to agree with.
+    const revertParentCid = await currentHeadCidFor(
+      world,
+      'matthew',
+      CHANNEL_ID,
+      c.releaseCid,
+      '[station6] revert target'
+    );
+
     const packaged = runDriver(
       'scripts/epr-release-package.ts',
       [
@@ -1810,6 +1884,8 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
         CHANNEL_ID,
         '--applies-to-from',
         matthewUrl,
+        FLAG_LINEAGE_PARENT,
+        revertParentCid,
         '--soak-secs',
         String(SOAK_SECS),
         // A revert needs nothing but the ceremony saying so (this station's
@@ -2009,6 +2085,9 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
       PERSONAL_CHANNEL_ID,
       '--applies-to-from',
       matthewUrl,
+      // No --lineage-parent: the FIRST release on the personal channel. Its
+      // rebases in `republishPersonalVariant` are the non-first ones that
+      // need one.
       '--wire-epoch',
       '0',
       '--additive-only',
@@ -2097,6 +2176,17 @@ async function republishPersonalVariant(
     REPORT_DIR,
     `a2o-runtime-upgrade-${RUN_STAMP}-personal-${station}.json`
   );
+  // A rebase is the personal channel's SECOND (then third) release, so it must
+  // name what it supersedes — james is the only peer that follows this channel,
+  // so his own resolved head is the chain the zome checks against. Without it
+  // his controller refuses `lineage_parent_mismatch` (see `currentHeadCidFor`).
+  const personalParentCid = await currentHeadCidFor(
+    world,
+    'james',
+    PERSONAL_CHANNEL_ID,
+    c.personalReleaseCid,
+    `[station7] personal rebase after ${station}`
+  );
   const packaged = runDriver(
     'scripts/epr-release-package.ts',
     [
@@ -2108,6 +2198,8 @@ async function republishPersonalVariant(
       PERSONAL_CHANNEL_ID,
       '--applies-to-from',
       jamesUrl,
+      FLAG_LINEAGE_PARENT,
+      personalParentCid,
       '--wire-epoch',
       '0',
       '--additive-only',
