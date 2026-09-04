@@ -71,18 +71,63 @@
 //! active. That is Station 7's revocation, and no amount of care on the reading
 //! side could close it while the fact lived in a private index.
 //!
-//! It is closed on the WRITING side (`mishpat::commitments::author_lifecycle_link`,
-//! coordinator-only): a lineage commitment records `active` on its own anchor
-//! when the validator accepts its quorum, and a quorum-checked revocation
-//! records `revoked` on the anchor it revokes. Both are `CommitmentByState`
-//! links on the DHT, so every peer reads the same lifecycle through its own
-//! conductor — evidence, never a peer's word.
+//! The COORDINATOR side of it is closed
+//! (`mishpat::commitments::author_lifecycle_link`, coordinator-only): a lineage
+//! commitment records `active` on its own anchor when the validator accepts its
+//! quorum, and a quorum-checked revocation records `revoked` on the anchor it
+//! revokes. Both are `CommitmentByState` links on the DHT, so every peer reads
+//! the same lifecycle through its own conductor rather than out of an index
+//! only one peer holds. That is a move from a PRIVATE fact to a PUBLIC one —
+//! it is not yet a move from a claim to a verified fact, and the next section
+//! says exactly why.
 //!
-//! The entry-action inference this replaces is deliberately GONE. Reading
+//! The entry-action inference this replaces is gone from the READ path. Reading
 //! "active" off the fact that an entry exists made activation an inference any
 //! author could produce; reading it off the link makes it an ACT the coordinator
 //! only performs after the quorum check, and — unlike an inference — an act that
-//! a revocation can undo.
+//! a revocation can undo. (The CACHE writer still infers from the entry action —
+//! `mishpat_projection`'s own dispatch arm — and [`resolve_lifecycle`] honours
+//! that row only when the links are silent.)
+//!
+//! # OPEN TRUST BOUNDARY, named rather than closed: gap G7
+//!
+//! **A `CommitmentByState` link is validated for tag SHAPE and nothing else.**
+//! `mishpat_integrity::validate_create_link` checks only that the tag parses as
+//! `"<state>|<signed_at>"` with both segments non-empty — it does not, and as an
+//! HDI validator with no `get_links` it largely cannot cheaply, check WHO
+//! authored the link or what the link's base actually is. And
+//! `create_commitment_state_link` is a PUBLIC extern on the mishpat coordinator.
+//!
+//! So any agent on the DHT can author `revoked|<t>` on any lineage commitment's
+//! anchor. This module reads it, [`lifecycle_from_links`] lets it win outright,
+//! [`resolve_lifecycle`] unions it, and `verify_path` refuses `path_revoked` —
+//! on every peer, permanently, because revocation is terminal and nothing
+//! reopens it. **A single unauthorized link is a permanent, mesh-wide denial of
+//! a migration path.** The same extern can author `active|<t>` on any anchor,
+//! which the ladder reads as an activation the quorum never granted.
+//!
+//! This module therefore reads the links as EVIDENCE IT CANNOT YET VERIFY: they
+//! are the whole mesh's word rather than one peer's private index, which is
+//! strictly better than what came before, but the authorship of the statement is
+//! unchecked. Do not read the paragraph above as "evidence, never a peer's
+//! word" — until G7 closes, an unauthorized peer's word is exactly what a link
+//! can be.
+//!
+//! **The fix is integrity-side and hash-moving**, which is why it is filed
+//! rather than done here: `validate_create_link` must bind the link's AUTHOR to
+//! the anchor —
+//!
+//! - `active` — only the agent who authored the Commitment at the link's base
+//!   may declare it active (the coordinator already authors the link in the same
+//!   call that created the entry, so the honest path already satisfies this);
+//! - `revoked` — only the author of a quorum-checked `revokes-commitment` whose
+//!   `target_cid` IS the link's base may declare it revoked.
+//!
+//! Both move the mishpat DNA hash, so G7 rides the sunset-hardening crossing
+//! alongside G1 and G4 rather than landing on its own. Until it does, a path's
+//! refusal is trustworthy (fail-closed is safe to over-trigger) and a path's
+//! ACCEPTANCE still rests on the quorum and roster checks in `verify_path`,
+//! which no link can forge.
 
 use std::sync::Arc;
 
@@ -213,6 +258,27 @@ pub async fn fetch_path_evidence(
     // ── The lifecycle, off the DHT (Task 19) ────────────────────────────────
     // The transitions this peer's own conductor can see on the commitment's
     // anchor. An unreadable read is `Unreachable` — never a state we made up.
+    //
+    // OPEN TRUST BOUNDARY, named rather than closed this round — GAP G7, and
+    // the reason the module docs stop short of calling these links verified.
+    // `mishpat_integrity::validate_create_link` validates a `CommitmentByState`
+    // link's TAG SHAPE only (`"<state>|<signed_at>"`, both segments non-empty);
+    // it binds neither the link's author nor its base. And
+    // `create_commitment_state_link` is a PUBLIC coordinator extern. So any
+    // agent on the DHT can author `revoked|<t>` on any lineage anchor — and
+    // because [`lifecycle_from_links`] lets a revocation win outright,
+    // [`resolve_lifecycle`] unions it, and `verify_path` checks `revoked_at`
+    // first, ONE unauthorized link is a permanent, mesh-wide, unreopenable
+    // denial of that migration path. The same extern can author `active|<t>` on
+    // any anchor, which reads as an activation the quorum never granted.
+    //
+    // What is read below is therefore EVIDENCE THIS PEER CANNOT YET VERIFY:
+    // public rather than private (the whole point of Task 19), but unauthored.
+    // The seam that closes it is integrity-side and HASH-MOVING — bind the link
+    // author to the anchor: `active` only from the agent who authored the
+    // Commitment at the base, `revoked` only from the author of a quorum-checked
+    // `revokes-commitment` whose `target_cid` is that base. Filed as gap G7,
+    // riding the sunset-hardening crossing with G1 and G4.
     let links = match read_state_links(hc, cid).await {
         Ok(links) => links,
         Err(()) => return Answer::Unreachable,
@@ -678,8 +744,15 @@ mod tests {
 
     /// **The Task 19 deliverable, at the reading end.** A revocation authored
     /// by ANOTHER peer reaches this one as a `revoked` link on the path's
-    /// anchor — no row, no signal, no peer's word — and `verify_path` refuses
+    /// anchor — no row and no signal needed — and `verify_path` refuses
     /// `path_revoked` because it checks `revoked_at` before anything else.
+    ///
+    /// It is a PUBLIC statement, not yet a verified one: nothing binds a link's
+    /// author to its anchor (gap G7, at the read site), so this arm is also the
+    /// arm an unauthorized `revoked|<t>` would ride to a permanent denial. The
+    /// asymmetry is deliberate for now — over-refusing a path is safe, and a
+    /// path's ACCEPTANCE still rests on the quorum and roster checks no link can
+    /// forge.
     #[test]
     fn a_revocation_authored_elsewhere_is_read_as_revoked_here() {
         let links = [

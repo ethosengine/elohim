@@ -219,8 +219,18 @@ pub fn parse_commitment_payload(
         // `validate_ratifies_limit_gradient` never pins the two together, so a
         // body claiming `"action": "migrates-lineage"` under a different entry
         // action reaches the coordinator unsigned. Keying off the body would
-        // project that forgery ACTIVE. See `release_adoption::path_evidence`'s
-        // `notarized_lineage_state` for the same rule on the read side.
+        // project that forgery ACTIVE.
+        //
+        // **Epic Task 19 — where this inference now sits.** The READ path no
+        // longer infers a lifecycle from the entry's action at all: it reads
+        // the `CommitmentByState` links off the commitment's own anchor
+        // (`release_adoption::path_evidence`). This arm is the CACHE writer,
+        // and it still infers from the entry action — deliberately, since a row
+        // is only ever written on the peer that authored the commitment, where
+        // that inference is exactly as sound as it ever was. `resolve_lifecycle`
+        // honours the row it produces ONLY when the DHT links are silent (plus
+        // its `revoked_at`, which is unioned because a revocation is terminal
+        // and honouring it can only ever add a refusal).
         "migrates-lineage" | "sunsets-lineage" => {
             parse_lineage_commitment(action, &payload, entry_hash, action_hash)
                 .map(CommitmentProjection::Upsert)
