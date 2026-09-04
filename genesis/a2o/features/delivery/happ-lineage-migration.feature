@@ -144,8 +144,12 @@ Feature: The network changes the rules its peers hold each other to without losi
   window it is merely not yet across.
 
   CLOSING a chain is the last action an agent commits on a cell, naming the
-  rule version its story continues on; nothing can be written after it, but
-  everything before it stays readable forever. OPENING is the matching
+  rule version its story continues on; everything before it stays readable
+  forever. The substrate itself does not stop a careless or hostile node
+  writing after its own close — measured — so the household enforces the
+  close where it already checks everything: v2 carries each close as a
+  proof and refuses any carried fact that came after it, and each runtime
+  disables its own closed cell. OPENING is the matching
   action on the continuing cell, naming the close it continues from. Both
   cells exist and have been written to long before either happens: the
   close and open are the seal on a crossing already made, not the making of
@@ -240,7 +244,9 @@ Feature: The network changes the rules its peers hold each other to without losi
     And each peer's runtime next reconciles
     Then each peer commits the close on its v1 cell naming v2, then the open on its already-running v2 cell naming that close, in that order
     And each closed v1 chain is still readable by every peer
-    And an attempt to write to a closed v1 chain is refused by the conductor itself
+    And each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended
+    And a fact authored on a v1 chain after its close is refused by v2's validation on every peer, naming "after close" as its reason
+    And each peer's runtime has disabled its v1 cell, so nothing of its own is written there again
     And each peer's passport shows the node-registry role with v2 authoring and v1 closed
     When a revocation of the migration commitment is notarized after the sunset
     Then nothing changes: the closed chains stay closed, v2 stays authoring, and every peer reports the sunset as final

@@ -33,3 +33,12 @@ preserved, notarization not, which is the gap the NotarizationWitness closes. Re
 node_registry (6 entry types, 1 storage call site, own bundle, not health-supervised). First
 runnable red: Station 1 (verify's DnaLineageMismatch gains its positive branch). Not active: the
 WIP fence is full (dataplane-convergence, runtime-death-witnessed); promotion is the operator's call.
+
+DELTA 2026-09-04 (Probes A+B, sweettest on the 0.7 line, `sweettest/src/tests/happ_lineage_migration.rs`, EXIT=0, 2 passed;
+re-run independently by the chief, 164 s): the KERNEL is green — v1 record re-created on v2 keeps its entry hash; the
+NotarizationWitness carrying the v1 action + signature is accepted by v2's own validation; a flipped signature and a
+foreign lineage hash are refused with typed messages; two cells under one agent key; late open_chain accepted.
+FINDING: close_chain is not a fence (author and single-conductor authority both accept post-close writes) — Station 8
+rewritten (the fence is ours: v1 cell disabled, v2 refuses carried facts after the close); Probe B2 (two conductors)
+opened. Status stays RED: the habit measures the STORY on the household mesh (0 of 10 stations), not the kernel.
+Landing rule: the witness type rides cargo feature `lineage-witness` so the default pack stays on `dna-hashes.baseline`.
