@@ -338,13 +338,26 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
     // it back as the EXPECTED hash for the served-vs-declared propagation probe,
     // without a second independent zip/hash (see stage-spa-blob.sh comment).
     def hashFile = "${env.WORKSPACE}/.ci-authored-hash-${bundle.slug}-${kind}.txt"
+    // Same marker convention as stageSpaBlobs' byte-seed pass (Phase 1): a
+    // Phase-1 verdict was already checked above (the outcomes[verdictKey]
+    // guard), but the PATCH call below re-runs the gate too — a bundle whose
+    // bytes only become judged BROKEN between Phase 1 and this Phase-2 PATCH
+    // must not fall silently into the "no live conductor bridge" fail-over
+    // bucket (that swallows the verdict and never reaches the post-Phase-2
+    // error()).
+    def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
     for (int i = 0; i < doorwayEprUrls.size(); i++) {
         def doorwayEprUrl = doorwayEprUrls[i]
         def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
         def rc = 1
         // returnStatus (not throw): a 503 here is EXPECTED on a bridgeless
         // backend and means "try the next doorway", not "fail the build".
-        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=1", "HASH_OUTPUT_FILE=${hashFile}"]) {
+        withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=1", "HASH_OUTPUT_FILE=${hashFile}", "DELIVERABILITY_VERDICT_FILE=${verdictFile}"]) {
+            // Clear any stale marker (an earlier doorway's fail-over attempt
+            // in this same loop, or a leftover from a prior build in this
+            // reused workspace) before this doorway's own run — mirrors the
+            // per-call rm -f in stageSpaBlobs above.
+            sh "rm -f '${verdictFile}'"
             rc = sh(returnStatus: true,
                     script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'")
         }
@@ -385,6 +398,21 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
             return host
         }
         echo "authorHeadOnce: ${host} could not author ${bundle.slug} (${kind}) (no live conductor bridge / persistent 503) — failing over to next doorway"
+    }
+    // Every doorway failed to author. Before reporting a generic "no live
+    // bridge" outcome, check whether the LAST verdict marker written during
+    // this loop says the peer judged the bytes broken — that is a
+    // Phase-2-first BROKEN_HEAD (Phase 1's byte-seed pass saw a healthy or
+    // not-yet-judged verdict, but this Phase-2 gate run caught it). Record it
+    // the same way the Phase-1-caught case is recorded above so the
+    // post-Phase-2 hard error() in stageAndVerifyAllBundles still fires.
+    if (fileExists(verdictFile)) {
+        def verdict = readFile(verdictFile).trim()
+        if (verdict.startsWith('BROKEN_HEAD')) {
+            outcomes["broken|${bundle.slug}|${kind}".toString()] = verdict
+            echo "authorHeadOnce: ${bundle.slug} (${kind}) SKIPPED — ${verdict}; the peer judged this bundle broken during the author-head gate run; no head will be authored"
+            return null
+        }
     }
     echo "authorHeadOnce: NO doorway could author ${bundle.slug} (${kind}) — no live conductor bridge in the fabric to witness the head"
     return null
