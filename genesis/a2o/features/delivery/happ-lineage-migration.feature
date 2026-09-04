@@ -121,6 +121,14 @@ Feature: The network changes the rules its peers hold each other to without losi
   lineage the new version declares, and the carry recipe that turns a record
   on the old version into one on the new and back — is the release's BRIDGE
   MAP, and it is what makes a release a path rather than a replacement. A
+  lineage release is ADMISSIBLE once a peer's own verification has checked
+  its bridge map against what that peer actually runs; it is ADOPTABLE only
+  when, on top of that, a migration commitment notarizes it — two states,
+  two Stations. The bridge map is the RELEASE's declaration; separately,
+  the new rule version's DNA carries its own lineage as a property, and it
+  is THAT declaration a witness is checked against when facts are carried —
+  two checks at two layers, which is why "lineage mismatch" (a release) and
+  "lineage unrecognized" (a witness) are different refusals. A
   lineage release is EARNED when its channel's election has promoted it past
   staging — the same election every content head rides, told in full in the
   sibling story runtime-upgrade-propagation.feature and inherited here — and
@@ -143,9 +151,12 @@ Feature: The network changes the rules its peers hold each other to without losi
   peer is STALE only when it is still on v1 after the sunset; inside the
   window it is merely not yet across.
 
-  CLOSING a chain is the last action an agent commits on a cell, naming the
-  rule version its story continues on; everything before it stays readable
-  forever. The substrate itself does not stop a careless or hostile node
+  CLOSING a chain is the last action committed on a cell, naming the rule
+  version its story continues on; everything before it stays readable
+  forever. The close is a SEALING act: the peer's runtime issues it on the
+  sunset commitment, under the peer's own key, regardless of the cell's
+  declared reading posture — it is the one write a reading cell still takes
+  from its own runtime, and the last — as the epic's kernel test measured. The substrate itself does not stop a careless or hostile node
   writing after its own close — measured — so the household enforces the
   close where it already checks everything: v2 carries each close as a
   proof and refuses any carried fact that came after it, and each runtime
@@ -154,6 +165,14 @@ Feature: The network changes the rules its peers hold each other to without losi
   cells exist and have been written to long before either happens: the
   close and open are the seal on a crossing already made, not the making of
   it, and they happen only at the sunset.
+
+  The TEST HARNESS is the rehearsal's own hand: the a2o runner that drives
+  the household mesh. It holds the fixture humans' keys and the bootstrap
+  steward's key, because that is how the household is staged, and it can
+  join as a fourth peer. When it does something a well-behaved peer never
+  would — write on a closed cell, forge a witness, sign below the bar — it
+  stands in for a careless or hostile node, and the refusal it earns is the
+  protocol's, not a test-only door.
 
   Each Station below is its own world: its Given sets exactly the state it
   needs, so a later Station may begin where an earlier one would have ended
@@ -236,20 +255,22 @@ Feature: The network changes the rules its peers hold each other to without losi
 
   # ── Station 8: the sunset is a separate notarized act, and it is the only irreversible one ──
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
-    Given a fresh migration commitment is notarized and all three peers have adopted v2 and attested their carry
+    Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
     But no sunset commitment exists
     When each peer's runtime next reconciles
     Then no peer closes its v1 chain
     When the elohim notarize a sunset commitment naming the migration
     And each peer's runtime next reconciles
-    Then each peer commits the close on its v1 cell naming v2, then the open on its already-running v2 cell naming that close, in that order
+    Then each peer's runtime seals the close on its v1 cell naming v2, then the open on its already-running v2 cell naming that close, in that order
     And each closed v1 chain is still readable by every peer
     And each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended
-    And a fact authored on a v1 chain after its close is refused by v2's validation on every peer, naming "after close" as its reason
     And each peer's runtime has disabled its v1 cell, so nothing of its own is written there again
     And each peer's passport shows the node-registry role with v2 authoring and v1 closed
+    When the test harness, holding james's key, writes a fact on james's closed v1 cell and offers it to v2 as a carried proof
+    Then the v1 conductor itself accepts that write — the substrate does not fence a closed chain, as the epic's kernel test measured
+    But v2's validation on every peer refuses the carried proof, naming "after close" as its reason
     When a revocation of the migration commitment is notarized after the sunset
-    Then nothing changes: the closed chains stay closed, v2 stays authoring, and every peer reports the sunset as final
+    Then nothing changes: the closed chains stay closed, and each peer's passport still shows the node-registry role with v2 authoring and v1 closed
 
   # ── Station 9: a forged witness is refused by every peer's own validation — so no one can be handed a fabricated history ──
   Scenario: Station 9 — a forged witness, whoever commits it, is refused by every peer's own validation, naming why
