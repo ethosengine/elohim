@@ -273,10 +273,10 @@ ContextResult {
   identity:    { path, cid, labels[] },
   intents:     [ { cid, gap_id, state, raised_by } ],
   commitments: [ { cid, provider, state, brief, habit, latest_event } ],
-  notes:       [ { cid, kind, actor, steward, reason, switched_to, verdict, occurred_at } ],
+  notes:       [ { cid, kind, actor, steward, reason, switched_to, verdict, occurred_at, via? } ],  // via = the gap id of the commitment a rolled-up note was recorded on
   seals:       { edges[], stale_downstream },
   habits:      [ { id, status, active, first_check, source } ],
-  gate:        { project, command, target_dir, rustflags },
+  gate:        { manifest, project?, command?, ambiguous[], target_dir?, rustflags? },  // project/command are null on a tie; ambiguous names every tied candidate
   governance:  { authority, cascade_depth, rule_count }
 }
 ```

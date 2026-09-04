@@ -7,7 +7,7 @@ domain: D9
 sprint: valueflow-authoring
 requires_env: [household-nodes]
 cites:
-  - "valueflow-authoring-surface-design | the design record this plan renders task by task and does not reopen; every task traces to one of its decision sections | sha256:d666021692f5938e | path: genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md"
+  - "valueflow-authoring-surface-design | the design record this plan renders task by task and does not reopen; every task traces to one of its decision sections | sha256:fa1d7d06135bff71 | path: genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md"
   - "epr-rea-valueflow-fabric | the atom definitions (Intent, Commitment, FlowEvent) Tasks 3 and 4 mint against, and the positional slot discipline that keeps existing content addresses stable | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md"
   - "actor-plane-implementation-plan | the house shape this plan follows, and the source of the --as / --session / steward arms the new verbs reuse | sha256:3044daacc8d5b48f | path: genesis/docs/superpowers/plans/2026-08-15-actor-plane-implementation-plan.md"
 ---
