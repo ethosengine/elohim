@@ -2844,6 +2844,32 @@ mesh_coordswap() {
   "$REPO_ROOT/scripts/ci/fleet-coordswap.sh" "$@"
 }
 
+# Task 10 part 2 (Holochain Evolution Epic MVP) — the a2o fixture's
+# baseline-convergence vehicle, callable directly for an operator/manual
+# reset. POSTs {"uninstall":true} to /admin/lineage/reset on every storage
+# peer: LineageRoles resets to the v1 base for every role AND any lineage
+# side app ("<base app id>@…") is disabled + uninstalled, so the mesh starts
+# and ends at the same baseline regardless of what a prior run opened (rung
+# 5's lesson, 8181d60a8). Non-2xx is a loud line, never a fatal exit — one
+# stuck peer must not block the others' convergence.
+lineage_reset_all() {
+  local j=0 name port resp code body
+  for name in "${PEERS[@]}"; do
+    port="$(http_port $j)"
+    resp="$(curl -s -m 15 -w '\n%{http_code}' -X POST \
+      -H 'Content-Type: application/json' \
+      -d '{"uninstall":true}' \
+      "http://127.0.0.1:$port/admin/lineage/reset" 2>/dev/null)"
+    code="${resp##*$'\n'}"
+    body="${resp%$'\n'*}"
+    case "$code" in
+      2??) echo "$name: $body" ;;
+      *)   echo "$name: LINEAGE RESET FAILED (HTTP ${code:-none}) -- ${body:-no response}" ;;
+    esac
+    j=$((j+1))
+  done
+}
+
 # Dispatch guard: only run the action switch when this file is EXECUTED, not
 # when it is SOURCED. hc-mesh-prologue.sh (and an operator's shell) source
 # this script to reuse conductor_csv/peer_csv/mesh_seed_env without risking an
@@ -2860,7 +2886,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     storage-restart) shift; restart_storage "$@" ;;
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
+    lineage-reset) lineage_reset_all ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi

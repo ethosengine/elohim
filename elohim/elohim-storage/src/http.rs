@@ -588,6 +588,36 @@ fn syncing_app_body(slug: &str) -> String {
     )
 }
 
+/// Pure filter behind `POST /admin/lineage/reset` (Task 10 part 2): every
+/// installed app id that is a lineage SIDE app of `base_app_id` — the
+/// `install_lineage` naming convention mints `"<base>@<label>"`, never bare
+/// `"<base>"` itself. Extracted from `list_apps`' output (already reduced to
+/// plain ids) so it is unit-testable without a conductor connection.
+fn lineage_side_app_ids(base_app_id: &str, installed_app_ids: &[String]) -> Vec<String> {
+    let prefix = format!("{base_app_id}@");
+    installed_app_ids
+        .iter()
+        .filter(|id| id.starts_with(&prefix))
+        .cloned()
+        .collect()
+}
+
+/// Pure parse of the `POST /admin/lineage/reset` body — `{"uninstall": true}`
+/// opts every lineage side app into `uninstall_app`, on top of the
+/// unconditional `disable_app`. Default (missing field, empty body,
+/// malformed JSON) is `false`: disable only, never uninstall — the safer
+/// reading wins rather than refusing the request.
+fn parse_lineage_reset_uninstall(body: &[u8]) -> bool {
+    #[derive(Debug, Default, serde::Deserialize)]
+    struct LineageResetBody {
+        #[serde(default)]
+        uninstall: bool,
+    }
+    serde_json::from_slice::<LineageResetBody>(body)
+        .map(|b| b.uninstall)
+        .unwrap_or(false)
+}
+
 /// Outcome of [`HttpServer::get_blob_or_heal`]: the shared local-read +
 /// T17 peer-heal sequence behind both `GET /blob/{hash}` and the `/apps/`
 /// resolver. Callers map each variant onto their own HTTP semantics — the
@@ -1786,6 +1816,16 @@ impl HttpServer {
             // Node-local: deliberately NOT in build_manifest() — never
             // doorway-proxied.
             (Method::POST, "/admin/coordinators/sync") => self.handle_coordinators_sync(req).await,
+
+            // Task 10 part 2 (Holochain Evolution Epic MVP) — the fixture's
+            // baseline-convergence vehicle. Resets `LineageRoles` to base for
+            // every tracked role and disables (optionally uninstalls) every
+            // lineage side app (`"<base app id>@…"`), so a mesh run starts
+            // and ends at the same v1 baseline regardless of what the prior
+            // run opened. Body: `{"uninstall": bool}` (default false).
+            // Node-local: deliberately NOT in build_manifest() — never
+            // doorway-proxied.
+            (Method::POST, "/admin/lineage/reset") => self.handle_lineage_reset(req).await,
 
             // Rung 4 of the same upgrade-velocity snowball: config as a RUNTIME
             // surface. GET reports the watcher (active/path/poll) plus every
@@ -5124,6 +5164,121 @@ impl HttpServer {
                 "coordinator sync failed: {e}"
             ))),
         }
+    }
+
+    /// `POST /admin/lineage/reset` (Task 10 part 2, Holochain Evolution Epic
+    /// MVP) — the fixture's baseline-convergence vehicle. A mesh run must
+    /// start AND end at the v1 baseline regardless of what a prior run
+    /// opened (rung 5's lesson, 8181d60a8): this route rolls `LineageRoles`
+    /// back to base for every tracked role via [`LineageRoles::reset_all`]
+    /// and disables — with `{"uninstall": true}`, also uninstalls — every
+    /// lineage side app the vehicle may have installed alongside the base
+    /// hApp (any installed app id starting with `"<base app id>@"`, the
+    /// `install_lineage` naming convention).
+    ///
+    /// Body (optional): `{"uninstall": bool}`, default `false` — disable
+    /// only, never uninstall, unless the caller explicitly opts in.
+    ///
+    /// Response 200: `{ "reset": [<role names from the pre-reset snapshot>],
+    /// "disabled": [<app ids>], "uninstalled": [<app ids>] }`. A per-app
+    /// `disable_app`/`uninstall_app` failure is logged and simply excluded
+    /// from its list — one stuck side app never blocks the reset of the
+    /// others or of `LineageRoles`.
+    ///
+    /// `lineage_roles` being `None` (a fixture that never wired it) still
+    /// runs the app-convergence half; `reset` comes back empty. Admin
+    /// connection selection is the SAME resolution as
+    /// `handle_coordinators_sync` (embedded conductor's dedicated admin
+    /// handle, falling back to any live external-conductor bridge in the
+    /// `HcClientRegistry`); 503 `{"error":"conductor_unavailable"}` only
+    /// when neither exists. Node-local: deliberately NOT in
+    /// build_manifest() — never doorway-proxied.
+    async fn handle_lineage_reset(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body_bytes = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        let uninstall = parse_lineage_reset_uninstall(&body_bytes);
+
+        // `LineageRoles::reset_all` happens FIRST and unconditionally — a
+        // pure in-memory op that needs no conductor, independent of
+        // whether any side app is installed anywhere or whether the admin
+        // websocket resolves below. A fixture that only opened a lineage
+        // WINDOW (no `install_lineage` side app) still needs this to
+        // converge, and a momentarily-unreachable conductor must never
+        // leave a role's routing stuck open.
+        let reset: Vec<String> = match self.lineage_roles.as_ref() {
+            Some(lineage_roles) => {
+                let roles: Vec<String> = lineage_roles.snapshot().into_keys().collect();
+                lineage_roles.reset_all();
+                roles
+            }
+            None => Vec::new(),
+        };
+
+        let Some(admin_ws) = self.admin_websocket.as_deref().cloned().or_else(|| {
+            self.hc_registry
+                .as_ref()
+                .and_then(|r| r.any_admin_websocket())
+        }) else {
+            return Ok(response::service_unavailable("conductor_unavailable"));
+        };
+
+        let base_app_id = self
+            .happ_app_id
+            .clone()
+            .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
+
+        let apps = admin_ws
+            .list_apps(None)
+            .await
+            .map_err(|e| StorageError::Internal(format!("list_apps: {e}")))?;
+        let app_ids: Vec<String> = apps.into_iter().map(|a| a.installed_app_id).collect();
+        let side_app_ids = lineage_side_app_ids(&base_app_id, &app_ids);
+
+        let mut disabled = Vec::new();
+        for app_id in &side_app_ids {
+            match admin_ws.disable_app(app_id.clone()).await {
+                Ok(()) => disabled.push(app_id.clone()),
+                Err(e) => tracing::warn!(
+                    app_id = app_id.as_str(),
+                    error = %e,
+                    "POST /admin/lineage/reset — disable_app failed, side app left as-is"
+                ),
+            }
+        }
+
+        let mut uninstalled = Vec::new();
+        if uninstall {
+            for app_id in &side_app_ids {
+                match admin_ws.uninstall_app(app_id.clone(), false).await {
+                    Ok(()) => uninstalled.push(app_id.clone()),
+                    Err(e) => tracing::warn!(
+                        app_id = app_id.as_str(),
+                        error = %e,
+                        "POST /admin/lineage/reset — uninstall_app failed, side app left disabled"
+                    ),
+                }
+            }
+        }
+
+        tracing::info!(
+            reset = reset.len(),
+            disabled = disabled.len(),
+            uninstalled = uninstalled.len(),
+            uninstall_requested = uninstall,
+            "POST /admin/lineage/reset — baseline convergence complete"
+        );
+
+        Ok(response::ok(&serde_json::json!({
+            "reset": reset,
+            "disabled": disabled,
+            "uninstalled": uninstalled,
+        })))
     }
 
     /// Operator/agent-initiated authority-arc actuation — the explicit POST
@@ -19056,5 +19211,64 @@ mod admission_egress_tests {
                 "cross-origin"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod lineage_reset_tests {
+    use super::*;
+
+    /// The `install_lineage` naming convention: `"<base>@<label>"`. Only
+    /// those ids are side apps; the base app itself and an unrelated app
+    /// with the base id as a mere prefix (no `@`) are both left alone.
+    #[test]
+    fn filters_only_lineage_side_apps_by_base_prefix() {
+        let ids = vec![
+            "elohim".to_string(),
+            "elohim@rung5-candidate".to_string(),
+            "elohim@another-window".to_string(),
+            "elohim-other-app".to_string(),
+            "not-elohim@decoy".to_string(),
+        ];
+        let side = lineage_side_app_ids("elohim", &ids);
+        assert_eq!(
+            side,
+            vec![
+                "elohim@rung5-candidate".to_string(),
+                "elohim@another-window".to_string(),
+            ],
+            "must catch every '<base>@…' id and nothing else"
+        );
+    }
+
+    /// No side apps installed anywhere is not an error — an empty vec, so
+    /// the route's `LineageRoles::reset_all()` half still runs.
+    #[test]
+    fn filter_is_empty_when_no_side_app_is_installed() {
+        let ids = vec!["elohim".to_string(), "imagodei".to_string()];
+        assert!(lineage_side_app_ids("elohim", &ids).is_empty());
+    }
+
+    /// `{"uninstall": true}` — the ONLY body shape that opts a side app into
+    /// `uninstall_app`.
+    #[test]
+    fn parses_uninstall_true_from_body() {
+        assert!(parse_lineage_reset_uninstall(br#"{"uninstall":true}"#));
+    }
+
+    /// `{"uninstall": false}` is explicit-false, same as the default.
+    #[test]
+    fn parses_uninstall_false_from_body() {
+        assert!(!parse_lineage_reset_uninstall(br#"{"uninstall":false}"#));
+    }
+
+    /// The safer default: an empty body, a body with no `uninstall` key, and
+    /// malformed JSON must ALL read as "never uninstall" — never refuse the
+    /// request, and never silently default to the destructive reading.
+    #[test]
+    fn defaults_to_false_never_uninstall_on_empty_missing_or_malformed_body() {
+        assert!(!parse_lineage_reset_uninstall(b""));
+        assert!(!parse_lineage_reset_uninstall(b"{}"));
+        assert!(!parse_lineage_reset_uninstall(b"not json"));
     }
 }

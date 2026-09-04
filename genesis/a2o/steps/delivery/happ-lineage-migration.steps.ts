@@ -179,6 +179,10 @@ const CANARY_PEER: PeerName = 'james';
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
 const VERSION_PATH = '/version';
+/** Task 10 part 2 — the fixture's baseline-convergence vehicle (see the
+ * `Before`/`AfterAll` hooks below). Resets `LineageRoles` to v1 base on the
+ * target peer and disables + uninstalls any lineage side app. */
+const LINEAGE_RESET_PATH = '/admin/lineage/reset';
 
 /** `epr-release-package.ts`'s own soak/threshold discipline flags — a call site that omits
  * either is refused at exit 64 (see that script's own module doc, quoted in
@@ -622,15 +626,50 @@ async function ensureRunOwnedFollowSet(): Promise<void> {
   runOwnedFollowSetEstablished = true;
 }
 
+/**
+ * Task 10 part 2 (Holochain Evolution Epic MVP) — the fixture's
+ * baseline-convergence vehicle. POSTs `LINEAGE_RESET_PATH` with
+ * `{"uninstall": true}` on every peer: `LineageRoles` resets to the v1
+ * base for every tracked role and any lineage side app (`"<base
+ * app id>@…"`) is disabled + uninstalled. A mesh run must start AND end at
+ * the same baseline regardless of what a PRIOR run opened (rung 5's
+ * lesson, 8181d60a8) — hence a call both in `Before` and in `AfterAll`.
+ *
+ * Never throws: a failed reset on one peer is logged with the
+ * `[happ-lineage-migration]` prefix and the other peers still get their
+ * chance, matching this file's other cleanup-leg posture (see the
+ * runtime-config restore loop below).
+ */
+async function resetLineageBaselineOnAllPeers(): Promise<void> {
+  for (const peer of PEER_NAMES) {
+    try {
+      const { status, text } = await postRaw(`${directPeerUrl(peer)}${LINEAGE_RESET_PATH}`, {
+        uninstall: true,
+      });
+      if (status < 200 || status >= 300) {
+        console.error(
+          `[happ-lineage-migration] ${peer}'s ${LINEAGE_RESET_PATH} returned ${status}: ${text}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `[happ-lineage-migration] ${peer}'s ${LINEAGE_RESET_PATH} failed: ${String(error)}`
+      );
+    }
+  }
+}
+
 /** Tag-scoped to this feature's own `@happ-lineage` so no other suite's runtime-config is ever
  * touched — fires before Station 1's own Given/When steps. */
 Before({ tags: '@happ-lineage', timeout: 60_000 }, async function (this: E2EWorld) {
   await ensureRunOwnedFollowSet();
+  await resetLineageBaselineOnAllPeers();
 });
 
 AfterAll({ timeout: 180_000 }, async function () {
   if (Object.keys(originalRuntimeConfigBytes).length === 0 || runOwnedFollowSetRestored) return;
   runOwnedFollowSetRestored = true;
+  await resetLineageBaselineOnAllPeers();
   for (const peer of PEER_NAMES) {
     const originalBytes = originalRuntimeConfigBytes[peer];
     if (originalBytes === undefined) continue;
