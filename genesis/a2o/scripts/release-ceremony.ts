@@ -43,31 +43,60 @@
  * ## Adopt-before-author (atom scope item 2)
  *
  * `publish` pre-flights `resolve_canonical_election` on the acting peer
- * before authoring. If the channel's current head is already EARNED, publish
- * refuses locally with a clear message rather than let a raw zome Guest
- * error ("earned head is protected") surface — the script must not crown its
- * own commit over an authority declaration it has not adopted. This is the
- * practical subset of the four-arm `services/head_adoption.rs` pre-flight
- * relevant to a single-conductor ceremony driver (LOCAL-DHT arm only); the
- * full sweep-controller semantics (PEER-HINT / AUTHOR-THEN-ADOPT /
+ * before authoring. If the channel's current head is already EARNED, the
+ * script must not crown its own commit over an authority declaration it has
+ * not adopted — but a channel is LONG-LIVED (the story's own vocabulary):
+ * the steward publishes on the same channel for as long as the household
+ * keeps it, so refusing every publish over an earned head forces a fresh
+ * channel per release, which is the seam Station 9 exists to close.
+ *
+ * The pre-flight therefore has an ADMITTED arm and a refusing arm, and both
+ * conditions must hold for admission:
+ *
+ *   (a) ADOPTED — the peer named by `--adoption-url` reports, on
+ *       `GET /admin/adoption`, a row for this channel whose
+ *       `appliedRelease.cid` IS the earned head's action hash. "A steward
+ *       cannot push what they have not themselves adopted."
+ *   (b) LINEAGE — the manifest being published declares
+ *       `envelope.lineageParentCid` === that same earned head. "The
+ *       candidate names that head as the release it builds on."
+ *
+ * Both hold → publish authors the version and declares STAGING exactly as
+ * on a fresh channel (the earned head stays the head; only the promotion
+ * ceremony moves it). Only one holds → a typed, one-sentence refusal naming
+ * which: `not_adopted` or `lineage_parent_mismatch`. Neither holds → the
+ * original refusal text, with both codes appended.
+ *
+ * This is the practical subset of the four-arm `services/head_adoption.rs`
+ * pre-flight relevant to a single-conductor ceremony driver (LOCAL-DHT arm
+ * plus the local controller's own adoption receipt); the full
+ * sweep-controller semantics (PEER-HINT / AUTHOR-THEN-ADOPT /
  * CONTEST-THEN-OBEY) belong to `task-release-adoption-controller-observe`,
  * not this driver. `revert <channelId> <manifest.json>` is the one caller
- * that bypasses this refusal: it re-elects a NEW version bound to OLD bytes
- * (a revert target can never be an existing version's action hash — a
- * release manifest's `appliesTo.coordinatorWasmHashes` names what it
- * SUPERSEDES, and the adoption controller refuses a peer not running them).
- * Revert is exempt because it is not a staging candidate contending for the
- * head at all — it declares EARNED directly, so the thing the pre-flight
- * guards against (crowning an un-adopted commit over an authority
- * declaration) does not apply; the declaring peer IS the authority moving
- * the earned head.
+ * that bypasses this pre-flight entirely: it re-elects a NEW version bound
+ * to OLD bytes (a revert target can never be an existing version's action
+ * hash — a release manifest's `appliesTo.coordinatorWasmHashes` names what
+ * it SUPERSEDES, and the adoption controller refuses a peer not running
+ * them). Revert is exempt because it is not a staging candidate contending
+ * for the head at all — it declares EARNED directly, so the thing the
+ * pre-flight guards against (crowning an un-adopted commit over an
+ * authority declaration) does not apply; the declaring peer IS the
+ * authority moving the earned head.
+ *
+ * NOTE ON THE ZOME FLOOR: the driver's admission is a PRE-flight, not the
+ * authority. `content_store::declare_canonical_content_head` carries its own
+ * earned-head guard, so a staging declaration beneath an earned head is
+ * admitted only once that zome-side guard also admits it (the DNA half of
+ * Station 9). Until it does, an admitted publish still surfaces the zome's
+ * "earned head is protected" Guest error — a floor refusing, not this
+ * driver's pre-flight.
  *
  * ## Usage
  *
  *   cd genesis/a2o && pnpm exec tsx scripts/release-ceremony.ts <verb> ...
  *
  *   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
- *   publish <manifest.json>
+ *   publish <manifest.json> [--adoption-url <storage base url>]
  *   promote <channelId> <releaseCid> [--delegation <file>]
  *   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
  *   status <channelId>
@@ -76,10 +105,18 @@
  *   --as <peerName>        act as this configured peer (default: first, "matthew")
  *   --conductors <csv>     name=admin:app,... (default: local household mesh)
  *   --timeout <ms>         per-peer connect timeout (default 5000)
+ *   --adoption-url <url>   storage base url whose GET /admin/adoption proves the
+ *                          acting peer has ADOPTED the channel's earned head
+ *                          (publish only; default: the acting peer's own storage
+ *                          URL — see `resolveAdoptionUrl`)
  *
  * Environment:
  *   PEER_CONDUCTOR_PORTS   conductor CSV used when --conductors is absent
  *                          (same convention as version-matrix.ts)
+ *   RELEASE_ADOPTION_URL   default for --adoption-url
+ *   E2E_STORAGE_<PEER>     per-peer storage base url (the a2o mesh convention);
+ *                          consulted for the acting peer before the port
+ *                          derivation below
  *
  * `status` ALWAYS emits one JSON object to stdout (rail #5): a
  * `{ channelId, checkedAt, peers: [...] }` row per configured peer, with
@@ -106,6 +143,17 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 // Same convention version-matrix.ts uses for its --conductors CSV.
 const DEFAULT_CONDUCTORS = 'matthew=4444:4445,jessica=4454:4455,james=4464:4465';
 
+/**
+ * Storage HTTP port for peer index i on the local household mesh
+ * (app/elohim-app/scripts/hc-mesh.sh: `storage http 8090+i`, the same
+ * derivation `scripts/release-attestation-probe.ts`'s PEER_A/B/C defaults
+ * carry). Used only as the LAST fallback for `--adoption-url`, after the
+ * flag itself, `RELEASE_ADOPTION_URL`, and `E2E_STORAGE_<PEER>`.
+ */
+const DEFAULT_STORAGE_HTTP_BASE_PORT = 8090;
+
+const ADOPTION_PATH = '/admin/adoption';
+
 const REACH_LEVELS = [
   'private',
   'self',
@@ -121,7 +169,7 @@ const USAGE = `Usage: release-ceremony.ts <verb> ... [options]
 
 Verbs:
   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
-  publish <manifest.json>
+  publish <manifest.json> [--adoption-url <storage base url>]
   promote <channelId> <releaseCid> [--delegation <file>]
   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
   status <channelId>
@@ -130,9 +178,15 @@ Options:
   --as <peerName>       act as this configured peer (default: first configured, "matthew")
   --conductors <csv>    name=admin:app,... (default: ${DEFAULT_CONDUCTORS})
   --timeout <ms>        per-peer connect timeout in ms (default: ${DEFAULT_TIMEOUT_MS})
+  --adoption-url <url>  publish only: storage base url whose GET ${ADOPTION_PATH} proves the
+                        acting peer has ADOPTED the channel's earned head
+                        (default: RELEASE_ADOPTION_URL, else E2E_STORAGE_<PEER>, else
+                        http://127.0.0.1:<${DEFAULT_STORAGE_HTTP_BASE_PORT}+peer index>)
 
 Environment:
-  PEER_CONDUCTOR_PORTS  conductor CSV used when --conductors is absent`;
+  PEER_CONDUCTOR_PORTS  conductor CSV used when --conductors is absent
+  RELEASE_ADOPTION_URL  default for --adoption-url
+  E2E_STORAGE_<PEER>    per-peer storage base url (a2o mesh convention)`;
 
 interface PeerConfig {
   name: string;
@@ -336,6 +390,87 @@ function loadDelegation(path: string | undefined): any {
   };
 }
 
+/**
+ * Where to read the acting peer's OWN adoption receipt from. Resolution
+ * order, first hit wins:
+ *
+ *   1. `--adoption-url <url>`
+ *   2. `RELEASE_ADOPTION_URL`
+ *   3. `E2E_STORAGE_<PEERNAME>` — the a2o household-mesh convention the
+ *      feature's Background already resolves peers from.
+ *   4. `http://127.0.0.1:<8090 + the acting peer's index in --conductors>` —
+ *      hc-mesh.sh's own port scheme. The conductor CSV is the only peer
+ *      identity this script has ever known (`peers` is built from it), so
+ *      the derivation stays keyed to the SAME list rather than inventing a
+ *      second peer registry.
+ */
+function resolveAdoptionUrl(flags: Flags, peers: PeerConfig[], actingPeer: PeerConfig): string {
+  const explicit = flags['adoption-url'];
+  if (explicit && explicit !== 'true') return explicit.replace(/\/$/, '');
+  const fromEnv =
+    process.env.RELEASE_ADOPTION_URL ?? process.env[`E2E_STORAGE_${actingPeer.name.toUpperCase()}`];
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const index = Math.max(
+    0,
+    peers.findIndex(p => p.name === actingPeer.name)
+  );
+  return `http://127.0.0.1:${DEFAULT_STORAGE_HTTP_BASE_PORT + index}`;
+}
+
+interface AdoptionChannelRowLite {
+  channelId: string;
+  appliedRelease: { cid: string } | null;
+  resolvedHead: { cid: string; tier: string } | null;
+}
+
+interface AdoptionReadResult {
+  /** The row's `appliedRelease.cid`, or null when the peer holds no row / has applied nothing. */
+  appliedCid: string | null;
+  /** Non-null when the surface itself could not be read — never conflated with "applied nothing". */
+  error: string | null;
+}
+
+/**
+ * Reads ONE channel's row off a peer's `GET /admin/adoption`. An unreadable
+ * surface is reported as an `error`, never as "this peer has adopted
+ * nothing" — the same unreachable-≠-absent rail `status` holds for the
+ * conductor read.
+ */
+async function readAdoptedRelease(
+  adoptionUrl: string,
+  channelId: string,
+  timeoutMs: number
+): Promise<AdoptionReadResult> {
+  let response: Response;
+  try {
+    response = await fetch(`${adoptionUrl}${ADOPTION_PATH}`, {
+      signal: AbortSignal.timeout(Math.max(timeoutMs, 5_000)),
+    });
+  } catch (e) {
+    return {
+      appliedCid: null,
+      error: `could not reach ${adoptionUrl}${ADOPTION_PATH}: ${String(e).slice(0, 200)}`,
+    };
+  }
+  if (!response.ok) {
+    return {
+      appliedCid: null,
+      error: `GET ${adoptionUrl}${ADOPTION_PATH} returned ${response.status}`,
+    };
+  }
+  let body: { channels?: AdoptionChannelRowLite[] };
+  try {
+    body = (await response.json()) as { channels?: AdoptionChannelRowLite[] };
+  } catch (e) {
+    return {
+      appliedCid: null,
+      error: `GET ${adoptionUrl}${ADOPTION_PATH} returned unparseable JSON: ${String(e).slice(0, 200)}`,
+    };
+  }
+  const row = (body.channels ?? []).find(r => r.channelId === channelId);
+  return { appliedCid: row?.appliedRelease?.cid ?? null, error: null };
+}
+
 async function resolveElectionOnPeer(peer: PeerConfig, channelId: string, timeoutMs: number) {
   try {
     const conn = await conductor(peer.name, peer.admin, peer.app, timeoutMs);
@@ -433,6 +568,78 @@ interface AuthoredVersion {
 }
 
 /**
+ * The `publish`-over-an-EARNED-head decision (module doc
+ * "Adopt-before-author"). Returns normally when the publish is ADMITTED —
+ * the acting peer has ADOPTED the earned head AND the manifest names that
+ * head as its lineage parent — and throws the typed refusal otherwise.
+ *
+ * A channel is long-lived: refusing every publish over an earned head is
+ * what forced a fresh channel per release, so this function is the seam
+ * Station 9 closes. It refuses on the SAME two facts the story names, and
+ * says which one is missing rather than making the steward guess.
+ */
+async function assertAdmissibleOverEarnedHead(
+  channelId: string,
+  earnedCid: string,
+  manifest: any,
+  flags: Flags,
+  peers: PeerConfig[],
+  actingPeer: PeerConfig,
+  timeoutMs: number
+): Promise<void> {
+  const adoptionUrl = resolveAdoptionUrl(flags, peers, actingPeer);
+  const adoption = await readAdoptedRelease(adoptionUrl, channelId, timeoutMs);
+  const adopted = adoption.error === null && adoption.appliedCid === earnedCid;
+
+  const declaredParent: unknown = manifest?.envelope?.lineageParentCid;
+  const lineageOk = typeof declaredParent === 'string' && declaredParent === earnedCid;
+
+  if (adopted && lineageOk) {
+    console.error(
+      `publish ADMITTED over earned head ${earnedCid} on channel '${channelId}': ` +
+        `${actingPeer.name}'s own runtime reports it applied (${adoptionUrl}${ADOPTION_PATH}) and ` +
+        `the manifest declares envelope.lineageParentCid=${earnedCid} — the candidate is declared ` +
+        `STAGING beneath the standing earned head, which only the promotion ceremony can move.`
+    );
+    return;
+  }
+
+  const notAdoptedDetail = adoption.error
+    ? `${actingPeer.name}'s adoption receipt could not be read (${adoption.error})`
+    : `${actingPeer.name}'s runtime reports appliedRelease=${adoption.appliedCid ?? 'none'} on ` +
+      `${adoptionUrl}${ADOPTION_PATH}`;
+
+  if (!adopted && !lineageOk) {
+    // Neither condition holds — the original, un-narrowed refusal, with both
+    // typed codes appended so an automated caller can classify it.
+    throw new Error(
+      `publish refused: channel '${channelId}' already has an EARNED head ` +
+        `(${earnedCid}). Publishing a fresh staging candidate over ` +
+        `an earned head would crown this peer's own commit without adopting the standing ` +
+        `authority declaration — promote/revert are the earned-tier verbs; adopt/resolve first ` +
+        `if this peer genuinely intends to supersede it. ` +
+        `[not_adopted: ${notAdoptedDetail}] ` +
+        `[lineage_parent_mismatch: the manifest declares envelope.lineageParentCid=` +
+        `${JSON.stringify(declaredParent ?? null)}]`
+    );
+  }
+
+  if (!adopted) {
+    throw new Error(
+      `publish refused (not_adopted): channel '${channelId}' has EARNED head ${earnedCid}, and a ` +
+        `steward cannot push what they have not themselves adopted — ${notAdoptedDetail}.`
+    );
+  }
+
+  throw new Error(
+    `publish refused (lineage_parent_mismatch): channel '${channelId}' has EARNED head ${earnedCid}, ` +
+      `so the candidate must name that head as the release it builds on, but the manifest declares ` +
+      `envelope.lineageParentCid=${JSON.stringify(declaredParent ?? null)} — repackage with ` +
+      `--lineage-parent ${earnedCid}.`
+  );
+}
+
+/**
  * Shared "author a version from a release manifest" path: read + duck-type
  * validate the manifest, connect as the acting peer, run the
  * adopt-before-author pre-flight, then call `update_content` with the
@@ -467,22 +674,27 @@ async function authorVersionFromManifest(
   const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
   console.log(`${actingPeer.name} agent (publisher): ${conn.agent}`);
 
-  // Adopt-before-author pre-flight (LOCAL-DHT arm; see module doc).
+  // Adopt-before-author pre-flight (LOCAL-DHT arm + the acting peer's own
+  // adoption receipt; see module doc "Adopt-before-author").
   const currentElection: any = await conn.call('resolve_canonical_election', channelId);
   if (currentElection?.canonical_earned) {
+    const earnedCid = toB64(currentElection.winner_target);
     if (refuseIfEarned) {
-      throw new Error(
-        `publish refused: channel '${channelId}' already has an EARNED head ` +
-          `(${toB64(currentElection.winner_target)}). Publishing a fresh staging candidate over ` +
-          `an earned head would crown this peer's own commit without adopting the standing ` +
-          `authority declaration — promote/revert are the earned-tier verbs; adopt/resolve first ` +
-          `if this peer genuinely intends to supersede it.`
+      await assertAdmissibleOverEarnedHead(
+        channelId,
+        earnedCid,
+        manifest,
+        flags,
+        peers,
+        actingPeer,
+        timeoutMs
+      );
+    } else {
+      console.error(
+        `revert: re-electing over earned head ${earnedCid} — this ` +
+          `declarer is the authority moving the earned head, not a staging candidate`
       );
     }
-    console.error(
-      `revert: re-electing over earned head ${toB64(currentElection.winner_target)} — this ` +
-        `declarer is the authority moving the earned head, not a staging candidate`
-    );
   }
 
   const releaseMetadata = {
