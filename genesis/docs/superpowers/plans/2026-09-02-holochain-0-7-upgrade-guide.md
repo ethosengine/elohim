@@ -673,7 +673,19 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
 - [x] **F4 (DONE 2026-09-03 21:xxZ, edge #1426: storage image FROM `conductor-25dd2d0be144` + `elohim-happ:dev-latest` = 0.7 (#1427), `iroh-relay:1.0.3-dev-latest` pushed; the alpha rollout waits on pods that cannot be ready until F5 step 2 wipes the 0.6 databases — the rollout timeout is expected): Land on dev.** Fast-forward `upgrade/holochain-0.7` → `dev`, push once. Dispatch order
   is conductor → dna → edge (the orchestrator does it; do not hand-trigger). The edge build's
   DNA Hash Guard prints `DNA-HASH <role> <hash>` matching F1's baseline.
-- [ ] **F5: Fleet ceremony — operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
+- [x] **F5 DONE 2026-09-04 00:3xZ — the alpha fleet runs holochain 0.7.0 on fresh genesis.** Operator wiped all seven
+  `holochain-data-*` (`databases/`, `ks/`) and `storage-data-*` volumes with every StatefulSet at 0 replicas (22:5xZ);
+  edge #1428 (dispatched 23:0xZ from 03c603f96) applied the manifests, rolled 7 storage + 7 conductor StatefulSets
+  (14 "rolling update complete") onto `conductor-25dd2d0be144` + the 0.7 hApp, both doorways rolled. Probes at
+  00:33Z: `doorway-alpha.elohim.host` and `elohim.host` `/health` → `peerCount 6, caughtUp true, converged true`;
+  `/db/p2p/conductor-diagnostics` on both → 35 agents = 7 peers × 5 DNA spaces, agent URLs homed on BOTH
+  `relay.alpha.elohim.host` and `relay.elohim.host` — the D2 measure (cross-relay preflight patch) holds on the
+  live fleet. No env flags were needed (wiped conductors first-install). Re-seed = `[build:genesis]` push after
+  #1428 ends. **Re-seed landed (genesis #1553, 2026-09-04 03:3xZ, operator-started):** 3,378 content inserted /
+  0 errors; matthew 3,442 · adam 3,441 · jessica 65 replicated (0 pending); propagation probes on the 0.7 fleet:
+  jessica served the build-unique probe blob on the first attempt (p2p data plane moved bytes), replica persisted
+  (filesystem 2→4); custody-convergence missing on adam only (his stakes posture); the seeder's identities leg hit the
+  genesis stage-order defect on matthew (findings §11). Landing/lamad bundles follow via the app pipeline. Operator runbook: `genesis/docs/superpowers/plans/2026-09-03-holochain-0-7-fleet-cutover-runbook.md`
   (the sequenced, step-by-step form of everything below, with the probes and the rollback). Summary (from
   `project_alpha_dna_migration_2026_09_02`):**
   **Operator authorization 2026-09-03: wipe the WHOLE fleet clean for this upgrade** — every alpha
@@ -701,7 +713,18 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   incident class). Rule from here: any conductor-side manifest addition and the storage
   `holochain_types` pin land in the SAME batch, and `tests/happ_manifest_relay_url_compat.rs`
   (now asserting strictness) is the tripwire.
-- [ ] **F6: Evidence.** Also re-check `elohim/holochain/.epr-meta/notary-authority.habit.md`: its DELTA
+- [x] **CUTOVER COMPLETE 2026-09-04 04:2xZ.** App #1691 (first green app run since the roll) staged the landing + lamad
+  bundles onto the seeded 0.7 fleet: `https://alpha.elohim.host/` 200, `/lamad/` 200, `https://elohim.host/` 200;
+  `elohim-host-landing` row carries blobHash + serverBlobHash. Sequence of the last mile: fleet roll (edge #1428) →
+  wipe-before-conductors amendment → doorway pool URL fix (edge #1429) → seed (genesis #1553, operator-started because
+  edge's empty-fleet validation timeout cancels the orchestrator chain) → app #1689/#1690 OOM'd on 7.6 GB ThinkPads →
+  memory request + operations-preferred affinity → #1691 green. Wall clock from the first push (2026-09-03 16:51Z):
+  ≈ 11.5 h, of which the substrate needed none.
+- [ ] **F6: Evidence — with the concession stated.** This cutover is NOT rung-5 evidence for a conductor-line change:
+  rung 5 covers coordinator-only releases; the line change was wiped and re-genesised because no vehicle carries data
+  across a lineage break (see `genesis/data/timeline/backlog/2026-09-03-lineage-crossing-migration-rna.md`). Bank it
+  as "coordinator release propagation survives the line change" (stations 1–5, 5/5 on 0.7) and as the cycle-time
+  row for a big-bang line change, never as upgrade propagation. Also re-check `elohim/holochain/.epr-meta/notary-authority.habit.md`: its DELTA
   2026-08-09 records `rea_commitment_replication::project_epr_commitment_replicates_to_peer_b` as
   known-RED on 0.6 (attributed to cold-cell wasm warm-up); it PASSES on 0.7 with the shared-rendezvous
   harness (2026-09-03, 186.9 s) — the attribution was probably wrong, and the atom's line is stale.

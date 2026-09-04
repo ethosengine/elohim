@@ -1551,13 +1551,19 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         '''
 
+                        // Gate on the DOORWAY's liveness (/health), not on the site root: on a
+                        // freshly genesised fleet `/` is 503 until the landing content this very
+                        // pipeline seeds exists (genesis #1551, 2026-09-04, after the 0.7 wipe —
+                        // "Waiting for target site..." ×24, seed stages skipped). The root check
+                        // was a chicken-and-egg gate; the doorway answering /health 200 is the
+                        // precondition seeding actually needs.
                         def targetHost = env.TARGET_HOST
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         def internalDoorway = env.INTERNAL_DOORWAY_URL
 
                         echo "Verifying target site: ${targetHost}"
                         sh """
-                            timeout 120s bash -c 'until curl -sf -o /dev/null "${targetHost}"; do
+                            timeout 120s bash -c 'until curl -sf -o /dev/null "${targetHost}/health"; do
                                 echo "Waiting for target site..."
                                 sleep 5
                             done'

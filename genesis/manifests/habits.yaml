@@ -556,6 +556,12 @@ habits:
       - 2026-09-01 16:01Z — household `peer_carried` sweep receipt STOPPED at the fixture seam: conductor-UP negative control converged with `peer_carried_delta=0`; stopping/pausing the adopter conductor makes the local election answer unreachable/blocked and returns before peer supply, while the successful supply branch still requires that same conductor for `verify_carried_election` + `validate_carried_head_record`. Missing station recorded in `task-peer-carried-sweep-mesh-receipt`: fixture observed-ABSENT without removing the wasm verifier. No receipt and no status flip; fleet watch remains authoritative.
       - 2026-09-01 16:20Z — household GSO burst/disconnect receipt STOPPED at the fixture seam (NO status flip): `gso-burst-receipt.ts` preserved the mixed `matthew=dual` / `jessica=iroh` posture and counted only decoded head-record replies, but a settled-mesh storage restart produced 12 successful exchanges in 360 s versus the required >=200. The fail-closed `no-burst` leg withheld SIGKILL and the receipt. Missing station: fixture-owned stale/full-corpus requester staging between mesh-harness -> burst-regime; parent GSO atom stays wip and this habit stays red.
       - 2026-09-02 00:43Z — household election-convergence numbers from the adoption ceremony (NO status flip: the a2o concern here is federation-deploy on the fleet): a fresh release channel's staged head reached 3/3 conductors ≤19 s after publish with doorway A (bootstrap/signal) up; the same publish took 20 min 18 s for the iroh peer while doorway A was DOWN (island; conductor log `NoPeersForLocation`) — doorway liveness is a precondition of every election measure, now in the ceremony preflight. Earned-head convergence: 75 s (promote) and 31 s (revert), 3/3.
+
+      DELTA 2026-09-04 00:3xZ (holochain 0.7 cutover, F5): the alpha fleet re-genesised on holochain 0.7.0 — 7 storage + 7
+      conductor StatefulSets rolled by edge #1428 onto wiped volumes; both doorways `caughtUp:true converged:true peerCount:6`;
+      conductor peer stores 35 agents / 5 spaces homed across BOTH relays (`relay.alpha.elohim.host` + `relay.elohim.host`).
+      Status unchanged (this habit's check is federation-deploy, Act II; the fleet has no content yet — re-seed follows). The
+      line change itself was a wipe, not propagation: see runtime-upgrade-propagation's 2026-09-03 scope DELTA.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -2597,13 +2603,14 @@ habits:
 
       DELTA 2026-09-03 16:00Z (holochain 0.7 cutover, F2; receipt `genesis/a2o/reports/sprint-report-household-20260903T154932Z-fcb81456.{md,json}`, log `reports/release-ceremony/2026-09-03/cucumber-stations-1-5-hc07-r6.log`): **Stations 1–5 PASS 5/5 (57/57 steps) on the STOCK holochain 0.7.0 conductor** — household mesh, ark launch, local iroh-relay 1.0.3, storage `dual`; james's controller applied the staged candidate via `sync_coordinators` ("coordinator hot-swap applied (no re-key, no DHT churn)") and attested; promotion + convergence held. The chain survives the conductor line change. Five reruns were spent on apparatus, none on the line: (r1) worktree lacked the packed `workdir/` bundles the packager stats; (r2) the baseline pair was pinned to the 0.6 content_store WasmHash — repinned to the 0.7 bundle N `uhCokta9…` (verified byte-exact by re-deriving Holochain's WasmHash from the packed DNA), now env-overridable; (r3) storage peers had no `ELOHIM_RUNTIME_CONFIG_PATH`, so the rung-4 watcher was never armed (`/admin/adoption` `sweeps:0`); (r4) `hc sandbox call` is gone in 0.7 → `AGENT_PUBKEY=""` → soak attestor had no deviceId. All four are hc-mesh.sh / a2o fixes on `upgrade/holochain-0.7`. Stations 6–8 not re-run this pass (scope = the habit's runnable check, stations 1–5). Status stays green; the 0.7 FLEET receipt (F5) is the next flip.
 
-      SEAM 2026-09-05 (found delivering the Holochain Evolution Epic's Task 2 on the 0.7 mesh): chain runtime-upgrade-propagation /
-      between Station 4 (earned promotion) → "the NEXT release on the same channel" / missing node: `release-ceremony.ts publish`
-      refuses any new staging candidate on a channel whose head is EARNED (adopt-before-author preflight, no override; `revert`
-      is the only earned-tier verb), so a long-lived channel cannot take a second candidate — the a2o fixture hides this by
-      minting a fresh channel per run (`runtime:coordinators:elohim:a2o-<stamp>`). The story's "ONE head with two tiers" implies
-      publish-over-earned must be admissible once the publisher has ADOPTED the earned head (AUTHOR-THEN-ADOPT arm). Current
-      state: workaround = fresh channel per release (epic Task 2 fix round 1); the driver fix is an open rung-5 item.
+      DELTA 2026-09-03 22:3xZ (scope, from the 0.7 cutover): this habit's green covers COORDINATOR-ONLY releases — integrity
+      zomes, DNA hashes and the conductor line unchanged. The holochain 0.6→0.7 cutover was three breaks at once (conductor
+      data layer with no upstream migration, integrity hashes moved on the hdk/hdi bump, kitsune2 0.4↔0.5 cannot talk) and
+      NONE of the adoption controller's vehicles carried it: the fleet was wiped and re-genesised (operator authorization
+      2026-09-03). That is not rung-5 evidence and must not be counted as such. The missing rung — carrying a network's data
+      across a lineage break, mixed-version peers still talking through the storage P2P plane, a migrate-from recipe declared
+      in the release manifest BEFORE data is held, adoption as a Mishpat commitment with a revert — is filed as
+      genesis/data/timeline/backlog/2026-09-03-lineage-crossing-migration-rna.md. Today's wipe is the last big-bang by intent.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
@@ -2614,55 +2621,6 @@ habits:
       channel with no Jenkins roll and no operator hand on any pod, each with its cycle-time row
       in the arc doc — the CI roll is then no longer a delivery path for the class and the
       register describes a product, not a practice.
-
-  - id: happ-lineage-migration
-    invariant: >
-      A hApp version crossing (an integrity change, a new DNA hash) is carried by the network
-      itself: refused at verify unless the release names what it migrates from and the elohim's
-      migration commitment for that path is already notarized (never a per-node or household consent); adopted beside v1 under the SAME agent key; every witnessed fact
-      crosses with its original v1 action + signature, re-verified by v2's own validation; dual-cell
-      peers bridge the window; revert is free by re-election until a separately ratified sunset
-      closes the v1 chains. No wipe, no re-seed, no re-key, ever again.
-    status: red
-    active: false
-    checks:
-      - "a2o @concern:happ-lineage-migration (genesis/a2o/features/delivery/happ-lineage-migration.feature — Stations 1-10, @wip; steps not yet written; rehearsal = node_registry v1 → v1+NotarizationWitness on the household mesh, 0.7)"
-      - "spike verdict (§9 Lane B, conductor fork): must_get_record_from_lineage host fn measured in elohim/holochain-conductor before B2 is decided — recorded as a dated delta below"
-    evidence: >
-      DELTA 2026-09-03 (birth, RED): declared after the 0.6→0.7 cutover proved the class has no vehicle
-      (the fleet was wiped; rung 5 passed 5/5 on 0.7 but carries only coordinator bytes on a fixed line).
-      Grounded by four readers (Sonnet ×2, Opus, Codex): the v1 action signature carries no DNA hash and
-      verifies under v2; `must_get_*` is same-DNA only so the proof is embedded; upstream ships a
-      chain-switch test (#5842) validating a signed summary against DNA-properties signers — authorship
-      preserved, notarization not, which is the gap the NotarizationWitness closes. Rehearsal DNA:
-      node_registry (6 entry types, 1 storage call site, own bundle, not health-supervised). First
-      runnable red: Station 1 (verify's DnaLineageMismatch gains its positive branch). Not active: the
-      WIP fence is full (dataplane-convergence, runtime-death-witnessed); promotion is the operator's call.
-
-      DELTA 2026-09-04 (Probes A+B, sweettest on the 0.7 line, `sweettest/src/tests/happ_lineage_migration.rs`, EXIT=0, 2 passed;
-      re-run independently by the chief, 164 s): the KERNEL is green — v1 record re-created on v2 keeps its entry hash; the
-      NotarizationWitness carrying the v1 action + signature is accepted by v2's own validation; a flipped signature and a
-      foreign lineage hash are refused with typed messages; two cells under one agent key; late open_chain accepted.
-      FINDING: close_chain is not a fence (author and single-conductor authority both accept post-close writes) — Station 8
-      rewritten (the fence is ours: v1 cell disabled, v2 refuses carried facts after the close); Probe B2 (two conductors)
-      opened. Status stays RED: the habit measures the STORY on the household mesh (0 of 10 stations), not the kernel.
-      Landing rule: the witness type rides cargo feature `lineage-witness` so the default pack stays on `dna-hashes.baseline`.
-
-      DELTA 2026-09-04 (Probe B2, two conductors, `happ_lineage_migration.rs::probe_b2_remote_authority_after_close`, 1 passed,
-      EXIT=0, re-run by the chief): the remote agent-activity authority applies ActionAfterChainClose — rejects the FIRST
-      post-close action (seq close+1) and issues a warrant — but the tail after it validates again and the post-close record
-      stays fetchable locally and over the network. The sunset fence is ours (v1 cell disabled + v2 refuses carried facts after
-      the close, Station 8); the warrant is read as evidence. De-risk pass complete; the MVP plan is the execution surface.
-    refs:
-      - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
-      - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
-      - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (ladder row 6)"
-      - "upstream kernel: elohim/holochain-conductor/crates/holochain/tests/tests/migration.rs (chain-switch, #5842)"
-    retire-when: >
-      when three consecutive integrity changes reach the alpha fleet through their release channel
-      with every witness verified and zero records re-seeded from outside, each with its cycle-time
-      row in the arc doc — the wipe is then not a delivery path for any class and the register
-      describes a product, not a practice.
 
   - id: custodial-authority-answerable
     invariant: >

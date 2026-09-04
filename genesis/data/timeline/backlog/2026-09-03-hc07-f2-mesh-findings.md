@@ -112,7 +112,35 @@ panics ×20 ("fixture … unreadable") in every edge build — #1423 (0.6, befor
 module. Fix: COPY the two fixture roots into the `check` stage (the path-dep COPY trap), or embed the fixtures with
 `include_str!`.
 
-## 10. Apparatus, fixed on the branch (for the record)
+## 10. Doorway worker pool: one auth token for many conductors — STANDING, exposed on the fresh 0.7 fleet
+
+doorway-alpha-b's pool dials every peer in `CONDUCTOR_URLS` (the seven conductor pods' 8445) but mints its app auth
+token on `CONDUCTOR_ADMIN_URL` (adam's conductor only); a token minted by one conductor is invalid on another, so each
+foreign session is accepted then closed ("Conductor closed connection: None" ×N/min, workers flapping 0↔2). Tokens
+are per-conductor: the pool must mint on each target's admin (`conductorWsHost(...):8444`) or restrict its workers to
+the primary. Separately, both doorways' `--conductor-url` still named the pre-split storage host (fixed in the
+manifests, 2026-09-04).
+
+## 11. First re-seed of a fresh fleet (genesis #1553, 2026-09-04 03:xxZ) — what the pipeline still assumes
+
+- `Verify Target Health` gated on the site root, which is 503 until the seed exists (fixed: `/health`, 83ae73bda).
+- `Seed Conductor Identities` reported `[C] Conflict` for matthew: his conductor already embodied a UUID human id
+  (`5f27bc9b-…`) before the seeder's identities leg reached it. Loki names the author: doorway A's
+  `auth_routes` — "Doorway: created Holochain identity via imagodei zome: 5f27bc9b… (display_name=Matthew)" at
+  03:35:29Z during the Seed Database stage's account seeding, then the SAME human_id and action hash reported as
+  "created" for Bub, Charlie, … (the hosted path is create-or-return on the conductor's single Human, logged as a
+  create). One agent = one Human, so the CI pipeline's order (Seed Database → accounts through the doorway → THEN
+  Seed Substrate → conductor identities) embodies matthew's conductor with a doorway-minted UUID first; the household
+  prologue already runs "Conductor Identities cast BEFORE Seed Humans" for exactly this reason — the genesis
+  Jenkinsfile needs the same order, and the doorway's hosted create should refuse (not echo) when the conductor
+  already embodies a different human.
+- `stakes seed adam: HTTP 403` — adam's storage runs with `ALLOW_SEED_NETWORK_STAKES` off (posture, not a bug; the
+  manifest seeded on matthew + jessica).
+- The landing and lamad-spa rows seed with `blobHash: null` / `serverBlobHash: null`: the SPA bundles are staged by
+  the APP pipeline's "Upload SPA Blob" stage, so `/` stays 503 and `/lamad/` 404 until an app run follows the seed —
+  the app run that ran before the roll (#1688) declared against the old fleet and is gone with the wipe.
+
+## 12. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
   a2o run executes from — a worktree that installs via `MESH_HAPP_PATH` must also stage `workdir/` (done).

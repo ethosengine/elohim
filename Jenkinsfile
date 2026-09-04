@@ -662,8 +662,28 @@ apiVersion: v1
 kind: Pod
 spec:
  serviceAccount: jenkins-deployer
- nodeSelector:
-    node-type: edge
+ # operations OR edge, operations preferred: the edge label is the 7.6 GB ThinkPads and
+ # a memory request alone still lands there (requests count reservations, not the
+ # 3-5 GB the peers actually leave free) — elohim #1691 landed on thinkc-p1s again.
+ # Same shape as the DNA pipeline's sweettest shards.
+ affinity:
+   nodeAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+       nodeSelectorTerms:
+         - matchExpressions:
+             - key: node-type
+               operator: In
+               values:
+                 - operations
+                 - edge
+     preferredDuringSchedulingIgnoredDuringExecution:
+       - weight: 100
+         preference:
+           matchExpressions:
+             - key: node-type
+               operator: In
+               values:
+                 - operations
  volumes:
   - name: containerd-sock
     hostPath:
@@ -680,10 +700,16 @@ spec:
    command:
    - cat
    tty: true
+   # memory: the Angular build needs ~5 GB; with no request the scheduler put this
+   # pod on a 7.6 GB ThinkPad twice (elohim #1689/#1690, 2026-09-04): the node hit
+   # 0.13 GB free, the JNLP channel dropped and the controller's exec fallback got
+   # HTTP 500 x5. A real request keeps the build on a node that can hold it.
    resources:
      requests:
+       memory: "6Gi"
        ephemeral-storage: "2Gi"
      limits:
+       memory: "10Gi"
        ephemeral-storage: "5Gi"
    volumeMounts:
    - name: containerd-sock
