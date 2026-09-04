@@ -1082,11 +1082,13 @@ interface LineageState {
   station8Active?: boolean;
   /** Station 8: the sunset commitment naming the migration, once notarized. */
   sunsetCommitmentCid?: string;
-  /** Station 8: each peer's own v1 CloseChain action, once the harness has
-   * performed the close/open the runtime's own sunset ceremony would (see the
-   * Stations 7-8 module note on what is, and is not, wired on this substrate). */
+  /** Station 8: each peer's own `seal_close` receipt, once the harness has
+   * called the coordinator's own seal ceremony that the runtime's sunset
+   * reaction would (see the Stations 7-8 module note on what is, and is
+   * not, wired on this substrate). */
   closeActionHashes?: Partial<Record<PeerName, string>>;
   openActionHashes?: Partial<Record<PeerName, string>>;
+  sealWitnessHashes?: Partial<Record<PeerName, string>>;
   /** Station 8: the harness's post-close write on james's v1 cell, and its
    * attempted carry into v2 — both read by the Thens that follow. */
   postCloseWriteActionHash?: string;
@@ -1707,39 +1709,44 @@ When("each peer's runtime next reconciles", { timeout: 400_000 }, async function
     // show — the following Then reads it directly.
     if (!c.sunsetCommitmentCid) return;
     // AFTER the sunset (the second occurrence): NAMED GAP — nothing in
-    // production reacts to a notarized sunset commitment by calling
-    // `close_chain_for`/`open_chain_from` (grepped `elohim-storage/src` and
-    // `elohim/holochain/dna` for both names outside this file and the
-    // epic's own sweettest; `services/lineage_bridge.rs`'s own module doc
-    // says the same of `revert`/`sunset`: "Deliberately NOT called by
-    // LineageRoles::revert/sunset — those are Task 13/14's ceremonies").
-    // This step performs the DNA-level half of that ceremony directly,
-    // through each peer's OWN key on each peer's OWN cells — never a
-    // forgery — standing in for the missing reconcile trigger exactly as
-    // Station 9's harness stands in for a fourth peer and Station 10's for
-    // the council. The storage-side `closed` flag that ceremony would also
-    // flip has no admin trigger at all (see the Thens below); this step
-    // does not attempt to fake that half.
+    // production reacts to a notarized sunset commitment by calling the
+    // coordinator's own `seal_close` (grepped `elohim-storage/src` for the
+    // name outside this file and the epic's own sweettest;
+    // `services/lineage_bridge.rs`'s own module doc says the same of
+    // `revert`/`sunset`: "Deliberately NOT called by
+    // LineageRoles::revert/sunset — those are Task 13/14's ceremonies", and
+    // Task 14's own ruling splits 14a — this DNA-side seal — from 14b, "the
+    // storage vehicle + LineageRoles::sunset", not yet landed). This step
+    // calls the coordinator's OWN one-call ceremony directly, through each
+    // peer's OWN key on each peer's OWN cells — never a forgery — standing
+    // in for the missing reconcile trigger exactly as Station 9's harness
+    // stands in for a fourth peer and Station 10's for the council.
+    // `seal_close` closes v1, opens v2 naming that close, AND carries the
+    // close itself into v2 as a witness, atomically — the Thens below read
+    // its receipt rather than re-deriving any of that. The storage-side
+    // `closed` flag 14b would also flip has no admin trigger at all (see
+    // the Thens below); this step does not attempt to fake that half.
     if (c.closeActionHashes) return; // idempotent — already performed
     c.closeActionHashes = {};
     c.openActionHashes = {};
+    c.sealWitnessHashes = {};
     for (const peer of PEER_NAMES) {
       const passport = await readPassport(peer);
       const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
       assert.ok(role?.lineage, `${peer} has no lineage view — not dual-celled`);
       const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
-      const closeHash = await closeV1Chain(peer, role.lineage.authoringDnaHash);
-      c.closeActionHashes[peer] = closeHash;
-      const openHash = await openV1SuccessorChain(
-        peer,
-        sideAppId,
-        role.lineage.readingDnaHash,
-        closeHash
+      const agent = await baseAgentKey(peer);
+      const receipt = await sealClose(peer, sideAppId, role.lineage.readingDnaHash, agent);
+      assert.ok(
+        !receipt.already_sealed,
+        `${peer}'s v1 chain was already sealed before this step ran`
       );
-      c.openActionHashes[peer] = openHash;
+      c.closeActionHashes[peer] = receipt.close_hash;
+      c.openActionHashes[peer] = receipt.open_hash;
+      c.sealWitnessHashes[peer] = receipt.witness_hash;
       console.error(
-        `[happ-lineage-migration] Station 8: ${peer} closed v1 (${closeHash}) and opened v2 ` +
-          `(${openHash})`
+        `[happ-lineage-migration] Station 8: ${peer} sealed — close ${receipt.close_hash}, open ` +
+          `${receipt.open_hash}, seal witness ${receipt.witness_hash}`
       );
     }
     return;
@@ -1829,23 +1836,33 @@ Then('no peer asked anyone in the household anything', function (this: E2EWorld)
 // Landed and used directly: the bridge sweep ticks automatically once a
 // window is open (Station 5/6); `mishpat::get_commitment_state_links` makes a
 // revocation's `revoked` state visible on EVERY peer's own conductor, not
-// only the author's (Station 7's Then on jessica's fresh verify); the DNA's
-// own `close_chain_for`/`open_chain_from`/`commit_witness` externs are real,
-// callable coordinator functions (Station 8's kernel-level Thens).
+// only the author's (Station 7's Then on jessica's fresh verify); and, in the
+// working tree as of this dispatch, Task 14a's whole DNA-side seal —
+// `seal_close` (one coordinator call: close v1, open v2 naming that close,
+// carry the close into v2 as a witness), `get_closes_for` (the coordinator's
+// own read index for "has this author's chain been sealed?"), and the
+// integrity zome's `refuse_carried_after_close` rule, whose refusal contains
+// the literal words "after close" (Station 8's Thens read all three
+// directly). That rule is real but NARROW: it reads the CALLING agent's own
+// earlier witnesses for the same lineage, never a DHT-wide index, so it
+// reliably catches a peer self-carrying their OWN post-close fact but not
+// (yet) a courier carrying someone ELSE's — a hole the rule's own source
+// comment names, not one this file invented; see the relevant Then's comment
+// for exactly which peers it reaches today.
 //
 // NOT landed, as of this reading (`elohim-storage/src`, grepped 2026-09-04):
 // no production call site reaches `LineageRoles::revert` or
 // `LineageRoles::sunset` outside their own unit tests — `watch.rs`'s C6b
 // idempotence exit means an ALREADY-APPLIED release is never re-verified, so
-// nothing reacts to a revoked or sunset commitment automatically; there is no
-// `/admin/lineage/{revert,sunset}` route (only `/admin/lineage/reset`
-// exists), so the storage-side `closed` flag cannot be flipped from outside
-// the process at all; and no validation arm compares a carried action's chain
-// position against its author's own close, so "after close" is not a refusal
-// this substrate can name yet. Every Then that depends on one of these is
-// written against the REAL contract (correct once the wiring lands) and is
-// named here rather than quietly worked around — see each Then's own comment
-// for the specific gap it measures.
+// nothing reacts to a revoked or sunset commitment automatically; and there
+// is no `/admin/lineage/{revert,sunset}` route (only `/admin/lineage/reset`
+// exists), so the storage-side `closed` flag `LineageRoles::sunset` would
+// flip cannot be set from outside the process at all — Task 14's own
+// ruling names this remaining half "14b: the storage vehicle +
+// LineageRoles::sunset + Station 8 steps", not yet landed. Every Then that
+// depends on one of these is written against the REAL contract (correct
+// once the wiring lands) and is named here rather than quietly worked
+// around — see each Then's own comment for the specific gap it measures.
 // ---------------------------------------------------------------------------
 
 // ── Station 3 — james, the canary, runs v2 beside v1 under the same key with nothing restarted ──
@@ -2527,69 +2544,59 @@ async function walkV1Records(
   }
 }
 
-/** `close_chain_for(successorDnaHash)` on one peer's OWN v1 cell, through
- * their own conductor and own key — never a forgery. Returns the new
- * `CloseChain` action hash, base64. */
-async function closeV1Chain(peer: PeerName, successorDnaHashB64: string): Promise<string> {
-  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
-  try {
-    const actionHash = (await rail.call(
-      'close_chain_for',
-      decodeHashFromBase64(successorDnaHashB64)
-    )) as Uint8Array;
-    return encodeHashToBase64(actionHash);
-  } finally {
-    await rail.close();
-  }
+/**
+ * `seal_close(v1_cell)` on one peer's OWN v2 side app cell — the coordinator's
+ * OWN one-call ceremony (Station 8's own section in
+ * `node_registry_coordinator/src/lib.rs`): closes v1 toward v2, opens v2 from
+ * that close, and carries the close itself into v2 as a `NotarizationWitness`
+ * proof, in that order, atomically. `agentB64` is the one key both cells
+ * share — `v1_cell` is built from it here rather than read back from
+ * `listApps`, so a caller who already has it need not re-fetch.
+ *
+ * Every field of `SealReceipt` is already rendered as canonical base64 by the
+ * zome (its own doc: "the zome renders; storage never re-derives a hash"),
+ * so no `encodeHashToBase64` round trip is needed on the read side.
+ */
+interface SealReceiptWire {
+  close_hash: string;
+  open_hash: string;
+  witness_hash: string;
+  already_sealed: boolean;
 }
-
-/** `open_chain_from((predecessorDnaHash, closeActionHash))` on one peer's OWN
- * v2 side app cell, through their own conductor and own key. Returns the new
- * `OpenChain` action hash, base64. */
-async function openV1SuccessorChain(
+async function sealClose(
   peer: PeerName,
   sideAppId: string,
-  predecessorDnaHashB64: string,
-  closeActionHashB64: string
-): Promise<string> {
+  v1DnaHashB64: string,
+  agentB64: string
+): Promise<SealReceiptWire> {
   const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
   try {
-    const actionHash = (await rail.call('open_chain_from', [
-      decodeHashFromBase64(predecessorDnaHashB64),
-      decodeHashFromBase64(closeActionHashB64),
-    ])) as Uint8Array;
-    return encodeHashToBase64(actionHash);
+    const v1CellId = [decodeHashFromBase64(v1DnaHashB64), decodeHashFromBase64(agentB64)];
+    return (await rail.call('seal_close', v1CellId)) as SealReceiptWire;
   } finally {
     await rail.close();
   }
 }
 
 /**
- * Carries ONE peer's own v1 close into their own v2 as a `NotarizationWitness`
- * proof — the real, narrow claim behind the story's "each peer carries its
- * own close into v2 as a proof": see the Then that calls this for the CAVEAT
- * a `CloseChain` action carries no entry hash, so no `EntryToWitness` link (and
- * so no `get_witnesses_for` query) can ever answer for it. Returns the new
- * `NotarizationWitness` action hash, base64 — the one readback a peer keeps
- * of its own call.
+ * `get_closes_for((lineageDnaHash, author))` — the coordinator-side read
+ * index `seal_close` authors (`AuthorToClose`), and the real query surface
+ * behind "each peer carries its own close into v2 as a proof": unlike a
+ * carried CONTENT record, a close IS queryable, because `seal_close` builds
+ * this index precisely because validation itself cannot traverse links.
  */
-async function carryOwnCloseIntoV2(
+async function getClosesFor(
   peer: PeerName,
   sideAppId: string,
-  v1DnaHashB64: string
-): Promise<string> {
-  const records = await walkV1Records(peer);
-  const closeRecord = records.at(-1);
-  assert.ok(closeRecord, `${peer}'s v1 chain is empty — no close action to carry`);
+  v1DnaHashB64: string,
+  authorB64: string
+): Promise<unknown[]> {
   const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
   try {
-    const actionHash = (await rail.call('commit_witness', {
-      lineage_dna_hash: decodeHashFromBase64(v1DnaHashB64),
-      proofs: [
-        { action: closeRecord.hashed.content, signature: closeRecord.signature, entry: null },
-      ],
-    })) as Uint8Array;
-    return encodeHashToBase64(actionHash);
+    return (await rail.call('get_closes_for', [
+      decodeHashFromBase64(v1DnaHashB64),
+      decodeHashFromBase64(authorB64),
+    ])) as unknown[];
   } finally {
     await rail.close();
   }
@@ -3285,10 +3292,11 @@ Then(
       );
     }
     // "In that order" is enforced by CONSTRUCTION, not merely observed: the
-    // shared "each peer's runtime next reconciles" step (below) performs
-    // `open_chain_from` with the close action's own returned hash as an
-    // input, which it cannot have without the close call already having
-    // returned it.
+    // shared "each peer's runtime next reconciles" step (above) calls the
+    // coordinator's own `seal_close`, whose internal order is close v1 first,
+    // read the signed close BACK, then open v2 naming that close's own
+    // returned hash — an order it cannot invert (there is no close hash to
+    // name until the predecessor call has returned one).
   }
 );
 
@@ -3305,30 +3313,34 @@ Then(
 
 Then(
   'each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended',
-  { timeout: 180_000 },
+  { timeout: 60_000 },
   async function (this: E2EWorld) {
-    // CAVEAT, named rather than hidden: `commit_witness` filters proofs by
-    // `action.entry_hash()`, and a `CloseChain` action commits no entry — so
-    // no `EntryToWitness` link is ever created for it, and there is no query
-    // by which a THIRD peer could ask "does v2 hold my close as a witness"
-    // (the same absent-projection shape Station 4 named for node-registry
-    // records generally). The real, checkable claim this Then asserts is
-    // narrower and still true: the `NotarizationWitness` entry itself
-    // commits successfully on each peer's own v2 cell, carrying that peer's
-    // own close action and signature.
+    // `seal_close` (the shared "next reconciles" step, above) already
+    // authored this witness as step 3 of its own one-call ceremony — this
+    // Then reads it back TWO ways: the receipt this dispatch's own harness
+    // captured, and `get_closes_for`, the coordinator's OWN read index
+    // (`AuthorToClose`) built for exactly this question. Unlike a carried
+    // CONTENT record (Station 4's own named gap — no `EntryToWitness` link
+    // for an entry-less `CloseChain`), a close IS queryable, because
+    // `seal_close` builds this second index precisely because validation
+    // itself cannot traverse links.
+    const c = lineage();
     for (const peer of PEER_NAMES) {
+      const witnessHash = c.sealWitnessHashes?.[peer];
+      assert.ok(witnessHash, `no seal witness hash captured for ${peer}`);
       const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
       const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
       assert.ok(role.lineage, `${peer} has no lineage view`);
-      const witnessActionHash = await carryOwnCloseIntoV2(
-        peer,
-        sideAppId,
-        role.lineage.readingDnaHash
+      const agent = await baseAgentKey(peer);
+      const closes = await getClosesFor(peer, sideAppId, role.lineage.readingDnaHash, agent);
+      assert.ok(
+        closes.length > 0,
+        `get_closes_for reports no seal for ${peer}'s own (lineage, agent) — the read index ` +
+          'seal_close builds is empty'
       );
-      assert.ok(witnessActionHash, `${peer}'s own close was not accepted as a witness on v2`);
       console.error(
-        `[happ-lineage-migration] Station 8: ${peer} carried its own close into v2 as witness ` +
-          witnessActionHash
+        `[happ-lineage-migration] Station 8: ${peer}'s own close is a v2 witness (${witnessHash}), ` +
+          `indexed by ${closes.length} AuthorToClose link(s)`
       );
     }
   }
@@ -3397,18 +3409,34 @@ When(
     const records = await walkV1Records('james');
     const postCloseRecord = records.at(-1);
     assert.ok(postCloseRecord, "james's v1 chain is empty after the post-close write");
+    const proof = {
+      lineage_dna_hash: decodeHashFromBase64(c.v1DnaHash as string),
+      proofs: [
+        {
+          action: postCloseRecord.hashed.content,
+          signature: postCloseRecord.signature,
+          entry: null,
+        },
+      ],
+    };
+    // `refuse_carried_after_close` reads the CALLING agent's OWN earlier
+    // witnesses for the same lineage (`must_get_agent_activity` from the
+    // caller's `prev_action`) — never a DHT-wide check. james ALREADY
+    // carries his own seal witness (the previous Then's `sealWitnessHashes`),
+    // so james self-carrying his own post-close fact is the case the rule
+    // is built to catch. matthew and jessica are attempted too (the story's
+    // own "on every peer"), through their OWN v2 cells — see the next
+    // Then's comment for what the landed rule does and does not promise
+    // for a courier who never sealed and never carried the close.
     const refusals: Partial<Record<PeerName, string | null>> = {};
     for (const peer of PEER_NAMES) {
-      refusals[peer] = await commitWitnessExpectingRefusal(peer, {
-        lineage_dna_hash: decodeHashFromBase64(c.v1DnaHash as string),
-        proofs: [
-          {
-            action: postCloseRecord.hashed.content,
-            signature: postCloseRecord.signature,
-            entry: null,
-          },
-        ],
-      });
+      refusals[peer] = await commitWitnessExpectingRefusal(peer, proof);
+      console.error(
+        `[happ-lineage-migration] Station 8: ${peer}'s v2 on james's post-close proof — ` +
+          (refusals[peer] === null
+            ? 'ACCEPTED'
+            : `refused: ${String(refusals[peer]).slice(0, 160)}`)
+      );
     }
     c.postCloseWitnessRefusals = refusals;
   }
@@ -3428,13 +3456,25 @@ Then(
 Then(
   "v2's validation on every peer refuses the carried proof, naming {string} as its reason",
   function (this: E2EWorld, storyReason: string) {
-    // NAMED GAP: no arm in `node_registry_integrity`'s witness validation
-    // compares a carried action's chain position against its author's own
-    // `CloseChain` action (grepped `commit_witness`'s validation path,
-    // 2026-09-04 — no chain-position check found). This Then asserts the
-    // real contract the story specifies and will legitimately read the
-    // post-close proof as ACCEPTED (not refused) until that check is
-    // written — a finding for the next seat, not a step defect.
+    // MEASURED FROM THE SOURCE (`refuse_carried_after_close`,
+    // node_registry_integrity/src/lib.rs — Task 14a, in the working tree as
+    // of this dispatch): the rule refuses a proof authored by agent A at
+    // action_seq S when the CALLING agent's OWN earlier witnesses (for the
+    // same lineage) already carry a `CloseChain` for A at a lower seq —
+    // walked via `must_get_agent_activity` from the CALLER's own chain,
+    // never a DHT-wide index. james self-carries his own post-close fact
+    // into his OWN v2 cell, whose earlier seal witness already names his
+    // own close — the case this rule exists to catch, and its refusal
+    // (containing the literal words "after close") is real and strict.
+    // matthew and jessica carry the SAME proof as COURIERS whose own v2
+    // chains have never recorded JAMES's close (only their own) — the
+    // source's own comment names this precisely as a real, undecided-by-HDI
+    // hole: "a COURIER that never sealed and never carried the close cannot
+    // be refused by any deterministic HDI rule ... That hole is named, not
+    // hidden," left for leg (i) of the fence (the storage-side v1-cell
+    // disable, Task 14b, not yet landed). This Then still asserts the
+    // story's literal claim for all three peers, so a live run tells the
+    // truth about which peers the landed rule reaches today.
     const refusals = lineage().postCloseWitnessRefusals;
     assert.ok(refusals, 'no post-close witness attempt was made — run the previous When first');
     for (const peer of PEER_NAMES) {
