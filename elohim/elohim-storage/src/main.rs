@@ -1370,6 +1370,19 @@ async fn async_main(
     // does NOT abort startup — the node still serves HTTP/blobs.
     //
     let peer_policy_path = config.peer_policy_path.clone();
+    // Task 6 (Holochain Evolution Epic MVP): the ONE per-role authoring app
+    // id resolver every `HcRegistryInputs` construction site below shares.
+    // Declared unconditionally (doesn't depend on `admin_url`) and BEFORE
+    // `hc_registry_for_http` so it's in scope for the whole function,
+    // including the several spawned-task construction sites further down
+    // that build their own `HcRegistryInputs` for a late-connect. With no
+    // lineage window ever opened, `lineage_roles.app_id_for(role)` always
+    // returns `args.app_id` — byte-for-byte the value every one of those
+    // sites hard-coded before this change.
+    let lineage_roles = std::sync::Arc::new(elohim_storage::lineage_roles::LineageRoles::new(
+        &args.app_id,
+        &elohim_storage::hc_client_registry::SUPERVISED_ROLES,
+    ));
     // Populated below; read by HTTP layer in Task 5.
     let mut hc_registry_for_http: Option<
         std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
@@ -1393,6 +1406,7 @@ async fn async_main(
                 admin_url: admin_url.clone(),
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
+                lineage: std::sync::Arc::clone(&lineage_roles),
             },
         )
         .await;
@@ -1407,6 +1421,7 @@ async fn async_main(
                 admin_url: admin_url.clone(),
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
+                lineage: std::sync::Arc::clone(&lineage_roles),
             },
             shutdown_tx.clone(),
         );
@@ -1470,6 +1485,7 @@ async fn async_main(
                         admin_url: admin_url.clone(),
                         app_url: args.app_url.clone(),
                         app_id: args.app_id.clone(),
+                        lineage: std::sync::Arc::clone(&lineage_roles),
                     };
                     let shutdown_tx = shutdown_tx.clone();
                     let blob_store = blob_store.clone();
@@ -2549,6 +2565,7 @@ async fn async_main(
                             admin_url: admin_url.clone(),
                             app_url: args.app_url.clone(),
                             app_id: args.app_id.clone(),
+                            lineage: std::sync::Arc::clone(&lineage_roles),
                         };
                     let reanchor_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
@@ -2647,6 +2664,7 @@ async fn async_main(
                         admin_url: admin_url.clone(),
                         app_url: args.app_url.clone(),
                         app_id: args.app_id.clone(),
+                        lineage: std::sync::Arc::clone(&lineage_roles),
                     };
                     let lamad_late_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
@@ -4109,23 +4127,22 @@ async fn async_main(
         http_server = http_server.with_import_api(Arc::clone(api));
     }
 
-    // Initialize and attach Node Registry API
-    info!("Initializing Node Registry API connection...");
-    match elohim_storage::NodeRegistryApi::connect(
-        args.admin_url
-            .clone()
-            .unwrap_or_else(|| "ws://localhost:4444".to_string()),
-        args.app_url.clone(),
-        args.app_id.clone(),
-    )
-    .await
-    {
-        Ok(api) => {
-            info!("  ✅ Node Registry API connected");
+    // Initialize and attach Node Registry API — registry-backed (Task 6,
+    // Holochain Evolution Epic MVP). `"node_registry"` is one of
+    // `HcClientRegistry::SUPERVISED_ROLES`, so the shared registry already
+    // attempted the bounded boot-ramp connect and armed the
+    // forever-reconnect supervisor for it above; this constructor never
+    // connects or blocks, it only wraps the shared handle. No registry
+    // (admin_url unset) means no conductor bridges at all — Node Registry
+    // API is simply unavailable, same as every other role in that shape.
+    match hc_registry_for_http.as_ref() {
+        Some(registry) => {
+            let api = elohim_storage::NodeRegistryApi::new(Arc::clone(registry));
             http_server = http_server.with_node_registry_api(Arc::new(api));
+            info!("  ✅ Node Registry API wired to the shared conductor registry");
         }
-        Err(e) => {
-            warn!("  ⚠️ Node Registry API connection failed: {}", e);
+        None => {
+            warn!("  ⚠️ Node Registry API disabled: no conductor registry (admin_url unset)");
         }
     }
 
@@ -4766,6 +4783,7 @@ async fn async_main(
                 admin_url,
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
+                lineage: std::sync::Arc::clone(&lineage_roles),
             };
             let connect_shutdown = shutdown_tx.subscribe();
             let fill_shutdown = shutdown_tx.subscribe();
@@ -5201,6 +5219,7 @@ async fn async_main(
                 admin_url,
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
+                lineage: std::sync::Arc::clone(&lineage_roles),
             }
         });
         // The reconcile arms ask peers through `ReconcilePeers`; a libp2p handle

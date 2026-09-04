@@ -14,6 +14,7 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::hc_client::{HcClient, HcClientConfig};
+use crate::lineage_roles::LineageRoles;
 
 /// Capped exponential backoff for a conductor-bridge reconnect loop.
 ///
@@ -77,12 +78,20 @@ pub struct HcClientRegistry {
     /// write path landing per 2026-05-26-substrate-rea-replication-fix.md
     /// (closes Gap C/D — REA + content row replication on alpha).
     pub lamad: RwLock<Option<Arc<HcClient>>>,
+    /// `node_registry` role — hosts the `node_registry_coordinator` zome
+    /// (shard assignments). Task 6 of the Holochain Evolution Epic MVP:
+    /// `NodeRegistryApi` used to own a private, unsupervised `HcClient` of
+    /// its own; folding it into this registry gives it the same
+    /// bounded-boot-ramp + forever-reconnect + supervisor liveness every
+    /// other role already has, instead of connecting once at startup and
+    /// staying dead forever after any conductor restart.
+    pub node_registry: RwLock<Option<Arc<HcClient>>>,
 }
 
 /// The roles the supervisor keeps alive. Ordered coldest-first, matching the
 /// boot ramp: `infrastructure` is the role most likely to be `None`-stamped on
 /// a slow conductor boot.
-pub const SUPERVISED_ROLES: [&str; 3] = ["infrastructure", "imagodei", "lamad"];
+pub const SUPERVISED_ROLES: [&str; 4] = ["infrastructure", "imagodei", "lamad", "node_registry"];
 
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
@@ -91,6 +100,11 @@ pub struct HcRegistryInputs {
     pub admin_url: String,
     pub app_url: String,
     pub app_id: String,
+    /// Per-role AUTHORING app id resolver (Task 6). With no lineage window
+    /// ever opened, `lineage.app_id_for(role)` always returns `app_id`
+    /// above — every `HcClientConfig` this registry builds is byte-for-byte
+    /// identical to the pre-Task-6 hard-coded `app_id.clone()`.
+    pub lineage: Arc<LineageRoles>,
 }
 
 impl HcClientRegistry {
@@ -101,10 +115,12 @@ impl HcClientRegistry {
         let infrastructure = Self::connect_role(inputs, "infrastructure").await;
         let imagodei = Self::connect_role(inputs, "imagodei").await;
         let lamad = Self::connect_role(inputs, "lamad").await;
+        let node_registry = Self::connect_role(inputs, "node_registry").await;
         Self {
             infrastructure: RwLock::new(infrastructure),
             imagodei: RwLock::new(imagodei),
             lamad: RwLock::new(lamad),
+            node_registry: RwLock::new(node_registry),
         }
     }
 
@@ -115,6 +131,7 @@ impl HcClientRegistry {
             infrastructure: RwLock::new(None),
             imagodei: RwLock::new(None),
             lamad: RwLock::new(None),
+            node_registry: RwLock::new(None),
         }
     }
 
@@ -123,6 +140,7 @@ impl HcClientRegistry {
             "infrastructure" => Some(&self.infrastructure),
             "imagodei" => Some(&self.imagodei),
             "lamad" => Some(&self.lamad),
+            "node_registry" => Some(&self.node_registry),
             _ => None,
         }
     }
@@ -197,7 +215,10 @@ impl HcClientRegistry {
         let config = HcClientConfig {
             admin_url: inputs.admin_url.clone(),
             app_url: inputs.app_url.clone(),
-            app_id: inputs.app_id.clone(),
+            // Task 6: routes through the per-role lineage resolver. With no
+            // window open this returns `inputs.app_id` unchanged — the same
+            // value this line hard-coded before.
+            app_id: inputs.lineage.app_id_for(role),
             role: Some(role.to_string()),
         };
         let max_attempts: u32 = 5;
@@ -258,7 +279,8 @@ impl HcClientRegistry {
         let config = HcClientConfig {
             admin_url: inputs.admin_url.clone(),
             app_url: inputs.app_url.clone(),
-            app_id: inputs.app_id.clone(),
+            // Task 6: same resolver as `connect_role` above.
+            app_id: inputs.lineage.app_id_for(role),
             role: Some(role.to_string()),
         };
         let mut attempt: u32 = 0;
@@ -469,6 +491,7 @@ mod supervised_slot_tests {
         assert!(reg.infrastructure_client().is_none());
         assert!(reg.imagodei_client().is_none());
         assert!(reg.lamad_client().is_none());
+        assert!(reg.client("node_registry").is_none());
         // An unknown role is a miss, never a panic.
         assert!(reg.client("qahal").is_none());
     }
@@ -524,6 +547,7 @@ mod supervised_slot_tests {
                 admin_url: "ws://127.0.0.1:1".into(),
                 app_url: "ws://127.0.0.1:1".into(),
                 app_id: "elohim".into(),
+                lineage: std::sync::Arc::new(LineageRoles::new("elohim", &SUPERVISED_ROLES)),
             },
             shutdown_tx.clone(),
         );

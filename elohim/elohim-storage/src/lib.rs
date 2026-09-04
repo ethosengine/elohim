@@ -112,6 +112,7 @@ pub mod hc_client_registry;
 pub mod http;
 pub mod identity_handshake_service;
 pub mod import_handler;
+pub mod lineage_roles; // Task 6 (Holochain Evolution Epic MVP): per-role authoring app id resolver
 pub mod metadata;
 pub mod metrics; // Durable Prometheus app-metrics surface (/metrics) — design-decision toolkit P0
 pub mod mishpat_projection; // Mishpat commitment projection handler (DHT → SQLite sync, Slice-2a T5)
