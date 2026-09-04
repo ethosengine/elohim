@@ -100,6 +100,7 @@
  *   promote <channelId> <releaseCid> [--delegation <file>]
  *   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
  *   status <channelId>
+ *   attestations <releaseCid> [--builder <peerName|agentKey>]
  *
  * Common flags:
  *   --as <peerName>        act as this configured peer (default: first, "matthew")
@@ -173,6 +174,7 @@ Verbs:
   promote <channelId> <releaseCid> [--delegation <file>]
   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
   status <channelId>
+  attestations <releaseCid> [--builder <peerName|agentKey>]
 
 Options:
   --as <peerName>       act as this configured peer (default: first configured, "matthew")
@@ -896,6 +898,194 @@ async function cmdRevert(
   await declareEarned('revert', channelId, authored.releaseCid, flags, peers, timeoutMs);
 }
 
+// =============================================================================
+// attestations <releaseCid> — read-only soak evidence BY CID
+//
+// The `/admin/adoption` row is NOT an honest observable for a STAGED
+// candidate's attestation. A row's `attestations` block is evidence for the
+// release that row RESOLVED, and a row resolves the channel's WINNER — so a
+// candidate staged beneath an earned head appears in no apply-mode row; and
+// once the CANARY has applied it, its sweeps take the idempotence exit
+// (`already_current`, zero conductor calls) and the threshold read never runs
+// at all, leaving that row's `attestations` null. Measured across runs
+// shift-it5/it6-20260904: james's controller DID author the attestation
+// ("soak attestation authored for an applied release", ~30s after his
+// hot-swap) while no row ever reported it.
+//
+// So evidence for a specific release is asked for BY CID, the way
+// `scripts/release-attestation-probe.ts` and the storage controller's own
+// `release_attestation.rs` ask: walk `get_attestations_for_subject <cid>` for
+// the authenticated (cid, issuer) pairs, read each issuer's entry back for its
+// context, and classify. This verb is that read and nothing else — it authors
+// NOTHING (the probe, by contrast, authors attestations as part of its own
+// legs and must never be invoked to merely observe).
+// =============================================================================
+
+/** The generated attestation kind release soak evidence rides (release_attestation.rs). */
+const RIDDEN_ATTESTATION_KIND = 'attestation:device-health';
+/** `metadata_json.proof_evidence.kind` discriminator for release-soak evidence. */
+const SOAK_DISCRIMINATOR = 'release-soak';
+
+/** The coordinator's deterministic content id (content_store/src/attestation.rs). */
+function attestationContentId(kind: string, issuer: string, subject: string): string {
+  return `attest-${kind}-${issuer}-${subject}`;
+}
+
+interface QualifyingEvidence {
+  linkedCount: number;
+  qualifying: number;
+  total: number;
+  builderExcluded: number;
+  failed: number;
+  provenanceMismatched: number;
+  unresolved: number;
+  byArchetype: Record<string, number>;
+}
+
+/**
+ * Wire mirror of `release_attestation::classify` + `::tally`, and of
+ * `release-attestation-probe.ts`'s `countQualifying`: the link walk supplies
+ * the AUTHENTICATED issuer, the entry read supplies the context, and the two
+ * must agree. One qualifying voice per agent — a peer that attests twice does
+ * not become two peers. The builder's own never counts (C1).
+ */
+async function countQualifying(
+  conn: Awaited<ReturnType<typeof conductor>>,
+  releaseCid: string,
+  builderAgent: string | null
+): Promise<QualifyingEvidence> {
+  const linked: any[] = (await conn.call('get_attestations_for_subject', releaseCid)) as any[];
+  const issuers = [...new Set(linked.map((l: any) => String(l.issuer_cid)))];
+  const evidence: QualifyingEvidence = {
+    linkedCount: linked.length,
+    qualifying: 0,
+    total: 0,
+    builderExcluded: 0,
+    failed: 0,
+    provenanceMismatched: 0,
+    unresolved: 0,
+    byArchetype: {},
+  };
+  const counted = new Set<string>();
+
+  for (const issuer of issuers) {
+    const got: any = await conn.call('get_content_by_id', {
+      id: attestationContentId(RIDDEN_ATTESTATION_KIND, issuer, releaseCid),
+    });
+    const content = got?.content;
+    if (!content) {
+      evidence.total += 1;
+      evidence.unresolved += 1;
+      continue;
+    }
+    if (content.author_id !== issuer) {
+      // Provenance laundering: the generic replication path re-authors the id
+      // under the RECEIVING peer's key. Counted, never trusted.
+      evidence.total += 1;
+      evidence.provenanceMismatched += 1;
+      continue;
+    }
+    let meta: any = {};
+    try {
+      meta = JSON.parse(content.metadata_json ?? '{}');
+    } catch {
+      evidence.total += 1;
+      evidence.unresolved += 1;
+      continue;
+    }
+    const proof = meta.proof_evidence ?? {};
+    if (meta.subject_cid !== releaseCid || proof.releaseCid !== releaseCid) {
+      evidence.total += 1;
+      evidence.unresolved += 1;
+      continue;
+    }
+    // Not release-soak evidence at all (or revoked): not part of the denominator.
+    if (proof.kind !== SOAK_DISCRIMINATOR || meta.revocation) continue;
+    evidence.total += 1;
+    if (builderAgent !== null && issuer === builderAgent) {
+      evidence.builderExcluded += 1;
+      continue;
+    }
+    if (proof.outcome !== 'pass') {
+      evidence.failed += 1;
+      continue;
+    }
+    if (counted.has(issuer)) continue;
+    counted.add(issuer);
+    evidence.qualifying += 1;
+    const archetype = String(proof.deviceArchetype ?? 'unknown');
+    evidence.byArchetype[archetype] = (evidence.byArchetype[archetype] ?? 0) + 1;
+  }
+  return evidence;
+}
+
+/**
+ * `attestations <releaseCid> [--as <peer>] [--builder <peerName|agentKey>]`.
+ *
+ * ALWAYS emits one JSON object to stdout (rail #5) and exits 0 on a successful
+ * read — "no evidence yet" is `qualifying: 0`, an answer, never an error.
+ *
+ * Read it from the ATTESTER's own conductor (`--as james`) when you can: an
+ * issuer's own entry resolves under its own key, so `author_id === issuer`
+ * holds by construction, while a foreign read can legitimately land on the
+ * locally re-authored projection and classify as `provenanceMismatched` — a
+ * measured substrate defect (see `release-attestation-probe.ts`'s module doc)
+ * that DEFLATES a count and would read as absent evidence.
+ */
+async function cmdAttestations(
+  releaseCid: string,
+  flags: Flags,
+  peers: PeerConfig[],
+  timeoutMs: number
+) {
+  const actingPeer = resolveActingPeer(flags, peers);
+  const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
+
+  let builderAgent: string | null = null;
+  const builder = flags.builder;
+  if (builder && builder !== 'true') {
+    const builderPeer = peers.find(p => p.name === builder);
+    if (builderPeer) {
+      const builderConn = await conductor(
+        builderPeer.name,
+        builderPeer.admin,
+        builderPeer.app,
+        timeoutMs
+      );
+      builderAgent = builderConn.agent;
+      try {
+        await (builderConn.appWs.client as unknown as { close(): unknown }).close();
+      } catch {
+        /* best-effort */
+      }
+      try {
+        await builderConn.admin.client.close();
+      } catch {
+        /* best-effort */
+      }
+    } else {
+      builderAgent = builder;
+    }
+  }
+
+  const evidence = await countQualifying(conn, releaseCid, builderAgent);
+  console.log(
+    JSON.stringify(
+      {
+        verb: 'attestations',
+        releaseCid,
+        readFrom: actingPeer.name,
+        readerAgent: conn.agent,
+        builderAgent,
+        ...evidence,
+      },
+      null,
+      2
+    )
+  );
+  process.exit(0);
+}
+
 async function cmdStatus(channelId: string, _flags: Flags, peers: PeerConfig[], timeoutMs: number) {
   const rows = await Promise.all(peers.map(p => resolveElectionOnPeer(p, channelId, timeoutMs)));
   const report = {
@@ -956,6 +1146,11 @@ async function main() {
     const [channelId] = positionals;
     if (!channelId) throw new Error('usage: status <channelId>');
     await cmdStatus(channelId, flags, peers, timeoutMs);
+  } else if (verb === 'attestations') {
+    const [releaseCid] = positionals;
+    if (!releaseCid)
+      throw new Error('usage: attestations <releaseCid> [--as <peer>] [--builder <peer|agentKey>]');
+    await cmdAttestations(releaseCid, flags, peers, timeoutMs);
   } else {
     console.error(USAGE);
     process.exit(2);

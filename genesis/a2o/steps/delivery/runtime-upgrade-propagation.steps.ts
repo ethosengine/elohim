@@ -434,6 +434,27 @@ interface ManifestAdoptionDiscipline {
   channelDiscipline?: { soakSecs: number; attestationThreshold: number; canaryOrder: string[] };
 }
 
+/**
+ * One JSON object from `release-ceremony.ts attestations <releaseCid>` — soak
+ * evidence for ONE release, counted by cid through a conductor with the same
+ * classification `release_attestation.rs` applies (soak pass, non-builder, one
+ * voice per distinct agent). See `ensureSecondAttested` for why no
+ * `/admin/adoption` row can answer this for a STAGED candidate.
+ */
+interface AttestationEvidence {
+  releaseCid: string;
+  readFrom: string;
+  builderAgent: string | null;
+  linkedCount: number;
+  qualifying: number;
+  total: number;
+  builderExcluded: number;
+  failed: number;
+  provenanceMismatched: number;
+  unresolved: number;
+  byArchetype: Record<string, number>;
+}
+
 /** The fields of a packaged manifest Station 9 reads back for verification. */
 interface SecondManifestFile {
   channelId?: string;
@@ -571,7 +592,8 @@ interface CeremonyState {
   secondCanaryRow?: AdoptionChannelRow;
   /** The second candidate's REAL installed hashes, read off james's passport after his apply. */
   secondCandidateWasmHashes?: Record<string, string>;
-  secondAttestationRow?: AdoptionChannelRow;
+  /** Soak evidence for the second fix, counted BY CID — see `ensureSecondAttested`. */
+  secondAttestationEvidence?: AttestationEvidence;
   secondAttestationTimestamp?: number;
   secondPromoteResult?: PromoteResult;
   secondPromotedAt?: number;
@@ -2693,72 +2715,82 @@ async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
 }
 
 /**
- * Waits for a qualifying attestation naming the SECOND FIX — read off JAMES's
- * row, not matthew's.
+ * Waits for a qualifying attestation naming the SECOND FIX, read BY CID
+ * through a conductor — never off an `/admin/adoption` row.
  *
- * ## Which row carries a staged candidate's evidence
+ * ## No row is an honest observable for a STAGED candidate's attestation
  *
- * A channel row's `attestations` block is evidence for the release that row
- * RESOLVED, and a row resolves the channel's WINNER. While the second fix is
- * staged beneath the standing earned head, the winner is still the earned head
- * (that is the whole point of Station 9), so matthew's and jessica's apply-mode
- * rows report evidence for the WINNER and a candidate beneath it can never
- * appear there. Run shift-it5-20260904T084753Z red exactly here: james applied
- * the second fix in 30s while matthew's row kept reporting
- * `resolvedHead: {cid: <earned winner>, tier: earned}, verdict: applied`.
+ * A row's `attestations` block is evidence for the release that row RESOLVED,
+ * and a row resolves the channel's WINNER. Two measured consequences:
  *
- * james's CANARY row is different: the controller substitutes the staging
- * candidate for him ("canary follows the staging candidate standing beneath the
- * earned head — the winner does not move until promotion"), so his
- * `resolvedHead.cid` IS the candidate and his `attestations` count attestations
- * naming it. Pinning on `resolvedHead.cid === secondReleaseCid` also removes
- * the need for the old swept-after-the-soak heuristic: the evidence is
- * identified by the release it is for, not by a timestamp that only suggests
- * which release it might be about.
+ *   - matthew's and jessica's apply-mode rows resolve the EARNED head while the
+ *     second fix is staged beneath it (the whole point of Station 9), so they
+ *     report the winner's evidence and never read the candidate's. Run
+ *     shift-it5-20260904T084753Z red exactly there.
+ *   - the CANARY's row resolves the candidate, but once james has APPLIED it
+ *     his sweeps take the idempotence exit (`already_current`, zero conductor
+ *     calls) and the threshold read never runs, so his `attestations` stays
+ *     null. Run shift-it6-20260904T091619Z red exactly there — while his own
+ *     log showed "soak attestation authored for an applied release" ~30s after
+ *     the hot-swap. The evidence existed; no row reported it.
  *
- * The other way to ask is by cid — `content_store::get_attestations_for_subject
- * <releaseCid>`, what `scripts/release-attestation-probe.ts` walks and what the
- * storage controller's own `release_attestation.rs` counts before a promotion.
- * That is a ZOME call: no HTTP surface exposes it (`release-ceremony.ts promote`
- * gathers no evidence itself; storage registers no by-cid attestation route), so
- * james's row is the observable this fixture can honestly read.
+ * Station 4 is not a counter-example: on a fresh channel the candidate IS the
+ * winner (staging tier), so matthew's row verifies it every sweep while waiting
+ * for promotion and carries the evidence as a side effect of that work.
+ *
+ * So this asks BY CID, the way `scripts/release-attestation-probe.ts` and the
+ * controller's own `release_attestation.rs` ask — the driver's read-only
+ * `attestations <releaseCid>` verb (link walk for authenticated issuers, entry
+ * read for context, same qualifying classification: soak pass, non-builder,
+ * one voice per distinct agent). Read from the ATTESTER's own conductor, where
+ * `author_id === issuer` holds by construction.
  */
 async function ensureSecondAttested(world: E2EWorld): Promise<void> {
   const c = ceremony();
   await ensureSecondCanaryApplied(world);
-  if (c.secondAttestationRow) return;
+  if (c.secondAttestationEvidence) return;
+
+  const releaseCid = c.secondReleaseCid;
+  assert.ok(releaseCid, 'no second releaseCid to gather attestation evidence for');
+  // The threshold this evidence is counted against is the one the SECOND
+  // MANIFEST declares — the channel's own discipline, inherited, not a number
+  // this fixture typed (see the discipline Then).
+  const threshold = c.secondDiscipline?.attestationThreshold ?? ATTESTATION_THRESHOLD;
 
   const waitStartedAt = Date.now();
   // The SAME budget Station 3 gives its attestation, measured from the point
-  // the soak can first have completed rather than from now: Station 3's budget
-  // starts after its own canary apply returned, and folding the 30s soak into a
-  // 95s budget left a single 60s sweep interval with no margin.
+  // the soak can first have completed rather than from now.
   const soakDoneAt = waitStartedAt + SOAK_SECS * 1000;
   const deadline = soakDoneAt + ATTESTATION_BUDGET_MS;
-  let lastRow: AdoptionChannelRow | undefined;
+  let lastEvidence: AttestationEvidence | undefined;
   while (Date.now() < deadline) {
-    const report = await getAdoptionReport(world, CANARY_PEER);
-    lastRow = findChannelRow(report, CHANNEL_ID);
-    const onCandidate = lastRow?.resolvedHead?.cid === c.secondReleaseCid;
-    if (onCandidate && (lastRow?.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD) {
-      c.secondAttestationRow = lastRow;
-      c.secondAttestationTimestamp = Date.now();
-      // eslint-disable-next-line no-console
-      console.log(
-        `[station9] qualifying attestation for the second fix after ` +
-          `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + ${ATTESTATION_BUDGET_MS}ms budget), ` +
-          `read off ${CANARY_PEER}'s canary row whose resolvedHead IS the candidate ` +
-          `${String(c.secondReleaseCid)}: ${JSON.stringify(lastRow?.attestations)}`
-      );
-      return;
+    const read = runDriver(
+      RELEASE_CEREMONY_SCRIPT,
+      ['attestations', releaseCid, '--as', CANARY_PEER, '--builder', 'matthew'],
+      60_000
+    );
+    if (read.status === 0) {
+      lastEvidence = extractJson<AttestationEvidence>(read.stdout);
+      if ((lastEvidence.qualifying ?? 0) >= threshold) {
+        c.secondAttestationEvidence = lastEvidence;
+        c.secondAttestationTimestamp = Date.now();
+        // eslint-disable-next-line no-console
+        console.log(
+          `[station9] qualifying attestation for the second fix after ` +
+            `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + ${ATTESTATION_BUDGET_MS}ms budget), ` +
+            `read BY CID ${releaseCid} through ${CANARY_PEER}'s conductor: ` +
+            JSON.stringify(lastEvidence)
+        );
+        return;
+      }
     }
     await new Promise<void>(resolve => setTimeout(resolve, 10_000));
   }
   assert.fail(
-    `no qualifying attestation naming the second fix ${String(c.secondReleaseCid)} on ` +
-      `${CANARY_PEER}'s row for ${CHANNEL_ID} within ${Date.now() - waitStartedAt}ms (soak ` +
-      `${SOAK_SECS}s + the ${ATTESTATION_BUDGET_MS}ms budget station 3 uses); last row: ` +
-      JSON.stringify(lastRow)
+    `no qualifying attestation naming the second fix ${releaseCid} within ` +
+      `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + the ${ATTESTATION_BUDGET_MS}ms budget ` +
+      `station 3 uses), counted against the manifest's threshold of ${threshold}; last evidence: ` +
+      JSON.stringify(lastEvidence)
   );
 }
 
@@ -3859,23 +3891,34 @@ Then(
       `the second promote declared "${c.secondPromoteResult.tier}", not earned`
     );
     assert.ok(
-      c.secondAttestationRow && c.secondAttestationTimestamp && c.secondPromotedAt,
+      c.secondAttestationEvidence && c.secondAttestationTimestamp && c.secondPromotedAt,
       'no attestation captured before the second promotion'
     );
     assert.ok(
       c.secondAttestationTimestamp < c.secondPromotedAt,
       'the second promotion is not after the attestation it is supposed to rest on'
     );
+    // "the same single-attester DISCIPLINE the first fix met": the threshold is
+    // the one the second manifest declares — inherited from the channel, not a
+    // number this fixture typed — and the count is evidence naming the second
+    // fix's own cid.
+    const threshold = c.secondDiscipline?.attestationThreshold;
+    assert.equal(
+      threshold,
+      ATTESTATION_THRESHOLD,
+      `the second fix declares a threshold of ${String(threshold)}, not the single attester the ` +
+        'first fix met'
+    );
     assert.ok(
-      (c.secondAttestationRow.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD,
-      `the second promotion ran with ${String(c.secondAttestationRow.attestations?.qualifying)}/` +
-        `${ATTESTATION_THRESHOLD} qualifying attestations`
+      c.secondAttestationEvidence.qualifying >= ATTESTATION_THRESHOLD,
+      `the second promotion ran with ${c.secondAttestationEvidence.qualifying}/` +
+        `${ATTESTATION_THRESHOLD} qualifying attestations for ` +
+        `${c.secondAttestationEvidence.releaseCid}: ${JSON.stringify(c.secondAttestationEvidence)}`
     );
     assert.equal(
-      c.secondAttestationRow.attestations?.threshold,
-      ATTESTATION_THRESHOLD,
-      `the channel counted against threshold ${String(c.secondAttestationRow.attestations?.threshold)}, ` +
-        `not the single attester the first fix met`
+      c.secondAttestationEvidence.releaseCid,
+      c.secondReleaseCid,
+      'the evidence counted names a different release than the one promoted'
     );
   }
 );
