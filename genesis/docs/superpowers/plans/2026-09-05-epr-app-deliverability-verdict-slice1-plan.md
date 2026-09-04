@@ -1,7 +1,7 @@
 ---
 title: EPR-app deliverability verdict — slice 1 (peer verdict, wire, stage gate) — Implementation Plan
 id: epr-app-deliverability-verdict-slice1-plan
-status: Draft
+status: landed
 class: process-meta
 domain: peer-hoster dataplane (T2) app delivery × deploy definition-of-done
 sprint: delivery-verdict
@@ -946,3 +946,12 @@ git commit -m "habit(doorway-failover): slice 1 delta — the peer judges the he
 - **Spec coverage (slice 1 = spec §9 item 1):** §2.1 check → Task 1; §2.2 extraction-time judgement + memo → Task 2; §2.3 `X-Deliverability` on `_capability` and the shell → Task 2 (the `/db/content/{slug}` row field is spec §2.3 too but belongs to slice 2 with the view-schema change — stated in Global Constraints as deferred); §5.3 metric + §5.5 log → Tasks 2–3; §7 stage leg → Tasks 4–5; §8 `judge_deliverability` registration → Task 1 Step 5; "each slice ends with the story + one delta" → Task 6.
 - **Placeholders:** none; every step has its code or exact command. Task 5 asks the implementer to read the ladder's shape before editing one block — that is a read instruction with the target block quoted, not a placeholder.
 - **Type consistency:** `DeliverabilityVerdict::{Boots, Broken(BrokenReason), NotJudged(NotJudgedWhy)}`, `header_value()`, `reason_value()` are used identically in Tasks 1–3; `with_deliverability_headers` and `deliverability_lookup` are defined in Task 2 and used only there; the gate's exit codes (0/2/3) match between Task 4's script, its test, and Task 5's Groovy.
+
+## Landed (2026-09-05)
+
+Eleven commits on dev, each reviewed (spec + quality) and re-reviewed after its fix round; final whole-branch review BLOCK → SHIP after one fix wave:
+`b75362ac3` `e92d3b8e6` (Task 1) · `a75ab6855` (Task 2) · `67da5542d` `13a459a61` (Task 3) · `78466b2bc` (Task 4) · `245dc874f` `df8c51bb0` (Task 5) · `f81763594` (Task 6) · `5335626e6` `d7bd2c5ad` `81812d1e7` (final fix wave).
+
+Stated deviations from the text above, all ruled in the run ledger: the mod list is in `src/lib.rs`; seam-registry test keys follow the live schema; asset resolution follows browser semantics (root-relative at the root only, document-relative at the index's directory only — the two-way fallback in Task 1 was a plan defect); the gate applies to `KIND=browser` bundles only (server bundles have no `index.html`; their renderer criterion is slice 2); a gate rc outside {0,2,3} is a loud advisory; `authorHeadOnce` skips a `BROKEN_HEAD` bundle and one `error()` after Phase 2 fails the build (the brief's in-loop `error()` was swallowed by `catchError`); the verdict marker is cleared before each host's run; the Jenkinsfile byte ceiling was a wrong proxy; the p2p-featured storage test run defers to the pre-push gate (RAM guard); the household-mesh story run defers to the fleet build (mesh lease held) and the refusal proof ran against a standalone storage instance.
+
+Carried to slice 2: `deliverability` on the content row; SQLite persistence of the memo; judgement at declared-head adoption; `ServerRenderFails`; counter per distinct CID rather than per extraction; `<base href>` and `modulepreload` refs; `_capability` header for an un-indexed slug.
