@@ -680,10 +680,16 @@ spec:
    command:
    - cat
    tty: true
+   # memory: the Angular build needs ~5 GB; with no request the scheduler put this
+   # pod on a 7.6 GB ThinkPad twice (elohim #1689/#1690, 2026-09-04): the node hit
+   # 0.13 GB free, the JNLP channel dropped and the controller's exec fallback got
+   # HTTP 500 x5. A real request keeps the build on a node that can hold it.
    resources:
      requests:
+       memory: "6Gi"
        ephemeral-storage: "2Gi"
      limits:
+       memory: "10Gi"
        ephemeral-storage: "5Gi"
    volumeMounts:
    - name: containerd-sock
