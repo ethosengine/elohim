@@ -188,6 +188,36 @@ struct CarryReceipt {
     already_carried: u32,
 }
 
+/// Mirror of `node_registry_coordinator::ReadoptInput` (Task 13b, Station 7 —
+/// the revert's re-authoring, driven ON the v1 cell).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ReadoptInput {
+    v2_cell: CellId,
+    cursor: Option<u32>,
+    limit: u32,
+}
+
+/// Mirror of `node_registry_coordinator::ReadoptReceipt`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ReadoptReceipt {
+    /// Own v2 records re-created natively on v1 by THIS page — new actions
+    /// over the SAME entry hashes.
+    readopted: u32,
+    /// Already on v1 before the page ran. Non-zero on a first sweep is
+    /// CORRECT: the carried re-creations of v1's own records are on both
+    /// chains by construction.
+    already_present: u32,
+    /// App entry types v1 does not know — v2's `NotarizationWitness`. Skipped,
+    /// counted, never an error.
+    #[serde(default)]
+    foreign: u32,
+    next_cursor: Option<u32>,
+    v2_digest: String,
+    /// READ from v2's export page, never derived from `readopted`, so the
+    /// driver's completeness check can actually fail.
+    v2_total: Option<u32>,
+}
+
 /// The properties both node_registry versions read.
 ///
 /// `progenitor_pubkey` is the pre-existing bootstrap-steward property;
@@ -2260,6 +2290,218 @@ async fn station_8_seal_close_resumes_a_half_seal_instead_of_closing_v1_twice() 
         )
         .await;
     println!("[station 8/half] pre-close carry after a RESUMED seal ACCEPTED at {ok}");
+
+    Ok(())
+}
+
+// ============================================================================
+// STATION 7 — REVERT BEFORE SUNSET (Holochain Evolution Epic §4 step 4, Task
+// 13b; the ZOME half — the storage vehicle's revert path is Task 13a)
+//
+// The crossing has happened: v1's fact was carried into v2 under a witness,
+// and the agent then authored a WINDOW-TIME fact on v2 — one that exists
+// nowhere else. Now the elohim revoke the migration commitment inside its
+// horizon and the peer returns to authoring on v1.
+//
+// Re-adoption is a RE-AUTHORING, not a carry. v1 has no witness type, so the
+// agent writes its own window-time fact again, natively, on the chain it is
+// returning to; the v2 action and signature stay in the disabled-but-intact v2
+// cell as the evidence §7 C14 keeps. What this probe pins:
+//
+//   1. the window-time v2 fact lands on v1 with the SAME entry hash and a NEW
+//      action — CID continuity across the revert, which is what makes the
+//      re-authored fact the same fact;
+//   2. the carried re-creations are NOT authored twice — they are already on
+//      v1 and report as `already_present`;
+//   3. v2's `NotarizationWitness` is counted `foreign` and never re-created —
+//      an entry type v1 does not know must not fail the page, or revert would
+//      be impossible for exactly the chains that took the crossing;
+//   4. a retry re-authors NOTHING (§7 C6b) — `readopted` falls to 0 and every
+//      record reports `already_present`.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn station_7_readopt_from_re_authors_window_time_v2_records_on_v1() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash: _,
+        v2_hash: _,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // --- 1. the pre-crossing v1 fact, then the crossing ---------------------
+    let (_ah_pre, sah_pre) =
+        author_and_read_back(&conductor, &z1, "readopt-baseline", &alice).await;
+    let eh_pre = sah_pre
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+
+    let carry: CarryReceipt = conductor
+        .call(
+            &z2,
+            "carry_from",
+            CarryInput {
+                v1_cell: z1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!("[station 7] carry receipt = {carry:?}");
+    assert_eq!(carry.carried, 1, "one v1 fact crossed");
+    assert_eq!(carry.self_carried, 1, "it was re-created natively on v2");
+    assert!(
+        !carry.witness_hash.is_empty(),
+        "the crossing committed a witness — the entry type v1 will report `foreign`"
+    );
+
+    // --- 2. the WINDOW-TIME fact: authored on v2, existing nowhere else -----
+    let (ah_window_v2, sah_window) =
+        author_and_read_back(&conductor, &z2, "readopt-window", &alice).await;
+    let eh_window = sah_window
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+    println!("[station 7] window-time v2 action = {ah_window_v2}");
+    println!("[station 7] window-time entry     = {eh_window}");
+
+    let v1_before: ExportPage = conductor
+        .call(&z1, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    assert_eq!(
+        v1_before.total,
+        Some(1),
+        "before the revert v1 holds ONLY its own pre-crossing fact"
+    );
+    assert!(
+        !v1_before
+            .records
+            .iter()
+            .any(|r| r.action().entry_hash() == Some(&eh_window)),
+        "the window-time fact must not be on v1 before the re-adoption — otherwise this probe \
+         proves nothing"
+    );
+
+    let v2_page: ExportPage = conductor
+        .call(&z2, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    println!("[station 7] v2 chain = {:?} app records", v2_page.total);
+    assert_eq!(
+        v2_page.total,
+        Some(3),
+        "v2 holds the carried re-creation, the witness, and the window-time fact"
+    );
+
+    // --- 3. the revert: re-adopt v2's window-time records onto v1 -----------
+    let readopt_input = || ReadoptInput {
+        v2_cell: z2.cell_id().clone(),
+        cursor: None,
+        limit: 16,
+    };
+    let first: ReadoptReceipt = conductor.call(&z1, "readopt_from", readopt_input()).await;
+    println!("[station 7] first readopt receipt = {first:?}");
+
+    assert_eq!(
+        first.readopted, 1,
+        "exactly the window-time fact comes home — the carried re-creation is already here \
+         and the witness is not v1's to hold"
+    );
+    assert_eq!(
+        first.already_present, 1,
+        "the carried re-creation of v1's own pre-crossing fact is already on this chain"
+    );
+    assert_eq!(
+        first.foreign, 1,
+        "v2's NotarizationWitness is an entry type v1 does not know — counted, never an error"
+    );
+    assert_eq!(first.next_cursor, None, "the page covered v2's whole chain");
+    assert_eq!(
+        first.v2_total, v2_page.total,
+        "v2_total is READ from v2's export page, never derived from `readopted`"
+    );
+    assert_eq!(
+        first.v2_digest, v2_page.digest,
+        "the receipt reports v2's own whole-chain digest verbatim"
+    );
+
+    // --- 4. SAME entry hash, NEW action -------------------------------------
+    let v1_after: ExportPage = conductor
+        .call(&z1, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    assert_eq!(
+        v1_after.total,
+        Some(2),
+        "v1 now holds its pre-crossing fact and the re-authored window-time fact — and nothing \
+         else: the witness was NOT re-created"
+    );
+    let readopted_records: Vec<_> = v1_after
+        .records
+        .iter()
+        .filter(|r| r.action().entry_hash() == Some(&eh_window))
+        .collect();
+    assert_eq!(
+        readopted_records.len(),
+        1,
+        "exactly one v1 action now commits to the window-time entry hash"
+    );
+    let ah_window_v1 = readopted_records[0].action_address().clone();
+    println!("[station 7] re-authored on v1 at action {ah_window_v1}");
+    assert_ne!(
+        ah_window_v1, ah_window_v2,
+        "re-adoption is a RE-AUTHORING: a NEW action on v1, not the v2 action moved"
+    );
+    assert_eq!(
+        readopted_records[0].action().author(),
+        &alice,
+        "the agent re-authors its OWN fact — same key, no courier"
+    );
+    // The pre-crossing fact was not authored a second time.
+    assert_eq!(
+        v1_after
+            .records
+            .iter()
+            .filter(|r| r.action().entry_hash() == Some(&eh_pre))
+            .count(),
+        1,
+        "the pre-crossing fact must not be re-authored — it never left v1"
+    );
+
+    // --- 5. the retry re-authors nothing (§7 C6b) ---------------------------
+    let retry: ReadoptReceipt = conductor.call(&z1, "readopt_from", readopt_input()).await;
+    println!("[station 7] retry readopt receipt = {retry:?}");
+    assert_eq!(
+        retry.readopted, 0,
+        "a retried page re-authors NOTHING — every own record is already on this chain"
+    );
+    assert_eq!(
+        retry.already_present,
+        first.already_present + first.readopted,
+        "on the retry, what the first run re-authored joins what was already present"
+    );
+    assert_eq!(
+        retry.foreign, first.foreign,
+        "the witness stays foreign on every pass — it is never re-created, never an error"
+    );
+    assert_eq!(
+        retry.v2_digest, first.v2_digest,
+        "both passes drew from the same v2 chain"
+    );
+
+    let v1_final: ExportPage = conductor
+        .call(&z1, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    assert_eq!(
+        v1_final.total,
+        Some(2),
+        "a retried re-adoption must not mint a second action over an entry hash this chain \
+         already holds"
+    );
 
     Ok(())
 }

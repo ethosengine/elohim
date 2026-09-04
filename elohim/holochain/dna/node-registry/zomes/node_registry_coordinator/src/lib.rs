@@ -1811,6 +1811,298 @@ pub fn get_record_at(input: (ActionHash, bool)) -> ExternResult<Option<Record>> 
 }
 
 // ============================================================================
+// STATION 7 — RE-ADOPTION BEFORE SUNSET (Holochain Evolution Epic §4 step 4,
+// §7 C14; Task 13b)
+//
+// The revert's other half. `carry_from` moves a v1 fact FORWARD into v2 under
+// a witness; `readopt_from` moves a WINDOW-TIME v2 fact BACK onto v1 when the
+// elohim revoke the migration commitment inside its horizon.
+//
+// It is deliberately NOT the mirror image of `carry_from`, and the asymmetry
+// is the whole point: **the v1 line has no witness type**. There is nowhere on
+// v1 to record "this action was authored on v2 and signed there", so a
+// re-adoption cannot be a CARRY. It is a RE-AUTHORING — the agent writes its
+// own fact again, natively, on the chain it is returning to. The v2 action and
+// its signature stay where they were authored, in the disabled-but-intact v2
+// cell, which is the evidence §7 C14 keeps.
+//
+// Three consequences follow, and each is enforced below:
+//
+//   * **Own records only.** A courier cannot re-adopt for an absent author,
+//     because a courier would have to author another agent's fact as its own.
+//     Records of other authors are ignored — the honest-absence report (§7 C4)
+//     is the storage side's `pending` count, computed against `v2_total`, not
+//     a number this zome can fabricate.
+//   * **Entry-hash continuity or nothing.** The re-created entry must hash to
+//     exactly what the v2 action committed to; schema drift between the
+//     lineage ends is refused rather than silently minting a new entry hash
+//     under an old fact's name.
+//   * **A v2-only entry type is not an error.** v2's `NotarizationWitness`
+//     sits at an `EntryDefIndex` v1 does not know. It is counted `foreign` and
+//     skipped: witnesses are v2's own bookkeeping about the crossing, never a
+//     fact of v1's, and refusing the page over one would make revert
+//     impossible for exactly the chains that took the crossing.
+//
+// Coordinator-only, and UNCONDITIONAL: it must exist on the PRISTINE v1
+// artifact, which is built without `lineage-witness`. That is safe because the
+// DNA hash covers integrity zomes and modifiers only — the default
+// `node-registry.dna` hash is unmoved by this section.
+// ============================================================================
+
+/// Input to [`readopt_from`]: which successor cell to read back from, where to
+/// resume, and how many records to take.
+///
+/// `limit` is clamped to [`READOPT_CAP`]. Re-adoption commits one entry per
+/// record on the page, so the page size IS the write batch — it is bounded for
+/// the same reason `carry_from`'s is (§7 C3 liveness, C11 backpressure).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReadoptInput {
+    /// The successor cell to read this agent's window-time records from. Its
+    /// DNA is NOT checked against a declared lineage: v1 predates the crossing
+    /// and declares no successor, so there is nothing on this chain to check
+    /// against. The caller (the storage vehicle, driving a revert it verified
+    /// against the revoked commitment) names the cell.
+    pub v2_cell: CellId,
+    pub cursor: Option<u32>,
+    pub limit: u32,
+}
+
+/// What one page of re-adoption produced.
+///
+/// Every count is scoped to the PAGE. The whole-sweep question — "did every
+/// window-time fact come home?" — is the driver's, answered by summing
+/// `readopted + already_present` across pages against [`Self::v2_total`], with
+/// `foreign` and other authors' records subtracted. This receipt never claims
+/// completeness on its own.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReadoptReceipt {
+    /// How many of this agent's own v2 records were re-created natively on
+    /// this chain by THIS page — new actions over the SAME entry hashes.
+    pub readopted: u32,
+    /// How many were already on this chain before the page ran, found by one
+    /// `query` over the page's entry hashes (§7 C6b, the same idempotency
+    /// discipline Task 20 gave `carry_from`).
+    ///
+    /// On the FIRST sweep of a crossing this is normally non-zero and that is
+    /// correct: v2's chain opens with the carried re-creations of v1's own
+    /// records, whose entry hashes are on v1 already. `already_present` is
+    /// therefore "v1 has this fact", never "a retry ran".
+    pub already_present: u32,
+    /// How many records on the page carried an app entry type THIS DNA does
+    /// not know — v2's `NotarizationWitness` above all. Skipped, counted, and
+    /// never an error: see the section comment.
+    ///
+    /// `#[serde(default)]` for the same additive reason every other receipt
+    /// field on this zome carries it — a decoder built against a receipt
+    /// shape without this field reads 0 rather than failing.
+    #[serde(default)]
+    pub foreign: u32,
+    /// Resume token for the next page, or `None` when the successor's export
+    /// is exhausted. `readopt_from` reads a successor cell's OWN chain
+    /// (`export_records`), so exhaustion here is end-of-chain — never the
+    /// held path's end-of-local-view.
+    pub next_cursor: Option<u32>,
+    /// The successor's whole-chain digest, reported verbatim from its export
+    /// page so a driver can check that a multi-page sweep drew from ONE chain.
+    pub v2_digest: String,
+    /// The successor's app-record count, READ from [`ExportPage::total`] and
+    /// never derived from `readopted` — so the driver's completeness check can
+    /// actually fail. `None` when the successor bundle predates that field.
+    pub v2_total: Option<u32>,
+}
+
+/// One page of re-adoption commits at most this many entries.
+const READOPT_CAP: u32 = 16;
+
+/// Re-author this agent's own window-time successor records back onto THIS
+/// chain (Holochain Evolution Epic §4 step 4 — Station 7, revert before
+/// sunset).
+///
+/// Runs ON THE PREDECESSOR (v1) cell and reaches ACROSS to `v2_cell` for one
+/// bounded page of that cell's own export. Same agent on both sides, so no
+/// capability secret is presented.
+///
+/// Idempotent by entry hash: a record whose entry is already on this chain is
+/// counted `already_present` and skipped, so a retried page re-creates nothing
+/// and the sweep can be driven defensively.
+#[hdk_extern]
+pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
+    let me = agent_info()?.agent_initial_pubkey;
+    let limit = input.limit.clamp(1, READOPT_CAP);
+
+    // (1) one bounded page of the successor's OWN chain, across the cell
+    //     boundary. `export_records` is unconditional on both lineage ends.
+    let response = call(
+        CallTargetCell::OtherCell(input.v2_cell.clone()),
+        "node_registry_coordinator",
+        "export_records".into(),
+        None,
+        ExportInput {
+            cursor: input.cursor,
+            limit,
+        },
+    )?;
+    let page: ExportPage = match response {
+        ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: could not decode the successor's ExportPage: {e:?}"
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: the successor cell refused export_records: {other:?}"
+            ))))
+        }
+    };
+
+    // `records` and `entries` are paired POSITIONALLY — a page whose two
+    // vectors disagree in length cannot be paired at all, and re-authoring the
+    // wrong bytes under a fact's name is the one failure this whole station
+    // exists to prevent. Refuse the page.
+    if page.records.len() != page.entries.len() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "readopt_from: the successor returned {} records but {} entries — the page cannot \
+             be paired positionally",
+            page.records.len(),
+            page.entries.len()
+        ))));
+    }
+
+    // (2) which app entry types THIS DNA knows. A successor's entry-def index
+    //     that this zome's scope does not resolve is `foreign` — asked here,
+    //     BEFORE `deserialize_from_type`, because that helper RETURNS AN ERROR
+    //     for an out-of-range index within a dependency zome, and an error is
+    //     exactly what §4 step 4 forbids for a v2-only type.
+    let known_entries = zome_info()?.zome_types.entries;
+    let knows = |def: &AppEntryDef| -> bool {
+        known_entries
+            .find_key(ScopedEntryDefIndex {
+                zome_index: def.zome_index(),
+                zome_type: def.entry_index(),
+            })
+            .is_some()
+    };
+
+    // (3) what this chain already holds, in ONE query over the page's
+    //     candidate entry hashes rather than one query per record.
+    let candidates: HashSet<EntryHash> = page
+        .records
+        .iter()
+        .filter(|signed| signed.action().author() == &me)
+        .filter_map(|signed| match signed.action().entry_type() {
+            Some(EntryType::App(def)) if knows(def) => signed.action().entry_hash().cloned(),
+            _ => None,
+        })
+        .collect();
+    let mut on_chain: HashSet<EntryHash> = if candidates.is_empty() {
+        HashSet::new()
+    } else {
+        query(
+            ChainQueryFilter::new()
+                .entry_hashes(candidates)
+                .include_entries(false),
+        )?
+        .iter()
+        .filter_map(|r| r.action().entry_hash().cloned())
+        .collect()
+    };
+
+    let mut readopted: u32 = 0;
+    let mut already_present: u32 = 0;
+    let mut foreign: u32 = 0;
+
+    for (i, signed) in page.records.iter().enumerate() {
+        let action = signed.action();
+
+        // Another agent's fact. Re-adoption re-authors the agent's OWN facts
+        // only — there is no witness type on this line to carry someone
+        // else's, so a courier here would be forging authorship. Ignored, and
+        // deliberately uncounted: the driver reports the residue as `pending`
+        // against `v2_total`, which is the honest number.
+        if action.author() != &me {
+            continue;
+        }
+
+        let Some(EntryType::App(def)) = action.entry_type() else {
+            // `export_records` filters to app entries, so this is unreachable
+            // on a well-formed page; skipping is the conservative read.
+            continue;
+        };
+
+        // A v2-only entry type (its `NotarizationWitness`). Skipped, counted,
+        // never an error.
+        if !knows(def) {
+            foreign = foreign.saturating_add(1);
+            continue;
+        }
+
+        let entry_hash = action.entry_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: record {i}: an app entry was exported but its action references \
+                 no entry hash"
+            )))
+        })?;
+
+        // Already here — either carried onto this chain before the crossing,
+        // or re-adopted by an earlier run of this same page.
+        if on_chain.contains(entry_hash) {
+            already_present = already_present.saturating_add(1);
+            continue;
+        }
+
+        let Some(entry) = page.entries.get(i).cloned().flatten() else {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: record {i}: the successor exported an app action with no entry \
+                 bytes — the fact cannot be re-authored from a page that does not carry it"
+            ))));
+        };
+
+        let raw = EntryTypes::deserialize_from_type(def.zome_index(), def.entry_index(), &entry);
+        let typed = raw.map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: record {i}: could not deserialize the exported entry into a known \
+                 entry type: {e:?}"
+            )))
+        })?;
+        let Some(typed) = typed else {
+            // The index resolved to no unit in this zome's scope — a type from
+            // a zome this DNA does not depend on. Same class as `!knows`.
+            foreign = foreign.saturating_add(1);
+            continue;
+        };
+
+        // CID continuity is the whole promise: the re-authored entry must hash
+        // to exactly what the v2 action committed to. If the two lineage ends
+        // disagree about the struct's shape the round-trip silently produces
+        // DIFFERENT bytes — a new fact wearing an old fact's name. Refuse.
+        let recreated_hash = hash_entry(&typed)?;
+        if &recreated_hash != entry_hash {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "readopt_from: record {i}: re-authored entry hash differs from the successor \
+                 action's — schema drift between lineage ends (re-authored {recreated_hash}, \
+                 successor action commits to {entry_hash})"
+            ))));
+        }
+
+        create_entry(typed)?;
+        // Guard an intra-page duplicate too: `on_chain` was a pre-loop
+        // snapshot, so without this a page carrying the same entry hash twice
+        // would mint two actions over it.
+        on_chain.insert(recreated_hash);
+        readopted = readopted.saturating_add(1);
+    }
+
+    Ok(ReadoptReceipt {
+        readopted,
+        already_present,
+        foreign,
+        next_cursor: page.next_cursor,
+        v2_digest: page.digest,
+        v2_total: page.total,
+    })
+}
+
+// ============================================================================
 // BOUNDED CROSS-CELL CARRY (Holochain Evolution Epic Task 9, spec §2/§8)
 //
 // Gated behind `lineage-witness`, and APPENDED at the end of the file rather
