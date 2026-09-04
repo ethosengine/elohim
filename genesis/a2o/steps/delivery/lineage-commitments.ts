@@ -423,7 +423,9 @@ export async function notarizeMigration(opts: {
   selfSign?: boolean;
 }): Promise<NotarizeResult> {
   const extern = opts.selfSign === false ? PLAIN_EXTERN : SELF_SIGNING_EXTERN;
-  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing migrates-lineage via ${extern}`);
+  console.error(
+    `[lineage-commitments] ${opts.actingPeer} notarizing migrates-lineage via ${extern}`
+  );
   return createCommitment(
     opts.conductor,
     'migrates-lineage',
@@ -442,7 +444,9 @@ export async function notarizeSunset(opts: {
   selfSign?: boolean;
 }): Promise<NotarizeResult> {
   const extern = opts.selfSign === false ? PLAIN_EXTERN : SELF_SIGNING_EXTERN;
-  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing sunsets-lineage via ${extern}`);
+  console.error(
+    `[lineage-commitments] ${opts.actingPeer} notarizing sunsets-lineage via ${extern}`
+  );
   return createCommitment(
     opts.conductor,
     'sunsets-lineage',
