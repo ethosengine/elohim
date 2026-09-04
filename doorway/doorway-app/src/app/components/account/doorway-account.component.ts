@@ -92,14 +92,15 @@ const AGENCY_STEPS: PipelineStep[] = [
           </div>
         </section>
 
-        <!-- Steward context banner -->
+        <!-- Hosted-steward context banner: the in-between state -->
         @if (stewardAccessingThroughDoorway()) {
-          <div class="context-banner">
+          <div class="context-banner" data-testid="account-hosted-steward-banner">
             <span class="banner-icon">&#9432;</span>
             <div class="banner-text">
-              <strong>Accessing through this doorway</strong>
+              <strong>Hosted Steward</strong>
               <p>
-                Your local conductor is not connected. You can download your key bundle or
+                Accessing through {{ gatewayDomain() }}. Your local conductor is not connected, so
+                this doorway is temporarily hosting your cell. You can download your key bundle or
                 re-provision below.
               </p>
             </div>
@@ -277,10 +278,23 @@ export class DoorwayAccountComponent implements OnInit {
     return !!acct && !acct.conductorId;
   });
 
-  /** Steward whose cell is still doorway-hosted (no local conductor). */
+  /**
+   * Steward whose cell is still doorway-hosted (no local conductor) — the
+   * "hosted steward" in-between state the elohim-app agency badge names.
+   */
   readonly stewardAccessingThroughDoorway = computed(() => {
     const acct = this.account();
     return !!acct?.isSteward && !!acct.conductorId;
+  });
+
+  /**
+   * The domain accounts on this doorway actually live at.
+   * doorway-alpha.elohim.host serves accounts at alpha.elohim.host — same
+   * derivation as threshold-login's gatewayDomain().
+   */
+  readonly gatewayDomain = computed(() => {
+    const hostname = window.location.hostname;
+    return hostname.startsWith('doorway-') ? hostname.replace(/^doorway-/, '') : hostname;
   });
 
   readonly storageColor = computed(() => quotaGaugeColor(this.storagePercent()));
@@ -340,7 +354,11 @@ export class DoorwayAccountComponent implements OnInit {
       case 'install_app':
         return this.runsOwnConductor();
       case 'steward':
-        return acct.isSteward;
+        // A steward whose cell is still doorway-hosted has NOT finished this
+        // step — they are a hosted steward. Ticking it complete made
+        // doorway/account claim they were further along than the elohim-app
+        // agency badge ("Hosted Steward") says.
+        return acct.isSteward && !this.stewardAccessingThroughDoorway();
       default:
         return false;
     }
@@ -349,6 +367,7 @@ export class DoorwayAccountComponent implements OnInit {
   isCurrentStep(step: AgencyStep): boolean {
     const acct = this.account();
     if (!acct) return step === 'hosted';
+    if (step === 'steward' && this.stewardAccessingThroughDoorway()) return true;
     if (step === 'steward' && !acct.isSteward && this.runsOwnConductor()) return true;
     if (step === 'install_app' && !this.runsOwnConductor() && acct.keyExported) return true;
     if (step === 'key_export' && !acct.keyExported) return true;
