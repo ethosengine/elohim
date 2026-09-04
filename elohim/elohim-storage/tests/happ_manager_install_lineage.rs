@@ -76,7 +76,7 @@ async fn install_lineage_installs_beside_under_same_key() {
         &happ_path,
         lineage_app_id,
         key.clone(),
-        &[v1_hash.clone()],
+        std::slice::from_ref(&v1_hash),
         "node_registry",
     )
     .await
@@ -87,7 +87,7 @@ async fn install_lineage_installs_beside_under_same_key() {
         &happ_path,
         lineage_app_id,
         key.clone(),
-        &[v1_hash],
+        std::slice::from_ref(&v1_hash),
         "node_registry",
     )
     .await
