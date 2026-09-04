@@ -734,6 +734,56 @@ pub struct CarryReceipt { pub carried: u32, pub next_cursor: Option<u32>, pub v1
 
 ---
 
+### Tasks 16–20: minted from the live measurement (2026-09-05, r15/r16 — see epic §11.4)
+
+The mesh run exposed five gaps none of the fifteen tasks named. Each is one gap item; each closes a named station or a named trust boundary.
+
+### Task 16: roster check in `verify_path` (Station 10, arm 1)
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/services/release_adoption/path_evidence.rs` (fetch the roster commitment named by `payload.roster_cid` through the peer's OWN conductor — `get_commitment` — and carry `roster_members: Vec<String>` + the signers' agent strings on `PathEvidence`)
+- Modify: `elohim/elohim-storage/src/services/release_adoption/verify.rs` (`verify_path`: after the count check, refuse `QuorumUnmet` with detail `signer <agent> is not on roster <cid>` when any counted signer ∉ roster members; an UNREADABLE roster is `Unreachable` → `conductor_unavailable`, never a pass)
+- Test: unit tests with an off-roster signer; a2o Station 10 arm 1 goes green on the mesh.
+
+- [ ] **Task 16 deliverable: a commitment signed by an agent that is not on the earned roster is refused `quorum_unmet` on every peer; Station 10 arm 1 green.**
+
+### Task 17: `constitution_root` reaches the passport (Station 10, arm 2)
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/runtime_passport.rs` (per role: read the installed cell's modifiers `properties` via admin `app_info` → decode `LineageProperties.constitution_root` → `HappRolePassport.constitution_root: Option<String>`)
+- Modify: `elohim/elohim-storage/src/services/release_adoption/verify.rs:136-138` (`from_happ_passport` carries it, so `RootMismatch` can fire)
+- Test: unit test the properties decode; Station 10 arm 2 green.
+
+- [ ] **Task 17 deliverable: a path whose `constitution_root` differs from the installed role's is refused `root_mismatch`; Station 10 green.**
+
+### Task 18: `export_held_records` — the held view a sweep can carry (Station 5; feeds Task 12)
+
+**Files:**
+- Modify: `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` (UNCONDITIONAL, coordinator-only, hash-neutral: `export_held_records(ExportHeldInput { agent, cursor, limit }) -> ExportPage` over `get_agent_activity(agent, ChainQueryFilter::new(), ActivityRequest::Full)` + DHT `get` per record, same cursor/digest/`total` discipline as `export_records`, cap 64; and `known_agents() -> Vec<AgentPubKey>` = authors of `NodeRegistration` entries the cell can read)
+- Modify: `carry_from` (gated) accepts `source: Own | Held(agent)` and calls the matching v1 extern.
+- Test: sweettest — bob's v1 record held-carried into alice's v2 with `entry: Some`, one witness, `self_carried == 0`.
+
+- [ ] **Task 18 deliverable: a neighbour's v1 record is carried into v2 as a held-carry with the courier's witness; default DNA hash unchanged.**
+
+### Task 19: path lifecycle from DHT truth (Station 7's revocation; trust boundary G4)
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/services/release_adoption/path_evidence.rs` (`state`/`revoked_at` from `mishpat::get_commitment_state_links(commitment_cid)` through the peer's own conductor — the CommitmentByState links — with the local projection row only as a cache; no links and no row → `proposed`; unreadable → `Unreachable`)
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs` (coordinator-only: `create_lineage_commitment` also authors the `active` state link when the validator accepted the quorum, so activation is DHT-visible; `revoke` authors `revoked`)
+- Test: Station 7 — a revocation authored on matthew is read as `path_revoked` on james within one sweep.
+
+- [ ] **Task 19 deliverable: a revoked path is refused `path_revoked` on every peer, not only the author's; Station 7's revocation half green.**
+
+### Task 20: carry idempotency (G5)
+
+**Files:**
+- Modify: `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` (gated `carry_from`: before `create_entry`, `query` this chain for the entry hash; if present, count it as already carried and author no second witness for it)
+- Test: sweettest — a second `carry_from` at cursor 0 reports the same `carried`, `self_carried == 0`, and `get_witnesses_for` still returns exactly one link.
+
+- [ ] **Task 20 deliverable: a retried carry commits no duplicate entries or witnesses; the "one witness per carried entry" property holds under retry.**
+
+---
+
 ## Self-review (done at authoring, 2026-09-04)
 
 - **Spec coverage:** §2 record → Tasks 9, 14 (the kernel exists: `e233bb4f7`); §3 gate entities → Tasks 2, 3, 4; §4 path steps 1–5 → Tasks 3, 4, 7, 13, 14; §4.1 root binding → Task 4 (`RootMismatch`, `constitution_root` on `InstalledRole`), quorum → Task 2 (MVP 1-of-1; roster chain = ledger item 2b); §5 bridge → Task 12; §5.1 many versions → out of MVP (Stations 11–13 later); §6 seam table → one task per row; §9 → Task 15; §11 → every task's ledger line.
