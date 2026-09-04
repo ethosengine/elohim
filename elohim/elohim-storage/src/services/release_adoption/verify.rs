@@ -1140,8 +1140,10 @@ mod tests {
                     .into_iter()
                     .collect(),
                 error: None,
+                lineage: None,
             }],
             error: None,
+            lineage_apps: Vec::new(),
         })
     }
 
@@ -1523,6 +1525,7 @@ mod tests {
             app_id: "elohim".to_string(),
             roles: Vec::new(),
             error: Some("conductor admin connection unavailable".to_string()),
+            lineage_apps: Vec::new(),
         });
         assert!(matches!(errored, Answer::Unreachable));
         let refusal = verify_envelope(&manifest, &errored).expect_err("unknown reality refuses");
@@ -1542,8 +1545,10 @@ mod tests {
                 dna_hash: "uhC0kSCgQh19oJMsMmZpirEuCK2NvtW0ULJYQ_Rmpx6AzH8H2Saco".to_string(),
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: Some("get_dna_definition failed".to_string()),
+                lineage: None,
             }],
             error: None,
+            lineage_apps: Vec::new(),
         });
         assert!(matches!(role_errored, Answer::Unreachable));
     }

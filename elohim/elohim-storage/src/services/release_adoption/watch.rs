@@ -467,6 +467,14 @@ impl InstalledRealitySource for PassportInstalledReality {
                 app_id: self.app_id.clone(),
                 libp2p_active: false,
                 iroh_active: false,
+                // This watch source has no `LineageRoles` handle of its own
+                // (it is a narrow read-only conductor-inventory leg, not the
+                // HTTP composition root) — an empty snapshot is honest and
+                // byte-identical to the pre-Task-8 shape: it renders no
+                // `lineage` on any role, matching a peer with no window ever
+                // opened. `HttpServer`'s own `/version` handler (the wired
+                // path) supplies the real snapshot via `with_lineage_roles`.
+                lineage: std::collections::BTreeMap::new(),
             },
         )
         .await;

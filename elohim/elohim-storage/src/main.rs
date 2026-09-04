@@ -4028,6 +4028,11 @@ async fn async_main(
     // upgrade-velocity debt snowball — the coordinator hot-swap vehicle) can
     // default its target app without the caller naming it.
     http_server = http_server.with_happ_app_id(args.app_id.clone());
+    // Task 8 (Holochain Evolution Epic MVP): the SAME per-role lineage
+    // resolver built above (line ~1382) so `GET /version` can render a
+    // role's dual-cell state. The passport only ever snapshots this Arc —
+    // it never holds it live.
+    http_server = http_server.with_lineage_roles(Arc::clone(&lineage_roles));
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
     // When the iroh node started successfully, thread its blob store so that

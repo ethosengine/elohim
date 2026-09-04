@@ -11,6 +11,8 @@ use std::time::Duration;
 use holochain_client::{AdminWebsocket, CellInfo};
 use serde::Serialize;
 
+use crate::lineage_roles::RoleLineage;
+
 const HAPP_INVENTORY_BUDGET: Duration = Duration::from_secs(5);
 
 /// Additive `/version` response.
@@ -67,6 +69,11 @@ pub struct HappPassport {
     pub roles: Vec<HappRolePassport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Every installed `<app_id>@…` lineage side-app under this peer's
+    /// agent key (Task 8), sorted. Empty (and so omitted) on a peer that
+    /// has never opened a lineage window — the pre-Task-8 shape.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lineage_apps: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -77,6 +84,26 @@ pub struct HappRolePassport {
     pub coordinator_wasm_hashes: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Dual-cell view (Task 8): present only while a lineage window is open
+    /// on this role, or after it has been sunset. `None` — and so omitted —
+    /// on the default single-cell shape every role starts and normally
+    /// stays in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lineage: Option<RoleLineageView>,
+}
+
+/// The dual-cell state of one role: which app id currently serves reads,
+/// which authors, each cell's DNA hash, and whether the window has been
+/// permanently closed (sunset). Projected from `LineageRoles::snapshot()`
+/// by [`lineage_view_for`] — never held live, always a point-in-time copy.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleLineageView {
+    pub reading_app_id: String,
+    pub authoring_app_id: String,
+    pub reading_dna_hash: String,
+    pub authoring_dna_hash: String,
+    pub closed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -109,6 +136,12 @@ pub struct StoragePassportContext {
     pub app_id: String,
     pub libp2p_active: bool,
     pub iroh_active: bool,
+    /// Point-in-time copy of every tracked role's lineage state
+    /// (`LineageRoles::snapshot()`, Task 8). The passport never holds the
+    /// `Arc<LineageRoles>` itself — only this snapshot, taken fresh on
+    /// every `/version` call. Empty on a node with no lineage window ever
+    /// opened, which is byte-identical to the pre-Task-8 response.
+    pub lineage: BTreeMap<String, RoleLineage>,
 }
 
 /// Assemble a fresh storage runtime passport.
@@ -132,7 +165,7 @@ pub async fn assemble_storage_passport(ctx: StoragePassportContext) -> RuntimeVe
     let happ = match ctx.admin_websocket.as_ref() {
         Some(admin) => match tokio::time::timeout(
             HAPP_INVENTORY_BUDGET,
-            inspect_installed_happ(admin, &ctx.app_id),
+            inspect_installed_happ(admin, &ctx.app_id, &ctx.lineage),
         )
         .await
         {
@@ -144,12 +177,14 @@ pub async fn assemble_storage_passport(ctx: StoragePassportContext) -> RuntimeVe
                     "conductor inventory timed out after {}s",
                     HAPP_INVENTORY_BUDGET.as_secs()
                 )),
+                lineage_apps: Vec::new(),
             },
         },
         None => HappPassport {
             app_id: ctx.app_id.clone(),
             roles: Vec::new(),
             error: Some("conductor admin connection unavailable".to_string()),
+            lineage_apps: Vec::new(),
         },
     };
 
@@ -223,7 +258,11 @@ fn adaptive_transport_selection_enabled() -> bool {
     }
 }
 
-async fn inspect_installed_happ(admin: &AdminWebsocket, app_id: &str) -> HappPassport {
+async fn inspect_installed_happ(
+    admin: &AdminWebsocket,
+    app_id: &str,
+    lineage: &BTreeMap<String, RoleLineage>,
+) -> HappPassport {
     let apps = match admin.list_apps(None).await {
         Ok(apps) => apps,
         Err(error) => {
@@ -231,14 +270,22 @@ async fn inspect_installed_happ(admin: &AdminWebsocket, app_id: &str) -> HappPas
                 app_id: app_id.to_string(),
                 roles: Vec::new(),
                 error: Some(format!("list_apps failed: {error}")),
+                lineage_apps: Vec::new(),
             };
         }
     };
+    let installed_app_ids: Vec<String> = apps
+        .iter()
+        .map(|app| app.installed_app_id.clone())
+        .collect();
+    let lineage_apps = lineage_apps_for(app_id, &installed_app_ids);
+
     let Some(app) = apps.iter().find(|app| app.installed_app_id == app_id) else {
         return HappPassport {
             app_id: app_id.to_string(),
             roles: Vec::new(),
             error: Some(format!("app '{app_id}' is not installed")),
+            lineage_apps,
         };
     };
 
@@ -253,43 +300,147 @@ async fn inspect_installed_happ(admin: &AdminWebsocket, app_id: &str) -> HappPas
                 dna_hash: "unknown".to_string(),
                 coordinator_wasm_hashes: BTreeMap::new(),
                 error: Some("role has no provisioned cell".to_string()),
+                lineage: None,
             });
             continue;
         };
 
         let dna_hash = cell_id.dna_hash().to_string();
-        match admin.get_dna_definition(cell_id).await {
-            Ok(definition) => roles.push(HappRolePassport {
-                role: role.to_string(),
-                dna_hash,
-                // Mirrors happ_manager's coordinator drift readback. The
-                // per-zome extractor is shared (`happ_manager::coordinator_wasm_hash`)
-                // so the 0.7 `ZomeDef::Wasm` field access lives in exactly one
-                // place; the passport still owns its own projection shape.
-                coordinator_wasm_hashes: definition
-                    .coordinator_zomes
-                    .iter()
-                    .filter_map(|(name, zome)| {
-                        crate::happ_manager::coordinator_wasm_hash(zome)
-                            .map(|hash| (name.to_string(), hash.to_string()))
-                    })
-                    .collect(),
-                error: None,
-            }),
-            Err(error) => roles.push(HappRolePassport {
-                role: role.to_string(),
-                dna_hash,
-                coordinator_wasm_hashes: BTreeMap::new(),
-                error: Some(format!("get_dna_definition failed: {error}")),
-            }),
-        }
+        let (coordinator_wasm_hashes, mut role_error) =
+            match admin.get_dna_definition(cell_id).await {
+                Ok(definition) => (
+                    // Mirrors happ_manager's coordinator drift readback. The
+                    // per-zome extractor is shared (`happ_manager::coordinator_wasm_hash`)
+                    // so the 0.7 `ZomeDef::Wasm` field access lives in exactly one
+                    // place; the passport still owns its own projection shape.
+                    definition
+                        .coordinator_zomes
+                        .iter()
+                        .filter_map(|(name, zome)| {
+                            crate::happ_manager::coordinator_wasm_hash(zome)
+                                .map(|hash| (name.to_string(), hash.to_string()))
+                        })
+                        .collect(),
+                    None,
+                ),
+                Err(error) => (
+                    BTreeMap::new(),
+                    Some(format!("get_dna_definition failed: {error}")),
+                ),
+            };
+
+        // Task 8: a lineage view is only worth an extra lookup when the
+        // snapshot actually says this role is dual-celled (an open window
+        // or a sunset) — `lineage_view_for` itself would return `None`
+        // otherwise, so skip the app-inventory scan in the common
+        // single-cell case.
+        let needs_lineage_view = lineage
+            .get(role)
+            .map(|entry| entry.authoring_app_id != entry.reading_app_id || entry.closed)
+            .unwrap_or(false);
+        let authoring_dna_hash = if needs_lineage_view {
+            let authoring_app_id = &lineage[role].authoring_app_id;
+            match resolve_role_dna_hash(&apps, authoring_app_id, role) {
+                Ok(hash) => Some(hash),
+                Err(lookup_error) => {
+                    if role_error.is_none() {
+                        role_error = Some(lookup_error);
+                    }
+                    Some("unknown".to_string())
+                }
+            }
+        } else {
+            None
+        };
+        let lineage_view = lineage_view_for(role, &dna_hash, lineage, authoring_dna_hash);
+
+        roles.push(HappRolePassport {
+            role: role.to_string(),
+            dna_hash,
+            coordinator_wasm_hashes,
+            error: role_error,
+            lineage: lineage_view,
+        });
     }
 
     HappPassport {
         app_id: app_id.to_string(),
         roles,
         error: None,
+        lineage_apps,
     }
+}
+
+/// Every installed app id that is a lineage side-app of `base_app_id`
+/// (`"<base_app_id>@…"`), sorted. Pure projection over the app-id list
+/// `list_apps` already returned — no conductor call of its own.
+fn lineage_apps_for(base_app_id: &str, installed_app_ids: &[String]) -> Vec<String> {
+    let prefix = format!("{base_app_id}@");
+    let mut apps: Vec<String> = installed_app_ids
+        .iter()
+        .filter(|id| id.starts_with(&prefix))
+        .cloned()
+        .collect();
+    apps.sort();
+    apps
+}
+
+/// The DNA hash of `role`'s provisioned cell inside `app_id`, read from an
+/// already-fetched `list_apps` result — no extra admin round trip. Used to
+/// resolve the AUTHORING cell's DNA hash for a dual-celled role; the
+/// READING cell's hash is already computed by the caller from the base
+/// app's own cell inventory.
+fn resolve_role_dna_hash(
+    apps: &[holochain_client::AppInfo],
+    app_id: &str,
+    role: &str,
+) -> Result<String, String> {
+    let app = apps
+        .iter()
+        .find(|app| app.installed_app_id == app_id)
+        .ok_or_else(|| format!("authoring app '{app_id}' is not installed"))?;
+    let cells = app
+        .cell_info
+        .get(role)
+        .ok_or_else(|| format!("authoring app '{app_id}' has no role '{role}'"))?;
+    cells
+        .iter()
+        .find_map(|cell| match cell {
+            CellInfo::Provisioned(provisioned) => Some(provisioned.cell_id.dna_hash().to_string()),
+            _ => None,
+        })
+        .ok_or_else(|| format!("authoring app '{app_id}' role '{role}' has no provisioned cell"))
+}
+
+/// Project one role's dual-cell state from the lineage snapshot into the
+/// passport's wire shape. `dna_hash` is the READING cell's DNA hash the
+/// caller already computed from the base app's cell inventory;
+/// `authoring_dna_hash` is a best-effort lookup the caller performs only
+/// when this function's own presence condition would otherwise return
+/// `Some` — `"unknown"` when that lookup failed.
+///
+/// `None` in two cases: the role has no snapshot entry at all, or it does
+/// but is still in the untouched single-cell state
+/// (`authoring_app_id == reading_app_id && !closed`) — the shape every role
+/// starts in and the shape a byte-identical-with-empty-snapshot response
+/// depends on.
+fn lineage_view_for(
+    role: &str,
+    dna_hash: &str,
+    snapshot: &BTreeMap<String, RoleLineage>,
+    authoring_dna_hash: Option<String>,
+) -> Option<RoleLineageView> {
+    let entry = snapshot.get(role)?;
+    if entry.authoring_app_id == entry.reading_app_id && !entry.closed {
+        return None;
+    }
+    Some(RoleLineageView {
+        reading_app_id: entry.reading_app_id.clone(),
+        authoring_app_id: entry.authoring_app_id.clone(),
+        reading_dna_hash: dna_hash.to_string(),
+        authoring_dna_hash: authoring_dna_hash.unwrap_or_else(|| "unknown".to_string()),
+        closed: entry.closed,
+    })
 }
 
 pub fn host_passport() -> HostPassport {
@@ -350,6 +501,7 @@ mod tests {
             app_id: "elohim".to_string(),
             libp2p_active: false,
             iroh_active: false,
+            lineage: BTreeMap::new(),
         })
         .await;
         let actual = serde_json::to_value(response).unwrap();
@@ -377,6 +529,7 @@ mod tests {
             app_id: "elohim".to_string(),
             libp2p_active: true,
             iroh_active: true,
+            lineage: BTreeMap::new(),
         })
         .await;
         let json = serde_json::to_value(response).unwrap();
@@ -406,10 +559,129 @@ mod tests {
                 "uhCok-example".to_string(),
             )]),
             error: None,
+            lineage: None,
         };
         let json = serde_json::to_value(role).unwrap();
         assert!(json.get("dnaHash").is_some());
         assert!(json.get("coordinatorWasmHashes").is_some());
         assert!(json.get("dna_hash").is_none());
+        assert!(json.get("lineage").is_none());
+    }
+
+    /// **Task 8.** An empty snapshot (the default, and every node until a
+    /// lineage window is ever opened) serializes with NO `lineage` key on
+    /// any role and NO `lineageApps` key on `happ` — byte-identical to the
+    /// pre-Task-8 shape.
+    #[test]
+    fn happ_passport_with_empty_lineage_snapshot_carries_no_lineage_keys() {
+        let happ = HappPassport {
+            app_id: "elohim".to_string(),
+            roles: vec![HappRolePassport {
+                role: "node_registry".to_string(),
+                dna_hash: "uhC0k-example".to_string(),
+                coordinator_wasm_hashes: BTreeMap::new(),
+                error: None,
+                lineage: lineage_view_for("node_registry", "uhC0k-example", &BTreeMap::new(), None),
+            }],
+            error: None,
+            lineage_apps: lineage_apps_for("elohim", &[]),
+        };
+        let json = serde_json::to_value(happ).unwrap();
+        assert!(json.get("lineageApps").is_none());
+        assert!(json["roles"][0].get("lineage").is_none());
+    }
+
+    /// `lineage_view_for`'s three cases: no snapshot entry, an open window,
+    /// and a sunset that left the ids equal (the OR-condition edge the
+    /// presence rule names explicitly).
+    #[test]
+    fn lineage_view_for_no_entry_returns_none() {
+        let snapshot: BTreeMap<String, RoleLineage> = BTreeMap::new();
+        assert!(lineage_view_for("node_registry", "uhC0k-base", &snapshot, None).is_none());
+    }
+
+    #[test]
+    fn lineage_view_for_open_window_returns_some() {
+        let mut snapshot = BTreeMap::new();
+        snapshot.insert(
+            "node_registry".to_string(),
+            RoleLineage {
+                reading_app_id: "elohim".to_string(),
+                authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
+                closed: false,
+            },
+        );
+        let view = lineage_view_for(
+            "node_registry",
+            "uhC0k-base",
+            &snapshot,
+            Some("uhC0k-lineage".to_string()),
+        )
+        .expect("open window projects a view");
+        assert_eq!(view.reading_app_id, "elohim");
+        assert_eq!(view.authoring_app_id, "elohim@EKiIscIk5BDd");
+        assert_eq!(view.reading_dna_hash, "uhC0k-base");
+        assert_eq!(view.authoring_dna_hash, "uhC0k-lineage");
+        assert!(!view.closed);
+    }
+
+    #[test]
+    fn lineage_view_for_sunset_with_equal_ids_returns_some_closed() {
+        // Mirrors the `closed` half of the OR condition: even when a caller
+        // has (e.g. via `reset_all` after a hand-rolled sunset) left
+        // authoring_app_id == reading_app_id, `closed: true` alone still
+        // surfaces the view rather than silently reverting to the
+        // untouched-role shape.
+        let mut snapshot = BTreeMap::new();
+        snapshot.insert(
+            "node_registry".to_string(),
+            RoleLineage {
+                reading_app_id: "elohim".to_string(),
+                authoring_app_id: "elohim".to_string(),
+                closed: true,
+            },
+        );
+        let view = lineage_view_for("node_registry", "uhC0k-base", &snapshot, None)
+            .expect("closed=true alone still projects a view");
+        assert_eq!(view.reading_app_id, "elohim");
+        assert_eq!(view.authoring_app_id, "elohim");
+        assert_eq!(view.authoring_dna_hash, "unknown");
+        assert!(view.closed);
+    }
+
+    #[test]
+    fn lineage_view_for_untouched_role_returns_none() {
+        // The state every role starts in and stays in with no window ever
+        // opened: same ids, not closed.
+        let mut snapshot = BTreeMap::new();
+        snapshot.insert(
+            "node_registry".to_string(),
+            RoleLineage {
+                reading_app_id: "elohim".to_string(),
+                authoring_app_id: "elohim".to_string(),
+                closed: false,
+            },
+        );
+        assert!(lineage_view_for("node_registry", "uhC0k-base", &snapshot, None).is_none());
+    }
+
+    #[test]
+    fn lineage_apps_for_filters_and_sorts_by_base_app_prefix() {
+        let installed = vec![
+            "elohim".to_string(),
+            "elohim@EKiIscIk5BDd".to_string(),
+            "elohim-not-a-lineage-app".to_string(),
+            "elohim@AAAA".to_string(),
+            "other-app".to_string(),
+        ];
+        assert_eq!(
+            lineage_apps_for("elohim", &installed),
+            vec!["elohim@AAAA".to_string(), "elohim@EKiIscIk5BDd".to_string()]
+        );
+    }
+
+    #[test]
+    fn lineage_apps_for_empty_list_returns_empty() {
+        assert!(lineage_apps_for("elohim", &[]).is_empty());
     }
 }

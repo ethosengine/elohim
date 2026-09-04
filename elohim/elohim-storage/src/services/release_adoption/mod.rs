@@ -1040,6 +1040,26 @@ mod tests {
         assert_reason_labels_stable::<DecisionArm>(&["watch", "fetch", "verify", "apply"]);
     }
 
+    /// **Task 8.** `GET /admin/adoption` renders `refusal.reason` straight
+    /// off `AdoptionRefusal::new` (`reason.label().to_string()`) — the same
+    /// field the a2o path-refusal story quotes verbatim (underscores
+    /// normalised to spaces by the a2o step). `refusal_reason_labels_are_stable`
+    /// above pins the `label()` constants; this pins that the CONSTRUCTED
+    /// refusal actually carries them on the field the report serializes.
+    #[test]
+    fn admin_adoption_names_the_path_and_lineage_refusal_reasons_verbatim() {
+        for (reason, expected) in [
+            (RefusalReason::PathNotNotarized, "path_not_notarized"),
+            (RefusalReason::PathRevoked, "path_revoked"),
+            (RefusalReason::QuorumUnmet, "quorum_unmet"),
+            (RefusalReason::RootMismatch, "root_mismatch"),
+            (RefusalReason::DnaLineageMismatch, "dna_lineage_mismatch"),
+        ] {
+            let refusal = AdoptionRefusal::new(reason, "detail");
+            assert_eq!(refusal.reason, expected);
+        }
+    }
+
     /// The two non-refusal reason labels are distinct from each other and from
     /// every refusal label. `already_current` sharing a bucket with `ok` would
     /// report a CONVERGED fleet as a continuously-applying one — which is

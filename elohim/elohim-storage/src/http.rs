@@ -385,6 +385,14 @@ pub struct HttpServer {
     /// node's install name. None → the handler falls back to
     /// `happ_manager::APP_ID`.
     happ_app_id: Option<String>,
+    /// Per-role lineage resolver (Task 6/8, Holochain Evolution Epic MVP).
+    /// Wired at startup via [`Self::with_lineage_roles`] from the SAME
+    /// `Arc<LineageRoles>` every `HcRegistryInputs` construction site
+    /// shares. `GET /version` snapshots it (never holds the Arc in the
+    /// passport itself) to render each role's dual-cell state. `None` on a
+    /// test fixture that never wires it → `/version` reports an empty
+    /// lineage snapshot, byte-identical to the pre-Task-8 shape.
+    lineage_roles: Option<Arc<crate::lineage_roles::LineageRoles>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -865,6 +873,7 @@ impl HttpServer {
             reconcile_kick: None,
             admin_websocket: None,
             happ_app_id: None,
+            lineage_roles: None,
             fan_out_ctx: None,
             network_stakes_resolver: None,
             #[cfg(feature = "ssr")]
@@ -1004,6 +1013,17 @@ impl HttpServer {
     /// can default its target app without the caller naming it.
     pub fn with_happ_app_id(mut self, app_id: String) -> Self {
         self.happ_app_id = Some(app_id);
+        self
+    }
+
+    /// Wire the per-role lineage resolver (Task 6/8) so `GET /version` can
+    /// render each role's dual-cell state. Pass the SAME `Arc<LineageRoles>`
+    /// every `HcRegistryInputs` construction site shares.
+    pub fn with_lineage_roles(
+        mut self,
+        lineage_roles: Arc<crate::lineage_roles::LineageRoles>,
+    ) -> Self {
+        self.lineage_roles = Some(lineage_roles);
         self
     }
 
@@ -1482,6 +1502,11 @@ impl HttpServer {
                             .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string()),
                         libp2p_active,
                         iroh_active,
+                        lineage: self
+                            .lineage_roles
+                            .as_ref()
+                            .map(|lineage_roles| lineage_roles.snapshot())
+                            .unwrap_or_default(),
                     },
                 )
                 .await;
