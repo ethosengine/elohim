@@ -1012,6 +1012,10 @@ impl AdoptionController {
                         cid: receipt.release_cid.clone(),
                         at: receipt.applied_at_unix,
                         vehicle: receipt.vehicle.clone(),
+                        // The lineage carry, kept rather than dropped: only the
+                        // `happ-lineage` vehicle fills this in, and this row is
+                        // the only place it survives the sweep.
+                        carry: receipt.carry.clone(),
                     },
                     pending_restart,
                 );
@@ -1464,6 +1468,11 @@ impl AdoptionController {
                                 cid: release_cid.clone(),
                                 at: now,
                                 vehicle: super::VEHICLE_ALREADY_INSTALLED.to_string(),
+                                // Nothing was carried — this arm is the
+                                // already-installed convergence exit, and a
+                                // carry receipt here would claim a crossing
+                                // that never ran.
+                                carry: None,
                             },
                             false,
                         );

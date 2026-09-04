@@ -369,13 +369,27 @@ function encodeHoloHashBase64(hash: Uint8Array): string {
   return `u${Buffer.from(hash).toString('base64url')}`;
 }
 
+/**
+ * The mishpat extern that SELF-SIGNS: `create_lineage_commitment` appends the
+ * CALLING agent's own `{agent, signature}` over `payload_json
+ * .signing_payload_cid` (via in-zome `sign_raw`, the literal-bytes counterpart
+ * of the validator's `verify_signature_raw`) and then takes the ordinary
+ * `create_commitment` path. Landed 2026-09-04 (`f508e75c9`) and hot-swapped
+ * onto the household mesh — it closes exactly the gap this module's "Signing
+ * path" section documents: `@holochain/client` cannot sign raw bytes with the
+ * agent's real conductor-held key, so the harness never constructs a signature.
+ */
+const SELF_SIGNING_EXTERN = 'create_lineage_commitment';
+const PLAIN_EXTERN = 'create_commitment';
+
 async function createCommitment(
   conductor: ConductorRail,
   action: string,
   payload: object,
-  signedAt: string
+  signedAt: string,
+  extern: string = PLAIN_EXTERN
 ): Promise<NotarizeResult> {
-  const raw = await conductor.call('create_commitment', {
+  const raw = await conductor.call(extern, {
     action,
     payload_json: JSON.stringify(payload),
     signed_at: signedAt,
@@ -390,19 +404,32 @@ async function createCommitment(
   return { cid: encodeHoloHashBase64(entryHash) };
 }
 
-/** Submits an already-built, already-signed `migrates-lineage` payload. */
+/**
+ * Submits a `migrates-lineage` payload.
+ *
+ * `selfSign` (the default, and what Task 11's live stations use) routes through
+ * [`SELF_SIGNING_EXTERN`], so the payload goes in with `signatures: []` and
+ * comes back notarized under the CALLING agent's own key — the harness supplies
+ * no key and no signature, ever. Pass `selfSign: false` to submit an
+ * already-signed payload through the plain extern (the shape this module
+ * originally had, kept because Station 10's negative branch needs a commitment
+ * that the self-signing path would never produce).
+ */
 export async function notarizeMigration(opts: {
   conductor: ConductorRail;
   actingPeer: string;
   payload: MigratesLineagePayload;
   signedAt?: string;
+  selfSign?: boolean;
 }): Promise<NotarizeResult> {
-  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing migrates-lineage`);
+  const extern = opts.selfSign === false ? PLAIN_EXTERN : SELF_SIGNING_EXTERN;
+  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing migrates-lineage via ${extern}`);
   return createCommitment(
     opts.conductor,
     'migrates-lineage',
     opts.payload,
-    opts.signedAt ?? new Date().toISOString()
+    opts.signedAt ?? new Date().toISOString(),
+    extern
   );
 }
 
@@ -412,13 +439,16 @@ export async function notarizeSunset(opts: {
   actingPeer: string;
   payload: SunsetsLineagePayload;
   signedAt?: string;
+  selfSign?: boolean;
 }): Promise<NotarizeResult> {
-  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing sunsets-lineage`);
+  const extern = opts.selfSign === false ? PLAIN_EXTERN : SELF_SIGNING_EXTERN;
+  console.error(`[lineage-commitments] ${opts.actingPeer} notarizing sunsets-lineage via ${extern}`);
   return createCommitment(
     opts.conductor,
     'sunsets-lineage',
     opts.payload,
-    opts.signedAt ?? new Date().toISOString()
+    opts.signedAt ?? new Date().toISOString(),
+    extern
   );
 }
 

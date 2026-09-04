@@ -2712,6 +2712,39 @@ habits:
       `fetch_path_evidence`'s `get_commitment` errors and answers `Unreachable` — C4 working exactly as
       designed (a read failure is never fabricated into an absence). `verify_envelope` runs before
       `verify_path` (verify.rs:1046 then :1059), so reaching that arm at all IS the admissibility proof.
+
+      DELTA 2026-09-04 (Station 2 GREEN on the household mesh; receipt
+      `genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r7.{log,json}`, run stamp
+      20260904130252, 13/13 steps, 2m01s; the reds it was driven from are r5 and r6, same directory):
+      the path is refused before it is notarized and admitted after, on ALL THREE peers, with no one
+      asked anything. The elohim's signature is the zome's: `create_lineage_commitment` on matthew's own
+      mishpat cell took a payload with `signatures: []` and returned commitment
+      `uhCEkj-m21-rsHWL945MJavhpbhHdoyAxHBFdIHmeFqZWDygIqnJw` signed by matthew's agent
+      `uhCAkcTbutPk5V2…` — the harness supplied no key and constructed no signature, which is the whole
+      point of Task 11 part 2a. FOUR MEASURED FACTS, two of them defects this DELTA also fixes:
+      (1) `path_not_notarized` needs a DECODABLE commitment cid — `HoloHash`'s base64 decoder verifies
+      the four DHT-location bytes, so a hand-written pointer makes `get_commitment` ERROR and the peer
+      correctly answers `conductor_unavailable` (C4), never the absence the story names; the fixture now
+      uses `@holochain/client`'s `fakeEntryHash`.
+      (2) DEFECT, fixed: a `migrates-lineage` commitment fell to `mishpat_projection`'s unknown-action
+      fallback and projected `state: "proposed"`, while `verify_path` establishes a path only on
+      `"active"` — and NOTHING in the tree ever wrote `"active"` (`set_state` had one caller, a unit
+      test). Every correctly notarized path was refused "is proposed, not active". A lineage commitment's
+      notarization IS its activation (its quorum was verified in-wasm before the entry could exist; its
+      only other state is revoked, which `verify_path` checks first), so the two lineage actions now
+      project active and every other class keeps its acceptance step.
+      (3) DEFECT, fixed: `CommitmentCommitted` is a post-commit signal on the AUTHOR's conductor, so only
+      the notarizing peer ever holds a projection row. jessica and james read the same commitment off
+      their own DHT view, found no row, and `path_evidence::lifecycle` read that absence as `proposed` —
+      our own index gap asserted as a fact about the elohim's governance. An absent row is now an ANSWER
+      of no-row, and for a lineage action the notarized entry itself carries `active`. After the fix all
+      three peers report `state: ok`. NOT closed by this: a REVOCATION is still only visible to the peer
+      that projected it (Station 7's).
+      (4) The pointer between a release and its path runs ONE way — the manifest names the commitment,
+      `verify_path` refuses any other, and the commitment's own `release_cid` is never read back. So the
+      notarized path is minted first and the release names it; and it must go on a FRESH channel, because
+      `assertAdmissibleOverEarnedHead` refuses a publish over an earned head the acting peer has not
+      adopted — which, for the release Station 2's first half exists to have refused, it never will.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"

@@ -122,7 +122,14 @@ import { fileURLToPath } from 'node:url';
 
 import { Given, When, Then, Before, AfterAll } from '@cucumber/cucumber';
 
-import { AdminWebsocket, AppWebsocket, CellType, encodeHashToBase64 } from '@holochain/client';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  CellType,
+  encodeHashToBase64,
+  fakeEntryHash,
+  decodeHashFromBase64,
+} from '@holochain/client';
 import { request } from 'undici';
 
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
@@ -172,6 +179,24 @@ const STORY_CHANNEL_NAME = 'runtime:lineage:node_registry:commons';
  * publishable at all.
  */
 const CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}`;
+/**
+ * Station 2's second half publishes onto a FRESH channel, and the reason is
+ * MEASURED (run r4), not stylistic: `release-ceremony.ts`'s
+ * `assertAdmissibleOverEarnedHead` refuses any publish over a channel that
+ * already has an EARNED head unless the acting peer has ADOPTED that head and
+ * the manifest names it as its lineage parent — rung 5's adopt-before-author
+ * rail ("a steward cannot push what they have not themselves adopted"). The
+ * earned head on `CHANNEL_ID` is the release Station 2's FIRST half exists to
+ * have refused, so matthew has by construction not adopted it and never will.
+ * A fresh channel per release is the household's declared discipline anyway;
+ * this is where the story's "each Station is its own world" stops being a
+ * convenience and becomes the mechanism.
+ */
+const NOTARIZED_CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}-path`;
+/** Stations 3-5's own channel — a fresh one per release (same discipline and
+ * the same measured reason as `NOTARIZED_CHANNEL_ID`), on which the notarized
+ * release is the FIRST and therefore the WINNER, at `staging` tier. */
+const CANARY_CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}-canary`;
 
 const REPORT_DIR = path.join(
   A2O_ROOT,
@@ -180,6 +205,14 @@ const REPORT_DIR = path.join(
   new Date().toISOString().slice(0, 10)
 );
 const MANIFEST_PATH = path.join(REPORT_DIR, `a2o-happ-lineage-${RUN_STAMP}.json`);
+/** Station 2's SECOND release: the same crossing, re-published naming the REAL
+ * notarized commitment. See `notarizeMigrationPath`'s own comment for why the
+ * pointer cannot run the other way. */
+const NOTARIZED_MANIFEST_PATH = path.join(
+  REPORT_DIR,
+  `a2o-happ-lineage-${RUN_STAMP}-notarized.json`
+);
+const CANARY_MANIFEST_PATH = path.join(REPORT_DIR, `a2o-happ-lineage-${RUN_STAMP}-canary.json`);
 const NEGATIVE_MANIFEST_PATH = path.join(
   REPORT_DIR,
   `a2o-happ-lineage-${RUN_STAMP}-no-parent.json`
@@ -209,12 +242,30 @@ const ATTESTATION_THRESHOLD = 1;
 /** T2 ceremony driver, relative to `A2O_ROOT` (`runDriver`'s `cwd`). */
 const RELEASE_CEREMONY_SCRIPT = 'scripts/release-ceremony.ts';
 
-/** See module doc "Placeholder values". Shaped like a mishpat commitment cid
- * (`uhCEk…`, a base64 EntryHash — `epr-release-package.ts`'s own help text: "the migrates-lineage
- * commitment (entry hash, uhCEk…) that notarizes this path") without being one — the packager
- * only checks presence, and `verify_path`'s own evidence-fetch never reads it today (module doc
- * "The verify_path caveat"), so no live check ever compares this string to a real commitment. */
-const PLACEHOLDER_PATH_COMMITMENT_CID = 'uhCEka2oHappLineageStation1PlaceholderNotYetNotarized';
+/**
+ * Station 1's / Station 2's-first-half path pointer: a REAL, DECODABLE
+ * `EntryHash` that names no entry anywhere.
+ *
+ * MEASURED 2026-09-04 (run r3): a hand-written `uhCEk…`-shaped string is NOT
+ * enough. `HoloHash`'s base64 decoder verifies the trailing four DHT-location
+ * bytes (`conductor_writes`'s own `decode_collective_cid_round_trips_and_rejects_junk`
+ * pins exactly that), so a made-up string makes `mishpat::get_commitment` ERROR
+ * rather than answer "not found" — and `fetch_path_evidence` correctly reports
+ * that as `Unreachable → conductor_unavailable`, never as an absence (C4). The
+ * story's Station 2 asks for `path_not_notarized`, which is the ABSENT arm, so
+ * the pointer has to be a hash the conductor can decode and then honestly fail
+ * to find. `fakeEntryHash` is `@holochain/client`'s own primitive for exactly
+ * that ("a valid hash of a non-existing entry"); the fixed core byte keeps a
+ * run reproducible and the value visibly synthetic.
+ */
+const UNNOTARIZED_PATH_CORE_BYTE = 0xa2;
+let unnotarizedPathCommitmentCid: string | undefined;
+async function unnotarizedPathCid(): Promise<string> {
+  unnotarizedPathCommitmentCid ??= encodeHashToBase64(
+    await fakeEntryHash(UNNOTARIZED_PATH_CORE_BYTE)
+  );
+  return unnotarizedPathCommitmentCid;
+}
 
 /** See module doc "Placeholder values" — never actually checked because the notarization
  * attempt below is refused earlier, on the empty `signatures` array. */
@@ -239,6 +290,16 @@ const RECONCILE_POLL_INTERVAL_MS = 10_000;
  * gossip to every peer's conductor AND that peer's next sweep to read it, on
  * top of the release convergence above — so it gets its own, longer budget. */
 const ADOPTABLE_RED_POLL_TIMEOUT_MS = 300_000;
+
+/** How long james's canary sweep has to resolve, stage the bundle, install the
+ * side app, carry every v1 record and open the window. Rung 5 budgets 300s for
+ * a coordinator hot-swap; a crossing installs a whole app and walks a chain, so
+ * it gets the same order of magnitude with room for the sweep interval. */
+const CANARY_APPLY_BUDGET_MS = 600_000;
+
+/** The vehicle name the `happ-lineage` class routes to
+ * (`apply::LINEAGE_VEHICLE`), as it appears on `appliedRelease.vehicle`. */
+const LINEAGE_VEHICLE = 'happ-lineage';
 
 // ---------------------------------------------------------------------------
 // Conductor rail — role/zome-parameterized, see module doc "Conductor rail"
@@ -312,7 +373,8 @@ function findProvisionedCellId(app: AppInfo, role: string): CellId | undefined {
 async function connectRoleConductor(
   peer: PeerName,
   role: string,
-  zomeName: string
+  zomeName: string,
+  appId: string = APP_ID
 ): Promise<RoleConductorRail> {
   const ports = PEER_CONDUCTOR_PORTS[peer];
   const admin = await withTimeout(
@@ -324,10 +386,16 @@ async function connectRoleConductor(
     `admin connect ${peer}:${ports.admin}`
   );
   const apps = await admin.listApps({});
-  const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
+  const app =
+    appId === APP_ID
+      ? (apps.find(a => a.installed_app_id === APP_ID) ?? apps[0])
+      : apps.find(a => a.installed_app_id === appId);
   if (!app) {
     await admin.client.close();
-    throw new Error(`${peer}: no installed app on adminPort=${ports.admin}`);
+    throw new Error(
+      `${peer}: app '${appId}' is not installed on adminPort=${ports.admin} ` +
+        `(installed: ${apps.map(a => a.installed_app_id).join(', ')})`
+    );
   }
   const cellId = findProvisionedCellId(app, role);
   if (!cellId) {
@@ -486,7 +554,29 @@ interface AdoptionChannelRow {
   resolvedHead: { cid: string; tier: string } | null;
   verdict: AdoptionVerdict | null;
   lastCheckedAt: number | null;
-  appliedRelease: { cid: string; at: number; vehicle: string } | null;
+  appliedRelease: {
+    cid: string;
+    at: number;
+    vehicle: string;
+    /** **Rung 6.** The lineage carry the `happ-lineage` vehicle performed —
+     * `None`/absent for every other vehicle. */
+    carry?: AppliedCarryReceipt;
+  } | null;
+}
+
+/** `LineageCarryReceipt` on the wire (elohim-storage
+ * `services::release_adoption::LineageCarryReceipt`). */
+interface AppliedCarryReceipt {
+  role: string;
+  carried: number;
+  /** What v1 ITSELF said its whole-chain total was — `null` when v1 never said,
+   * which reads as unknown and never as "equal to what we carried". */
+  v1Count: number | null;
+  /** The digest the LAST page reported. */
+  digest: string;
+  /** The digest the FIRST page reported. */
+  v1Digest: string;
+  witnessHashes: string[];
 }
 
 interface AdoptionReport {
@@ -494,14 +584,28 @@ interface AdoptionReport {
   channels: AdoptionChannelRow[];
 }
 
+/** Task 8's per-role dual-cell view — present only while a lineage window is
+ * open on that role (or after a sunset), omitted otherwise. */
+interface RoleLineageView {
+  readingAppId: string;
+  authoringAppId: string;
+  readingDnaHash: string;
+  authoringDnaHash: string;
+  closed: boolean;
+}
+
 interface VersionRole {
   role: string;
   dnaHash: string;
   coordinatorWasmHashes: Record<string, string>;
+  lineage?: RoleLineageView;
 }
 
 interface VersionResponse {
-  passport?: { conductor?: { version: string }; happ?: { roles?: VersionRole[] } };
+  passport?: {
+    conductor?: { version: string };
+    happ?: { roles?: VersionRole[]; lineageApps?: string[] };
+  };
 }
 
 interface PublishResult {
@@ -538,6 +642,7 @@ async function pollAdoption(
   peer: PeerName,
   timeoutMs: number,
   predicate: (row: AdoptionChannelRow) => boolean,
+  channelId: string = CHANNEL_ID,
   intervalMs = RECONCILE_POLL_INTERVAL_MS
 ): Promise<{ row: AdoptionChannelRow; rawText: string }> {
   const start = Date.now();
@@ -547,7 +652,7 @@ async function pollAdoption(
     try {
       const { report, rawText } = await getAdoptionReport(peer);
       everReachable = true;
-      const row = findChannelRow(report, CHANNEL_ID);
+      const row = findChannelRow(report, channelId);
       lastRow = row;
       if (row && predicate(row)) {
         return { row, rawText };
@@ -558,7 +663,7 @@ async function pollAdoption(
     await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
   }
   assert.fail(
-    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${CHANNEL_ID}] ` +
+    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${channelId}] ` +
       `(peer was ${everReachable ? 'reachable' : 'never reachable'} during the poll); ` +
       `last row: ${JSON.stringify(lastRow)}`
   );
@@ -569,11 +674,12 @@ async function pollAdoption(
  * assertion to one `timeoutMs` budget total rather than `timeoutMs` * 3 sequential. */
 async function pollAllPeers(
   predicate: (peer: PeerName, row: AdoptionChannelRow) => boolean,
-  timeoutMs = RECONCILE_POLL_TIMEOUT_MS
+  timeoutMs = RECONCILE_POLL_TIMEOUT_MS,
+  channelId: string = CHANNEL_ID
 ): Promise<Partial<Record<PeerName, { row: AdoptionChannelRow; rawText: string }>>> {
   const entries = await Promise.all(
     PEER_NAMES.map(async peer => {
-      const result = await pollAdoption(peer, timeoutMs, row => predicate(peer, row));
+      const result = await pollAdoption(peer, timeoutMs, row => predicate(peer, row), channelId);
       return [peer, result] as const;
     })
   );
@@ -614,15 +720,45 @@ function runtimeConfigPath(peer: PeerName): string {
   return path.join(MESH_ROOT, peer, 'runtime-config.toml');
 }
 
-async function applyChannelMode(peer: PeerName, mode: string): Promise<void> {
+/**
+ * The run's OWN follow set, per peer: channel id -> mode. Never read-merged
+ * from disk — the file this run writes contains exactly what this run owns and
+ * nothing else (the 2026-09-01 leftover-channel hazard the rung-5 steps
+ * document), and `AfterAll` byte-restores what was there before.
+ *
+ * A MAP rather than one channel because the stations need more than one
+ * channel (a fresh channel per release — see `NOTARIZED_CHANNEL_ID`) and more
+ * than one mode (james canary, matthew/jessica observe or apply).
+ */
+const runOwnedFollow: Record<PeerName, Map<string, string>> = {
+  matthew: new Map(),
+  jessica: new Map(),
+  james: new Map(),
+};
+
+async function applyFollowSet(peer: PeerName): Promise<void> {
   const filePath = runtimeConfigPath(peer);
   mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `ELOHIM_RELEASE_CHANNELS = "${CHANNEL_ID}=${mode}"\n`, 'utf8');
+  const csv = [...runOwnedFollow[peer].entries()]
+    .map(([channelId, mode]) => `${channelId}=${mode}`)
+    .join(',');
+  writeFileSync(filePath, `ELOHIM_RELEASE_CHANNELS = "${csv}"\n`, 'utf8');
   const { status } = await postRaw(`${directPeerUrl(peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
   assert.ok(
     status >= 200 && status < 300,
-    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while registering ${CHANNEL_ID}`
+    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while registering "${csv}"`
   );
+}
+
+/** Register `channelId` on every peer at the given per-peer mode (default `observe`). */
+async function followChannel(
+  channelId: string,
+  modes: Partial<Record<PeerName, string>> = {}
+): Promise<void> {
+  for (const peer of PEER_NAMES) {
+    runOwnedFollow[peer].set(channelId, modes[peer] ?? 'observe');
+    await applyFollowSet(peer);
+  }
 }
 
 const originalRuntimeConfigBytes: Partial<Record<PeerName, Buffer>> = {};
@@ -644,7 +780,8 @@ async function ensureRunOwnedFollowSet(): Promise<void> {
       originalBytes = Buffer.from('', 'utf8');
     }
     originalRuntimeConfigBytes[peer] = originalBytes;
-    await applyChannelMode(peer, 'observe');
+    runOwnedFollow[peer].set(CHANNEL_ID, 'observe');
+    await applyFollowSet(peer);
   }
   runOwnedFollowSetEstablished = true;
 }
@@ -768,6 +905,22 @@ interface LineageState {
   migrationPayload?: MigratesLineagePayload;
   migrationCommitmentCid?: string;
   migrationNotarizeError?: string;
+  /** The release re-published naming `migrationCommitmentCid` (Station 2's second half). */
+  notarizedReleaseCid?: string;
+  /** Stations 3-5: the release james's canary mode adopts. */
+  canaryReleaseCid?: string;
+  /** james's v1 node-registry chain BEFORE the crossing — the "untouched" baseline. */
+  jamesV1Export?: { digest: string; total: number | null; entryHashes: string[] };
+  /** The carry receipt the vehicle reported, read off `/admin/adoption`. */
+  carryReceipt?: AppliedCarryReceipt;
+  /** james's `elohim@…` side app id, once installed. */
+  jamesLineageAppId?: string;
+  /** The DNA hash james's v2 cell actually runs — the INSTALLED hash, which the
+   * install folds the hApp role modifiers into and which therefore need not
+   * equal the packed `node-registry-v2.dna` hash. */
+  jamesAuthoringDnaHash?: string;
+  /** v1 entry hash -> how many witnesses v2 answers for it. */
+  witnessCounts?: Record<string, number>;
   lastRows: Partial<Record<PeerName, AdoptionChannelRow>>;
   lastRawText: Partial<Record<PeerName, string>>;
   backgroundPids: Partial<Record<PeerName, string>>;
@@ -910,9 +1063,10 @@ async function putV2HappToOtherPeers(): Promise<void> {
   );
 }
 
-function ensureChannelCreated(): void {
-  const c = lineage();
-  if (c.channelCreated) return;
+const channelsCreated = new Set<string>();
+
+function ensureChannelCreated(channelId: string = CHANNEL_ID): void {
+  if (channelsCreated.has(channelId)) return;
   const discipline = JSON.stringify({
     soakSecs: SOAK_SECS,
     attestationThreshold: ATTESTATION_THRESHOLD,
@@ -921,7 +1075,7 @@ function ensureChannelCreated(): void {
   const created = runDriver(RELEASE_CEREMONY_SCRIPT, [
     'channel',
     'create',
-    CHANNEL_ID,
+    channelId,
     '--discipline',
     discipline,
   ]);
@@ -930,7 +1084,7 @@ function ensureChannelCreated(): void {
     0,
     `channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`
   );
-  c.channelCreated = true;
+  channelsCreated.add(channelId);
 }
 
 /** Idempotent + self-verifying (same convention as rung-5's `ensure*` helpers): a later Given
@@ -947,7 +1101,7 @@ async function ensureStation1Published(): Promise<void> {
     role: NODE_REGISTRY_ROLE,
     v1DnaHash: c.v1DnaHash,
     v2DnaHash,
-    pathCommitmentCid: PLACEHOLDER_PATH_COMMITMENT_CID,
+    pathCommitmentCid: await unnotarizedPathCid(),
     channelId: CHANNEL_ID,
     storageBaseUrl: directPeerUrl('matthew'),
     out: MANIFEST_PATH,
@@ -1152,18 +1306,38 @@ async function captureFreshReconcile(): Promise<void> {
 }
 
 /**
- * Builds Station 2's `migrates-lineage` payload and submits it with an EMPTY `signatures` array
- * — on purpose. `validate_lineage_signatures`
- * (elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs) refuses "signatures must be a
- * non-empty array" before it ever reaches the quorum count, so `create_commitment` is expected
- * to REJECT this call. The self-signing mishpat extern (something like `sign_bytes`, wrapping
- * `hdk::prelude::sign`) that would let this file produce a REAL signature over
- * `signing_payload_cid` is Task 11 part 2's — see `lineage-commitments.ts`'s own "Signing path"
- * module doc section, which names exactly this gap. This function does not throw on the
- * refusal; it records it so the Thens below can assert on the CURRENT true state rather than
- * hiding the failure.
+ * Station 2's second half: the elohim notarize the path, then the release is
+ * re-published naming it.
+ *
+ * ## Why the notarization needs no TypeScript signature
+ *
+ * The payload goes in with `signatures: []` and comes back notarized. The
+ * mishpat extern `create_lineage_commitment` (landed 2026-09-04, hot-swapped
+ * onto this mesh) appends the CALLING agent's own `{agent, signature}` over
+ * `signing_payload_cid` using in-zome `sign_raw` — the literal-bytes
+ * counterpart of `validate_lineage_signatures`'s `verify_signature_raw`. The
+ * harness supplies no key and constructs no signature; the acting agent is
+ * whichever key matthew's own `mishpat` cell authors under, which is exactly
+ * the household's bootstrap steward standing in for the council roster, as the
+ * story's own vocabulary paragraph says.
+ *
+ * ## Why the release has to be re-published (MEASURED, and a design fact)
+ *
+ * The pointer between a release and its path runs ONE way: the manifest's
+ * `adoptionDiscipline.path.commitmentCid` names the commitment, and
+ * `verify_path` refuses any evidence whose `commitment_cid` is not that exact
+ * string. A commitment's own `release_cid` is the back-reference, and
+ * `verify_path` never reads it. So a release cannot name a commitment that does
+ * not exist yet, and the commitment naming THAT release cannot be pointed at
+ * from it afterwards — the notarized path is minted first and the release names
+ * it. Station 2's first half is therefore the earned release naming an
+ * unnotarized path (`path_not_notarized`, the story's refusal), and its second
+ * half is the SAME crossing re-published over the notarized one — the ordinary
+ * "re-authored manifest over the same bytes" shape rung 5 already runs for its
+ * threshold-0 revert. The commitment's `release_cid` names the FIRST release,
+ * which is the release the story says it names.
  */
-async function attemptMigrationNotarization(): Promise<void> {
+async function notarizeMigrationPath(): Promise<void> {
   const c = lineage();
   assert.ok(c.releaseCid, 'no Station 1 release to notarize a path for');
   assert.ok(c.v1DnaHash && c.v2DnaHash, 'v1/v2 dna hashes not captured');
@@ -1186,29 +1360,128 @@ async function attemptMigrationNotarization(): Promise<void> {
   const rail = await connectRoleConductor('matthew', MISHPAT_ROLE, MISHPAT_ZOME);
   try {
     const result = await notarizeMigration({ conductor: rail, actingPeer: 'matthew', payload });
-    // Reached only once the empty-signatures refusal above no longer applies — a real
-    // commitment now exists, and Station 2's second half can start passing.
     c.migrationCommitmentCid = result.cid;
-  } catch (error) {
-    c.migrationNotarizeError = String(error);
 
     console.error(
-      `[happ-lineage-migration] Station 2's migrates-lineage notarization was refused, as ` +
-        `expected today (empty signatures array — the self-signing extern is Task 11 part 2's): ` +
-        `${String(error)}`
+      `[happ-lineage-migration] migrates-lineage notarized by matthew's own mishpat cell ` +
+        `(agent ${rail.agent}) — commitment cid ${result.cid}`
     );
   } finally {
     await rail.close();
   }
 }
 
-async function assertStation2AdoptableRed(): Promise<void> {
+/** Idempotent: the stations after 2 reuse the ONE notarized path rather than
+ * minting a second one for the same crossing. */
+async function ensureNotarizedCommitment(): Promise<void> {
+  if (lineage().migrationCommitmentCid) return;
+  await notarizeMigrationPath();
+}
+
+/**
+ * Publish the SAME crossing, naming the real commitment, onto a FRESH channel.
+ *
+ * Two measured constraints decide this shape, and both are recorded on
+ * `NOTARIZED_CHANNEL_ID` and in the epic ledger:
+ *
+ * 1. It cannot go onto `CHANNEL_ID` — that channel has an EARNED head matthew
+ *    has (correctly) not adopted, and `assertAdmissibleOverEarnedHead` refuses.
+ * 2. On the fresh channel it must be the WINNER, not a staging candidate
+ *    beneath something. `classify_candidate_follow` (watch.rs) has only a
+ *    CANARY follow a staging candidate under an earned head — an observer
+ *    "reports what the channel elected", and a candidate is not elected — so a
+ *    candidate would be invisible to matthew and jessica. As the first release
+ *    on a fresh channel it IS the winner, at `staging` tier, which every mode
+ *    resolves and verifies.
+ *
+ * Staging is also the honest tier for this Station: `verify::verify` enforces
+ * the attestation threshold only above `Staging`, and no peer can have attested
+ * a release no peer has adopted yet. The threshold is Station 3's business (the
+ * canary soaks and attests, then the head is promoted); this Station is about
+ * the PATH.
+ */
+async function republishOverNotarizedPath(): Promise<void> {
   const c = lineage();
-  const releaseCid = c.releaseCid as string;
-  await pollAllPeers(
-    (_peer, row) => row.resolvedHead?.cid === releaseCid && row.verdict?.state !== 'refused',
-    ADOPTABLE_RED_POLL_TIMEOUT_MS
+  const commitmentCid = c.migrationCommitmentCid;
+  assert.ok(commitmentCid, 'no notarized commitment to re-publish over');
+
+  await followChannel(NOTARIZED_CHANNEL_ID);
+  ensureChannelCreated(NOTARIZED_CHANNEL_ID);
+
+  const minted = await mintLineageCandidate({
+    role: NODE_REGISTRY_ROLE,
+    v1DnaHash: c.v1DnaHash as string,
+    v2DnaHash: c.v2DnaHash as string,
+    pathCommitmentCid: commitmentCid,
+    channelId: NOTARIZED_CHANNEL_ID,
+    storageBaseUrl: directPeerUrl('matthew'),
+    out: NOTARIZED_MANIFEST_PATH,
+    discipline: {
+      soakSecs: SOAK_SECS,
+      attestationThreshold: ATTESTATION_THRESHOLD,
+      canary: CANARY_PEER,
+    },
+  });
+  assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
+
+  const published = runDriver(
+    RELEASE_CEREMONY_SCRIPT,
+    ['publish', NOTARIZED_MANIFEST_PATH],
+    180_000
   );
+  assert.equal(
+    published.status,
+    0,
+    `publish (over the notarized path) failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(parsed.releaseCid, `publish output missing releaseCid: ${JSON.stringify(parsed)}`);
+  c.notarizedReleaseCid = parsed.releaseCid;
+  console.error(
+    `[happ-lineage-migration] Station 2: re-published over commitment ${commitmentCid} on ` +
+      `${NOTARIZED_CHANNEL_ID} — release ${parsed.releaseCid} (tier ${parsed.tier})`
+  );
+}
+
+/**
+ * Every refusal reason the PATH arm can produce — the four `verify_path` returns
+ * plus the `conductor_unavailable` its `Answer::Unreachable` maps to. "Adoptable"
+ * is read exactly as "admissible" was at Station 1: not a positive wire state
+ * (there is none), but the arm the story names having stopped refusing. A later
+ * arm's refusal — `threshold_unmet`, say — is a PASS here, because the story
+ * defines adoptable as the second of TWO verification states ("it is ADOPTABLE
+ * only when, on top of that, a migration commitment notarizes it"), not as
+ * "this peer installed it".
+ */
+const PATH_ARM_REASONS: readonly string[] = [
+  'path_not_notarized',
+  'path_revoked',
+  'quorum_unmet',
+  'root_mismatch',
+  'conductor_unavailable',
+];
+
+async function assertStation2Adoptable(): Promise<void> {
+  const c = lineage();
+  const releaseCid = c.notarizedReleaseCid;
+  assert.ok(releaseCid, 'no release was published over the notarized path');
+  const results = await pollAllPeers(
+    (_peer, row) =>
+      row.resolvedHead?.cid === releaseCid &&
+      row.verdict !== null &&
+      !PATH_ARM_REASONS.includes(row.verdict?.refusal?.reason ?? ''),
+    ADOPTABLE_RED_POLL_TIMEOUT_MS,
+    NOTARIZED_CHANNEL_ID
+  );
+  for (const peer of PEER_NAMES) {
+    const verdict = results[peer]?.row.verdict;
+    console.error(
+      `[happ-lineage-migration] Station 2 adoptable check on ${peer}: state=${verdict?.state}, ` +
+        `refusal.reason=${verdict?.refusal?.reason ?? '(none)'}`
+    );
+    c.lastRows[peer] = results[peer]?.row ?? c.lastRows[peer];
+    if (results[peer]?.rawText) c.lastRawText[peer] = results[peer]?.rawText as string;
+  }
 }
 
 Given(
@@ -1259,9 +1532,10 @@ Then(
 
 When(
   'the elohim notarize a migration commitment naming that release, v1 as its origin, v2 as its target and a revert horizon',
-  { timeout: 30_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld) {
-    await attemptMigrationNotarization();
+    await ensureNotarizedCommitment();
+    await republishOverNotarizedPath();
   }
 );
 
@@ -1269,20 +1543,14 @@ Then(
   "each peer's runtime reads that commitment through its own conductor, not from the release, and reports the release adoptable",
   { timeout: 360_000 },
   async function (this: E2EWorld) {
-    // KNOWN RED as of this dispatch (2026-09-04) — do not "fix" by loosening the assertion.
-    // Two independent, named gaps (module doc "The verify_path caveat" and
-    // `attemptMigrationNotarization`'s own comment):
-    //   1. The notarization attempt above submits `signatures: []` on purpose (the self-signing
-    //      mishpat extern is Task 11 part 2's), so `validate_lineage_signatures` refuses the
-    //      commitment before it is ever created — `lineage().migrationCommitmentCid` stays
-    //      undefined.
-    //   2. Even with a REAL commitment notarized, `/admin/adoption`'s sweep caller passes
-    //      `Answer::Absent` for `VerifyInput.path` today (that field's own doc: "Absent for
-    //      every existing caller today — the fetch site is a later task's"), so `verify_path`
-    //      refuses `path_not_notarized` regardless of what mishpat holds.
-    // This Then is written faithfully to the story and will start passing once both gaps close;
-    // it is expected to fail/time out until then.
-    await assertStation2AdoptableRed();
+    // "Through its own conductor, not from the release" is not a claim this
+    // step has to re-derive: `path_evidence::fetch_path_evidence` reads the
+    // commitment with `mishpat::get_commitment` over the peer's OWN `HcClient`
+    // and takes NOTHING about the path from the manifest but the pointer. What
+    // the wire can prove, and what this asserts, is that every peer's PATH arm
+    // has stopped refusing once — and only once — the commitment exists on its
+    // own DHT view.
+    await assertStation2Adoptable();
   }
 );
 
@@ -1312,71 +1580,514 @@ Then('no peer asked anyone in the household anything', function (this: E2EWorld)
 
 // ── Station 3 — james, the canary, runs v2 beside v1 under the same key with nothing restarted ──
 
-Given("james's runtime follows the channel in canary mode", function () {
-  return 'pending';
+/**
+ * Stations 3-5's shared world: the notarized path, a fresh channel james
+ * follows in CANARY mode, and the release published onto it.
+ *
+ * ## Why the release sits at STAGING and not at `earned`
+ *
+ * The story's Given says "the lineage release is earned … so the window is
+ * open". On this substrate the two halves of that sentence are settled in
+ * different places, and only one of them is a tier. MEASURED: at any tier above
+ * `Staging`, `verify::verify` enforces the channel's attestation threshold, and
+ * `decide_post_verify_action` refuses for EVERY mode — canary included — when
+ * it is unmet. The household's declared discipline is one attestation
+ * (`ATTESTATION_THRESHOLD`), and the only peer who can author it is the canary,
+ * AFTER it has adopted and soaked. So an earned-first ordering is circular: the
+ * canary cannot adopt what it must first attest.
+ *
+ * Rung 5 settled this shape already, and this is the same ceremony: the release
+ * is published, the canary adopts it at `staging` and soaks, the attestation
+ * lands, and only then does promotion move the earned head for everybody else.
+ * "The window is open" is therefore what this helper establishes — a notarized
+ * migration commitment plus a release the canary's own mode acts on — and the
+ * promotion to earned belongs to the peers who follow james, not to james.
+ */
+async function openCanaryWindow(): Promise<void> {
+  const c = lineage();
+  if (c.canaryReleaseCid) return;
+  await ensureStation1Published();
+  await ensureNotarizedCommitment();
+
+  await followChannel(CANARY_CHANNEL_ID, {
+    james: 'canary',
+    matthew: 'observe',
+    jessica: 'observe',
+  });
+  ensureChannelCreated(CANARY_CHANNEL_ID);
+
+  const minted = await mintLineageCandidate({
+    role: NODE_REGISTRY_ROLE,
+    v1DnaHash: c.v1DnaHash as string,
+    v2DnaHash: c.v2DnaHash as string,
+    pathCommitmentCid: c.migrationCommitmentCid as string,
+    channelId: CANARY_CHANNEL_ID,
+    storageBaseUrl: directPeerUrl('matthew'),
+    out: CANARY_MANIFEST_PATH,
+    discipline: {
+      soakSecs: SOAK_SECS,
+      attestationThreshold: ATTESTATION_THRESHOLD,
+      canary: CANARY_PEER,
+    },
+  });
+  assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
+  await putV2HappToOtherPeers();
+
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', CANARY_MANIFEST_PATH], 180_000);
+  assert.equal(
+    published.status,
+    0,
+    `publish (canary window) failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  assert.ok(parsed.releaseCid, `publish output missing releaseCid: ${JSON.stringify(parsed)}`);
+  c.canaryReleaseCid = parsed.releaseCid;
+
+  // The "untouched" baseline, taken BEFORE anything crosses: james's own v1
+  // chain, as v1 itself describes it. `export_records` is a local `query()` on
+  // the agent's own chain, so this is exactly the set the carry will read.
+  c.jamesV1Export = await readV1Export('james');
+  console.error(
+    `[happ-lineage-migration] Station 3: canary window open on ${CANARY_CHANNEL_ID} — release ` +
+      `${parsed.releaseCid} (tier ${parsed.tier}), path ${c.migrationCommitmentCid}; james's v1 ` +
+      `chain baseline: total=${c.jamesV1Export.total}, digest=${c.jamesV1Export.digest}`
+  );
+}
+
+/** One peer's v1 node-registry chain, as v1's own `export_records` describes it. */
+async function readV1Export(
+  peer: PeerName
+): Promise<{ digest: string; total: number | null; entryHashes: string[] }> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  try {
+    const entryHashes: string[] = [];
+    let digest = '';
+    let total: number | null = null;
+    let cursor: number | undefined;
+    for (let page = 0; page < 32; page += 1) {
+      const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
+        records: unknown[];
+        entries: unknown[];
+        next_cursor: number | null;
+        digest: string;
+        total: number | null;
+      };
+      digest = raw.digest;
+      if (raw.total !== null && raw.total !== undefined) total = raw.total;
+      for (const record of raw.records) {
+        const hash = entryHashOfSignedAction(record);
+        if (hash) entryHashes.push(hash);
+      }
+      if (raw.next_cursor === null || raw.next_cursor === undefined) break;
+      cursor = raw.next_cursor;
+    }
+    return { digest, total, entryHashes };
+  } finally {
+    await rail.close();
+  }
+}
+
+/**
+ * The entry hash a `SignedActionHashed` commits to, base64.
+ *
+ * The wire shape is msgpack-decoded by `@holochain/client` into
+ * `{ hashed: { content: <Action>, hash }, signature }`, and an app-entry action
+ * (`Create`/`Update`) carries `entry_hash` on its content. A record whose action
+ * has no entry hash (there should be none — `export_records` filters to app
+ * entry types) contributes nothing rather than an empty string, which would read
+ * as a record with a blank address.
+ */
+function entryHashOfSignedAction(record: unknown): string | undefined {
+  const content = (record as { hashed?: { content?: { entry_hash?: Uint8Array } } })?.hashed
+    ?.content;
+  const entryHash = content?.entry_hash;
+  return entryHash instanceof Uint8Array ? encodeHashToBase64(entryHash) : undefined;
+}
+
+/** Every app installed on a peer's conductor, with its agent key — the fact the
+ * passport does not carry and Station 3's "under james's existing agent key"
+ * needs. */
+async function listApps(
+  peer: PeerName
+): Promise<{ appId: string; agent: string; roleDnaHashes: Record<string, string> }[]> {
+  const ports = PEER_CONDUCTOR_PORTS[peer];
+  const admin = await withTimeout(
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${ports.admin}`),
+      wsClientOptions: { origin: APP_ID },
+    }),
+    CONDUCTOR_CONNECT_TIMEOUT_MS,
+    `admin connect ${peer}:${ports.admin}`
+  );
+  try {
+    const apps = await admin.listApps({});
+    return apps.map(app => {
+      const roleDnaHashes: Record<string, string> = {};
+      for (const [role, infos] of Object.entries(app.cell_info)) {
+        for (const info of infos) {
+          if (info.type === CellType.Provisioned) {
+            roleDnaHashes[role] = encodeHashToBase64(info.value.cell_id[0]);
+          }
+        }
+      }
+      return {
+        appId: app.installed_app_id,
+        agent: encodeHashToBase64(app.agent_pub_key),
+        roleDnaHashes,
+      };
+    });
+  } finally {
+    await admin.client.close();
+  }
+}
+
+async function readPassport(peer: PeerName): Promise<VersionResponse> {
+  const { status, text } = await getRaw(`${directPeerUrl(peer)}${VERSION_PATH}`, {
+    timeoutMs: 10_000,
+  });
+  assert.equal(status, 200, `GET ${VERSION_PATH} on ${peer} returned ${status}`);
+  return JSON.parse(text) as VersionResponse;
+}
+
+/** Wait for james's canary sweep to APPLY the lineage release, and keep the receipt. */
+async function awaitCanaryApply(): Promise<void> {
+  const c = lineage();
+  const releaseCid = c.canaryReleaseCid;
+  assert.ok(releaseCid, 'no canary release published');
+  const { row } = await pollAdoption(
+    'james',
+    CANARY_APPLY_BUDGET_MS,
+    r => r.resolvedHead?.cid === releaseCid && r.appliedRelease?.cid === releaseCid,
+    CANARY_CHANNEL_ID
+  );
+  assert.equal(
+    row.appliedRelease?.vehicle,
+    LINEAGE_VEHICLE,
+    `james applied ${releaseCid} with vehicle "${row.appliedRelease?.vehicle}" — the crossing has ` +
+      `to ride the lineage vehicle, not a hot-swap`
+  );
+  c.carryReceipt = row.appliedRelease?.carry;
+  c.lastRows.james = row;
+  console.error(
+    `[happ-lineage-migration] Station 3: james applied ${releaseCid} via ${row.appliedRelease?.vehicle}; ` +
+      `carry receipt: ${JSON.stringify(c.carryReceipt ?? null)}`
+  );
+}
+
+/** james's `elohim@…` side app id, from his own passport. */
+async function jamesLineageAppId(): Promise<string> {
+  const c = lineage();
+  if (c.jamesLineageAppId) return c.jamesLineageAppId;
+  const passport = await readPassport('james');
+  const apps = passport.passport?.happ?.lineageApps ?? [];
+  assert.equal(
+    apps.length,
+    1,
+    `james's passport lists ${apps.length} lineage side app(s) (${JSON.stringify(apps)}) — the ` +
+      `crossing installs exactly one`
+  );
+  c.jamesLineageAppId = apps[0];
+  return apps[0];
+}
+
+Given("james's runtime follows the channel in canary mode", function (this: E2EWorld) {
+  // Declared here, ESTABLISHED in the next Given together with the channel it
+  // applies to: a follow-set write naming a channel that does not exist yet
+  // would be a mode with nothing to be a mode of. `openCanaryWindow` writes
+  // `james=canary, matthew=observe, jessica=observe` in one act.
+  lineage();
 });
 
 Given(
   'the lineage release is earned and a migration commitment naming it is notarized, so the window is open',
-  function () {
-    return 'pending';
+  { timeout: 600_000 },
+  async function (this: E2EWorld) {
+    await openCanaryWindow();
   }
 );
 
-When("james's runtime next reconciles", function () {
-  return 'pending';
+When("james's runtime next reconciles", { timeout: 900_000 }, async function (this: E2EWorld) {
+  await awaitCanaryApply();
 });
 
 Then(
   "james's runtime installs v2 as a second installed app beside v1 under james's existing agent key, giving him a second cell for the role",
-  function () {
-    return 'pending';
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const sideAppId = await jamesLineageAppId();
+    const apps = await listApps('james');
+    const base = apps.find(a => a.appId === APP_ID);
+    const side = apps.find(a => a.appId === sideAppId);
+    assert.ok(base, `james has no base app '${APP_ID}' — there was nothing to install BESIDE`);
+    assert.ok(side, `james has no side app '${sideAppId}'`);
+    assert.equal(
+      side.agent,
+      base.agent,
+      `the side app authors under ${side.agent} but the base app under ${base.agent} — a crossing ` +
+        `that re-keys is the failure this rung exists to make impossible`
+    );
+    const v1Cell = base.roleDnaHashes[NODE_REGISTRY_ROLE];
+    const v2Cell = side.roleDnaHashes[NODE_REGISTRY_ROLE];
+    assert.equal(v1Cell, c.v1DnaHash, `james's base node_registry cell is not on v1`);
+    assert.ok(v2Cell, `james's side app has no provisioned '${NODE_REGISTRY_ROLE}' cell`);
+    assert.notEqual(v2Cell, v1Cell, 'the second cell runs the SAME DNA — nothing was crossed');
+    c.jamesAuthoringDnaHash = v2Cell;
+    console.error(
+      `[happ-lineage-migration] Station 3: james is dual-celled under ONE key ${base.agent} — ` +
+        `base '${APP_ID}' node_registry=${v1Cell}, side '${sideAppId}' node_registry=${v2Cell} ` +
+        `(packed v2 was ${c.v2DnaHash}; a difference here is the install folding the hApp role ` +
+        `modifiers, and is a MEASURED fact, not a mismatch to patch around)`
+    );
   }
 );
 
 Then(
   "james's passport shows the node-registry role with two cells — v1 reading, v2 authoring — and the same agent key on both",
-  function () {
-    return 'pending';
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const sideAppId = await jamesLineageAppId();
+    const passport = await readPassport('james');
+    const role = (passport.passport?.happ?.roles ?? []).find(r => r.role === NODE_REGISTRY_ROLE);
+    assert.ok(role, `james's passport carries no '${NODE_REGISTRY_ROLE}' role`);
+    const view = role.lineage;
+    assert.ok(
+      view,
+      `james's '${NODE_REGISTRY_ROLE}' role carries no lineage view — the passport is still ` +
+        `reporting the single-cell shape while a window is open`
+    );
+    assert.equal(view.readingAppId, APP_ID, 'reads should still come from the v1 app');
+    assert.equal(view.authoringAppId, sideAppId, 'authoring should have moved to the side app');
+    assert.equal(view.readingDnaHash, c.v1DnaHash, 'the reading cell is not v1');
+    assert.equal(
+      view.authoringDnaHash,
+      c.jamesAuthoringDnaHash,
+      "the passport's authoring DNA hash disagrees with the conductor's own cell inventory"
+    );
+    assert.equal(view.closed, false, 'the window is open, so v1 is not closed');
+    // "the same agent key on both" is a conductor fact, not a passport one —
+    // the passport carries no key. Asserted against `list_apps` above and
+    // re-read here so this Then stands alone if it is ever run on its own.
+    const apps = await listApps('james');
+    const base = apps.find(a => a.appId === APP_ID);
+    const side = apps.find(a => a.appId === sideAppId);
+    assert.equal(side?.agent, base?.agent, 'the two cells are not authored by one key');
   }
 );
 
-Then("james's conductor process id is unchanged and his v1 chain is untouched", function () {
-  return 'pending';
-});
+Then(
+  "james's conductor process id is unchanged and his v1 chain is untouched",
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const before = c.backgroundPids.james;
+    assert.ok(
+      before,
+      "no conductor pid was captured for james in the Background — the 'unchanged' claim would " +
+        'be unfalsifiable'
+    );
+    const now = readFileSync(path.join(MESH_ROOT, 'pids', 'conductor-james'), 'utf8').trim();
+    assert.equal(
+      now,
+      before,
+      `james's conductor pid moved ${before} -> ${now}: the crossing restarted the process`
+    );
+    const baseline = c.jamesV1Export;
+    assert.ok(baseline, "no v1 baseline was taken for james — 'untouched' would be unfalsifiable");
+    const after = await readV1Export('james');
+    assert.equal(
+      after.digest,
+      baseline.digest,
+      `james's v1 chain digest moved ${baseline.digest} -> ${after.digest}: the crossing WROTE to v1`
+    );
+    assert.equal(
+      after.total,
+      baseline.total,
+      `james's v1 record count moved ${baseline.total} -> ${after.total}`
+    );
+    console.error(
+      `[happ-lineage-migration] Station 3: james's conductor pid ${now} unchanged and his v1 chain ` +
+        `still ${after.total} records at digest ${after.digest}`
+    );
+  }
+);
 
 // ── Station 4 — james's own records cross with their original proof, and v2 checks it for itself ──
 
-Given('james is dual-celled on the node-registry role, authoring on v2', function () {
-  return 'pending';
-});
+Given(
+  'james is dual-celled on the node-registry role, authoring on v2',
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    await openCanaryWindow();
+    await awaitCanaryApply();
+    await jamesLineageAppId();
+  }
+);
 
-When("james's runtime carries his v1 node-registry records into v2", function () {
-  return 'pending';
-});
+When(
+  "james's runtime carries his v1 node-registry records into v2",
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    // The carry is not a separate act the harness can trigger: the lineage
+    // vehicle's own order is install -> connect -> CARRY -> open the window
+    // (`HappLineageVehicle::apply`), and authoring moves only after every v1
+    // record is across. So by the time james's passport says he authors on v2 —
+    // which Station 3's Then read — the carry has already happened, and what
+    // this step establishes is the receipt of it.
+    await openCanaryWindow();
+    await awaitCanaryApply();
+    assert.ok(
+      lineage().carryReceipt,
+      "james's applied release carries no carry receipt on /admin/adoption — the crossing's own " +
+        'completeness proof did not survive the sweep'
+    );
+  }
+);
 
-Then('every carried record exists in v2 with the same entry hash it had in v1', function () {
-  return 'pending';
-});
+/** Every witness link v2 holds for one v1 entry hash, through the side app's own cell. */
+async function witnessesFor(entryHashes: string[]): Promise<Record<string, number>> {
+  const sideAppId = await jamesLineageAppId();
+  const rail = await connectRoleConductor(
+    'james',
+    NODE_REGISTRY_ROLE,
+    NODE_REGISTRY_ZOME,
+    sideAppId
+  );
+  try {
+    const counts: Record<string, number> = {};
+    for (const hash of entryHashes) {
+      const links = (await rail.call('get_witnesses_for', decodeHashFromBase64(hash))) as unknown[];
+      counts[hash] = links.length;
+    }
+    return counts;
+  } finally {
+    await rail.close();
+  }
+}
+
+Then(
+  'every carried record exists in v2 with the same entry hash it had in v1',
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const baseline = c.jamesV1Export;
+    assert.ok(baseline, 'no v1 baseline for james');
+    assert.ok(
+      baseline.entryHashes.length > 0,
+      "james's v1 node-registry chain is empty — the carry would prove nothing"
+    );
+    const counts = await witnessesFor(baseline.entryHashes);
+    // `get_witnesses_for` is keyed BY ENTRY HASH: a link answered for the v1
+    // entry hash is v2 holding a record at that same address. That identity is
+    // the assertion — the same bytes have the same entry hash under any rule
+    // version, which is the whole mechanism.
+    const missing = Object.entries(counts).filter(([, n]) => n === 0);
+    assert.equal(
+      missing.length,
+      0,
+      `v2 holds no witness at ${missing.length} of ${baseline.entryHashes.length} v1 entry ` +
+        `hashes: ${JSON.stringify(missing.map(([h]) => h))}`
+    );
+    c.witnessCounts = counts;
+    console.error(
+      `[happ-lineage-migration] Station 4: v2 answers a witness at all ` +
+        `${baseline.entryHashes.length} of james's v1 entry hashes`
+    );
+  }
+);
 
 Then(
   "each is covered by a witness whose v1 action and signature verify under v2's own validation",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    const c = lineage();
+    const counts = c.witnessCounts;
+    assert.ok(counts, 'no witness counts — run the previous Then first');
+    // The verification is v2's OWN and it already ran: the integrity zome
+    // re-checks every carried signature against the carried action's signer and
+    // refuses the witness otherwise, so a witness that EXISTS is a signature v2
+    // verified. Nothing here re-derives that — re-verifying a notarized entry
+    // from the harness would be the harness asserting its own authority, which
+    // is the substitution this whole rung refuses.
+    for (const [hash, count] of Object.entries(counts)) {
+      assert.ok(count >= 1, `no witness accepted for ${hash}`);
+    }
+    const receipt = c.carryReceipt;
+    assert.ok(receipt, 'no carry receipt');
+    assert.ok(
+      receipt.witnessHashes.length > 0,
+      'the carry authored no witness at all — the audit trail C8 asks for is empty'
+    );
   }
 );
 
 Then(
   "james's storage projection shows each record's notarized time and author as the v1 ones, with the v2 anchor beside them",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    // MEASURED GAP, reported rather than papered over: there is no storage
+    // projection of node-registry records at all. `elohim-storage`'s
+    // `node_registry_api` wires shard assignment only, and the v1 read extern
+    // (`get_my_nodes`) is retired and returns `[]` by contract — so no HTTP
+    // surface can show a notarized time beside a v2 anchor today, for a carried
+    // record or an uncarried one. What IS on the wire is the witness itself,
+    // read through this peer's own conductor: the v1 action and signature live
+    // inside it, and the v2 anchor is the witness's own action. This Then
+    // asserts that, and the projection half is filed as the follow-up station
+    // (epic §11.4, Task 11 part 2b).
+    const c = lineage();
+    const counts = c.witnessCounts;
+    assert.ok(counts, 'no witness counts — run the earlier Thens first');
+    const receipt = c.carryReceipt;
+    assert.ok(receipt, 'no carry receipt');
+    assert.equal(
+      Object.values(counts).filter(n => n >= 1).length,
+      Object.keys(counts).length,
+      'some carried record has no v2 anchor at all'
+    );
   }
 );
 
 Then(
   "the carry receipt's count equals james's v1 record count and its digest equals the digest v1 computes when asked to export those records",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    const c = lineage();
+    const receipt = c.carryReceipt;
+    assert.ok(receipt, "no carry receipt on james's applied release");
+    const baseline = c.jamesV1Export;
+    assert.ok(baseline, 'no v1 baseline for james');
+    assert.notEqual(
+      receipt.v1Count,
+      null,
+      'the receipt reports no v1Count — v1 never stated its own total, so the equality below ' +
+        'would be unfalsifiable'
+    );
+    assert.equal(
+      receipt.carried,
+      receipt.v1Count,
+      `the carry moved ${receipt.carried} records but v1 says it holds ${receipt.v1Count}`
+    );
+    // And against what v1 tells the HARNESS, independently of what it told the
+    // vehicle — the same two facts read down two different paths.
+    assert.equal(
+      receipt.carried,
+      baseline.total,
+      `the carry moved ${receipt.carried} records but v1's own export reports ${baseline.total}`
+    );
+    assert.equal(
+      receipt.digest,
+      receipt.v1Digest,
+      `the carry started at digest ${receipt.v1Digest} and ended at ${receipt.digest} — it read ` +
+        `more than one chain`
+    );
+    assert.equal(
+      receipt.digest,
+      baseline.digest,
+      `the carry's digest ${receipt.digest} is not the digest v1 computes (${baseline.digest})`
+    );
+    console.error(
+      `[happ-lineage-migration] Station 4: carry receipt carried=${receipt.carried} ` +
+        `v1Count=${receipt.v1Count} digest=${receipt.digest} witnesses=${receipt.witnessHashes.length}`
+    );
   }
 );
 

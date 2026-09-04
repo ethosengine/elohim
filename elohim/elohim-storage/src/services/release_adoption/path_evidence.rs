@@ -141,8 +141,43 @@ pub async fn fetch_path_evidence(
 
     // The projection carries the lifecycle; the DHT entry carries the body.
     // A projection we could not READ is unreachable — never a state we made up.
-    let Some((state, revoked_at)) = lifecycle(db, cid).await else {
+    let Some(row) = lifecycle(db, cid).await else {
         return Answer::Unreachable;
+    };
+    let (state, revoked_at) = match row {
+        Some(pair) => pair,
+        // NO ROW HERE. Measured on the household mesh 2026-09-04 (epic Task 11,
+        // Station 2): `CommitmentCommitted` is a post-commit signal on the
+        // AUTHOR's conductor, so only the peer whose elohim notarized the path
+        // ever projects a `mishpat_commitments` row for it. Every other peer
+        // reads the same commitment off its own DHT view — body, signatures and
+        // all — and finds no row, and reading that as [`UNPROJECTED_STATE`]
+        // refused the path on two of three peers with "is proposed, not
+        // active". That is our own index gap being asserted as a fact about
+        // someone else's governance, which is precisely the substitution this
+        // module exists to refuse.
+        //
+        // For a LINEAGE commitment the entry IS the lifecycle statement: its
+        // quorum was verified in-wasm by `validate_lineage_signatures` before
+        // the entry could exist, and its only other state is REVOKED, which
+        // arrives as a separate `revokes-commitment` entry. So an absent row on
+        // a lineage action reads ACTIVE from the notarized body, and the row —
+        // when this peer has one — still governs, including its `revoked_at`.
+        //
+        // Any OTHER action keeps the old fail-closed default: those classes
+        // have a real acceptance step, and absence there genuinely means "not
+        // accepted here yet".
+        None => match notarized_lineage_state(&payload) {
+            Some(state) => {
+                tracing::debug!(
+                    commitment_cid = %cid,
+                    "release-adoption: lineage path has no local projection row — reading the \
+                     notarized entry itself as active (the row is an index, not the authority)"
+                );
+                (state.to_string(), None)
+            }
+            None => (UNPROJECTED_STATE.to_string(), None),
+        },
     };
 
     Answer::Present(evidence_from(
@@ -223,18 +258,41 @@ fn to_lower_camel(snake: &str) -> String {
     out
 }
 
-/// The commitment's projected lifecycle: `Some((state, revoked_at))` when the
-/// projection ANSWERED, `None` when it could not be read at all.
+/// The lifecycle a LINEAGE commitment body carries on its own, or `None` for
+/// every other action.
+///
+/// `migrates-lineage` / `sunsets-lineage` are the two actions whose
+/// notarization IS their activation — see the call site for the measurement
+/// that made this necessary, and `mishpat_projection`'s own dispatch arm for
+/// the same rule applied to the row this peer writes when it IS the author.
+fn notarized_lineage_state(payload: &serde_json::Value) -> Option<&'static str> {
+    match payload.get("action").and_then(|v| v.as_str()) {
+        Some("migrates-lineage" | "sunsets-lineage") => Some("active"),
+        _ => None,
+    }
+}
+
+/// The commitment's projected lifecycle.
+///
+/// Three answers, and the two nested layers are both load-bearing:
+/// `None` — the projection could not be READ at all (no pool, a checkout that
+/// timed out, a query error, a panicked blocking task); the caller answers
+/// `Unreachable`. `Some(None)` — the projection ANSWERED and holds no row for
+/// this cid. `Some(Some((state, revoked_at)))` — the row, verbatim.
 ///
 /// The distinction is the same C4 line the conductor read draws, applied to the
-/// second source. An **absent row** is an answer — the commitment has not
-/// projected here yet, which is honestly [`UNPROJECTED_STATE`] and refuses. A
-/// **failed read** — no pool configured, a pool checkout that timed out, a
-/// query error, a blocking task that panicked — is not an answer, and
-/// returning `proposed` for it would let a busy sqlite read as "the elohim did
-/// not notarize this path". Those all come back `None`, and the caller answers
+/// second source. An **absent row** is an answer — this peer holds no
+/// projection for the commitment — and what that answer MEANS is the caller's
+/// to decide per action class ([`UNPROJECTED_STATE`] and a refusal for the
+/// classes with an acceptance step; the notarized entry itself for a lineage
+/// path, whose row only ever exists on the peer that authored it). A **failed
+/// read** — no pool configured, a pool checkout that timed out, a query error,
+/// a blocking task that panicked — is not an answer, and returning `proposed`
+/// for it would let a busy sqlite read as "the elohim did not notarize this
+/// path". Those all come back `None`, and the caller answers
 /// [`Answer::Unreachable`].
-async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<(String, Option<String>)> {
+#[allow(clippy::option_option)]
+async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<Option<(String, Option<String>)>> {
     let pool = db.cloned()?;
     let cid = cid.to_string();
     // The pool checkout + diesel query are blocking; offload exactly as
@@ -249,9 +307,9 @@ async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<(String, Option<Str
     )
     .await;
     match joined {
-        Ok(Ok(Some(row))) => Some((row.state, row.revoked_at)),
+        Ok(Ok(Some(row))) => Some(Some((row.state, row.revoked_at))),
         // The projection answered: no such row here yet.
-        Ok(Ok(None)) => Some((UNPROJECTED_STATE.to_string(), None)),
+        Ok(Ok(None)) => Some(None),
         Ok(Err(e)) => {
             tracing::warn!(
                 error = %e,
@@ -272,6 +330,33 @@ async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<(String, Option<Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The measured Station-2 defect on the two peers that did NOT notarize:
+    /// only the AUTHOR's storage projects a `mishpat_commitments` row (the
+    /// `CommitmentCommitted` signal is a post-commit hook on the author's own
+    /// conductor), so every other peer reads the same notarized commitment off
+    /// its own DHT view and finds no row. Reading that as `proposed` refused
+    /// the path on jessica and james with "is proposed, not active" while
+    /// matthew — who happened to author it — passed.
+    #[test]
+    fn a_lineage_body_carries_its_own_active_state() {
+        assert_eq!(
+            notarized_lineage_state(&body()),
+            Some("active"),
+            "a notarized migrates-lineage entry IS the activation — its quorum was verified \
+             in-wasm before the entry could exist"
+        );
+        assert_eq!(
+            notarized_lineage_state(&serde_json::json!({ "action": "sunsets-lineage" })),
+            Some("active")
+        );
+        // Every class with a real acceptance step keeps the fail-closed default.
+        assert_eq!(
+            notarized_lineage_state(&serde_json::json!({ "action": "delegates-compute" })),
+            None
+        );
+        assert_eq!(notarized_lineage_state(&serde_json::json!({})), None);
+    }
 
     /// A migrates-lineage commitment body in the shape the NOTARIZING side
     /// actually writes — every field
@@ -483,14 +568,23 @@ mod tests {
             .expect("pool");
         crate::db::run_migrations(&pool).expect("migrations");
 
-        // (2) Pool present, row absent — the projection ANSWERED "no such row".
+        // (2) Pool present, row absent — the projection ANSWERED "no such row",
+        // which is `Some(None)` and NOT the same value as "could not read".
         let answered = lifecycle(Some(&pool), "uhCEkPathCommitment")
             .await
             .expect("a reachable projection always answers");
-        assert_eq!(answered.0, UNPROJECTED_STATE);
-        assert_eq!(answered.0, "proposed");
-        assert!(answered.1.is_none());
-        let ev = evidence_from("uhCEkPathCommitment", &body(), answered.0, answered.1);
+        assert!(
+            answered.is_none(),
+            "an absent row is an ANSWER of no-row, not a fabricated lifecycle"
+        );
+        // What that no-row answer means is the caller's decision, per action
+        // class. A class with a real acceptance step still refuses.
+        let ev = evidence_from(
+            "uhCEkPathCommitment",
+            &body(),
+            UNPROJECTED_STATE.to_string(),
+            None,
+        );
         assert_eq!(ev.state, "proposed");
         assert_ne!(
             ev.state, "active",
@@ -522,7 +616,8 @@ mod tests {
         }
         let (state, revoked) = lifecycle(Some(&pool), "uhCEkPathCommitment")
             .await
-            .expect("a reachable projection always answers");
+            .expect("a reachable projection always answers")
+            .expect("the row is present now");
         let ev = evidence_from("uhCEkPathCommitment", &body(), state, revoked);
         assert_eq!(ev.state, "active");
         assert_eq!(

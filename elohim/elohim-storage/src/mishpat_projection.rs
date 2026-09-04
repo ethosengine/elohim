@@ -185,6 +185,30 @@ pub fn parse_commitment_payload(
             parse_acknowledges_reach_change(&payload, entry_hash, action_hash)
                 .map(CommitmentProjection::Upsert)
         }
+        // **Holochain Evolution Epic, Task 11 (Station 2, measured on the
+        // household mesh 2026-09-04).** Without this arm a `migrates-lineage`
+        // commitment fell to the `other =>` fallback and projected
+        // `state: "proposed"` — and `release_adoption::verify::verify_path`
+        // establishes a path ONLY on `"active"`, so every correctly notarized
+        // migration path was refused `path_not_notarized` with the detail
+        // "path <cid> is proposed, not active". Nothing in this codebase ever
+        // wrote `"active"` to this column (`set_state` had exactly one caller:
+        // a unit test), so the positive branch of the whole rung was
+        // unreachable.
+        //
+        // A LINEAGE commitment's notarization IS its activation, and that is a
+        // property of this action class rather than a shortcut: the quorum was
+        // verified in-wasm at commit time by `validate_lineage_signatures`
+        // before the entry existed at all, so there is nothing left to accept.
+        // Its only other lifecycle state is REVOKED, which arrives as a
+        // `revokes-commitment` setting `revoked_at` — the field `verify_path`
+        // checks BEFORE it looks at `state`. `delegates-compute` and friends
+        // keep `"proposed"` because they have a real acceptance step this class
+        // does not have.
+        "migrates-lineage" | "sunsets-lineage" => {
+            parse_lineage_commitment(action, &payload, entry_hash, action_hash)
+                .map(CommitmentProjection::Upsert)
+        }
         "revokes-commitment" => parse_revokes_commitment(&payload),
         "author-lens" => parse_author_lens(&payload, entry_hash, action_hash)
             .map(CommitmentProjection::UpsertLens),
@@ -296,6 +320,66 @@ fn parse_delegates_compute(
 /// Fail-closed: required fields error (the signal handler warn-skips that row only,
 /// never the whole signal). The S1 coordinator validator already rejects malformed
 /// lenses at create-time; this is the defense-in-depth projection-side guard.
+/// Parse a `migrates-lineage` / `sunsets-lineage` payload into a
+/// `mishpat_commitments` row, `state: "active"`.
+///
+/// See the dispatch arm above for WHY the state is active on notarization. The
+/// row is what `release_adoption::path_evidence::lifecycle` reads; the
+/// commitment BODY that `verify_path` checks the crossing against is read from
+/// the DHT entry itself, never from here — so this projection deliberately does
+/// not try to be a second home for `from_dna_hash`/`to_dna_hash`. It keeps the
+/// whole notarized payload in `bounds_json` so an operator reading the
+/// commitment ledger sees the path they are looking at.
+///
+/// Fail-open on the window fields (empty string when absent) rather than
+/// refusing the row: `validate_migrates_lineage` in the mishpat coordinator
+/// already required them before the entry could be created, and a row this
+/// projection dropped would read as "no path notarized" — turning a parse
+/// nicety into a statement about someone else's governance.
+fn parse_lineage_commitment(
+    action: &str,
+    payload: &serde_json::Value,
+    entry_hash: &str,
+    action_hash: &str,
+) -> Result<NewMishpatCommitment, String> {
+    let role = payload
+        .get("role")
+        .and_then(|v| v.as_str())
+        .unwrap_or(action)
+        .to_string();
+    let window = payload.get("window");
+    let window_field = |name: &str| -> String {
+        window
+            .and_then(|w| w.get(name))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+    // `migrates-lineage` carries opens_at/revert_until; `sunsets-lineage`
+    // carries sunsets_at and no far edge — a sunset has no revert horizon by
+    // construction, which is the whole reason it is a separate commitment.
+    let valid_from = if window_field("opens_at").is_empty() {
+        window_field("sunsets_at")
+    } else {
+        window_field("opens_at")
+    };
+    let valid_until = window_field("revert_until");
+
+    Ok(NewMishpatCommitment {
+        cid: entry_hash.to_string(),
+        action: action.to_string(),
+        scope: role,
+        provider: String::new(),
+        recipient: String::new(),
+        bounds_json: payload.to_string(),
+        valid_from,
+        valid_until,
+        revoked_at: None,
+        state: "active".to_string(),
+        dht_anchor_hash: Some(action_hash.to_string()),
+    })
+}
+
 fn parse_author_lens(
     payload: &serde_json::Value,
     entry_hash: &str,
@@ -2164,5 +2248,105 @@ mod tests {
         // caller-supplied timestamp, passed through opaque
         assert_eq!(payload.signed_at, "2026-06-10T00:00:00Z");
         assert!(!payload.payload_json.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod lineage_projection_tests {
+    use super::*;
+
+    /// The measured Station-2 defect, pinned: a notarized `migrates-lineage`
+    /// commitment must project ACTIVE, because `verify_path` establishes a path
+    /// only on `"active"` and nothing else in this codebase ever writes that
+    /// value. Before this arm existed the action fell to the unknown-action
+    /// fallback and landed `"proposed"`, and every correct migration path on
+    /// the household mesh was refused `path_not_notarized` ("is proposed, not
+    /// active").
+    #[test]
+    fn migrates_lineage_projects_active_with_its_window() {
+        let payload = serde_json::json!({
+            "action": "migrates-lineage",
+            "role": "node_registry",
+            "from_dna_hash": "uhC0kFROM",
+            "to_dna_hash": "uhC0kTO",
+            "release_cid": "uhCkkRELEASE",
+            "constitution_root": "root",
+            "roster_cid": "roster",
+            "signing_payload_cid": "bafySigning",
+            "signatures": [{ "agent": "uhCAkSIGNER", "signature": "c2ln" }],
+            "required_signatures": 1,
+            "window": { "opens_at": "2026-09-04T00:00:00Z", "revert_until": "2026-09-05T00:00:00Z" }
+        });
+        let projected = parse_commitment_payload(
+            "migrates-lineage",
+            &payload.to_string(),
+            "uhCEkENTRY",
+            "uhCkkACTION",
+        )
+        .expect("a well-formed migrates-lineage payload projects");
+        let CommitmentProjection::Upsert(row) = projected else {
+            panic!("migrates-lineage must project into mishpat_commitments");
+        };
+        assert_eq!(
+            row.state, "active",
+            "a notarized path is active on notarization"
+        );
+        assert_eq!(row.cid, "uhCEkENTRY");
+        assert_eq!(row.action, "migrates-lineage");
+        assert_eq!(row.scope, "node_registry");
+        assert_eq!(row.valid_from, "2026-09-04T00:00:00Z");
+        assert_eq!(row.valid_until, "2026-09-05T00:00:00Z");
+        assert_eq!(row.revoked_at, None);
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkkACTION"));
+    }
+
+    /// A sunset has no revert horizon by construction — its window carries
+    /// `sunsets_at` alone, and the row must not invent a far edge for it.
+    #[test]
+    fn sunsets_lineage_projects_active_with_no_far_edge() {
+        let payload = serde_json::json!({
+            "action": "sunsets-lineage",
+            "role": "node_registry",
+            "migration_commitment_cid": "uhCEkMIGRATION",
+            "window": { "sunsets_at": "2026-09-09T00:00:00Z" }
+        });
+        let projected = parse_commitment_payload(
+            "sunsets-lineage",
+            &payload.to_string(),
+            "uhCEkSUNSET",
+            "uhCkkACTION2",
+        )
+        .expect("a well-formed sunsets-lineage payload projects");
+        let CommitmentProjection::Upsert(row) = projected else {
+            panic!("sunsets-lineage must project into mishpat_commitments");
+        };
+        assert_eq!(row.state, "active");
+        assert_eq!(row.valid_from, "2026-09-09T00:00:00Z");
+        assert_eq!(row.valid_until, "");
+    }
+
+    /// The classes with a real acceptance step are UNTOUCHED — this arm is
+    /// about the lineage actions only, never a loosening of the ledger.
+    #[test]
+    fn delegates_compute_still_projects_proposed() {
+        let payload = serde_json::json!({
+            "scope": "compute",
+            "provider": "p",
+            "recipient": "r",
+            "valid_from": "2026-09-04T00:00:00Z",
+            "valid_until": "2026-09-05T00:00:00Z",
+            "bounds": {}
+        });
+        let projected = parse_commitment_payload(
+            "delegates-compute",
+            &payload.to_string(),
+            "uhCEkDC",
+            "uhCkkDC",
+        )
+        .expect("projects");
+        let CommitmentProjection::Upsert(row) = projected else {
+            panic!("delegates-compute projects a commitment row");
+        };
+        assert_eq!(row.state, "proposed");
     }
 }

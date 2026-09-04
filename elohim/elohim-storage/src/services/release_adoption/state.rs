@@ -420,6 +420,19 @@ pub struct AppliedRelease {
     pub at: i64,
     /// Which vehicle acted.
     pub vehicle: String,
+    /// **Rung 6.** The carry the `happ-lineage` vehicle performed — `None`, and
+    /// absent from the wire, for every other vehicle, so every pre-rung-6
+    /// receipt stays byte-identical.
+    ///
+    /// It is HERE because this is the only place the receipt survives the
+    /// sweep. [`AppliedReceipt`](super::AppliedReceipt) carries it out of the
+    /// vehicle, and before this field the apply arm read `pendingRestart` off
+    /// the receipt's detail and dropped the rest — so the one fact the crossing
+    /// exists to prove (`carried == v1_count`, `digest == v1_digest`, one
+    /// witness per page) reached a tracing line and nothing else. A completeness
+    /// proof no operator and no check can read is not a proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carry: Option<super::LineageCarryReceipt>,
 }
 
 /// Everything the controller knows about one followed channel right now.
@@ -893,6 +906,7 @@ mod tests {
             cid: "uhCkkOld".to_string(),
             at: 1_000,
             vehicle: "sync_coordinators".to_string(),
+            carry: None,
         });
         state.pending_restart = true;
 
@@ -1344,6 +1358,7 @@ mod tests {
                 cid: "uhCkktI48lSxdGOi7Hx9Ew10wkmq1iDrJJ98oG7W02G3q6".to_string(),
                 at: 2_000,
                 vehicle: super::super::VEHICLE_ALREADY_INSTALLED.to_string(),
+                carry: None,
             },
             false,
         );
@@ -1440,6 +1455,7 @@ mod tests {
                 cid: "uhCkkBinary".to_string(),
                 at: 1_000,
                 vehicle: "exe_slot_stage".to_string(),
+                carry: None,
             },
             true,
         );
@@ -1449,6 +1465,7 @@ mod tests {
                 cid: "uhCkkConfig".to_string(),
                 at: 2_000,
                 vehicle: "runtime_config_reload".to_string(),
+                carry: None,
             },
             false,
         );
