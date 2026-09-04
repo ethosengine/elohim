@@ -456,18 +456,38 @@ export async function notarizeSunset(opts: {
   );
 }
 
-/** Submits an already-built (and, when it targets a lineage action, already-signed) `revokes-commitment` payload. */
+/**
+ * Submits a `revokes-commitment` payload.
+ *
+ * `selfSign` (the default) routes through [`SELF_SIGNING_EXTERN`] exactly as
+ * `notarizeMigration`/`notarizeSunset` do: when `payload.target_action` names a
+ * lineage action, `validate_revokes_commitment` runs the SAME
+ * `validate_lineage_signatures` quorum check the original crossing took, so a
+ * revocation naming a lineage target needs its own quorum-worth of signatures
+ * — never the target commitment's. `create_lineage_commitment` appends the
+ * CALLING agent's own signature over `payload.signing_payload_cid`, which is
+ * exactly the one-of-one bootstrap-steward quorum this household declares (the
+ * same acting peer `notarizeMigrationPath` used to open the crossing signs its
+ * reversal). Pass `selfSign: false` to submit an already-signed payload (or a
+ * plain, non-lineage revocation, which carries no `signing_payload_cid` at
+ * all) through the plain extern instead.
+ */
 export async function revokeMigration(opts: {
   conductor: ConductorRail;
   actingPeer: string;
   payload: RevocationPayload;
   signedAt?: string;
+  selfSign?: boolean;
 }): Promise<NotarizeResult> {
-  console.error(`[lineage-commitments] ${opts.actingPeer} revoking ${opts.payload.target_cid}`);
+  const extern = opts.selfSign === false ? PLAIN_EXTERN : SELF_SIGNING_EXTERN;
+  console.error(
+    `[lineage-commitments] ${opts.actingPeer} revoking ${opts.payload.target_cid} via ${extern}`
+  );
   return createCommitment(
     opts.conductor,
     'revokes-commitment',
     opts.payload,
-    opts.signedAt ?? new Date().toISOString()
+    opts.signedAt ?? new Date().toISOString(),
+    extern
   );
 }

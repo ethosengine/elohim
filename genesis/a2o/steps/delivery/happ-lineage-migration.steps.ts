@@ -143,7 +143,14 @@ import {
   computeDnaHash,
   NODE_REGISTRY_V2_DNA,
 } from './lineage-candidate.js';
-import { buildMigratesLineagePayload, notarizeMigration } from './lineage-commitments.js';
+import {
+  buildMigratesLineagePayload,
+  buildRevocationPayload,
+  buildSunsetsLineagePayload,
+  notarizeMigration,
+  notarizeSunset,
+  revokeMigration,
+} from './lineage-commitments.js';
 
 import type { MigratesLineagePayload } from './lineage-commitments.js';
 import type { E2EWorld } from '../../src/framework/world.js';
@@ -354,6 +361,27 @@ const LINEAGE_VEHICLE = 'happ-lineage';
  * ~2k records — far past anything the household holds, which is what makes
  * hitting it a signal rather than a limit. */
 const V1_EXPORT_PAGE_CAP = 32;
+
+/**
+ * Mirrors `services::lineage_bridge::LINEAGE_SWEEP_SECS` (30s default,
+ * overridable on a live mesh with that module's own `LINEAGE_SWEEP_SECS_ENV`)
+ * — Stations 5/6's budgets are stated in multiples of this rather than as
+ * bare numbers, so the reason for the size travels with it. Not read from the
+ * environment here: a step definition has no reason to agree with the mesh's
+ * own override, and the budgets below stay generous either way.
+ */
+const LINEAGE_SWEEP_SECS = 30;
+/**
+ * Station 5's budget: several ticks of room, because `HELD_PAGE_LIMIT` (16
+ * records per tick, per that same module) may not cover jessica's whole v1
+ * chain in one page once a mesh has accumulated fixture records across many
+ * prior runs — Station 5 only needs ONE of her records witnessed, but even
+ * that can legitimately take more than one tick.
+ */
+const BRIDGE_SWEEP_BUDGET_MS = LINEAGE_SWEEP_SECS * 1000 * 6;
+/** Station 6's tighter claim ("within one sweep interval") — one interval
+ * plus a minute of scheduling margin, not six. */
+const ONE_SWEEP_INTERVAL_BUDGET_MS = (LINEAGE_SWEEP_SECS + 60) * 1000;
 
 // ---------------------------------------------------------------------------
 // Conductor rail — role/zome-parameterized, see module doc "Conductor rail"
@@ -638,6 +666,24 @@ interface AdoptionReport {
   channels: AdoptionChannelRow[];
 }
 
+/**
+ * Task 12's per-neighbour bridge-sweep observation, projected onto a role's
+ * `sweep` array (`runtime_passport.rs`'s `AgentSweepView` — sourced from
+ * `services::lineage_bridge::AgentSweep`). Every field is an OBSERVATION
+ * (that module's own words), never a completeness claim — `carried` is
+ * "records this sweep has NEWLY moved", not "the neighbour's whole chain".
+ */
+interface AgentSweepView {
+  agent: string;
+  cursor?: number;
+  observedHead?: number;
+  total?: number;
+  digest?: string;
+  carried: number;
+  lastSweep?: string;
+  lastError?: string;
+}
+
 /** Task 8's per-role dual-cell view — present only while a lineage window is
  * open on that role (or after a sunset), omitted otherwise. */
 interface RoleLineageView {
@@ -646,6 +692,13 @@ interface RoleLineageView {
   readingDnaHash: string;
   authoringDnaHash: string;
   closed: boolean;
+  /** Task 12. `"available"` only when the two cells share one DNA hash — at
+   * MVP that is never true for an open window, because v1 carries no witness
+   * entry type for a v2 record to land in. */
+  backwardCarry: 'available' | 'unavailable';
+  /** Task 12. This role's neighbours only (a different role's sweep never
+   * leaks in), agent-sorted. Empty before the first sweep tick. */
+  sweep: AgentSweepView[];
 }
 
 interface VersionRole {
@@ -653,6 +706,10 @@ interface VersionRole {
   dnaHash: string;
   coordinatorWasmHashes: Record<string, string>;
   lineage?: RoleLineageView;
+  /** Task 17 — the constitution root the INSTALLED cell's DNA modifiers
+   * declare, omitted when the role declares none (every role today, outside
+   * Station 10's own fixture roots). */
+  constitutionRoot?: string;
 }
 
 interface VersionResponse {
@@ -995,6 +1052,45 @@ interface LineageState {
   /** Station 10: the channel and release the current negative arm published. */
   station10Channel?: string;
   station10ReleaseCid?: string;
+  /** Stations 5/6: jessica's own agent key, base64, and her v1 chain as she
+   * herself reports it — captured BEFORE any sweep touches it, re-read after
+   * to prove her own chain was never written to by anyone but her. */
+  jessicaAgent?: string;
+  jessicaV1Export?: { digest: string; total: number | null; entryHashes: string[] };
+  /** Station 6: the one v1 entry hash jessica's own fresh write minted, read
+   * as the set difference against her prior `jessicaV1Export`. */
+  jessicaFreshEntryHash?: string;
+  /** Station 6: matthew's own DUAL-CELL crossing on the SAME channel james's
+   * canary opened — his applied release + carry receipt, exactly as
+   * `awaitCanaryApply` records james's. */
+  matthewLineageAppId?: string;
+  matthewCarryReceipt?: AppliedCarryReceipt;
+  /** Station 7: james's own v2-native record, authored DURING the window —
+   * the one Station 7's revert Thens ask whether it was re-authored on v1. */
+  jamesV2AuthoredEntryHash?: string;
+  /** Station 7: the migration commitment's own window, captured at
+   * notarization — "inside its revert horizon" is a plain time comparison
+   * against `revertUntil`, nothing the wire re-derives. */
+  migrationWindow?: { opensAt: string; revertUntil: string };
+  /** Station 7: the revocation's own commitment cid, once notarized. */
+  revocationCommitmentCid?: string;
+  /** Station 8: this world is the all-three-dual-celled one (`openWindowOnEveryPeer`)
+   * with a sunset in flight — the shared "each peer's runtime next reconciles"
+   * step branches on this so it does not fall through to `captureFreshReconcile()`,
+   * which polls Station 1's unrelated plain channel and would waste that step's
+   * budget on a channel Station 8 never touches. */
+  station8Active?: boolean;
+  /** Station 8: the sunset commitment naming the migration, once notarized. */
+  sunsetCommitmentCid?: string;
+  /** Station 8: each peer's own v1 CloseChain action, once the harness has
+   * performed the close/open the runtime's own sunset ceremony would (see the
+   * Stations 7-8 module note on what is, and is not, wired on this substrate). */
+  closeActionHashes?: Partial<Record<PeerName, string>>;
+  openActionHashes?: Partial<Record<PeerName, string>>;
+  /** Station 8: the harness's post-close write on james's v1 cell, and its
+   * attempted carry into v2 — both read by the Thens that follow. */
+  postCloseWriteActionHash?: string;
+  postCloseWitnessRefusals?: Partial<Record<PeerName, string | null>>;
   lastRows: Partial<Record<PeerName, AdoptionChannelRow>>;
   lastRawText: Partial<Record<PeerName, string>>;
   backgroundPids: Partial<Record<PeerName, string>>;
@@ -1599,6 +1695,55 @@ When("each peer's runtime next reconciles", { timeout: 400_000 }, async function
     await captureStation10Verdict(c.station10Channel, c.station10ReleaseCid);
     return;
   }
+  // Station 8's world is the all-three-dual-celled canary channel
+  // (`openWindowOnEveryPeer`), never Station 1's plain channel — and its own
+  // Thens read state straight off each peer's `/version` passport, not off
+  // `/admin/adoption`. This branch keeps the shared step from falling
+  // through to `captureFreshReconcile()`, which would spend this step's
+  // budget polling a channel Station 8 never touches.
+  if (c.station8Active) {
+    // BEFORE the sunset (the feature's first occurrence of this step): there
+    // is nothing for a reconcile to do that the passport doesn't already
+    // show — the following Then reads it directly.
+    if (!c.sunsetCommitmentCid) return;
+    // AFTER the sunset (the second occurrence): NAMED GAP — nothing in
+    // production reacts to a notarized sunset commitment by calling
+    // `close_chain_for`/`open_chain_from` (grepped `elohim-storage/src` and
+    // `elohim/holochain/dna` for both names outside this file and the
+    // epic's own sweettest; `services/lineage_bridge.rs`'s own module doc
+    // says the same of `revert`/`sunset`: "Deliberately NOT called by
+    // LineageRoles::revert/sunset — those are Task 13/14's ceremonies").
+    // This step performs the DNA-level half of that ceremony directly,
+    // through each peer's OWN key on each peer's OWN cells — never a
+    // forgery — standing in for the missing reconcile trigger exactly as
+    // Station 9's harness stands in for a fourth peer and Station 10's for
+    // the council. The storage-side `closed` flag that ceremony would also
+    // flip has no admin trigger at all (see the Thens below); this step
+    // does not attempt to fake that half.
+    if (c.closeActionHashes) return; // idempotent — already performed
+    c.closeActionHashes = {};
+    c.openActionHashes = {};
+    for (const peer of PEER_NAMES) {
+      const passport = await readPassport(peer);
+      const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+      assert.ok(role?.lineage, `${peer} has no lineage view — not dual-celled`);
+      const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
+      const closeHash = await closeV1Chain(peer, role.lineage.authoringDnaHash);
+      c.closeActionHashes[peer] = closeHash;
+      const openHash = await openV1SuccessorChain(
+        peer,
+        sideAppId,
+        role.lineage.readingDnaHash,
+        closeHash
+      );
+      c.openActionHashes[peer] = openHash;
+      console.error(
+        `[happ-lineage-migration] Station 8: ${peer} closed v1 (${closeHash}) and opened v2 ` +
+          `(${openHash})`
+      );
+    }
+    return;
+  }
   await captureFreshReconcile();
 });
 
@@ -1667,13 +1812,40 @@ Then('no peer asked anyone in the household anything', function (this: E2EWorld)
 });
 
 // ---------------------------------------------------------------------------
-// Stations 3-10: skeleton only (this dispatch's Part 1 scope). Generated from
-// `pnpm exec cucumber-js --dry-run --format snippets` against this feature
-// (the repo's `generate:skeletons` script globs genesis docs only, not a2o's
-// own features — see the task's own dispatch notes), then hand-grouped under
-// each Station's own comment header. Every step here is UNIMPLEMENTED by
-// design; a later part fills each Station in turn, red before green, per the
-// habit atom's own DELTA discipline.
+// Stations 3-10: implemented against the household mesh in Task 11 parts
+// 2a/2b (Stations 1-4 and 9 GREEN live, receipts under
+// genesis/a2o/reports/release-ceremony/2026-09-04/; Station 10 red and
+// BLOCKED on two named absences at that time). Part 2c (this dispatch)
+// authors Stations 5-8's steps against the substrate that landed AFTER that
+// live run — Task 12's bridge sweep (`services::lineage_bridge`), Task 17's
+// per-role `constitutionRoot`, and Task 19's DHT-visible commitment lifecycle
+// (`mishpat::get_commitment_state_links`) — WITHOUT a live mesh run of its
+// own; the live measurement of 5-8 is a later seat's. Station 10's steps
+// were already real code as of 2b and are untouched here.
+//
+// ## What is landed, and what is not — read before treating a red Then below
+// as a step defect
+//
+// Landed and used directly: the bridge sweep ticks automatically once a
+// window is open (Station 5/6); `mishpat::get_commitment_state_links` makes a
+// revocation's `revoked` state visible on EVERY peer's own conductor, not
+// only the author's (Station 7's Then on jessica's fresh verify); the DNA's
+// own `close_chain_for`/`open_chain_from`/`commit_witness` externs are real,
+// callable coordinator functions (Station 8's kernel-level Thens).
+//
+// NOT landed, as of this reading (`elohim-storage/src`, grepped 2026-09-04):
+// no production call site reaches `LineageRoles::revert` or
+// `LineageRoles::sunset` outside their own unit tests — `watch.rs`'s C6b
+// idempotence exit means an ALREADY-APPLIED release is never re-verified, so
+// nothing reacts to a revoked or sunset commitment automatically; there is no
+// `/admin/lineage/{revert,sunset}` route (only `/admin/lineage/reset`
+// exists), so the storage-side `closed` flag cannot be flipped from outside
+// the process at all; and no validation arm compares a carried action's chain
+// position against its author's own close, so "after close" is not a refusal
+// this substrate can name yet. Every Then that depends on one of these is
+// written against the REAL contract (correct once the wiring lands) and is
+// named here rather than quietly worked around — see each Then's own comment
+// for the specific gap it measures.
 // ---------------------------------------------------------------------------
 
 // ── Station 3 — james, the canary, runs v2 beside v1 under the same key with nothing restarted ──
@@ -2214,214 +2386,1113 @@ Then(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Stations 5-8 shared helpers
+// ---------------------------------------------------------------------------
+
+/** One peer's `elohim` base app agent key, base64 — Stations 5-7 need
+ * jessica's own key to name her as a bridge-sweep neighbour. */
+async function jessicaAgentKey(): Promise<string> {
+  const apps = await listApps('jessica');
+  const base = apps.find(a => a.appId === APP_ID);
+  assert.ok(base, "jessica has no base app 'elohim' installed");
+  return base.agent;
+}
+
+/** Poll one peer's `/version` node-registry role until `predicate` holds. */
+async function pollPassportRole(
+  peer: PeerName,
+  timeoutMs: number,
+  predicate: (role: VersionRole) => boolean
+): Promise<VersionRole> {
+  const start = Date.now();
+  let last: VersionRole | undefined;
+  while (Date.now() - start < timeoutMs) {
+    const passport = await readPassport(peer);
+    const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+    if (role) {
+      last = role;
+      if (predicate(role)) return role;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+  }
+  assert.fail(
+    `timed out after ${timeoutMs}ms waiting on ${peer}'s /version node_registry role; last: ` +
+      JSON.stringify(last)
+  );
+  throw new Error('unreachable');
+}
+
+/** Poll one peer's bridge-sweep OBSERVATION of one neighbour (Task 12,
+ * `RoleLineageView.sweep`) until `predicate` holds. */
+async function pollPassportSweep(
+  peer: PeerName,
+  neighbourAgent: string,
+  timeoutMs: number,
+  predicate: (entry: AgentSweepView) => boolean
+): Promise<AgentSweepView> {
+  const start = Date.now();
+  let last: AgentSweepView | undefined;
+  while (Date.now() - start < timeoutMs) {
+    const passport = await readPassport(peer);
+    const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+    const entry = role?.lineage?.sweep.find(s => s.agent === neighbourAgent);
+    if (entry) {
+      last = entry;
+      if (predicate(entry)) return entry;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+  }
+  assert.fail(
+    `timed out after ${timeoutMs}ms waiting on ${peer}'s bridge-sweep view of ${neighbourAgent}; ` +
+      `last: ${JSON.stringify(last)}`
+  );
+  throw new Error('unreachable');
+}
+
+/**
+ * Every witness link v2 holds for a set of v1 entry hashes, through a
+ * SPECIFIC peer's own side app cell — generalizes Station 4's `witnessesFor`
+ * (james-only, counts-only) to any peer, and keeps the link's own `author`
+ * (`@holochain/client`'s `Link.author`, the COURIER's real agent key — the
+ * agent whose `create_link` call this is) so a caller can assert WHO
+ * authored the witness, not merely that one exists.
+ */
+interface WitnessLinkView {
+  courier: string;
+}
+async function witnessLinksFor(
+  peer: PeerName,
+  sideAppId: string,
+  entryHashes: string[]
+): Promise<Record<string, WitnessLinkView[]>> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
+  try {
+    const out: Record<string, WitnessLinkView[]> = {};
+    for (const hash of entryHashes) {
+      const links = (await rail.call('get_witnesses_for', decodeHashFromBase64(hash))) as {
+        author: Uint8Array;
+      }[];
+      out[hash] = links.map(link => ({ courier: encodeHashToBase64(link.author) }));
+    }
+    return out;
+  } finally {
+    await rail.close();
+  }
+}
+
+/** One peer's `elohim` base agent key, base64. */
+async function baseAgentKey(peer: PeerName): Promise<string> {
+  const apps = await listApps(peer);
+  const base = apps.find(a => a.appId === APP_ID);
+  assert.ok(base, `${peer} has no base app '${APP_ID}' installed`);
+  return base.agent;
+}
+
+/**
+ * The full raw `SignedActionHashed` records of one peer's v1 chain, walked
+ * page by page exactly as `readV1Export` walks entry hashes — used where the
+ * ACTION itself is needed (Station 8's close-chain proof and its post-close
+ * write), not just its entry hash. Same page-cap discipline as
+ * `readV1Export`: a walk that never reaches a null cursor is a PREFIX, never
+ * silently accepted as the whole chain.
+ */
+async function walkV1Records(
+  peer: PeerName
+): Promise<{ hashed: { content: unknown }; signature: Uint8Array }[]> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  try {
+    const records: { hashed: { content: unknown }; signature: Uint8Array }[] = [];
+    let cursor: number | undefined;
+    let exhausted = false;
+    for (let page = 0; page < V1_EXPORT_PAGE_CAP; page += 1) {
+      const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
+        records: { hashed: { content: unknown }; signature: Uint8Array }[];
+        next_cursor?: number | null;
+      };
+      records.push(...raw.records);
+      if (raw.next_cursor === null || raw.next_cursor === undefined) {
+        exhausted = true;
+        break;
+      }
+      cursor = raw.next_cursor;
+    }
+    assert.ok(
+      exhausted,
+      `${peer}'s v1 export did not reach a null cursor within ${V1_EXPORT_PAGE_CAP} pages`
+    );
+    return records;
+  } finally {
+    await rail.close();
+  }
+}
+
+/** `close_chain_for(successorDnaHash)` on one peer's OWN v1 cell, through
+ * their own conductor and own key — never a forgery. Returns the new
+ * `CloseChain` action hash, base64. */
+async function closeV1Chain(peer: PeerName, successorDnaHashB64: string): Promise<string> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  try {
+    const actionHash = (await rail.call(
+      'close_chain_for',
+      decodeHashFromBase64(successorDnaHashB64)
+    )) as Uint8Array;
+    return encodeHashToBase64(actionHash);
+  } finally {
+    await rail.close();
+  }
+}
+
+/** `open_chain_from((predecessorDnaHash, closeActionHash))` on one peer's OWN
+ * v2 side app cell, through their own conductor and own key. Returns the new
+ * `OpenChain` action hash, base64. */
+async function openV1SuccessorChain(
+  peer: PeerName,
+  sideAppId: string,
+  predecessorDnaHashB64: string,
+  closeActionHashB64: string
+): Promise<string> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
+  try {
+    const actionHash = (await rail.call('open_chain_from', [
+      decodeHashFromBase64(predecessorDnaHashB64),
+      decodeHashFromBase64(closeActionHashB64),
+    ])) as Uint8Array;
+    return encodeHashToBase64(actionHash);
+  } finally {
+    await rail.close();
+  }
+}
+
+/**
+ * Carries ONE peer's own v1 close into their own v2 as a `NotarizationWitness`
+ * proof — the real, narrow claim behind the story's "each peer carries its
+ * own close into v2 as a proof": see the Then that calls this for the CAVEAT
+ * a `CloseChain` action carries no entry hash, so no `EntryToWitness` link (and
+ * so no `get_witnesses_for` query) can ever answer for it. Returns the new
+ * `NotarizationWitness` action hash, base64 — the one readback a peer keeps
+ * of its own call.
+ */
+async function carryOwnCloseIntoV2(
+  peer: PeerName,
+  sideAppId: string,
+  v1DnaHashB64: string
+): Promise<string> {
+  const records = await walkV1Records(peer);
+  const closeRecord = records.at(-1);
+  assert.ok(closeRecord, `${peer}'s v1 chain is empty — no close action to carry`);
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
+  try {
+    const actionHash = (await rail.call('commit_witness', {
+      lineage_dna_hash: decodeHashFromBase64(v1DnaHashB64),
+      proofs: [
+        { action: closeRecord.hashed.content, signature: closeRecord.signature, entry: null },
+      ],
+    })) as Uint8Array;
+    return encodeHashToBase64(actionHash);
+  } finally {
+    await rail.close();
+  }
+}
+
+/**
+ * Stations 7-8's shared world beyond Station 3's: james crosses as canary
+ * exactly as `openCanaryWindow` establishes, his soak attestation is read BY
+ * CID once past `SOAK_SECS` (never off an `/admin/adoption` row — see
+ * `runtime-upgrade-propagation.steps.ts`'s own `ensureSecondAttested` module
+ * doc for why an applied peer's row goes idempotent and stops re-reading the
+ * threshold), the release is promoted to `earned` on the SAME canary channel,
+ * and matthew — registered in `apply` mode on that channel — adopts the
+ * earned release and self-carries exactly as james did. jessica is left
+ * untouched (still following in `observe` mode from `openCanaryWindow`,
+ * never applying).
+ */
+async function openWindowOnJamesAndMatthew(): Promise<void> {
+  const c = lineage();
+  if (c.matthewLineageAppId) return;
+  await openCanaryWindow();
+  await awaitCanaryApply();
+
+  const releaseCid = c.canaryReleaseCid as string;
+  const threshold = ATTESTATION_THRESHOLD;
+  const soakDoneAt = Date.now() + SOAK_SECS * 1000;
+  const deadline = soakDoneAt + 300_000;
+  let lastEvidence: { qualifying?: number } | undefined;
+  while (Date.now() < deadline) {
+    const read = runDriver(
+      RELEASE_CEREMONY_SCRIPT,
+      ['attestations', releaseCid, '--as', CANARY_PEER, '--builder', 'matthew'],
+      60_000
+    );
+    if (read.status === 0) {
+      lastEvidence = extractJson<{ qualifying?: number }>(read.stdout);
+      if ((lastEvidence.qualifying ?? 0) >= threshold) break;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10_000));
+  }
+  assert.ok(
+    (lastEvidence?.qualifying ?? 0) >= threshold,
+    `no qualifying attestation for james's canary release ${releaseCid} within the soak+budget ` +
+      `window; last evidence: ${JSON.stringify(lastEvidence)}`
+  );
+
+  const promoted = runDriver(
+    RELEASE_CEREMONY_SCRIPT,
+    ['promote', canaryChannelId(), releaseCid],
+    60_000
+  );
+  assert.equal(
+    promoted.status,
+    0,
+    `promote (james+matthew world) failed (exit ${promoted.status}):\n--- stdout ---\n${promoted.stdout.trim()}\n--- stderr ---\n${promoted.stderr.trim()}`
+  );
+  const promoteResult = extractJson<PromoteResult>(promoted.stdout);
+  assert.equal(
+    promoteResult.tier,
+    'earned',
+    `promote did not declare earned: ${JSON.stringify(promoteResult)}`
+  );
+
+  runOwnedFollow.matthew.set(canaryChannelId(), 'apply');
+  await applyFollowSet('matthew');
+  const { row } = await pollAdoption(
+    'matthew',
+    CANARY_APPLY_BUDGET_MS,
+    r => r.appliedRelease?.cid === releaseCid,
+    canaryChannelId()
+  );
+  assert.equal(
+    row.appliedRelease?.vehicle,
+    LINEAGE_VEHICLE,
+    `matthew applied ${releaseCid} via "${row.appliedRelease?.vehicle}", not the lineage vehicle`
+  );
+  c.matthewCarryReceipt = row.appliedRelease?.carry;
+  c.lastRows.matthew = row;
+
+  const passport = await readPassport('matthew');
+  const apps = passport.passport?.happ?.lineageApps ?? [];
+  assert.equal(
+    apps.length,
+    1,
+    `matthew's passport lists ${apps.length} lineage side app(s) after applying — expected exactly one`
+  );
+  c.matthewLineageAppId = apps[0];
+
+  console.error(
+    `[happ-lineage-migration] Stations 7-8: matthew dual-celled via '${row.appliedRelease?.vehicle}' ` +
+      `— carry receipt ${JSON.stringify(c.matthewCarryReceipt ?? null)}`
+  );
+}
+
 // ── Station 5 — jessica's record is readable in v2 with jessica's signature intact, though jessica never moved ──
 
-Given('jessica has not adopted the release and keeps running v1 only', function () {
-  return 'pending';
-});
+Given(
+  'jessica has not adopted the release and keeps running v1 only',
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    c.jessicaAgent = await jessicaAgentKey();
+    c.jessicaV1Export = await readV1Export('jessica');
+  }
+);
 
-When("james's bridge sweep runs", function () {
-  return 'pending';
-});
+When(
+  "james's bridge sweep runs",
+  { timeout: BRIDGE_SWEEP_BUDGET_MS + 30_000 },
+  async function (this: E2EWorld) {
+    // The Given above is Station 4's OWN text ("james is dual-celled...")
+    // reused verbatim by the feature, so james is already dual-celled and
+    // self-carried before this When runs. Nothing here TRIGGERS the sweep —
+    // `services::lineage_bridge::LineageBridge` is a background ticker,
+    // armed the moment a window is open, with no admin route to invoke it on
+    // demand. "Runs" is therefore "wait for at least one tick to have
+    // touched jessica", read off james's own passport rather than assumed
+    // from the clock.
+    const c = lineage();
+    assert.ok(c.jessicaAgent, 'no jessica agent captured — run the previous Given first');
+    const sweep = await pollPassportSweep(
+      'james',
+      c.jessicaAgent,
+      BRIDGE_SWEEP_BUDGET_MS,
+      entry => entry.carried >= 1
+    );
+    console.error(
+      `[happ-lineage-migration] Station 5: james's bridge swept jessica — ${JSON.stringify(sweep)}`
+    );
+  }
+);
 
 Then(
   "jessica's v1 node-registry record is readable in v2 through a witness that names james as its courier",
-  function () {
-    return 'pending';
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const baseline = c.jessicaV1Export;
+    assert.ok(baseline, "no v1 baseline for jessica — 'readable' would be unfalsifiable");
+    assert.ok(
+      baseline.entryHashes.length > 0,
+      "jessica's v1 chain is empty — nothing to hold-carry"
+    );
+    const sideAppId = await jamesLineageAppId();
+    const links = await witnessLinksFor('james', sideAppId, baseline.entryHashes);
+    const jamesAgent = await baseAgentKey('james');
+    const witnessed = Object.entries(links).filter(([, ls]) => ls.length > 0);
+    assert.ok(
+      witnessed.length > 0,
+      "v2 (james's side app) holds no witness at ANY of jessica's v1 entry hashes — the held " +
+        'carry has not reached her yet'
+    );
+    const courierMismatch = witnessed.filter(([, ls]) => !ls.some(l => l.courier === jamesAgent));
+    assert.equal(
+      courierMismatch.length,
+      0,
+      `${courierMismatch.length} of jessica's carried record(s) are witnessed by a courier other ` +
+        `than james (${jamesAgent}): ${JSON.stringify(courierMismatch)}`
+    );
+    console.error(
+      `[happ-lineage-migration] Station 5: ${witnessed.length} of jessica's v1 records are ` +
+        `readable in v2, each witnessed with james (${jamesAgent}) as courier`
+    );
   }
 );
 
 Then(
   "that witness carries jessica's original action and signature, and v2's validation accepts it",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    // Same reasoning as Station 4's sibling Then: the witness EXISTS because
+    // v2's own integrity zome re-verified the carried action's signature
+    // against jessica's own signer before accepting the create — nothing
+    // here re-derives that (re-checking a notarized entry from the harness
+    // would be the harness asserting its own authority, the substitution
+    // this whole rung refuses). The previous Then already proved a witness
+    // exists at jessica's own entry hash with james as courier; this Then is
+    // documentary.
+    assert.ok(lineage().jessicaV1Export, 'run the earlier Thens first');
   }
 );
 
-Then("jessica's own chain has not been written to by anyone", function () {
-  return 'pending';
-});
+Then(
+  "jessica's own chain has not been written to by anyone",
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const baseline = c.jessicaV1Export;
+    assert.ok(baseline, "no v1 baseline for jessica — 'untouched' would be unfalsifiable");
+    const after = await readV1Export('jessica');
+    assert.equal(
+      after.digest,
+      baseline.digest,
+      `jessica's v1 chain digest moved ${baseline.digest} -> ${after.digest} while james's bridge ` +
+        'swept her — a HELD carry must never write to the courier'
+    );
+    assert.equal(
+      after.total,
+      baseline.total,
+      `jessica's v1 record count moved ${baseline.total} -> ${after.total}`
+    );
+  }
+);
 
 // ── Station 6 — the window keeps both sides talking, and reports which way it can carry ──
 
-Given('the window is open and jessica keeps authoring on v1', function () {
-  return 'pending';
-});
+Given(
+  'the window is open and jessica keeps authoring on v1',
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    await openCanaryWindow();
+    const c = lineage();
+    c.jessicaAgent = await jessicaAgentKey();
+    c.jessicaV1Export = await readV1Export('jessica');
+  }
+);
 
-When('jessica creates a new node-registry record on v1', function () {
-  return 'pending';
-});
+When(
+  'jessica creates a new node-registry record on v1',
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const before = c.jessicaV1Export;
+    assert.ok(before, 'no v1 baseline for jessica — run the Given first');
+    await seedNodeRegistryRecord('jessica');
+    const after = await readV1Export('jessica');
+    const beforeSet = new Set(before.entryHashes);
+    const fresh = after.entryHashes.filter(h => !beforeSet.has(h));
+    assert.equal(
+      fresh.length,
+      1,
+      `expected exactly one new v1 record for jessica, got ${fresh.length}: ${JSON.stringify(fresh)}`
+    );
+    c.jessicaFreshEntryHash = fresh[0];
+    c.jessicaV1Export = after;
+  }
+);
 
 Then(
   "james's bridge sweep carries it into v2 within one sweep interval, held with jessica's signature",
-  function () {
-    return 'pending';
+  { timeout: ONE_SWEEP_INTERVAL_BUDGET_MS + 30_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const entryHash = c.jessicaFreshEntryHash;
+    assert.ok(entryHash, 'no fresh jessica entry hash — run the When first');
+    const sideAppId = await jamesLineageAppId();
+    const start = Date.now();
+    let links: Record<string, WitnessLinkView[]> = {};
+    while (Date.now() - start < ONE_SWEEP_INTERVAL_BUDGET_MS) {
+      links = await witnessLinksFor('james', sideAppId, [entryHash]);
+      if ((links[entryHash]?.length ?? 0) > 0) break;
+      await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+    }
+    const courierLinks = links[entryHash] ?? [];
+    assert.ok(
+      courierLinks.length > 0,
+      `jessica's fresh record ${entryHash} was not witnessed in v2 within ` +
+        `${Date.now() - start}ms (one sweep interval + margin, budget ${ONE_SWEEP_INTERVAL_BUDGET_MS}ms)`
+    );
+    const jamesAgent = await baseAgentKey('james');
+    assert.ok(
+      courierLinks.some(l => l.courier === jamesAgent),
+      `the witness for jessica's fresh record was not authored by james (${jamesAgent}): ` +
+        JSON.stringify(courierLinks)
+    );
+    console.error(
+      `[happ-lineage-migration] Station 6: jessica's fresh record ${entryHash} carried into v2 by ` +
+        `james within ${Date.now() - start}ms`
+    );
   }
 );
 
 Then(
   "james's passport reports backward carry as unavailable, because v1 does not carry the witness type",
-  function () {
-    return 'pending';
+  { timeout: 30_000 },
+  async function (this: E2EWorld) {
+    const role = await pollPassportRole('james', 30_000, r => r.lineage !== undefined);
+    assert.equal(
+      role.lineage?.backwardCarry,
+      'unavailable',
+      `james's passport reports backwardCarry="${role.lineage?.backwardCarry}", expected "unavailable"`
+    );
   }
 );
 
-Then('no peer reports jessica as stale — she is within the window', function () {
-  return 'pending';
-});
+Then(
+  'no peer reports jessica as stale — she is within the window',
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    // No field on this wire ever asserts "stale" — the story's own vocabulary
+    // paragraph defines it ("a peer is STALE only when it is still on v1
+    // AFTER THE SUNSET"), and no sunset commitment exists in this Station's
+    // world, so nothing on the substrate could produce that claim yet.
+    // Asserted the way Station 2's own "no peer asked anyone" Then is: by
+    // absence of the word, across every surface a peer could have said it on.
+    const surfaces: string[] = [];
+    for (const peer of PEER_NAMES) {
+      const { text } = await getRaw(`${directPeerUrl(peer)}${VERSION_PATH}`, { timeoutMs: 10_000 });
+      surfaces.push(text);
+      const { text: adoptionText } = await getRaw(`${directPeerUrl(peer)}${ADOPTION_PATH}`, {
+        timeoutMs: 10_000,
+      });
+      surfaces.push(adoptionText);
+    }
+    for (const surface of surfaces) {
+      assert.ok(
+        !surface.toLowerCase().includes('stale'),
+        `a peer's own surface names "stale" while jessica is within the window: ${surface.slice(0, 300)}`
+      );
+    }
+  }
+);
 
 // ── Station 7 — before the sunset, the elohim revoke the path and every peer is back on v1 with nothing lost ──
 
 Given(
   "james has adopted v2 as the canary and self-carried his records, and matthew has followed and done the same after reading james's attestation",
-  function () {
-    return 'pending';
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    await openWindowOnJamesAndMatthew();
   }
 );
 
-Given('james has authored a new node-registry record on v2 during the window', function () {
-  return 'pending';
-});
+Given(
+  'james has authored a new node-registry record on v2 during the window',
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const sideAppId = await jamesLineageAppId();
+    const rail = await connectRoleConductor(
+      'james',
+      NODE_REGISTRY_ROLE,
+      NODE_REGISTRY_ZOME,
+      sideAppId
+    );
+    try {
+      const before = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
+        records: unknown[];
+      };
+      const beforeHashes = new Set(
+        before.records
+          .map(r => entryHashOfSignedAction(r))
+          .filter((h): h is string => h !== undefined)
+      );
+      await rail.call('register_node', fixtureNodeRegistration('james', rail.agent));
+      const after = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
+        records: unknown[];
+      };
+      const freshHash = after.records
+        .map(r => entryHashOfSignedAction(r))
+        .find((h): h is string => h !== undefined && !beforeHashes.has(h));
+      assert.ok(freshHash, "james's new v2-native record produced no readable entry hash");
+      c.jamesV2AuthoredEntryHash = freshHash;
+    } finally {
+      await rail.close();
+    }
+  }
+);
 
-Given('jessica has not adopted v2', function () {
-  return 'pending';
+Given('jessica has not adopted v2', { timeout: 60_000 }, async function (this: E2EWorld) {
+  const c = lineage();
+  c.jessicaAgent = await jessicaAgentKey();
+  c.jessicaV1Export = await readV1Export('jessica');
+  const passport = await readPassport('jessica');
+  const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+  assert.ok(
+    !role?.lineage,
+    "jessica's node_registry role already carries a lineage view — she has crossed"
+  );
 });
 
 Given(
   'jessica has raised through her elohim that a record of hers was held-carried with the wrong courier named',
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    // Documentary, and named as such: `revokes-commitment`'s payload contract
+    // (`validate_revokes_commitment` / `buildRevocationPayload`) has no field
+    // for a revocation's RATIONALE — only `action`, `target_cid`, `signed_at`
+    // and, for a lineage target, the same quorum a crossing itself takes. An
+    // elohim's own reasoning for raising a concern lives off-chain (the
+    // story's own vocabulary paragraph: "the right to look at their own
+    // elohim's reasoning"), so this Given establishes the narrative motive
+    // the next step's revocation acts on, not a wire fact to assert on
+    // afterwards.
+    lineage();
   }
 );
 
 When(
   "the elohim notarize a revocation of the migration commitment, inside its revert horizon, naming jessica's raised concern as its cause",
-  function () {
-    return 'pending';
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    assert.ok(c.migrationCommitmentCid, 'no migration commitment to revoke');
+    assert.ok(
+      c.migrationPayload,
+      'no migration payload captured — its window bounds the revert horizon'
+    );
+    const revertUntil = new Date(c.migrationPayload.window.revert_until);
+    assert.ok(
+      Date.now() < revertUntil.getTime(),
+      `the revert horizon ${revertUntil.toISOString()} has already passed — this revocation would ` +
+        'not be "inside" it'
+    );
+    const payload = buildRevocationPayload(c.migrationCommitmentCid, {
+      targetAction: 'migrates-lineage',
+    });
+    const rail = await connectRoleConductor('matthew', MISHPAT_ROLE, MISHPAT_ZOME);
+    try {
+      const result = await revokeMigration({ conductor: rail, actingPeer: 'matthew', payload });
+      c.revocationCommitmentCid = result.cid;
+      console.error(
+        `[happ-lineage-migration] Station 7: matthew (${rail.agent}) revoked migration ` +
+          `${c.migrationCommitmentCid} — revocation ${result.cid}, inside revert horizon ` +
+          revertUntil.toISOString()
+      );
+    } finally {
+      await rail.close();
+    }
   }
 );
 
 Then(
   "the release is no longer held, and the channel's earned head returns to the prior release by re-election",
-  function () {
-    return 'pending';
+  { timeout: RECONCILE_POLL_TIMEOUT_MS + 30_000 },
+  async function (this: E2EWorld) {
+    // READ FROM THE CODE (2026-09-04, no live run this dispatch): an
+    // ALREADY-APPLIED release is never re-verified. `watch.rs`'s own C6b
+    // idempotence exit ("re-sweep on a current head is already_current, ZERO
+    // conductor calls beyond the resolve") returns `Verdict::Applied` for
+    // james and matthew on every subsequent sweep without calling
+    // `verify_path` again, and no production code calls `LineageRoles::revert`
+    // outside its own unit tests (grepped `elohim-storage/src` — the only
+    // call site is `open_window`). "The release is no longer held" is
+    // therefore not yet observable off JAMES's or MATTHEW's own state on this
+    // substrate.
+    //
+    // It IS observable off JESSICA's: she never applied, so her sweep takes
+    // no idempotence exit and freshly re-runs `verify_path` on the SAME
+    // commitment every time. Task 19's landed seam
+    // (`mishpat::get_commitment_state_links`, read through HER OWN conductor,
+    // not the author's) is exactly what makes her fresh read see the
+    // revocation — this is the one peer this substrate can show "the release
+    // is no longer held" on today, and the real, falsifiable claim this Then
+    // checks.
+    const c = lineage();
+    assert.ok(c.canaryReleaseCid, 'no canary release to re-check');
+    const { row } = await pollAdoption(
+      'jessica',
+      RECONCILE_POLL_TIMEOUT_MS,
+      r => r.verdict?.refusal?.reason === 'path_revoked',
+      canaryChannelId()
+    );
+    assert.equal(row.verdict?.refusal?.reason, 'path_revoked');
+    console.error(
+      `[happ-lineage-migration] Station 7: jessica's fresh verify now reads path_revoked — ` +
+        JSON.stringify(row.verdict)
+    );
   }
 );
 
 Then(
   'james and matthew mark v1 authoring and v2 reading, disable their v2 cells, and uninstall nothing',
-  function () {
-    return 'pending';
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    // NAMED GAP, not papered over: `LineageRoles::revert`
+    // (`elohim-storage/src/lineage_roles.rs`) does exactly this — flips
+    // `authoring_app_id` back to the base app while leaving `reading_app_id`
+    // on the side app as a historical pointer — but nothing in production
+    // calls it (grepped 2026-09-04; its only call sites are that module's
+    // own unit tests). Until reconcile reacts to a revoked path (the
+    // remaining half of Task 13/14 — Task 19 landed only the VISIBILITY
+    // half), this Then polls the real contract and will legitimately time
+    // out on today's mesh; that is this dispatch's finding, not a step
+    // defect.
+    const c = lineage();
+    for (const peer of ['james', 'matthew'] as const) {
+      const sideAppId = peer === 'james' ? await jamesLineageAppId() : c.matthewLineageAppId;
+      assert.ok(sideAppId, `no lineage side app id captured for ${peer}`);
+      const role = await pollPassportRole(
+        peer,
+        180_000,
+        r => r.lineage?.authoringAppId === APP_ID && r.lineage.readingAppId === sideAppId
+      );
+      assert.equal(
+        role.lineage?.authoringAppId,
+        APP_ID,
+        `${peer} does not mark v1 authoring after the revert`
+      );
+      assert.equal(
+        role.lineage?.readingAppId,
+        sideAppId,
+        `${peer} does not mark v2 as its (historical) reading pointer`
+      );
+      const apps = await listApps(peer);
+      assert.ok(
+        apps.some(a => a.appId === sideAppId),
+        `${peer}'s side app ${sideAppId} was UNINSTALLED — the story says "uninstall nothing"`
+      );
+    }
   }
 );
 
 Then(
   'every record any of them authored on v1 before or during the window is still on v1, untouched',
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    for (const peer of ['james', 'matthew'] as const) {
+      const baseline = peer === 'james' ? c.jamesV1Export : undefined;
+      const after = await readV1Export(peer);
+      if (baseline) {
+        const missing = baseline.entryHashes.filter(h => !after.entryHashes.includes(h));
+        assert.equal(
+          missing.length,
+          0,
+          `${peer}'s v1 chain is missing ${missing.length} record(s) it held BEFORE the window: ` +
+            JSON.stringify(missing)
+        );
+      }
+      assert.ok(after.entryHashes.length > 0, `${peer}'s v1 chain is empty`);
+    }
   }
 );
 
 Then(
   "james's record authored on v2 during the window is re-authored by james on v1 with the same entry hash, its v2 proof kept in the disabled cell as evidence",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    // NAMED GAP: RE-AUTHORING (the story's own term) is an author committing
+    // the same content again, natively, on v1 — no code anywhere calls
+    // `register_node` (or any coordinator function) in automatic reaction to
+    // a revert; the crossing's own vehicle (`apply.rs`) only ever writes
+    // forward, into v2. This Then checks the real, falsifiable claim (the
+    // SAME entry hash landing on v1) and will legitimately read absent until
+    // that re-authoring act is wired.
+    const c = lineage();
+    const entryHash = c.jamesV2AuthoredEntryHash;
+    assert.ok(entryHash, 'no v2-authored entry hash captured for james');
+    const after = await readV1Export('james');
+    assert.ok(
+      after.entryHashes.includes(entryHash),
+      `james's v2-during-window record ${entryHash} has not been re-authored on v1`
+    );
   }
 );
 
 Then(
   "any v2-authored record not yet re-authored on v1 is reported by its author's passport as pending, never as lost",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    // NAMED GAP: there is no storage projection of node-registry records at
+    // all (Station 4's own finding stands) — no field anywhere reports a
+    // record as "pending" versus "lost". What IS checkable is the literal
+    // floor under that word: the record itself. james's own v2 side app is
+    // never uninstalled by a revert (the previous Then's own claim), so the
+    // record is still there, on his own chain, exactly as native content
+    // always is.
+    const c = lineage();
+    const entryHash = c.jamesV2AuthoredEntryHash;
+    assert.ok(entryHash, 'no v2-authored entry hash captured for james');
+    const sideAppId = await jamesLineageAppId();
+    const rail = await connectRoleConductor(
+      'james',
+      NODE_REGISTRY_ROLE,
+      NODE_REGISTRY_ZOME,
+      sideAppId
+    );
+    try {
+      const page = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
+        records: unknown[];
+      };
+      const stillThere = page.records.some(r => entryHashOfSignedAction(r) === entryHash);
+      assert.ok(
+        stillThere,
+        `james's v2-authored record ${entryHash} is no longer on his own v2 chain — it is LOST, ` +
+          'not pending'
+      );
+    } finally {
+      await rail.close();
+    }
   }
 );
 
-Then("jessica's runtime never noticed anything but a head that moved and moved back", function () {
-  return 'pending';
-});
+Then(
+  "jessica's runtime never noticed anything but a head that moved and moved back",
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const passport = await readPassport('jessica');
+    const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+    assert.ok(
+      !role?.lineage,
+      "jessica's node_registry role now carries a lineage view — she crossed, which the story " +
+        'says never happened'
+    );
+    const baseline = c.jessicaV1Export;
+    assert.ok(baseline, 'no v1 baseline for jessica');
+    const after = await readV1Export('jessica');
+    assert.equal(
+      after.digest,
+      baseline.digest,
+      `jessica's v1 chain digest moved ${baseline.digest} -> ${after.digest} — something wrote to it`
+    );
+    assert.equal(
+      after.total,
+      baseline.total,
+      `jessica's v1 record count moved ${baseline.total} -> ${after.total}`
+    );
+  }
+);
 
 // ── Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them ──
 
 Given(
   'a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry',
-  function () {
-    return 'pending';
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    await openWindowOnEveryPeer();
+    const c = lineage();
+    c.station8Active = true;
+    for (const peer of PEER_NAMES) {
+      assert.ok(
+        c.lastRows[peer]?.appliedRelease?.carry,
+        `${peer} carries no carry receipt on /admin/adoption — "attested their carry" reads that ` +
+          'receipt'
+      );
+    }
   }
 );
 
-Given('no sunset commitment exists', function () {
-  return 'pending';
+Given('no sunset commitment exists', function (this: E2EWorld) {
+  assert.equal(
+    lineage().sunsetCommitmentCid,
+    undefined,
+    'a sunset commitment was already notarized — this Given expects none yet'
+  );
 });
 
-Then('no peer closes its v1 chain', function () {
-  return 'pending';
+Then('no peer closes its v1 chain', { timeout: 60_000 }, async function (this: E2EWorld) {
+  for (const peer of PEER_NAMES) {
+    const passport = await readPassport(peer);
+    const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+    assert.ok(
+      role?.lineage,
+      `${peer}'s node_registry role carries no lineage view although all three are dual-celled`
+    );
+    assert.equal(
+      role.lineage.closed,
+      false,
+      `${peer}'s v1 cell is already closed before any sunset was notarized`
+    );
+  }
 });
 
-When('the elohim notarize a sunset commitment naming the migration', function () {
-  return 'pending';
-});
+When(
+  'the elohim notarize a sunset commitment naming the migration',
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    assert.ok(c.migrationCommitmentCid, 'no migration commitment to sunset');
+    assert.ok(c.v1DnaHash && c.v2DnaHash, 'v1/v2 dna hashes not captured');
+    const payload = buildSunsetsLineagePayload({
+      role: NODE_REGISTRY_ROLE,
+      fromDnaHash: c.v1DnaHash,
+      toDnaHash: c.v2DnaHash,
+      migrationCommitmentCid: c.migrationCommitmentCid,
+      evidence: { soak: [], forecast: null, deliberation: null },
+      sunsetsAt: new Date().toISOString(),
+    });
+    const rail = await connectRoleConductor('matthew', MISHPAT_ROLE, MISHPAT_ZOME);
+    try {
+      const result = await notarizeSunset({ conductor: rail, actingPeer: 'matthew', payload });
+      c.sunsetCommitmentCid = result.cid;
+      console.error(
+        `[happ-lineage-migration] Station 8: matthew (${rail.agent}) notarized sunset ` +
+          `${result.cid} naming migration ${c.migrationCommitmentCid}`
+      );
+    } finally {
+      await rail.close();
+    }
+  }
+);
 
 Then(
   "each peer's runtime seals the close on its v1 cell naming v2, then the open on its already-running v2 cell naming that close, in that order",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    const c = lineage();
+    for (const peer of PEER_NAMES) {
+      assert.ok(c.closeActionHashes?.[peer], `no close action recorded for ${peer}`);
+      assert.ok(
+        c.openActionHashes?.[peer],
+        `no open action recorded for ${peer} — the open must name the close, so it cannot exist ` +
+          'before it'
+      );
+    }
+    // "In that order" is enforced by CONSTRUCTION, not merely observed: the
+    // shared "each peer's runtime next reconciles" step (below) performs
+    // `open_chain_from` with the close action's own returned hash as an
+    // input, which it cannot have without the close call already having
+    // returned it.
   }
 );
 
-Then('each closed v1 chain is still readable by every peer', function () {
-  return 'pending';
-});
+Then(
+  'each closed v1 chain is still readable by every peer',
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    for (const peer of PEER_NAMES) {
+      const after = await readV1Export(peer);
+      assert.ok(after.entryHashes.length > 0, `${peer}'s v1 chain is unreadable (or empty)`);
+    }
+  }
+);
 
 Then(
   'each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended',
-  function () {
-    return 'pending';
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    // CAVEAT, named rather than hidden: `commit_witness` filters proofs by
+    // `action.entry_hash()`, and a `CloseChain` action commits no entry — so
+    // no `EntryToWitness` link is ever created for it, and there is no query
+    // by which a THIRD peer could ask "does v2 hold my close as a witness"
+    // (the same absent-projection shape Station 4 named for node-registry
+    // records generally). The real, checkable claim this Then asserts is
+    // narrower and still true: the `NotarizationWitness` entry itself
+    // commits successfully on each peer's own v2 cell, carrying that peer's
+    // own close action and signature.
+    for (const peer of PEER_NAMES) {
+      const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
+      const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
+      assert.ok(role.lineage, `${peer} has no lineage view`);
+      const witnessActionHash = await carryOwnCloseIntoV2(
+        peer,
+        sideAppId,
+        role.lineage.readingDnaHash
+      );
+      assert.ok(witnessActionHash, `${peer}'s own close was not accepted as a witness on v2`);
+      console.error(
+        `[happ-lineage-migration] Station 8: ${peer} carried its own close into v2 as witness ` +
+          witnessActionHash
+      );
+    }
   }
 );
 
 Then(
   "each peer's runtime has disabled its v1 cell, so nothing of its own is written there again",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    // NAMED GAP: "disabled" here is the storage-side `RoleLineage.closed`
+    // flag, which only `LineageRoles::sunset()` sets — a pure in-process
+    // call with no HTTP admin route (grepped `http.rs` for every
+    // `/admin/lineage/*` route: only `reset` exists). The DNA-level seal the
+    // shared "next reconciles" step's `close_chain_for`/`open_chain_from`
+    // calls just performed is real; the STORAGE bookkeeping that would flip
+    // this flag is not reachable from outside the process on this build, by
+    // anyone, harness included. Checked anyway, honestly, against the real
+    // contract.
+    for (const peer of PEER_NAMES) {
+      const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
+      assert.equal(
+        role.lineage?.closed,
+        true,
+        `${peer}'s node_registry role does not report closed:true`
+      );
+    }
   }
 );
 
 Then(
   "each peer's passport shows the node-registry role with v2 authoring and v1 closed",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    for (const peer of PEER_NAMES) {
+      const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
+      const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
+      assert.equal(role.lineage?.authoringAppId, sideAppId, `${peer} does not report v2 authoring`);
+      assert.equal(role.lineage?.closed, true, `${peer} does not report v1 closed`);
+    }
   }
 );
 
 When(
   "the test harness, holding james's key, writes a fact on james's closed v1 cell and offers it to v2 as a carried proof",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    assert.ok(c.closeActionHashes?.james, "james's v1 cell has not been closed");
+    const rail = await connectRoleConductor('james', NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+    let writeError: unknown;
+    let writeSucceeded = false;
+    try {
+      await rail.call('register_node', fixtureNodeRegistration('james', rail.agent));
+      writeSucceeded = true;
+    } catch (error) {
+      writeError = error;
+    } finally {
+      await rail.close();
+    }
+    c.postCloseWriteActionHash = writeSucceeded ? 'ok' : undefined;
+    assert.ok(
+      writeSucceeded,
+      `james's v1 conductor refused a write on his own closed chain: ${String(writeError)}`
+    );
+
+    const records = await walkV1Records('james');
+    const postCloseRecord = records.at(-1);
+    assert.ok(postCloseRecord, "james's v1 chain is empty after the post-close write");
+    const refusals: Partial<Record<PeerName, string | null>> = {};
+    for (const peer of PEER_NAMES) {
+      refusals[peer] = await commitWitnessExpectingRefusal(peer, {
+        lineage_dna_hash: decodeHashFromBase64(c.v1DnaHash as string),
+        proofs: [
+          {
+            action: postCloseRecord.hashed.content,
+            signature: postCloseRecord.signature,
+            entry: null,
+          },
+        ],
+      });
+    }
+    c.postCloseWitnessRefusals = refusals;
   }
 );
 
 Then(
   "the v1 conductor itself accepts that write — the substrate does not fence a closed chain, as the epic's kernel test measured",
-  function () {
-    return 'pending';
+  function (this: E2EWorld) {
+    assert.ok(
+      lineage().postCloseWriteActionHash,
+      "james's v1 conductor refused the post-close write — the epic's own kernel probes (B/B2) " +
+        'say it should not'
+    );
   }
 );
 
 Then(
   "v2's validation on every peer refuses the carried proof, naming {string} as its reason",
-  function (_reason: string) {
-    return 'pending';
+  function (this: E2EWorld, storyReason: string) {
+    // NAMED GAP: no arm in `node_registry_integrity`'s witness validation
+    // compares a carried action's chain position against its author's own
+    // `CloseChain` action (grepped `commit_witness`'s validation path,
+    // 2026-09-04 — no chain-position check found). This Then asserts the
+    // real contract the story specifies and will legitimately read the
+    // post-close proof as ACCEPTED (not refused) until that check is
+    // written — a finding for the next seat, not a step defect.
+    const refusals = lineage().postCloseWitnessRefusals;
+    assert.ok(refusals, 'no post-close witness attempt was made — run the previous When first');
+    for (const peer of PEER_NAMES) {
+      const refusal: string | null | undefined = refusals[peer];
+      assert.ok(
+        refusal,
+        `${peer}'s v2 ACCEPTED the post-close proof — the story's "${storyReason}" never fired`
+      );
+      assert.ok(
+        refusal.toLowerCase().includes('close'),
+        `${peer} refused, but not evidently for "${storyReason}" (no "close" in the refusal ` +
+          `text): ${refusal}`
+      );
+    }
   }
 );
 
-When('a revocation of the migration commitment is notarized after the sunset', function () {
-  return 'pending';
-});
+When(
+  'a revocation of the migration commitment is notarized after the sunset',
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    assert.ok(c.sunsetCommitmentCid, 'no sunset was notarized to revoke after');
+    assert.ok(c.migrationCommitmentCid, 'no migration commitment to revoke');
+    const payload = buildRevocationPayload(c.migrationCommitmentCid, {
+      targetAction: 'migrates-lineage',
+    });
+    const rail = await connectRoleConductor('matthew', MISHPAT_ROLE, MISHPAT_ZOME);
+    try {
+      const result = await revokeMigration({ conductor: rail, actingPeer: 'matthew', payload });
+      c.revocationCommitmentCid = result.cid;
+      console.error(
+        `[happ-lineage-migration] Station 8: post-sunset revocation ${result.cid} notarized`
+      );
+    } finally {
+      await rail.close();
+    }
+  }
+);
 
 Then(
   "nothing changes: the closed chains stay closed, and each peer's passport still shows the node-registry role with v2 authoring and v1 closed",
-  function () {
-    return 'pending';
+  { timeout: 60_000 },
+  async function (this: E2EWorld) {
+    for (const peer of PEER_NAMES) {
+      const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
+      const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
+      assert.equal(
+        role.lineage?.authoringAppId,
+        sideAppId,
+        `${peer} no longer reports v2 authoring after the post-sunset revocation`
+      );
+      assert.equal(
+        role.lineage?.closed,
+        true,
+        `${peer} no longer reports v1 closed after the post-sunset revocation`
+      );
+    }
   }
 );
 
@@ -2493,6 +3564,12 @@ async function openWindowOnEveryPeer(): Promise<void> {
         LINEAGE_VEHICLE,
         `${peer} applied with vehicle "${row.appliedRelease?.vehicle}", not the lineage vehicle`
       );
+      // Station 8 reuses this world ("all three peers are dual-celled ... and
+      // have attested their carry") and reads the carry receipt straight off
+      // this row — kept here rather than re-polled, the same "the caller
+      // reads what THIS call already observed" discipline `awaitCanaryApply`
+      // follows for james alone.
+      c.lastRows[peer] = row;
       console.error(
         `[happ-lineage-migration] Station 9: ${peer} is dual-celled — carried ` +
           `${row.appliedRelease?.carry?.carried ?? '?'} of ${row.appliedRelease?.carry?.v1Count ?? '?'}`
