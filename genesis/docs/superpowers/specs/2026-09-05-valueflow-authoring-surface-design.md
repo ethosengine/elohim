@@ -391,16 +391,38 @@ assertions regardless, because the CLI-level test is the executing proof while t
 for its wiring. The a2o governance manifest attaches a context-blind reader review obligation to
 any feature write, and that loop runs on this file.
 
-## 12. Open questions
+## 12. Closed, not open (close-out round, 2026-09-05)
 
-None. The decisions in sections 1 through 11 are closed and this spec is their record. What
-remains is not an open question but a named slice-2 graduation:
+The operator ruled that nothing named here stays open. Every graduation this section once
+listed as slice 2 shipped in the close-out round, and this section is now the record of what
+shipped and how each is measured.
 
-- Habit status flips read as rulings by the register projector, so the ruling event becomes the
-  authority and the delta line becomes its prose projection.
-- The WIP fence expressed as a bounded commitment, using the bound vocabulary the fabric already
-  carries, so attention allocation is measured rather than remembered.
-- Habit delta lines generated from the flow rather than hand-written.
-- `epr flow ledger <atom>`, which makes the progress file and the epic's status section
-  generated projections.
-- The `.epr-meta` observer minting claims and fulfilments on write, so nobody logs at all.
+- **`epr flow ledger <atom>`** renders one chronological, oldest-first list of the claims,
+  fulfilments and notes on an atom and on every commitment scoped to it, as pasteable markdown
+  or JSON. A progress file or a spec's status section is now a projection of that ledger; the
+  ledger is the record.
+- **The WIP fence is a bounded commitment.** `project` mints one Active commitment on the
+  covenant's body address, provider `tool:habits-register`, with a ceiling bound. The fabric
+  breaches a ceiling at stock greater than or equal to the limit, so the covenant's "max 2
+  active" is encoded as limit 3, the first forbidden level; the basis line prints the covenant's
+  own number beside the encoding. The `active-habits` stock is a projected level read from the
+  generated register, stated as such in the output, never event-derived. Two active habits reads
+  at the band edge with an approach signal; three reads over the bound and `--check` exits
+  non-zero. Because the sidecar is append-only, an amended limit is a newer fence record, and the
+  newest fence decides.
+- **Flips are rulings.** `habits-project.py --check` refuses a habit whose declared status
+  changed since the last committed projection without a `ruling` note on its atom newer than
+  the atom's last commit, printing the exact `epr flow note` to run.
+- **The observer mints on write.** A PostToolUse hook reads the frontmatter of a task brief
+  (`gap`, `actor`) or a task report (`gap`, `actor`, `status`, `commits`) and runs the claim,
+  the fulfilment, or the observation note itself. The seat skills state the convention and their
+  terminal verb becomes a fallback. Proven live on this plan: a brief write minted a claim, a
+  report write discharged it, and no verb was typed.
+- **Notes resolve gap ids** the same way claims and fulfilments do, so the observer's
+  non-discharging statuses land on the commitment and roll up onto the plan.
+- **The psephos naming drift** has a backlog row carrying the operator's definition (psephos is
+  the psychometric instrument, not the ballot renderer) and one checkbox per misnamed surface,
+  so decompose can mint the rename as intents.
+
+What remains is not a question but a rate: the commitments stock still fills faster than it
+drains, and the equilibrium habit stays red until the drain is a habit rather than an event.
