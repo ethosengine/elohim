@@ -434,3 +434,47 @@ on every peer's own verification).
 proposal → the elohim's notarized `migrates-lineage` commitment → per-peer window (install beside,
 carry with witnesses, attest) → laggards mirrored, forks filed → free revert by re-election → the elohim's notarized `sunsets-lineage` → per-peer Close/Open → closed chains readable. Stations 1–10 green on
 the mesh with the node_registry rehearsal; §9 spike verdict recorded; §4 posture accepted.
+
+## 11. Progress — from idea to validated delivery (the hub; every follow-up starts here)
+
+This section is the epic's running ledger. Each row is a dated fact with its evidence; nothing here
+is intention. The habit atom (`elohim/holochain/.epr-meta/happ-lineage-migration.habit.md`) carries the
+runnable check and its DELTA lines; this table carries the epic-level picture the operator reads first.
+
+### 11.1 De-risk probes (decided 2026-09-04 — cheapest first, each retires a named unknown)
+
+| Probe | Retires | Owner | State | Evidence |
+|---|---|---|---|---|
+| **A** sweettest: v1 + v2 (node_registry + witness) cells under ONE agent in one conductor; a v1 record carried into v2 as a witness, accepted; tampered signature and foreign DNA hash refused | the core claim: `verify_signature` in `validate`, action round-trip, entry-hash equality, the integrity-change build, two cells one key | Opus (rust-architect) | dispatched 2026-09-04 | — |
+| **B** sweettest: late `open_chain` (v2 authored many actions, then v1 `close_chain` → v2 `open_chain(close_hash)`) | Station 8's only unmeasured Holochain rule | Opus, after A | dispatched 2026-09-04 | — |
+| **C** mesh: install a second app under an EXISTING agent key by admin websocket (`elohim@probe`), watch the storage client | whether the dual-cell change is ADDITIVE (second client per app id) rather than a hot-path refactor | chief (this session) | pending | — |
+| **D** local `hc dna pack` of node_registry with the witness type added | the local DNA build; fallback = CI DNA pipeline artifact | Codex | dispatched 2026-09-04 | — |
+| **D2** read-only: the additive dual-client design in `hc_client_registry.rs` / `hc_client.rs` (what breaks with two app ids, what does not) | collapses the 2-day refactor to a switch, or proves it cannot | Codex | dispatched 2026-09-04 | — |
+
+### 11.2 Stations (the story's finish lines; RED until measured on the household mesh)
+
+| Station | State | Evidence |
+|---|---|---|
+| 1 admissibility (verify's positive lineage branch) | red, not started | — |
+| 2 notarized path (`PathNotNotarized`) | red | — |
+| 3 install beside, same key | red | — |
+| 4 self-carry, notarization re-verified | red | — |
+| 5 held-carry | red | — |
+| 6 bridge direction | red | — |
+| 7 revert before sunset | red | — |
+| 8 sunset | red | — |
+| 9 forged witness refused | red | — |
+| 10 quorum / root refused | red | — |
+| 11–13 many versions (§5.1) | designed, not in the story yet | — |
+
+### 11.3 Decisions still the operator's
+
+- WIP slot for the habit (the fence is full: dataplane-convergence, runtime-death-witnessed).
+- Acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible) — the graduation trigger.
+- Lane B (§9) timing: after Station 4 by default.
+
+### 11.4 Ledger (newest first)
+
+- 2026-09-04 — probes A/B/D/D2 dispatched (Opus, Codex); C taken by the chief on the running mesh (note: this workspace's mesh runs **stock 0.6.0**, not the 0.7 line — probe C's finding is about the storage client, which is line-independent; A/B run in sweettest on the dev tree's pins).
+- 2026-09-04 — §5.1 bridge across many versions and branches added (graded verification; routing via nearest common ancestor; Stations 11–13 seam).
+- 2026-09-03 — epic designed from four grounded readers; story Stations 1–10 READY (blind-reader r4); habit born red; renamed from "rung 6" to the Holochain Evolution Epic (spec-level, not manifesto-tier) by the operator.
