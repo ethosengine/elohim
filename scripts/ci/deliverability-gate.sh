@@ -30,7 +30,9 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     case "$verdict" in
         boots)  echo "  ✓ deliverability: ${BLOB_HASH} boots (peer-judged)"; exit 0 ;;
         broken) echo "  ✗ deliverability: ${BLOB_HASH} is BROKEN — ${reason:-no reason} — refusing to author this head" >&2; exit 2 ;;
-        *)      echo "  … deliverability: not judged yet (attempt ${attempt}/${ATTEMPTS}, header='${verdict:-absent}')"; sleep 5 ;;
+        *)      echo "  … deliverability: not judged yet (attempt ${attempt}/${ATTEMPTS}, header='${verdict:-absent}')"
+                [ "${attempt}" -ne "${ATTEMPTS}" ] && sleep 5
+                ;;
     esac
 done
 if [ "$GATE_MODE" = "strict" ]; then

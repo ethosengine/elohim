@@ -341,12 +341,21 @@ stage_once() {
     # The peer judges the bytes we just staged; a broken bundle never gets a
     # head. Exit 2 from the gate is a VERDICT, not a transport blip — surface
     # it as the stage's own failure code so the retry ladder does not re-try
-    # a deterministic answer.
-    local gate_rc=0
-    bash "$(dirname "$0")/deliverability-gate.sh" "${DOORWAY_EPR_URL}" "${SPA_HASH}" || gate_rc=$?
-    if [ "${gate_rc}" -eq 2 ] || [ "${gate_rc}" -eq 3 ]; then
-        echo "BROKEN_HEAD ${SLUG} ${KIND} ${SPA_HASH}" > "${DELIVERABILITY_VERDICT_FILE:-/dev/null}" 2>/dev/null || true
-        return 2
+    # a deterministic answer. Server bundles have no index.html at all (they
+    # carry index.server.html) — the gate's boot probe would read every one
+    # of them as broken:no-index, so it only runs for kind=browser; server
+    # bundles are judged by the renderer, slice 2.
+    if [ "${KIND}" = "browser" ]; then
+        local gate_rc=0
+        bash "$(dirname "$0")/deliverability-gate.sh" "${DOORWAY_EPR_URL}" "${SPA_HASH}" || gate_rc=$?
+        if [ "${gate_rc}" -eq 2 ] || [ "${gate_rc}" -eq 3 ]; then
+            echo "BROKEN_HEAD ${SLUG} ${KIND} ${SPA_HASH}" > "${DELIVERABILITY_VERDICT_FILE:-/dev/null}" 2>/dev/null || true
+            return 2
+        elif [ "${gate_rc}" -ne 0 ]; then
+            echo "  ⚠ [${SLUG}] deliverability gate could not run (rc=${gate_rc}) — proceeding unjudged (advisory)" >&2
+        fi
+    else
+        echo "  ⊘ [${SLUG}] deliverability gate skipped for kind=${KIND} (server bundles are judged by the renderer, slice 2)"
     fi
 
     if [ "${DO_PATCH}" = "1" ]; then

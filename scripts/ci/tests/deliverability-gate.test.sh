@@ -11,15 +11,18 @@ class H(http.server.BaseHTTPRequestHandler):
     def _v(self):
         if "broken" in self.path: return ("broken", "missing-asset:main-EAKNZDUP.js")
         if "unjudged" in self.path: return ("not-judged", "not-held")
+        if "absent" in self.path: return (None, None)
         return ("boots", None)
     def do_GET(self):
         v, r = self._v()
-        self.send_response(200); self.send_header("X-Deliverability", v)
+        self.send_response(200)
+        if v: self.send_header("X-Deliverability", v)
         if r: self.send_header("X-Deliverability-Reason", r)
         self.end_headers(); self.wfile.write(b"<html></html>")
     def do_HEAD(self):
         v, r = self._v()
-        self.send_response(200); self.send_header("X-Deliverability", v)
+        self.send_response(200)
+        if v: self.send_header("X-Deliverability", v)
         if r: self.send_header("X-Deliverability-Reason", r)
         self.end_headers()
     def log_message(self, *a): pass
@@ -34,4 +37,6 @@ bash "$gate" "$base" "sha256-boots" 1 && echo "PASS boots"
 if bash "$gate" "$base" "sha256-broken" 1; then echo "FAIL broken should exit 2"; exit 1; else rc=$?; [ "$rc" -eq 2 ] && echo "PASS broken rc=2"; fi
 bash "$gate" "$base" "sha256-unjudged" 1 && echo "PASS not-judged is advisory"
 if DELIVERABILITY_GATE=strict bash "$gate" "$base" "sha256-unjudged" 1; then echo "FAIL strict not-judged should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict rc=3"; fi
+bash "$gate" "$base" "sha256-absent" 1 && echo "PASS absent header is advisory"
+if DELIVERABILITY_GATE=strict bash "$gate" "$base" "sha256-absent" 1; then echo "FAIL strict absent header should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict absent rc=3"; fi
 echo "ALL PASS"
