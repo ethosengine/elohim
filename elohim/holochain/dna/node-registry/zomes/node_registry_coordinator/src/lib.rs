@@ -2310,48 +2310,169 @@ pub struct SealReceipt {
     /// SECOND `CloseChain` on the predecessor — there is no un-closing it. The
     /// guard is one local `query`, and the retry reads as the same receipt.
     pub already_sealed: bool,
+    /// **Additive.** `true` when this call found a HALF-SEAL — v1 already
+    /// closed toward this DNA, but this chain had no matching `OpenChain` — and
+    /// RESUMED at the open step rather than closing v1 again.
+    ///
+    /// The window is real: [`seal_close`] closes v1 through a cross-cell call
+    /// and then opens here, and a failure between those two steps leaves v1
+    /// closed with nothing on this side to key idempotency on. Closing again
+    /// would author a second `CloseChain`, which Probe B2 measured the remote
+    /// authority refusing with a WARRANT against the author — a sunset that
+    /// warrants the peer performing it. So the retry probes v1 first.
+    ///
+    /// `#[serde(default)]` so a consumer built against the pre-resume receipt
+    /// still decodes, reading `false`.
+    #[serde(default)]
+    pub resumed: bool,
 }
+
+/// How far back from v1's chain head [`seal_close`] looks for an existing
+/// `CloseChain` toward this DNA before authoring one.
+///
+/// A bound, not a guess: the half-seal window is the gap between two adjacent
+/// steps of ONE seal, so an existing close sits at or within a handful of
+/// actions of v1's head. Post-close writes are exactly what the after-close
+/// rule forbids, so a chain with 32 actions above its close is already outside
+/// the sunset's honest shape. Bounded because each step back is a cross-cell
+/// `get`, and an unbounded scan would make every seal pay for v1's whole chain.
+#[cfg(feature = "lineage-witness")]
+const HALF_SEAL_SCAN: u32 = 32;
 
 /// The seal this chain already holds for `lineage_dna_hash`, if any.
 ///
-/// Keyed on the `OpenChain` action, because that is the one action a sealed v2
-/// chain must carry and it names the predecessor's close hash directly — so
-/// the receipt is reconstructed without re-hashing anything.
+/// Keyed on the `OpenChain` action, because that is the one action a sealed
+/// chain must carry and it names the predecessor's close hash directly.
+///
+/// The seal WITNESS is then keyed on THAT close hash, not merely on "a witness
+/// from this lineage carrying some close": a courier could have carried another
+/// agent's close from the same lineage, and reporting it as this chain's seal
+/// witness would hand the vehicle a receipt pointing at somebody else's act.
+/// The carried action is re-hashed and compared.
 #[cfg(feature = "lineage-witness")]
 fn existing_seal(lineage_dna_hash: &DnaHash) -> ExternResult<Option<SealReceipt>> {
     let target = MigrationTarget::Dna(lineage_dna_hash.clone());
-    let mut open: Option<(ActionHash, ActionHash)> = None;
-    let mut witness: Option<ActionHash> = None;
+    let records = query(ChainQueryFilter::new().include_entries(true))?;
 
-    for record in query(ChainQueryFilter::new().include_entries(true))? {
-        match &record.action().data {
-            ActionData::OpenChain(data) if data.prev_target == target => {
+    // (1) the OpenChain — the seal's own record on this chain.
+    let mut open: Option<(ActionHash, ActionHash)> = None;
+    for record in &records {
+        if let ActionData::OpenChain(data) = &record.action().data {
+            if data.prev_target == target {
                 open = Some((record.action_address().clone(), data.close_hash.clone()));
             }
-            ActionData::Create(_) if witness.is_none() => {
-                // A record that is not a witness simply fails to decode as one;
-                // that is a skip, never an error, because this walk crosses
-                // every app entry on the chain.
-                if let Ok(Some(w)) = record.entry().to_app_option::<NotarizationWitness>() {
-                    if &w.lineage_dna_hash == lineage_dna_hash
-                        && w.proofs
-                            .iter()
-                            .any(|p| matches!(p.action.data, ActionData::CloseChain(_)))
-                    {
-                        witness = Some(record.action_address().clone());
-                    }
-                }
+        }
+    }
+    let Some((open_hash, close_hash)) = open else {
+        return Ok(None);
+    };
+
+    // (2) the witness carrying THAT close.
+    let mut witness_hash: Option<ActionHash> = None;
+    for record in &records {
+        if witness_hash.is_some() {
+            break;
+        }
+        if !matches!(record.action().data, ActionData::Create(_)) {
+            continue;
+        }
+        // A record that is not a witness simply fails to decode as one; that is
+        // a skip, never an error, because this walk crosses every app entry on
+        // the chain.
+        let Ok(Some(w)) = record.entry().to_app_option::<NotarizationWitness>() else {
+            continue;
+        };
+        if &w.lineage_dna_hash != lineage_dna_hash {
+            continue;
+        }
+        for proof in &w.proofs {
+            if !matches!(proof.action.data, ActionData::CloseChain(_)) {
+                continue;
             }
-            _ => {}
+            if hash_action(proof.action.clone())? == close_hash {
+                witness_hash = Some(record.action_address().clone());
+                break;
+            }
         }
     }
 
-    Ok(open.map(|(open_hash, close_hash)| SealReceipt {
+    Ok(Some(SealReceipt {
         close_hash: close_hash.to_string(),
         open_hash: open_hash.to_string(),
-        witness_hash: witness.map(|h| h.to_string()).unwrap_or_default(),
+        witness_hash: witness_hash.map(|h| h.to_string()).unwrap_or_default(),
         already_sealed: true,
+        resumed: false,
     }))
+}
+
+/// v1's existing `CloseChain` toward `my_dna_hash`, if it already has one.
+///
+/// The half-seal probe. Reads v1 through externs the PRISTINE v1 coordinator
+/// already exports — `my_chain_activity` for the (seq, hash) pairs and
+/// `get_record_at` for each candidate's action data — so it needs no v1
+/// redeploy. Walks newest-first and stops at [`HALF_SEAL_SCAN`] actions below
+/// v1's head.
+#[cfg(feature = "lineage-witness")]
+fn v1_close_toward(v1_cell: &CellId, my_dna_hash: &DnaHash) -> ExternResult<Option<ActionHash>> {
+    let activity: AgentActivityStatus = match call(
+        CallTargetCell::OtherCell(v1_cell.clone()),
+        "node_registry_coordinator",
+        "my_chain_activity".into(),
+        None,
+        (),
+    )? {
+        ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: could not decode the predecessor's chain activity: {e:?}"
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: the predecessor cell refused my_chain_activity: {other:?}"
+            ))))
+        }
+    };
+
+    let mut seen = activity.valid_activity;
+    seen.sort_by_key(|a| std::cmp::Reverse(a.0));
+    let Some((head_seq, _)) = seen.first().cloned() else {
+        return Ok(None);
+    };
+
+    let wanted = MigrationTarget::Dna(my_dna_hash.clone());
+    for (seq, action_hash) in seen {
+        if head_seq.saturating_sub(seq) > HALF_SEAL_SCAN {
+            break;
+        }
+        let record: Option<Record> = match call(
+            CallTargetCell::OtherCell(v1_cell.clone()),
+            "node_registry_coordinator",
+            "get_record_at".into(),
+            None,
+            (action_hash.clone(), true),
+        )? {
+            ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "seal_close: could not decode the predecessor's record at {action_hash}: {e:?}"
+                )))
+            })?,
+            other => {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "seal_close: the predecessor cell refused get_record_at: {other:?}"
+                ))))
+            }
+        };
+        let Some(record) = record else {
+            continue;
+        };
+        if let ActionData::CloseChain(data) = &record.action().data {
+            if data.new_target.as_ref() == Some(&wanted) {
+                return Ok(Some(action_hash));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 /// Seal the crossing: close the predecessor chain toward THIS DNA, open this
@@ -2362,8 +2483,11 @@ fn existing_seal(lineage_dna_hash: &DnaHash) -> ExternResult<Option<SealReceipt>
 /// check is one every peer agrees on. Same agent on both cells, so the
 /// cross-cell call presents no capability secret (measured on 0.7.0).
 ///
-/// Idempotent by the `OpenChain` already on this chain: a second call authors
-/// nothing and returns the first seal with `already_sealed: true`.
+/// Idempotent at BOTH points a retry can arrive at. A completed seal is keyed
+/// on the `OpenChain` already on this chain (`already_sealed: true`, nothing
+/// authored). A HALF-seal — v1 closed, this side empty — is keyed on v1's own
+/// chain, and resumes at the open step (`resumed: true`) rather than closing v1
+/// a second time.
 #[cfg(feature = "lineage-witness")]
 #[hdk_extern]
 pub fn seal_close(v1_cell: CellId) -> ExternResult<SealReceipt> {
@@ -2393,24 +2517,38 @@ pub fn seal_close(v1_cell: CellId) -> ExternResult<SealReceipt> {
         return Ok(sealed);
     }
 
-    // (3) close v1 toward this DNA.
+    // (3) close v1 toward this DNA — unless it is ALREADY closed toward us.
+    //
+    // The half-seal window. Step (2) keys idempotency on this chain's own
+    // OpenChain, which does not exist yet when a call dies between the close
+    // below and the open at (5): v1 is closed, this side holds nothing, and a
+    // naive retry would author a SECOND CloseChain. Probe B2 measured what that
+    // costs — the remote authority rejects the action after a close and issues
+    // a WARRANT against its author, so a re-close warrants the very peer
+    // performing the sunset. Probe v1 first and resume at the open step.
     let my_dna_hash = dna_info()?.hash;
-    let close_hash: ActionHash = match call(
-        CallTargetCell::OtherCell(v1_cell.clone()),
-        "node_registry_coordinator",
-        "close_chain_for".into(),
-        None,
-        my_dna_hash,
-    )? {
-        ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "seal_close: could not decode the predecessor's CloseChain hash: {e:?}"
-            )))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "seal_close: the predecessor cell refused close_chain_for: {other:?}"
-            ))))
+    let (close_hash, resumed): (ActionHash, bool) = match v1_close_toward(&v1_cell, &my_dna_hash)? {
+        Some(existing) => (existing, true),
+        None => {
+            let fresh: ActionHash = match call(
+                CallTargetCell::OtherCell(v1_cell.clone()),
+                "node_registry_coordinator",
+                "close_chain_for".into(),
+                None,
+                my_dna_hash,
+            )? {
+                ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "seal_close: could not decode the predecessor's CloseChain hash: {e:?}"
+                    )))
+                })?,
+                other => {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "seal_close: the predecessor cell refused close_chain_for: {other:?}"
+                    ))))
+                }
+            };
+            (fresh, false)
         }
     };
 
@@ -2477,6 +2615,7 @@ pub fn seal_close(v1_cell: CellId) -> ExternResult<SealReceipt> {
         open_hash: open_hash.to_string(),
         witness_hash: witness_hash.to_string(),
         already_sealed: false,
+        resumed,
     })
 }
 

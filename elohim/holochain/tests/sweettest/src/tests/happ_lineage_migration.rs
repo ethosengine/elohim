@@ -1785,6 +1785,35 @@ struct SealReceipt {
     open_hash: String,
     witness_hash: String,
     already_sealed: bool,
+    /// Fix round 1 (additive): the seal found v1 ALREADY closed toward this DNA
+    /// with no matching `OpenChain` here — a half-seal — and resumed at the open
+    /// step instead of closing v1 twice.
+    #[serde(default)]
+    resumed: bool,
+}
+
+/// Every `CloseChain` on `zome`'s chain, as `(action_seq, action_hash)`.
+///
+/// Reads through the same two pristine-v1 externs the zome's half-seal probe
+/// uses, so the test measures what the zome can actually see.
+async fn close_chain_actions(
+    conductor: &SweetConductor,
+    zome: &SweetZome,
+) -> Vec<(u32, ActionHash)> {
+    let activity: AgentActivityStatus = conductor.call(zome, "my_chain_activity", ()).await;
+    let mut found = Vec::new();
+    for (seq, hash) in activity.valid_activity {
+        let record: Option<Record> = conductor
+            .call(zome, "get_record_at", (hash.clone(), true))
+            .await;
+        if let Some(record) = record {
+            if matches!(record.action().data, ActionData::CloseChain(_)) {
+                found.push((seq, hash));
+            }
+        }
+    }
+    found.sort_by_key(|(seq, _)| *seq);
+    found
 }
 
 /// INTRA-WITNESS half: one batch may not carry a close AND a fact authored
@@ -2085,6 +2114,152 @@ async fn station_8_seal_close_then_post_close_carry_is_refused_by_v2() -> Result
             );
         }
     }
+
+    Ok(())
+}
+
+/// The HALF-SEAL window: v1 already closed toward v2, nothing on v2 to key on.
+/// A retry must RESUME at the open step, never close v1 a second time.
+///
+/// Why it matters, in Probe B2's own measurement: the remote agent-activity
+/// authority rejects the action after a close and issues a WARRANT against its
+/// author. A re-close would therefore warrant the very peer performing the
+/// sunset — the sunset accusing itself.
+#[tokio::test(flavor = "multi_thread")]
+async fn station_8_seal_close_resumes_a_half_seal_instead_of_closing_v1_twice() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash,
+        v2_hash,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    let (_pre_ah, pre) = author_and_read_back(&conductor, &z1, "s8-half-pre", &alice).await;
+
+    // Simulate the half state: v1 is closed toward v2 by a call that then died
+    // before v2 could open. `close_chain_for` alone is exactly that state.
+    let close_hash: ActionHash = conductor
+        .call_fallible(&z1, "close_chain_for", v2_hash.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("close_chain on v1 was refused: {e:?}"))?;
+    println!("[station 8/half] v1 CloseChain = {close_hash}");
+
+    let before = close_chain_actions(&conductor, &z1).await;
+    assert_eq!(
+        before.len(),
+        1,
+        "the half state has exactly one CloseChain on v1, got {before:?}"
+    );
+
+    // The retry.
+    let seal: SealReceipt = conductor
+        .call(&z2, "seal_close", z1.cell_id().clone())
+        .await;
+    println!("[station 8/half] seal = {seal:?}");
+
+    assert!(
+        seal.resumed,
+        "the retry must RESUME the half-seal, not start a fresh one"
+    );
+    assert!(
+        !seal.already_sealed,
+        "the half state has no OpenChain, so this is not an already-sealed crossing"
+    );
+    assert_eq!(
+        seal.close_hash,
+        close_hash.to_string(),
+        "the resumed seal must adopt v1's EXISTING close, not a new one"
+    );
+
+    // The measurement that matters: v1 was not closed twice.
+    let after = close_chain_actions(&conductor, &z1).await;
+    assert_eq!(
+        after, before,
+        "a resumed seal must author NO second CloseChain on v1 — got {after:?}"
+    );
+
+    // And the crossing is complete: the open names that close, and the witness
+    // carries it, so the after-close rule is armed on every later witness.
+    assert!(!seal.open_hash.is_empty() && !seal.witness_hash.is_empty());
+    let open_hash = ActionHash::try_from(seal.open_hash.as_str())
+        .map_err(|e| anyhow::anyhow!("open_hash is not an ActionHash: {e:?}"))?;
+    let signed_open: SignedActionHashed = conductor
+        .call::<_, Option<SignedActionHashed>>(&z2, "get_signed_action", open_hash)
+        .await
+        .expect("the OpenChain must be on v2's chain");
+    match &signed_open.action().data {
+        ActionData::OpenChain(d) => {
+            assert_eq!(d.close_hash, close_hash);
+            assert_eq!(d.prev_target, MigrationTarget::Dna(v1_hash.clone()));
+        }
+        other => panic!("open_hash does not name an OpenChain: {other:?}"),
+    }
+
+    // A third call now finds the completed seal and still authors nothing.
+    let third: SealReceipt = conductor
+        .call(&z2, "seal_close", z1.cell_id().clone())
+        .await;
+    assert!(third.already_sealed, "the completed seal is idempotent");
+    assert_eq!(third.close_hash, seal.close_hash);
+    assert_eq!(
+        third.witness_hash, seal.witness_hash,
+        "the reported seal witness must be the one carrying THIS close"
+    );
+    assert_eq!(
+        close_chain_actions(&conductor, &z1).await,
+        before,
+        "no seal call may ever author a second CloseChain on v1"
+    );
+
+    // The fence is armed all the same: a post-close fact is still refused.
+    let post_ah: ActionHash = conductor
+        .call(&z1, "register_node", node_registration("s8-half-post", &alice))
+        .await;
+    let post: SignedActionHashed = conductor
+        .call::<_, Option<SignedActionHashed>>(&z1, "get_signed_action", post_ah)
+        .await
+        .expect("the post-close action is on v1's chain");
+    let err = conductor
+        .call_fallible::<_, ActionHash>(
+            &z2,
+            "commit_witness",
+            NotarizationWitness {
+                lineage_dna_hash: v1_hash.clone(),
+                proofs: vec![CarriedProof {
+                    action: post.action().clone(),
+                    signature: post.signature.clone(),
+                    entry: None,
+                }],
+            },
+        )
+        .await
+        .expect_err("a resumed seal must arm the after-close fence like any other");
+    let msg = format!("{err:?}");
+    println!("[station 8/half] NEGATIVE refusal after a RESUMED seal:\n{msg}");
+    assert!(
+        msg.contains("after close"),
+        "expected the after-close refusal BY NAME, got: {msg}"
+    );
+
+    // And the pre-close fact still carries — the resume did not over-fence.
+    let ok: ActionHash = conductor
+        .call(
+            &z2,
+            "commit_witness",
+            NotarizationWitness {
+                lineage_dna_hash: v1_hash.clone(),
+                proofs: vec![CarriedProof {
+                    action: pre.action().clone(),
+                    signature: pre.signature.clone(),
+                    entry: None,
+                }],
+            },
+        )
+        .await;
+    println!("[station 8/half] pre-close carry after a RESUMED seal ACCEPTED at {ok}");
 
     Ok(())
 }
