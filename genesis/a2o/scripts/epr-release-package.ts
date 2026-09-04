@@ -69,6 +69,7 @@ const ARTIFACT_CLASSES = [
   'config-epr',
   'storage-binary',
   'happ-bundle',
+  'happ-lineage',
 ] as const;
 type ArtifactClass = (typeof ARTIFACT_CLASSES)[number];
 
@@ -83,6 +84,7 @@ const CLASS_CHANNEL_SEGMENT: Record<ArtifactClass, string> = {
   'config-epr': 'config',
   'storage-binary': 'storage-binary',
   'happ-bundle': 'happ',
+  'happ-lineage': 'happ',
 };
 
 const USAGE = `Usage: epr-release-package.ts --artifact <path> --artifact-class <class> [options]
@@ -124,6 +126,14 @@ Adoption discipline (spec §5) — declared or inherited, never defaulted:
                                 channel from that storage peer (the channel root's own
                                 registered discipline, or its current head release manifest's);
                                 --soak-secs/--attestation-threshold/--canary still override
+
+happ-lineage (spec 2026-09-03-holochain-evolution-epic-design §4):
+  --migrate-from <role>=<dnaHash>
+                                the DNA hash this role's release migrates FROM; repeatable
+  --lineage <dnaHash,...>       comma-separated ancestry the v2 DNA properties declare; applied
+                                to every role named by --migrate-from
+  --path-commitment <cid>       the migrates-lineage commitment (entry hash, uhCEk…) that
+                                notarizes this path; required when --artifact-class is happ-lineage
 
 Blob plane:
   --peer <url>                  storage peer for the blob PUT (default: ${DEFAULT_PEER})
@@ -224,6 +234,12 @@ interface Options {
   attestationThreshold: number | null;
   canaryOrder: string[];
   inheritDisciplineFrom: string | null;
+  /** role name -> the DNA hash that role's happ-lineage release migrates FROM. */
+  migrateFrom: Record<string, string>;
+  /** The ancestry (dnaHash list) applied to every role named in `migrateFrom`. */
+  lineage: string[];
+  /** The notarized migrates-lineage commitment (entry hash) for a happ-lineage release. */
+  pathCommitment: string | null;
   peer: string;
   agentId: string;
   put: boolean;
@@ -279,6 +295,17 @@ function parseHttpUrl(rawUrl: string, flag: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
+/** Splits `role=value` for `--migrate-from`; either side empty is a usage error. */
+function parseRoleEquals(raw: string, flag: string): [string, string] {
+  const eq = raw.indexOf('=');
+  const role = eq < 0 ? '' : raw.slice(0, eq);
+  const value = eq < 0 ? '' : raw.slice(eq + 1);
+  if (!role || !value) {
+    throw new UsageError(`${flag} expects role=value, got: ${raw}`);
+  }
+  return [role, value];
+}
+
 function parseArtifactClass(value: string): ArtifactClass {
   const found = ARTIFACT_CLASSES.find(candidate => candidate === value);
   if (!found) {
@@ -314,6 +341,9 @@ function parseArgs(argv: string[]): Options {
     attestationThreshold: null,
     canaryOrder: [],
     inheritDisciplineFrom: null,
+    migrateFrom: {},
+    lineage: [],
+    pathCommitment: null,
     peer: parseHttpUrl(process.env['RELEASE_PEER_URL'] ?? DEFAULT_PEER, '--peer'),
     agentId: DEFAULT_AGENT_ID,
     put: true,
@@ -419,6 +449,25 @@ function parseArgs(argv: string[]): Options {
         options.canaryOrder.push(requiredValue(argv, index, arg));
         index++;
         break;
+      case '--migrate-from': {
+        const [role, dnaHash] = parseRoleEquals(requiredValue(argv, index, arg), arg);
+        options.migrateFrom[role] = dnaHash;
+        index++;
+        break;
+      }
+      case '--lineage':
+        options.lineage.push(
+          ...requiredValue(argv, index, arg)
+            .split(',')
+            .map(entry => entry.trim())
+            .filter(entry => entry.length > 0)
+        );
+        index++;
+        break;
+      case '--path-commitment':
+        options.pathCommitment = requiredValue(argv, index, arg);
+        index++;
+        break;
       case '--peer':
         options.peer = parseHttpUrl(requiredValue(argv, index, arg), arg);
         index++;
@@ -456,6 +505,12 @@ function parseArgs(argv: string[]): Options {
   if (options.help || options.validate.length > 0) return options;
   if (options.artifacts.length === 0) throw new UsageError('--artifact is required');
   if (!options.artifactClass) throw new UsageError('--artifact-class is required');
+  if (options.artifactClass === 'happ-lineage' && !options.pathCommitment) {
+    throw new UsageError(
+      '--path-commitment <cid> is required when --artifact-class is happ-lineage — a lineage ' +
+        'crossing is adoptable only when a notarized migrates-lineage commitment names it'
+    );
+  }
   if (options.wireEpochs.length === 0) options.wireEpochs.push(0);
   return options;
 }
@@ -476,6 +531,10 @@ interface RoleBinding {
   dnaHash: string;
   coordinatorWasmHashes: string[];
   coordinatorZomes?: Record<string, string>;
+  /** happ-lineage only: the DNA hash this role's release migrates FROM. */
+  migrateFrom?: string;
+  /** happ-lineage only: the ancestry the v2 DNA properties declare. */
+  lineage?: string[];
 }
 
 interface ReleaseManifest {
@@ -515,6 +574,13 @@ interface AdoptionDiscipline {
    * Additive and open-schema-legal (§8.2); see `PRODUCER_ADDITIVE_KEYS`.
    */
   inheritedFrom?: string;
+  /**
+   * happ-lineage only: the notarized migrates-lineage commitment (entry hash)
+   * that this release's crossing walks (spec 2026-09-03-holochain-evolution-
+   * epic-design §4). Required by the schema's root `if/then` when
+   * `artifactClass` is happ-lineage.
+   */
+  path?: { commitmentCid: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -697,6 +763,37 @@ function normaliseAppliesTo(raw: JsonObject): { roles: Record<string, RoleBindin
   const roles = (raw['roles'] ?? raw) as Record<string, RoleBinding>;
   if (typeof roles !== 'object' || Object.keys(roles).length === 0) {
     throw new UsageError('--applies-to needs a non-empty { "roles": { … } } map');
+  }
+  return { roles };
+}
+
+/**
+ * Applies `--migrate-from <role>=<dnaHash>` / `--lineage <dnaHash,...>` onto
+ * the resolved role bindings for a happ-lineage release. `--lineage` is one
+ * shared ancestry list, applied to every role named by `--migrate-from`
+ * (spec 2026-09-03-holochain-evolution-epic-design §4); role-level
+ * requiredness (a happ-lineage role must carry both) is left to Rust
+ * (Task 4) — an omitted role here surfaces as a schema failure at emit time
+ * (roleBinding is a shared $defs entry every artifactClass reuses).
+ */
+function applyLineageBindings(
+  appliesTo: { roles: Record<string, RoleBinding> },
+  options: Options
+): { roles: Record<string, RoleBinding> } {
+  if (Object.keys(options.migrateFrom).length === 0) return appliesTo;
+  const roles: Record<string, RoleBinding> = { ...appliesTo.roles };
+  for (const [role, migrateFrom] of Object.entries(options.migrateFrom)) {
+    const existing = roles[role];
+    if (!existing) {
+      throw new UsageError(
+        `--migrate-from names role "${role}", which --applies-to/--applies-to-from did not resolve`
+      );
+    }
+    roles[role] = {
+      ...existing,
+      migrateFrom,
+      ...(options.lineage.length > 0 ? { lineage: options.lineage } : {}),
+    };
   }
   return { roles };
 }
@@ -1010,7 +1107,7 @@ async function assembleManifest(options: Options): Promise<{
     blobs.push(await packageArtifact(file, options, artifactClass));
   }
 
-  const appliesTo = await resolveAppliesTo(options);
+  const appliesTo = applyLineageBindings(await resolveAppliesTo(options), options);
   const buildInfo = await resolveBuildInfo(options);
   const gitCommit = options.gitCommit ?? git(['rev-parse', 'HEAD']);
   if (!gitCommit) {
@@ -1044,7 +1141,10 @@ async function assembleManifest(options: Options): Promise<{
       },
     },
     declaredReach: options.declaredReach,
-    adoptionDiscipline,
+    adoptionDiscipline: {
+      ...adoptionDiscipline,
+      ...(options.pathCommitment ? { path: { commitmentCid: options.pathCommitment } } : {}),
+    },
     ...(options.notes ? { notes: options.notes } : {}),
   };
 

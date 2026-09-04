@@ -1,17 +1,24 @@
 /**
- * Release manifest schema — the `happ-lineage` artifactClass (epic Task 3).
+ * Release manifest schema + packager — the `happ-lineage` artifactClass
+ * (epic Task 3).
  *
- * Validates manifest objects directly against
+ * Part 1 (schema-only tests) validates manifest objects directly against
  * `elohim/rakia/schemas/v1/release-manifest.schema.json` with the same Ajv
  * setup `epr-release-package.ts --validate` uses (dist/2020.js, strict:
- * false, allErrors: true). This test does NOT import the packager module —
- * it is mid-edit in another session tonight (a discipline-inheritance
- * change) and importing it here would couple this spec to that in-flight
- * shape. The schema file is the shared contract; that's what's under test.
+ * false, allErrors: true), without importing the packager module.
+ *
+ * Part 2 (packager tests) drives the real `epr-release-package.ts` CLI as a
+ * subprocess (via `tsx`, `--no-put` so nothing touches the network) rather
+ * than importing it — the module exports nothing beyond content-addressing
+ * helpers, and reaching into its internals would couple this spec to
+ * implementation shape rather than the CLI contract these flags are part of.
  */
 
+import { execFileSync } from 'node:child_process';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +36,11 @@ const AjvCtor: new (opts: AjvOptions) => AjvNs.default =
 const SCHEMA_PATH = fileURLToPath(
   new URL('../../../../elohim/rakia/schemas/v1/release-manifest.schema.json', import.meta.url)
 );
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+const TSX_BIN = path.join(REPO_ROOT, 'node_modules/.bin/tsx');
+const PACKAGER_SCRIPT = path.join(REPO_ROOT, 'genesis/a2o/scripts/epr-release-package.ts');
+const MIGRATE_FROM_HASH = 'uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH';
+const PATH_COMMITMENT_CID = 'uhCEk' + 'A'.repeat(48);
 
 type JsonObject = Record<string, unknown>;
 
@@ -142,5 +154,133 @@ void describe('release-manifest schema — happ-lineage artifactClass', () => {
     nodeRegistry['lineage'] = [];
     const result = validateManifest(m);
     assert.equal(result.ok, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part 2 — the packager CLI (--migrate-from / --lineage / --path-commitment)
+// ---------------------------------------------------------------------------
+
+function tempArtifact(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'epr-release-package-spec-'));
+  const file = path.join(dir, 'artifact.bin');
+  writeFileSync(file, 'happ-lineage-fixture-bytes');
+  return file;
+}
+
+/** Shells out to the real CLI so `parseArgs` + the manifest literal are under test, not a mock. */
+function runPackager(args: string[]): string {
+  return execFileSync(TSX_BIN, [PACKAGER_SCRIPT, ...args], {
+    encoding: 'utf8',
+    cwd: REPO_ROOT,
+  });
+}
+
+function appliesToLiteral(): string {
+  return JSON.stringify({
+    roles: {
+      node_registry: { dnaHash: 'uhC0k' + 'B'.repeat(48), coordinatorWasmHashes: [] },
+    },
+  });
+}
+
+function happLineageArgs(artifactPath: string, extra: string[] = []): string[] {
+  return [
+    '--artifact',
+    artifactPath,
+    '--artifact-class',
+    'happ-lineage',
+    '--applies-to',
+    appliesToLiteral(),
+    '--migrate-from',
+    `node_registry=${MIGRATE_FROM_HASH}`,
+    '--lineage',
+    MIGRATE_FROM_HASH,
+    '--soak-secs',
+    '900',
+    '--attestation-threshold',
+    '2',
+    '--no-put',
+    ...extra,
+  ];
+}
+
+void describe('epr-release-package.ts CLI — happ-lineage flags', () => {
+  void it('assembles a manifest with migrateFrom/lineage/path that passes schema + --strict', () => {
+    const stdout = runPackager(
+      happLineageArgs(tempArtifact(), ['--path-commitment', PATH_COMMITMENT_CID, '--compact', '--strict'])
+    );
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const result = validateManifest(manifest);
+    assert.equal(result.ok, true, result.errors.join('\n'));
+
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    const nodeRegistry = roles['node_registry'] as JsonObject;
+    assert.equal(nodeRegistry['migrateFrom'], MIGRATE_FROM_HASH);
+    assert.deepEqual(nodeRegistry['lineage'], [MIGRATE_FROM_HASH]);
+    assert.deepEqual((manifest['adoptionDiscipline'] as JsonObject)['path'], {
+      commitmentCid: PATH_COMMITMENT_CID,
+    });
+  });
+
+  void it('refuses to package a happ-lineage release without --path-commitment', () => {
+    assert.throws(
+      () => runPackager(happLineageArgs(tempArtifact())),
+      (error: unknown) => {
+        const status = (error as { status?: number }).status;
+        assert.equal(status, 64, `expected a usage-error exit (64), got ${String(status)}`);
+        return true;
+      }
+    );
+  });
+
+  void it('refuses --migrate-from for a role --applies-to did not resolve', () => {
+    assert.throws(
+      () =>
+        runPackager([
+          '--artifact',
+          tempArtifact(),
+          '--artifact-class',
+          'happ-lineage',
+          '--applies-to',
+          appliesToLiteral(),
+          '--migrate-from',
+          `mishpat=${MIGRATE_FROM_HASH}`,
+          '--path-commitment',
+          PATH_COMMITMENT_CID,
+          '--soak-secs',
+          '900',
+          '--attestation-threshold',
+          '2',
+          '--no-put',
+        ]),
+      (error: unknown) => {
+        const status = (error as { status?: number }).status;
+        assert.equal(status, 64, `expected a usage-error exit (64), got ${String(status)}`);
+        return true;
+      }
+    );
+  });
+
+  void it('a coordinator-bundle manifest never gains a path field', () => {
+    const stdout = runPackager([
+      '--artifact',
+      tempArtifact(),
+      '--artifact-class',
+      'coordinator-bundle',
+      '--applies-to',
+      appliesToLiteral(),
+      '--soak-secs',
+      '900',
+      '--attestation-threshold',
+      '2',
+      '--no-put',
+      '--compact',
+      '--strict',
+    ]);
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const result = validateManifest(manifest);
+    assert.equal(result.ok, true, result.errors.join('\n'));
+    assert.equal((manifest['adoptionDiscipline'] as JsonObject)['path'], undefined);
   });
 });
