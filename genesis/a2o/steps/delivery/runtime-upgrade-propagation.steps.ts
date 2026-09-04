@@ -1633,7 +1633,10 @@ async function ensureCanaryApplied(world: E2EWorld): Promise<void> {
     world,
     'james',
     300_000,
-    r => r.appliedRelease?.cid === c.releaseCid || r.verdict?.state === 'refused'
+    // Only a TERMINAL refusal ends this poll early: a transient one (the
+    // candidate's blob still replicating, say) is the controller's own
+    // not-yet and it re-asks on its backoff ladder — see `isTerminalRefusal`.
+    r => r.appliedRelease?.cid === c.releaseCid || isTerminalRefusal(r)
   );
   assert.notEqual(
     row.verdict?.state,
@@ -2257,7 +2260,65 @@ async function republishPersonalVariant(
   );
 }
 
+/**
+ * A refusal the CONTROLLER ITSELF marks transient (`refusal.transient === true`
+ * — `RefusalReason::is_transient`: artifact_unavailable, installed_reality_unknown,
+ * lineage_unverifiable, threshold_* …). It is a not-yet, not a verdict: the
+ * controller re-asks on its own backoff ladder, and only a NEW release ever
+ * changes a terminal one.
+ */
+function isTransientRefusal(row: AdoptionChannelRow): boolean {
+  return row.verdict?.state === 'refused' && row.verdict?.refusal?.transient === true;
+}
+
+/**
+ * A refusal that IS a verdict — the thing every "no peer applies it" assertion
+ * in this file means. Terminal by the controller's own classification.
+ */
+function isTerminalRefusal(row: AdoptionChannelRow): boolean {
+  return row.verdict?.state === 'refused' && !isTransientRefusal(row);
+}
+
+/**
+ * Waits out a TRANSIENT refusal on one peer's channel row before it is read as
+ * evidence.
+ *
+ * Measured (run shift-it3-20260904T064119Z, 7/8): Station 7 read james's
+ * personal-channel verdict ~50s after the post-revert republish and found
+ * `refused / artifact_unavailable` — the blob had been PUT to matthew and had
+ * not yet replicated to james. That is the controller saying "the bytes may
+ * simply not have replicated yet", which it flags `transient: true`; iteration
+ * 1 passed the identical step only because the blob happened to arrive first.
+ * Reading an instantaneous verdict on a freshly published head is a race, and
+ * a transient refusal read as an envelope breach is a false red.
+ *
+ * A NON-transient refusal returns immediately, so the caller's assertion still
+ * fails at once with the verdict quoted — the compatibility-envelope check is
+ * unchanged, only the race is removed. Bounded by the same budget Station 5
+ * gives fleet convergence.
+ */
+async function settleTransientRefusal(
+  world: E2EWorld,
+  peer: PeerName,
+  channelId: string
+): Promise<void> {
+  await pollAdoption(
+    world,
+    peer,
+    FLEET_ADOPTION_CONVERGE_BUDGET_MS,
+    row => !isTransientRefusal(row),
+    channelId,
+    5_000
+  );
+}
+
+/**
+ * The "as they happened" reading of james's two channels. The personal channel
+ * is settled first (see `settleTransientRefusal`): its release was published
+ * seconds earlier, so its bytes may still be in flight.
+ */
 async function readJamesChannelRows(world: E2EWorld): Promise<JamesChannelRows> {
+  await settleTransientRefusal(world, 'james', PERSONAL_CHANNEL_ID);
   const report = await getAdoptionReport(world, 'james');
   return {
     commons: findChannelRow(report, CHANNEL_ID),
@@ -2560,7 +2621,8 @@ async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
     world,
     'james',
     300_000,
-    r => r.appliedRelease?.cid === c.secondReleaseCid || r.verdict?.state === 'refused'
+    // Terminal refusals only — same rail as Station 3's canary poll.
+    r => r.appliedRelease?.cid === c.secondReleaseCid || isTerminalRefusal(r)
   );
   assert.notEqual(
     row.verdict?.state,
@@ -2715,7 +2777,13 @@ async function ensureJamesAlreadyCurrent(world: E2EWorld): Promise<void> {
     world,
     'james',
     FLEET_ADOPTION_CONVERGE_BUDGET_MS,
-    r => r.resolvedHead?.cid === c.secondReleaseCid && r.resolvedHead?.tier === 'earned'
+    // …and not parked on a transient refusal: the head moved to earned seconds
+    // ago, and the Then below asserts on this row's verdict. See
+    // `settleTransientRefusal` for the race this closes.
+    r =>
+      r.resolvedHead?.cid === c.secondReleaseCid &&
+      r.resolvedHead?.tier === 'earned' &&
+      !isTransientRefusal(r)
   );
   c.jamesAlreadyCurrentRow = row;
 }
