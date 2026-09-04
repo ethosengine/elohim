@@ -1010,7 +1010,11 @@ fn active_habits_report(root: &Path, records: &[(Cid, FlowRecord)]) -> StockRepo
     };
     let level = habits.iter().filter(|habit| habit.active).count() as f64;
 
-    let fence = records.iter().find_map(|(cid, record)| match record {
+    // NEWEST first. The sidecar is append-only, so amending the covenant's number leaves the old
+    // fence standing beside the new one; reading the first match would let a superseded limit
+    // keep deciding forever, and did — the first time this limit moved, the live reading kept
+    // the old band. Same "newest wins" rule the gap-id arms hold.
+    let fence = records.iter().rev().find_map(|(cid, record)| match record {
         FlowRecord::Commitment(commitment)
             if commitment.state == CommitmentState::Active
                 && commitment

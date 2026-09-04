@@ -1481,6 +1481,59 @@ fn the_active_habits_level_is_judged_against_the_fence_band_and_check_refuses_ov
     assert_eq!(report.bound.as_ref().unwrap().level, 3.0);
 }
 
+/// The sidecar is append-only, so a fence whose limit is amended leaves the OLD promise standing
+/// beside the new one. The reading must follow the newest, or an amended covenant never takes
+/// effect and the superseded number wins forever — which is exactly what happened live the first
+/// time this limit moved.
+#[test]
+fn the_newest_fence_commitment_wins_when_an_amended_limit_supersedes_an_older_one() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+
+    // An AMENDED fence with a tighter limit, appended after the one `project` minted.
+    let scope = elohim_epr_cli::flow::body_cid_of_file(&root.join(".epr-meta/habits-covenant.md"))
+        .expect("the covenant is readable");
+    let amended = elohim_epr_rea::Commitment {
+        action: elohim_epr_rea::ReaVerb::Produce,
+        provider: elohim_epr_rea::AgentRef("tool:habits-register".to_string()),
+        receiver: elohim_epr_rea::AgentRef("repo:ethosengine/elohim".to_string()),
+        resource_spec: elohim_epr_rea::ResourceSpec {
+            classified_as: vec![
+                "register:wip-fence".to_string(),
+                "habit:attention".to_string(),
+            ],
+            quantity: None,
+        },
+        in_scope_of: scope,
+        valid_from: None,
+        valid_until: None,
+        state: elohim_epr_rea::CommitmentState::Active,
+        satisfies: Vec::new(),
+        bound: Some(elohim_epr_rea::Bound {
+            limit: 1.0,
+            unit: "active-habit".to_string(),
+            threshold_pct: 50.0,
+            sense: None,
+            source: None,
+        }),
+    };
+    // Appended AFTER the fixture's projected fence, so it is the newest — the shape an amended
+    // covenant leaves behind in an append-only log.
+    let mut store = SidecarFlowStore::open(root).expect("sidecar opens");
+    store
+        .append(FlowRecord::Commitment(amended))
+        .expect("append the amended fence");
+
+    write_register(root, 2);
+    let report = fence_reading(root);
+    let bound = report.bound.as_ref().expect("a bounded reading");
+    assert_eq!(
+        bound.limit, 1.0,
+        "the NEWEST fence decides; a superseded limit must not keep deciding forever"
+    );
+    assert_eq!(report.verdict.word(), "OVER-BOUND");
+}
+
 #[test]
 fn an_unreadable_register_or_a_missing_fence_refuses_rather_than_reading_zero() {
     let dir = valueflow_fixture();
