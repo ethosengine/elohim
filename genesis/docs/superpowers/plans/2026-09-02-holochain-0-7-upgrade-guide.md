@@ -713,6 +713,13 @@ to `AdminWebsocket`, `AppWebsocket`, `encodeHashToBase64`, `CellId`, `ActionHash
   incident class). Rule from here: any conductor-side manifest addition and the storage
   `holochain_types` pin land in the SAME batch, and `tests/happ_manifest_relay_url_compat.rs`
   (now asserting strictness) is the tripwire.
+- [x] **CUTOVER COMPLETE 2026-09-04 04:2xZ.** App #1691 (first green app run since the roll) staged the landing + lamad
+  bundles onto the seeded 0.7 fleet: `https://alpha.elohim.host/` 200, `/lamad/` 200, `https://elohim.host/` 200;
+  `elohim-host-landing` row carries blobHash + serverBlobHash. Sequence of the last mile: fleet roll (edge #1428) →
+  wipe-before-conductors amendment → doorway pool URL fix (edge #1429) → seed (genesis #1553, operator-started because
+  edge's empty-fleet validation timeout cancels the orchestrator chain) → app #1689/#1690 OOM'd on 7.6 GB ThinkPads →
+  memory request + operations-preferred affinity → #1691 green. Wall clock from the first push (2026-09-03 16:51Z):
+  ≈ 11.5 h, of which the substrate needed none.
 - [ ] **F6: Evidence — with the concession stated.** This cutover is NOT rung-5 evidence for a conductor-line change:
   rung 5 covers coordinator-only releases; the line change was wiped and re-genesised because no vehicle carries data
   across a lineage break (see `genesis/data/timeline/backlog/2026-09-03-lineage-crossing-migration-rna.md`). Bank it
