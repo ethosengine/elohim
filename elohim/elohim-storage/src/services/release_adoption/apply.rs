@@ -650,6 +650,18 @@ pub struct CarryReceipt {
     pub v1_digest: String,
     /// The `NotarizationWitness` this page authored, base64.
     pub witness_hash: String,
+    /// **Additive.** The v1 cell's own total record count, when the zome can
+    /// state it. `#[serde(default)]` so a page that omits it decodes to `None`
+    /// on an older peer and a newer peer's page decodes on an older build —
+    /// the additive-wire floor, applied to a contract Task 9 owns.
+    ///
+    /// This is the ONLY honest source for
+    /// [`super::LineageCarryReceipt::v1_count`]. It is never derived from
+    /// `carried`: a count this side computed from its own walk cannot witness
+    /// that the walk was complete, which is precisely what
+    /// `carried == v1_count` is supposed to establish.
+    #[serde(default)]
+    pub v1_total: Option<u32>,
 }
 
 /// Fold a cursor-driven carry into one [`super::LineageCarryReceipt`].
@@ -672,6 +684,7 @@ where
     let mut cursor: Option<u32> = None;
     let mut carried: u32 = 0;
     let mut first_digest: Option<String> = None;
+    let mut v1_total: Option<u32> = None;
     let mut witness_hashes: Vec<String> = Vec::new();
 
     for page_no in 0..MAX_CARRY_PAGES {
@@ -687,6 +700,12 @@ where
         if first_digest.is_none() {
             first_digest = Some(page.v1_digest.clone());
         }
+        // LAST non-`None` wins: v1's total is a fact about v1, so the freshest
+        // statement of it is the one to keep. A page that says nothing leaves
+        // the previous statement standing rather than erasing it.
+        if page.v1_total.is_some() {
+            v1_total = page.v1_total;
+        }
         // A page that authored no witness contributes none — an empty string
         // in the audit trail would read as a witness that exists and is blank.
         if !page.witness_hash.is_empty() {
@@ -697,13 +716,12 @@ where
             return Ok(super::LineageCarryReceipt {
                 role: role.to_string(),
                 carried,
-                // The per-page wire reports no independent v1 total, so the
-                // only number this side can honestly put here is what the walk
-                // covered — and the walk ended because v1 said it was
-                // exhausted, not because we counted. The INDEPENDENT
-                // `carried == v1_count` proof is read off the v1 cell itself
-                // on the mesh (Task 11 Station 3/4), never off this receipt.
-                v1_count: carried,
+                // Whatever v1 ITSELF said its total was — `None` when v1 never
+                // told us, which reads as "unknown" and never as "equal to
+                // what we carried". Deriving this from `carried` would make
+                // `carried == v1_count` true by construction and therefore
+                // worthless as the completeness proof it exists to be.
+                v1_count: v1_total,
                 // The LAST page's digest — what the carry ended up with.
                 digest: page.v1_digest,
                 v1_digest: first_digest.unwrap_or_default(),
@@ -819,6 +837,48 @@ impl HappLineageVehicle {
         Ok(crossings)
     }
 
+    /// The ONE crossing this vehicle applies. Pure, so both refusals are
+    /// testable without a conductor.
+    ///
+    /// # Why more than one crossing is refused rather than looped
+    ///
+    /// The vehicle's whole safety claim is "**any failure leaves the side app
+    /// installed and the window CLOSED**". Across two roles that claim stops
+    /// being true: role A installs, carries and opens its window; role B then
+    /// fails its install, and the apply returns a refusal with role A's window
+    /// ALREADY OPEN. The receipt says refused, the node is authoring on v2 for
+    /// A, and nothing walks it back.
+    ///
+    /// The honest fixes are a transaction across two conductors' worth of
+    /// state (there isn't one) or a revert-on-failure path (which is rung 6's
+    /// ceremony, not a vehicle's improvisation). So the MVP refuses the shape
+    /// it cannot hold, BEFORE any install, and the single-crossing invariant
+    /// makes the bolded claim a fact of control flow: `open_window` is reached
+    /// only after the one install, connect and carry have all succeeded.
+    ///
+    /// `ApplyPayloadUnusable` and not `ApplyFailed`: nothing was attempted and
+    /// nothing about this node is wrong — the payload is a shape this vehicle
+    /// does not apply, and more sweeps will not make it a different shape.
+    fn sole_crossing(
+        manifest: &super::ReleaseManifest,
+    ) -> Result<(&String, &super::RoleBinding), AdoptionRefusal> {
+        let crossings = Self::crossings(manifest)?;
+        if crossings.len() > 1 {
+            return Err(AdoptionRefusal::new(
+                RefusalReason::ApplyPayloadUnusable,
+                format!(
+                    "this release declares {} crossings ({:?}) — one crossing per release at MVP: \
+                     a multi-role migration cannot keep the guarantee that a failed apply leaves \
+                     every window CLOSED, because an earlier role's window would already be open \
+                     when a later role fails",
+                    crossings.len(),
+                    crossings.iter().map(|(role, _)| role).collect::<Vec<_>>()
+                ),
+            ));
+        }
+        Ok(crossings[0])
+    }
+
     /// The DNA lineage a role's side app is installed with. Pure.
     ///
     /// `install_lineage` writes these into the new cell's DNA properties, and
@@ -918,103 +978,104 @@ async fn call_carry_from(
 impl ApplyVehicle for HappLineageVehicle {
     async fn apply(&self, verified: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal> {
         let (_, happ_path) = sole_artifact(verified, LINEAGE_VEHICLE)?;
-        let crossings = Self::crossings(&verified.manifest)?;
+        // Both crossing refusals land HERE — before `list_apps`, before any
+        // install, before anything on this conductor changes.
+        let (role, binding) = Self::sole_crossing(&verified.manifest)?;
         let base = self.base_app_info().await?;
         let agent_key = base.agent_pub_key.clone();
 
-        let mut applied: Vec<(String, super::LineageCarryReceipt)> = Vec::new();
-        for (role, binding) in crossings {
-            let lineage_app_id =
-                crate::happ_manager::lineage_app_id(&self.base_app_id, &binding.dna_hash);
-            let lineage = Self::lineage_hashes(role, binding)?;
-            let v1_cell = Self::v1_cell(&base, role)?;
+        let lineage_app_id =
+            crate::happ_manager::lineage_app_id(&self.base_app_id, &binding.dna_hash);
+        let lineage = Self::lineage_hashes(role, binding)?;
+        let v1_cell = Self::v1_cell(&base, role)?;
 
-            // (1) INSTALL BESIDE — same key, inherited network seed, idempotent
-            // on an app id that is already there (so a retried sweep resumes).
-            crate::happ_manager::install_lineage(
-                &self.admin,
-                happ_path,
-                &lineage_app_id,
-                agent_key.clone(),
-                &lineage,
-                role,
+        // (1) INSTALL BESIDE — same key, inherited network seed, idempotent on
+        // an app id that is already there (so a retried sweep resumes, and the
+        // early return reconciles the enable half rather than short-circuiting
+        // an installed-but-disabled app).
+        crate::happ_manager::install_lineage(
+            &self.admin,
+            happ_path,
+            &lineage_app_id,
+            agent_key,
+            &lineage,
+            role,
+        )
+        .await
+        .map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!("install_lineage('{lineage_app_id}') for role '{role}': {e}"),
             )
+        })?;
+
+        // (2) A FRESH client for the side app, owned for exactly this apply.
+        // Never cached on the vehicle: a handle held across applies outlives
+        // the window it belongs to, and a reverted or sunset window would still
+        // have a live authoring path into v2.
+        let client = self
+            .registry
+            .connect_app(&lineage_app_id, role)
             .await
             .map_err(|e| {
                 AdoptionRefusal::new(
                     RefusalReason::ApplyFailed,
-                    format!("install_lineage('{lineage_app_id}') for role '{role}': {e}"),
+                    format!(
+                        "installed '{lineage_app_id}' but could not connect to it ({e}) — the \
+                         side app stays installed and the window stays CLOSED"
+                    ),
                 )
             })?;
 
-            // (2) A FRESH client for the side app, owned for exactly this
-            // apply. Never cached on the vehicle: a handle held across applies
-            // outlives the window it belongs to, and a reverted or sunset
-            // window would still have a live authoring path into v2.
-            let client = self
-                .registry
-                .connect_app(&lineage_app_id, role)
-                .await
-                .map_err(|e| {
-                    AdoptionRefusal::new(
-                        RefusalReason::ApplyFailed,
-                        format!(
-                            "installed '{lineage_app_id}' but could not connect to it ({e}) — the \
-                             side app stays installed and the window stays CLOSED"
-                        ),
-                    )
-                })?;
+        // (3) CARRY to the cursor's end.
+        let client_ref = &client;
+        let cell_ref = &v1_cell;
+        let carry = fold_carry(role, move |cursor| async move {
+            call_carry_from(
+                client_ref,
+                CarryInput {
+                    v1_cell: cell_ref.clone(),
+                    cursor,
+                    limit: CARRY_PAGE_LIMIT,
+                },
+            )
+            .await
+        })
+        .await?;
 
-            // (3) CARRY to the cursor's end.
-            let client_ref = &client;
-            let cell_ref = &v1_cell;
-            let carry = fold_carry(role, move |cursor| async move {
-                call_carry_from(
-                    client_ref,
-                    CarryInput {
-                        v1_cell: cell_ref.clone(),
-                        cursor,
-                        limit: CARRY_PAGE_LIMIT,
-                    },
-                )
-                .await
-            })
-            .await?;
-
-            // (4) AND ONLY NOW does authoring move. Every refusal above
-            // returned before this line, which is what makes "failure leaves
-            // the window closed" a property of the control flow rather than a
-            // promise in a comment.
-            self.lineage.open_window(role, &lineage_app_id);
-            tracing::info!(
-                channel = %verified.channel_id,
-                release_cid = %verified.release_cid,
-                role,
-                lineage_app_id = %lineage_app_id,
-                carried = carry.carried,
-                "release-adoption: lineage window OPEN — the role authors on v2, v1 stays live"
-            );
-            applied.push((lineage_app_id, carry));
-        }
+        // (4) AND ONLY NOW does authoring move. Every refusal above returned
+        // before this line, which is what makes "failure leaves the window
+        // closed" a property of the control flow rather than a promise in a
+        // comment — and what `sole_crossing` keeps true.
+        self.lineage.open_window(role, &lineage_app_id);
+        tracing::info!(
+            channel = %verified.channel_id,
+            release_cid = %verified.release_cid,
+            role,
+            lineage_app_id = %lineage_app_id,
+            carried = carry.carried,
+            v1_count = ?carry.v1_count,
+            "release-adoption: lineage window OPEN — the role authors on v2, v1 stays live"
+        );
 
         let detail = serde_json::json!({
             "baseAppId": self.base_app_id,
             "happ": happ_path.display().to_string(),
-            "crossings": applied.iter().map(|(app_id, carry)| serde_json::json!({
+            // Plural and an array although the MVP crosses exactly one role:
+            // the wire shape does not have to change the day a multi-role
+            // ceremony earns its revert path.
+            "crossings": [{
                 "role": carry.role,
-                "lineageAppId": app_id,
+                "lineageAppId": lineage_app_id,
                 "carried": carry.carried,
+                "v1Count": carry.v1_count,
                 "digest": carry.digest,
                 "v1Digest": carry.v1_digest,
                 "witnessHashes": carry.witness_hashes,
-            })).collect::<Vec<_>>(),
+            }],
         });
         let mut out = receipt(verified, LINEAGE_VEHICLE, detail);
-        // `AppliedReceipt.carry` is one carry; `detail.crossings` is all of
-        // them. The MVP rehearsal crosses exactly one role (spec §4.1), so the
-        // singular field is the one an operator reads — and a multi-role
-        // release is still fully reported rather than silently truncated.
-        out.carry = applied.into_iter().next().map(|(_, carry)| carry);
+        out.carry = Some(carry);
         Ok(out)
     }
 
@@ -1771,6 +1832,39 @@ mod tests {
         );
     }
 
+    /// **The single-crossing fence.** A manifest declaring two crossings is
+    /// refused BEFORE any install — `ApplyPayloadUnusable`, naming the count.
+    /// Looping it would break the invariant the whole vehicle is built on: the
+    /// first role's window would already be open when the second role failed.
+    #[test]
+    fn a_two_crossing_release_is_refused_before_anything_is_installed() {
+        let manifest = super::super::test_support::lineage_manifest_with_two_crossings();
+        // `crossings()` still reports N — the fence is a separate, explicit
+        // decision, not a selector that quietly hides roles.
+        assert_eq!(HappLineageVehicle::crossings(&manifest).unwrap().len(), 2);
+
+        let refusal = HappLineageVehicle::sole_crossing(&manifest)
+            .expect_err("two crossings must refuse at MVP");
+        assert_eq!(
+            refusal.reason_code(),
+            RefusalReason::ApplyPayloadUnusable,
+            "nothing was attempted and nothing about this node is wrong — the payload is the \
+             shape this vehicle does not apply"
+        );
+        assert!(refusal.detail.contains('2'), "got {}", refusal.detail);
+        assert!(
+            refusal.detail.contains("one crossing per release at MVP"),
+            "got {}",
+            refusal.detail
+        );
+
+        // And the single-crossing manifest passes the same fence.
+        let single = super::super::test_support::lineage_manifest();
+        let (role, _) = HappLineageVehicle::sole_crossing(&single)
+            .expect("one crossing is the applicable shape");
+        assert_eq!(role.as_str(), super::super::test_support::ROLE);
+    }
+
     /// A crossing with no `lineage` is refused rather than installed with an
     /// EMPTY lineage property — a cell that accepts crossing from nothing.
     #[test]
@@ -1820,12 +1914,17 @@ mod tests {
                 next_cursor: Some(32),
                 v1_digest: "digest-after-page-one".to_string(),
                 witness_hash: "uhCEkWitnessOne".to_string(),
+                v1_total: None,
             },
             CarryReceipt {
                 carried: 7,
                 next_cursor: None,
                 v1_digest: "digest-after-page-two".to_string(),
                 witness_hash: "uhCEkWitnessTwo".to_string(),
+                // v1 states its own total on the last page; the fold takes it
+                // verbatim and NEVER from `carried` — 5 ≠ 39 on purpose, so a
+                // fold that derived the count would fail this assertion.
+                v1_total: Some(5),
             },
         ]);
         let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
@@ -1840,7 +1939,11 @@ mod tests {
 
         assert_eq!(carry.role, "node_registry");
         assert_eq!(carry.carried, 39, "32 + 7, summed across pages");
-        assert_eq!(carry.v1_count, 39);
+        assert_eq!(
+            carry.v1_count,
+            Some(5),
+            "v1_count is what v1 SAID, never what we counted"
+        );
         assert_eq!(carry.v1_digest, "digest-after-page-one");
         assert_eq!(carry.digest, "digest-after-page-two");
         assert_eq!(
@@ -1862,6 +1965,7 @@ mod tests {
                 next_cursor: Some(1),
                 v1_digest: "d".to_string(),
                 witness_hash: String::new(),
+                v1_total: None,
             })
         })
         .await
@@ -1906,6 +2010,7 @@ mod tests {
             next_cursor: Some(32),
             v1_digest: "digest".to_string(),
             witness_hash: "uhCEkWitness".to_string(),
+            v1_total: Some(39),
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
@@ -1920,6 +2025,19 @@ mod tests {
         }))
         .unwrap();
         assert!(rmp_serde::from_slice::<CarryReceipt>(&hostile).is_err());
+
+        // `v1_total` is ADDITIVE: a page from a zome that predates it decodes
+        // to `None` rather than failing, which is what lets this mirror ship
+        // before Task 9 emits the field.
+        let without = rmp_serde::to_vec_named(&serde_json::json!({
+            "carried": 1,
+            "next_cursor": serde_json::Value::Null,
+            "v1_digest": "digest",
+            "witness_hash": "uhCEkWitness",
+        }))
+        .unwrap();
+        let decoded: CarryReceipt = rmp_serde::from_slice(&without).expect("additive decode");
+        assert_eq!(decoded.v1_total, None);
     }
 
     /// The batch is bounded BEFORE the call is made, and the page ceiling is

@@ -140,7 +140,10 @@ pub async fn fetch_path_evidence(
     };
 
     // The projection carries the lifecycle; the DHT entry carries the body.
-    let (state, revoked_at) = lifecycle(db, cid).await;
+    // A projection we could not READ is unreachable — never a state we made up.
+    let Some((state, revoked_at)) = lifecycle(db, cid).await else {
+        return Answer::Unreachable;
+    };
 
     Answer::Present(evidence_from(
         // The commitment's CID is its ENTRY hash, never its action hash —
@@ -220,32 +223,48 @@ fn to_lower_camel(snake: &str) -> String {
     out
 }
 
-/// The commitment's projected lifecycle: `(state, revoked_at)`.
+/// The commitment's projected lifecycle: `Some((state, revoked_at))` when the
+/// projection ANSWERED, `None` when it could not be read at all.
 ///
-/// A missing pool, a pool checkout failure, a query failure, or a row that has
-/// not projected yet all resolve to [`UNPROJECTED_STATE`] — fail-closed in
-/// every direction, because the only state that establishes a path is
-/// `"active"` and none of those four situations is evidence of one.
-async fn lifecycle(db: Option<&DbPool>, cid: &str) -> (String, Option<String>) {
-    let unprojected = || (UNPROJECTED_STATE.to_string(), None);
-    let Some(pool) = db.cloned() else {
-        return unprojected();
-    };
+/// The distinction is the same C4 line the conductor read draws, applied to the
+/// second source. An **absent row** is an answer — the commitment has not
+/// projected here yet, which is honestly [`UNPROJECTED_STATE`] and refuses. A
+/// **failed read** — no pool configured, a pool checkout that timed out, a
+/// query error, a blocking task that panicked — is not an answer, and
+/// returning `proposed` for it would let a busy sqlite read as "the elohim did
+/// not notarize this path". Those all come back `None`, and the caller answers
+/// [`Answer::Unreachable`].
+async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<(String, Option<String>)> {
+    let pool = db.cloned()?;
     let cid = cid.to_string();
     // The pool checkout + diesel query are blocking; offload exactly as
     // `ProjectionCommitmentFetcher::fetch` does rather than stalling a runtime
     // worker on a sqlite read.
-    let joined = tokio::task::spawn_blocking(move || {
-        let mut conn = pool.get().ok()?;
-        crate::db::mishpat_commitments::get_by_cid(&mut conn, &cid).ok()?
-    })
+    let joined = tokio::task::spawn_blocking(
+        move || -> Result<Option<crate::db::models::MishpatCommitment>, String> {
+            let mut conn = pool.get().map_err(|e| format!("db pool: {e}"))?;
+            crate::db::mishpat_commitments::get_by_cid(&mut conn, &cid)
+                .map_err(|e| format!("query: {e}"))
+        },
+    )
     .await;
     match joined {
-        Ok(Some(row)) => (row.state, row.revoked_at),
-        Ok(None) => unprojected(),
+        Ok(Ok(Some(row))) => Some((row.state, row.revoked_at)),
+        // The projection answered: no such row here yet.
+        Ok(Ok(None)) => Some((UNPROJECTED_STATE.to_string(), None)),
+        Ok(Err(e)) => {
+            tracing::warn!(
+                error = %e,
+                "release-adoption: path lifecycle unreadable — unreachable, never a fabricated state"
+            );
+            None
+        }
         Err(e) => {
-            tracing::warn!(error = %e, "release-adoption: path lifecycle read panicked/aborted");
-            unprojected()
+            tracing::warn!(
+                error = %e,
+                "release-adoption: path lifecycle read panicked/aborted — unreachable"
+            );
+            None
         }
     }
 }
@@ -254,13 +273,39 @@ async fn lifecycle(db: Option<&DbPool>, cid: &str) -> (String, Option<String>) {
 mod tests {
     use super::*;
 
+    /// A migrates-lineage commitment body in the shape the NOTARIZING side
+    /// actually writes — every field
+    /// `mishpat::commitments::validate_migrates_lineage` requires, with
+    /// `signatures` as `[{agent, signature}]` OBJECTS (that validator's
+    /// `validate_lineage_signatures` reads `.agent` and `.signature` off each
+    /// element and verifies over `signing_payload_cid`).
+    ///
+    /// This side only takes `.len()` of that array, which is correct — the
+    /// signatures were verified in-wasm at commit time and re-verifying a
+    /// notarized entry here would be re-deriving authority the DHT already
+    /// established. But the FIXTURE must be the real shape, or the parse is
+    /// pinned against a body no conductor will ever return.
     fn body() -> serde_json::Value {
         serde_json::json!({
+            "action": "migrates-lineage",
+            "role": "node_registry",
             "from_dna_hash": "uhC0kINSTALLED",
             "to_dna_hash": "uhC0kV2NODEREG",
+            "release_cid": "uhCkkLineageReleaseHead",
             "constitution_root": "bafyLineageConstitutionRoot",
-            "signatures": ["uhCAkSignerOne", "uhCAkSignerTwo", "uhCAkSignerThree"],
+            "roster_cid": "bafyProgenitorRoster",
+            "signing_payload_cid": "bafySigningPayload",
+            "signatures": [
+                { "agent": "uhCAkSignerOne", "signature": "c2lnLW9uZQ==" },
+                { "agent": "uhCAkSignerTwo", "signature": "c2lnLXR3bw==" },
+                { "agent": "uhCAkSignerThree", "signature": "c2lnLXRocmVl" },
+            ],
             "required_signatures": 3,
+            "evidence": { "soakSecs": 900 },
+            "window": {
+                "opens_at": "2026-09-04T00:00:00Z",
+                "revert_until": "2026-09-11T00:00:00Z",
+            },
         })
     }
 
@@ -318,7 +363,11 @@ mod tests {
             None,
         );
         assert_eq!(ev.signatures, 0);
+        // The SAME default the notarizing side applies
+        // (`validate_lineage_signatures`: `None => 1usize`), so the two sides
+        // cannot disagree about what quorum an unstated k-of-n means.
         assert_eq!(ev.required_signatures, DEFAULT_REQUIRED_SIGNATURES);
+        assert_eq!(DEFAULT_REQUIRED_SIGNATURES, 1);
         assert!(ev.required_signatures > 0);
         assert!(ev.signatures < ev.required_signatures, "must fail quorum");
         assert!(ev.from_dna_hash.is_empty());
@@ -390,5 +439,96 @@ mod tests {
             fetch_path_evidence(None, None, &m).await,
             Answer::Absent
         ));
+    }
+
+    /// **C4 on the SECOND source.** The projection supplies `state` and
+    /// `revoked_at`, and the three outcomes must stay distinct:
+    ///
+    /// - **No pool configured** → `None` → the fetch answers `Unreachable`. We
+    ///   could not READ the lifecycle, and a fabricated `proposed` would let an
+    ///   unconfigured (or busy, or broken) sqlite read as "the elohim did not
+    ///   notarize this path".
+    /// - **Row absent, pool present** → an ANSWER: `proposed`, which refuses on
+    ///   state and self-heals the moment the projection lands.
+    /// - **Row revoked** → the revocation carried through verbatim.
+    ///
+    /// Run against a real in-memory pool, so what is asserted is the query
+    /// path's own behaviour rather than a hand-built tuple.
+    #[tokio::test]
+    async fn an_unreadable_lifecycle_is_unreachable_and_an_absent_row_is_proposed() {
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::sqlite::SqliteConnection;
+
+        // (1) No pool at all — unreadable, never a state.
+        assert!(
+            lifecycle(None, "uhCEkPathCommitment").await.is_none(),
+            "an unconfigured pool is an unreadable lifecycle, never a fabricated state"
+        );
+        // …and the fetch boundary turns that into Unreachable rather than the
+        // Absent that would read as "not notarized". A manifest is needed here
+        // only to reach the lifecycle read at all.
+        let m = super::super::test_support::lineage_manifest();
+        assert!(matches!(
+            fetch_path_evidence(None, None, &m).await,
+            Answer::Unreachable
+        ));
+
+        let url = format!(
+            "file:path_evidence_lifecycle_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool: DbPool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        crate::db::run_migrations(&pool).expect("migrations");
+
+        // (2) Pool present, row absent — the projection ANSWERED "no such row".
+        let answered = lifecycle(Some(&pool), "uhCEkPathCommitment")
+            .await
+            .expect("a reachable projection always answers");
+        assert_eq!(answered.0, UNPROJECTED_STATE);
+        assert_eq!(answered.0, "proposed");
+        assert!(answered.1.is_none());
+        let ev = evidence_from("uhCEkPathCommitment", &body(), answered.0, answered.1);
+        assert_eq!(ev.state, "proposed");
+        assert_ne!(
+            ev.state, "active",
+            "an unprojected row must never read as the one state that establishes a path"
+        );
+
+        // (3) A projected, REVOKED row — the revocation is carried, and it is
+        // read off the projection rather than off the DHT body (which still
+        // says nothing about revocation: it cannot, it was written first).
+        {
+            let mut conn = pool.get().expect("conn");
+            crate::db::mishpat_commitments::upsert_with_anchor(
+                &mut conn,
+                crate::db::models::NewMishpatCommitment {
+                    cid: "uhCEkPathCommitment".to_string(),
+                    action: "migrates-lineage".to_string(),
+                    scope: "migrates-lineage".to_string(),
+                    provider: "uhCAkSignerOne".to_string(),
+                    recipient: "uhCAkSignerTwo".to_string(),
+                    bounds_json: "{}".to_string(),
+                    valid_from: "2026-09-04T00:00:00Z".to_string(),
+                    valid_until: "2026-09-11T00:00:00Z".to_string(),
+                    revoked_at: Some("2026-09-04T10:00:00Z".to_string()),
+                    state: "active".to_string(),
+                    dht_anchor_hash: Some("uhCkkPathCommitmentAction".to_string()),
+                },
+            )
+            .expect("upsert");
+        }
+        let (state, revoked) = lifecycle(Some(&pool), "uhCEkPathCommitment")
+            .await
+            .expect("a reachable projection always answers");
+        let ev = evidence_from("uhCEkPathCommitment", &body(), state, revoked);
+        assert_eq!(ev.state, "active");
+        assert_eq!(
+            ev.revoked_at.as_deref(),
+            Some("2026-09-04T10:00:00Z"),
+            "verify_path refuses `path_revoked` on this, terminally and independent of state"
+        );
     }
 }

@@ -860,6 +860,24 @@ async fn base_role_seed(
     Ok(provisioned.dna_modifiers.network_seed.clone())
 }
 
+/// Whether an ALREADY-INSTALLED lineage app still needs its `enable_app` half.
+///
+/// [`install_lineage`] is install-then-enable, which is two admin calls and
+/// therefore two chances to fail between. If the first call installs and then
+/// dies at `enable_app`, the app exists on the conductor `Disabled`. A retry
+/// that treated "the app id is in `list_apps`" as done would return `Ok` on an
+/// app whose cells never started — and the caller (the lineage vehicle) would
+/// go on to dial it, fail, and refuse. Forever, on every sweep, with an
+/// increasingly confusing error.
+///
+/// So only [`AppStatus::Enabled`] is done. `Disabled(_)` is the resumable case
+/// this predicate exists for. `AwaitingMemproofs` also answers `true`, and
+/// `enable_app` will refuse it — deliberately: a legible error every sweep is
+/// a better report than a silent `Ok` on an app that cannot serve.
+pub(crate) fn lineage_install_needs_enable(status: &holochain_types::prelude::AppStatus) -> bool {
+    !matches!(status, holochain_types::prelude::AppStatus::Enabled)
+}
+
 /// Install a second app alongside the base app ([`APP_ID`]), under the SAME
 /// agent key — never a new one — so both apps' source chains are authored by
 /// the one identity. Used to bring a lineage DNA (a coordinator- or
@@ -873,9 +891,12 @@ async fn base_role_seed(
 /// the new cell lands on the same DHT the base app's cell for that role is
 /// on rather than forking a private network.
 ///
-/// Idempotent: if `lineage_app_id` is already installed, this is a no-op —
-/// safe to call on every boot/reconcile pass the same way [`install_fresh`]
-/// is guarded by its caller's `list_apps` check.
+/// Idempotent, and idempotent about the WHOLE job: this function installs AND
+/// enables, so "already installed" is only a no-op when the existing app is
+/// also enabled. An app left `Disabled` by a previous call that installed and
+/// then failed at `enable_app` gets its enable RECONCILED here — see
+/// [`lineage_install_needs_enable`] for why returning `Ok` on a disabled app
+/// would strand a retry forever.
 pub async fn install_lineage(
     admin_ws: &AdminWebsocket,
     happ_path: &Path,
@@ -888,10 +909,25 @@ pub async fn install_lineage(
         .list_apps(None)
         .await
         .map_err(|e| anyhow::anyhow!("list_apps: {e}"))?;
-    if apps.iter().any(|a| a.installed_app_id == lineage_app_id) {
+    if let Some(existing) = apps.iter().find(|a| a.installed_app_id == lineage_app_id) {
+        if lineage_install_needs_enable(&existing.status) {
+            info!(
+                app_id = lineage_app_id,
+                status = ?existing.status,
+                "lineage app is installed but not enabled — reconciling the enable half"
+            );
+            admin_ws
+                .enable_app(lineage_app_id.to_string())
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!("enable_app({lineage_app_id}) on retry failed: {e}")
+                })?;
+            info!(app_id = lineage_app_id, "lineage app enabled on retry");
+            return Ok(());
+        }
         info!(
             app_id = lineage_app_id,
-            "lineage app already installed — idempotent"
+            "lineage app already installed and enabled — idempotent"
         );
         return Ok(());
     }
@@ -1392,6 +1428,38 @@ mod tests {
         };
 
         DnaFile::new(dna_def, vec![integrity, coordinator]).await
+    }
+
+    /// **The install-ok/enable-fail resume.** `install_lineage` is two admin
+    /// calls; a crash between them leaves the app installed and `Disabled`.
+    /// Only `Enabled` counts as done — every other status must send the retry
+    /// back through `enable_app` rather than short-circuiting on "the app id
+    /// is in list_apps", which would strand the vehicle dialling a dead app on
+    /// every sweep forever.
+    ///
+    /// A predicate rather than an end-to-end test: `AdminWebsocket` has no
+    /// offline constructor in this crate (these tests exercise pure hashing),
+    /// so the DECISION is what is testable here and the two admin calls around
+    /// it are the mesh's to prove (Task 11).
+    #[test]
+    fn an_installed_but_disabled_lineage_app_still_needs_enabling() {
+        use holochain_types::prelude::{AppStatus, DisabledAppReason};
+        assert!(!lineage_install_needs_enable(&AppStatus::Enabled));
+        for disabled in [
+            DisabledAppReason::NeverStarted,
+            DisabledAppReason::NotStartedAfterProvidingMemproofs,
+            DisabledAppReason::User,
+            DisabledAppReason::Error("enable_app died mid-install".into()),
+        ] {
+            assert!(
+                lineage_install_needs_enable(&AppStatus::Disabled(disabled.clone())),
+                "a {disabled:?} app is resumable, never done"
+            );
+        }
+        // Not enableable by `enable_app` — but answering `true` means the
+        // retry reports a legible refusal every sweep instead of an Ok on an
+        // app whose cells never started.
+        assert!(lineage_install_needs_enable(&AppStatus::AwaitingMemproofs));
     }
 
     #[tokio::test]

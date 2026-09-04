@@ -416,12 +416,16 @@ pub struct LineageCarryReceipt {
     pub role: String,
     /// Records carried, summed over every page the cursor walked.
     pub carried: u32,
-    /// Records the walk covered in v1. See
-    /// [`apply::CarryReceipt`] for why this equals `carried` by construction
-    /// today: the per-page wire Task 9 owns reports no independent v1 total,
-    /// so a divergence between the two is a fact only the v1 cell itself can
-    /// establish (Station 3/4 reads it there, not from this receipt).
-    pub v1_count: u32,
+    /// The v1 cell's OWN total record count, as v1 stated it
+    /// ([`apply::CarryReceipt::v1_total`], last non-`None` page wins).
+    ///
+    /// `None` means v1 never told us — an honest unknown, and absent from the
+    /// wire. It is **never** derived from `carried`: the deliverable's
+    /// assertion is `carried == v1_count`, and a `v1_count` this side computed
+    /// from its own walk would make that equality true by construction and
+    /// prove nothing about completeness.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v1_count: Option<u32>,
     /// The digest the LAST page reported — what the carry ended up with.
     pub digest: String,
     /// The digest the FIRST page reported — what the carry started from.
@@ -955,6 +959,17 @@ pub(crate) mod test_support {
         m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
             commitment_cid: LINEAGE_PATH_CID.to_string(),
         });
+        m
+    }
+
+    /// A lineage manifest declaring TWO crossings — the shape the vehicle
+    /// refuses before installing anything, because a failure part-way through
+    /// would leave the first role's window already open.
+    pub fn lineage_manifest_with_two_crossings() -> ReleaseManifest {
+        let mut m = lineage_manifest();
+        let mut second = m.applies_to.roles[ROLE].clone();
+        second.dna_hash = "uhC0kSecondRoleV2Hash".to_string();
+        m.applies_to.roles.insert("lamad".to_string(), second);
         m
     }
 

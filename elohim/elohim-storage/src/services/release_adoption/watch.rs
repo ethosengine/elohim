@@ -556,9 +556,14 @@ impl AdoptionController {
 
     /// Equip the local projection pool. Read by exactly one thing: the
     /// migrates-lineage path evidence's LIFECYCLE half
-    /// (`super::path_evidence::fetch_path_evidence`). Without it a
-    /// `happ-lineage` release refuses `path_not_notarized` — fail-closed, and
-    /// the only cost on a node that follows no lineage channel is a `None`.
+    /// (`super::path_evidence::fetch_path_evidence`).
+    ///
+    /// Without it a `happ-lineage` release refuses `conductor_unavailable` —
+    /// this node cannot READ the commitment's lifecycle, which establishes
+    /// nothing about the commitment in either direction (C4). It is
+    /// deliberately NOT read as "not notarized": an unconfigured pool is a
+    /// fact about us. Every other artifact class ignores this field entirely,
+    /// so a node that follows no lineage channel pays a `None`.
     pub fn with_db(mut self, db: crate::db::DbPool) -> Self {
         self.db = Some(db);
         self
