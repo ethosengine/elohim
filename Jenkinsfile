@@ -281,14 +281,21 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
         // emitAppDeployJunit NAMES it (Part B, 2026-06-27) instead of a buried
         // UNSTABLE. The notarized head is NOT authored here — authorHeadOnce does
         // that exactly once, via a live conductor bridge.
+        def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE',
                    message: "seed ${host} ${bundle.slug} (${kind}): blob byte upload failed after retries; see junit testcase") {
-            withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}"]) {
+            withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}", "DELIVERABILITY_VERDICT_FILE=${verdictFile}"]) {
                 sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'"
             }
             // Reached only on a clean return — catchError swallows exceptions
             // before this line on any failure path.
             outcomes[outcomeKey] = true
+        }
+        // Read the deliverability marker AFTER catchError so a failed (caught)
+        // stage still records BROKEN_HEAD if stage-spa-blob.sh wrote one before
+        // exiting non-zero — authorHeadOnce below is the sole consumer.
+        if (fileExists(verdictFile)) {
+            outcomes["deliverability|${bundle.slug}|${kind}".toString()] = readFile(verdictFile).trim()
         }
     }
 }
@@ -305,6 +312,14 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
 // = own CPS method; no heredoc (CPS 64KB limit — bash lives in stage-spa-blob.sh).
 def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map outcomes) {
     def kind = bundle.kind ?: 'browser'
+    def verdictKey = "deliverability|${bundle.slug}|${kind}".toString()
+    if (outcomes[verdictKey]?.startsWith('BROKEN_HEAD')) {
+        // A peer judged this bundle from its bytes: it cannot boot. Authoring
+        // the head would mint a witnessed pointer to a blank page (2026-09-04).
+        // Hard FAILURE on purpose — the UNSTABLE dependency-chain rule is for
+        // transient substrate churn, and a broken bundle is not churn.
+        error("authorHeadOnce: ${bundle.slug} (${kind}) refused — ${outcomes[verdictKey]}. The bundle's index names an asset it does not hold; fix the build, do not re-run.")
+    }
     def authorKey = "author|${bundle.slug}|${kind}".toString()
     // Hand-off file for verifyProjectedHeads (Track-4 T4-2): stage-spa-blob.sh
     // writes the content hash it just computed here so the Jenkinsfile can read
