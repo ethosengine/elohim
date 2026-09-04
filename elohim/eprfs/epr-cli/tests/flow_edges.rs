@@ -1612,3 +1612,56 @@ fn a_note_resolves_a_gap_id_to_its_commitment_and_rolls_up_onto_the_plan() {
     .expect_err("an unknown gap id is not a silent no-op");
     assert!(err.to_string().contains("epic#99"), "{err}");
 }
+
+/// The two render falsities: a summary that speaks for a stock it cannot measure, and a line of
+/// fold accounting printed for a stock that was never folded.
+#[test]
+fn the_summary_never_says_draining_for_a_stock_that_does_not_drain() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let window = stocks::parse_window("2026-08-29..2026-09-05", stocks::Period::Day)
+        .expect("a declared window");
+
+    // At the band edge: admissible, so `--check` still passes — and the summary must NOT claim
+    // that every stock is draining, because a projected level never drains at all.
+    write_register(root, 2);
+    let outcome =
+        stocks::stocks(root, &window, &[stocks::StockName::ActiveHabits]).expect("stocks runs");
+    assert!(
+        outcome.equilibrium,
+        "two active is what the covenant permits"
+    );
+    let line = outcome.equilibrium_line();
+    assert!(
+        !line.contains("draining"),
+        "a projected level does not drain and the summary must not say it does: {line}"
+    );
+    assert!(line.contains("n/a"), "{line}");
+    assert!(line.contains("at its band edge"), "{line}");
+
+    // Over the limit: still no claim of draining, and the band phrase changes.
+    write_register(root, 3);
+    let outcome =
+        stocks::stocks(root, &window, &[stocks::StockName::ActiveHabits]).expect("stocks runs");
+    assert!(!outcome.equilibrium);
+    let line = outcome.equilibrium_line();
+    assert!(!line.contains("draining"), "{line}");
+    assert!(line.contains("over its limit"), "{line}");
+
+    // Inside the band, the same discipline holds.
+    write_register(root, 0);
+    let line = stocks::stocks(root, &window, &[stocks::StockName::ActiveHabits])
+        .expect("stocks runs")
+        .equilibrium_line();
+    assert!(line.contains("inside its band"), "{line}");
+    assert!(!line.contains("draining"), "{line}");
+
+    // A FOLDED stock keeps the sentence it has always had, byte for byte.
+    let folded = stocks::stocks(root, &window, &[stocks::StockName::Commitments])
+        .expect("stocks runs")
+        .equilibrium_line();
+    assert!(
+        folded.starts_with("equilibrium (every stock draining): "),
+        "the folded summary is unchanged: {folded}"
+    );
+}

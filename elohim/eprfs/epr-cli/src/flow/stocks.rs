@@ -867,6 +867,10 @@ impl StocksOutcome {
                     println!("      inflow:  {}", m.inflow_basis);
                     println!("      outflow: {}", m.outflow_basis);
                     println!(
+                        "    observed in window: {} · excluded by unit: {}",
+                        stock.observed_in_window, stock.excluded_by_unit
+                    );
+                    println!(
                         "    outflow arm: fulfillment only — Dismiss is a regression marker \
                          (empty `fulfills`) and no path mints a Revoked commitment"
                     );
@@ -878,10 +882,6 @@ impl StocksOutcome {
                     }
                 }
             }
-            println!(
-                "    observed in window: {} · excluded by unit: {}",
-                stock.observed_in_window, stock.excluded_by_unit
-            );
             if stock.undated_mints > 0 || stock.undated_discharges > 0 {
                 println!(
                     "    undated: {} mints, {} discharges (present in the level, absent from \
@@ -911,10 +911,57 @@ impl StocksOutcome {
                 println!("    basis:    {}", bound.level_basis);
             }
         }
-        println!(
-            "  equilibrium (every stock draining): {}",
-            if self.equilibrium { "yes" } else { "no" }
-        );
+        println!("  {}", self.equilibrium_line());
+    }
+
+    /// The summary sentence.
+    ///
+    /// "Every stock draining" is a true sentence only about FOLDED stocks. A projected level
+    /// never drains — there is no flow under it to drain — so a summary that answered `yes` for
+    /// one would be asserting a measurement that was never taken, which is the exact over-claim
+    /// this leg's whole vocabulary exists to prevent. When a bounded stock is present the
+    /// sentence therefore changes shape and reports each one's BAND instead, and it never uses
+    /// the word "draining" about it.
+    ///
+    /// A folded-only run keeps its sentence byte for byte, so every existing reader of this line
+    /// is unaffected.
+    ///
+    /// This is deliberately NOT the same predicate as [`Self::equilibrium`], which is what
+    /// `--check` exits on: two active habits is the covenant's maximum and must pass the check,
+    /// while the summary must still not call it draining. A verdict and a sentence about a
+    /// verdict are different things, and collapsing them is how one of them starts lying.
+    pub fn equilibrium_line(&self) -> String {
+        let bounded: Vec<String> = self
+            .stocks
+            .iter()
+            .filter_map(|stock| {
+                stock.bound.as_ref().map(|bound| {
+                    let band = if bound.level >= bound.limit {
+                        "over its limit"
+                    } else if bound.level >= bound.band_edge {
+                        "at its band edge"
+                    } else {
+                        "inside its band"
+                    };
+                    format!("{} is a projected level {band}", stock.stock)
+                })
+            })
+            .collect();
+        if bounded.is_empty() {
+            return format!(
+                "equilibrium (every stock draining): {}",
+                if self.equilibrium { "yes" } else { "no" }
+            );
+        }
+        let folded: Vec<&StockReport> = self.stocks.iter().filter(|s| s.bound.is_none()).collect();
+        let head = if folded.is_empty() {
+            "n/a".to_string()
+        } else if folded.iter().all(|s| s.verdict.is_equilibrium()) {
+            "n/a for the drain question; every folded stock draining".to_string()
+        } else {
+            "n/a for the drain question; a folded stock is filling".to_string()
+        };
+        format!("equilibrium: {head} — {}", bounded.join("; "))
     }
 }
 
