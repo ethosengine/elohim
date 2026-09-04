@@ -338,6 +338,17 @@ stage_once() {
         return 1
     fi
 
+    # The peer judges the bytes we just staged; a broken bundle never gets a
+    # head. Exit 2 from the gate is a VERDICT, not a transport blip — surface
+    # it as the stage's own failure code so the retry ladder does not re-try
+    # a deterministic answer.
+    local gate_rc=0
+    bash "$(dirname "$0")/deliverability-gate.sh" "${DOORWAY_EPR_URL}" "${SPA_HASH}" || gate_rc=$?
+    if [ "${gate_rc}" -eq 2 ] || [ "${gate_rc}" -eq 3 ]; then
+        echo "BROKEN_HEAD ${SLUG} ${KIND} ${SPA_HASH}" > "${DELIVERABILITY_VERDICT_FILE:-/dev/null}" 2>/dev/null || true
+        return 2
+    fi
+
     if [ "${DO_PATCH}" = "1" ]; then
         curl -fSs -X PATCH \
             -H 'Content-Type: application/json' \
@@ -460,8 +471,18 @@ stage_once() {
 # in the fabric can author the single head.
 attempt=1
 while true; do
-    if stage_once; then
+    rc=0
+    stage_once || rc=$?
+    if [ "${rc}" -eq 0 ]; then
         break
+    fi
+    # A deterministic peer VERDICT (broken bundle, or NOT-JUDGED under strict
+    # mode) is not a transport blip — retrying re-asks a question the peer has
+    # already answered. Terminal, immediately, never counted against ATTEMPTS.
+    if [ "${rc}" -eq 2 ]; then
+        echo "ERROR: [${SLUG}] the peer judged ${SPA_HASH} BROKEN — not retrying a deterministic verdict" >&2
+        rm -f spa-bundle.zip
+        exit 2
     fi
     if [ "${attempt}" -ge "${ATTEMPTS}" ]; then
         echo "ERROR: [${SLUG}] stage failed after ${ATTEMPTS} attempt(s) against ${DOORWAY_EPR_URL} — host left STALE" >&2
