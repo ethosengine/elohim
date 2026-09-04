@@ -2259,3 +2259,243 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         already_carried,
     })
 }
+
+// ============================================================================
+// STATION 8 — THE SEAL (Holochain Evolution Epic §4 step 5, §8)
+//
+// Gated behind `lineage-witness` and APPENDED at the end of the file, for the
+// same reason the sections above are: the default build's compiled output must
+// not be perturbed by this section's mere physical presence in the source text.
+//
+// The sunset is a separate notarized act, taken only after fleet convergence
+// AND a `sunsets-lineage` commitment. `seal_close` is its DNA half, in the one
+// order that makes it irreversible:
+//
+//   1. v1 `close_chain(Dna(v2))`  — the predecessor declares its close;
+//   2. v2 `open_chain(Dna(v1), close_hash)` — the successor names it, so the
+//      crossing is on BOTH chains and the far end is discoverable from either;
+//   3. v2 `commit_witness([the CloseChain proof])` — the close becomes a FACT
+//      in v2's DHT, which is what makes the integrity zome's after-close rule
+//      (`refuse_carried_after_close`) able to fire on every later witness;
+//   4. an `AuthorToClose` link from an anchor over (lineage, author) to that
+//      seal witness — the coordinator-side read index. Validation does NOT
+//      traverse it (HDI has no `get_links`; see the integrity zome's recorded
+//      deviation); the vehicle and the passport do.
+//
+// The v1 chain stays READABLE forever: nothing here deletes, disables or
+// rewrites it. Disabling the v1 CELL is the storage controller's half of the
+// fence (Task 14b) — this extern never touches installation state.
+// ============================================================================
+
+/// What one [`seal_close`] produced.
+///
+/// Every hash is rendered as canonical base64, NOT a native `HoloHash`, for
+/// exactly the reason [`CarryReceipt::witness_hash`] documents: a `HoloHash`
+/// serialises to a msgpack BYTE ARRAY and the storage-side decoder reads a
+/// `String`. The zome renders; storage never re-derives a hash.
+#[cfg(feature = "lineage-witness")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SealReceipt {
+    /// The predecessor's `CloseChain` action, on the v1 chain.
+    pub close_hash: String,
+    /// This chain's `OpenChain` action, which names `close_hash`.
+    pub open_hash: String,
+    /// The witness that carried the close into v2, or `""` when a prior seal
+    /// was found without one (see [`SealReceipt::already_sealed`]).
+    pub witness_hash: String,
+    /// `true` when this call found an existing seal for the same lineage on
+    /// this chain and authored NOTHING.
+    ///
+    /// A sunset is irreversible, so a retried vehicle step must never author a
+    /// SECOND `CloseChain` on the predecessor — there is no un-closing it. The
+    /// guard is one local `query`, and the retry reads as the same receipt.
+    pub already_sealed: bool,
+}
+
+/// The seal this chain already holds for `lineage_dna_hash`, if any.
+///
+/// Keyed on the `OpenChain` action, because that is the one action a sealed v2
+/// chain must carry and it names the predecessor's close hash directly — so
+/// the receipt is reconstructed without re-hashing anything.
+#[cfg(feature = "lineage-witness")]
+fn existing_seal(lineage_dna_hash: &DnaHash) -> ExternResult<Option<SealReceipt>> {
+    let target = MigrationTarget::Dna(lineage_dna_hash.clone());
+    let mut open: Option<(ActionHash, ActionHash)> = None;
+    let mut witness: Option<ActionHash> = None;
+
+    for record in query(ChainQueryFilter::new().include_entries(true))? {
+        match &record.action().data {
+            ActionData::OpenChain(data) if data.prev_target == target => {
+                open = Some((record.action_address().clone(), data.close_hash.clone()));
+            }
+            ActionData::Create(_) if witness.is_none() => {
+                // A record that is not a witness simply fails to decode as one;
+                // that is a skip, never an error, because this walk crosses
+                // every app entry on the chain.
+                if let Ok(Some(w)) = record.entry().to_app_option::<NotarizationWitness>() {
+                    if &w.lineage_dna_hash == lineage_dna_hash
+                        && w.proofs
+                            .iter()
+                            .any(|p| matches!(p.action.data, ActionData::CloseChain(_)))
+                    {
+                        witness = Some(record.action_address().clone());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(open.map(|(open_hash, close_hash)| SealReceipt {
+        close_hash: close_hash.to_string(),
+        open_hash: open_hash.to_string(),
+        witness_hash: witness.map(|h| h.to_string()).unwrap_or_default(),
+        already_sealed: true,
+    }))
+}
+
+/// Seal the crossing: close the predecessor chain toward THIS DNA, open this
+/// chain from that close, and witness the close here.
+///
+/// `v1_cell` must name the DNA this DNA declares as its predecessor — read from
+/// this DNA's own `lineage` property, which folds into the DNA hash, so the
+/// check is one every peer agrees on. Same agent on both cells, so the
+/// cross-cell call presents no capability secret (measured on 0.7.0).
+///
+/// Idempotent by the `OpenChain` already on this chain: a second call authors
+/// nothing and returns the first seal with `already_sealed: true`.
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn seal_close(v1_cell: CellId) -> ExternResult<SealReceipt> {
+    // (1) the declared predecessor, from this DNA's identity-bearing properties.
+    let properties: LineageProperties =
+        dna_info()?.modifiers.properties.try_into().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: could not deserialize DNA properties: {e:?}"
+            )))
+        })?;
+    let lineage_dna_hash = properties.lineage.first().cloned().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "seal_close: this DNA declares no lineage — there is no predecessor to seal"
+                .to_string(),
+        ))
+    })?;
+    if v1_cell.dna_hash() != &lineage_dna_hash {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "seal_close: v1_cell names DNA {}, but this DNA declares {} as its predecessor",
+            v1_cell.dna_hash(),
+            lineage_dna_hash
+        ))));
+    }
+
+    // (2) never seal twice — a CloseChain cannot be taken back.
+    if let Some(sealed) = existing_seal(&lineage_dna_hash)? {
+        return Ok(sealed);
+    }
+
+    // (3) close v1 toward this DNA.
+    let my_dna_hash = dna_info()?.hash;
+    let close_hash: ActionHash = match call(
+        CallTargetCell::OtherCell(v1_cell.clone()),
+        "node_registry_coordinator",
+        "close_chain_for".into(),
+        None,
+        my_dna_hash,
+    )? {
+        ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: could not decode the predecessor's CloseChain hash: {e:?}"
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: the predecessor cell refused close_chain_for: {other:?}"
+            ))))
+        }
+    };
+
+    // (4) read the close back, SIGNED — that signed action is the proof the
+    //     witness carries, and it is what lets v2's validators know the close's
+    //     `action_seq` without any access to v1.
+    let signed_close: SignedActionHashed = match call(
+        CallTargetCell::OtherCell(v1_cell.clone()),
+        "node_registry_coordinator",
+        "get_signed_action".into(),
+        None,
+        close_hash.clone(),
+    )? {
+        ZomeCallResponse::Ok(io) => io
+            .decode::<Option<SignedActionHashed>>()
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "seal_close: could not decode the predecessor's signed CloseChain: {e:?}"
+                )))
+            })?
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "seal_close: the predecessor cell has no record of the CloseChain it just \
+                     authored at {close_hash}"
+                )))
+            })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "seal_close: the predecessor cell refused get_signed_action: {other:?}"
+            ))))
+        }
+    };
+
+    // (5) open THIS chain from that close — after the close, never before.
+    let open_hash = open_chain(MigrationTarget::Dna(lineage_dna_hash.clone()), close_hash.clone())?;
+
+    // (6) carry the close itself into v2 as a proof. A CloseChain references no
+    //     entry, so the proof carries no entry bytes.
+    let close_author = signed_close.action().header.author.clone();
+    let witness_hash = commit_witness(NotarizationWitness {
+        lineage_dna_hash: lineage_dna_hash.clone(),
+        proofs: vec![CarriedProof {
+            action: signed_close.action().clone(),
+            signature: signed_close.signature.clone(),
+            entry: None,
+        }],
+    })?;
+
+    // (7) the coordinator-side read index: (lineage, author) -> the seal witness.
+    let anchor = StringAnchor {
+        anchor_type: "lineage_close".to_string(),
+        anchor_value: format!("{lineage_dna_hash}:{close_author}"),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    create_link(
+        anchor_hash,
+        witness_hash.clone(),
+        LinkTypes::AuthorToClose,
+        (),
+    )?;
+
+    Ok(SealReceipt {
+        close_hash: close_hash.to_string(),
+        open_hash: open_hash.to_string(),
+        witness_hash: witness_hash.to_string(),
+        already_sealed: false,
+    })
+}
+
+/// Every seal witness this peer holds for `(lineage_dna_hash, author)` — the
+/// `AuthorToClose` read index [`seal_close`] authors.
+///
+/// Validation cannot traverse links (HDI has no `get_links`), so this is a
+/// COORDINATOR-side query only: the vehicle and the passport ask it "has this
+/// author's predecessor chain been sealed, as far as I can see?". It is
+/// evidence, never the fence.
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn get_closes_for(input: (DnaHash, AgentPubKey)) -> ExternResult<Vec<Link>> {
+    let (lineage_dna_hash, author) = input;
+    let anchor = StringAnchor {
+        anchor_type: "lineage_close".to_string(),
+        anchor_value: format!("{lineage_dna_hash}:{author}"),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::AuthorToClose)?;
+    get_links(query, GetStrategy::default())
+}

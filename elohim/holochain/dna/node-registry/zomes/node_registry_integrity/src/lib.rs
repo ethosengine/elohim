@@ -456,6 +456,7 @@ pub enum LinkTypes {
 
     // Lineage / notarization carrying
     EntryToWitness,             // EntryHash(carried entry) -> NotarizationWitness
+    AuthorToClose,              // Anchor(lineage:author) -> the SEAL witness (Station 8)
 }
 
 // --- feature-ON validate(): pristine rules PLUS the witness rules. --------
@@ -466,14 +467,21 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         // --- NotarizationWitness (Holochain Evolution Epic §2) --------------
         // Both the StoreEntry and StoreRecord ops are matched, as upstream's
         // MigrationRecord does, so the rule holds for every authority.
+        //
+        // `action` is BOUND (not `..`) because Station 8's after-close rule
+        // needs the CARRIER's own identity and chain position: the close a
+        // carrier has already witnessed lives on the carrier's own v2 chain,
+        // and `header.prev_action` is the deterministic chain top the walk
+        // starts from. Both arms carry a `TypedAction<CreateData>`, so one
+        // binding serves both.
         FlatOp::CreateEntry(OpEntry::CreateEntry {
             app_entry: EntryTypes::NotarizationWitness(witness),
-            ..
+            action,
         })
         | FlatOp::CreateRecord(OpRecord::CreateEntry {
             app_entry: EntryTypes::NotarizationWitness(witness),
-            ..
-        }) => validate_notarization_witness(&witness),
+            action,
+        }) => validate_notarization_witness(&witness, &action.header),
 
         // (4a) a witness can never be updated.
         FlatOp::CreateEntry(OpEntry::UpdateEntry {
@@ -540,9 +548,12 @@ fn refuse_witness_delete(deletes_address: &ActionHash) -> ExternResult<ValidateC
 ///    `action_signer()` uses when the conductor signs and verifies actions.
 /// 3. when `entry` is carried (held-carry), it must hash to the entry hash the
 ///    carried action commits to.
+/// 4. **after close** (Station 8, epic §3 (ii)): no proof may sit after the
+///    predecessor chain's close — see [`refuse_carried_after_close`].
 #[cfg(feature = "lineage-witness")]
 fn validate_notarization_witness(
     witness: &NotarizationWitness,
+    header: &ActionHeader,
 ) -> ExternResult<ValidateCallbackResult> {
     // (1) lineage — read from the DNA's own identity-bearing properties.
     let properties: LineageProperties =
@@ -600,6 +611,159 @@ fn validate_notarization_witness(
                 return Ok(ValidateCallbackResult::Invalid(format!(
                     "NotarizationWitness proof {i}: carried entry hashes to {actual}, but the \
                      action commits to {expected}"
+                )));
+            }
+        }
+    }
+
+    // (4) the sunset fence.
+    refuse_carried_after_close(witness, header)
+}
+
+// =============================================================================
+// STATION 8 — the after-close rule (the sunset's fence is OURS)
+//
+// Spec §3 "Design Constraints Discovered" (ii) and §4 step 5. MEASURED on 0.7
+// (probes B and B2): `close_chain` is NOT a source-chain guard — the author's
+// own conductor accepts a post-close create, and the REMOTE agent-activity
+// authority refuses only the CloseChain's immediate successor (one rejection
+// plus a warrant; the tail validates again and the bytes stay fetchable). So
+// Holochain's contribution to the sunset is EVIDENCE, not a fence. The fence
+// is (i) the storage controller disabling the v1 cell (Task 14b) and (ii) this
+// rule: v2 refuses to carry a predecessor fact that sits AFTER that chain's
+// close.
+//
+// -----------------------------------------------------------------------------
+// IMPLEMENTATION DEVIATION, recorded (the same shape as the spec's note that
+// rule (4)'s `entry: None` branch "is not expressible as written").
+//
+// The task brief specifies looking the close up through an `AuthorToClose`
+// LINK. HDI 0.8 has no `get_links` — a validator's only deterministic
+// dependencies are `must_get_entry` / `must_get_action` / `must_get_valid_record`
+// (by exact hash) and `must_get_agent_activity` (an agent's chain in THIS DNA,
+// by chain filter). So the link cannot be traversed here. `AuthorToClose` is
+// still authored by `seal_close` — as the COORDINATOR-side read index the
+// passport and the vehicle query — and the VALIDATOR reaches the same fact the
+// HDI-legal way: it walks the carrier's OWN v2 chain, which is exactly "an
+// earlier witness for that lineage" from the brief.
+//
+// What this buys and what it does not, stated plainly:
+//   * a carrier that has sealed CANNOT then carry post-close facts — the close
+//     is on its own chain and every authority re-derives the same verdict. That
+//     is the sunset case (the peer seals, disables v1, and must not re-carry),
+//     and it is non-evadable.
+//   * a carrier that carries the close and the post-close facts in ONE witness
+//     is refused by the intra-witness half of the same rule.
+//   * a COURIER that never sealed and never carried the close cannot be
+//     refused by any deterministic HDI rule, because "does a close exist for
+//     author A?" is an unbounded lookup and HDI has no unbounded lookup. That
+//     hole is named, not hidden: it is why the fence has leg (i) at all, and
+//     why Probe B2's warrant is read by the storage plane as evidence of a
+//     violated sunset.
+//
+// COST, declared: the walk makes the carrier's own chain a validation
+// dependency for every witness it authors. For the node_registry rehearsal
+// (tens of witnesses) that is small; a DNA carrying thousands of witnesses
+// should bound the filter (`ChainFilter::until_hash` at its own OpenChain)
+// before adopting this rule at that scale.
+// =============================================================================
+
+/// Fold the `CloseChain` proofs a witness carries into `closes` as
+/// `(author, lowest close action_seq)`.
+///
+/// The LOWEST seq wins: two closes on one chain would mean the earlier one
+/// already fenced everything after it, and taking the later would let facts
+/// between them through.
+#[cfg(feature = "lineage-witness")]
+fn collect_closes(witness: &NotarizationWitness, closes: &mut Vec<(AgentPubKey, u32)>) {
+    for proof in &witness.proofs {
+        if !matches!(proof.action.data, ActionData::CloseChain(_)) {
+            continue;
+        }
+        let author = proof.action.header.author.clone();
+        let seq = proof.action.header.action_seq;
+        match closes.iter_mut().find(|(a, _)| a == &author) {
+            Some((_, known)) => {
+                if seq < *known {
+                    *known = seq;
+                }
+            }
+            None => closes.push((author, seq)),
+        }
+    }
+}
+
+/// Refuse any carried proof that sits after its author's predecessor-chain
+/// close, per the section header above.
+///
+/// A close is known from two places, both deterministic:
+///   (a) THIS witness — a batch carrying the close cannot also carry facts
+///       authored after it;
+///   (b) an EARLIER witness on the carrier's own v2 chain that names the same
+///       `lineage_dna_hash` — reached with `must_get_agent_activity` from the
+///       carrier's `prev_action`, which is the chain top every authority
+///       resolves identically.
+///
+/// **Absence of a close is not a rule.** A witness carried before any sunset
+/// finds no close and is untouched — pre-sunset carriage (Stations 4, 5, 6) is
+/// unaffected by construction.
+#[cfg(feature = "lineage-witness")]
+fn refuse_carried_after_close(
+    witness: &NotarizationWitness,
+    header: &ActionHeader,
+) -> ExternResult<ValidateCallbackResult> {
+    let mut closes: Vec<(AgentPubKey, u32)> = Vec::new();
+
+    // (a) this witness's own batch.
+    collect_closes(witness, &mut closes);
+
+    // (b) the carrier's earlier witnesses for the SAME lineage.
+    if let Some(prev_action) = header.prev_action.as_ref() {
+        let witness_def: ScopedEntryDefIndex = (&UnitEntryTypes::NotarizationWitness).try_into()?;
+        let activity = must_get_agent_activity(
+            header.author.clone(),
+            ChainFilter::new(prev_action.clone()),
+        )?;
+        for entry in activity {
+            let action = entry.action.action().clone();
+            let ActionData::Create(create) = &action.data else {
+                continue;
+            };
+            let EntryType::App(app_entry_def) = &create.entry_type else {
+                continue;
+            };
+            if app_entry_def.zome_index != witness_def.zome_index
+                || app_entry_def.entry_index != witness_def.zome_type
+            {
+                continue;
+            }
+            let earlier =
+                NotarizationWitness::try_from(must_get_entry(create.entry_hash.clone())?)?;
+            if earlier.lineage_dna_hash != witness.lineage_dna_hash {
+                continue;
+            }
+            collect_closes(&earlier, &mut closes);
+        }
+    }
+
+    if closes.is_empty() {
+        return Ok(ValidateCallbackResult::Valid);
+    }
+
+    for (i, proof) in witness.proofs.iter().enumerate() {
+        // The close itself is the fence post, never fenced by itself.
+        if matches!(proof.action.data, ActionData::CloseChain(_)) {
+            continue;
+        }
+        let author = &proof.action.header.author;
+        let seq = proof.action.header.action_seq;
+        if let Some((_, close_seq)) = closes.iter().find(|(a, _)| a == author) {
+            if seq > *close_seq {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "NotarizationWitness proof {i}: after close — {author}'s chain in lineage \
+                     {} was closed at action_seq {close_seq}, but this proof sits at \
+                     action_seq {seq}",
+                    witness.lineage_dna_hash
                 )));
             }
         }

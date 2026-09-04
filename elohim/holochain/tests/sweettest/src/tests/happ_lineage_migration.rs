@@ -1748,3 +1748,343 @@ async fn held_carry_retry_is_idempotent() -> Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// STATION 8 — the sunset's fence (epic §3 (ii), §4 step 5, §8)
+//
+// Probe B measured that `close_chain` is not a source-chain guard; Probe B2
+// measured that the REMOTE agent-activity authority refuses exactly the
+// CloseChain's immediate successor and issues a warrant, while the tail
+// validates again and the bytes stay fetchable. So Holochain's contribution to
+// the sunset is EVIDENCE, and the fence is ours:
+//
+//   (i)  the storage controller disables the v1 cell (Task 14b), and
+//   (ii) v2's witness validation refuses a carried v1 proof that sits AFTER
+//        that chain's close — the two tests below.
+//
+// (ii) has two deterministic halves, and each gets its own test because they
+// reach the close by different routes and must be able to fail separately:
+//   * INTRA-WITNESS — the close and a post-close fact in ONE batch;
+//   * ACROSS WITNESSES — the close was carried by an EARLIER witness on this
+//     carrier's own v2 chain, which is what `seal_close` commits.
+//
+// A third fact both tests rest on: **absence of a close is not a rule.** Every
+// probe above carries proofs with no close anywhere and is accepted; the
+// pre-close proof carried AFTER the seal in the second test below is the
+// positive control that the rule does not over-refuse.
+// ============================================================================
+
+/// Mirror of `node_registry_coordinator::SealReceipt` (Task 14a).
+///
+/// Every hash is a base64 `String`, not a native `HoloHash` — the same wire
+/// discipline `CarryReceipt::witness_hash` documents, so the storage-side
+/// vehicle (Task 14b) decodes strings and never re-derives a hash.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SealReceipt {
+    close_hash: String,
+    open_hash: String,
+    witness_hash: String,
+    already_sealed: bool,
+}
+
+/// INTRA-WITNESS half: one batch may not carry a close AND a fact authored
+/// after it.
+#[tokio::test(flavor = "multi_thread")]
+async fn station_8_close_and_a_post_close_proof_in_one_witness_is_refused() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash,
+        v2_hash,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // A fact authored BEFORE the close — this one is always carryable.
+    let (_pre_ah, pre) = author_and_read_back(&conductor, &z1, "s8-pre-close", &alice).await;
+
+    // v1 closes toward v2. Called directly (not through `seal_close`) so this
+    // test measures the intra-witness rule alone: nothing is committed on v2's
+    // chain, so the across-witness half cannot fire and mask it.
+    let close_hash: ActionHash = conductor
+        .call_fallible(&z1, "close_chain_for", v2_hash.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("close_chain on v1 was refused: {e:?}"))?;
+    let signed_close: SignedActionHashed = conductor
+        .call::<_, Option<SignedActionHashed>>(&z1, "get_signed_action", close_hash.clone())
+        .await
+        .expect("the CloseChain just authored must be on v1's chain");
+    println!(
+        "[station 8] v1 CloseChain = {close_hash} at action_seq {}",
+        signed_close.action().header.action_seq
+    );
+
+    // And writes on v1 anyway — accepted by the author's own conductor, as
+    // probes B and B2 measured. That acceptance is precisely why v2 needs a
+    // rule of its own.
+    let (_post_ah, post) = author_and_read_back(&conductor, &z1, "s8-post-close", &alice).await;
+    assert!(
+        post.action().header.action_seq > signed_close.action().header.action_seq,
+        "the post-close write must sit after the close on v1's chain"
+    );
+
+    let close_proof = CarriedProof {
+        action: signed_close.action().clone(),
+        signature: signed_close.signature.clone(),
+        entry: None,
+    };
+
+    // POSITIVE control: the close plus a PRE-close fact is fine — the rule
+    // fences what comes after the close, not the whole batch.
+    let ok = NotarizationWitness {
+        lineage_dna_hash: v1_hash.clone(),
+        proofs: vec![
+            close_proof.clone(),
+            CarriedProof {
+                action: pre.action().clone(),
+                signature: pre.signature.clone(),
+                entry: None,
+            },
+        ],
+    };
+    let ok_hash: ActionHash = conductor.call(&z2, "commit_witness", ok).await;
+    println!("[station 8] close + pre-close proof ACCEPTED at {ok_hash}");
+
+    // NEGATIVE: the close plus a POST-close fact, same batch.
+    let refused = NotarizationWitness {
+        lineage_dna_hash: v1_hash.clone(),
+        proofs: vec![
+            close_proof,
+            CarriedProof {
+                action: post.action().clone(),
+                signature: post.signature.clone(),
+                entry: None,
+            },
+        ],
+    };
+    let err = conductor
+        .call_fallible::<_, ActionHash>(&z2, "commit_witness", refused)
+        .await
+        .expect_err("a proof authored after the carried close MUST be refused");
+    let msg = format!("{err:?}");
+    println!("[station 8] NEGATIVE intra-witness refusal:\n{msg}");
+    assert!(
+        msg.contains("after close"),
+        "expected the after-close refusal BY NAME, got: {msg}"
+    );
+
+    Ok(())
+}
+
+/// ACROSS-WITNESSES half, and the seal itself: `seal_close` closes v1, opens v2
+/// from that close and witnesses the close here — in that order — after which
+/// v1 stays readable, a pre-close fact still carries, and a post-close fact is
+/// refused on every later witness by name.
+#[tokio::test(flavor = "multi_thread")]
+async fn station_8_seal_close_then_post_close_carry_is_refused_by_v2() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash,
+        v2_hash,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // Two pre-close facts: one carried before the seal, one held back as the
+    // positive control that the rule does not fence what came before the close.
+    let (_a_ah, pre_a) = author_and_read_back(&conductor, &z1, "s8-seal-pre-a", &alice).await;
+    let (_b_ah, pre_b) = author_and_read_back(&conductor, &z1, "s8-seal-pre-b", &alice).await;
+
+    let carried_before: ActionHash = conductor
+        .call(
+            &z2,
+            "commit_witness",
+            NotarizationWitness {
+                lineage_dna_hash: v1_hash.clone(),
+                proofs: vec![CarriedProof {
+                    action: pre_a.action().clone(),
+                    signature: pre_a.signature.clone(),
+                    entry: None,
+                }],
+            },
+        )
+        .await;
+    println!("[station 8] pre-seal carry ACCEPTED at {carried_before}");
+
+    // --- the seal -----------------------------------------------------------
+    let seal: SealReceipt = conductor
+        .call(&z2, "seal_close", z1.cell_id().clone())
+        .await;
+    println!("[station 8] seal = {seal:?}");
+    assert!(!seal.already_sealed, "the first seal authors the crossing");
+    assert!(!seal.close_hash.is_empty() && !seal.open_hash.is_empty());
+    assert!(
+        !seal.witness_hash.is_empty(),
+        "the seal must carry the close into v2 as a proof — that is what lets \
+         every later witness be validated against it"
+    );
+
+    // close BEFORE open, and the open NAMES the close.
+    let close_hash = ActionHash::try_from(seal.close_hash.as_str())
+        .map_err(|e| anyhow::anyhow!("close_hash is not an ActionHash: {e:?}"))?;
+    let open_hash = ActionHash::try_from(seal.open_hash.as_str())
+        .map_err(|e| anyhow::anyhow!("open_hash is not an ActionHash: {e:?}"))?;
+    let signed_close: SignedActionHashed = conductor
+        .call::<_, Option<SignedActionHashed>>(&z1, "get_signed_action", close_hash.clone())
+        .await
+        .expect("the CloseChain must be on v1's chain");
+    let signed_open: SignedActionHashed = conductor
+        .call::<_, Option<SignedActionHashed>>(&z2, "get_signed_action", open_hash.clone())
+        .await
+        .expect("the OpenChain must be on v2's chain");
+    match &signed_close.action().data {
+        ActionData::CloseChain(d) => assert_eq!(
+            d.new_target,
+            Some(MigrationTarget::Dna(v2_hash.clone())),
+            "v1 must close TOWARD v2"
+        ),
+        other => panic!("close_hash does not name a CloseChain: {other:?}"),
+    }
+    match &signed_open.action().data {
+        ActionData::OpenChain(d) => {
+            assert_eq!(d.close_hash, close_hash, "the open must name the close");
+            assert_eq!(
+                d.prev_target,
+                MigrationTarget::Dna(v1_hash.clone()),
+                "v2 must open FROM v1"
+            );
+        }
+        other => panic!("open_hash does not name an OpenChain: {other:?}"),
+    }
+
+    // --- v1 stays readable forever ------------------------------------------
+    let still_there: Option<SignedActionHashed> = conductor
+        .call(&z1, "get_signed_action", pre_a.as_hash().clone())
+        .await;
+    assert!(
+        still_there.is_some(),
+        "a closed chain must stay READABLE — the sunset closes it, it does not erase it"
+    );
+    let v1_page: ExportPage = conductor
+        .call(&z1, "export_records", ExportInput { cursor: None, limit: 16 })
+        .await;
+    assert_eq!(
+        v1_page.records.len(),
+        2,
+        "both pre-close records must still export from the closed chain"
+    );
+
+    // --- the seal is idempotent ---------------------------------------------
+    let again: SealReceipt = conductor
+        .call(&z2, "seal_close", z1.cell_id().clone())
+        .await;
+    assert!(
+        again.already_sealed,
+        "a second seal must author NOTHING — a CloseChain cannot be taken back"
+    );
+    assert_eq!(again.close_hash, seal.close_hash);
+    assert_eq!(again.open_hash, seal.open_hash);
+
+    // --- POSITIVE control: a pre-close fact still carries after the seal -----
+    let after_seal: ActionHash = conductor
+        .call(
+            &z2,
+            "commit_witness",
+            NotarizationWitness {
+                lineage_dna_hash: v1_hash.clone(),
+                proofs: vec![CarriedProof {
+                    action: pre_b.action().clone(),
+                    signature: pre_b.signature.clone(),
+                    entry: None,
+                }],
+            },
+        )
+        .await;
+    println!("[station 8] post-seal carry of a PRE-close fact ACCEPTED at {after_seal}");
+
+    // --- the harness writes on v1 anyway ------------------------------------
+    let post_close: Result<ActionHash, _> = conductor
+        .call_fallible(
+            &z1,
+            "register_node",
+            node_registration("s8-seal-post", &alice),
+        )
+        .await;
+    assert!(
+        post_close.is_ok(),
+        "MEASURED CHANGE: the author's conductor now refuses a post-close create — \
+         probes B and B2 measured that it does not; re-read Station 8"
+    );
+    let post = conductor
+        .call::<_, Option<SignedActionHashed>>(
+            &z1,
+            "get_signed_action",
+            post_close.unwrap(),
+        )
+        .await
+        .expect("the post-close action is on v1's chain, accepted by its author");
+    assert!(
+        post.action().header.action_seq > signed_close.action().header.action_seq,
+        "the post-close write must sit after the close"
+    );
+    println!(
+        "[station 8] post-close v1 write ACCEPTED BY THE CONDUCTOR at seq {}",
+        post.action().header.action_seq
+    );
+
+    // --- and v2 refuses to carry it, by name --------------------------------
+    let err = conductor
+        .call_fallible::<_, ActionHash>(
+            &z2,
+            "commit_witness",
+            NotarizationWitness {
+                lineage_dna_hash: v1_hash.clone(),
+                proofs: vec![CarriedProof {
+                    action: post.action().clone(),
+                    signature: post.signature.clone(),
+                    entry: None,
+                }],
+            },
+        )
+        .await
+        .expect_err("after the seal, a post-close fact MUST be refused by v2");
+    let msg = format!("{err:?}");
+    println!("[station 8] NEGATIVE across-witness refusal:\n{msg}");
+    assert!(
+        msg.contains("after close"),
+        "expected the after-close refusal BY NAME, got: {msg}"
+    );
+
+    // The same fact refused through the DRIVER, not just by hand: `carry_from`
+    // pages v1's whole chain, so the post-close record is on the page and the
+    // page's witness must be refused for the same reason.
+    let driven = conductor
+        .call_fallible::<_, CarryReceipt>(
+            &z2,
+            "carry_from",
+            CarryInput {
+                v1_cell: z1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    match &driven {
+        Ok(receipt) => panic!(
+            "carry_from must not be able to land a post-close page — got {receipt:?}"
+        ),
+        Err(e) => {
+            let msg = format!("{e:?}");
+            println!("[station 8] NEGATIVE carry_from refusal:\n{msg}");
+            assert!(
+                msg.contains("after close"),
+                "expected the after-close refusal BY NAME through the driver, got: {msg}"
+            );
+        }
+    }
+
+    Ok(())
+}
