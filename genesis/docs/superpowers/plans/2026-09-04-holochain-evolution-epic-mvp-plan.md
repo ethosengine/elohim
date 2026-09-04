@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:e0d365df55623604 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:eead063dc875a298 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
