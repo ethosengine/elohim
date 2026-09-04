@@ -93,8 +93,8 @@ def discover(root: Path) -> list[Path]:
             continue
         if p.parent.name != MANIFEST_DIR_NAME:
             continue  # a `*.habit.md` outside the governance package declares nothing
-        if p.is_file():
-            keep.append(p)
+        if p.is_file() and p not in keep:
+            keep.append(p)  # a conflicted index lists one path per merge stage — one atom, one home
     return sorted(keep)
 
 
