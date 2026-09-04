@@ -1289,25 +1289,83 @@ pub struct ExportInput {
     pub limit: u32,
 }
 
-/// One bounded, cursor-resumable page of this agent's own app-entry records,
-/// plus a chain digest that is the SAME on every page (computed once over the
-/// whole chain, not the page) — Task 7 compares it to the carry receipt.
+/// One bounded, cursor-resumable page of app-entry records, plus a chain digest
+/// that is the SAME on every page (computed once over the whole walk, not the
+/// page) — Task 7 compares it to the carry receipt.
+///
+/// **WHOSE chain, and how completely, depends on which export produced it.**
+/// [`export_records`] walks the calling agent's OWN source chain with a local
+/// `query()`: the walk is complete by construction, so `digest`/`total` describe
+/// the whole chain. [`export_held_records`] walks a NEIGHBOUR's chain as this
+/// peer's own agent-activity store has it — the COURIER'S VIEW, which is a
+/// subset of the neighbour's real chain and may be gapped, because gossip is
+/// asynchronous and this peer holds only what it has validated and integrated.
+/// Every field below is scoped to that walk, never to a truth the courier
+/// cannot see. See [`ExportPage::observed_head`] for the one field that reaches
+/// past the courier's view.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExportPage {
     pub records: Vec<SignedActionHashed>,
     pub entries: Vec<Option<Entry>>,
+    /// Where to resume, or `None` when THIS WALK is exhausted.
+    ///
+    /// On the own-chain path (`export_records`) that is end-of-chain. On the
+    /// held path (`export_held_records`) it is only END-OF-LOCAL-VIEW: the
+    /// courier has no more records it holds, which is not the same claim as
+    /// "the neighbour has no more records". A driver that reads `None` as
+    /// chain-complete on a held page will silently truncate a neighbour whose
+    /// tail has not gossiped here yet — compare `total` against
+    /// `observed_head`, or against the neighbour's own export, before
+    /// concluding completeness.
     pub next_cursor: Option<u32>,
     pub digest: String,
-    /// The WHOLE-chain count of app-entry records this export walks — the same
-    /// on every page, like `digest`. A carry receipt reports it verbatim so
-    /// Station 3's `carried == v1_count` equality is falsifiable; deriving it
-    /// from `carried` would make the check tautological.
+    /// The count of app-entry records THIS WALK covers — the same on every
+    /// page, like `digest`. A carry receipt reports it verbatim so Station 3's
+    /// `carried == v1_count` equality is falsifiable; deriving it from
+    /// `carried` would make the check tautological.
+    ///
+    /// On the own-chain path this is the whole chain. On the held path it is
+    /// the courier's own integrated view of the neighbour's chain — a subset,
+    /// possibly gapped. **A held page is therefore never self-evidencing**:
+    /// `carried == total` on a held receipt says the courier carried everything
+    /// it had, not everything the neighbour had.
     ///
     /// `Option` + `#[serde(default)]` is additive by construction: a caller
     /// holding an older `ExportPage` shape still decodes, and a bundle packed
     /// before this field existed decodes to `None` rather than a fabricated 0.
     #[serde(default)]
     pub total: Option<u32>,
+    /// **Additive.** The highest action SEQUENCE observed for this chain — the
+    /// one field that reaches past the courier's own view, and so the only way
+    /// a held page can be checked for truncation from inside itself.
+    ///
+    /// On the held path this is `AgentActivityStatus::highest_observed`
+    /// (holochain 0.7 exposes it as `Option<HighestObserved>` and computes it
+    /// BEFORE the entry-type filter, from actions the authority has *seen* but
+    /// not necessarily validated or integrated). On the own-chain path it is
+    /// this agent's own chain-head sequence.
+    ///
+    /// It is a SEQUENCE, not a count, and it spans every action including
+    /// genesis, `InitZomesComplete` and links — so `observed_head >= total - 1`
+    /// always, and the two are equal only on a chain that is nothing but app
+    /// entries. The gap is normally LARGE and means nothing on its own:
+    /// MEASURED on this DNA, five `register_node` calls give `total: 5` against
+    /// `observed_head: 33`, because each call commits six actions (one Create
+    /// plus five CreateLinks) above three genesis actions and an
+    /// `InitZomesComplete`.
+    ///
+    /// So a driver must not read the distance as staleness. What this field IS
+    /// good for is comparison ACROSS peers: two views of the same chain that
+    /// report different `observed_head`s disagree about how far that chain has
+    /// got, and the lower one is a courier that has not caught up. Compare
+    /// against the neighbour's own export, or across successive sweeps — never
+    /// against `total`.
+    ///
+    /// `Option` + `#[serde(default)]`: `None` from a bundle packed before this
+    /// field existed, and `None` when the authority reported no observation at
+    /// all — never a fabricated 0, which would read as "chain head at genesis".
+    #[serde(default)]
+    pub observed_head: Option<u32>,
 }
 
 const EXPORT_CAP: u32 = 64;
@@ -1346,6 +1404,10 @@ where
 pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
     let limit = input.limit.clamp(1, EXPORT_CAP) as usize;
     let all = query(ChainQueryFilter::new().include_entries(true))?;
+    // Read the chain head BEFORE the app-entry filter: `observed_head` is a
+    // sequence over every action, so that the held path (which reads it from
+    // the authority's pre-filter `highest_observed`) means the same thing.
+    let observed_head = all.iter().map(|r| r.action().action_seq()).max();
     let mut app: Vec<Record> = all
         .into_iter()
         .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
@@ -1370,6 +1432,7 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         next_cursor,
         digest,
         total,
+        observed_head,
     })
 }
 
@@ -1428,10 +1491,19 @@ fn app_entry_types_in_scope() -> ExternResult<Vec<EntryType>> {
 ///
 /// Bounded by construction: `get_agent_activity` returns hashes only (cheap,
 /// one round trip), and at most `limit.clamp(1, EXPORT_CAP)` records are then
-/// fetched. `digest` and `total` cover the agent's WHOLE filtered valid
-/// activity and are page-independent, exactly as in `export_records` — and are
-/// computed with the same [`chain_digest`], so a `v1_digest` comparison is
-/// like-for-like whichever export produced it.
+/// fetched. `digest` and `total` cover the whole filtered valid activity and
+/// are page-independent, exactly as in `export_records` — and are computed with
+/// the same [`chain_digest`], so a `v1_digest` comparison is like-for-like
+/// whichever export produced it.
+///
+/// **What "whole" means here is the COURIER'S VIEW, not the neighbour's chain.**
+/// This reads THIS peer's own agent-activity store, so `total`, `digest` and
+/// `next_cursor` all describe a subset of `agent`'s real chain — possibly a
+/// gapped one, since gossip is asynchronous. A page from this extern is
+/// therefore never self-evidencing: `next_cursor: None` means end-of-local-view,
+/// and a receipt's `carried == total` says the courier carried everything it
+/// had. [`ExportPage::observed_head`] is the one field that reaches past that
+/// view and lets a driver notice it is behind.
 ///
 /// A record the authority named but that cannot be fetched is a LOUD Guest
 /// error naming the action hash. Silently skipping it would produce a page that
@@ -1475,6 +1547,14 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         GetOptions::local(),
     )?;
 
+    // MEASURED (holochain 0.7.0): `highest_observed` is computed by
+    // `build_agent_activity_response` from the classified lists BEFORE
+    // `filter.filter_actions` runs, so it spans the whole chain the authority
+    // has seen — genesis, links and all — not just the app entries this walk
+    // returns. That is what makes it a truncation check the page cannot fake:
+    // it reaches past the filtered view the rest of this response describes.
+    let observed_head = activity.highest_observed.map(|h| h.action_seq);
+
     // `valid_activity` arrives ascending by sequence (the authority sorts before
     // filtering), which is the order `export_records` establishes with its
     // explicit `sort_by_key(action_seq)`.
@@ -1516,6 +1596,7 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         next_cursor,
         digest,
         total,
+        observed_head,
     })
 }
 
@@ -1532,6 +1613,13 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
 /// the registration's author — and taking it from there keeps this extern a
 /// single `get_links` instead of one network `get` per registration, which is
 /// what makes it usable as the first step of a sweep.
+///
+/// **THE CALLER'S OWN KEY IS INCLUDED** when this cell has registered a node,
+/// and deliberately so: this extern reports who is on the DHT, not who is
+/// foreign. A sweep must therefore filter itself out, or route its own key
+/// through [`CarrySource::Own`] — passing it to `CarrySource::Held` is refused
+/// by `carry_from`, which is the honest signal rather than a silent
+/// mis-labelled self-carry.
 ///
 /// Coordinator-only, so DNA-hash-NEUTRAL.
 #[hdk_extern]
@@ -1736,17 +1824,35 @@ pub struct CarryInput {
 }
 
 /// What one page of carriage produced.
+///
+/// **Scope follows [`CarryInput::source`].** On [`CarrySource::Own`] every field
+/// below describes the predecessor's whole chain, because `export_records`
+/// walked it locally and completely. On [`CarrySource::Held`] they describe the
+/// COURIER'S VIEW of the neighbour's chain — what the predecessor cell had
+/// validated and integrated at the moment it answered, which is a subset and may
+/// be gapped. A held receipt is therefore **never self-evidencing**: no
+/// combination of its own fields proves the neighbour's chain was carried whole.
+/// [`CarryReceipt::v1_observed_head`] is the one number that reaches past that
+/// view.
 #[cfg(feature = "lineage-witness")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CarryReceipt {
     /// How many predecessor records this page carried (== the witness's proof
     /// count).
     pub carried: u32,
-    /// Resume token for the next page, or `None` when the predecessor's export
-    /// is exhausted. The caller drives the loop.
+    /// Resume token for the next page, or `None` when the export THIS PAGE
+    /// DREW FROM is exhausted. The caller drives the loop.
+    ///
+    /// On the `Own` path that is end-of-chain. On the `Held` path it is only
+    /// END-OF-LOCAL-VIEW — the predecessor cell has no further records of the
+    /// neighbour that it holds, which is not a claim about the neighbour's
+    /// chain. A driver must not read `None` on a held page as "carried whole".
     pub next_cursor: Option<u32>,
-    /// The predecessor's whole-chain digest, reported verbatim — the same on
-    /// every page, so a driver can check that it carried from ONE chain.
+    /// The digest of the chain walk this page drew from, reported verbatim —
+    /// the same on every page, so a driver can check that it carried from ONE
+    /// chain. On the `Held` path it digests the courier's view, so two peers
+    /// carrying the same neighbour at different catch-up points legitimately
+    /// report different digests; that is a staleness signal, not a fork.
     pub v1_digest: String,
     /// The witness committed for this page, rendered as canonical base64
     /// (`HoloHash`'s `Display`), or the EMPTY STRING for a page that authored
@@ -1760,10 +1866,16 @@ pub struct CarryReceipt {
     /// class that has bitten this codebase repeatedly. The zome renders; the
     /// storage side never re-derives a hash.
     pub witness_hash: String,
-    /// The predecessor's whole-chain app-record count, READ from its
+    /// The app-record count of the walk this page drew from, READ from its
     /// [`ExportPage::total`] — never derived from `carried`, so the driver's
     /// `sum(carried) == v1_total` check can actually fail. `None` when the
     /// predecessor bundle predates that field.
+    ///
+    /// On the `Own` path this is the predecessor's whole chain. On the `Held`
+    /// path it is the courier's own integrated view of the neighbour's chain —
+    /// so `sum(carried) == v1_total` there says everything the courier HAD of
+    /// the neighbour was carried, never everything the neighbour had. Station
+    /// 5/6 assertions on a held sweep must be worded that way.
     pub v1_total: Option<u32>,
     /// **Additive.** How many of `carried` were re-created NATIVELY on this
     /// chain (self-carry, §2.1) — held-carries are excluded. `carried` alone
@@ -1776,6 +1888,29 @@ pub struct CarryReceipt {
     /// reads as 0 rather than failing.
     #[serde(default)]
     pub self_carried: u32,
+    /// **Additive.** The highest action SEQUENCE the predecessor observed for
+    /// the chain it exported, READ from [`ExportPage::observed_head`] — the one
+    /// number in this receipt that reaches past the courier's own view, and so
+    /// the only way a held receipt can be checked for truncation at all.
+    ///
+    /// It is a sequence spanning every action (genesis, `InitZomesComplete`,
+    /// links and app entries alike), so `v1_observed_head >= v1_total - 1`
+    /// always and the gap is normally large — see [`ExportPage::observed_head`]
+    /// for the measured 33-against-5. **Do not read the distance from
+    /// `v1_total` as staleness.** The usable comparison is across VIEWS: a held
+    /// sweep whose `v1_observed_head` sits below what another peer reports for
+    /// the same chain is a courier that has not caught up, and should be
+    /// re-swept rather than recorded as a complete crossing.
+    ///
+    /// `#[serde(default)]` and `None` from a page that predates the field, or
+    /// from an authority that reported no observation — never a fabricated 0,
+    /// which would read as "chain head at genesis".
+    ///
+    /// A multi-page sweep keeps the LAST NON-`None` value: an intermediate page
+    /// answered by a momentarily blind authority must not erase what an earlier
+    /// page established.
+    #[serde(default)]
+    pub v1_observed_head: Option<u32>,
 }
 
 /// Pull ONE bounded page from a predecessor cell and witness it here.
@@ -1990,5 +2125,6 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         witness_hash,
         v1_total: page.total,
         self_carried,
+        v1_observed_head: page.observed_head,
     })
 }

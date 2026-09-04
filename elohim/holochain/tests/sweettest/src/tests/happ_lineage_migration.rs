@@ -95,12 +95,20 @@ struct ExportPage {
     entries: Vec<Option<Entry>>,
     next_cursor: Option<u32>,
     digest: String,
-    /// Task 9 (additive): the WHOLE-chain app-record count the export walks.
+    /// Task 9 (additive): the app-record count the export walks — the WHOLE
+    /// chain on the own-chain path, and only the COURIER'S OWN INTEGRATED VIEW
+    /// of a neighbour's chain on the held path.
     /// `#[serde(default)]` because a v1 bundle packed before Task 9 does not
     /// emit the field — the carry receipt then reports `v1_total: None` rather
     /// than a fabricated number.
     #[serde(default)]
     total: Option<u32>,
+    /// Task 18 fix round 1 (additive): the highest action SEQUENCE observed for
+    /// that chain — the one field that reaches past the courier's view, so a
+    /// held page can be checked for truncation from inside itself. A sequence,
+    /// not a count, so `observed_head >= total - 1` always.
+    #[serde(default)]
+    observed_head: Option<u32>,
 }
 
 /// Mirror of `node_registry_coordinator::ExportHeldInput` (Task 18, v1 held view).
@@ -159,12 +167,19 @@ struct CarryReceipt {
     /// authored no witness.
     witness_hash: String,
     /// Station 3's equality `carried == v1_count` is only falsifiable if this
-    /// is READ from v1's export page, never derived from `carried`.
+    /// is READ from v1's export page, never derived from `carried`. On the held
+    /// path it counts the COURIER'S VIEW of the neighbour's chain, so the
+    /// equality means "everything the courier had", never "everything the
+    /// neighbour had".
     v1_total: Option<u32>,
     /// Additive: how many of `carried` were re-created NATIVELY here
     /// (held-carries excluded).
     #[serde(default)]
     self_carried: u32,
+    /// Task 18 fix round 1 (additive): the predecessor's `observed_head`,
+    /// carried through so a held receipt is checkable for truncation.
+    #[serde(default)]
+    v1_observed_head: Option<u32>,
 }
 
 /// The properties both node_registry versions read.
@@ -1061,8 +1076,9 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
     println!(
-        "[export/held] total={:?} digest={} records={}",
+        "[export/held] total={:?} observed_head={:?} digest={} records={}",
         held.total,
+        held.observed_head,
         held.digest,
         held.records.len()
     );
@@ -1082,6 +1098,39 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
         held.entries.len(),
         held.records.len(),
         "records and entries are paired POSITIONALLY"
+    );
+
+    // `observed_head` is a chain SEQUENCE (genesis and links included), `total`
+    // a count of app entries, so the invariant is an inequality — and it is what
+    // lets a driver notice a courier that has not caught up.
+    let observed_head = held
+        .observed_head
+        .expect("the authority observed this chain, so it must report a head");
+    assert!(
+        observed_head >= held.total.unwrap() - 1,
+        "observed_head is a sequence spanning EVERY action, so it can never sit \
+         below the app-entry count minus one — got head {observed_head}, total {:?}",
+        held.total
+    );
+    // MEASURED (holochain 0.7.0, 2026-09-04) and asserted so a toolchain or a
+    // `register_node` change is LOUD rather than silent. The head is 33, not 5:
+    //   seq 0..2   3 genesis actions (Dna, AgentValidationPkg, agent-key Create)
+    //   seq 3      InitZomesComplete
+    //   seq 4..33  5 × register_node, each SIX actions — one NodeRegistration
+    //              Create plus five CreateLinks (region, status, tier, node_id,
+    //              custodian; the fixture opts in to custodianship)
+    // This is precisely why observed_head is not comparable to `total`: 33 vs 5
+    // on a chain with no gap at all. Only the inequality above is an invariant.
+    assert_eq!(
+        observed_head, 33,
+        "MEASURED (holochain 0.7.0): 3 genesis + InitZomesComplete + 5×6 register_node \
+         actions — the head is a chain SEQUENCE spanning links and bookkeeping, not an \
+         app-entry count"
+    );
+    assert_eq!(
+        p1.observed_head,
+        Some(observed_head),
+        "the own-chain export reports the SAME head as the held view of the same chain"
     );
 
     // and the sweep's agent enumeration sees the author of those registrations
@@ -1209,8 +1258,9 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
     println!(
-        "[task18] alice's held view of bob: total={:?} digest={} records={}",
+        "[task18] alice's held view of bob: total={:?} observed_head={:?} digest={} records={}",
         held.total,
+        held.observed_head,
         held.digest,
         held.records.len()
     );
@@ -1222,7 +1272,22 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
     );
     assert_eq!(
         held.digest, bob_page.digest,
-        "LIKE-FOR-LIKE across peers: alice's held digest of bob's chain must equal bob's own"
+        "LIKE-FOR-LIKE across peers: alice's held digest of bob's chain must equal bob's own \
+         — the two views have converged at this point, which is what await_consistency bought"
+    );
+    // Length first: `records[0]` below is only meaningful once the page is known
+    // to hold exactly the one record, and a bare index would panic opaquely on
+    // an empty page rather than naming what went wrong.
+    assert_eq!(
+        held.records.len(),
+        1,
+        "the held page must hold exactly bob's one record, got {}",
+        held.records.len()
+    );
+    assert_eq!(
+        held.entries.len(),
+        held.records.len(),
+        "records and entries are paired POSITIONALLY"
     );
     assert_eq!(
         held.records[0].action_address(),
@@ -1233,6 +1298,31 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
         held.entries[0].is_some(),
         "a held page ships the entry BYTES — v2's validator checks them against the \
          carried action's entry hash"
+    );
+    // The truncation check a held page CAN make about itself. MEASURED: bob's
+    // chain head is 9 — 3 genesis actions, InitZomesComplete, then his one
+    // register_node as SIX actions (the Create plus five CreateLinks). Against a
+    // `total` of 1 that is a distance of 8 which is ALL bookkeeping, not a chain
+    // alice is behind on: the distance alone proves nothing, which is why the
+    // real completeness check is the agreement with bob's own head below.
+    let held_head = held
+        .observed_head
+        .expect("alice's authority observed bob's chain, so it must report a head");
+    assert!(
+        held_head >= held.total.unwrap() - 1,
+        "observed_head is a sequence over EVERY action and can never sit below the \
+         app-entry count minus one — got head {held_head}, total {:?}",
+        held.total
+    );
+    assert_eq!(
+        held_head, 9,
+        "MEASURED (holochain 0.7.0): 3 genesis + InitZomesComplete + 6 register_node \
+         actions on bob's chain"
+    );
+    assert_eq!(
+        held.observed_head, bob_page.observed_head,
+        "alice's view of bob's chain HEAD must agree with bob's own — if it did not, \
+         alice would be carrying a chain she has not caught up with"
     );
 
     // --- 3. and knows WHOM to ask ------------------------------------------
@@ -1269,8 +1359,10 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
 
     assert_eq!(
         receipt.carried,
-        bob_page.total.expect("bob reported a total"),
-        "everything bob had was carried"
+        held.total.expect("alice's held view reported a total"),
+        "everything ALICE HAD OF BOB was carried — a held receipt describes the courier's \
+         own integrated view, never a claim about bob's whole chain. (Here the two happen \
+         to agree, because await_consistency ran first.)"
     );
     assert_eq!(receipt.carried, 1);
     assert_eq!(
@@ -1278,11 +1370,21 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
         "bob's record is NOT alice's to re-create — a held-carry is never a self-carry"
     );
     assert_eq!(
-        receipt.v1_digest, bob_page.digest,
-        "the receipt reports the digest of the chain it actually carried — BOB's"
+        receipt.v1_digest, held.digest,
+        "the receipt reports the digest of the walk it actually carried — alice's view \
+         of bob's chain"
     );
     assert_eq!(receipt.v1_total, Some(1));
-    assert_eq!(receipt.next_cursor, None, "a partial page offers no further cursor");
+    assert_eq!(
+        receipt.v1_observed_head, held.observed_head,
+        "observed_head threads through the receipt, so a driver can tell a complete \
+         held sweep from a courier that is behind"
+    );
+    assert_eq!(
+        receipt.next_cursor, None,
+        "a partial page offers no further cursor — on the held path that means \
+         end-of-LOCAL-VIEW, not end-of-bob's-chain"
+    );
     assert!(!receipt.witness_hash.is_empty(), "a non-empty page commits exactly one witness");
 
     // --- 5. ONE witness, at bob's entry hash, carrying the BYTES ------------
