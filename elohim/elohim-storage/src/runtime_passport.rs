@@ -723,7 +723,9 @@ mod tests {
             panic!("a role with no error is installed reality, not an outage");
         };
         assert_eq!(
-            installed.roles["node_registry"].constitution_root.as_deref(),
+            installed.roles["node_registry"]
+                .constitution_root
+                .as_deref(),
             Some("bafyLineageConstitutionRoot")
         );
     }

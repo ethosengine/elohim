@@ -260,10 +260,24 @@ async fn roster_members(
     hc: Option<&Arc<HcClient>>,
     roster_cid: &str,
 ) -> Result<Option<Vec<String>>, ()> {
-    // A body naming no roster names no members. Not an outage — the commitment
-    // really says nothing — so it is an ANSWER of absence, and `verify_path`
-    // refuses `quorum_unmet` rather than passing an uncheckable quorum.
-    if roster_cid.is_empty() {
+    // A body naming no roster, or naming one that is not even an ADDRESS,
+    // names no members. Neither is an outage — the commitment really does say
+    // nothing this peer can go and look at — so both are an ANSWER of absence,
+    // and `verify_path` refuses `quorum_unmet` rather than passing an
+    // uncheckable quorum.
+    //
+    // The shape check is not decoration. `mishpat::get_commitment` does
+    // `EntryHash::try_from(cid)` and returns a GUEST ERROR for anything that
+    // is not a base64 entry hash, which arrives here as `Err` and would be
+    // read as `conductor_unavailable` — our outage — when what actually
+    // happened is that the notarized body named a roster that cannot exist.
+    // Checking the shape locally keeps that a statement about the COMMITMENT,
+    // and costs no round trip.
+    if roster_cid.is_empty() || !is_addressable_cid(roster_cid) {
+        tracing::debug!(
+            roster_cid = %roster_cid,
+            "release-adoption: path names no addressable roster — an absent roster, never an outage"
+        );
         return Ok(None);
     }
     // Unreachable by construction: `fetch_path_evidence` already returned on a
@@ -362,6 +376,14 @@ fn string_field(payload: &serde_json::Value, snake: &str) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or_default()
         .to_string()
+}
+
+/// Whether a string is an entry hash this conductor could actually be asked
+/// about — the same `EntryHash::try_from` the mishpat coordinator applies,
+/// run locally so a malformed cid never has to be told apart from an outage
+/// after the fact.
+fn is_addressable_cid(cid: &str) -> bool {
+    holochain_types::prelude::EntryHash::try_from(cid.to_string()).is_ok()
 }
 
 /// A string ARRAY field from a commitment body, accepting either spelling —
@@ -693,21 +715,42 @@ mod tests {
         );
     }
 
-    /// A body naming no roster at all reads as `roster_members: None` WITHOUT
-    /// a conductor round-trip — asserted by passing no bridge, which would
-    /// answer `Err` (→ `Unreachable`) if the empty cid were dialled. The
-    /// refusal that `None` produces is `verify_path`'s.
+    /// A body naming no ADDRESSABLE roster reads as `roster_members: None`
+    /// WITHOUT a conductor round-trip — asserted by passing no bridge, which
+    /// would answer `Err` (→ `Unreachable`) if the cid were dialled. The
+    /// refusal that `None` produces is `verify_path`'s `quorum_unmet`.
+    ///
+    /// The second case is the one that matters in practice: `roster_cid` is a
+    /// free string in the notarized body, and
+    /// `mishpat::get_commitment`'s `EntryHash::try_from` turns anything that
+    /// is not a base64 entry hash into a guest ERROR. Read naively that would
+    /// arrive as `conductor_unavailable` — OUR outage — when the honest
+    /// finding is that the commitment named a roster that cannot exist. The
+    /// live a2o Station 10 fixture names exactly such a roster
+    /// (`a2o-fixture-bootstrap-steward-roster`), so this is the difference
+    /// between the story measuring `quorum_unmet` and it measuring a
+    /// substrate failure.
     #[tokio::test]
-    async fn a_body_naming_no_roster_is_an_absent_roster_not_an_outage() {
+    async fn a_body_naming_no_addressable_roster_is_an_absent_roster_not_an_outage() {
         assert_eq!(
             roster_members(None, "").await,
             Ok(None),
             "no roster named is an ANSWER of absence, and never a dial"
         );
-        // …whereas a roster that IS named with no bridge to ask through is an
-        // outage, and must never read as an empty/absent roster (C4).
         assert_eq!(
-            roster_members(None, "bafyProgenitorRoster").await,
+            roster_members(None, "a2o-fixture-bootstrap-steward-roster").await,
+            Ok(None),
+            "a roster cid that is not an ADDRESS is a fact about the commitment, never an outage"
+        );
+        assert!(!is_addressable_cid("a2o-fixture-bootstrap-steward-roster"));
+        assert!(!is_addressable_cid("bafyProgenitorRoster"));
+
+        // …whereas a roster named by a REAL entry hash, with no bridge to ask
+        // through, is an outage — and must never read as an absent roster (C4).
+        let real = holochain_types::prelude::EntryHash::from_raw_32(vec![0x5A; 32]).to_string();
+        assert!(is_addressable_cid(&real));
+        assert_eq!(
+            roster_members(None, &real).await,
             Err(()),
             "a roster we could not ASK about is unreachable, never absence"
         );
