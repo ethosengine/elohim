@@ -9469,6 +9469,13 @@ impl HttpServer {
             reason = ?verdict.reason_value(),
             "app head judged"
         );
+        let reason_class = verdict
+            .reason_value()
+            .map(|r| r.split(':').next().unwrap_or("none").to_string())
+            .unwrap_or_else(|| "none".to_string());
+        crate::metrics::APP_DELIVERABILITY_VERDICTS
+            .with_label_values(&[verdict.header_value(), &reason_class])
+            .inc();
         self.deliverability_memo
             .write()
             .await

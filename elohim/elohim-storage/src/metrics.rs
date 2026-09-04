@@ -222,6 +222,18 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The peer's deliverability verdict per judged app head (spec 2026-09-05
+    /// §5.3). label reason is the reason CLASS ("missing-asset", "invalid-zip",
+    /// "no-index", "none") — never the asset name, which is unbounded.
+    pub static ref APP_DELIVERABILITY_VERDICTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_app_deliverability_verdict_total",
+            "App heads judged by this peer, by verdict and reason class.",
+        ),
+        &["verdict", "reason"],
+    )
+    .unwrap();
+
     /// Active bindings that were SELF-ASSERTED at the moment an economic
     /// attribution join asked for them (habit `identity-cross-signed`).
     ///
@@ -2242,6 +2254,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
+        let _ = REGISTRY.register(Box::new(APP_DELIVERABILITY_VERDICTS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_UNVERIFIED_BINDINGS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_JOINS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_BINDINGS_EXAMINED.clone()));
@@ -5822,5 +5835,24 @@ mod tests {
             before_count + 1,
             "a successful request must be observed under 2xx"
         );
+    }
+
+    #[test]
+    fn app_deliverability_verdict_counter_is_registered_and_labelled() {
+        register_all();
+        APP_DELIVERABILITY_VERDICTS
+            .with_label_values(&["broken", "missing-asset"])
+            .inc();
+        let families = REGISTRY.gather();
+        let f = families
+            .iter()
+            .find(|f| f.get_name() == "elohim_app_deliverability_verdict_total")
+            .expect("counter registered");
+        let m = f.get_metric().iter().find(|m| {
+            m.get_label()
+                .iter()
+                .any(|l| l.get_name() == "verdict" && l.get_value() == "broken")
+        });
+        assert!(m.is_some(), "verdict label present");
     }
 }
