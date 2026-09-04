@@ -18,11 +18,14 @@
       <p class="subtitle">Set up your profile and credentials</p>
     </div>
 
-    <!-- Connection Status -->
+    <!-- Connection Status — informational only. Creating an account goes over
+         doorway HTTP and does not wait for the peer network. -->
     @if (!isConnected()) {
-      <div class="status-banner warning">
-        <span class="status-icon">&#x26A0;</span>
-        <span>Connecting to network...</span>
+      <div class="status-banner info" data-testid="register-network-banner">
+        <span class="status-icon">&#x2139;</span>
+        <span>
+          Connecting to the peer network in the background. You can create your account now.
+        </span>
       </div>
     }
 
@@ -222,7 +225,6 @@
           class="btn btn-primary"
           [disabled]="
             isRegistering() ||
-            !isConnected() ||
             !form.displayName.trim() ||
             !form.email.trim() ||
             !form.password ||

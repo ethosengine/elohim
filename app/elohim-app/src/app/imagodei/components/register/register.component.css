@@ -105,6 +105,14 @@
   border: 1px solid var(--yellow-200, #fde68a);
 }
 
+/* Informational: the peer network is still connecting, but nothing on this
+   page is blocked by it — registration goes over doorway HTTP. */
+.status-banner.info {
+  background: var(--primary-50, #eff6ff);
+  color: var(--primary-700, #1d4ed8);
+  border: 1px solid var(--primary-200, #bfdbfe);
+}
+
 .status-icon {
   font-size: 1.1rem;
 }

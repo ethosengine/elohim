@@ -321,10 +321,13 @@ export class RegisterComponent implements OnInit {
    * Returns error message if validation fails, null if valid.
    */
   private validateRegistrationForm(): string | null {
-    if (!this.isConnected()) {
-      return 'Not connected to network. Please wait for connection.';
-    }
-
+    // NOT gated on holochainClient.isConnected(). Hosted registration goes over
+    // doorway HTTP (PasswordAuthProvider.register -> POST /auth/register) and
+    // needs no Holochain WebSocket at all; gating it here meant an anonymous
+    // visitor whose browser cannot open a conductor socket could never register.
+    // Only the session-MIGRATION path needs the connection, and
+    // SessionMigrationService.canMigrate already requires it — which is why
+    // onRegister falls through to standard registration when it is false.
     if (!this.form.displayName.trim()) {
       return 'Please enter a display name.';
     }
