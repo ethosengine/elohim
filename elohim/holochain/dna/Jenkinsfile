@@ -648,6 +648,28 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     echo "node_registry=${_h_node_registry}" >> "$DNA_HASH_FILE"
                                     echo "   ✅ node-registry.dna"
 
+                                    # --- node-registry v2 (lineage-witness feature variant) ---
+                                    # Holochain Evolution Epic §2/§8 successor artifact. The
+                                    # `lineage-witness` cargo feature adds the NotarizationWitness
+                                    # entry type, so this pack has a DIFFERENT DNA hash BY DESIGN.
+                                    # Its hash is PRINTED but deliberately NOT appended to
+                                    # $DNA_HASH_FILE: the DNA Hash Guard baseline covers the
+                                    # DEFAULT build only (see the 2026-09-02 incident comment on
+                                    # that stage). NOTE: this whole body runs inside bash -c
+                                    # SINGLE quotes, so no apostrophes anywhere in it.
+                                    # ORDER MATTERS — this must come AFTER the default pack above,
+                                    # because it overwrites the shared target/ wasm with
+                                    # feature-built bytes. Nothing downstream re-packs
+                                    # node-registry.dna from wasm (the happ pack and the sweettest
+                                    # stash both consume the already-written .dna file).
+                                    echo ""
+                                    echo "=== Building node-registry v2 (lineage-witness variant) ==="
+                                    cargo build --release --target wasm32-unknown-unknown --features lineage-witness
+                                    hc dna pack . -o node-registry-v2.dna
+                                    _h_node_registry_v2=$(hc dna hash node-registry-v2.dna)
+                                    echo "DNA-HASH node_registry_v2 ${_h_node_registry_v2}"
+                                    echo "   ✅ node-registry-v2.dna (feature variant — NOT in the hash baseline)"
+
                                     echo ""
                                     echo "=== Building mishpat DNA (governance) ==="
                                     cd ../mishpat
@@ -676,6 +698,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna,dna-hashes.actual', allowEmptyArchive: false
                             stash name: 'happ-bundle', includes: 'elohim.happ'
+
+                            // Holochain Evolution Epic §8: the successor artifact is packed in
+                            // the node-registry directory, outside this dir() scope, so it needs
+                            // its own archive step. It is deliberately NOT stashed for the
+                            // sweettest stage: the lineage probes need a v1 bundle too, and
+                            // shipping v2 alone would turn their clean SKIP into a red.
+                            dir("${env.WORKSPACE}/elohim/holochain/dna/node-registry") {
+                                archiveArtifacts artifacts: 'node-registry-v2.dna', allowEmptyArchive: true
+                            }
 
                             def props = loadBuildVars()
 

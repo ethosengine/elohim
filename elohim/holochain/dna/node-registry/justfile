@@ -61,3 +61,11 @@ pack: build
 build-witness:
     cargo build --release --target {{wasm_target}} --features lineage-witness
     hc dna pack . -o node-registry-v2.dna
+
+# Pack the one-role successor hApp bundle around node-registry-v2.dna
+# (Holochain Evolution Epic Task 9). The role's `lineage` property here is an
+# EMPTY placeholder: the real predecessor DNA hash is only knowable at install
+# time, so the vehicle overrides `modifiers.properties` then. Depends on
+# `build-witness` having produced ../node-registry-v2.dna.
+build-witness-happ: build-witness
+    hc app pack workdir-v2 -o node-registry-v2.happ

@@ -92,6 +92,36 @@ struct ExportPage {
     entries: Vec<Option<Entry>>,
     next_cursor: Option<u32>,
     digest: String,
+    /// Task 9 (additive): the WHOLE-chain app-record count the export walks.
+    /// `#[serde(default)]` because a v1 bundle packed before Task 9 does not
+    /// emit the field — the carry receipt then reports `v1_total: None` rather
+    /// than a fabricated number.
+    #[serde(default)]
+    total: Option<u32>,
+}
+
+/// Mirror of `node_registry_coordinator::CarryInput` (Task 9, v2 cross-cell carry).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct CarryInput {
+    v1_cell: CellId,
+    cursor: Option<u32>,
+    limit: u32,
+}
+
+/// Mirror of `node_registry_coordinator::CarryReceipt`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct CarryReceipt {
+    carried: u32,
+    next_cursor: Option<u32>,
+    v1_digest: String,
+    /// Base64, NOT a native `ActionHash` — the landed consumer
+    /// (`elohim-storage/.../release_adoption/apply.rs`) decodes a `String`, and
+    /// a `HoloHash` on the wire is a msgpack byte array. Empty for a page that
+    /// authored no witness.
+    witness_hash: String,
+    /// Station 3's equality `carried == v1_count` is only falsifiable if this
+    /// is READ from v1's export page, never derived from `carried`.
+    v1_total: Option<u32>,
 }
 
 /// The properties both node_registry versions read.
@@ -358,6 +388,140 @@ async fn probe_a_v1_notarization_carried_into_v2() -> Result<()> {
     assert!(
         msg.contains("is not declared in this DNA's lineage property"),
         "expected the lineage refusal, got: {msg}"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// PROBE A (carry drive) — Task 9: `carry_from` pulls ONE bounded page from the
+// v1 cell across the cell boundary and does, in the zome, exactly what probe A
+// above does by hand: re-create the agent's own record natively (same
+// EntryHash) and commit ONE witness for the page.
+//
+// It is a SEPARATE test rather than more steps appended to probe A because
+// probe A's `get_witnesses_for` assertion counts witnesses for the carried
+// entry hash; driving `carry_from` inside probe A would commit a SECOND
+// witness for the same entry hash and turn that measured "exactly one" into a
+// weaker "two, one of which". Both tests share `install_crossing()`, so the
+// crossing under measurement is identical.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn probe_a_carry_from_pulls_one_bounded_page_across_cells() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash: _,
+        v2_hash: _,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // --- 1. one real v1 record — the fact to carry --------------------------
+    let (_ah1, sah1) = author_and_read_back(&conductor, &z1, "carry-probe", &alice).await;
+    let eh1 = sah1
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+    println!("[probe A/carry] v1 action = {}", sah1.action_address());
+    println!("[probe A/carry] v1 entry  = {eh1}");
+
+    // --- 2. v1's own view of its export, for the receipt comparison ---------
+    let v1_page: ExportPage = conductor
+        .call(&z1, "export_records", ExportInput { cursor: None, limit: 16 })
+        .await;
+    assert_eq!(
+        v1_page.records.len(),
+        1,
+        "one register_node call commits exactly one app-entry record"
+    );
+    assert_eq!(
+        v1_page.total,
+        Some(1),
+        "ExportPage.total is the WHOLE-chain app-record count, not the page length"
+    );
+
+    // --- 3. the carry, driven across the cell boundary ----------------------
+    let receipt: CarryReceipt = conductor
+        .call(
+            &z2,
+            "carry_from",
+            CarryInput {
+                v1_cell: z1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!("[probe A/carry] receipt = {receipt:?}");
+
+    assert_eq!(receipt.carried, 1, "the page held exactly one record to carry");
+    assert_eq!(
+        receipt.next_cursor, None,
+        "a partial page must not offer a further cursor"
+    );
+    assert_eq!(
+        receipt.v1_digest, v1_page.digest,
+        "the receipt must report v1's OWN chain digest, unmodified"
+    );
+    assert_eq!(
+        receipt.v1_total,
+        Some(1),
+        "v1_total is read from v1's export page — Station 3's `carried == v1_count` \
+         is only falsifiable when it is not derived from `carried`"
+    );
+    assert_eq!(
+        receipt.carried,
+        receipt.v1_total.expect("v1 reported a total"),
+        "Station 3: everything v1 had was carried"
+    );
+    assert!(
+        !receipt.witness_hash.is_empty(),
+        "a non-empty page commits exactly one witness"
+    );
+
+    // --- 4. ONE witness per page, reachable through the witness index -------
+    let links: Vec<Link> = conductor.call(&z2, "get_witnesses_for", eh1.clone()).await;
+    assert_eq!(
+        links.len(),
+        1,
+        "carry_from commits exactly ONE witness per page, got {} links",
+        links.len()
+    );
+    let linked = links[0]
+        .target
+        .clone()
+        .into_action_hash()
+        .expect("the witness link targets an action hash");
+    assert_eq!(
+        linked.to_string(),
+        receipt.witness_hash,
+        "the witness link must target the witness the receipt names — and the receipt must \
+         render it as the canonical base64 the storage-side consumer decodes"
+    );
+
+    // --- 5. the self-carried record was re-created NATIVELY on v2 -----------
+    // Same EntryHash, new ActionHash: v2 holds the content as its own commit,
+    // not merely as bytes inside a witness.
+    let v2_page: ExportPage = conductor
+        .call(&z2, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    let recreated = v2_page
+        .records
+        .iter()
+        .find(|r| r.action().entry_hash() == Some(&eh1))
+        .expect("carry_from must re-create the agent's own entry natively on v2");
+    println!(
+        "[probe A/carry] v2 re-created action = {}",
+        recreated.action_address()
+    );
+    assert_ne!(
+        recreated.action_address(),
+        sah1.action_address(),
+        "the v2 re-creation is a NEW action — only the entry hash is shared"
     );
 
     Ok(())

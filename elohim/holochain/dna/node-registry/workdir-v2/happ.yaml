@@ -1,0 +1,33 @@
+# node_registry v2 — the successor bundle (Holochain Evolution Epic Task 9).
+#
+# ONE role, so the bundle is exactly the crossing under measurement and nothing
+# else. It wraps ../node-registry-v2.dna: the `lineage-witness` feature variant
+# packed by `just build-witness`. The DEFAULT pack (node-registry.dna) is
+# untouched by this file and stays byte-identical — see the justfile.
+#
+# `properties.lineage` is an EMPTY PLACEHOLDER. The predecessor DNA hash is not
+# knowable until install time (it depends on the network seed and properties the
+# predecessor was installed with), and `lineage` folds into the DNA hash, so the
+# installing vehicle MUST override `modifiers.properties` with the real
+# predecessor hash. Installing this bundle as-packed yields a v2 that declares
+# no predecessor and therefore refuses every carriage — which is the correct,
+# loud failure, not a silent one.
+---
+manifest_version: "0"
+name: node_registry_v2
+description: "Node Registry — lineage-witness successor (Holochain Evolution Epic §2)"
+roles:
+  - name: node_registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "../node-registry-v2.dna"
+      modifiers:
+        network_seed: "elohim_node_registry_alpha"
+        properties:
+          progenitor_pubkey: ~  # bootstrap steward; override at install
+          lineage: []           # placeholder — override with the predecessor DNA hash
+          constitution_root: ~
+      installed_hash: ~
+      clone_limit: 0

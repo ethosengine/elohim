@@ -1298,6 +1298,16 @@ pub struct ExportPage {
     pub entries: Vec<Option<Entry>>,
     pub next_cursor: Option<u32>,
     pub digest: String,
+    /// The WHOLE-chain count of app-entry records this export walks — the same
+    /// on every page, like `digest`. A carry receipt reports it verbatim so
+    /// Station 3's `carried == v1_count` equality is falsifiable; deriving it
+    /// from `carried` would make the check tautological.
+    ///
+    /// `Option` + `#[serde(default)]` is additive by construction: a caller
+    /// holding an older `ExportPage` shape still decodes, and a bundle packed
+    /// before this field existed decodes to `None` rather than a fabricated 0.
+    #[serde(default)]
+    pub total: Option<u32>,
 }
 
 const EXPORT_CAP: u32 = 64;
@@ -1327,6 +1337,8 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         hasher.update(r.action_address().get_raw_39());
     }
     let digest = hex::encode(hasher.finalize());
+    // Cheap: the walk above already read the whole chain.
+    let total = Some(app.len() as u32);
 
     let start = input.cursor.unwrap_or(0) as usize;
     let page: Vec<Record> = app.into_iter().skip(start).take(limit).collect();
@@ -1341,6 +1353,7 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         records: page.into_iter().map(|r| r.signed_action).collect(),
         next_cursor,
         digest,
+        total,
     })
 }
 
@@ -1463,4 +1476,188 @@ pub fn get_record_at(input: (ActionHash, bool)) -> ExternResult<Option<Record>> 
         GetOptions::network()
     };
     get(action_hash, options)
+}
+
+// ============================================================================
+// BOUNDED CROSS-CELL CARRY (Holochain Evolution Epic Task 9, spec §2/§8)
+//
+// Gated behind `lineage-witness`, and APPENDED at the end of the file rather
+// than interleaved with the section above, for the same reason the integrity
+// zome appends its gated section: the default build's compiled output must not
+// be perturbed by this section's mere physical presence in the source text.
+//
+// `carry_from` is the whole crossing in one bounded step: it asks the
+// PREDECESSOR cell for one page of its own export, re-creates this agent's own
+// records natively on THIS chain (so the entry hash is preserved and v2 holds
+// the content as its own commit, not merely as bytes inside a witness), and
+// commits ONE witness carrying the page's predecessor notarizations. Records
+// authored by somebody else cannot be re-created natively — they are carried
+// as held-carries (§2.2), entry bytes included, so v2's validator can still
+// check that the carried entry is the one the carried action commits to.
+// ============================================================================
+
+/// Input to [`carry_from`]: which predecessor cell to pull from, where to
+/// resume, and how many records to take. `limit` is clamped to
+/// [`WITNESS_BATCH`] because one page becomes exactly one witness, and a
+/// witness may carry at most that many proofs.
+#[cfg(feature = "lineage-witness")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarryInput {
+    pub v1_cell: CellId,
+    pub cursor: Option<u32>,
+    pub limit: u32,
+}
+
+/// What one page of carriage produced.
+#[cfg(feature = "lineage-witness")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarryReceipt {
+    /// How many predecessor records this page carried (== the witness's proof
+    /// count).
+    pub carried: u32,
+    /// Resume token for the next page, or `None` when the predecessor's export
+    /// is exhausted. The caller drives the loop.
+    pub next_cursor: Option<u32>,
+    /// The predecessor's whole-chain digest, reported verbatim — the same on
+    /// every page, so a driver can check that it carried from ONE chain.
+    pub v1_digest: String,
+    /// The witness committed for this page, rendered as canonical base64
+    /// (`HoloHash`'s `Display`), or the EMPTY STRING for a page that authored
+    /// no witness.
+    ///
+    /// A `String` and not an `ActionHash` on purpose. `HoloHash` serialises to
+    /// a msgpack BYTE ARRAY, and the landed consumer
+    /// (`elohim-storage/src/services/release_adoption/apply.rs`, Task 8)
+    /// decodes this field as a `String` — returning the native hash here fails
+    /// with "invalid type: byte array, expected a string", the signal-decode
+    /// class that has bitten this codebase repeatedly. The zome renders; the
+    /// storage side never re-derives a hash.
+    pub witness_hash: String,
+    /// The predecessor's whole-chain app-record count, READ from its
+    /// [`ExportPage::total`] — never derived from `carried`, so the driver's
+    /// `sum(carried) == v1_total` check can actually fail. `None` when the
+    /// predecessor bundle predates that field.
+    pub v1_total: Option<u32>,
+}
+
+/// Pull ONE bounded page from a predecessor cell and witness it here.
+///
+/// The predecessor DNA is read from THIS DNA's own `lineage` property (which
+/// folds into the DNA hash, so every peer agrees on it) — `v1_cell` must name
+/// that DNA, otherwise the carriage is refused here rather than deeper in
+/// validation. MVP scope: the FIRST declared parent; a multi-parent lineage is
+/// a later station.
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
+    // (1) the declared predecessor, from this DNA's identity-bearing properties.
+    let properties: LineageProperties =
+        dna_info()?.modifiers.properties.try_into().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "carry_from: could not deserialize DNA properties: {e:?}"
+            )))
+        })?;
+    let lineage_dna_hash = properties.lineage.first().cloned().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "carry_from: this DNA declares no lineage — there is no predecessor to carry from"
+                .to_string(),
+        ))
+    })?;
+    if input.v1_cell.dna_hash() != &lineage_dna_hash {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "carry_from: v1_cell names DNA {}, but this DNA declares {} as its predecessor",
+            input.v1_cell.dna_hash(),
+            lineage_dna_hash
+        ))));
+    }
+
+    // (2) one bounded page of the predecessor's own export, across the cell
+    //     boundary. Same agent, so no capability secret is presented.
+    let limit = input.limit.clamp(1, WITNESS_BATCH as u32);
+    let response = call(
+        CallTargetCell::OtherCell(input.v1_cell.clone()),
+        "node_registry_coordinator",
+        "export_records".into(),
+        None,
+        ExportInput {
+            cursor: input.cursor,
+            limit,
+        },
+    )?;
+    let page: ExportPage = match response {
+        ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "carry_from: could not decode the predecessor's ExportPage: {e:?}"
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "carry_from: the predecessor cell refused export_records: {other:?}"
+            ))))
+        }
+    };
+
+    // (3) self-carry vs held-carry, per §2.1/§2.2.
+    let me = agent_info()?.agent_initial_pubkey;
+    let mut proofs: Vec<CarriedProof> = Vec::with_capacity(page.records.len());
+
+    for (i, signed) in page.records.iter().enumerate() {
+        let action = signed.action().clone();
+        let carried_entry: Option<Entry> = page.entries.get(i).cloned().flatten();
+
+        // Our OWN record: re-create it natively from the SAME bytes. Matching
+        // the carried action's app entry-def index and round-tripping through
+        // the concrete integrity struct reproduces the identical entry, so the
+        // EntryHash is preserved across the DNA line.
+        let mut recreated = false;
+        if action.author() == &me {
+            if let (Some(EntryType::App(def)), Some(entry)) =
+                (action.entry_type(), carried_entry.as_ref())
+            {
+                let typed = EntryTypes::deserialize_from_type(
+                    def.zome_index,
+                    def.entry_index,
+                    entry,
+                )
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "carry_from: proof {i}: could not deserialize the carried entry into a \
+                         known entry type: {e:?}"
+                    )))
+                })?;
+                if let Some(typed) = typed {
+                    create_entry(typed)?;
+                    recreated = true;
+                }
+            }
+        }
+
+        proofs.push(CarriedProof {
+            action,
+            signature: signed.signature.clone(),
+            // Self-carry omits the bytes (they are on this chain now);
+            // held-carry ships them so the validator can check the entry hash.
+            entry: if recreated { None } else { carried_entry },
+        });
+    }
+
+    // (4) ONE witness per page.
+    let carried = proofs.len() as u32;
+    let witness_hash = if proofs.is_empty() {
+        String::new()
+    } else {
+        commit_witness(NotarizationWitness {
+            lineage_dna_hash,
+            proofs,
+        })?
+        .to_string()
+    };
+
+    Ok(CarryReceipt {
+        carried,
+        next_cursor: page.next_cursor,
+        v1_digest: page.digest,
+        witness_hash,
+        v1_total: page.total,
+    })
 }
