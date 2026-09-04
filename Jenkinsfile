@@ -285,6 +285,13 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE',
                    message: "seed ${host} ${bundle.slug} (${kind}): blob byte upload failed after retries; see junit testcase") {
             withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}", "DELIVERABILITY_VERDICT_FILE=${verdictFile}"]) {
+                // Clear any stale marker from an earlier build/host in this
+                // reused workspace before the byte-seed runs — otherwise a
+                // BROKEN_HEAD written by host A's run survives into host B's
+                // clean run's outcomes (the read below only assigns when the
+                // file exists, so a leftover file is indistinguishable from
+                // a fresh one).
+                sh "rm -f '${verdictFile}'"
                 sh "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '${bundle.distDir}' '${bundle.slug}' '${doorwayEprUrl}' '${kind}'"
             }
             // Reached only on a clean return — catchError swallows exceptions
@@ -316,9 +323,14 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
     if (outcomes[verdictKey]?.startsWith('BROKEN_HEAD')) {
         // A peer judged this bundle from its bytes: it cannot boot. Authoring
         // the head would mint a witnessed pointer to a blank page (2026-09-04).
-        // Hard FAILURE on purpose — the UNSTABLE dependency-chain rule is for
-        // transient substrate churn, and a broken bundle is not churn.
-        error("authorHeadOnce: ${bundle.slug} (${kind}) refused — ${outcomes[verdictKey]}. The bundle's index names an asset it does not hold; fix the build, do not re-run.")
+        // Do NOT error() here: this call runs inside Phase 2's own catchError
+        // (stageAndVerifyAllBundles), which would swallow the throw to UNSTABLE
+        // (orchestrator treats UNSTABLE as success) AND unwind the bundle loop,
+        // starving sibling bundles of authoring. Record + skip instead; the
+        // hard FAILURE is raised once, after the loop, by the caller.
+        outcomes["broken|${bundle.slug}|${kind}".toString()] = outcomes[verdictKey]
+        echo "authorHeadOnce: ${bundle.slug} (${kind}) SKIPPED — ${outcomes[verdictKey]}; no head will be authored for a bundle that cannot boot"
+        return null
     }
     def authorKey = "author|${bundle.slug}|${kind}".toString()
     // Hand-off file for verifyProjectedHeads (Track-4 T4-2): stage-spa-blob.sh
@@ -548,6 +560,19 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         for (bundle in bundles) {
             authorHeadOnce(doorwayEprUrls, bundle, adminKey, outcomes)
         }
+    }
+    // Hard gate, OUTSIDE Phase 2's catchError above (so it is a real FAILURE,
+    // never swallowed to UNSTABLE): authorHeadOnce recorded 'broken|...' and
+    // returned without authoring for every bundle a peer judged BROKEN_HEAD.
+    // A plain keySet() loop (not findAll/collect) keeps this CPS-safe.
+    def broken = []
+    for (k in outcomes.keySet()) {
+        if (k.startsWith('broken|')) {
+            broken.add("${k.substring(7)}: ${outcomes[k]}")
+        }
+    }
+    if (!broken.isEmpty()) {
+        error("Deploy refused: ${broken.size()} bundle(s) cannot boot — ${broken.join('; ')}. The peer judged the bytes; fix the build, do not re-run.")
     }
 
     // End-to-end serving seatbelt: probe the EPR-routed mounts a human actually
