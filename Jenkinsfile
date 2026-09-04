@@ -662,8 +662,28 @@ apiVersion: v1
 kind: Pod
 spec:
  serviceAccount: jenkins-deployer
- nodeSelector:
-    node-type: edge
+ # operations OR edge, operations preferred: the edge label is the 7.6 GB ThinkPads and
+ # a memory request alone still lands there (requests count reservations, not the
+ # 3-5 GB the peers actually leave free) — elohim #1691 landed on thinkc-p1s again.
+ # Same shape as the DNA pipeline's sweettest shards.
+ affinity:
+   nodeAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+       nodeSelectorTerms:
+         - matchExpressions:
+             - key: node-type
+               operator: In
+               values:
+                 - operations
+                 - edge
+     preferredDuringSchedulingIgnoredDuringExecution:
+       - weight: 100
+         preference:
+           matchExpressions:
+             - key: node-type
+               operator: In
+               values:
+                 - operations
  volumes:
   - name: containerd-sock
     hostPath:
