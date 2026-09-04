@@ -1776,4 +1776,17 @@ mod tests {
             &[ZomeName::from("test_integrity")]
         );
     }
+    /// Diagnostic (ignored): print the per-role DNA hashes storage resolves from a bundle, so an
+    /// installed-vs-bundle mismatch can be attributed to the resolver or to the install path.
+    /// Run: ELOHIM_HAPP_PROBE=<path.happ> cargo test -p elohim-storage --lib happ_manager::tests::probe_bundle_dna_hashes -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore = "diagnostic: set ELOHIM_HAPP_PROBE to a .happ path"]
+    async fn probe_bundle_dna_hashes() {
+        let Ok(path) = std::env::var("ELOHIM_HAPP_PROBE") else { return };
+        let hashes = bundle_dna_hashes(std::path::Path::new(&path)).await.expect("resolve");
+        for (role, h) in &hashes { eprintln!("[probe] bundle_dna_hashes {role} = {h}"); }
+        let files = bundle_role_dna_files(std::path::Path::new(&path)).await.expect("resolve files");
+        for (role, f) in &files { eprintln!("[probe] bundle_role_dna_files {role} = {}", f.dna_hash()); }
+    }
+
 }
