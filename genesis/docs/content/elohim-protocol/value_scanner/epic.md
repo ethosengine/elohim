@@ -35,7 +35,7 @@ That's up to $300 per year, per family, just for the privilege of teaching kids 
 
 Beyond the financial cost lies a heavier burden: the mental load of family coordination.
 
-The average parent spends 11 hours per week on household management—remembering who needs what, when activities happen, what's in the fridge, who's picking up whom. It's invisible labor that creates visible stress:
+The average parent spends, by most estimates, around 11 hours a week on household management—remembering who needs what, when activities happen, what's in the fridge, who's picking up whom. It's invisible labor that creates visible stress:
 
 - "Did you remember the milk?"
 - "We have three bottles of ketchup and no mustard."
@@ -52,7 +52,7 @@ What if every family interaction—from morning chores to afternoon shopping—c
 
 Not value extraction. Value creation.
 
-A word on the name before the story continues. In this document an *Elohim* is a software agent that runs on the household's own devices, acts on the values the family has declared together, and negotiates on the family's behalf with other such agents: a personal Elohim for each member, a family Elohim on the home hub, and store, community and global Elohim beyond the front door. They speak a common protocol, the Elohim Protocol, so that a child's agent and a store's agent can reach an agreement in milliseconds without either surrendering what it protects. The Value Scanner is the family-facing product built on that protocol. No agent here is an authority over the family; each is a steward of the values it was given.
+A word on the name before the story continues. In this document an *Elohim* is a software agent that runs on the household's own devices, acts on the values the family has declared together, and negotiates on the family's behalf with other such agents: a personal Elohim for each member, a family Elohim on the home hub, and store, community and global Elohim beyond the front door. They speak a common protocol, the Elohim Protocol, so that a child's agent and a store's agent can reach an agreement in milliseconds without either surrendering what it protects. The Value Scanner is the family-facing product built on that protocol. No agent here is an authority over the family; each is a steward of the values it was given. The name is the Hebrew plural for the powers that hold a people together: chosen because these agents are many, act in concert, and answer to the values they were given rather than to any one of them. It claims no divinity and asks for none.
 
 The Elohim Value Scanner (EVS) transforms routine family activities into a rich economy of care, learning, and mutual support. It uses the same devices you already have (smartphones, simple home cameras, QR codes) but with radically different logic: care is the primary currency, money is just one type of value among many.
 
@@ -75,7 +75,7 @@ The family's Elohim agent, living in their home hub, understands what just happe
 - ⏰ 15 minute tokens (saved parent time)
 - 🌱 5 growth tokens (new recipe attempted)
 
-Tommy doesn't need to log anything. The Elohim observes patterns of care and records the story. This isn't surveillance—the camera sees but doesn't record, understands but doesn't store video. It's like having a wise grandmother who notices when children are kind to each other.
+Tommy doesn't need to log anything. The Elohim observes patterns of care and records the story. This isn't surveillance—the camera sees but doesn't record, understands but doesn't store video. A small model runs right there on the device, turns what it sees into a structured event—breakfast made, sister considered—and discards the frame within moments; no image is stored, and none ever leaves the home. Three properties make that a guarantee rather than a promise: no frame outlives the moment it is read, nothing the camera produces ever crosses the home's network boundary, and the family can switch the camera off and it stays off. It's like having a wise grandmother who notices when children are kind to each other.
 
 ### 3:30 PM - The Shopping Mission
 
@@ -180,7 +180,7 @@ Each product scan triggers a multi-agent negotiation:
 - **Global Elohim**: Provides supply chain awareness
 
 ### Phase 3: Negotiate (Real-time Dialogue)
-Agents reach consensus in milliseconds. Not through rules but through values alignment. Care for sister outweighs treat budget. Family dinner needs override personal limits. Community sustainability shapes choices.
+Agents reach consensus in milliseconds. Each agent brings a constraint and a preference its household or store declared ahead of time, and the family's own stated priorities break any tie — consensus is fast because the values were already declared, not because anything is hidden. Care for sister outweighs treat budget. Family dinner needs override personal limits. Community sustainability shapes choices.
 
 ### Phase 4: Bundle (Single Checkout)
 All micro-negotiations resolve into one QR code containing:
@@ -303,9 +303,13 @@ This demo doesn't just show an app—it reveals an entirely different economic l
 
 **Them**: $5-15 monthly fees, consumption training, data extraction, corporate lock-in
 
-**EVS**: Free forever, care cultivation, family sovereignty, community ownership
+**EVS**: No subscription, ever; care cultivation, family stewardship, community ownership
+
+The protocol itself is open and community-run; the home hub is a one-time purchase or provided by the community program. No one pays rent on the basic act of coordinating their own family.
 
 ### The Subsumption Strategy
+
+*Growing the new economy inside the old one's infrastructure until the old one is optional.*
 
 We're not destroying the old economy. We're growing the new one inside it:
 
@@ -407,7 +411,7 @@ The world as we know it optimises the emblem up front. A number is chosen, the n
 A word about where that respect came from, because it did not start as respect. This project began from a Christian reading in which *the love of money is a root of all kinds of evil* (1 Timothy 6:10), and that warning still stands at the floor. What the research below added was not a contradiction of it but a deeper account of what money actually is, so that the warning could be honoured with design rather than with avoidance. Gesell and Lietaer are named here because they are where that account first came clear to us. They are not exclusive and they are not the end of the reading; Proudhon, George, the WIR, Carson and Bauwens are read alongside them in the succession argument, and the [monetary posture research](../../../../research/monetary-posture-internal-currencies-external-fiat-2026-08-23.md) names the wider list. What follows is the part of that reading the tokens rest on.
 
 - **Silvio Gesell** saw in 1916 that the trouble with money is its zero cost of carry: the one asset that never decays holds all the leverage, so it is the thing to hoard, and hoarding it is what makes it a target. His stamped money, *Freigeld*, put a carrying cost on the note. The [succession argument](../succession.md) at §3.2 reads Gesell and George as twin pillars, and at §3.3 records that the WIR, the one design in the lineage that lived, dropped his demurrage in 1948 because the stamp could be discarded and the institution could not. Here the stamp returns as a setting rather than a law. The protocol's resource-flow layer, the part that keeps the accounts of stewardship and resource flow, lets a community switch on decay and renewal: a balance that sits unused slowly returns to the commons, while a balance that keeps moving between people is renewed. That is Gesell's carrying cost expressed as a lens a household or a neighbourhood declares for itself rather than a stamp a state prints on every note, and it is why no care token here is a unit held as property. The rule is described in [the resource-flow rules](../shefa.md).
-- **Lietaer** documented a whole ecology of complementary currencies and never resolved their recursion: each one needed a competent, funded, trustworthy institution at its centre, so you could not have a thousand currencies if each needed a bank (succession §3.6). The five Elohim negotiating over an olive-oil bottle are the answer to that recursion. The family Elohim is the clerk; the council, at arm's length from the flows it accounts, is the issuer; and the record beneath both is witnessed by peers rather than kept by a bank (succession §5.2 and §5.3).
+- **Lietaer** documented a whole ecology of complementary currencies and never resolved their recursion: each one needed a competent, funded, trustworthy institution at its centre, so you could not have a thousand currencies if each needed a bank (succession §3.6). The five Elohim negotiating over an olive-oil bottle are the answer to that recursion. The family Elohim is the clerk; the council, a body the community itself seats at arm's length from the flows it accounts, is the issuer; and the record beneath both is witnessed by peers rather than kept by a bank (succession §5.2 and §5.3).
 - **The floor and the ceiling.** The protocol never computes a payout at the ceiling and never exercises judgment at the floor (succession, orientation). Tommy's discovery budget, the no-nuts rule and the age ladder are floor: mechanical, the same for everyone, unarguable. The care bonus and the celebration are ceiling: discerning, contextual, and free to be playful precisely because nothing at the floor depends on them.
 - **The common inheritance.** The protocol's settled positions are numbered as Stances, and the fourth draws a line between what a person makes and what the community makes around them. A worker keeps the produce of their labour. The value that arises only because many people are present together, the rising worth of a location, the yield of a network, and the power to issue money itself, is the common inheritance, and it belongs to a commons that nobody holds as property. The protocol therefore socialises issuance rather than abolishing it, and holds that issuance behind preconditions that are not yet met. Until they are, the protocol mints nothing, and the tokens in this story remain what they are today: readings of a record. The position is stated in full as [Stance I.4](../values-forward.md).
 
@@ -445,7 +449,7 @@ The only question is: **When does your family begin writing its story?**
 *Join the revolution that starts with strawberries.*
 
 **The Elohim Family Pilot Program**  
-*No fees. No surveillance. Just care made visible, valuable, and viral.*
+*No fees. No surveillance. Just care made visible, valuable, and shared.*
 
 **Start your family's story at: elohim.host/families**
 
@@ -460,7 +464,7 @@ The only question is: **When does your family begin writing its story?**
 The protocol-layer work that makes household care legible at scale:
 
 - [`Records Lifecycle`](../architecture/2026-05-24-records-lifecycle-design.md) *(canonical)* — **the records lifecycle that lets inventory-elohim, vehicle-elohim, and care-stewardship-elohim narrate household activity into REA Events** without overwhelming the substrate. Part A §7 of every primitive specifies where elohim cognition is load-bearing; Part B.1 §"Where agentic intelligence carries the load" walks the value-prop unlock (cooking, cleaning, caregiving become legible to the household's economic picture).
-- [`Observation / Event Layer`](../../../superpowers/specs/2026-05-11-observation-event-layer-design.md) — the ephemeral peer-witnessed evidence tier; how a strawberry-handoff becomes a structured care-Event without storing surveillance.
+- [`Observation / Event Layer`](../architecture/2026-05-11-observation-event-layer-design.md) — the ephemeral peer-witnessed evidence tier; how a strawberry-handoff becomes a structured care-Event without storing surveillance.
 
 For the full canonical-specs index, see [`canonical-specs/INDEX.md`](../architecture/INDEX.md).
 
