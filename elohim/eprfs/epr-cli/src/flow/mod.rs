@@ -281,7 +281,17 @@ fn run_claim(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow fulfill` — ONE verb, two arms, branched on whether the first argument is a flag.
+///
+/// The positional arm (`fulfill <report.json>`) reads an a2o sprint report and is byte-compatible
+/// with what it has always done. The flag arm (`fulfill --on …`) discharges one claimed gap-item
+/// commitment from an authored task report. Branching on the argument SHAPE rather than adding a
+/// second subcommand keeps "discharge a promise" one word in the surface, which is what it is in
+/// the ledger.
 fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
+    if args.first().is_some_and(|first| first.starts_with("--")) {
+        return run_fulfill_on(args);
+    }
     let (file, tail) = positional_file(args)?;
     let (opts, rest) = parse_global(tail)?;
     let mut fulfill_opts = fulfill::FulfillOptions::default();
@@ -312,6 +322,60 @@ fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&summary)?);
     } else {
         summary.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The task-report arm of `fulfill`. Repeatable `--commit` is walked positionally rather than
+/// through `take_opt`, which returns only the FIRST match — a second SHA silently dropped is
+/// evidence silently dropped.
+fn run_fulfill_on(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let mut commits = Vec::new();
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--commit" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| FlowError::InvalidArguments("--commit needs a sha".into()))?;
+                commits.push(value.clone());
+                i += 2;
+            }
+            "--on" | "--report" | "--status" | "--as" | "--session" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown fulfill argument `{other}`"
+                )))
+            }
+        }
+    }
+    let on = take_opt(&rest, "--on")?.ok_or_else(|| {
+        FlowError::InvalidArguments("fulfill needs --on <commitment-cid|gap-id>".into())
+    })?;
+    let report = take_opt(&rest, "--report")?
+        .ok_or_else(|| FlowError::InvalidArguments("fulfill needs --report <path>".into()))?;
+    let status = take_opt(&rest, "--status")?.ok_or_else(|| {
+        FlowError::InvalidArguments("fulfill needs --status DONE|DONE_WITH_CONCERNS".into())
+    })?;
+    let actor = note::NoteActor {
+        as_ref: take_opt(&rest, "--as")?,
+        session: resolve_session(take_opt(&rest, "--session")?),
+    };
+    let outcome = fulfill::fulfill_on(
+        &opts.root,
+        &fulfill::FulfillOnRequest {
+            on: &on,
+            report: &report,
+            status: &status,
+            commits: &commits,
+            actor: &actor,
+        },
+    )?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -500,6 +564,9 @@ fn usage() -> String {
      (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \
      intent is refused by name unless --supersede)\n  \
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
+     | fulfill --on <commitment-cid|gap-id> --report <path> --status DONE|DONE_WITH_CONCERNS \
+     [--commit <sha>]... [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
+     (NEEDS_CONTEXT|BLOCKED|HOLD are refused — record those as note --kind observation)\n  \
      | note --on <commitment-cid-or-path> \
      --kind failed-approach|correction|observation|ruling|verdict \
      --reason <text> [--switched-to <text>] \

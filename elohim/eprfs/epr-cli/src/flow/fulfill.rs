@@ -57,8 +57,12 @@ use elohim_epr_rea::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::read::{commitment_latest_event, is_strictly_newer};
-use super::{body_cid_of_file, repo_agent, repo_scope_atom, FlowError, FlowResult};
+use super::note::{named_identity, non_empty, resolve_attribution, NoteActor, STEWARD_SLOT_PREFIX};
+use super::read::{commitment_latest_event, is_strictly_newer, OccurredAtKey};
+use super::{
+    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent,
+    repo_scope_atom, FlowError, FlowResult,
+};
 
 /// The synthetic CI agent standing in for the a2o run that observed the verdict.
 const CI_AGENT: &str = "ci:dataplane";
@@ -426,6 +430,282 @@ fn stage_or_count(
         *new_counter += 1;
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// The task-report arm: `epr flow fulfill --on <commitment|gap-id> --report … --status …`
+//
+// A SECOND ARM ON ONE VERB, not a second verb. The positional sprint-report path above is
+// untouched — its records, its counters and its CIDs are byte-identical — because a2o's
+// scenario-green discharge is a CI observation and this one is an authored delivery, and the
+// two must stay distinguishable in the ledger while meaning the same thing to the drain: an
+// event whose `fulfills` names a commitment.
+//
+// The status gate is the load-bearing part. `NEEDS_CONTEXT`, `BLOCKED` and `HOLD` are REFUSED
+// rather than recorded as a weaker discharge, because the dev-system-equilibrium habit's
+// outflow classifier keys on `fulfills` — a non-discharging status that emitted the field would
+// read as a drain that never happened, which is exactly the over-claim that habit's invariant
+// names. The refusal names `note --kind observation` as the record those three actually want.
+// ---------------------------------------------------------------------------
+
+/// The unit a task-report discharge is counted in — distinct from `green-run` so a CI verdict
+/// and an authored delivery can never be folded together by a unit-keyed stock.
+const TASK_REPORT_UNIT: &str = "task-report";
+
+const REPORT_SLOT_PREFIX: &str = "report:";
+const EVIDENCE_SLOT_PREFIX: &str = "evidence:";
+const COMMIT_SLOT_PREFIX: &str = "commit:";
+
+/// The two statuses that DISCHARGE a commitment.
+const DISCHARGING: [&str; 2] = ["DONE", "DONE_WITH_CONCERNS"];
+
+/// The three that do not, and that this verb refuses by name.
+const NON_DISCHARGING: [&str; 3] = ["NEEDS_CONTEXT", "BLOCKED", "HOLD"];
+
+/// What the caller asked for, already split out of argv.
+pub struct FulfillOnRequest<'a> {
+    pub on: &'a str,
+    pub report: &'a str,
+    pub status: &'a str,
+    pub commits: &'a [String],
+    pub actor: &'a NoteActor,
+}
+
+/// The machine-facing result of one task-report fulfilment.
+#[derive(Debug, Serialize)]
+pub struct FulfillOnOutcome {
+    pub commitment: String,
+    /// The commitment's subject slot — the gap id, when it has one.
+    pub gap_id: String,
+    pub status: String,
+    /// The report's repo-relative path.
+    pub report: String,
+    /// The report's canonical body address — the evidence, carried by reference.
+    pub evidence: String,
+    pub commits: Vec<String>,
+    pub provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steward: Option<String>,
+    pub occurred_at: String,
+    /// The event's atom address, absent when nothing was minted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub record_cid: Option<String>,
+    pub appended: bool,
+    /// `true` when the commitment was ALREADY discharged, so this call appended nothing.
+    pub already_fulfilled: bool,
+}
+
+impl FulfillOnOutcome {
+    pub fn render(&self) {
+        println!("fulfill {} → {}", self.status, self.gap_id);
+        println!("        report: {} ({})", self.report, self.evidence);
+        if !self.commits.is_empty() {
+            println!("        commits: {}", self.commits.join(", "));
+        }
+        println!("        by: {}", self.provider);
+        if let Some(steward) = &self.steward {
+            println!("        steward: {steward}");
+        }
+        if self.already_fulfilled {
+            println!("        (already discharged — no-op)");
+        } else if !self.appended {
+            println!("        (already recorded — no-op)");
+        }
+    }
+}
+
+/// Normalize and gate `--status`.
+///
+/// Case and hyphens are forgiven (`done-with-concerns` is the same declaration as
+/// `DONE_WITH_CONCERNS`); the VOCABULARY is not. An unknown status is refused naming all five,
+/// because a status this verb silently accepted would classify a delivery by a word nothing
+/// downstream reads.
+fn gate_status(raw: &str) -> FlowResult<String> {
+    let normalized = raw.trim().to_ascii_uppercase().replace('-', "_");
+    if DISCHARGING.contains(&normalized.as_str()) {
+        return Ok(normalized);
+    }
+    if NON_DISCHARGING.contains(&normalized.as_str()) {
+        return Err(FlowError::InvalidArguments(format!(
+            "status `{normalized}` does not discharge a commitment — only {} do. \
+             Record it instead as `epr flow note --on <gap-id> --kind observation --reason '…'`; \
+             a non-discharging status that emitted `fulfills` would read as a drain that never \
+             happened",
+            DISCHARGING.join(" and ")
+        )));
+    }
+    Err(FlowError::InvalidArguments(format!(
+        "unknown --status `{raw}` — the report vocabulary is closed: {}|{}",
+        DISCHARGING.join("|"),
+        NON_DISCHARGING.join("|")
+    )))
+}
+
+/// `epr flow fulfill --on <commitment-cid|gap-id> --report <path> --status <STATUS>`.
+///
+/// Two phases, the idiom this family uses everywhere: Phase 1 resolves and refuses, Phase 2
+/// appends exactly one record or none.
+pub fn fulfill_on(root: &Path, request: &FulfillOnRequest) -> FlowResult<FulfillOnOutcome> {
+    let on = non_empty(request.on, "--on")?;
+    let report_rel = non_empty(request.report, "--report")?;
+    let status = gate_status(request.status)?;
+    let named = named_identity(request.actor.as_ref.as_deref())?;
+
+    let mut store = SidecarFlowStore::open(root)?;
+    let records = store.records()?;
+    let (commit_cid, commitment) = resolve_commitment(on, &records)?;
+
+    let canonical_root = std::fs::canonicalize(root).map_err(|source| FlowError::Read {
+        path: root.to_path_buf(),
+        source,
+    })?;
+    let report_abs = if Path::new(report_rel).is_absolute() {
+        std::path::PathBuf::from(report_rel)
+    } else {
+        canonical_root.join(report_rel)
+    };
+    let report_abs = confine_under(&canonical_root, &report_abs)?;
+    let evidence = body_cid_of_file(&report_abs).ok_or_else(|| {
+        FlowError::UnknownResource(format!(
+            "{report_rel} (named by --report, but it cannot be read) — \
+             the evidence is carried by address, so the report must exist to have one"
+        ))
+    })?;
+    let report_label = rel_to_root(&canonical_root, &report_abs);
+
+    let (author, occurred_at) = head_commit_provenance(root).ok_or_else(|| {
+        FlowError::InvalidArguments(format!(
+            "cannot date a fulfilment in `{}`: git has no HEAD commit to date it against",
+            root.display()
+        ))
+    })?;
+    let attribution = resolve_attribution(root, named, request.actor.session.as_deref(), &author);
+
+    let gap_id = commitment
+        .resource_spec
+        .classified_as
+        .get(1)
+        .cloned()
+        .unwrap_or_else(|| commit_cid.to_string());
+
+    // Already discharged? The crate's one derivation of it — any event whose `fulfills` names
+    // the commitment — so this verb, `claim`, `walk` and the stock fold never disagree.
+    let already_fulfilled = records.iter().any(|(_, record)| match record {
+        FlowRecord::Event(e) => e.fulfills.contains(&commit_cid),
+        _ => false,
+    });
+
+    let mut classified_as = Vec::with_capacity(4 + request.commits.len());
+    classified_as.push(format!("{REPORT_SLOT_PREFIX}{status}"));
+    classified_as.push(gap_id.clone());
+    classified_as.push(format!("{EVIDENCE_SLOT_PREFIX}{evidence}"));
+    let mut commits = Vec::with_capacity(request.commits.len());
+    for sha in request.commits {
+        let sha = non_empty(sha, "--commit")?.to_string();
+        classified_as.push(format!("{COMMIT_SLOT_PREFIX}{sha}"));
+        commits.push(sha);
+    }
+    if let Some(steward) = &attribution.steward {
+        classified_as.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
+    }
+
+    let event = FlowEvent {
+        action: ReaVerb::Produce,
+        provider: AgentRef(attribution.provider(&author)),
+        receiver: repo_agent(),
+        resource: evidence,
+        quantity: Magnitude::Count {
+            value: 1.0,
+            unit: TASK_REPORT_UNIT.to_string(),
+        },
+        process: None,
+        // The commitment's OWN scope, copied: the delivery is accounted to the container that
+        // raised the promise, not to a scope this verb invented.
+        in_scope_of: commitment.in_scope_of,
+        fulfills: vec![commit_cid],
+        satisfies: Vec::new(),
+        classified_as,
+        occurred_at: occurred_at.clone(),
+    };
+
+    let record = FlowRecord::Event(event);
+    let record_cid = record.cid()?;
+    let already_recorded = records.iter().any(|(cid, _)| cid == &record_cid);
+    let appended = !already_fulfilled && !already_recorded;
+
+    let outcome = FulfillOnOutcome {
+        commitment: commit_cid.to_string(),
+        gap_id,
+        status,
+        report: report_label,
+        evidence: evidence.to_string(),
+        commits,
+        provider: attribution.provider(&author),
+        steward: attribution.steward.clone(),
+        occurred_at,
+        record_cid: appended.then(|| record_cid.to_string()),
+        appended,
+        already_fulfilled,
+    };
+
+    if appended {
+        store.append(record)?;
+    }
+    Ok(outcome)
+}
+
+/// Resolve `--on` to `(commitment cid, commitment)`: an address this sidecar holds, or a gap id.
+///
+/// The gap-id arm picks the NEWEST active commitment carrying that id — newest by `valid_from`
+/// with sidecar append order as the tie-break, the same ordering rule
+/// [`crate::flow::read::commitment_latest_event`] holds. A superseded claim and the claim that
+/// took it over both carry the id; discharging the older one would leave the live promise open.
+fn resolve_commitment(
+    on: &str,
+    records: &[(Cid, FlowRecord)],
+) -> FlowResult<(Cid, elohim_epr_rea::Commitment)> {
+    if let Ok(cid) = on.parse::<Cid>() {
+        for (record_cid, record) in records {
+            if record_cid == &cid {
+                return match record {
+                    FlowRecord::Commitment(c) => Ok((cid, c.clone())),
+                    _ => Err(FlowError::InvalidArguments(format!(
+                        "{on} is not a Commitment in this sidecar — a fulfilment discharges a \
+                         promise, and only a commitment is one"
+                    ))),
+                };
+            }
+        }
+        return Err(FlowError::UnknownResource(format!(
+            "{on} (a well-formed CID, but no record in this sidecar mints it)"
+        )));
+    }
+
+    let mut candidates: Vec<(usize, Cid, &elohim_epr_rea::Commitment)> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (cid, record))| match record {
+            FlowRecord::Commitment(c)
+                if c.state == CommitmentState::Active
+                    && c.resource_spec.classified_as.iter().any(|s| s == on) =>
+            {
+                Some((index, *cid, c))
+            }
+            _ => None,
+        })
+        .collect();
+    candidates.sort_by(|a, b| {
+        let left = OccurredAtKey::parse(a.2.valid_from.as_deref().unwrap_or_default());
+        let right = OccurredAtKey::parse(b.2.valid_from.as_deref().unwrap_or_default());
+        left.cmp(&right).then_with(|| a.0.cmp(&b.0))
+    });
+    match candidates.last() {
+        Some((_, cid, commitment)) => Ok((*cid, (*commitment).clone())),
+        None => Err(FlowError::UnknownResource(format!(
+            "{on} names no active commitment — claim it first with \
+             `epr flow claim --on {on} --as agent:<role>@<model>`"
+        ))),
+    }
 }
 
 #[cfg(test)]

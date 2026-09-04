@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
-use elohim_epr_cli::flow::{claim, project, seal, walk};
+use elohim_epr_cli::flow::{claim, fulfill, project, seal, walk};
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use tempfile::TempDir;
 
@@ -700,4 +700,151 @@ fn serves_is_checked_against_the_register_and_a_brief_is_carried_by_address() {
         ],
         "slot order is positional: tag, subject, brief, habit, steward LAST"
     );
+}
+
+// ── fulfill --on: the task-report arm ────────────────────────────────────────────────────
+
+fn claimed(root: &Path, gap_id: &str, who: &NoteActor) -> String {
+    claim::claim(root, &request(gap_id, who))
+        .expect("claim runs")
+        .commitment_cid
+}
+
+fn fulfil_request<'a>(
+    on: &'a str,
+    status: &'a str,
+    who: &'a NoteActor,
+) -> fulfill::FulfillOnRequest<'a> {
+    fulfill::FulfillOnRequest {
+        on,
+        report: "reports/task-1-report.md",
+        status,
+        commits: &[],
+        actor: who,
+    }
+}
+
+fn discharged(root: &Path, commitment_cid: &str) -> bool {
+    records(root).into_iter().any(|(_, record)| match record {
+        FlowRecord::Event(e) => e.fulfills.iter().any(|c| c.to_string() == commitment_cid),
+        _ => false,
+    })
+}
+
+#[test]
+fn a_done_report_discharges_the_commitment_and_the_three_other_statuses_are_refused() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let commitment = claimed(root, "epic#1", &implementer);
+
+    // The three non-discharging statuses refuse, and each names the record they belong in.
+    for status in ["NEEDS_CONTEXT", "BLOCKED", "HOLD"] {
+        let err = fulfill::fulfill_on(root, &fulfil_request("epic#1", status, &implementer))
+            .expect_err("only DONE and DONE_WITH_CONCERNS discharge");
+        assert!(
+            err.to_string().contains("--kind observation"),
+            "the refusal must name the record these three belong in; got: {err}"
+        );
+    }
+    assert!(
+        !discharged(root, &commitment),
+        "a non-discharging status must never mark the commitment drained"
+    );
+
+    let commits = vec!["825a090df".to_string(), "4425bb6fb".to_string()];
+    let outcome = fulfill::fulfill_on(
+        root,
+        &fulfill::FulfillOnRequest {
+            commits: &commits,
+            ..fulfil_request("epic#1", "DONE", &implementer)
+        },
+    )
+    .expect("a DONE report discharges");
+    assert!(outcome.appended);
+    assert!(!outcome.already_fulfilled);
+    assert_eq!(outcome.status, "DONE");
+    assert_eq!(outcome.commitment, commitment);
+    assert_eq!(outcome.commits, commits);
+    assert!(discharged(root, &commitment));
+
+    // The event's slots, positionally.
+    let slots = records(root)
+        .into_iter()
+        .find_map(|(cid, record)| match record {
+            FlowRecord::Event(e) if Some(cid.to_string()) == outcome.record_cid => {
+                Some(e.classified_as)
+            }
+            _ => None,
+        })
+        .expect("the fulfilment event landed");
+    assert_eq!(slots[0], "report:DONE");
+    assert_eq!(slots[1], "epic#1");
+    assert_eq!(slots[2], format!("evidence:{}", outcome.evidence));
+    assert_eq!(slots[3], "commit:825a090df");
+    assert_eq!(slots[4], "commit:4425bb6fb");
+    assert_eq!(slots[5], "steward:author@example.test", "steward LAST");
+
+    // A second fulfilment appends nothing and says so.
+    let again = fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &implementer))
+        .expect("a second fulfilment is a no-op, not an error");
+    assert!(again.already_fulfilled);
+    assert!(!again.appended);
+    assert!(again.record_cid.is_none());
+}
+
+#[test]
+fn the_status_gate_refuses_by_name_and_points_at_the_observation_note() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    claimed(root, "epic#1", &implementer);
+
+    let err = fulfill::fulfill_on(root, &fulfil_request("epic#1", "BLOCKED", &implementer))
+        .expect_err("BLOCKED does not discharge");
+    let message = err.to_string();
+    assert!(message.contains("BLOCKED"), "{message}");
+    assert!(message.contains("--kind observation"), "{message}");
+
+    let unknown = fulfill::fulfill_on(root, &fulfil_request("epic#1", "SHIPPED", &implementer))
+        .expect_err("an unknown status is refused, never defaulted");
+    assert!(unknown.to_string().contains("DONE_WITH_CONCERNS"));
+
+    // Case and hyphens are forgiven; the vocabulary is not.
+    let ok = fulfill::fulfill_on(
+        root,
+        &fulfil_request("epic#1", "done-with-concerns", &implementer),
+    )
+    .expect("a forgiving spelling of a legal status still discharges");
+    assert_eq!(ok.status, "DONE_WITH_CONCERNS");
+}
+
+#[test]
+fn a_gap_id_resolves_to_the_newest_active_commitment_and_an_unclaimed_one_refuses() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let reviewer = actor("agent:reviewer@claude-opus-5");
+
+    claimed(root, "epic#1", &implementer);
+    let taken = claim::claim(
+        root,
+        &claim::ClaimRequest {
+            supersede: true,
+            ..request("epic#1", &reviewer)
+        },
+    )
+    .expect("supersede runs")
+    .commitment_cid;
+
+    let outcome = fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &reviewer))
+        .expect("the gap id resolves");
+    assert_eq!(
+        outcome.commitment, taken,
+        "the newest active commitment carrying the id is the live promise"
+    );
+
+    let err = fulfill::fulfill_on(root, &fulfil_request("epic#2", "DONE", &implementer))
+        .expect_err("an unclaimed gap item has no promise to discharge");
+    assert!(err.to_string().contains("epr flow claim"));
 }
