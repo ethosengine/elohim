@@ -47,6 +47,7 @@ rules:
   - id: brief-is-a-claim
     class: inject
     when: { write: ".superpowers/sdd/**/task-*-brief.md" }
+    route-to: { dest: "epr flow claim" }
     why: >
       A dispatched task brief is a claim on promised work. Record that act with
       `epr flow claim --on <gap-id> --as agent:implementer@<model> --brief <this file>` so the
@@ -58,6 +59,7 @@ rules:
   - id: report-is-a-fulfilment
     class: inject
     when: { write: ".superpowers/sdd/**/task-*-report.md" }
+    route-to: { dest: "epr flow fulfill" }
     why: >
       A completed task report discharges promised work. Record that act with
       `epr flow fulfill --on <gap-id> --report <this file> --status <DONE|DONE_WITH_CONCERNS>` so
@@ -68,6 +70,7 @@ rules:
   - id: rulings-are-notes
     class: inject
     when: { write: ".superpowers/sdd/**/progress.md" }
+    route-to: { dest: "epr flow note --kind ruling" }
     why: >
       A ruling belongs in the valueflow record: use
       `epr flow note --on <gap-id|plan> --kind ruling --reason '...'`. The progress file is a
