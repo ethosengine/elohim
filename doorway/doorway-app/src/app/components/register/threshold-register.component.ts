@@ -5,9 +5,9 @@
  * When elohim-app redirects a user here, this component:
  * 1. Reads OAuth params from URL (?client_id, ?redirect_uri, ?response_type, ?state)
  * 2. Shows registration form for the user to create an account
- * 3. Creates Holochain identity (human entry in imagodei zome)
- * 4. Registers auth credentials with doorway
- * 5. On success, generates authorization code and redirects back to elohim-app
+ * 3. Registers auth credentials with doorway (which creates the Holochain
+ *    identity — human entry in imagodei zome — server-side)
+ * 4. On success, generates authorization code and redirects back to elohim-app
  *
  * This enables the thin-federated architecture where any doorway
  * can be an identity provider for elohim-app.
@@ -44,7 +44,7 @@ interface RegisterForm {
 }
 
 /** State machine for registration flow */
-type RegisterState = 'form' | 'creating_identity' | 'registering' | 'authorizing' | 'error';
+type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
 
 @Component({
   selector: 'app-threshold-register',
@@ -106,16 +106,25 @@ type RegisterState = 'form' | 'creating_identity' | 'registering' | 'authorizing
                   type="text"
                   id="email"
                   name="email"
-                  [(ngModel)]="form.email"
+                  [ngModel]="form.email"
+                  (ngModelChange)="onIdentifierChange($event)"
                   required
                   autocomplete="email"
                   placeholder="username"
+                  pattern="[^@\\s]+"
+                  inputmode="text"
                   class="identifier-input"
                   data-testid="threshold-register-email"
                 />
-                <span class="domain-suffix">&#64;{{ gatewayDomain() }}</span>
+                <span class="domain-suffix" data-testid="threshold-register-domain-suffix">
+                  &#64;{{ gatewayDomain() }}
+                </span>
               </div>
-              <p class="input-hint">Or use your full email address</p>
+              <p class="input-hint">
+                Your account is created at
+                <strong>{{ gatewayDomain() }}</strong>
+                .
+              </p>
             </div>
 
             <div class="form-group">
@@ -177,13 +186,6 @@ type RegisterState = 'form' | 'creating_identity' | 'registering' | 'authorizing
         }
 
         <!-- Loading states -->
-        @if (state() === 'creating_identity') {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Creating your identity...</p>
-          </div>
-        }
-
         @if (state() === 'registering') {
           <div class="loading-state">
             <div class="spinner"></div>
@@ -340,13 +342,11 @@ export class ThresholdRegisterComponent implements OnInit {
     this.error.set('');
 
     try {
-      // Step 1: Create Holochain identity
-      this.state.set('creating_identity');
-      const identity = await this.createHolochainIdentity();
-
-      // Step 2: Register auth credentials
+      // Register. The doorway creates the Holochain identity INSIDE
+      // /auth/register (call_create_human / provision_agent) — there is no
+      // client-side identity step to show a spinner for.
       this.state.set('registering');
-      const authResult = await this.registerCredentials(identity);
+      const authResult = await this.registerCredentials();
 
       if (!authResult) {
         throw new Error('Registration failed');
@@ -382,42 +382,27 @@ export class ThresholdRegisterComponent implements OnInit {
   }
 
   /**
-   * Create Holochain identity via doorway's WebSocket proxy.
-   * This calls the imagodei zome's create_human function.
-   */
-  private async createHolochainIdentity(): Promise<{
-    humanId: string;
-    agentPubKey: string;
-  }> {
-    // For doorway-hosted registration, we use an HTTP API endpoint
-    // that wraps the zome call, since we don't have a WebSocket client here.
-    //
-    // The doorway's /auth/register endpoint can optionally create the identity
-    // if humanId is not provided. This is the recommended approach.
-    //
-    // For now, we'll pass empty values and let the backend handle it.
-    // The backend will create the identity if needed.
-    return {
-      humanId: '',
-      agentPubKey: '',
-    };
-  }
-
-  /**
    * Register auth credentials with doorway.
+   *
+   * The body is camelCase because doorway's `RegisterRequest` is
+   * `#[serde(rename_all = "camelCase")]` (doorway-service/src/routes/auth_routes.rs).
+   * snake_case keys deserialize into serde defaults — which is how a typed
+   * Display Name used to be silently discarded and the profile named after the
+   * identifier's local-part instead.
+   *
+   * `humanId` / `agentPubKey` are sent empty: the doorway mints the Holochain
+   * identity itself when they are, so there is nothing for the browser to
+   * create first.
    */
-  private async registerCredentials(identity: {
-    humanId: string;
-    agentPubKey: string;
-  }): Promise<AuthResponse | null> {
+  private async registerCredentials(): Promise<AuthResponse | null> {
     const response = await firstValueFrom(
       this.http.post<AuthResponse>('/auth/register', {
-        human_id: identity.humanId,
-        agent_pub_key: identity.agentPubKey,
+        humanId: '',
+        agentPubKey: '',
         identifier: this.form.email,
-        identifier_type: 'email',
+        identifierType: 'email',
         password: this.form.password,
-        display_name: this.form.displayName,
+        displayName: this.form.displayName,
       })
     );
     return response;
@@ -459,6 +444,18 @@ export class ThresholdRegisterComponent implements OnInit {
     } else {
       throw new Error('Authorization failed');
     }
+  }
+
+  /**
+   * Strip any '@' segment as the human types. The doorway re-qualifies every
+   * identifier to `localpart@<gateway domain>` (`normalize_identifier` in
+   * auth_routes.rs), so a typed foreign domain is never honoured — showing it
+   * in the field promises an account this doorway will not create. Same rule
+   * as threshold-login.
+   */
+  onIdentifierChange(value: string): void {
+    const atIndex = value.indexOf('@');
+    this.form.email = atIndex === -1 ? value : value.slice(0, atIndex);
   }
 
   clearError(): void {
