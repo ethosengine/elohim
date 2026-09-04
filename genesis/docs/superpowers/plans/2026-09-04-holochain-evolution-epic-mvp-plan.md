@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:eead063dc875a298 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:cd90459caf3769fe | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -781,6 +781,38 @@ The mesh run exposed five gaps none of the fifteen tasks named. Each is one gap 
 - Test: sweettest — a second `carry_from` at cursor 0 reports the same `carried`, `self_carried == 0`, and `get_witnesses_for` still returns exactly one link.
 
 - [ ] **Task 20 deliverable: a retried carry commits no duplicate entries or witnesses; the "one witness per carried entry" property holds under retry.**
+
+---
+
+### Tasks 21–23: the sunset-hardening crossing (integrity-side; ONE hash-moving DNA-lineage event, minted 2026-09-05 from the reviews)
+
+The rehearsal measures with these open and says so in every receipt. They are integrity changes, so they ride one deliberate crossing (mishpat + node-registry v2), never a hot-swap.
+
+### Task 21: G1 — the roster bound to the elohim (mishpat integrity)
+
+**Files:**
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs` (`commitment_action_requirements` gains the lineage arms: `migrates-lineage` / `sunsets-lineage` / lineage-targeting `revokes-commitment` require every signature in `signatures` to verify over `signing_payload_cid`, every signer ∈ the roster named by `roster_cid` — `must_get_entry` of that commitment, members read from its body — and `roster.constitution_root == payload.constitution_root`; a `declares-roster` arm whose author must be the progenitor named by the DNA's `LineageProperties` or a member of the previous roster (chain to the root))
+- Test: sweettest — an off-roster signer's lineage commitment is REJECTED by validation on a receiving peer, not only refused by the author's coordinator.
+
+- [ ] **Task 21 deliverable: a receiving peer's integrity validation rejects a lineage commitment whose signers are not on a roster that chains to the declared root; storage's `verify_path` roster check becomes a coherence check over a validated fact.**
+
+### Task 22: G7 — state links authored only by their rightful author (mishpat integrity)
+
+**Files:**
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs` (`validate_commitment_by_state_tag` → full `CommitmentByState` link validation: `active|t` only when the link author == the anchor commitment's author; `revoked|t` only when the link author == the author of a validated `revokes-commitment` naming that anchor — `must_get_entry` + tag carries the revocation's entry hash)
+- Modify: coordinator `create_commitment_state_link` (tag carries the revocation entry hash for `revoked`) — coordinator-only, rides the same crossing.
+- Test: sweettest — a stranger's `revoked|t` link on a lineage anchor is rejected; the honest revocation's link is accepted.
+
+- [ ] **Task 22 deliverable: no agent can revoke or activate a path it did not author or lawfully revoke; storage's lifecycle read becomes a verified fact.**
+
+### Task 23: G6 — the after-close fence reaches every courier (node-registry v2 integrity + coordinator)
+
+**Files:**
+- Modify: coordinator `carry_from` / `seal_close`: after a seal, every witness for that lineage carries the close proof (`CarriedProof` of the `CloseChain`) as its first proof, so a courier that never sealed still carries the close; `export_held_records` surfaces the neighbour's `CloseChain` when present.
+- Modify: integrity `refuse_carried_after_close`: a `CarriedProof` whose author has a `CloseChain` toward this DNA in the SAME batch (now guaranteed present after the seal) and whose `action_seq` is past it is refused — no chain walk needed for the cross-courier case.
+- Test: sweettest — jessica's post-close v1 write, carried by james (who never sealed), is refused by v2 as after-close.
+
+- [ ] **Task 23 deliverable: Station 8's "every peer" claim holds — a post-close v1 fact is refused by v2 regardless of which courier carries it.**
 
 ---
 
