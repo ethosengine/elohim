@@ -721,6 +721,19 @@ fn gateway_domain(doorway_url: Option<&str>) -> Option<String> {
     Some(host.strip_prefix("doorway-").unwrap_or(host).to_string())
 }
 
+/// Minimum password length accepted at registration.
+const MIN_PASSWORD_LEN: usize = 8;
+
+/// Whether a candidate password is refused for being too short.
+///
+/// Pulled out as a pure function because it is the first gate in
+/// `handle_register`'s pre-validation block: it must be answerable — and
+/// testable — without a conductor, a database, or a JWT key, which is exactly
+/// why it can run BEFORE any side effect.
+fn password_too_weak(password: &str) -> bool {
+    password.len() < MIN_PASSWORD_LEN
+}
+
 /// Re-qualify an identifier's local-part with the doorway's gateway domain. Idempotent
 /// for an already-own-domain identifier (no double-qualify); converges bare,
 /// full-own-domain, and full-foreign-domain inputs all to `localpart@gateway`.
@@ -797,6 +810,81 @@ async fn handle_register(
             },
         );
     }
+
+    // ── PRE-VALIDATION ─────────────────────────────────────────────────────────
+    // Everything that can REFUSE this registration runs BEFORE the agency-phase
+    // branch, because that branch has side effects we cannot take back: it calls
+    // create_human on a conductor (a source-chain action) and provisions agent
+    // cells. Running the refusals afterwards meant a weak password or an already-
+    // taken identifier could still mint a Human entry and burn a provisioned agent
+    // before the caller got their 400/409 — the DHT kept a human the DB never knew.
+    // Nothing here touches the conductor; it is all local checks plus one read.
+
+    // Validate password strength.
+    if password_too_weak(&body.password) {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &ErrorResponse {
+                error: format!("Password must be at least {MIN_PASSWORD_LEN} characters"),
+                code: Some("WEAK_PASSWORD".into()),
+            },
+        );
+    }
+
+    // Get JWT validator — a doorway that cannot mint a token must not register.
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    // Resolve the users collection and refuse a duplicate identifier, when
+    // MongoDB is configured. When it is not, this is the dev-mode-without-Mongo
+    // path: no collection, no lookup, and the simplified flow below still runs.
+    let user_collection = match &state.mongo {
+        Some(mongo) => {
+            let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+                Ok(c) => c,
+                Err(e) => {
+                    return json_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &ErrorResponse {
+                            error: format!("Database error: {e}"),
+                            code: Some("DB_ERROR".into()),
+                        },
+                    )
+                }
+            };
+
+            // Check if identifier already exists — BEFORE we create anything.
+            match collection
+                .find_one(doc! { "identifier": &body.identifier })
+                .await
+            {
+                Ok(Some(_)) => {
+                    return json_response(
+                        StatusCode::CONFLICT,
+                        &ErrorResponse {
+                            error: "An account with this identifier already exists".into(),
+                            code: Some("USER_EXISTS".into()),
+                        },
+                    )
+                }
+                Ok(None) => {} // Good, doesn't exist
+                Err(e) => {
+                    return json_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &ErrorResponse {
+                            error: format!("Database error: {e}"),
+                            code: Some("DB_ERROR".into()),
+                        },
+                    )
+                }
+            }
+
+            Some(collection)
+        }
+        None => None,
+    };
 
     // Branch registration flow by agency phase.
     // Returns (human_id, agent_pub_key, profile, provisioned).
@@ -1333,23 +1421,6 @@ async fn handle_register(
         }
     };
 
-    // Validate password strength (minimum 8 characters)
-    if body.password.len() < 8 {
-        return json_response(
-            StatusCode::BAD_REQUEST,
-            &ErrorResponse {
-                error: "Password must be at least 8 characters".into(),
-                code: Some("WEAK_PASSWORD".into()),
-            },
-        );
-    }
-
-    // Get JWT validator
-    let jwt = match get_jwt_validator(&state) {
-        Ok(j) => j,
-        Err(resp) => return resp,
-    };
-
     // In dev mode without MongoDB, use simplified flow
     if state.args.dev_mode && state.mongo.is_none() {
         info!("Dev mode register (no MongoDB): {}", body.identifier);
@@ -1371,9 +1442,10 @@ async fn handle_register(
         .await;
     }
 
-    // Production flow: use MongoDB
-    let mongo = match &state.mongo {
-        Some(m) => m,
+    // Production flow: the collection was resolved (and the duplicate-identifier
+    // refusal already made) in pre-validation, before any side effect.
+    let collection = match user_collection {
+        Some(c) => c,
         None => {
             return json_response(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -1384,46 +1456,6 @@ async fn handle_register(
             )
         }
     };
-
-    // Get users collection
-    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
-        Ok(c) => c,
-        Err(e) => {
-            return json_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &ErrorResponse {
-                    error: format!("Database error: {e}"),
-                    code: Some("DB_ERROR".into()),
-                },
-            )
-        }
-    };
-
-    // Check if identifier already exists
-    match collection
-        .find_one(doc! { "identifier": &body.identifier })
-        .await
-    {
-        Ok(Some(_)) => {
-            return json_response(
-                StatusCode::CONFLICT,
-                &ErrorResponse {
-                    error: "An account with this identifier already exists".into(),
-                    code: Some("USER_EXISTS".into()),
-                },
-            )
-        }
-        Ok(None) => {} // Good, doesn't exist
-        Err(e) => {
-            return json_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &ErrorResponse {
-                    error: format!("Database error: {e}"),
-                    code: Some("DB_ERROR".into()),
-                },
-            )
-        }
-    }
 
     // Hash password
     let password_hash = match hash_password(&body.password) {
@@ -4663,6 +4695,25 @@ mod tests {
         );
         // no configured URL → no domain → caller leaves the identifier untouched
         assert_eq!(gateway_domain(None), None);
+    }
+
+    /// `handle_register` refuses a weak password BEFORE the agency-phase branch,
+    /// because that branch calls create_human on a conductor and provisions agent
+    /// cells — side effects a later 400 cannot take back. The refusal itself has
+    /// to be answerable with no conductor, no database and no JWT key, which is
+    /// what makes it safe to hoist; this pins that boundary.
+    ///
+    /// The handler around it is not unit-testable here (it needs a live conductor
+    /// and MongoDB); the ordering it now enforces is exercised end-to-end by the
+    /// a2o auth scenarios.
+    #[test]
+    fn password_strength_is_a_pure_pre_side_effect_gate() {
+        assert!(password_too_weak(""));
+        assert!(password_too_weak("short"));
+        assert!(password_too_weak("1234567"), "one below the minimum");
+        assert!(!password_too_weak("12345678"), "exactly the minimum");
+        assert!(!password_too_weak("a longer passphrase"));
+        assert_eq!(MIN_PASSWORD_LEN, 8, "WEAK_PASSWORD message quotes this");
     }
 
     #[test]
