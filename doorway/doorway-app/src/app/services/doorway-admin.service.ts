@@ -50,6 +50,30 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
  * operator dashboards. Includes both REST API calls and
  * WebSocket real-time updates.
  */
+/**
+ * Close codes that mean "this socket ended the way it was supposed to":
+ * 1000 normal, 1001 the page is going away (navigation / logout redirect),
+ * 1005 closed with no status. rxjs's WebSocketSubject errors — rather than
+ * completes — on any close it did not initiate, so without this every logout
+ * printed `[DoorwayAdmin] WebSocket error: CloseEvent` to the console.
+ */
+const EXPECTED_CLOSE_CODES = new Set([1000, 1001, 1005]);
+
+/**
+ * Was this socket failure an EXPECTED end rather than a fault?
+ *
+ * `deliberate` is true once disconnect() has been called (logout, leaving the
+ * dashboard, auth cleared) — nothing that follows is news. Otherwise the close
+ * code decides: a normal or going-away close is the browser tearing the socket
+ * down on navigation, not an error the operator needs to see.
+ */
+export function isExpectedSocketClose(err: unknown, deliberate: boolean): boolean {
+  if (deliberate) return true;
+  if (typeof err !== 'object' || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === 'number' && EXPECTED_CLOSE_CODES.has(code);
+}
+
 @Injectable({ providedIn: 'root' })
 export class DoorwayAdminService {
   private readonly http = inject(HttpClient);
@@ -578,6 +602,12 @@ export class DoorwayAdminService {
   // ============================================================================
 
   /**
+   * True once disconnect() has been called — a close after that is expected,
+   * not a fault. Reset on the next connect().
+   */
+  private closeExpected = false;
+
+  /**
    * Connect to the real-time dashboard WebSocket
    */
   connect(): void {
@@ -585,6 +615,7 @@ export class DoorwayAdminService {
       return; // Already connected
     }
 
+    this.closeExpected = false;
     this._connectionState.set('connecting');
 
     // Determine WebSocket URL
@@ -616,8 +647,17 @@ export class DoorwayAdminService {
         }
       },
       error: err => {
-        console.error('[DoorwayAdmin] WebSocket error:', err);
-        this._connectionState.set('error');
+        if (isExpectedSocketClose(err, this.closeExpected)) {
+          // Logout, navigation away, or our own disconnect(). Not a fault: a
+          // console.error here fails any a2o scenario that walks through
+          // sign-out, and warn would fire on every single logout.
+          // eslint-disable-next-line no-console -- debug is the honest level for an expected close
+          console.debug('[DoorwayAdmin] WebSocket closed as expected');
+          this._connectionState.set('disconnected');
+        } else {
+          console.error('[DoorwayAdmin] WebSocket error:', err);
+          this._connectionState.set('error');
+        }
         this.ws$ = null;
       },
     });
@@ -627,6 +667,8 @@ export class DoorwayAdminService {
    * Disconnect from WebSocket
    */
   disconnect(): void {
+    // Anything the socket reports from here on is our own doing.
+    this.closeExpected = true;
     if (this.ws$) {
       this.ws$.complete();
       this.ws$ = null;
