@@ -410,7 +410,7 @@ impl RaceFetchPuller {
 fn merge_candidates(inventory: Vec<String>, connected: &[String], cap: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for peer in inventory.into_iter().chain(connected.iter().cloned()) {
-        if !out.iter().any(|p| *p == peer) {
+        if !out.contains(&peer) {
             out.push(peer);
         }
     }
