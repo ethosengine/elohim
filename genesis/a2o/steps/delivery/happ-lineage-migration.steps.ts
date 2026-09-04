@@ -90,13 +90,13 @@
  *
  * ## Run-scoped channel, one channel only (Part 1's scope)
  *
- * `CHANNEL_ID` mints fresh per run from a run stamp, exactly like the rung-5
- * steps' `CHANNEL_ID` — a repeat run never collides with a channel a prior
+ * `channelId()` mints fresh per run from a run stamp, exactly like the rung-5
+ * steps' `channelId()` — a repeat run never collides with a channel a prior
  * run left mid-flight. The story names the channel
  * "runtime:lineage:node_registry:commons"; this file substitutes a
  * run-scoped id for the SAME behavioural role (the Background's own Given
  * asserts the STORY name against `STORY_CHANNEL_NAME`, then acts on
- * `CHANNEL_ID` internally — same substitution rung-5's own Background does
+ * `channelId()` internally — same substitution rung-5's own Background does
  * for `STORY_COMMONS_CHANNEL_NAME`). Part 1 only ever needs the channel in
  * `observe` mode (no station here applies or promotes past a bare
  * `channel create` + `publish` + `promote`), so the follow-set machinery
@@ -128,6 +128,7 @@ import {
   CellType,
   encodeHashToBase64,
   fakeEntryHash,
+  fakeDnaHash,
   decodeHashFromBase64,
 } from '@holochain/client';
 import { request } from 'undici';
@@ -174,11 +175,49 @@ const STORY_CHANNEL_NAME = 'runtime:lineage:node_registry:commons';
  * mesh. The run-scoped id therefore spells the role with a HYPHEN. This is a
  * substitution of the same behavioural role the module doc already documents
  * (the Background asserts the STORY name against `STORY_CHANNEL_NAME` and acts
- * on `CHANNEL_ID`), plus one measured fact for the ledger: the story's literal
+ * on `channelId()`), plus one measured fact for the ledger: the story's literal
  * channel name would have to be `runtime:lineage:node-registry:commons` to be
  * publishable at all.
  */
-const CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}`;
+/**
+ * Each Station is its own WORLD — the story says so in as many words ("its
+ * Given sets exactly the state it needs, so a later Station may begin where an
+ * earlier one would have ended without replaying it"), and this fixture's
+ * `Before` enforces it by resetting every peer to the v1 baseline. So the
+ * cross-scenario memo in `lineage()` is dropped per scenario too, and each
+ * world gets its OWN channels and manifests: a second scenario reusing the
+ * first's channel id would publish onto a channel whose earned head belongs to
+ * a world that has just been torn down.
+ *
+ * MEASURED (run r11): without this, Station 4 running after Station 3 in one
+ * process short-circuited every memoized helper, went looking for the side app
+ * the `Before` had just uninstalled, and failed with "app 'elohim@…' is not
+ * installed on adminPort=4464".
+ */
+let worldIndex = 0;
+function worldStamp(): string {
+  return `${RUN_STAMP}w${worldIndex}`;
+}
+
+/**
+ * This world's channel — the one Station 1 and Station 2's first half act on.
+ *
+ * MEASURED 2026-09-04 (Station 1, run r1): the STORY's channel name
+ * "runtime:lineage:node_registry:commons" is not a legal channel id — the
+ * release-manifest schema's `channelId` pattern is
+ * `^runtime:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$`
+ * (`is_channel_id` in elohim-storage's `release_adoption::verify` enforces the
+ * same shape), and an UNDERSCORE is not in that alphabet. Packaging refused
+ * with `schema: /channelId must match pattern …` before anything reached the
+ * mesh. The run-scoped id therefore spells the role with a HYPHEN; the
+ * Background still asserts the STORY name against `STORY_CHANNEL_NAME`. One
+ * measured fact for the ledger: the story's literal channel name would have to
+ * be `runtime:lineage:node-registry:commons` to be publishable at all.
+ */
+function channelId(): string {
+  return `runtime:lineage:node-registry:a2o-${worldStamp()}`;
+}
+
 /**
  * Station 2's second half publishes onto a FRESH channel, and the reason is
  * MEASURED (run r4), not stylistic: `release-ceremony.ts`'s
@@ -186,17 +225,22 @@ const CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}`;
  * already has an EARNED head unless the acting peer has ADOPTED that head and
  * the manifest names it as its lineage parent — rung 5's adopt-before-author
  * rail ("a steward cannot push what they have not themselves adopted"). The
- * earned head on `CHANNEL_ID` is the release Station 2's FIRST half exists to
+ * earned head on `channelId()` is the release Station 2's FIRST half exists to
  * have refused, so matthew has by construction not adopted it and never will.
  * A fresh channel per release is the household's declared discipline anyway;
  * this is where the story's "each Station is its own world" stops being a
  * convenience and becomes the mechanism.
  */
-const NOTARIZED_CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}-path`;
+function notarizedChannelId(): string {
+  return `${channelId()}-path`;
+}
+
 /** Stations 3-5's own channel — a fresh one per release (same discipline and
- * the same measured reason as `NOTARIZED_CHANNEL_ID`), on which the notarized
+ * the same measured reason as `notarizedChannelId`), on which the notarized
  * release is the FIRST and therefore the WINNER, at `staging` tier. */
-const CANARY_CHANNEL_ID = `runtime:lineage:node-registry:a2o-${RUN_STAMP}-canary`;
+function canaryChannelId(): string {
+  return `${channelId()}-canary`;
+}
 
 const REPORT_DIR = path.join(
   A2O_ROOT,
@@ -204,19 +248,23 @@ const REPORT_DIR = path.join(
   'release-ceremony',
   new Date().toISOString().slice(0, 10)
 );
-const MANIFEST_PATH = path.join(REPORT_DIR, `a2o-happ-lineage-${RUN_STAMP}.json`);
+
+function manifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}.json`);
+}
+/** Station 1's negative control — v2 with no parent named. */
+function negativeManifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-no-parent.json`);
+}
 /** Station 2's SECOND release: the same crossing, re-published naming the REAL
- * notarized commitment. See `notarizeMigrationPath`'s own comment for why the
- * pointer cannot run the other way. */
-const NOTARIZED_MANIFEST_PATH = path.join(
-  REPORT_DIR,
-  `a2o-happ-lineage-${RUN_STAMP}-notarized.json`
-);
-const CANARY_MANIFEST_PATH = path.join(REPORT_DIR, `a2o-happ-lineage-${RUN_STAMP}-canary.json`);
-const NEGATIVE_MANIFEST_PATH = path.join(
-  REPORT_DIR,
-  `a2o-happ-lineage-${RUN_STAMP}-no-parent.json`
-);
+ * notarized commitment. See `notarizeMigrationPath` for why the pointer cannot
+ * run the other way. */
+function notarizedManifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-notarized.json`);
+}
+function canaryManifestPath(): string {
+  return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-canary.json`);
+}
 
 const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
 
@@ -327,7 +375,7 @@ const CONDUCTOR_CONNECT_TIMEOUT_MS = 5_000;
  * (`AdminWebsocket.connect` / `AppWebsocket.connect` only — `listApps`,
  * `authorizeSigningCredentials` and `issueAppAuthenticationToken` are NOT wrapped there either).
  */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error(`timeout after ${timeoutMs}ms: ${label}`)),
@@ -633,7 +681,7 @@ function findChannelRow(report: AdoptionReport, channelId: string): AdoptionChan
 }
 
 /**
- * Poll one peer's `/admin/adoption` for `CHANNEL_ID` until `predicate` is satisfied. A connect
+ * Poll one peer's `/admin/adoption` for `channelId()` until `predicate` is satisfied. A connect
  * failure or non-200 is NOT "absent" — the poll keeps retrying rather than concluding the row
  * doesn't exist (same "unreachable ≠ absent" rail `runtime-upgrade-propagation.steps.ts`'s own
  * `pollAdoption` documents).
@@ -642,7 +690,7 @@ async function pollAdoption(
   peer: PeerName,
   timeoutMs: number,
   predicate: (row: AdoptionChannelRow) => boolean,
-  channelId: string = CHANNEL_ID,
+  channel: string = channelId(),
   intervalMs = RECONCILE_POLL_INTERVAL_MS
 ): Promise<{ row: AdoptionChannelRow; rawText: string }> {
   const start = Date.now();
@@ -652,7 +700,7 @@ async function pollAdoption(
     try {
       const { report, rawText } = await getAdoptionReport(peer);
       everReachable = true;
-      const row = findChannelRow(report, channelId);
+      const row = findChannelRow(report, channel);
       lastRow = row;
       if (row && predicate(row)) {
         return { row, rawText };
@@ -663,7 +711,7 @@ async function pollAdoption(
     await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
   }
   assert.fail(
-    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${channelId}] ` +
+    `timed out after ${timeoutMs}ms waiting on ${peer}'s ${ADOPTION_PATH}[${channel}] ` +
       `(peer was ${everReachable ? 'reachable' : 'never reachable'} during the poll); ` +
       `last row: ${JSON.stringify(lastRow)}`
   );
@@ -675,11 +723,11 @@ async function pollAdoption(
 async function pollAllPeers(
   predicate: (peer: PeerName, row: AdoptionChannelRow) => boolean,
   timeoutMs = RECONCILE_POLL_TIMEOUT_MS,
-  channelId: string = CHANNEL_ID
+  channel: string = channelId()
 ): Promise<Partial<Record<PeerName, { row: AdoptionChannelRow; rawText: string }>>> {
   const entries = await Promise.all(
     PEER_NAMES.map(async peer => {
-      const result = await pollAdoption(peer, timeoutMs, row => predicate(peer, row), channelId);
+      const result = await pollAdoption(peer, timeoutMs, row => predicate(peer, row), channel);
       return [peer, result] as const;
     })
   );
@@ -727,7 +775,7 @@ function runtimeConfigPath(peer: PeerName): string {
  * document), and `AfterAll` byte-restores what was there before.
  *
  * A MAP rather than one channel because the stations need more than one
- * channel (a fresh channel per release — see `NOTARIZED_CHANNEL_ID`) and more
+ * channel (a fresh channel per release — see `notarizedChannelId()`) and more
  * than one mode (james canary, matthew/jessica observe or apply).
  */
 const runOwnedFollow: Record<PeerName, Map<string, string>> = {
@@ -752,11 +800,11 @@ async function applyFollowSet(peer: PeerName): Promise<void> {
 
 /** Register `channelId` on every peer at the given per-peer mode (default `observe`). */
 async function followChannel(
-  channelId: string,
+  target: string,
   modes: Partial<Record<PeerName, string>> = {}
 ): Promise<void> {
   for (const peer of PEER_NAMES) {
-    runOwnedFollow[peer].set(channelId, modes[peer] ?? 'observe');
+    runOwnedFollow[peer].set(target, modes[peer] ?? 'observe');
     await applyFollowSet(peer);
   }
 }
@@ -766,21 +814,26 @@ let runOwnedFollowSetEstablished = false;
 let runOwnedFollowSetRestored = false;
 
 /** Captures each peer's TRUE on-disk bytes once, then writes a run-owned file containing only
- * `CHANNEL_ID=observe` — same "the run owns its own follow set, never a read-merge-write" rule
+ * `channelId()=observe` — same "the run owns its own follow set, never a read-merge-write" rule
  * `runtime-upgrade-propagation.steps.ts`'s module doc explains (the 2026-09-01 leftover-channel
  * hazard this closes). */
 async function ensureRunOwnedFollowSet(): Promise<void> {
-  if (runOwnedFollowSetEstablished) return;
   mkdirSync(REPORT_DIR, { recursive: true });
   for (const peer of PEER_NAMES) {
-    let originalBytes: Buffer;
-    try {
-      originalBytes = readFileSync(runtimeConfigPath(peer));
-    } catch {
-      originalBytes = Buffer.from('', 'utf8');
+    if (!runOwnedFollowSetEstablished) {
+      let originalBytes: Buffer;
+      try {
+        originalBytes = readFileSync(runtimeConfigPath(peer));
+      } catch {
+        originalBytes = Buffer.from('', 'utf8');
+      }
+      originalRuntimeConfigBytes[peer] = originalBytes;
     }
-    originalRuntimeConfigBytes[peer] = originalBytes;
-    runOwnedFollow[peer].set(CHANNEL_ID, 'observe');
+    // One world's channels are not the next world's: drop what a previous
+    // scenario registered rather than leaving this peer following a channel
+    // whose head belongs to a torn-down world.
+    runOwnedFollow[peer].clear();
+    runOwnedFollow[peer].set(channelId(), 'observe');
     await applyFollowSet(peer);
   }
   runOwnedFollowSetEstablished = true;
@@ -822,6 +875,15 @@ async function resetLineageBaselineOnAllPeers(): Promise<void> {
 /** Tag-scoped to this feature's own `@happ-lineage` so no other suite's runtime-config is ever
  * touched — fires before Station 1's own Given/When steps. */
 Before({ tags: '@happ-lineage', timeout: 60_000 }, async function (this: E2EWorld) {
+  // Each Station is its own WORLD (the story's own words, and this hook's whole
+  // reason for existing): the peers go back to the v1 baseline, and the
+  // cross-step memo goes with them. Keeping the memo across scenarios in one
+  // process is how run r11's Station 4 ended up looking for a side app this
+  // very hook had just uninstalled. `worldIndex` moves with it so the next
+  // scenario's channels cannot inherit an earned head from a torn-down world.
+  worldIndex += 1;
+  state = undefined;
+  channelsCreated.clear();
   await ensureRunOwnedFollowSet();
   await resetLineageBaselineOnAllPeers();
 });
@@ -921,6 +983,9 @@ interface LineageState {
   jamesAuthoringDnaHash?: string;
   /** v1 entry hash -> how many witnesses v2 answers for it. */
   witnessCounts?: Record<string, number>;
+  /** Station 9: each peer's v2 refusal text for the forgery just attempted
+   * (`null` means that peer ACCEPTED it, which is the failure). */
+  witnessRefusals?: Partial<Record<PeerName, string | null>>;
   lastRows: Partial<Record<PeerName, AdoptionChannelRow>>;
   lastRawText: Partial<Record<PeerName, string>>;
   backgroundPids: Partial<Record<PeerName, string>>;
@@ -1065,8 +1130,8 @@ async function putV2HappToOtherPeers(): Promise<void> {
 
 const channelsCreated = new Set<string>();
 
-function ensureChannelCreated(channelId: string = CHANNEL_ID): void {
-  if (channelsCreated.has(channelId)) return;
+function ensureChannelCreated(target: string = channelId()): void {
+  if (channelsCreated.has(target)) return;
   const discipline = JSON.stringify({
     soakSecs: SOAK_SECS,
     attestationThreshold: ATTESTATION_THRESHOLD,
@@ -1075,7 +1140,7 @@ function ensureChannelCreated(channelId: string = CHANNEL_ID): void {
   const created = runDriver(RELEASE_CEREMONY_SCRIPT, [
     'channel',
     'create',
-    channelId,
+    target,
     '--discipline',
     discipline,
   ]);
@@ -1084,7 +1149,7 @@ function ensureChannelCreated(channelId: string = CHANNEL_ID): void {
     0,
     `channel create failed (exit ${created.status}):\n--- stdout ---\n${created.stdout.trim()}\n--- stderr ---\n${created.stderr.trim()}`
   );
-  channelsCreated.add(channelId);
+  channelsCreated.add(target);
 }
 
 /** Idempotent + self-verifying (same convention as rung-5's `ensure*` helpers): a later Given
@@ -1102,9 +1167,9 @@ async function ensureStation1Published(): Promise<void> {
     v1DnaHash: c.v1DnaHash,
     v2DnaHash,
     pathCommitmentCid: await unnotarizedPathCid(),
-    channelId: CHANNEL_ID,
+    channelId: channelId(),
     storageBaseUrl: directPeerUrl('matthew'),
-    out: MANIFEST_PATH,
+    out: manifestPath(),
     discipline: {
       soakSecs: SOAK_SECS,
       attestationThreshold: ATTESTATION_THRESHOLD,
@@ -1116,7 +1181,7 @@ async function ensureStation1Published(): Promise<void> {
   await putV2HappToOtherPeers();
   ensureChannelCreated();
 
-  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', MANIFEST_PATH]);
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', manifestPath()]);
   assert.equal(
     published.status,
     0,
@@ -1134,7 +1199,7 @@ interface ManifestRoleBindingFile {
 
 function assertManifestNamesV1Parent(): void {
   const c = lineage();
-  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as ManifestRoleBindingFile;
+  const manifest = JSON.parse(readFileSync(manifestPath(), 'utf8')) as ManifestRoleBindingFile;
   const binding = manifest.appliesTo?.roles?.[NODE_REGISTRY_ROLE];
   assert.equal(binding?.migrateFrom, c.v1DnaHash, 'manifest does not declare migrateFrom = v1');
   assert.ok(
@@ -1191,9 +1256,9 @@ async function ensureStation1NegativePublished(): Promise<void> {
   const minted = await lineageReleaseWithoutParent({
     role: NODE_REGISTRY_ROLE,
     v2DnaHash,
-    channelId: CHANNEL_ID,
+    channelId: channelId(),
     storageBaseUrl: directPeerUrl('matthew'),
-    out: NEGATIVE_MANIFEST_PATH,
+    out: negativeManifestPath(),
     discipline: {
       soakSecs: SOAK_SECS,
       attestationThreshold: ATTESTATION_THRESHOLD,
@@ -1202,7 +1267,7 @@ async function ensureStation1NegativePublished(): Promise<void> {
   });
   assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
 
-  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', NEGATIVE_MANIFEST_PATH]);
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', negativeManifestPath()]);
   assert.equal(
     published.status,
     0,
@@ -1276,7 +1341,7 @@ async function ensureStation2Earned(): Promise<void> {
   await ensureStation1Published();
   if (c.promotedAt) return;
   const releaseCid = c.releaseCid as string;
-  const promoted = runDriver(RELEASE_CEREMONY_SCRIPT, ['promote', CHANNEL_ID, releaseCid], 60_000);
+  const promoted = runDriver(RELEASE_CEREMONY_SCRIPT, ['promote', channelId(), releaseCid], 60_000);
   assert.equal(
     promoted.status,
     0,
@@ -1382,9 +1447,9 @@ async function ensureNotarizedCommitment(): Promise<void> {
  * Publish the SAME crossing, naming the real commitment, onto a FRESH channel.
  *
  * Two measured constraints decide this shape, and both are recorded on
- * `NOTARIZED_CHANNEL_ID` and in the epic ledger:
+ * `notarizedChannelId()` and in the epic ledger:
  *
- * 1. It cannot go onto `CHANNEL_ID` — that channel has an EARNED head matthew
+ * 1. It cannot go onto `channelId()` — that channel has an EARNED head matthew
  *    has (correctly) not adopted, and `assertAdmissibleOverEarnedHead` refuses.
  * 2. On the fresh channel it must be the WINNER, not a staging candidate
  *    beneath something. `classify_candidate_follow` (watch.rs) has only a
@@ -1405,17 +1470,17 @@ async function republishOverNotarizedPath(): Promise<void> {
   const commitmentCid = c.migrationCommitmentCid;
   assert.ok(commitmentCid, 'no notarized commitment to re-publish over');
 
-  await followChannel(NOTARIZED_CHANNEL_ID);
-  ensureChannelCreated(NOTARIZED_CHANNEL_ID);
+  await followChannel(notarizedChannelId());
+  ensureChannelCreated(notarizedChannelId());
 
   const minted = await mintLineageCandidate({
     role: NODE_REGISTRY_ROLE,
     v1DnaHash: c.v1DnaHash as string,
     v2DnaHash: c.v2DnaHash as string,
     pathCommitmentCid: commitmentCid,
-    channelId: NOTARIZED_CHANNEL_ID,
+    channelId: notarizedChannelId(),
     storageBaseUrl: directPeerUrl('matthew'),
-    out: NOTARIZED_MANIFEST_PATH,
+    out: notarizedManifestPath(),
     discipline: {
       soakSecs: SOAK_SECS,
       attestationThreshold: ATTESTATION_THRESHOLD,
@@ -1426,7 +1491,7 @@ async function republishOverNotarizedPath(): Promise<void> {
 
   const published = runDriver(
     RELEASE_CEREMONY_SCRIPT,
-    ['publish', NOTARIZED_MANIFEST_PATH],
+    ['publish', notarizedManifestPath()],
     180_000
   );
   assert.equal(
@@ -1439,7 +1504,7 @@ async function republishOverNotarizedPath(): Promise<void> {
   c.notarizedReleaseCid = parsed.releaseCid;
   console.error(
     `[happ-lineage-migration] Station 2: re-published over commitment ${commitmentCid} on ` +
-      `${NOTARIZED_CHANNEL_ID} — release ${parsed.releaseCid} (tier ${parsed.tier})`
+      `${notarizedChannelId()} — release ${parsed.releaseCid} (tier ${parsed.tier})`
   );
 }
 
@@ -1453,13 +1518,13 @@ async function republishOverNotarizedPath(): Promise<void> {
  * only when, on top of that, a migration commitment notarizes it"), not as
  * "this peer installed it".
  */
-const PATH_ARM_REASONS: readonly string[] = [
+const PATH_ARM_REASONS = new Set([
   'path_not_notarized',
   'path_revoked',
   'quorum_unmet',
   'root_mismatch',
   'conductor_unavailable',
-];
+]);
 
 async function assertStation2Adoptable(): Promise<void> {
   const c = lineage();
@@ -1469,9 +1534,9 @@ async function assertStation2Adoptable(): Promise<void> {
     (_peer, row) =>
       row.resolvedHead?.cid === releaseCid &&
       row.verdict !== null &&
-      !PATH_ARM_REASONS.includes(row.verdict?.refusal?.reason ?? ''),
+      !PATH_ARM_REASONS.has(row.verdict?.refusal?.reason ?? ''),
     ADOPTABLE_RED_POLL_TIMEOUT_MS,
-    NOTARIZED_CHANNEL_ID
+    notarizedChannelId()
   );
   for (const peer of PEER_NAMES) {
     const verdict = results[peer]?.row.verdict;
@@ -1480,7 +1545,8 @@ async function assertStation2Adoptable(): Promise<void> {
         `refusal.reason=${verdict?.refusal?.reason ?? '(none)'}`
     );
     c.lastRows[peer] = results[peer]?.row ?? c.lastRows[peer];
-    if (results[peer]?.rawText) c.lastRawText[peer] = results[peer]?.rawText as string;
+    const rawText = results[peer]?.rawText;
+    if (rawText) c.lastRawText[peer] = rawText;
   }
 }
 
@@ -1609,21 +1675,21 @@ async function openCanaryWindow(): Promise<void> {
   await ensureStation1Published();
   await ensureNotarizedCommitment();
 
-  await followChannel(CANARY_CHANNEL_ID, {
+  await followChannel(canaryChannelId(), {
     james: 'canary',
     matthew: 'observe',
     jessica: 'observe',
   });
-  ensureChannelCreated(CANARY_CHANNEL_ID);
+  ensureChannelCreated(canaryChannelId());
 
   const minted = await mintLineageCandidate({
     role: NODE_REGISTRY_ROLE,
     v1DnaHash: c.v1DnaHash as string,
     v2DnaHash: c.v2DnaHash as string,
     pathCommitmentCid: c.migrationCommitmentCid as string,
-    channelId: CANARY_CHANNEL_ID,
+    channelId: canaryChannelId(),
     storageBaseUrl: directPeerUrl('matthew'),
-    out: CANARY_MANIFEST_PATH,
+    out: canaryManifestPath(),
     discipline: {
       soakSecs: SOAK_SECS,
       attestationThreshold: ATTESTATION_THRESHOLD,
@@ -1633,7 +1699,7 @@ async function openCanaryWindow(): Promise<void> {
   assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
   await putV2HappToOtherPeers();
 
-  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', CANARY_MANIFEST_PATH], 180_000);
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', canaryManifestPath()], 180_000);
   assert.equal(
     published.status,
     0,
@@ -1648,7 +1714,7 @@ async function openCanaryWindow(): Promise<void> {
   // the agent's own chain, so this is exactly the set the carry will read.
   c.jamesV1Export = await readV1Export('james');
   console.error(
-    `[happ-lineage-migration] Station 3: canary window open on ${CANARY_CHANNEL_ID} — release ` +
+    `[happ-lineage-migration] Station 3: canary window open on ${canaryChannelId()} — release ` +
       `${parsed.releaseCid} (tier ${parsed.tier}), path ${c.migrationCommitmentCid}; james's v1 ` +
       `chain baseline: total=${c.jamesV1Export.total}, digest=${c.jamesV1Export.digest}`
   );
@@ -1668,9 +1734,9 @@ async function readV1Export(
       const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
         records: unknown[];
         entries: unknown[];
-        next_cursor: number | null;
+        next_cursor?: number | null;
         digest: string;
-        total: number | null;
+        total?: number | null;
       };
       digest = raw.digest;
       if (raw.total !== null && raw.total !== undefined) total = raw.total;
@@ -1687,22 +1753,33 @@ async function readV1Export(
   }
 }
 
+// the honest return: a record whose action carries no entry hash contributes
+// nothing, and an empty string would read as a record with a blank address.
 /**
  * The entry hash a `SignedActionHashed` commits to, base64.
  *
- * The wire shape is msgpack-decoded by `@holochain/client` into
- * `{ hashed: { content: <Action>, hash }, signature }`, and an app-entry action
- * (`Create`/`Update`) carries `entry_hash` on its content. A record whose action
- * has no entry hash (there should be none — `export_records` filters to app
- * entry types) contributes nothing rather than an empty string, which would read
- * as a record with a blank address.
+ * MEASURED against a live 0.7 conductor (2026-09-04): the msgpack shape is
+ * `{ hashed: { content: { header: { author, timestamp, action_seq, prev_action },
+ * data: { type: "Create", entry_type, entry_hash } }, hash }, signature }` —
+ * the action is split into a common HEADER and a per-variant DATA half, and the
+ * entry hash lives on `data`, NOT flat on the action as the pre-0.7 shape had
+ * it. Reading it off the wrong level silently yields no hashes at all, which
+ * reads as "james's v1 chain is empty" — the first red this Station took.
+ *
+ * A record whose action carries no entry hash contributes nothing rather than
+ * an empty string, which would read as a record with a blank address.
  */
+/* eslint-disable sonarjs/function-return-type -- `string | undefined` is the honest
+   return here: a record whose action carries no entry hash contributes NOTHING, and an
+   empty string would read as a record with a blank address. Same posture as
+   `findProvisionedCellId` and `findChannelRow` above. */
 function entryHashOfSignedAction(record: unknown): string | undefined {
-  const content = (record as { hashed?: { content?: { entry_hash?: Uint8Array } } })?.hashed
-    ?.content;
-  const entryHash = content?.entry_hash;
+  const data = (record as { hashed?: { content?: { data?: { entry_hash?: Uint8Array } } } })?.hashed
+    ?.content?.data;
+  const entryHash = data?.entry_hash;
   return entryHash instanceof Uint8Array ? encodeHashToBase64(entryHash) : undefined;
 }
+/* eslint-enable sonarjs/function-return-type */
 
 /** Every app installed on a peer's conductor, with its agent key — the fact the
  * passport does not carry and Station 3's "under james's existing agent key"
@@ -1758,7 +1835,7 @@ async function awaitCanaryApply(): Promise<void> {
     'james',
     CANARY_APPLY_BUDGET_MS,
     r => r.resolvedHead?.cid === releaseCid && r.appliedRelease?.cid === releaseCid,
-    CANARY_CHANNEL_ID
+    canaryChannelId()
   );
   assert.equal(
     row.appliedRelease?.vehicle,
@@ -2304,34 +2381,249 @@ Then(
 
 // ── Station 9 — a forged witness, whoever commits it, is refused by every peer's own validation, naming why ──
 
-Given('the test harness joins the mesh as a fourth peer running v2', function () {
-  return 'pending';
-});
+/**
+ * Station 9's world: ALL THREE peers dual-celled, so "every peer's own
+ * validation" is three real validations and not one peer's generalized.
+ *
+ * The story's Given says the harness "joins the mesh as a fourth peer running
+ * v2". On this substrate the harness has no conductor of its own — it drives
+ * the household's three. What it does have is exactly what the story's own
+ * vocabulary paragraph grants it: the fixture humans' keys, and the standing to
+ * do "something a well-behaved peer never would". So the forgery is committed
+ * THROUGH each peer's own v2 cell, under that peer's own key, which is a
+ * strictly harder test than a fourth peer would be: the refusal has to come
+ * from v2's validation rather than from the network declining to accept a
+ * stranger.
+ */
+async function openWindowOnEveryPeer(): Promise<void> {
+  const c = lineage();
+  if (c.canaryReleaseCid) return;
+  await ensureStation1Published();
+  await ensureNotarizedCommitment();
 
-When(
-  "the harness commits a witness whose signature does not verify against the action's signer",
-  function () {
-    return 'pending';
+  await followChannel(canaryChannelId(), {
+    james: 'canary',
+    matthew: 'canary',
+    jessica: 'canary',
+  });
+  ensureChannelCreated(canaryChannelId());
+
+  const minted = await mintLineageCandidate({
+    role: NODE_REGISTRY_ROLE,
+    v1DnaHash: c.v1DnaHash as string,
+    v2DnaHash: c.v2DnaHash as string,
+    pathCommitmentCid: c.migrationCommitmentCid as string,
+    channelId: canaryChannelId(),
+    storageBaseUrl: directPeerUrl('matthew'),
+    out: canaryManifestPath(),
+    discipline: {
+      soakSecs: SOAK_SECS,
+      attestationThreshold: ATTESTATION_THRESHOLD,
+      canary: CANARY_PEER,
+    },
+  });
+  assert.ok(existsSync(minted.manifestPath), `manifest was not written to ${minted.manifestPath}`);
+  await putV2HappToOtherPeers();
+
+  const published = runDriver(RELEASE_CEREMONY_SCRIPT, ['publish', canaryManifestPath()], 180_000);
+  assert.equal(
+    published.status,
+    0,
+    `publish (all-peer window) failed (exit ${published.status}):\n--- stdout ---\n${published.stdout.trim()}\n--- stderr ---\n${published.stderr.trim()}`
+  );
+  const parsed = extractJson<PublishResult>(published.stdout);
+  c.canaryReleaseCid = parsed.releaseCid;
+
+  await Promise.all(
+    PEER_NAMES.map(async peer => {
+      const { row } = await pollAdoption(
+        peer,
+        CANARY_APPLY_BUDGET_MS,
+        r => r.appliedRelease?.cid === parsed.releaseCid,
+        canaryChannelId()
+      );
+      assert.equal(
+        row.appliedRelease?.vehicle,
+        LINEAGE_VEHICLE,
+        `${peer} applied with vehicle "${row.appliedRelease?.vehicle}", not the lineage vehicle`
+      );
+      console.error(
+        `[happ-lineage-migration] Station 9: ${peer} is dual-celled — carried ` +
+          `${row.appliedRelease?.carry?.carried ?? '?'} of ${row.appliedRelease?.carry?.v1Count ?? '?'}`
+      );
+    })
+  );
+}
+
+/** One peer's `elohim@…` side app id, from its own passport. */
+async function lineageAppIdOf(peer: PeerName): Promise<string> {
+  const passport = await readPassport(peer);
+  const apps = passport.passport?.happ?.lineageApps ?? [];
+  assert.equal(
+    apps.length,
+    1,
+    `${peer}'s passport lists ${apps.length} lineage side app(s) (${JSON.stringify(apps)})`
+  );
+  return apps[0];
+}
+
+/** One real, honestly-notarized v1 proof, taken straight off a peer's own v1 chain. */
+async function realProof(
+  peer: PeerName
+): Promise<{ action: unknown; signature: Uint8Array; entry: null }> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  try {
+    const page = (await rail.call('export_records', { cursor: null, limit: 1 })) as {
+      records: { hashed: { content: unknown }; signature: Uint8Array }[];
+    };
+    assert.ok(page.records.length > 0, `${peer}'s v1 chain is empty — nothing to forge FROM`);
+    const record = page.records[0];
+    return { action: record.hashed.content, signature: record.signature, entry: null };
+  } finally {
+    await rail.close();
+  }
+}
+
+/** Commit a witness on one peer's v2 cell and return the refusal, or `null` if it was ACCEPTED. */
+async function commitWitnessExpectingRefusal(
+  peer: PeerName,
+  witness: unknown
+): Promise<string | null> {
+  const sideAppId = await lineageAppIdOf(peer);
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
+  try {
+    await rail.call('commit_witness', witness);
+    return null;
+  } catch (error) {
+    return String(error);
+  } finally {
+    await rail.close();
+  }
+}
+
+/** The story's reason names, matched against v2's OWN refusal text. */
+const WITNESS_REFUSAL_MARKERS: Record<string, string> = {
+  'signature invalid': 'carried signature does not verify against the',
+  'lineage unrecognized': "is not declared in this DNA's lineage property",
+};
+
+Given(
+  'the test harness joins the mesh as a fourth peer running v2',
+  { timeout: 900_000 },
+  async function (this: E2EWorld) {
+    await openWindowOnEveryPeer();
   }
 );
 
-Then(
-  "v2's validation on every peer refuses it, naming {string} as its reason",
-  function (_reason: string) {
-    return 'pending';
+When(
+  "the harness commits a witness whose signature does not verify against the action's signer",
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    const refusals: Partial<Record<PeerName, string | null>> = {};
+    for (const peer of PEER_NAMES) {
+      const proof = await realProof(peer);
+      // One byte of a REAL signature over a REAL action, flipped. Everything
+      // else about this witness is genuine, so the only thing v2 can be
+      // refusing is the notarization itself.
+      const forged = Uint8Array.from(proof.signature);
+      forged[0] ^= 0xff;
+      refusals[peer] = await commitWitnessExpectingRefusal(peer, {
+        lineage_dna_hash: decodeHashFromBase64(c.v1DnaHash as string),
+        proofs: [{ action: proof.action, signature: forged, entry: null }],
+      });
+    }
+    c.witnessRefusals = refusals;
   }
 );
 
 When(
   'the harness commits a witness naming a parent rule version the v2 DNA does not declare in its lineage',
-  function () {
-    return 'pending';
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    const c = lineage();
+    // A REAL, VALID proof under a parent this DNA never declared — so the only
+    // thing being refused is the lineage claim, not the notarization.
+    const foreignLineage = await fakeDnaHash(0xd1);
+    const refusals: Partial<Record<PeerName, string | null>> = {};
+    for (const peer of PEER_NAMES) {
+      const proof = await realProof(peer);
+      refusals[peer] = await commitWitnessExpectingRefusal(peer, {
+        lineage_dna_hash: foreignLineage,
+        proofs: [{ action: proof.action, signature: proof.signature, entry: null }],
+      });
+    }
+    c.witnessRefusals = refusals;
   }
 );
 
-Then('neither refusal disturbs any record that was carried honestly', function () {
-  return 'pending';
-});
+Then(
+  "v2's validation on every peer refuses it, naming {string} as its reason",
+  function (this: E2EWorld, storyReason: string) {
+    const c = lineage();
+    const refusals = c.witnessRefusals;
+    assert.ok(refusals, 'no witness commit was attempted');
+    const marker = WITNESS_REFUSAL_MARKERS[storyReason];
+    assert.ok(marker, `no known v2 refusal text for the story reason "${storyReason}"`);
+    for (const peer of PEER_NAMES) {
+      const refusal: string | null | undefined = refusals[peer];
+      assert.ok(
+        refusal,
+        `${peer}'s v2 ACCEPTED the forged witness — the forgery is in the DHT and the story's ` +
+          `"${storyReason}" never fired`
+      );
+      assert.ok(
+        refusal.includes(marker),
+        `${peer} refused, but not for "${storyReason}" (expected text containing "${marker}"): ${refusal}`
+      );
+      console.error(
+        `[happ-lineage-migration] Station 9: ${peer}'s v2 refused "${storyReason}" — ${refusal.slice(0, 220)}`
+      );
+    }
+  }
+);
+
+Then(
+  'neither refusal disturbs any record that was carried honestly',
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    // The honest carry is james's own, taken BEFORE the two forgeries: every v1
+    // entry hash still answers at least one witness, and none of them is the
+    // one that was refused (a refused entry never lands, so it cannot be
+    // linked).
+    const baseline = await readV1Export('james');
+    assert.ok(baseline.entryHashes.length > 0, "james's v1 chain is empty");
+    const sideAppId = await lineageAppIdOf('james');
+    const rail = await connectRoleConductor(
+      'james',
+      NODE_REGISTRY_ROLE,
+      NODE_REGISTRY_ZOME,
+      sideAppId
+    );
+    try {
+      let covered = 0;
+      for (const hash of baseline.entryHashes) {
+        const links = (await rail.call(
+          'get_witnesses_for',
+          decodeHashFromBase64(hash)
+        )) as unknown[];
+        if (links.length > 0) covered += 1;
+      }
+      assert.equal(
+        covered,
+        baseline.entryHashes.length,
+        `${baseline.entryHashes.length - covered} honestly-carried record(s) lost their witness ` +
+          `while the forgeries were refused`
+      );
+      console.error(
+        `[happ-lineage-migration] Station 9: all ${covered} honestly-carried records still ` +
+          `witnessed after two refusals`
+      );
+    } finally {
+      await rail.close();
+    }
+  }
+);
 
 // ── Station 10 — a commitment the roster did not hold is refused by every peer's own verification, whatever it claims ──
 

@@ -2745,6 +2745,31 @@ habits:
       notarized path is minted first and the release names it; and it must go on a FRESH channel, because
       `assertAdmissibleOverEarnedHead` refuses a publish over an earned head the acting peer has not
       adopted — which, for the release Station 2's first half exists to have refused, it never will.
+
+      DELTA 2026-09-04 (Stations 3 and 4 GREEN on the household mesh, and Stations 1-4 green TOGETHER in
+      one run; receipts `genesis/a2o/reports/release-ceremony/2026-09-04/cucumber-stations-mvp-r8` (S3,
+      11/11, 50s), `-r10` (S4, 11/11, 31s) and `-r12` (Stations 1-4, 4 scenarios / 44 steps, 6m11s), all
+      `.{log,json}` in that directory): james's runtime installed v2 BESIDE v1 and carried his whole v1
+      chain across, and every one of those records is in v2 at the same entry hash with a witness v2's own
+      validation accepted. Measured, from the receipts: one agent key `uhCAkTlfAatal8yJHFgPfUTtAVZD68x8ORRHweLHuumG1QQ8RAwd3`
+      on BOTH apps (base `elohim`, side `elohim@EKiIscIk5BDd`); passport role `node_registry` carries
+      `lineage { readingAppId: elohim, authoringAppId: elohim@EKiIscIk5BDd, closed: false }`; conductor pid
+      unchanged; james's v1 chain still at its pre-crossing digest and count; carry receipt
+      `carried == v1Count` (114/114 in r10, 119/119 in r11's world, 131 in r12's) with
+      `digest == v1Digest` and a witness per page — and v2 answers a witness at ALL of james's v1 entry
+      hashes. THE INSTALLED v2 HASH IS NOT THE PACKED ONE: james's authoring cell runs
+      `uhC0kN2gubu9MBAiyqmo3IbG0XfSp8aT2R4rx8-kIm-i7En2haNpV` while `hc dna hash node-registry-v2.dna`
+      says `uhC0kEKiIscIk5BDdethLGMFGLnvSvP2gRP5o74v0vAvoRnEzbiJ1` — the install folds the hApp role
+      modifiers (inherited network seed + the lineage property `install_lineage` writes), exactly Task 1's
+      trap, now measured on the authoring side too. THREE MORE MEASURED FACTS. (1) The 0.7
+      `SignedActionHashed` wire shape splits the action into `content.header` + `content.data`, and the
+      entry hash lives on `data` — reading it at the pre-0.7 flat level yields NO hashes and reads as "the
+      chain is empty" (Station 4's first red). (2) `LineageCarryReceipt` reached a tracing line and nothing
+      else: it is now kept on `appliedRelease.carry`, because a completeness proof no operator and no check
+      can read is not a proof. (3) At any tier above staging the floor enforces the attestation threshold
+      for EVERY mode, canary included — so an earned-first ordering is circular (the canary cannot adopt
+      what it must first attest) and the canary necessarily acts at `staging`, which is rung 5's ceremony
+      unchanged.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
