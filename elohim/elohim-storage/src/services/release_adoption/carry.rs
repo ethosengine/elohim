@@ -15,6 +15,16 @@
 //! pre-Task-12 path (`apply::CarryInput`, `apply::CarryReceipt`,
 //! `apply::CARRY_PAGE_LIMIT`) still resolves at exactly the same name.
 //!
+//! # Idempotency is a property of the ZOME, and it is not landed yet
+//!
+//! Nothing on this side makes a carry idempotent. Entry-hash idempotency (skip
+//! `create_entry` when the hash is already on the chain; skip the witness for a
+//! page whose proofs are all already witnessed) is Task 20's work IN THE ZOME,
+//! and it announces itself on the wire as [`CarryReceipt::already_carried`].
+//! Until it lands, re-carrying a cursor re-creates every entry and authors a
+//! duplicate witness. Callers that repeat must therefore ask
+//! [`CarryReceipt::reports_idempotency`] before re-walking anything.
+//!
 //! # The mirror is the contract
 //!
 //! These types mirror the v2 cell's `node_registry_coordinator` externs rather
@@ -95,6 +105,15 @@ pub struct CarryInput {
     /// underneath a walk. [`crate::services::lineage_bridge`] watches
     /// [`CarryReceipt::v1_digest`] for exactly that and restarts the walk
     /// rather than trusting a stale ordinal.
+    ///
+    /// **Restarting is only safe against a Task-20 zome.** Re-carrying a cursor
+    /// on a v2 that predates entry-hash idempotency re-creates the entry (same
+    /// entry hash, NEW action) and commits a SECOND `NotarizationWitness` for
+    /// the page. Within one [`fold_carry`] sweep this cannot happen — the
+    /// non-advancing-cursor refusal stops it — but a RETRIED apply, and any
+    /// repeating sweep, would double-carry. The bridge refuses the re-walk
+    /// rather than performing it; see
+    /// [`crate::services::lineage_bridge::next_sweep`].
     pub cursor: Option<u32>,
     pub limit: u32,
     /// **Additive.** Whose records to carry, defaulting to [`CarrySource::Own`].
@@ -185,11 +204,16 @@ pub struct CarryReceipt {
     /// witness from this lineage. They contribute to `carried` (the content IS
     /// here) but pushed no proof and authored no second witness.
     ///
-    /// This is what lets a TRAILING sweep re-walk a neighbour's view without
-    /// inflating its own totals — see
-    /// [`crate::services::lineage_bridge::next_sweep`].
+    /// **`None` means the zome predates the field, and that distinction is
+    /// load-bearing**, which is why this is an `Option<u32>` where the zome
+    /// declares a plain `u32`: a `0` from a Task-20 zome says "this page
+    /// carried nothing that was already here", while an ABSENT field says "this
+    /// cell cannot tell me whether it is idempotent". A trailing sweep may
+    /// re-walk a view only under the first; under the second a re-walk
+    /// re-creates every entry and authors a duplicate witness every tick, so
+    /// [`crate::services::lineage_bridge::next_sweep`] halts instead.
     #[serde(default)]
-    pub already_carried: u32,
+    pub already_carried: Option<u32>,
 }
 
 impl CarryReceipt {
@@ -198,8 +222,25 @@ impl CarryReceipt {
     ///
     /// The honest accumulator for a repeating sweep. Summing `carried` itself
     /// across re-walks of the same view would report a multiple of the truth.
+    ///
+    /// An ABSENT `already_carried` reads as 0 here, which is correct for the
+    /// only pages a pre-Task-20 sweep is allowed to take: the FORWARD ones,
+    /// where nothing was already here. The re-walk that would make this reading
+    /// wrong is refused upstream rather than mis-counted here.
     pub fn newly_carried(&self) -> u32 {
-        self.carried.saturating_sub(self.already_carried)
+        self.carried
+            .saturating_sub(self.already_carried.unwrap_or(0))
+    }
+
+    /// Whether the cell that answered this page can state its own idempotency
+    /// — i.e. whether Task 20's `already_carried` is on the wire at all.
+    ///
+    /// `false` is the honest "I do not know", never "no records were already
+    /// here": a v2 whose zome predates Task 20 calls `create_entry`
+    /// unconditionally, so re-carrying a cursor re-creates the entry (same
+    /// entry hash, NEW action) and commits a SECOND `NotarizationWitness`.
+    pub fn reports_idempotency(&self) -> bool {
+        self.already_carried.is_some()
     }
 }
 
@@ -386,12 +427,13 @@ mod tests {
             v1_total: Some(5),
             self_carried: 0,
             v1_observed_head: Some(33),
-            already_carried: 0,
+            already_carried: Some(0),
         };
         assert_eq!(fresh.newly_carried(), 5);
+        assert!(fresh.reports_idempotency());
 
         let rewalk = CarryReceipt {
-            already_carried: 5,
+            already_carried: Some(5),
             witness_hash: String::new(),
             ..fresh.clone()
         };
@@ -400,7 +442,7 @@ mod tests {
         // Saturating, never a panic, on a zome that reports nonsense.
         let nonsense = CarryReceipt {
             carried: 1,
-            already_carried: 9,
+            already_carried: Some(9),
             ..fresh
         };
         assert_eq!(nonsense.newly_carried(), 0);
@@ -424,6 +466,12 @@ mod tests {
             decoded.v1_observed_head, None,
             "never a fabricated 0 — that would read as 'chain head at genesis'"
         );
-        assert_eq!(decoded.already_carried, 0);
+        assert_eq!(
+            decoded.already_carried, None,
+            "absent is NEVER 0 here — 0 would read as 'this zome is idempotent \
+             and nothing was already here', which is the exact claim a \
+             pre-Task-20 cell cannot make"
+        );
+        assert!(!decoded.reports_idempotency());
     }
 }

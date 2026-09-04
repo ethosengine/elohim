@@ -954,6 +954,7 @@ mod tests {
                 carried: 16,
                 last_sweep: Some("2026-09-04T00:00:00Z".into()),
                 last_error: None,
+                halted: false,
             },
         );
         // A different ROLE's neighbour must not leak into this role's view.

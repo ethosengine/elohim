@@ -33,9 +33,26 @@
 //! neighbour's chain — a subset, possibly gapped. When that view grows, every
 //! ordinal past the insertion point shifts. So a `v1_digest` that changes
 //! mid-walk restarts the walk at cursor 0 rather than trusting a stale
-//! position. Re-walking is safe and cheap because the zome is idempotent by
-//! entry hash (Task 20): a re-carried record comes back as `already_carried`,
-//! creates nothing and authors no second witness.
+//! position.
+//!
+//! **But re-walking depends on Task 20's `already_carried`, which is in flight
+//! in the zome and is NOT landed.** Entry-hash idempotency lives on the v2
+//! side; until it lands, a caught-up sweep that re-walks a view re-creates
+//! every entry and authors a duplicate witness EVERY TICK. So the bridge does
+//! not assume it: a page whose receipt omits `already_carried` is a v2 that
+//! cannot state its own idempotency, and the sweep HALTS that neighbour at the
+//! moment it would have rewound rather than re-walking blind
+//! ([`AgentSweep::halted`]). Forward progress up to the end of the local view
+//! is kept — it is only the repeat that is refused. Do not read this module as
+//! evidence that idempotency has landed.
+//!
+//! **Neighbours are enumerated from the READING cell.** `known_agents` is a v1
+//! question — who is on the PREDECESSOR DHT — so it is asked of the app id the
+//! window pins reads to, connected explicitly. Asking the role's supervised
+//! client instead would be wrong the moment the bridge supervisor re-mints it
+//! mid-window: that client resolves through `LineageRoles::app_id_for`, which
+//! returns the AUTHORING app, and the sweep would enumerate v2's DHT and find
+//! nobody to carry.
 //!
 //! **Storage never claims completeness.** A held page is not self-evidencing —
 //! `carried == v1_total` on it says the courier carried everything IT HAD, not
@@ -110,9 +127,23 @@ pub struct AgentSweep {
     /// failure. Stamped by the ticker, not by [`next_sweep`], which stays pure.
     pub last_sweep: Option<String>,
     /// The last thing worth an operator's attention about this neighbour: a
-    /// page failure, or the `restarted:` note a mid-walk digest change leaves.
-    /// Cleared by the next clean page.
+    /// page failure, the `restarted:` note a mid-walk digest change leaves, or
+    /// the `halted:` reason below. Cleared by the next clean page.
     pub last_error: Option<String>,
+    /// **Terminal for this neighbour until a reset.** Set when the sweep
+    /// reached the point where it would REWIND (end of the local view, or a
+    /// digest change mid-walk) against a v2 that does not report
+    /// `already_carried` — i.e. a zome predating Task 20's entry-hash
+    /// idempotency, where a re-walk re-creates every entry and authors a
+    /// duplicate witness every tick.
+    ///
+    /// Halting rather than rewinding keeps the forward progress already made
+    /// and refuses only the repeat. It is deliberately NOT cleared by a later
+    /// page: the property is about the v2 cell's code, which does not change
+    /// under a running window. `POST /admin/lineage/reset` clears it with the
+    /// rest of the state, which is the right granularity — a new crossing gets
+    /// a fresh judgement.
+    pub halted: bool,
 }
 
 /// Fold ONE held page into a neighbour's sweep state. Pure — no clock, no
@@ -135,8 +166,15 @@ pub struct AgentSweep {
 ///    "start again at the beginning next tick" — which is precisely what a
 ///    trailing sweep should do, and is safe because a re-carried record comes
 ///    back as `already_carried`.
-/// 3. **`carried` accumulates NEW carriage only.**
-/// 4. **`total` / `observed_head` keep the last non-`None`.** A momentarily
+/// 3. **A rewind against a pre-Task-20 v2 HALTS instead.** Both cases above
+///    resolve to "start again at the beginning next tick", which is a re-walk.
+///    A re-walk is only safe when the v2 cell reports `already_carried`
+///    ([`CarryReceipt::reports_idempotency`]); a cell that cannot state it
+///    would re-create every entry and author a duplicate witness every tick, so
+///    the neighbour is halted with a `halted:` reason and the forward progress
+///    already made is kept.
+/// 4. **`carried` accumulates NEW carriage only.**
+/// 5. **`total` / `observed_head` keep the last non-`None`.** A momentarily
 ///    blind authority must not erase what an earlier page established.
 pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
     let mid_walk = state.cursor.is_some();
@@ -145,6 +183,10 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
         .as_deref()
         .is_some_and(|prev| prev != page.v1_digest);
     let restarted = mid_walk && digest_changed;
+    // Both ways the cursor can land back at the beginning — which is the ONLY
+    // thing idempotency is needed for. A forward page never needs it.
+    let would_rewind = restarted || page.next_cursor.is_none();
+    let halted = state.halted || (would_rewind && !page.reports_idempotency());
 
     AgentSweep {
         cursor: if restarted { None } else { page.next_cursor },
@@ -153,7 +195,15 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
         total: page.v1_total.or(state.total),
         carried: state.carried.saturating_add(page.newly_carried()),
         last_sweep: state.last_sweep.clone(),
-        last_error: if restarted {
+        last_error: if halted {
+            Some(
+                "halted: this v2 cell does not report `already_carried`, so it predates Task 20's \
+                 entry-hash idempotency — re-walking the local view would re-create every entry \
+                 and author a duplicate witness on every tick. Forward carriage up to here is \
+                 kept; the repeat is refused. Clears on POST /admin/lineage/reset."
+                    .to_string(),
+            )
+        } else if restarted {
             Some(format!(
                 "restarted: the courier's view of this chain changed mid-walk (digest {} → {}) — \
                  the held cursor is an ordinal into a list gossip can grow, so the walk resumes at \
@@ -164,6 +214,7 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
         } else {
             None
         },
+        halted,
     }
 }
 
@@ -171,6 +222,17 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
 /// canonical `uhCAk…` rendering. A `String` and not an `AgentPubKey` so the
 /// state is `Ord`-keyed, cheap to snapshot, and directly projectable.
 pub type SweepKey = (String, String);
+
+/// One role with a lineage window currently OPEN, carrying BOTH app ids the
+/// sweep needs — because it asks two different cells two different questions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OpenWindow {
+    role: String,
+    /// The v1 app id reads stay pinned to. `known_agents` is asked HERE.
+    reading_app_id: String,
+    /// The v2 side app id authoring for this role. `carry_from` runs HERE.
+    authoring_app_id: String,
+}
 
 /// The ticker. One tokio task, spawned once at startup, idle while no lineage
 /// window is open.
@@ -223,19 +285,45 @@ impl LineageBridge {
             .clear();
     }
 
-    /// The roles with an OPEN lineage window, paired with the side app id
-    /// authoring for them. Pure over a snapshot, so the idle-tick exit is
-    /// testable without a conductor.
+    /// The roles with an OPEN lineage window, each paired with BOTH app ids the
+    /// sweep needs. Pure over a snapshot, so the idle-tick exit and the app-id
+    /// selection are both testable without a conductor.
     ///
-    /// A SUNSET role is excluded: the window is closed, the crossing is over,
-    /// and a courier that kept carrying into a closed window would be writing
-    /// into a cell the ceremony has already finished with.
-    fn open_windows(&self) -> Vec<(String, String)> {
+    /// Both ids are returned rather than just the authoring one because the
+    /// sweep asks two DIFFERENT cells two different questions: `known_agents`
+    /// goes to the READING (v1) app — who is on the predecessor DHT — and
+    /// `carry_from` goes to the AUTHORING (v2) side app. Collapsing them to one
+    /// id is the mistake this signature exists to make impossible.
+    ///
+    /// # The predicate names the OPEN shape, it does not negate the closed ones
+    ///
+    /// An open window is exactly what `LineageRoles::open_window` builds:
+    /// **reads pinned to the base app, authoring moved off it, not closed.**
+    /// All three clauses are load-bearing, and the tempting shorthand
+    /// `authoring != reading && !closed` is WRONG — `revert` leaves the two ids
+    /// still different but INVERTED (it moves the side app into
+    /// `reading_app_id` as a historical pointer and puts authoring back on
+    /// base). A sweep run over a reverted role would ask `known_agents` of v2
+    /// and `carry_from` of v1: backwards on both cells, and noisy rather than
+    /// silent, but never something a courier should attempt.
+    ///
+    /// A SUNSET role is excluded by `!closed`: the crossing is over, and a
+    /// courier that kept carrying into a closed window would be writing into a
+    /// cell the ceremony has already finished with.
+    fn open_windows(&self) -> Vec<OpenWindow> {
         self.lineage
             .snapshot()
             .into_iter()
-            .filter(|(_, role)| role.authoring_app_id != role.reading_app_id && !role.closed)
-            .map(|(name, role)| (name, role.authoring_app_id))
+            .filter(|(_, lineage)| {
+                !lineage.closed
+                    && lineage.reading_app_id == self.base_app_id
+                    && lineage.authoring_app_id != self.base_app_id
+            })
+            .map(|(role, lineage)| OpenWindow {
+                role,
+                reading_app_id: lineage.reading_app_id,
+                authoring_app_id: lineage.authoring_app_id,
+            })
             .collect()
     }
 
@@ -249,13 +337,14 @@ impl LineageBridge {
         if windows.is_empty() {
             return;
         }
-        for (role, lineage_app_id) in windows {
-            self.sweep_role(&role, &lineage_app_id).await;
+        for window in windows {
+            self.sweep_role(&window).await;
         }
     }
 
     /// Sweep every known neighbour for ONE role, one page each.
-    async fn sweep_role(&self, role: &str, lineage_app_id: &str) {
+    async fn sweep_role(&self, window: &OpenWindow) {
+        let role = window.role.as_str();
         let Some(admin) = self.registry.any_admin_websocket() else {
             tracing::debug!(
                 role,
@@ -271,14 +360,36 @@ impl LineageBridge {
             }
         };
 
-        // `known_agents` runs on the BASE app's supervised client — the normal
-        // role path. It is a v1 question ("who is on the predecessor DHT?"),
-        // so it is asked of a v1 cell.
-        let Some(base_client) = self.registry.client(role) else {
-            tracing::debug!(role, "lineage bridge: role bridge unconnected this tick");
-            return;
+        // `known_agents` is a V1 QUESTION — who is on the PREDECESSOR DHT — so
+        // it is asked of the READING app id, connected explicitly.
+        //
+        // **The hazard this avoids.** `registry.client(role)` looks like the
+        // normal path, and it is the wrong one here: that supervised client is
+        // built from `LineageRoles::app_id_for(role)`, which resolves to the
+        // AUTHORING app while a window is open. It happens to still hold a v1
+        // connection only because it was dialled before the window opened — so
+        // the first time the bridge supervisor re-mints that role mid-window
+        // (any conductor restart), it silently reconnects to v2 and this call
+        // starts enumerating the SUCCESSOR's DHT. The failure is quiet: an
+        // empty or foreign neighbour list, and a sweep that carries nothing
+        // while reporting no error.
+        let reading = match self
+            .registry
+            .connect_app(&window.reading_app_id, role)
+            .await
+        {
+            Ok(client) => client,
+            Err(e) => {
+                tracing::warn!(
+                    role,
+                    reading_app_id = %window.reading_app_id,
+                    error = %e,
+                    "lineage bridge: could not connect to the reading (v1) app this tick"
+                );
+                return;
+            }
         };
-        let agents = match self.neighbours(&base_client).await {
+        let agents = match self.neighbours(&reading).await {
             Ok(agents) => agents,
             Err(e) => {
                 tracing::warn!(role, error = %e, "lineage bridge: could not list neighbours");
@@ -294,12 +405,16 @@ impl LineageBridge {
         // does not cache it: a handle held across ticks outlives the window it
         // belongs to, and a reverted or sunset window would still have a live
         // authoring path into v2.
-        let side = match self.registry.connect_app(lineage_app_id, role).await {
+        let side = match self
+            .registry
+            .connect_app(&window.authoring_app_id, role)
+            .await
+        {
             Ok(client) => client,
             Err(e) => {
                 tracing::warn!(
                     role,
-                    lineage_app_id,
+                    lineage_app_id = %window.authoring_app_id,
                     error = %e,
                     "lineage bridge: could not connect to the side app this tick"
                 );
@@ -331,6 +446,12 @@ impl LineageBridge {
             .get(&key)
             .cloned()
             .unwrap_or_default();
+        // A halted neighbour is not swept again. The reason is on its
+        // `last_error` and was logged once, at the transition below — logging
+        // it every tick forever would be the noise a halt exists to avoid.
+        if before.halted {
+            return;
+        }
 
         let input = CarryInput {
             v1_cell: v1_cell.clone(),
@@ -355,6 +476,19 @@ impl LineageBridge {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .insert(key.clone(), after.clone());
+
+        if after.halted && !before.halted {
+            tracing::warn!(
+                role,
+                agent = %key.1,
+                carried = after.carried,
+                "lineage bridge: HALTED this neighbour — the v2 cell does not report \
+                 `already_carried`, so it predates Task 20's entry-hash idempotency and a re-walk \
+                 would re-create every entry and author a duplicate witness each tick. Forward \
+                 carriage is kept; the repeat is refused until POST /admin/lineage/reset."
+            );
+            return;
+        }
 
         match &outcome {
             Ok(_) if carried_this_page > 0 => tracing::info!(
@@ -416,6 +550,10 @@ impl LineageBridge {
     }
 
     /// Who is on the v1 DHT, MINUS ourselves.
+    ///
+    /// `client` MUST be connected to the READING app id — see the hazard named
+    /// at the call site. This function cannot check that for itself, which is
+    /// why `OpenWindow` carries the id rather than the caller re-deriving one.
     ///
     /// `known_agents` deliberately INCLUDES the caller (it reports who is on
     /// the DHT, not who is foreign), and `carry_from` refuses
@@ -480,6 +618,7 @@ fn now_rfc3339() -> String {
 mod tests {
     use super::*;
 
+    /// A page from a Task-20 v2 — one that reports its own idempotency.
     fn page(
         carried: u32,
         already: u32,
@@ -502,7 +641,16 @@ mod tests {
             // witness, never the content.
             self_carried: 0,
             v1_observed_head: head,
-            already_carried: already,
+            already_carried: Some(already),
+        }
+    }
+
+    /// The same page from a v2 whose zome PREDATES Task 20 — `already_carried`
+    /// simply is not on the wire.
+    fn pre_task_20_page(carried: u32, next_cursor: Option<u32>, digest: &str) -> CarryReceipt {
+        CarryReceipt {
+            already_carried: None,
+            ..page(carried, 0, next_cursor, digest, None, None)
         }
     }
 
@@ -645,10 +793,15 @@ mod tests {
         lineage.open_window("node_registry", "elohim@EKiIscIk5BDd");
         assert_eq!(
             bridge.open_windows(),
-            vec![(
-                "node_registry".to_string(),
-                "elohim@EKiIscIk5BDd".to_string()
-            )]
+            vec![OpenWindow {
+                role: "node_registry".to_string(),
+                // `known_agents` is asked HERE — the v1 app reads stay pinned
+                // to, never the authoring one. Asking the role's supervised
+                // client instead would resolve to the authoring app after a
+                // mid-window re-mint and enumerate v2's DHT.
+                reading_app_id: "elohim".to_string(),
+                authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
+            }]
         );
 
         // Sunset closes the crossing — a courier must not keep carrying into a
@@ -695,6 +848,101 @@ mod tests {
         assert_eq!(bridge.snapshot().len(), 1);
         bridge.reset();
         assert!(bridge.snapshot().is_empty());
+    }
+
+    /// **The two app ids an open window carries are DIFFERENT and are never
+    /// collapsed.** This is the whole guard behind Minor 1: the sweep asks
+    /// `known_agents` of the reading (v1) app and `carry_from` of the authoring
+    /// (v2) side app, and a window whose ids were equal would not be an open
+    /// window at all.
+    #[test]
+    fn an_open_windows_two_app_ids_are_never_the_same_cell() {
+        let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
+        lineage.open_window("node_registry", "elohim@EKiIscIk5BDd");
+        let bridge = LineageBridge::new(
+            Arc::clone(&lineage),
+            Arc::new(HcClientRegistry::empty()),
+            "elohim",
+        );
+        let [window] = bridge.open_windows().try_into().expect("one open window");
+        assert_ne!(window.reading_app_id, window.authoring_app_id);
+        assert_eq!(window.reading_app_id, "elohim", "the PREDECESSOR is asked");
+        // …and a REVERT ends the window. This is the case the naive predicate
+        // `authoring != reading && !closed` gets wrong: revert leaves the two
+        // ids different but INVERTED (the side app becomes the historical
+        // `reading_app_id`, authoring goes back to base), so a sweep would ask
+        // `known_agents` of v2 and `carry_from` of v1 — backwards on both.
+        lineage.revert("node_registry");
+        let reverted = lineage.snapshot();
+        assert_ne!(
+            reverted["node_registry"].reading_app_id, reverted["node_registry"].authoring_app_id,
+            "the ids ARE still different after a revert — which is exactly why the \
+             predicate names the open shape instead of negating the closed ones"
+        );
+        assert!(bridge.open_windows().is_empty());
+    }
+
+    /// **A pre-Task-20 v2 halts at the rewind rather than re-walking.** The
+    /// forward page is taken (that carriage is real); the moment the walk would
+    /// return to the beginning, the sweep refuses — because on a cell that
+    /// cannot state its own idempotency a re-walk re-creates every entry and
+    /// authors a duplicate witness on every tick.
+    #[test]
+    fn a_pre_task_20_v2_halts_instead_of_re_walking() {
+        // Forward page: NOT halted, and the records really moved.
+        let forward = next_sweep(
+            &AgentSweep::default(),
+            &pre_task_20_page(16, Some(16), "digest-a"),
+        );
+        assert!(!forward.halted, "forward carriage is never refused");
+        assert_eq!(forward.carried, 16);
+
+        // End of the local view — the rewind point. Halt.
+        let at_end = next_sweep(&forward, &pre_task_20_page(9, None, "digest-a"));
+        assert!(at_end.halted);
+        assert_eq!(at_end.carried, 25, "the last page's carriage is still kept");
+        let why = at_end.last_error.clone().expect("a halt states its reason");
+        assert!(why.starts_with("halted:"), "got {why}");
+        assert!(why.contains("already_carried"), "{why}");
+
+        // Terminal: a LATER page — even a well-formed Task-20 one — does not
+        // un-halt it. The property is about the cell's code, and only a reset
+        // re-judges it.
+        let later = next_sweep(&at_end, &page(1, 0, Some(1), "digest-a", None, None));
+        assert!(later.halted);
+    }
+
+    /// A digest change mid-walk is also a rewind, so it halts too on a
+    /// pre-Task-20 cell — restarting there would re-carry from zero.
+    #[test]
+    fn a_digest_change_on_a_pre_task_20_v2_halts_rather_than_restarting() {
+        let before = AgentSweep {
+            cursor: Some(16),
+            last_digest: Some("digest-a".into()),
+            carried: 16,
+            ..Default::default()
+        };
+        let after = next_sweep(&before, &pre_task_20_page(4, Some(32), "digest-b"));
+        assert!(after.halted);
+        assert!(after.last_error.unwrap().starts_with("halted:"));
+    }
+
+    /// A Task-20 cell that reports `already_carried: Some(0)` is NOT halted —
+    /// absent and zero are different claims, and only absence is a refusal.
+    #[test]
+    fn a_reported_zero_is_not_an_absent_field() {
+        let after = next_sweep(
+            &AgentSweep::default(),
+            &page(9, 0, None, "digest-a", Some(9), Some(33)),
+        );
+        assert!(
+            !after.halted,
+            "'nothing was already here' is a claim; 'I cannot tell you' is not"
+        );
+        assert_eq!(
+            after.cursor, None,
+            "and it rewinds, as a trailing sweep should"
+        );
     }
 
     /// The page batch is bounded BEFORE the call is made, and the cadence is

@@ -1757,7 +1757,7 @@ mod tests {
                 v1_total: None,
                 self_carried: 32,
                 v1_observed_head: None,
-                already_carried: 0,
+                already_carried: Some(0),
             },
             CarryReceipt {
                 carried: 7,
@@ -1770,7 +1770,7 @@ mod tests {
                 v1_total: Some(5),
                 self_carried: 7,
                 v1_observed_head: Some(33),
-                already_carried: 0,
+                already_carried: Some(0),
             },
         ]);
         let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
@@ -1814,7 +1814,7 @@ mod tests {
                 v1_total: None,
                 self_carried: 0,
                 v1_observed_head: None,
-                already_carried: 1,
+                already_carried: Some(1),
             })
         })
         .await
@@ -1862,7 +1862,7 @@ mod tests {
             v1_total: Some(39),
             self_carried: 32,
             v1_observed_head: Some(41),
-            already_carried: 0,
+            already_carried: Some(0),
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
