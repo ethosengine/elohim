@@ -15,6 +15,15 @@
  * packages — the manifest records what the artifact actually is, and the
  * adoption controller's verify step is the floor that refuses it.
  *
+ * The one thing it will NOT invent is the channel's adoption discipline. Soak
+ * budget and attestation threshold are either DECLARED (`--soak-secs` +
+ * `--attestation-threshold`) or INHERITED from the channel
+ * (`--inherit-discipline-from <storage base url>`); with neither, packaging
+ * refuses. The retired `soakSecs 900` / `attestationThreshold 2` defaults
+ * wedged a three-device household twice in one night — one attester
+ * archetype, a threshold of two — and a number nobody typed is not a
+ * discipline. See `AdoptionDiscipline` and `resolveAdoptionDiscipline`.
+ *
  * Spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md §5, §8.
  *
  * Run from genesis/a2o:
@@ -45,8 +54,6 @@ const DEFAULT_PEER = 'http://localhost:8090';
 const DEFAULT_NETWORK = 'elohim';
 const DEFAULT_CHANNEL = 'commons';
 const DEFAULT_REACH = 'commons';
-const DEFAULT_SOAK_SECS = 900;
-const DEFAULT_ATTESTATION_THRESHOLD = 2;
 const DEFAULT_AGENT_ID = 'did:elohim:release-packager';
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -108,10 +115,15 @@ Provenance:
   --build-info-from <url>       read it from a runtime's GET /version envelope
   --git-commit <sha>            override the probed HEAD commit
 
-Adoption discipline (spec §5):
-  --soak-secs <n>               green-run budget before a peer may attest (default: ${DEFAULT_SOAK_SECS})
-  --attestation-threshold <n>   independent attestations to earn (default: ${DEFAULT_ATTESTATION_THRESHOLD})
+Adoption discipline (spec §5) — declared or inherited, never defaulted:
+  --soak-secs <n>               green-run budget before a peer may attest
+  --attestation-threshold <n>   independent attestations to earn
   --canary <name>               ordered rollout wave; repeatable
+  --inherit-discipline-from <url>
+                                copy the discipline the household already registered for this
+                                channel from that storage peer (the channel root's own
+                                registered discipline, or its current head release manifest's);
+                                --soak-secs/--attestation-threshold/--canary still override
 
 Blob plane:
   --peer <url>                  storage peer for the blob PUT (default: ${DEFAULT_PEER})
@@ -206,9 +218,12 @@ interface Options {
   buildInfo: string | null;
   buildInfoFrom: string | null;
   gitCommit: string | null;
-  soakSecs: number;
-  attestationThreshold: number;
+  /** null = not declared on the command line; see `resolveAdoptionDiscipline`. */
+  soakSecs: number | null;
+  /** null = not declared on the command line; see `resolveAdoptionDiscipline`. */
+  attestationThreshold: number | null;
   canaryOrder: string[];
+  inheritDisciplineFrom: string | null;
   peer: string;
   agentId: string;
   put: boolean;
@@ -218,6 +233,18 @@ interface Options {
   strict: boolean;
   notes: string | null;
 }
+
+/**
+ * The flags whose value is a peer base URL, and the `Options` field each
+ * fills. One switch arm parses all three (`parseHttpUrl` is the same
+ * validation for each), which also keeps the argv switch under the lint's
+ * case ceiling.
+ */
+const URL_VALUED_FLAGS = {
+  '--applies-to-from': 'appliesToFrom',
+  '--build-info-from': 'buildInfoFrom',
+  '--inherit-discipline-from': 'inheritDisciplineFrom',
+} as const satisfies Record<string, keyof Options>;
 
 function requiredValue(args: string[], index: number, flag: string): string {
   const value = args[index + 1];
@@ -283,9 +310,10 @@ function parseArgs(argv: string[]): Options {
     buildInfo: null,
     buildInfoFrom: null,
     gitCommit: null,
-    soakSecs: DEFAULT_SOAK_SECS,
-    attestationThreshold: DEFAULT_ATTESTATION_THRESHOLD,
+    soakSecs: null,
+    attestationThreshold: null,
     canaryOrder: [],
+    inheritDisciplineFrom: null,
     peer: parseHttpUrl(process.env['RELEASE_PEER_URL'] ?? DEFAULT_PEER, '--peer'),
     agentId: DEFAULT_AGENT_ID,
     put: true,
@@ -346,8 +374,13 @@ function parseArgs(argv: string[]): Options {
         options.additiveOnly = parseBoolean(requiredValue(argv, index, arg), arg);
         index++;
         break;
+      // Every flag whose value is a peer base URL shares one arm (see
+      // `URL_VALUED_FLAGS`) — three separate cases would push this switch past
+      // the 30-case lint ceiling for no reader benefit.
       case '--applies-to-from':
-        options.appliesToFrom = parseHttpUrl(requiredValue(argv, index, arg), arg);
+      case '--build-info-from':
+      case '--inherit-discipline-from':
+        options[URL_VALUED_FLAGS[arg]] = parseHttpUrl(requiredValue(argv, index, arg), arg);
         index++;
         break;
       case '--applies-to':
@@ -368,10 +401,6 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--build-info':
         options.buildInfo = requiredValue(argv, index, arg);
-        index++;
-        break;
-      case '--build-info-from':
-        options.buildInfoFrom = parseHttpUrl(requiredValue(argv, index, arg), arg);
         index++;
         break;
       case '--git-commit':
@@ -464,8 +493,28 @@ interface ReleaseManifest {
     builtFrom: { gitCommit: string; gitBranch?: string; dirty?: boolean };
   };
   declaredReach: string;
-  adoptionDiscipline: { soakSecs: number; attestationThreshold: number; canaryOrder: string[] };
+  adoptionDiscipline: AdoptionDiscipline;
   notes?: string;
+}
+
+/**
+ * The channel's rule for how attestation evidence is counted (spec §5). It is
+ * DECLARED (`--soak-secs` + `--attestation-threshold`) or INHERITED from the
+ * channel (`--inherit-discipline-from`) — never defaulted, because a number
+ * nobody typed is not a discipline: the retired `soakSecs 900 /
+ * attestationThreshold 2` defaults silently wedged a three-device household
+ * whose only attester archetype could never reach two.
+ */
+interface AdoptionDiscipline {
+  soakSecs: number;
+  attestationThreshold: number;
+  canaryOrder: string[];
+  /**
+   * The record this discipline was copied from — the channel head's
+   * `dhtAnchorHash` on the peer named by `--inherit-discipline-from`.
+   * Additive and open-schema-legal (§8.2); see `PRODUCER_ADDITIVE_KEYS`.
+   */
+  inheritedFrom?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,6 +542,16 @@ function resolveRef(schema: JsonObject, node: JsonObject): JsonObject {
   const defs = schema['$defs'] as Record<string, JsonObject> | undefined;
   return defs?.[ref.slice('#/$defs/'.length)] ?? node;
 }
+
+/**
+ * Keys this packager emits DELIBERATELY that the schema does not (yet) name.
+ * The schema is open by design (§8.2) so they validate; `--strict` is a typo
+ * lint for the author, and a key the author meant to write is not a typo.
+ * Declare it here and add it to `elohim/rakia/schemas/v1/release-manifest.schema.json`
+ * the next time that schema is touched — this set is the producer's promise,
+ * not a second schema.
+ */
+const PRODUCER_ADDITIVE_KEYS = new Set(['/adoptionDiscipline/inheritedFrom']);
 
 /**
  * The schema is deliberately OPEN so mixed-version peers tolerate fields they
@@ -527,7 +586,7 @@ function lintUnknownKeys(
       lintUnknownKeys(schema, declared, child, `${pointer}/${key}`, found);
     } else if (additional && typeof additional === 'object') {
       lintUnknownKeys(schema, additional as JsonObject, child, `${pointer}/${key}`, found);
-    } else if (properties) {
+    } else if (properties && !PRODUCER_ADDITIVE_KEYS.has(`${pointer}/${key}`)) {
       found.push(`${pointer}/${key}`);
     }
   }
@@ -772,6 +831,157 @@ async function resolveAppliesTo(options: Options): Promise<{ roles: Record<strin
   throw new UsageError('one of --applies-to-from <url> or --applies-to <json|@file> is required');
 }
 
+// ---------------------------------------------------------------------------
+// Adoption discipline — declared or inherited, never defaulted
+// ---------------------------------------------------------------------------
+
+const CHANNEL_ROOT_KIND = 'release-channel';
+const RELEASE_MANIFEST_KIND = 'release-manifest';
+
+/** The two fields of a storage content row this tool reads for inheritance. */
+interface ChannelContentItem {
+  metadata?: {
+    kind?: unknown;
+    discipline?: unknown;
+    manifest?: { adoptionDiscipline?: unknown };
+  };
+  dhtAnchorHash?: unknown;
+}
+
+interface InheritedDiscipline {
+  soakSecs: number;
+  attestationThreshold: number;
+  canaryOrder: string[];
+  /** What the discipline was read off — named in the stderr receipt. */
+  source: string;
+  /** The head record's action hash, when the row reports one. */
+  anchor: string | null;
+}
+
+function disciplineShape(
+  raw: unknown,
+  where: string
+): { soakSecs: number; attestationThreshold: number; canaryOrder: string[] } {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new PackagingFailure(`${where} carries no adoption discipline to inherit`);
+  }
+  const record = raw as Record<string, unknown>;
+  const soakSecs = record['soakSecs'];
+  const attestationThreshold = record['attestationThreshold'];
+  if (!Number.isSafeInteger(soakSecs) || !Number.isSafeInteger(attestationThreshold)) {
+    throw new PackagingFailure(
+      `${where} carries an adoption discipline without integer soakSecs/attestationThreshold`,
+      [JSON.stringify(record).slice(0, 300)]
+    );
+  }
+  const canaryOrder = Array.isArray(record['canaryOrder'])
+    ? (record['canaryOrder'] as unknown[]).filter((v): v is string => typeof v === 'string')
+    : [];
+  return {
+    soakSecs: soakSecs as number,
+    attestationThreshold: attestationThreshold as number,
+    canaryOrder,
+  };
+}
+
+/**
+ * Reads the discipline the household already registered for this channel from
+ * one storage peer's `GET /db/content/{channelId}` — the channel's own content
+ * row, whose `metadata` is either
+ *
+ *   - the channel ROOT record (`kind: "release-channel"`), carrying the
+ *     `discipline` the steward registered at `channel create`; or
+ *   - the channel's current HEAD release manifest (`kind: "release-manifest"`),
+ *     carrying that release's `adoptionDiscipline`.
+ *
+ * One read answers both because the row IS the channel's current head record:
+ * before the first publish it is the root; after it, the head manifest. That
+ * ordering is the story's own rule — "once a channel has a head, every later
+ * release on that channel inherits the head's discipline unless the steward
+ * deliberately changes it."
+ */
+async function readChannelDiscipline(
+  baseUrl: string,
+  channelId: string,
+  timeoutMs: number
+): Promise<InheritedDiscipline> {
+  const url = `${baseUrl}/db/content/${encodeURIComponent(channelId)}`;
+  const row = (await getJson(url, timeoutMs)) as ChannelContentItem;
+  const anchor = typeof row.dhtAnchorHash === 'string' ? row.dhtAnchorHash : null;
+  const kind = row.metadata?.kind;
+  if (kind === RELEASE_MANIFEST_KIND) {
+    const shape = disciplineShape(
+      row.metadata?.manifest?.adoptionDiscipline,
+      `the head release manifest on ${url}`
+    );
+    return { ...shape, source: `the channel head's release manifest at ${url}`, anchor };
+  }
+  if (kind === CHANNEL_ROOT_KIND) {
+    const shape = disciplineShape(row.metadata?.discipline, `the channel root at ${url}`);
+    return { ...shape, source: `the channel's registered discipline at ${url}`, anchor };
+  }
+  throw new PackagingFailure(
+    `${url} is not a release channel: its metadata.kind is ${JSON.stringify(kind ?? null)}, ` +
+      `not "${CHANNEL_ROOT_KIND}" or "${RELEASE_MANIFEST_KIND}"`
+  );
+}
+
+/**
+ * Where a release's adoption discipline comes from, in order: the explicit
+ * flags, then `--inherit-discipline-from`, and otherwise a REFUSAL. There is
+ * no default — see `AdoptionDiscipline`'s own doc for the wedge the retired
+ * `900 / 2` defaults caused.
+ */
+async function resolveAdoptionDiscipline(
+  options: Options,
+  channelId: string
+): Promise<AdoptionDiscipline> {
+  const declaredBoth = options.soakSecs !== null && options.attestationThreshold !== null;
+
+  if (!options.inheritDisciplineFrom) {
+    if (!declaredBoth) {
+      throw new UsageError(
+        `a release must carry an adoption discipline for channel ${channelId}: declare it with ` +
+          `--soak-secs <n> AND --attestation-threshold <n>, or inherit the household's own with ` +
+          `--inherit-discipline-from <storage base url> — this tool no longer defaults it, because ` +
+          `a number nobody typed is not a discipline` +
+          (options.soakSecs === null ? ' (--soak-secs was not given)' : '') +
+          (options.attestationThreshold === null ? ' (--attestation-threshold was not given)' : '')
+      );
+    }
+    return {
+      soakSecs: options.soakSecs as number,
+      attestationThreshold: options.attestationThreshold as number,
+      canaryOrder: options.canaryOrder,
+    };
+  }
+
+  const inherited = await readChannelDiscipline(
+    options.inheritDisciplineFrom,
+    channelId,
+    options.requestTimeoutMs
+  );
+  const fromChannel: string[] = [];
+  if (options.soakSecs === null) fromChannel.push('soakSecs');
+  if (options.attestationThreshold === null) fromChannel.push('attestationThreshold');
+  if (options.canaryOrder.length === 0) fromChannel.push('canaryOrder');
+
+  const discipline: AdoptionDiscipline = {
+    soakSecs: options.soakSecs ?? inherited.soakSecs,
+    attestationThreshold: options.attestationThreshold ?? inherited.attestationThreshold,
+    canaryOrder: options.canaryOrder.length > 0 ? options.canaryOrder : inherited.canaryOrder,
+    ...(fromChannel.length > 0 && inherited.anchor ? { inheritedFrom: inherited.anchor } : {}),
+  };
+  console.error(
+    `inherited ${fromChannel.length > 0 ? fromChannel.join('+') : 'nothing (every field overridden)'} ` +
+      `from ${inherited.source}` +
+      (inherited.anchor ? ` (head ${inherited.anchor})` : ' (row reports no head anchor)') +
+      `: soakSecs=${discipline.soakSecs} attestationThreshold=${discipline.attestationThreshold} ` +
+      `canaryOrder=${JSON.stringify(discipline.canaryOrder)}`
+  );
+  return discipline;
+}
+
 async function resolveBuildInfo(options: Options): Promise<Record<string, unknown>> {
   if (options.buildInfo) return readJsonArgument(options.buildInfo, '--build-info');
   if (options.buildInfoFrom) {
@@ -789,6 +999,12 @@ async function assembleManifest(options: Options): Promise<{
   blobs: BlobResult[];
 }> {
   const artifactClass = options.artifactClass as ArtifactClass;
+  const channelId = resolveChannelId(options, artifactClass);
+  // Resolved BEFORE the blob plane is touched: a missing discipline is a
+  // usage refusal, and refusing it after PUTting a nine-megabyte bundle
+  // would make the tool look slow rather than strict.
+  const adoptionDiscipline = await resolveAdoptionDiscipline(options, channelId);
+
   const blobs: BlobResult[] = [];
   for (const file of options.artifacts) {
     blobs.push(await packageArtifact(file, options, artifactClass));
@@ -806,7 +1022,7 @@ async function assembleManifest(options: Options): Promise<{
   const manifest: ReleaseManifest = {
     kind: 'release-manifest',
     manifestVersion: '1.0',
-    channelId: resolveChannelId(options, artifactClass),
+    channelId,
     artifactClass,
     artifacts: blobs.map(blob => blob.entry),
     appliesTo,
@@ -828,11 +1044,7 @@ async function assembleManifest(options: Options): Promise<{
       },
     },
     declaredReach: options.declaredReach,
-    adoptionDiscipline: {
-      soakSecs: options.soakSecs,
-      attestationThreshold: options.attestationThreshold,
-      canaryOrder: options.canaryOrder,
-    },
+    adoptionDiscipline,
     ...(options.notes ? { notes: options.notes } : {}),
   };
 

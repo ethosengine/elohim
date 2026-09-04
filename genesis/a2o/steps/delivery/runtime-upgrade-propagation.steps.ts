@@ -176,6 +176,19 @@ function candidateHapp(): string {
   return minted.happPath;
 }
 
+/**
+ * THE household's own adoption discipline: one attester (james), a 30-second
+ * soak. It is registered on the channel at `channel create --discipline` and
+ * declared again on every manifest this file packages.
+ *
+ * `epr-release-package.ts` no longer defaults either number (its retired
+ * `soakSecs 900` / `attestationThreshold 2` wedged this three-device mesh
+ * twice on 2026-09-03 — one attester archetype, a threshold of two), so every
+ * packaging call site below MUST pass `--soak-secs` + `--attestation-threshold`
+ * explicitly, or inherit the channel's own with `--inherit-discipline-from`
+ * (what Station 9's second candidate does). A call site that passes neither is
+ * refused at exit 64 rather than silently packaged with a number nobody typed.
+ */
 const SOAK_SECS = 30;
 const ATTESTATION_THRESHOLD = 1;
 
