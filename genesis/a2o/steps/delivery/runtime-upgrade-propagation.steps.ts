@@ -239,6 +239,24 @@ const SOAK_SECS = 30;
 const ATTESTATION_THRESHOLD = 1;
 
 /**
+ * How long a canary is given to ADOPT a staged release: resolve it through its
+ * own conductor, pull the artifact, verify, and hot-swap. Station 3's own
+ * budget, named here so Station 9's second fix waits exactly as long for
+ * exactly the same work — run shift-it4-20260904T082029Z measured Station 3's
+ * adopt+attest at 176s end to end, and a station that budgets less for the
+ * identical ceremony reds on the fixture's arithmetic, not the runtime's.
+ */
+const CANARY_APPLY_BUDGET_MS = 300_000;
+
+/**
+ * How long a qualifying attestation is given AFTER the soak can first have
+ * completed — the controller's sweep interval is 60s, so this must cover a
+ * sweep plus the gossip that carries the attestation into the reader's view.
+ * Station 3's own budget; Station 9 uses the same one from the same point.
+ */
+const ATTESTATION_BUDGET_MS = Math.max((SOAK_SECS + 65) * 1000, 90_000);
+
+/**
  * 2026-09-02 diagnosis of station 6's `coordinator_lineage_mismatch`: the
  * elohim-storage release-adoption controller caches "installed reality"
  * (its own snapshot of what a peer's runtime would report) for
@@ -1632,7 +1650,7 @@ async function ensureCanaryApplied(world: E2EWorld): Promise<void> {
   const { row } = await pollAdoption(
     world,
     'james',
-    300_000,
+    CANARY_APPLY_BUDGET_MS,
     // Only a TERMINAL refusal ends this poll early: a transient one (the
     // candidate's blob still replicating, say) is the controller's own
     // not-yet and it re-asks on its backoff ladder — see `isTerminalRefusal`.
@@ -1677,7 +1695,7 @@ async function ensureAttested(world: E2EWorld): Promise<void> {
   await ensureCanaryApplied(world);
   if (c.attestationRow) return;
 
-  const budgetMs = Math.max((SOAK_SECS + 65) * 1000, 90_000);
+  const budgetMs = ATTESTATION_BUDGET_MS;
   const deadline = Date.now() + budgetMs;
   let lastRow: AdoptionChannelRow | undefined;
   while (Date.now() < deadline) {
@@ -2280,8 +2298,19 @@ function isTerminalRefusal(row: AdoptionChannelRow): boolean {
 }
 
 /**
- * Waits out a TRANSIENT refusal on one peer's channel row before it is read as
- * evidence.
+ * A row the controller has nothing to say about YET: its conductor has not
+ * resolved a head for the channel at all (`resolvedHead: null`, verdict
+ * `idle`). For a channel whose head this run just declared, that is gossip in
+ * flight — the declaration has not reached this peer's conductor — not an
+ * absence to record.
+ */
+function isUnresolvedRow(row: AdoptionChannelRow): boolean {
+  return row.resolvedHead === null || row.verdict?.state === 'idle';
+}
+
+/**
+ * Waits out a TRANSIENT refusal — or a not-yet-resolved head — on one peer's
+ * channel row before it is read as evidence.
  *
  * Measured (run shift-it3-20260904T064119Z, 7/8): Station 7 read james's
  * personal-channel verdict ~50s after the post-revert republish and found
@@ -2292,21 +2321,27 @@ function isTerminalRefusal(row: AdoptionChannelRow): boolean {
  * Reading an instantaneous verdict on a freshly published head is a race, and
  * a transient refusal read as an envelope breach is a false red.
  *
+ * Measured again (run shift-it4-20260904T082029Z, 7/9): Station 7's FIRST
+ * reading — after staging — found `resolvedHead: null` on an idle row, because
+ * the Background publish's head declaration had not yet gossiped to james's
+ * conductor. Same shape as the refusal race, one step earlier in the pipeline:
+ * a peer that has not heard the declaration yet is not a peer that resolved
+ * nothing. So this also waits while the row is unresolved (`isUnresolvedRow`),
+ * which is only ever called for a channel whose head THIS RUN just declared.
+ *
  * A NON-transient refusal returns immediately, so the caller's assertion still
  * fails at once with the verdict quoted — the compatibility-envelope check is
- * unchanged, only the race is removed. Bounded by the same budget Station 5
- * gives fleet convergence.
+ * unchanged, only the race is removed. A head still null when the budget
+ * expires fails the same way, with the row quoted by `pollAdoption`'s own
+ * timeout message. Bounded by the same budget Station 5 gives fleet
+ * convergence.
  */
-async function settleTransientRefusal(
-  world: E2EWorld,
-  peer: PeerName,
-  channelId: string
-): Promise<void> {
+async function settleChannelRow(world: E2EWorld, peer: PeerName, channelId: string): Promise<void> {
   await pollAdoption(
     world,
     peer,
     FLEET_ADOPTION_CONVERGE_BUDGET_MS,
-    row => !isTransientRefusal(row),
+    row => !isUnresolvedRow(row) && !isTransientRefusal(row),
     channelId,
     5_000
   );
@@ -2314,11 +2349,12 @@ async function settleTransientRefusal(
 
 /**
  * The "as they happened" reading of james's two channels. The personal channel
- * is settled first (see `settleTransientRefusal`): its release was published
- * seconds earlier, so its bytes may still be in flight.
+ * is settled first (see `settleChannelRow`): its head was declared seconds
+ * earlier, so the declaration may still be gossiping to his conductor and its
+ * bytes may still be in flight.
  */
 async function readJamesChannelRows(world: E2EWorld): Promise<JamesChannelRows> {
-  await settleTransientRefusal(world, 'james', PERSONAL_CHANNEL_ID);
+  await settleChannelRow(world, 'james', PERSONAL_CHANNEL_ID);
   const report = await getAdoptionReport(world, 'james');
   return {
     commons: findChannelRow(report, CHANNEL_ID),
@@ -2617,10 +2653,10 @@ async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
   if (c.secondCanaryRow) return;
 
   const pidBefore = readPid('james');
-  const { row } = await pollAdoption(
+  const { row, elapsedMs: canaryApplyMs } = await pollAdoption(
     world,
     'james',
-    300_000,
+    CANARY_APPLY_BUDGET_MS,
     // Terminal refusals only — same rail as Station 3's canary poll.
     r => r.appliedRelease?.cid === c.secondReleaseCid || isTerminalRefusal(r)
   );
@@ -2650,7 +2686,8 @@ async function ensureSecondCanaryApplied(world: E2EWorld): Promise<void> {
   );
   // eslint-disable-next-line no-console
   console.log(
-    `[station9] james applied the second fix ${c.secondReleaseCid}: lamad ` +
+    `[station9] james applied the second fix ${c.secondReleaseCid} after ${canaryApplyMs}ms ` +
+      `(budget ${CANARY_APPLY_BUDGET_MS}ms, the same one station 3 uses): lamad ` +
       `coordinatorWasmHashes=${JSON.stringify(c.secondCandidateWasmHashes)}`
   );
 }
@@ -2667,9 +2704,15 @@ async function ensureSecondAttested(world: E2EWorld): Promise<void> {
   await ensureSecondCanaryApplied(world);
   if (c.secondAttestationRow) return;
 
-  const soakDoneAt = Date.now() + SOAK_SECS * 1000;
-  const budgetMs = Math.max((SOAK_SECS + 65) * 1000, 90_000);
-  const deadline = Date.now() + budgetMs;
+  const waitStartedAt = Date.now();
+  const soakDoneAt = waitStartedAt + SOAK_SECS * 1000;
+  // The SAME budget Station 3 gives its attestation — measured from the point
+  // the soak can first have completed, not from now. Station 3's budget starts
+  // after its own canary apply returned; this station additionally requires a
+  // sweep LATER than the soak (see this function's doc), and folding the soak
+  // into the budget left one 60s sweep interval with no margin. Run
+  // shift-it4-20260904T082029Z reds here on exactly that arithmetic.
+  const deadline = soakDoneAt + ATTESTATION_BUDGET_MS;
   let lastRow: AdoptionChannelRow | undefined;
   while (Date.now() < deadline) {
     const report = await getAdoptionReport(world, 'matthew');
@@ -2678,13 +2721,20 @@ async function ensureSecondAttested(world: E2EWorld): Promise<void> {
     if ((lastRow?.attestations?.qualifying ?? 0) >= ATTESTATION_THRESHOLD && sweptAt > soakDoneAt) {
       c.secondAttestationRow = lastRow;
       c.secondAttestationTimestamp = Date.now();
+      // eslint-disable-next-line no-console
+      console.log(
+        `[station9] qualifying attestation for the second fix after ` +
+          `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + ` +
+          `${ATTESTATION_BUDGET_MS}ms budget): ${JSON.stringify(lastRow?.attestations)}`
+      );
       return;
     }
     await new Promise<void>(resolve => setTimeout(resolve, 10_000));
   }
   assert.fail(
-    `no qualifying attestation for the second fix on ${CHANNEL_ID} within ${budgetMs}ms; ` +
-      `last row: ${JSON.stringify(lastRow)}`
+    `no qualifying attestation for the second fix on ${CHANNEL_ID} within ` +
+      `${Date.now() - waitStartedAt}ms (soak ${SOAK_SECS}s + the ${ATTESTATION_BUDGET_MS}ms budget ` +
+      `station 3 uses); last row: ${JSON.stringify(lastRow)}`
   );
 }
 
@@ -2779,7 +2829,7 @@ async function ensureJamesAlreadyCurrent(world: E2EWorld): Promise<void> {
     FLEET_ADOPTION_CONVERGE_BUDGET_MS,
     // …and not parked on a transient refusal: the head moved to earned seconds
     // ago, and the Then below asserts on this row's verdict. See
-    // `settleTransientRefusal` for the race this closes.
+    // `settleChannelRow` for the race this closes.
     r =>
       r.resolvedHead?.cid === c.secondReleaseCid &&
       r.resolvedHead?.tier === 'earned' &&
