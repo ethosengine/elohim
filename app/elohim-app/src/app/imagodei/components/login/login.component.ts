@@ -135,21 +135,61 @@ export class LoginComponent implements OnInit, AfterViewInit {
     ) {
       return;
     }
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (early return above when window is undefined)
+    const origin = window.location.origin;
+
     try {
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard (early return above when window is undefined)
-      const resp = await fetch(`${window.location.origin}/auth/me`, { credentials: 'include' });
+      const resp = await fetch(`${origin}/auth/me`, { credentials: 'include' });
+      if (resp.ok) {
+        const data = (await resp.json()) as Record<string, unknown>;
+        const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+        const label = (authorityData['label'] as string | undefined) ?? '';
+        if (label) {
+          this.authority = {
+            trustMode:
+              (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+            authority: {
+              label,
+              id: authorityData['id'] as string | undefined,
+            },
+            flywheelHint: data['flywheelHint'] as boolean | undefined,
+            attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
+          };
+          return;
+        }
+      }
+    } catch {
+      // Network error — fall through to the anonymous discovery document.
+    }
+
+    // /auth/me is 401 for EVERY anonymous visitor, which is everyone reading a
+    // SIGN-IN page — so the trust chip rendered "Hosted via" followed by
+    // nothing. The doorway publishes who it is anonymously at
+    // /.well-known/elohim-auth (doorway-service/src/routes/auth_discovery.rs);
+    // that is the honest answer to "whose porch am I standing on" before a
+    // session exists.
+    await this._prefetchAuthorityFromDiscovery(origin);
+  }
+
+  /**
+   * Anonymous fallback: name the doorway from its own discovery document.
+   * The document is origin-relative by construction, so the only identity it
+   * can assert is its own; if it omits `doorwayId` we fall back to the hostname
+   * the human already typed or clicked.
+   */
+  private async _prefetchAuthorityFromDiscovery(origin: string): Promise<void> {
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: caller returns early when window is undefined
+    const hostname = window.location.hostname;
+    try {
+      const resp = await fetch(`${origin}/.well-known/elohim-auth`);
       if (!resp.ok) return;
-      const data = (await resp.json()) as Record<string, unknown>;
-      const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+      const doc = (await resp.json()) as Record<string, unknown>;
+      const doorwayId = (doc['doorwayId'] as string | undefined) ?? '';
+      const label = doorwayId || hostname;
+      if (!label) return;
       this.authority = {
-        trustMode:
-          (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
-        authority: {
-          label: (authorityData['label'] as string | undefined) ?? '',
-          id: authorityData['id'] as string | undefined,
-        },
-        flywheelHint: data['flywheelHint'] as boolean | undefined,
-        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
+        trustMode: 'doorway-host',
+        authority: { label, id: doorwayId || undefined },
       };
     } catch {
       // Network error — leave authority null; shell will emit authority-needed.

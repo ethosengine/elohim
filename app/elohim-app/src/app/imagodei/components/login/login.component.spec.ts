@@ -377,4 +377,106 @@ describe('LoginComponent (Lit wrapper)', () => {
     const validSteps: string[] = ['resolve', 'login'];
     expect(validSteps).toContain(component.step);
   });
+  // ==========================================================================
+  // Authority pre-fetch — the trust chip on an ANONYMOUS sign-in page
+  // ==========================================================================
+
+  describe('authority pre-fetch', () => {
+    let originalLocation: Location;
+
+    /** Reach the private pre-fetch without waiting on ngOnInit's fire-and-forget. */
+    const prefetch = (): Promise<void> =>
+      (component as unknown as { _prefetchAuthority(): Promise<void> })._prefetchAuthority();
+
+    beforeEach(() => {
+      component.authority = null;
+      originalLocation = globalThis.location;
+      Object.defineProperty(globalThis, 'location', {
+        value: {
+          origin: 'https://doorway-alpha.elohim.host',
+          hostname: 'doorway-alpha.elohim.host',
+          protocol: 'https:',
+          href: 'https://doorway-alpha.elohim.host/identity/login',
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(globalThis, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    const jsonResponse = (body: unknown) => ({ ok: true, json: async () => body });
+    const unauthorized = { ok: false, status: 401, json: async () => ({}) };
+
+    it('falls back to the discovery document when /auth/me is 401 (every anonymous visitor)', async () => {
+      const fetchMock = vi.fn(async (url: string) =>
+        url.endsWith('/auth/me')
+          ? unauthorized
+          : jsonResponse({ version: 1, doorwayId: 'alpha.elohim.host', portal: '/threshold/login' })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      await prefetch();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // The chip used to read "Hosted via" followed by NOTHING here.
+      expect(component.authority).not.toBeNull();
+      expect(component.authority?.authority.label).toBe('alpha.elohim.host');
+      expect(component.authority?.authority.id).toBe('alpha.elohim.host');
+      expect(component.authority?.trustMode).toBe('doorway-host');
+    });
+
+    it('names the page hostname when the discovery document declares no doorwayId', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url.endsWith('/auth/me')
+            ? unauthorized
+            : jsonResponse({ version: 1, portal: '/threshold/login' })
+        )
+      );
+
+      await prefetch();
+
+      expect(component.authority?.authority.label).toBe('doorway-alpha.elohim.host');
+      expect(component.authority?.authority.id).toBeUndefined();
+    });
+
+    it('prefers the session answer when /auth/me actually resolves an authority', async () => {
+      const fetchMock = vi.fn(async () =>
+        jsonResponse({
+          trustMode: 'peer-native',
+          authority: { label: 'matthew.steward.example', id: 'matthew' },
+          flywheelHint: true,
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      await prefetch();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1); // discovery not consulted
+      expect(component.authority?.authority.label).toBe('matthew.steward.example');
+      expect(component.authority?.trustMode).toBe('peer-native');
+      expect(component.authority?.flywheelHint).toBe(true);
+    });
+
+    it('leaves authority null when neither endpoint answers, so the shell can ask', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('offline');
+        })
+      );
+
+      await prefetch();
+
+      expect(component.authority).toBeNull();
+    });
+  });
 });
