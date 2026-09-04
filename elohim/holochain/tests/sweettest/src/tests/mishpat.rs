@@ -352,3 +352,302 @@ async fn revokes_commitment_without_target_action_is_unaffected() -> Result<()> 
     assert!(!out.entry_hash.to_string().is_empty());
     Ok(())
 }
+
+// =============================================================================
+// Task 2 fix round 3 — quorum-validator refusal-path coverage (review finding 1)
+// and the sunsets-lineage identity-field symmetry fix (review finding 2).
+// =============================================================================
+
+/// The SAME agent appearing twice in `signatures` is refused before either
+/// copy is even verified — `validate_lineage_signatures`'s duplicate-signer
+/// guard, not a quorum-counting quirk (two identical entries would otherwise
+/// silently count as two signers).
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_duplicate_signer() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let mut bad = migrates_lineage_payload(cid, &sig_b64, &alice);
+    bad["signatures"] = serde_json::json!([
+        {"agent": alice.to_string(), "signature": sig_b64},
+        {"agent": alice.to_string(), "signature": sig_b64},
+    ]);
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("duplicate signer"),
+        "refusal must name the duplicate-signer condition: {err}"
+    );
+    Ok(())
+}
+
+/// A `signature` field that is not valid base64 at all is refused, naming
+/// the decode failure — distinct from a well-formed-but-wrong-length or
+/// well-formed-but-non-verifying signature.
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_non_base64_signature() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let mut bad = migrates_lineage_payload(cid, "unused", &alice);
+    bad["signatures"] = serde_json::json!([
+        {"agent": alice.to_string(), "signature": "not-valid-base64!!!"},
+    ]);
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("signature not base64"),
+        "refusal must name the base64-decode failure: {err}"
+    );
+    Ok(())
+}
+
+/// A `signature` that decodes as valid base64 but is the wrong byte length
+/// (32 bytes, not the 64-byte ed25519 signature length) is refused, naming
+/// the length requirement.
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_wrong_length_signature() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let short_sig_b64 = STANDARD.encode([0u8; 32]);
+    let mut bad = migrates_lineage_payload(cid, "unused", &alice);
+    bad["signatures"] = serde_json::json!([
+        {"agent": alice.to_string(), "signature": short_sig_b64},
+    ]);
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("signature must be 64 bytes"),
+        "refusal must name the 64-byte length requirement: {err}"
+    );
+    Ok(())
+}
+
+/// `required_signatures: 2` with only one verified signature present is
+/// refused as a quorum shortfall, naming the exact count (not just "not
+/// enough signatures").
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_requires_quorum_of_required_signatures() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let mut bad = migrates_lineage_payload(cid, &sig_b64, &alice);
+    bad["required_signatures"] = serde_json::json!(2);
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("quorum unmet: 1 of 2"),
+        "refusal must name the exact shortfall: {err}"
+    );
+    Ok(())
+}
+
+/// A `window.opens_at` without the `Z` UTC suffix is refused — the
+/// lexicographic-comparison precondition the validator's comment documents
+/// (a fixed-offset timestamp would sort out of chronological order against
+/// a `Z`-suffixed one).
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_non_z_opens_at() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let mut bad = migrates_lineage_payload(cid, &sig_b64, &alice);
+    bad["window"] = serde_json::json!({
+        "opens_at": "2026-09-04T00:00:00+00:00",
+        "revert_until": "2026-09-11T00:00:00Z"
+    });
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("RFC3339 UTC") && err.contains("Z"),
+        "refusal must name the Z-suffix requirement: {err}"
+    );
+    Ok(())
+}
+
+/// `from_dna_hash == to_dna_hash` is refused for `migrates-lineage` — a
+/// migration that doesn't actually move DNA lineage is not a migration.
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_equal_dna_hashes() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let mut bad = migrates_lineage_payload(cid, &sig_b64, &alice);
+    bad["to_dna_hash"] = bad["from_dna_hash"].clone();
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("from_dna_hash and to_dna_hash must differ"),
+        "refusal must name the identical-hash condition: {err}"
+    );
+    Ok(())
+}
+
+/// Review finding 2 (plan-mandated symmetry, spec §3): `sunsets-lineage`
+/// must apply the SAME `from_dna_hash`/`to_dna_hash` identity checks as
+/// `migrates-lineage` — `from_dna_hash == to_dna_hash` is refused with the
+/// identical message.
+#[tokio::test(flavor = "multi_thread")]
+async fn sunsets_lineage_commitment_rejects_equal_dna_hashes() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let bad = serde_json::json!({
+        "action": "sunsets-lineage",
+        "role": "node_registry",
+        "from_dna_hash": "uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH",
+        "to_dna_hash": "uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH",
+        "migration_commitment_cid": "uhCEkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "signing_payload_cid": cid,
+        "signatures": [{"agent": alice.to_string(), "signature": sig_b64}],
+        "evidence": {"convergence": ["bafyconv"], "soak": ["bafysoak"], "deliberation": "bafyd"},
+        "window": {"sunsets_at": "2026-09-11T00:00:00Z"}
+    });
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "sunsets-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("from_dna_hash and to_dna_hash must differ"),
+        "sunsets-lineage must apply the same identity check as migrates-lineage: {err}"
+    );
+    Ok(())
+}
+
+/// Minor fix: a `revokes-commitment` naming a `target_action` OUTSIDE the two
+/// known lineage actions is NOT gated by the quorum rule (the tightened
+/// `target_action` match, not a bare non-empty-string check) — an unrelated
+/// commitment class using the same field name for its own purposes must not
+/// be accidentally quorum-gated.
+#[tokio::test(flavor = "multi_thread")]
+async fn revokes_commitment_ignores_non_lineage_target_action() -> Result<()> {
+    let (conductor, cell, _alice) = mishpat_cell().await?;
+    let payload = serde_json::json!({
+        "action": "revokes-commitment",
+        "target_cid": "some-non-lineage-commitment-cid",
+        "target_action": "delegates-compute",
+        "reason": "pin removed",
+        "signed_at": "2026-09-05T00:00:00Z",
+        "signatures": []
+    });
+    let out: CommitmentOutput = conductor
+        .call(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "revokes-commitment".into(),
+                payload_json: payload.to_string(),
+                signed_at: "2026-09-05T00:00:00Z".into(),
+            },
+        )
+        .await;
+    assert!(
+        !out.entry_hash.to_string().is_empty(),
+        "target_action naming a non-lineage action must not trigger the quorum gate"
+    );
+    Ok(())
+}
+
+/// Minor fix: `required_signatures` present but not an integer (e.g. a
+/// string) is refused rather than silently defaulting to 1 — a caller who
+/// mistypes the field must not accidentally get the weakest quorum.
+#[tokio::test(flavor = "multi_thread")]
+async fn migrates_lineage_commitment_rejects_non_integer_required_signatures() -> Result<()> {
+    let (conductor, cell, alice) = mishpat_cell().await?;
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    let sig_b64 = sign_cid(&conductor, &alice, cid).await?;
+    let mut bad = migrates_lineage_payload(cid, &sig_b64, &alice);
+    bad["required_signatures"] = serde_json::json!("two");
+    let err = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &cell.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: bad.to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("required_signatures must be a non-negative integer"),
+        "refusal must name the required_signatures type requirement: {err}"
+    );
+    Ok(())
+}

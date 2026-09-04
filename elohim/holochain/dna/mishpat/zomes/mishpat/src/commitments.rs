@@ -366,13 +366,10 @@ fn validate_revokes_commitment(payload: &serde_json::Value) -> Result<(), String
     // that carry `target_action` in this MVP) — the SAME signature-quorum rule
     // that authored the lineage commitment gates pulling it back. A lineage
     // commitment cannot be revoked by one signer's say-so alone.
-    if payload
-        .get("target_action")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .is_some()
-    {
-        validate_lineage_signatures(payload)?;
+    if let Some(target_action) = payload.get("target_action").and_then(|v| v.as_str()) {
+        if matches!(target_action, "migrates-lineage" | "sunsets-lineage") {
+            validate_lineage_signatures(payload)?;
+        }
     }
     Ok(())
 }
@@ -762,10 +759,13 @@ fn validate_lineage_signatures(payload: &serde_json::Value) -> Result<(), String
         .and_then(|v| v.as_array())
         .filter(|a| !a.is_empty())
         .ok_or("signatures must be a non-empty array")?;
-    let required = payload
-        .get("required_signatures")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1) as usize;
+    let required = match payload.get("required_signatures") {
+        None => 1usize,
+        Some(v) => v
+            .as_u64()
+            .ok_or("required_signatures must be a non-negative integer")?
+            as usize,
+    };
     let mut seen = std::collections::BTreeSet::new();
     for s in sigs {
         let agent = s
@@ -879,6 +879,17 @@ fn validate_sunsets_lineage(payload: &serde_json::Value) -> Result<(), String> {
     }
     if payload["action"] != "sunsets-lineage" {
         return Err("action field must equal 'sunsets-lineage'".into());
+    }
+    // Spec §3 binds both lineage arms to the same identity fields — a sunset
+    // names the same from/to DNA-hash pair the migration it closes named.
+    for f in ["from_dna_hash", "to_dna_hash"] {
+        let h = payload[f].as_str().unwrap_or("");
+        if !h.starts_with("uhC0k") {
+            return Err(format!("{f} must be a DNA hash (uhC0k…)"));
+        }
+    }
+    if payload["from_dna_hash"] == payload["to_dna_hash"] {
+        return Err("from_dna_hash and to_dna_hash must differ".into());
     }
     let sunsets_at = payload["window"]
         .get("sunsets_at")
