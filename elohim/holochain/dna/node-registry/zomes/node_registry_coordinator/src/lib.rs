@@ -1312,6 +1312,26 @@ pub struct ExportPage {
 
 const EXPORT_CAP: u32 = 64;
 
+/// The chain digest every export reports: a hex sha256 over the concatenated
+/// raw action hashes, in chain order.
+///
+/// Factored out ON PURPOSE. `export_records` (own chain, local `query`) and
+/// `export_held_records` (a neighbour's chain, via the agent-activity
+/// authority) MUST hash the same way, because the carry receipt's `v1_digest`
+/// is a like-for-like comparison against whichever of the two the sweep called.
+/// Two copies of this loop would let the two exports drift silently and turn
+/// that comparison into a tautology.
+fn chain_digest<'a, I>(hashes: I) -> String
+where
+    I: IntoIterator<Item = &'a ActionHash>,
+{
+    let mut hasher = Sha256::new();
+    for h in hashes {
+        hasher.update(h.get_raw_39());
+    }
+    hex::encode(hasher.finalize())
+}
+
 /// v1 bounded export (Holochain Evolution Epic Task 1). Exports THIS agent's
 /// own chain actions of app entry types — genesis actions, capability
 /// grants, and agent-validation packages are conductor bookkeeping, not
@@ -1332,11 +1352,7 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         .collect();
     app.sort_by_key(|r| r.action().action_seq());
 
-    let mut hasher = Sha256::new();
-    for r in &app {
-        hasher.update(r.action_address().get_raw_39());
-    }
-    let digest = hex::encode(hasher.finalize());
+    let digest = chain_digest(app.iter().map(|r| r.action_address()));
     // Cheap: the walk above already read the whole chain.
     let total = Some(app.len() as u32);
 
@@ -1355,6 +1371,188 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         digest,
         total,
     })
+}
+
+/// Input to [`export_held_records`]: WHOSE chain to read, plus the same page
+/// cursor/limit discipline as [`ExportInput`].
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExportHeldInput {
+    /// The neighbour whose chain this cell should hand over. Not necessarily
+    /// (and usually not) the calling agent.
+    pub agent: AgentPubKey,
+    pub cursor: Option<u32>,
+    pub limit: u32,
+}
+
+/// The app entry types in scope for THIS zome, rendered as an exact
+/// [`ChainQueryFilter`] entry-type set.
+///
+/// `export_records` selects app entries with `matches!(entry_type, Some(App(_)))`
+/// — a predicate it can evaluate because it holds whole `Record`s.
+/// `export_held_records` holds only `(seq, ActionHash)` pairs, so the same
+/// selection has to be expressed as a filter the agent-activity AUTHORITY
+/// applies on its side (`ChainQueryFilter::filter_actions`, exact `EntryType`
+/// equality). Enumerating every scoped `(zome_index, entry_index)` at both
+/// visibilities reproduces the predicate exactly for this DNA, whose one
+/// integrity zome defines every app entry type there is.
+///
+/// Derived at runtime from `zome_info()`, so the `lineage-witness` build's extra
+/// entry type is covered without this function knowing about it.
+fn app_entry_types_in_scope() -> ExternResult<Vec<EntryType>> {
+    let scoped = zome_info()?.zome_types.entries;
+    let mut types = Vec::new();
+    for (zome_index, entry_indexes) in scoped.0.iter() {
+        for entry_index in entry_indexes {
+            for visibility in [EntryVisibility::Public, EntryVisibility::Private] {
+                types.push(EntryType::App(AppEntryDef::new(
+                    *entry_index,
+                    *zome_index,
+                    visibility,
+                )));
+            }
+        }
+    }
+    Ok(types)
+}
+
+/// v1 bounded export of a NEIGHBOUR's chain (Holochain Evolution Epic Task 18).
+///
+/// Why this exists. [`export_records`] is a local `query()` — it can only ever
+/// hand back the calling agent's OWN chain, so every record a sweep pulled
+/// through it was a self-carry and v2's held-carry branch (§2.2) was
+/// unreachable in practice (Station 5's live measurement). This extern is the
+/// missing HELD view: it reads `agent`'s chain through the agent-activity
+/// authority and fetches each record of the page window from the DHT, returning
+/// the SAME [`ExportPage`] shape so `carry_from` can consume either without
+/// caring which it asked for.
+///
+/// Bounded by construction: `get_agent_activity` returns hashes only (cheap,
+/// one round trip), and at most `limit.clamp(1, EXPORT_CAP)` records are then
+/// fetched. `digest` and `total` cover the agent's WHOLE filtered valid
+/// activity and are page-independent, exactly as in `export_records` — and are
+/// computed with the same [`chain_digest`], so a `v1_digest` comparison is
+/// like-for-like whichever export produced it.
+///
+/// A record the authority named but that cannot be fetched is a LOUD Guest
+/// error naming the action hash. Silently skipping it would produce a page that
+/// disagrees with its own digest and total, which the driver would read as a
+/// short chain rather than as a fetch failure.
+///
+/// Coordinator-only, so DNA-hash-NEUTRAL: it hot-swaps onto a running v1
+/// conductor with no reinstall and no re-key.
+#[hdk_extern]
+pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
+    let limit = input.limit.clamp(1, EXPORT_CAP) as usize;
+
+    // Same selection as `export_records`, expressed as an authority-side filter.
+    let mut filter = ChainQueryFilter::new();
+    for entry_type in app_entry_types_in_scope()? {
+        filter = filter.entry_type(entry_type);
+    }
+
+    // `GetOptions::local()` — THIS conductor's own authority store, i.e. what
+    // this peer validated and integrated. Two reasons, one principled and one
+    // measured:
+    //
+    //   * a courier should carry only what IT holds, never what a remote peer
+    //     told it it holds — the same verify-locally-then-serve invariant the
+    //     rest of the dataplane keeps;
+    //   * MEASURED (holochain 0.7.0, 2026-09-04): a lone conductor reading its
+    //     OWN key with `GetOptions::network()` returns an EMPTY activity list
+    //     (`total: Some(0)`, digest of the empty string) even 60 s after five
+    //     `register_node` calls, while the same read with `local()` returns all
+    //     five. `network()` is therefore not a superset of `local()` here, and
+    //     `export_held_records(self)` would silently report an empty chain.
+    //
+    // A peer that has not yet gossiped the neighbour's chain reports a SHORT
+    // view rather than a wrong one: `total` and `digest` cover exactly the
+    // records this page can also hand over, so a driver comparing them against
+    // the neighbour's own export sees the disagreement instead of inheriting it.
+    let activity = get_agent_activity(
+        input.agent.clone(),
+        filter,
+        ActivityRequest::Full,
+        GetOptions::local(),
+    )?;
+
+    // `valid_activity` arrives ascending by sequence (the authority sorts before
+    // filtering), which is the order `export_records` establishes with its
+    // explicit `sort_by_key(action_seq)`.
+    let hashes: Vec<ActionHash> = activity
+        .valid_activity
+        .into_iter()
+        .map(|(_seq, hash)| hash)
+        .collect();
+
+    let digest = chain_digest(hashes.iter());
+    let total = Some(hashes.len() as u32);
+
+    let start = input.cursor.unwrap_or(0) as usize;
+    let window: Vec<ActionHash> = hashes.into_iter().skip(start).take(limit).collect();
+    let next_cursor = if window.len() == limit {
+        Some((start + limit) as u32)
+    } else {
+        None
+    };
+
+    let mut records = Vec::with_capacity(window.len());
+    let mut entries = Vec::with_capacity(window.len());
+    for action_hash in window {
+        let record = get(action_hash.clone(), GetOptions::network())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "export_held_records: the agent-activity authority named action {action_hash} \
+                 for {}, but it could not be fetched — refusing to return a page that \
+                 disagrees with its own digest and total",
+                input.agent
+            )))
+        })?;
+        entries.push(record.entry().as_option().cloned());
+        records.push(record.signed_action);
+    }
+
+    Ok(ExportPage {
+        records,
+        entries,
+        next_cursor,
+        digest,
+        total,
+    })
+}
+
+/// The agents whose registrations this cell can see (Holochain Evolution Epic
+/// Task 18) — the sweep's enumeration of WHOM to ask for a held export.
+///
+/// Walks the same index the discovery externs walk: `register_node` links every
+/// new registration from the `("status", "online")` anchor, so that anchor is
+/// the one enumeration that covers every registration regardless of region or
+/// tier.
+///
+/// The author is read from the LINK, not from a fetched record. `register_node`
+/// creates the entry and this link in one zome call, so the link's author IS
+/// the registration's author — and taking it from there keeps this extern a
+/// single `get_links` instead of one network `get` per registration, which is
+/// what makes it usable as the first step of a sweep.
+///
+/// Coordinator-only, so DNA-hash-NEUTRAL.
+#[hdk_extern]
+pub fn known_agents(_: ()) -> ExternResult<Vec<AgentPubKey>> {
+    let status_anchor = StringAnchor {
+        anchor_type: "status".to_string(),
+        anchor_value: "online".to_string(),
+    };
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+    let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::StatusToNode)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut agents: Vec<AgentPubKey> = Vec::new();
+    for link in links {
+        if !agents.contains(&link.author) {
+            agents.push(link.author);
+        }
+    }
+
+    Ok(agents)
 }
 
 /// Close this chain toward a successor DNA. Returns the real `CloseChain`
@@ -1496,6 +1694,26 @@ pub fn get_record_at(input: (ActionHash, bool)) -> ExternResult<Option<Record>> 
 // check that the carried entry is the one the carried action commits to.
 // ============================================================================
 
+/// WHOSE predecessor records a [`carry_from`] page should pull.
+///
+/// `Own` reads the predecessor cell's own chain through `export_records` — the
+/// self-carry path (§2.1), where the carrier is the author and re-creates the
+/// content natively.
+///
+/// `Held(agent)` reads a NEIGHBOUR's chain through `export_held_records` — the
+/// held-carry path (§2.2), where the carrier is a COURIER: it authors the
+/// witness, but never the carried content.
+#[cfg(feature = "lineage-witness")]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub enum CarrySource {
+    /// The predecessor cell's own chain (the pre-Task-18 behaviour, and the
+    /// `#[serde(default)]` a request that omits `source` decodes to).
+    #[default]
+    Own,
+    /// A neighbour's chain, as the predecessor cell can see it.
+    Held(AgentPubKey),
+}
+
 /// Input to [`carry_from`]: which predecessor cell to pull from, where to
 /// resume, and how many records to take. `limit` is clamped to
 /// [`WITNESS_BATCH`] because one page becomes exactly one witness, and a
@@ -1506,6 +1724,15 @@ pub struct CarryInput {
     pub v1_cell: CellId,
     pub cursor: Option<u32>,
     pub limit: u32,
+    /// **Additive.** Whose records to carry, defaulting to [`CarrySource::Own`].
+    ///
+    /// `#[serde(default)]` is what keeps this byte-compatible: the landed
+    /// storage decoder (`elohim-storage/.../release_adoption/apply.rs`) emits no
+    /// `source` key at all, and `holochain_serialized_bytes` encodes structs as
+    /// NAMED msgpack maps, so an absent key reads as `Own` — exactly the
+    /// behaviour that driver already relies on.
+    #[serde(default)]
+    pub source: CarrySource,
 }
 
 /// What one page of carriage produced.
@@ -1558,6 +1785,14 @@ pub struct CarryReceipt {
 /// that DNA, otherwise the carriage is refused here rather than deeper in
 /// validation. MVP scope: the FIRST declared parent; a multi-parent lineage is
 /// a later station.
+///
+/// [`CarryInput::source`] chooses WHOSE records the page holds:
+/// [`CarrySource::Own`] (the default, and what a request omitting the field
+/// decodes to) takes the predecessor cell's own chain and re-creates this
+/// agent's records natively; [`CarrySource::Held`] takes a neighbour's chain
+/// through `export_held_records` and carries every record as a held-carry —
+/// entry bytes inside the witness, `self_carried` untouched, this agent as
+/// courier.
 #[cfg(feature = "lineage-witness")]
 #[hdk_extern]
 pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
@@ -1582,19 +1817,60 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         ))));
     }
 
-    // (2) one bounded page of the predecessor's own export, across the cell
+    // (2) one bounded page of the predecessor's export, across the cell
     //     boundary. Same agent, so no capability secret is presented.
+    //
+    //     WHICH export depends on `source`: the predecessor's own chain
+    //     (`export_records`, self-carry) or a neighbour's chain as the
+    //     predecessor can see it (`export_held_records`, held-carry). Both
+    //     return the same `ExportPage` shape, so only the call differs.
+    let me = agent_info()?.agent_initial_pubkey;
     let limit = input.limit.clamp(1, WITNESS_BATCH as u32);
-    let response = call(
-        CallTargetCell::OtherCell(input.v1_cell.clone()),
-        "node_registry_coordinator",
-        "export_records".into(),
-        None,
-        ExportInput {
-            cursor: input.cursor,
-            limit,
-        },
-    )?;
+    // Held pages are ALWAYS held-carries: the courier is not the author, so no
+    // record on the page may be re-created natively on this chain.
+    let held = matches!(input.source, CarrySource::Held(_));
+    let extern_name = if held {
+        "export_held_records"
+    } else {
+        "export_records"
+    };
+
+    let response = match &input.source {
+        CarrySource::Own => call(
+            CallTargetCell::OtherCell(input.v1_cell.clone()),
+            "node_registry_coordinator",
+            "export_records".into(),
+            None,
+            ExportInput {
+                cursor: input.cursor,
+                limit,
+            },
+        )?,
+        CarrySource::Held(agent) => {
+            // A held-carry of one's OWN chain would be a self-carry wearing the
+            // wrong label: the loop below would ship the entry bytes inside the
+            // witness and report `self_carried: 0` for content this agent could
+            // have re-created natively. Refuse rather than quietly downgrade.
+            if agent == &me {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "carry_from: Held(self) is not a held-carry — use CarrySource::Own to \
+                     re-create this agent's own records natively"
+                        .to_string(),
+                )));
+            }
+            call(
+                CallTargetCell::OtherCell(input.v1_cell.clone()),
+                "node_registry_coordinator",
+                "export_held_records".into(),
+                None,
+                ExportHeldInput {
+                    agent: agent.clone(),
+                    cursor: input.cursor,
+                    limit,
+                },
+            )?
+        }
+    };
     let page: ExportPage = match response {
         ZomeCallResponse::Ok(io) => io.decode().map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
@@ -1603,7 +1879,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         })?,
         other => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "carry_from: the predecessor cell refused export_records: {other:?}"
+                "carry_from: the predecessor cell refused {extern_name}: {other:?}"
             ))))
         }
     };
@@ -1622,7 +1898,6 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
     }
 
     // (3) self-carry vs held-carry, per §2.1/§2.2.
-    let me = agent_info()?.agent_initial_pubkey;
     let mut proofs: Vec<CarriedProof> = Vec::with_capacity(page.records.len());
     let mut self_carried: u32 = 0;
 
@@ -1634,8 +1909,15 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         // the carried action's app entry-def index and round-tripping through
         // the concrete integrity struct reproduces the identical entry, so the
         // EntryHash is preserved across the DNA line.
+        //
+        // `!held` is load-bearing, not belt-and-braces. A held page names a
+        // NEIGHBOUR's chain, so `action.author() == &me` should already be
+        // false for every record on it — but a predecessor that returned the
+        // wrong page would otherwise make this chain silently re-author another
+        // peer's content as its own commit. A courier carries; it does not
+        // author.
         let mut recreated = false;
-        if action.author() == &me {
+        if !held && action.author() == &me {
             if let (Some(EntryType::App(def)), Some(entry)) =
                 (action.entry_type(), carried_entry.as_ref())
             {

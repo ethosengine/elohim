@@ -47,7 +47,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use elohim_sweettest::common::{
-    conductors::{load_dna_from_path, single_agent_conductor, two_agent_conductors_isolated},
+    conductors::{
+        load_dna_from_path, single_agent_conductor, two_agent_conductors,
+        two_agent_conductors_isolated,
+    },
     fixtures::{network_seed, node_registration, NodeRegistration},
 };
 use holochain::sweettest::{await_consistency_s, SweetConductor, SweetZome};
@@ -100,12 +103,48 @@ struct ExportPage {
     total: Option<u32>,
 }
 
+/// Mirror of `node_registry_coordinator::ExportHeldInput` (Task 18, v1 held view).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ExportHeldInput {
+    agent: AgentPubKey,
+    cursor: Option<u32>,
+    limit: u32,
+}
+
+/// Mirror of `node_registry_coordinator::CarrySource` (Task 18).
+///
+/// Externally tagged, exactly as serde renders the zome-side enum: `Own` is the
+/// bare string, `Held(agent)` a single-key map.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+enum CarrySource {
+    #[allow(dead_code)]
+    Own,
+    Held(AgentPubKey),
+}
+
 /// Mirror of `node_registry_coordinator::CarryInput` (Task 9, v2 cross-cell carry).
+///
+/// Task 18 added a `source` field to the zome-side struct. This mirror
+/// DELIBERATELY keeps the pre-Task-18 shape (no `source`): the landed storage
+/// decoder (`elohim-storage/.../release_adoption/apply.rs`) emits exactly these
+/// bytes, so every existing carry test doubles as the byte-compatibility check
+/// that `#[serde(default)] source: CarrySource` still decodes an old page
+/// request as `CarrySource::Own`. Use [`CarryInputHeld`] to exercise the new
+/// discriminator.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct CarryInput {
     v1_cell: CellId,
     cursor: Option<u32>,
     limit: u32,
+}
+
+/// The Task 18 input shape: [`CarryInput`] plus the explicit source.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct CarryInputHeld {
+    v1_cell: CellId,
+    cursor: Option<u32>,
+    limit: u32,
+    source: CarrySource,
 }
 
 /// Mirror of `node_registry_coordinator::CarryReceipt`.
@@ -993,6 +1032,338 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
     assert_eq!(p1.digest, p2.digest, "digest is page-independent — computed once over the whole chain");
     assert!(!p1.digest.is_empty());
     assert!(p2.next_cursor.is_none(), "the last page must not offer a further cursor");
+
+    // --- Task 18: the HELD view of the same chain, like-for-like ------------
+    //
+    // `export_held_records` reads an agent's chain through the agent-activity
+    // authority instead of the local `query()`. Pointed at the caller's OWN
+    // key it must agree with `export_records` exactly — same digest recipe over
+    // the same app-entry set, same whole-chain total. If the two ever disagree
+    // the sweep's `v1_digest` comparison stops being like-for-like, which is
+    // the only reason the carry receipt's digest is falsifiable at all.
+    //
+    // Bounded poll: agent activity is read from the INTEGRATED store, and
+    // self-authored ops reach it a beat after the zome call returns. Polling to
+    // the expected total keeps the equality honest instead of racing it.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let mut held: ExportPage;
+    loop {
+        held = conductor
+            .call(
+                &zome,
+                "export_held_records",
+                ExportHeldInput { agent: alice.clone(), cursor: None, limit: 64 },
+            )
+            .await;
+        if held.total == Some(5) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    println!(
+        "[export/held] total={:?} digest={} records={}",
+        held.total,
+        held.digest,
+        held.records.len()
+    );
+    assert_eq!(
+        held.total,
+        Some(5),
+        "the held view of alice's own chain must see the same 5 app-entry records"
+    );
+    assert_eq!(
+        held.digest, p1.digest,
+        "LIKE-FOR-LIKE: the held export must use the SAME digest recipe over the same \
+         app-entry set as export_records, or a carry receipt's v1_digest compares nothing"
+    );
+    assert_eq!(held.records.len(), 5, "limit 64 takes the whole chain in one page");
+    assert!(held.next_cursor.is_none(), "a partial page must not offer a further cursor");
+    assert_eq!(
+        held.entries.len(),
+        held.records.len(),
+        "records and entries are paired POSITIONALLY"
+    );
+
+    // and the sweep's agent enumeration sees the author of those registrations
+    let agents: Vec<AgentPubKey> = conductor.call(&zome, "known_agents", ()).await;
+    println!("[export/held] known_agents = {agents:?}");
+    assert!(
+        agents.contains(&alice),
+        "known_agents must list the author of the NodeRegistration entries this cell can read"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// Task 18 — A NEIGHBOUR'S RECORD, HELD-CARRIED
+//
+// Station 5's live measurement found the held-carry branch of `carry_from`
+// unreachable: `export_records` is a local `query()`, so a v1 cell can only
+// ever hand the sweep its OWN chain, and every record it returns is therefore
+// a self-carry. The gap is not in v2's carrying — it is that v1 had no held
+// VIEW to offer.
+//
+// Task 18 adds one, unconditionally and coordinator-only (hash-neutral):
+// `export_held_records(agent, cursor, limit)` reads a NEIGHBOUR's chain through
+// the agent-activity authority and `get`s each record from the DHT, in the same
+// `ExportPage` shape and with the same digest recipe. `known_agents()` names
+// whom to ask. On the v2 side `CarryInput.source` selects between them.
+//
+// The shape here: alice and bob are DIFFERENT agents on the SAME v1 DHT; only
+// alice holds v2. Bob authors a registration; alice's v2 carries it through her
+// OWN v1 cell — courier, not author. The record must land as a HELD-carry
+// (`entry: Some`, bytes included so v2's validator can check the entry hash),
+// never re-created natively, with `self_carried == 0` and one witness authored
+// by alice.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else { return Ok(()); };
+
+    // Bootstrap ON (the `two_agent_conductors` default): this test needs the
+    // pair to find each other on the v1 space WITHOUT `exchange_peer_info`,
+    // which cannot be used here — it only returns true when every space across
+    // the batch holds an agent info per conductor, and v2 exists on alice
+    // alone (measured in probe B2).
+    let [(mut ca, alice), (mut cb, bob)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+
+    let v1_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![],
+        constitution_root: None,
+    })?;
+    let v1_dna = load_dna_from_path(&v1_path(), &seed, Some(v1_props)).await?;
+    let v1_hash = v1_dna.dna_hash().clone();
+
+    let v2_props = SerializedBytes::try_from(LineageProperties {
+        progenitor_pubkey: Some(alice.to_string()),
+        lineage: vec![v1_hash.clone()],
+        constitution_root: None,
+    })?;
+    let v2_dna = load_dna_from_path(&v2_path(), &seed, Some(v2_props)).await?;
+    let v2_hash = v2_dna.dna_hash().clone();
+    assert_ne!(v1_hash, v2_hash);
+
+    // alice: v1 AND v2 (she is the courier). bob: v1 only.
+    let app_a1 = ca
+        .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1_dna.clone()])
+        .await?;
+    let app_a2 = ca
+        .setup_app_for_agent("node-registry-v2", alice.clone(), &[v2_dna])
+        .await?;
+    let app_b1 = cb
+        .setup_app_for_agent("node-registry-v1", bob.clone(), &[v1_dna])
+        .await?;
+
+    let cell_a1 = app_a1.cells().first().expect("alice v1 cell").clone();
+    let cell_b1 = app_b1.cells().first().expect("bob v1 cell").clone();
+    let za1 = cell_a1.zome(ZOME);
+    let za2 = app_a2.cells().first().expect("alice v2 cell").zome(ZOME);
+    let zb1 = cell_b1.zome(ZOME);
+
+    println!("[task18] v1 dna hash = {v1_hash}");
+    println!("[task18] v2 dna hash = {v2_hash}");
+    println!("[task18] alice       = {alice}");
+    println!("[task18] bob         = {bob}");
+
+    // Pay bob's one-time wasm instantiation before any bounded window.
+    let _: Vec<NodeRegistration> = cb.call(&zb1, "get_my_nodes", ()).await;
+
+    // --- 1. BOB authors the fact ------------------------------------------
+    let (_bob_ah, bob_sah) = author_and_read_back(&cb, &zb1, "neighbour-node", &bob).await;
+    let bob_eh = bob_sah
+        .action()
+        .entry_hash()
+        .cloned()
+        .expect("a Create action commits to an entry hash");
+    println!("[task18] bob action = {}", bob_sah.action_address());
+    println!("[task18] bob entry  = {bob_eh}");
+
+    // bob's own local view, for the like-for-like comparison below
+    let bob_page: ExportPage = cb
+        .call(&zb1, "export_records", ExportInput { cursor: None, limit: 16 })
+        .await;
+    assert_eq!(bob_page.total, Some(1), "bob committed exactly one app-entry record");
+
+    await_consistency_s(120, [&cell_a1, &cell_b1])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout on the v1 space: {e}"))?;
+
+    // --- 2. ALICE's v1 cell can SEE bob's chain (Task 18's held view) ------
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let mut held: ExportPage;
+    loop {
+        held = ca
+            .call(
+                &za1,
+                "export_held_records",
+                ExportHeldInput { agent: bob.clone(), cursor: None, limit: 16 },
+            )
+            .await;
+        if held.total == Some(1) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    println!(
+        "[task18] alice's held view of bob: total={:?} digest={} records={}",
+        held.total,
+        held.digest,
+        held.records.len()
+    );
+    assert_eq!(
+        held.total,
+        Some(1),
+        "alice's v1 cell must see bob's one app-entry record through the agent-activity \
+         authority — this is exactly what `export_records` (a local query) cannot do"
+    );
+    assert_eq!(
+        held.digest, bob_page.digest,
+        "LIKE-FOR-LIKE across peers: alice's held digest of bob's chain must equal bob's own"
+    );
+    assert_eq!(
+        held.records[0].action_address(),
+        bob_sah.action_address(),
+        "the held page must carry bob's real signed action"
+    );
+    assert!(
+        held.entries[0].is_some(),
+        "a held page ships the entry BYTES — v2's validator checks them against the \
+         carried action's entry hash"
+    );
+
+    // --- 3. and knows WHOM to ask ------------------------------------------
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let mut agents: Vec<AgentPubKey>;
+    loop {
+        agents = ca.call(&za1, "known_agents", ()).await;
+        if agents.contains(&bob) || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    println!("[task18] alice's known_agents = {agents:?}");
+    assert!(
+        agents.contains(&bob),
+        "known_agents is how a sweep enumerates whose chains to carry — bob registered a \
+         node on this DHT and must appear, got {agents:?}"
+    );
+
+    // --- 4. the CARRY: alice's v2 pulls bob's record through her own v1 -----
+    let receipt: CarryReceipt = ca
+        .call(
+            &za2,
+            "carry_from",
+            CarryInputHeld {
+                v1_cell: cell_a1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+                source: CarrySource::Held(bob.clone()),
+            },
+        )
+        .await;
+    println!("[task18] receipt = {receipt:?}");
+
+    assert_eq!(
+        receipt.carried,
+        bob_page.total.expect("bob reported a total"),
+        "everything bob had was carried"
+    );
+    assert_eq!(receipt.carried, 1);
+    assert_eq!(
+        receipt.self_carried, 0,
+        "bob's record is NOT alice's to re-create — a held-carry is never a self-carry"
+    );
+    assert_eq!(
+        receipt.v1_digest, bob_page.digest,
+        "the receipt reports the digest of the chain it actually carried — BOB's"
+    );
+    assert_eq!(receipt.v1_total, Some(1));
+    assert_eq!(receipt.next_cursor, None, "a partial page offers no further cursor");
+    assert!(!receipt.witness_hash.is_empty(), "a non-empty page commits exactly one witness");
+
+    // --- 5. ONE witness, at bob's entry hash, carrying the BYTES ------------
+    let links: Vec<Link> = ca.call(&za2, "get_witnesses_for", bob_eh.clone()).await;
+    assert_eq!(
+        links.len(),
+        1,
+        "carry_from commits exactly ONE witness per page, got {} links",
+        links.len()
+    );
+    let witness_action = links[0]
+        .target
+        .clone()
+        .into_action_hash()
+        .expect("the witness link targets an action hash");
+    assert_eq!(
+        witness_action.to_string(),
+        receipt.witness_hash,
+        "the witness link must target the witness the receipt names"
+    );
+
+    let witness_record: Option<Record> = ca
+        .call(&za2, "get_record_at", (witness_action.clone(), true))
+        .await;
+    let witness_record = witness_record.expect("the witness alice just authored is on her chain");
+    assert_eq!(
+        witness_record.action().author(),
+        &alice,
+        "COURIER semantics: the carrying agent authors the witness, not the original author"
+    );
+    let Some(Entry::App(app_bytes)) = witness_record.entry().as_option() else {
+        panic!("the witness record must carry an app entry");
+    };
+    let witness: NotarizationWitness = holochain_serialized_bytes::decode(app_bytes.bytes())
+        .expect("the witness entry decodes to NotarizationWitness");
+    assert_eq!(witness.lineage_dna_hash, v1_hash);
+    assert_eq!(witness.proofs.len(), 1, "one carried record, one proof");
+    assert!(
+        witness.proofs[0].entry.is_some(),
+        "HELD-CARRY (§2.2): the bytes ride inside the witness, because the courier cannot \
+         re-create another agent's entry natively"
+    );
+    assert_eq!(
+        witness.proofs[0].action.author(),
+        &bob,
+        "the carried notarization is BOB's — alice only witnessed it"
+    );
+
+    // --- 6. and v2 did NOT re-create bob's entry as its own commit ----------
+    let v2_page: ExportPage = ca
+        .call(&za2, "export_records", ExportInput { cursor: None, limit: 64 })
+        .await;
+    assert!(
+        v2_page
+            .records
+            .iter()
+            .all(|r| r.action().entry_hash() != Some(&bob_eh)),
+        "a held-carry must NEVER be re-created natively — alice's chain would then claim \
+         authorship of bob's record"
+    );
+
+    // --- 7. NEGATIVE: Held(self) is a refusal, not a silent self-carry ------
+    let err = ca
+        .call_fallible::<_, CarryReceipt>(
+            &za2,
+            "carry_from",
+            CarryInputHeld {
+                v1_cell: cell_a1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+                source: CarrySource::Held(alice.clone()),
+            },
+        )
+        .await
+        .expect_err("Held(self) MUST be refused — use CarrySource::Own");
+    let msg = format!("{err:?}");
+    println!("[task18] NEGATIVE Held(self) refusal:\n{msg}");
+    assert!(
+        msg.contains("Held(self)"),
+        "expected the Held(self) refusal, got: {msg}"
+    );
 
     Ok(())
 }
