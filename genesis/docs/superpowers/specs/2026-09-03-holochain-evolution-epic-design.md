@@ -484,7 +484,7 @@ runnable check and its DELTA lines; this table carries the epic-level picture th
 - **2026-09-05 — §4 posture ACCEPTED; epic graduated Draft→Active.** The crossing is the elohim's notarized path, no per-node consent, the sunset irreversible and ours to enforce.
 - **2026-09-05 — execution: subagent-driven** (one fresh implementer per task, task review after each; ledger `.superpowers/sdd/2026-09-04-holochain-evolution-epic-mvp-plan/progress.md`).
 - Lane B (§9) timing: after Station 4 by default (Task 15).
-- **Integrator (push ordering):** `elohim/rakia` submodule commit `4947469` first, then the superproject.
+- **Integrator (push ordering) — OPERATOR ITEM, 2026-09-05:** neither overnight session holds GitHub credentials (measured by the peer session: `git push --dry-run` refused on both remotes), so nothing was pushed. The morning integrator pushes **`elohim/rakia` commit `4947469` first** (`git -C elohim/rakia push origin main`), **then `dev`** (58+ commits ahead of `origin/dev`, both sessions' work) — the superproject's gitlink `9b0f7acee` references that rakia SHA and CI's checkout dies on a dangling gitlink.
 
 ### 11.4 Ledger (newest first)
 
