@@ -1,14 +1,14 @@
 ---
 title: "Holochain Evolution Epic — a hApp version crossing carried by the network itself, notarizations intact, the crossing held by the elohim"
 id: holochain-evolution-epic
-status: Draft
+status: Active
 class: protocol-canonical
 context-tier: disclosed
 steward: rust-architect
 serves:
   - happ-lineage-migration
   - runtime-upgrade-propagation
-graduation-trigger: the household-mesh a2o receipt for @concern:happ-lineage-migration passes Stations 1–9 on 3 peers with the node_registry rehearsal (v1 → v1+witness), AND the Lane-B spike (§9) has a measured verdict recorded on this spec (an epr flow note or a dated §9 delta), AND the operator records acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible)
+graduation-trigger: graduated Draft→Active 2026-09-05 on the operator's acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible; recorded in §11.3). Graduates Active→Canonical when the household-mesh a2o receipt for @concern:happ-lineage-migration passes Stations 1–10 on 3 peers with the node_registry rehearsal AND the Lane-B spike (§9) has a measured verdict recorded on this spec
 created: 2026-09-03
 domain: D2
 topic: [dna-lineage, happ-migration, notarization, chain-switch, chain-continuation, conductor-fork, mishpat, release-channel, revert, bridge]
@@ -478,13 +478,16 @@ runnable check and its DELTA lines; this table carries the epic-level picture th
 | 10 quorum / root refused | red | — |
 | 11–13 many versions (§5.1) | designed, not in the story yet | — |
 
-### 11.3 Decisions still the operator's
+### 11.3 Operator decisions
 
-- WIP slot for the habit (the fence is full: dataplane-convergence, runtime-death-witnessed).
-- Acceptance of §4's posture (elohim-held crossing, no per-node consent, sunset irreversible) — the graduation trigger.
-- Lane B (§9) timing: after Station 4 by default.
+- **2026-09-05 — WIP slot: HELD.** The habit `happ-lineage-migration` stays declared, red and `active: false`; the fence keeps dataplane-convergence and runtime-death-witnessed. Execution proceeds under the plan without a slot; the slot question returns when a station is ready to flip.
+- **2026-09-05 — §4 posture ACCEPTED; epic graduated Draft→Active.** The crossing is the elohim's notarized path, no per-node consent, the sunset irreversible and ours to enforce.
+- **2026-09-05 — execution: subagent-driven** (one fresh implementer per task, task review after each; ledger `.superpowers/sdd/2026-09-04-holochain-evolution-epic-mvp-plan/progress.md`).
+- Lane B (§9) timing: after Station 4 by default (Task 15).
 
 ### 11.4 Ledger (newest first)
+
+- 2026-09-05 — operator: no WIP slot for the habit yet; §4 posture accepted → **epic Active**. Plan execution started subagent-driven; Task 1 (v1 `export_records` + first rung-5 delivery on the 0.7 mesh) dispatched.
 
 - 2026-09-04 — **Probe B2 PASS** (two conductors, 0.7; re-run by the chief): the remote authority refuses exactly the first post-close action and issues a warrant; the tail validates again; the record stays fetchable. Design consequence: §3 (iii) and §4 step 5 now say what Holochain adds — a warrant we read as evidence — and keep the fence ours. Test committed with two hash-neutral coordinator externs. All three probes together: 3 passed, 229 s. The de-risk pass is complete: every named unknown (core claim · late open · close fence · remote authority · additive storage · local pack · hash neutrality) is measured.
 
