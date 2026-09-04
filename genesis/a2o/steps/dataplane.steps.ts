@@ -18,6 +18,9 @@
  *   Then blob {string} is byte-present on peer {string}
  *   Then EPR {string} blobHash is non-null on peer {string}
  *   Then the served head for EPR {string} matches the declared head on peer {string}
+ *   When a visitor asks peer {string} for the page at {string}
+ *   Then every script and stylesheet the page from peer {string} names is one that peer serves
+ *   Then the page from peer {string} names the same browser entry point as the declared browser head of EPR {string}
  *   Then no HOUSEHOLD-member human on peer {string} is missing its agentPubKey
  *   Then every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey
  *   Then resolving {string} on peer {string} does NOT return App-not-found
@@ -49,6 +52,7 @@ import {
   resolvePeerUrl,
   resolveStorageUrl,
   getRaw,
+  getRawWithHeaders,
   postRaw,
   probeHealth,
   probeSyncDocs,
@@ -858,6 +862,288 @@ Then(
         `(materializedAt=${probe.entry.materializedAt ?? 'unknown'}, status=${probe.entry.status ?? 'unknown'}) ` +
         `— the running doorway process has not materialized the current declared head.`
     );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Served-shell asset helpers (the browser-boot half of served-vs-declared)
+// ---------------------------------------------------------------------------
+
+/** One asset reference lifted out of a served HTML shell, exactly as written. */
+interface ShellAssetRef {
+  /** The literal attribute value a person's browser would resolve. */
+  ref: string;
+  kind: 'script' | 'stylesheet';
+}
+
+const SCRIPT_SRC_RE = /<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi;
+const LINK_TAG_RE = /<link\b[^>]*>/gi;
+const LINK_REL_STYLESHEET_RE = /\brel\s*=\s*["']?stylesheet\b/i;
+const LINK_HREF_RE = /\bhref\s*=\s*["']([^"']+)["']/i;
+/** The Angular browser entry point (`main-7QFGHX5X.js`) — the file that BOOTS the app. */
+const BROWSER_ENTRY_RE = /(?:^|\/)(main-[^/]*\.js)$/i;
+
+/**
+ * Every `<script src>` and `<link rel=stylesheet href>` a served shell names.
+ * Deliberately a scan of the bytes the doorway actually handed over, not a DOM
+ * walk: the question is what a browser would GO AND FETCH from this response.
+ */
+function parseShellAssetRefs(html: string): ShellAssetRef[] {
+  const refs: ShellAssetRef[] = [];
+  for (const match of html.matchAll(SCRIPT_SRC_RE)) {
+    if (match[1]) refs.push({ ref: match[1], kind: 'script' });
+  }
+  for (const tag of html.matchAll(LINK_TAG_RE)) {
+    if (!LINK_REL_STYLESHEET_RE.test(tag[0])) continue;
+    const href = LINK_HREF_RE.exec(tag[0])?.[1];
+    if (href) refs.push({ ref: href, kind: 'stylesheet' });
+  }
+  return refs;
+}
+
+/** An asset reference with its query/fragment cut off — the filename a browser fetches. */
+function assetPathOnly(ref: string): string {
+  const marks = [ref.indexOf('?'), ref.indexOf('#')].filter(i => i >= 0);
+  return marks.length > 0 ? ref.slice(0, Math.min(...marks)) : ref;
+}
+
+/** Name of the browser entry point a shell names; '' when it names none. */
+function browserEntryName(refs: ShellAssetRef[]): string {
+  for (const { ref } of refs) {
+    const name = BROWSER_ENTRY_RE.exec(assetPathOnly(ref))?.[1];
+    if (name) return name;
+  }
+  return '';
+}
+
+/** A shell asset reference paired with the absolute URL a browser would fetch. */
+interface ShellAssetProbe extends ShellAssetRef {
+  url: string;
+}
+
+/**
+ * The subset of a shell's asset references THIS peer promised to serve, each
+ * resolved exactly as a browser would resolve it against the shell's own URL.
+ * References that leave this doorway (a CDN font, a `data:` URI) are dropped —
+ * they are somebody else's contract, and this step only holds a peer to its own.
+ */
+function assetsPromisedByPeer(refs: ShellAssetRef[], shellUrl: string): ShellAssetProbe[] {
+  const shellOrigin = new URL(shellUrl).origin;
+  const promised: ShellAssetProbe[] = [];
+  for (const { ref, kind } of refs) {
+    let resolved: URL;
+    try {
+      resolved = new URL(ref, shellUrl);
+    } catch {
+      continue;
+    }
+    if (resolved.origin === shellOrigin) promised.push({ ref, kind, url: resolved.toString() });
+  }
+  return promised;
+}
+
+/** Asset references the peer does NOT answer 200 for, described for a human. */
+async function findUnresolvedAssets(refs: ShellAssetRef[], shellUrl: string): Promise<string[]> {
+  const unresolved: string[] = [];
+  for (const { ref, kind, url } of assetsPromisedByPeer(refs, shellUrl)) {
+    const { status } = await getRaw(url);
+    if (status !== 200) unresolved.push(`${kind} "${ref}" -> HTTP ${status}`);
+  }
+  return unresolved;
+}
+
+/**
+ * The doorway's own account of WHICH shell it hands out, read from the
+ * response headers. Called only on the failure path, because the assertion
+ * read rides the catching-up shed (getRawRidingCatchUp) and that ride does not
+ * carry headers. It is a SECOND read, so it is labelled as one wherever it is
+ * printed: diagnosis for the operator, never the evidence the step asserts on.
+ */
+async function describeShellProvenance(shellUrl: string): Promise<string> {
+  try {
+    const { headers } = await getRawWithHeaders(shellUrl);
+    const marks = ['x-elohim-bundle', 'x-content-address', 'x-elohim-freshness', 'x-ssr-skipped']
+      .map(name => `${name}=${headers[name] ?? 'absent'}`)
+      .join(' ');
+    return ` [shell provenance, re-read: ${marks}]`;
+  } catch {
+    return ' [shell provenance, re-read: unavailable]';
+  }
+}
+
+/**
+ * The page one peer handed back during THIS scenario, kept so the assertion
+ * step reads the same bytes the visitor step fetched (never a second, possibly
+ * different, response). Keyed by peer name so a scenario may ask several peers
+ * for the same path and hold each answer distinctly.
+ */
+interface ServedPage {
+  /** The path the visitor asked for, as written in the scenario (e.g. "/"). */
+  urlPath: string;
+  /** The absolute URL that path resolved to on this peer. */
+  url: string;
+  status: number;
+  text: string;
+  /** describeCatchUpRide() of the fetch — empty unless a shed was ridden. */
+  ride: string;
+}
+const servedPages = new WeakMap<E2EWorld, Map<string, ServedPage>>();
+
+function getServedPageMap(world: E2EWorld): Map<string, ServedPage> {
+  let map = servedPages.get(world);
+  if (!map) {
+    map = new Map<string, ServedPage>();
+    servedPages.set(world, map);
+  }
+  return map;
+}
+
+/**
+ * Fetch the page a visitor is handed at a path on one peer, and keep it for the
+ * assertion step. Plain HTTP, exactly what a browser's FIRST request gets: the
+ * question this pair answers is whether those bytes can go on to boot an app,
+ * so no browser is involved in obtaining them.
+ *
+ * Rides the bounded catching-up shed — a doorway mid-reconcile answers 503 with
+ * a documented body, and that is churn, not the stale-shell defect under test.
+ */
+When(
+  'a visitor asks peer {string} for the page at {string}',
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld, peerName: string, urlPath: string) {
+    const peerUrl = getPeerUrl(this, peerName);
+    const url = new URL(urlPath, `${peerUrl}/`).toString();
+    const res = await getRawRidingCatchUp(url);
+    getServedPageMap(this).set(peerName, {
+      urlPath,
+      url,
+      status: res.status,
+      text: res.text,
+      ride: describeCatchUpRide(res),
+    });
+  }
+);
+
+/** The page this scenario already fetched from a peer, or a crisp "run the visitor step first". */
+function requireServedPage(world: E2EWorld, peerName: string): ServedPage {
+  const page = getServedPageMap(world).get(peerName);
+  assert.ok(
+    page,
+    `no page has been fetched from ${peerName} in this scenario — the step 'a visitor asks peer "${peerName}" for the page at ...' must run first`
+  );
+  assert.strictEqual(
+    page.status,
+    200,
+    `${peerName}: GET ${page.url} returned ${page.status}${page.ride} — a visitor asking for the app was handed no page at all`
+  );
+  return page;
+}
+
+/**
+ * Track-4 T4-2 (browser half), assertion 1 of 2 — CAN IT BOOT AT ALL.
+ *
+ * Every script and stylesheet the served page names must be a file this same
+ * peer answers 200 for. On 2026-09-04 both doorways failed exactly here: the
+ * page named main-EAKNZDUP.js, the doorway held main-7QFGHX5X.js, and the 404
+ * on that one entry script was the whole blank page. Fonts, styles and
+ * polyfills all resolved — which is why a mount-level 200 check saw nothing.
+ *
+ * Off-peer references (a CDN font, a `data:` URI) are not asserted: they are
+ * somebody else's contract, and this step holds a peer only to its own.
+ */
+Then(
+  'every script and stylesheet the page from peer {string} names is one that peer serves',
+  // One bounded fetch per named asset; a page names a handful.
+  { timeout: 90_000 },
+  async function (this: E2EWorld, peerName: string) {
+    const page = requireServedPage(this, peerName);
+
+    const refs = parseShellAssetRefs(page.text);
+    assert.ok(
+      refs.length > 0,
+      `${peerName}: the page served at "${page.urlPath}" names no script or stylesheet at all — there is nothing for a browser to boot`
+    );
+
+    const unresolved = await findUnresolvedAssets(refs, page.url);
+    if (unresolved.length > 0) {
+      assert.fail(
+        `${peerName}: the page served at "${page.urlPath}" names ${unresolved.length} asset(s) this doorway does not hold — ` +
+          `${unresolved.join('; ')}${await describeShellProvenance(page.url)}. A page whose entry script is missing renders blank.`
+      );
+    }
+  }
+);
+
+/**
+ * Track-4 T4-2 (browser half), assertion 2 of 2 — IS IT THE RIGHT ERA.
+ *
+ * The served page's browser entry point (`main-<hash>.js`) — the script a
+ * browser would run to start the app — must be the one the DECLARED BROWSER
+ * HEAD carries. This step compares the two NAMES; it does not run either. Assertion 1 catches the era mismatch only when
+ * it 404s; a doorway that still holds both eras answers 200 for a page that
+ * boots yesterday's app, and only this comparison sees that.
+ *
+ * DECLARED: GET /db/content/{slug}.blobHash — the BROWSER bundle pointer
+ * (distinct from serverBlobHash, the SSR server bundle the served-vs-declared
+ * step above compares), read through that bundle's own index as the
+ * /apps/{slug}/index.html projection serves it.
+ * SERVED: the bytes the visitor step already fetched from this peer.
+ *
+ * Two honest, non-failing outcomes sit alongside the pass/fail comparison:
+ *   - No declared blobHash yet (no browser head authored) -> 'pending'.
+ *   - The peer does not project /apps/{slug}/index.html, or neither index
+ *     names a `main-*.js` -> a NOTE, and the comparison is skipped. Assertion 1
+ *     stands on its own either way.
+ */
+Then(
+  'the page from peer {string} names the same browser entry point as the declared browser head of EPR {string}',
+  // One ridden read of the content row plus two bounded fetches.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
+  async function (this: E2EWorld, peerName: string, eprId: string) {
+    const page = requireServedPage(this, peerName);
+    const peerUrl = getPeerUrl(this, peerName);
+    const where = `EPR "${eprId}" on ${peerName}`;
+
+    const { body: row } = await probeContent(peerUrl, eprId);
+    const declaredBlobHash = typeof row.blobHash === 'string' ? row.blobHash : '';
+    if (declaredBlobHash === '') {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: ${where} declares no browser blobHash yet — no head has been authored for the served page to match`
+      );
+      return 'pending';
+    }
+
+    const declaredIndex = await getRawWithHeaders(
+      `${peerUrl}/apps/${encodeURIComponent(eprId)}/index.html`
+    );
+    if (declaredIndex.status !== 200) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  NOTE: ${where} — GET /apps/${eprId}/index.html returned ${declaredIndex.status}; this peer does not project the declared bundle's own index, so the entry-point comparison is unavailable here`
+      );
+      return undefined;
+    }
+
+    const declaredEntry = browserEntryName(parseShellAssetRefs(declaredIndex.text));
+    const servedEntry = browserEntryName(parseShellAssetRefs(page.text));
+    if (declaredEntry === '' || servedEntry === '') {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  NOTE: ${where} — no browser entry point (main-*.js) named by the served page (${servedEntry || 'none'}) and/or by the declared bundle index (${declaredEntry || 'none'}); entry-point comparison skipped`
+      );
+      return undefined;
+    }
+    if (servedEntry !== declaredEntry) {
+      assert.fail(
+        `${where}: the page served at "${page.urlPath}" boots "${servedEntry}", but the declared browser head — ` +
+          `blobHash ${declaredBlobHash}, projected at /apps/${eprId}/index.html as content-address ` +
+          `${declaredIndex.headers['x-content-address'] ?? 'unknown'} — boots "${declaredEntry}"` +
+          `${await describeShellProvenance(page.url)}. This doorway is handing a visitor a page from a PREVIOUS ` +
+          `bundle era: every other asset can answer 200 and the app still never boots.`
+      );
+    }
+    return undefined;
   }
 );
 

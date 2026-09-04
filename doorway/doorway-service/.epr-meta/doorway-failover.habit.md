@@ -7,10 +7,11 @@ invariant: >
   (serving | shedding | dead), at least one always serves, the name rides
   through a sibling's shed, and whichever serves resolves the same
   declared head. Federation failover, not per-host luck.
-status: green
+status: red
 active: false
 checks:
   - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — @act:i, so its authority is the household lane: `just test mesh features/dataplane/doorway-failover.feature` against the built binaries, run-identified report under genesis/a2o/reports/. It is HELD on the edge Dataplane Validation stage by LAYERS.md design (Act II drops owned-substrate) — a fleet build number can never measure it; the fleet contributes only the deploy that carries the same commit.)"
+  - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/served-shell-boots.feature — @act:ii, the browser-shell clause of the invariant: the page a doorway hands a visitor at `/` names only assets its declared browser head holds. Runs against the deployed fleet (edge Dataplane Validation, `[edge:validate-only]` too) and from any host: `cd genesis/a2o && E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host pnpm exec cucumber-js --name 'handed a page that can boot'`; RED 2026-09-04 naming main-EAKNZDUP.js -> 404.)"
 refs:
   - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
   - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
@@ -21,6 +22,7 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-04 (GREEN -> RED on live evidence; the invariant's last clause failed on both names): from ~04:23Z both alpha.elohim.host and elohim.host answered 200 at `/` with a shell from the PREVIOUS bundle era (main-EAKNZDUP.js, app build #1691) while the row declared blobHash sha256-7725d4… (main-7QFGHX5X.js, build #1692, PATCHed 04:52Z) — entry script 404, blank page for every visitor. Mechanism (Opus + Codex RCA, converged): the doorway's warm-shell cache fetches the shell by SLUG and files it under the head its own projection declares; on the fleet that projection carries no head for app rows (DEV_MODE wiring drops the projection engine's signal sender at boot, and the storage `content.updated` event clears only the /apps slug index), so a shell stocked with an empty head classified AtHead and was never re-fetched; the SSR breaker had been OPEN since 04:33Z (build #1691's server bundle panics in the renderer), so every `/` rode the EPR-router warm arm. Evidence: Loki `EPR router: shell served from the warm-boot cache — no upstream fetch, head:""`, `HEAD /apps/elohim-host-landing/_capability` x-projection-ready:false, the new @regression scenario "A visitor asking for the site root is handed a page that can boot" (served-projected-head.feature) RED against the fleet at 14:40Z naming main-EAKNZDUP.js -> 404. Cure in flight: hash-bound shell fetch + head-bound archive marker + unknown-head never AtHead (rate-limited refresh) + admin eviction of the warm hot entry; re-green needs that scenario green on a fleet build carrying the cure. Separately named, not fixed here: apex API host doorway.elohim.host 503 (ingress backend in a prod namespace with zero pods).
 DELTA 2026-09-01 (GREEN preserved; cross-seam serving honesty hardened): doorway `/health/serving` now performs one primary-scoped, 2-second-bounded read of storage's own `/health/serving`; storage 503 demotes doorway 503 without opening the general read breaker, preserves storage's `Retry-After: 20`, and renders typed `serving | refused | unreachable | not-configured | not-observed` evidence while `/health` remains 200 liveness. Focused doorway health suite: 35/35 green; concern census: 0 findings.
 DELTA 2026-08-25b (RED -> GREEN on measured evidence; the flip authority
 was mis-assigned): the fleet's first Dataplane Validation admitted by the
