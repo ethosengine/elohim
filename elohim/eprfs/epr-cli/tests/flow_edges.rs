@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
-use elohim_epr_cli::flow::{claim, fulfill, project, seal, walk};
+use elohim_epr_cli::flow::{claim, context, fulfill, note, project, seal, walk};
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use tempfile::TempDir;
 
@@ -847,4 +847,147 @@ fn a_gap_id_resolves_to_the_newest_active_commitment_and_an_unclaimed_one_refuse
     let err = fulfill::fulfill_on(root, &fulfil_request("epic#2", "DONE", &implementer))
         .expect_err("an unclaimed gap item has no promise to discharge");
     assert!(err.to_string().contains("epr flow claim"));
+}
+
+// ── context: the one screen ──────────────────────────────────────────────────────────────
+
+#[test]
+fn context_shows_identity_intents_commitments_and_seals_for_a_path() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    let commitment = claimed(root, "epic#1", &implementer);
+
+    let result = context::context(root, "plans/epic.md").expect("context runs");
+    assert_eq!(result.identity.path.as_deref(), Some("plans/epic.md"));
+    assert!(result.scope_note.is_none(), "a path computes every section");
+
+    let gap_ids: Vec<&str> = result
+        .intents
+        .iter()
+        .filter_map(|i| i.gap_id.as_deref())
+        .collect();
+    assert!(
+        gap_ids.contains(&"epic#1") && gap_ids.contains(&"epic#2"),
+        "{gap_ids:?}"
+    );
+
+    let claimed_row = result
+        .commitments
+        .iter()
+        .find(|c| c.cid == commitment)
+        .expect("the claim shows as an undischarged commitment");
+    assert_eq!(claimed_row.provider, "agent:implementer@claude-opus-5");
+    assert_eq!(claimed_row.gap_id.as_deref(), Some("epic#1"));
+    assert!(
+        claimed_row.latest_event.is_none(),
+        "nothing has happened on this promise yet"
+    );
+
+    // Sections 5 and 8 are computed for a path, even when they are empty.
+    assert!(result.seals.is_some());
+    assert!(result.governance.is_some());
+
+    // Discharging it moves the latest-event line, by the one shared ordering rule.
+    fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &implementer))
+        .expect("a DONE report discharges");
+    let after = context::context(root, "plans/epic.md").expect("context runs");
+    assert!(
+        !after.commitments.iter().any(|c| c.cid == commitment),
+        "a discharged commitment leaves the undischarged section"
+    );
+}
+
+#[test]
+fn a_ruling_and_a_verdict_are_readable_in_context_newest_first() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let author = NoteActor::default();
+
+    note::note(
+        root,
+        "plans/epic.md",
+        "ruling",
+        "defer the puller to slice two",
+        None,
+        None,
+        &author,
+    )
+    .expect("a ruling is a note");
+    note::note(
+        root,
+        "plans/epic.md",
+        "verdict",
+        "the gate line is present and the diff conforms",
+        None,
+        Some("approved"),
+        &actor("agent:reviewer@claude-opus-5"),
+    )
+    .expect("a verdict is a note");
+
+    let result = context::context(root, "plans/epic.md").expect("context runs");
+    assert_eq!(result.notes.len(), 2);
+    assert_eq!(result.notes[0].kind, "run:verdict", "newest first");
+    assert_eq!(result.notes[0].verdict.as_deref(), Some("approved"));
+    assert_eq!(result.notes[0].actor, "agent:reviewer@claude-opus-5");
+    assert_eq!(
+        result.notes[0].steward.as_deref(),
+        Some("author@example.test")
+    );
+    assert_eq!(result.notes[1].kind, "run:ruling");
+    assert_eq!(
+        result.notes[1].reason.as_deref(),
+        Some("defer the puller to slice two")
+    );
+
+    // The window truncates rather than growing without bound.
+    assert_eq!(
+        context::context_with(root, "plans/epic.md", 1)
+            .expect("context runs")
+            .notes
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn a_content_address_target_skips_the_path_only_sections_and_says_why() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let implementer = actor("agent:implementer@claude-opus-5");
+    claimed(root, "epic#1", &implementer);
+
+    let address = intent_cid_for(root, "epic#1");
+    let scope = records(root)
+        .into_iter()
+        .find_map(|(_, record)| match record {
+            FlowRecord::Intent(i)
+                if i.resource_spec.classified_as.get(1).map(String::as_str) == Some("epic#1") =>
+            {
+                Some(i.in_scope_of.to_string())
+            }
+            _ => None,
+        })
+        .expect("the intent declares a scope");
+
+    let result = context::context(root, &scope).expect("context on a bare address runs");
+    assert!(result.identity.path.is_none());
+    assert!(
+        result.scope_note.is_some(),
+        "an empty section printed without saying why reads as 'there are none'"
+    );
+    assert!(result.seals.is_none());
+    assert!(result.governance.is_none());
+    assert!(
+        result.intents.iter().any(|i| i.cid == address),
+        "the scoped intents are still derived for a bare address"
+    );
+    assert_eq!(result.commitments.len(), 1);
+
+    // A well-formed address for something never recorded is refused, not rendered empty.
+    assert!(context::context(
+        root,
+        "bafyreibzhpdchthmt3zlnhjjjsll6ji6p6fmhqlarcoymuhiprzof75jbq"
+    )
+    .is_err());
 }

@@ -7,6 +7,7 @@
 //! git, and records are deduped by CID against the existing sidecar before append.
 
 pub mod claim;
+pub mod context;
 pub mod edges;
 pub mod fulfill;
 pub mod governor;
@@ -148,6 +149,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "reseal" => run_reseal(&args[1..]),
         "hold" => run_hold(&args[1..]),
         "claim" => run_claim(&args[1..]),
+        "context" => run_context(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
@@ -230,6 +232,43 @@ fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
         outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow context <path|cid>` — the READ verb. Its only argument is positional, because the
+/// question it answers is "tell me about THIS", and a required flag on a one-argument read is
+/// ceremony rather than precision.
+fn run_context(args: &[String]) -> FlowResult<ExitCode> {
+    let Some(target) = args.first().filter(|a| !a.starts_with("--")) else {
+        return Err(FlowError::InvalidArguments(
+            "usage: epr flow context <path|cid> [--notes N] [--json] [--root DIR]".into(),
+        ));
+    };
+    let target = target.clone();
+    let (opts, rest) = parse_global(&args[1..])?;
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--notes" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown context argument `{other}`"
+                )))
+            }
+        }
+    }
+    let notes = match take_opt(&rest, "--notes")? {
+        Some(raw) => raw.trim().parse::<usize>().map_err(|_| {
+            FlowError::InvalidArguments(format!("--notes needs a count, got `{raw}`"))
+        })?,
+        None => context::DEFAULT_NOTES,
+    };
+    let result = context::context_with(&opts.root, &target, notes)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        result.render();
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -559,6 +598,9 @@ fn usage() -> String {
      (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
+     | context <path|cid> [--notes N] [--json] [--root DIR] \
+     (identity · intents · commitments · notes · seals · habit · gate · governance on one screen; \
+     a bare cid skips the path-only sections and says so)\n  \
      | claim --on <intent-cid|gap-id|path> [--as agent:<role>@<model>] [--brief <path>] \
      [--serves <habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
      (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \
