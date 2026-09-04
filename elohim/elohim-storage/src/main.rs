@@ -5679,10 +5679,59 @@ async fn async_main(
             )));
         }
 
+        // The artifact source. The local blob store is the floor and the fast
+        // path; when this node has a libp2p plane AND a pool to finalize
+        // through, it is WRAPPED so a local miss becomes one bounded peer pull
+        // through the same `race_fetch` helper `GET /blob/{hash}` and the
+        // custody controller already use. Without either, the local-only source
+        // stands exactly as before — `artifact_unavailable` stays transient and
+        // the next sweep asks again.
+        let local_artifacts: std::sync::Arc<dyn watch::ArtifactSource> =
+            std::sync::Arc::new(watch::BlobStoreArtifactSource::new(blob_store.clone()));
+        #[cfg(feature = "p2p")]
+        let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = match (
+            p2p_node.as_ref().map(|n| n.handle()),
+            db_pool.clone(),
+        ) {
+            (Some(handle), Some(pool)) => {
+                let command_tx = handle.command_sender();
+                let peers: std::sync::Arc<
+                    dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers,
+                > = std::sync::Arc::new(handle);
+                info!("  Release adoption: peer-pull artifact source wired (libp2p)");
+                std::sync::Arc::new(
+                    elohim_storage::services::release_adoption::artifact_pull::PeerPullArtifactSource::new(
+                        local_artifacts.clone(),
+                        std::sync::Arc::new(
+                            elohim_storage::services::release_adoption::artifact_pull::RaceFetchPuller::new(
+                                command_tx,
+                                peers,
+                                pool,
+                                blob_store.clone(),
+                                // The `serve-blob` receiver: the canonical
+                                // agent identity when we have one, the
+                                // transport id only as a fallback — the same
+                                // preference `RaceFetchKicker` applies.
+                                args.agent_pubkey
+                                    .clone()
+                                    .or_else(|| {
+                                        hc_for_adoption.as_ref().map(|hc| hc.agent_key_uhcak())
+                                    })
+                                    .or_else(|| config.self_cid.clone())
+                                    .unwrap_or_default(),
+                                &config,
+                            ),
+                        ),
+                    ),
+                )
+            }
+            _ => local_artifacts.clone(),
+        };
+        #[cfg(not(feature = "p2p"))]
+        let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = local_artifacts.clone();
+
         let mut controller = watch::AdoptionController::new(staging_root.clone())
-            .with_artifact_source(std::sync::Arc::new(watch::BlobStoreArtifactSource::new(
-                blob_store.clone(),
-            )))
+            .with_artifact_source(artifacts)
             .with_apply_vehicles(std::sync::Arc::new(vehicles));
         if let Some(hc) = hc_for_adoption.clone() {
             controller = controller.with_conductor(hc.clone());

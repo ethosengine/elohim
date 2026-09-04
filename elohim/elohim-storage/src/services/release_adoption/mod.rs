@@ -125,6 +125,7 @@
 //! test cannot be measuring its own mirror.
 
 pub mod apply;
+pub mod artifact_pull;
 pub mod state;
 pub mod verify;
 pub mod watch;
