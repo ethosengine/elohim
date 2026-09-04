@@ -66,7 +66,15 @@ Feature: The household's runtime stays current the way its content does — by e
   so. An ATTESTATION is that someone-else saying so: not just "it worked"
   but the CONTEXT it worked in — whose device, what kind of device, and a
   concrete thing it checked (for example, that the new coordinator code
-  still answers a real request within budget, on real hardware).
+  still answers a real request within budget, on real hardware). A channel's
+  ATTESTATION DISCIPLINE is the rule its releases carry for how that evidence
+  is counted: how long a canary must run a release clean before its
+  attestation counts, and how many devices must attest before promotion. The
+  discipline is written into each release manifest, and once a channel has a
+  head, every later release on that channel inherits the head's discipline
+  unless the steward deliberately changes it — a number nobody typed is not a
+  discipline. This household is three devices of one kind, so its commons
+  channel's discipline is a single attester: james.
 
   Three verbs carry different weight in what follows. To FOLLOW a channel is
   to declare interest in it — a runtime will track its head, nothing more.
@@ -90,6 +98,13 @@ Feature: The household's runtime stays current the way its content does — by e
   to earned requires an attestation from a device that is not the builder's,
   so a canary's attestation and the steward's ceremony are each necessary
   and neither is sufficient alone.
+  A channel is long-lived: the steward publishes on the same channel for as
+  long as the household keeps it. Publishing a new candidate on a channel that
+  already has an earned head requires the steward's own runtime to be running
+  that head — a steward cannot push what they have not themselves adopted —
+  and the candidate names that head as the release it builds on. The earned
+  head stays the head while the candidate is staged beneath it; only the
+  promotion ceremony moves the head.
 
   A runtime's PASSPORT is its own self-report of who it is and what it runs:
   its agent identity (the key by which every other peer knows it), its CELLS
@@ -152,7 +167,7 @@ Feature: The household's runtime stays current the way its content does — by e
     Given james's staging attestation for the release on channel "runtime:coordinators:elohim:commons" is recorded
     When matthew runs the promotion ceremony for that release
     Then the release becomes the earned head of channel "runtime:coordinators:elohim:commons"
-    And the promotion names james's attestation as the evidence it rests on
+    And the promotion names james's attestation as the evidence it rests on — the single attester the commons channel's discipline asks for
 
   # Station 5: fleet convergence — nobody restarts, nobody is asked.
 
@@ -199,6 +214,22 @@ Feature: The household's runtime stays current the way its content does — by e
     Then the matrix shows matthew's, jessica's, and james's runtimes moving staging, then earned, then back, in that order
     And the matrix shows james's personal channel diverging compatibly the whole time
     And every row in the matrix is read from what each runtime itself reports, never asserted from the ceremony's own intent
+
+  # Station 9: the channel is long-lived — the NEXT release rides the same head, it does not mint a new channel.
+  # (Seam: the driver refused to publish over an earned head, so every release needed a fresh channel; and a
+  # peer already running the target bytes was refused by content identity. This station proves both are healed.)
+
+  Scenario: Station 9 — matthew's next fix rides the same commons channel: publish over the adopted head, and a peer already running the bytes is current, not refused
+    Given the household has converged on the earned head of channel "runtime:coordinators:elohim:commons" and matthew's own runtime has adopted it
+    And matthew has built a second coordinator fix on top of the one the household runs
+    When matthew publishes the second fix as a release manifest on the same channel "runtime:coordinators:elohim:commons"
+    Then the publish is admitted because matthew's runtime already runs the channel's earned head, and the second fix is declared staging beneath that earned head
+    And the release manifest carries the commons channel's attestation discipline, inherited from the head — a single attester — not a default matthew never typed
+    And every peer's runtime keeps running the earned head while it resolves the staged second fix
+    When james, the canary, adopts and attests the staged second fix and matthew runs the promotion ceremony on that evidence, following the same ceremony Stations 3–4 proved for the first fix
+    Then the second fix becomes the earned head of channel "runtime:coordinators:elohim:commons", james's attestation meeting the same single-attester discipline the first fix met
+    And matthew's and jessica's runtimes converge on the second fix without any device restarting, within the same convergence window the first fix needed
+    And james's runtime — already running the second fix's bytes from his canary adoption — reports the earned head applied and current, never refused on lineage grounds
 
   # Structural protection, not a veto — the constitutional posture named (spec §4).
 
