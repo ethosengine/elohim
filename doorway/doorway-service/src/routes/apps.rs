@@ -278,6 +278,12 @@ async fn fetch_and_cache(
                             data: body.to_vec(),
                             content_type: content_type.clone(),
                             blob_hash: blob_hash.to_string(),
+                            // Mirrors the `put` above, which writes an unmarked
+                            // doc. This path IS hash-addressed
+                            // (`resolved_app_path`), so it could mark; leaving it
+                            // unmarked only costs the warm-shell path one
+                            // hash-addressed re-fetch per (slug, head).
+                            head_bound: false,
                         };
                         cache.finish_fetch(slug, file_path, Some(cached_file));
 

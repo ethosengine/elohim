@@ -697,6 +697,12 @@ decisionPoints:
       unanswerable — the existing 503 catching-up contract, immediately). The load-bearing arm
       is (AtHead, _) -> ServeWarm: a warm shell NEVER pays a per-request upstream fetch, which
       is what stops `/` riding a doomed 10s stall through a post-deploy catch-up window.
+      Since 2026-09-04 the predicate takes a third input, upgrade_due (the
+      SHELL_UPGRADE_RETRY_SECS rate limit), and AtHead itself requires proof: a shell classifies
+      AtHead only when its bytes were FETCHED by the declared head (head_bound), never when they
+      were merely stocked under it, and an UNKNOWN declared head is Behind rather than AtHead.
+      That closes the moving-pointer defect where a slug-addressed fetch archived old-era bytes
+      at the new head and served them AtHead forever.
     concernIds:
       - id: C4
         status: answered
@@ -727,6 +733,24 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/render/warm_shell.rs
         testName: an_upgrade_fetch_gets_the_tight_budget_a_cold_fetch_gets_the_full_one
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unmarked_archive_doc_at_the_declared_head_is_not_at_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unknown_declared_head_is_behind_never_at_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unknown_head_re_checks_at_most_once_per_retry_interval
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: the_fetch_closure_is_handed_the_head_the_bytes_will_be_stocked_under
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: exactly_one_request_per_interval_claims_the_upgrade
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: converging_to_at_head_releases_the_claim_slot
         kind: unit
 
   - name: ShellOutcome
@@ -762,6 +786,12 @@ decisionPoints:
       - path: doorway/doorway-service/src/render/warm_shell.rs
         testName: a_failed_upgrade_falls_back_to_the_one_behind_shell_never_a_shed
         kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: a_failed_upgrade_with_an_unknown_head_serves_warm_never_unavailable
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: unbound_bytes_replace_the_stale_hot_shell_for_the_whole_interval
+        kind: unit
 
   - name: ShellProvenance
     kind: reason-outcome-enum
@@ -770,18 +800,25 @@ decisionPoints:
       modulePath: render::warm_shell::ShellProvenance
       line: 155
     summary: >
-      LastReconciled / DeclaredHead — WHY a served shell carries (or does not carry) the
-      x-elohim-bundle staleness marker. LastReconciled means the doorway served its own
-      projection of the last reconciled bundle with no upstream read this request; DeclaredHead
-      means the upstream confirmed it, so no marker is emitted and the marker DROPS the moment
-      the upstream answers again.
+      LastReconciled / DeclaredHead / SlugResolved — WHY a served shell carries (or does not
+      carry) the x-elohim-bundle staleness marker. LastReconciled means the doorway served its
+      own projection of the last reconciled bundle with no upstream read this request;
+      DeclaredHead means the upstream confirmed the declared head, so no marker is emitted and
+      the marker DROPS the moment the upstream answers again. SlugResolved (2026-09-04) is the
+      third answer the two-valued enum could not give: bytes READ from the upstream this
+      request but addressed by SLUG, because the projection declared no head to bind them to —
+      a fetch happened, so it is not last-reconciled, but nothing confirmed a head, so it must
+      not borrow DeclaredHead's silence. Provenance is derived from the BYTES
+      (ShellProvenance::for_fresh reads WarmShell::head_bound), never from the fact that a
+      fetch occurred.
     concernIds:
       - id: C7
         status: answered
         justification: >
           What the response advertises equals what it serves: a possibly-one-behind bundle
           declares itself as such on the wire rather than passing as the declared head.
-          Pinned by warm_shell_serve_is_marked_and_a_confirmed_head_drops_the_marker.
+          Pinned by warm_shell_serve_is_marked_and_a_confirmed_head_drops_the_marker and
+          fresh_bytes_declare_whether_a_head_confirmed_them.
       - id: C8
         status: partial
         justification: >

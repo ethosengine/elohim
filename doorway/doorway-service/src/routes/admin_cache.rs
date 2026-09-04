@@ -100,8 +100,10 @@ pub async fn cache_enable(state: Arc<AppState>) -> Response<Full<Bytes>> {
 /// Evict all cached files for a specific app slug from MongoDB.
 ///
 /// Also removes the slug from the in-memory blob-hash index so the next
-/// request re-resolves with a fresh hash. Returns the number of documents
-/// removed.
+/// request re-resolves with a fresh hash, AND drops the warm-shell hot entry —
+/// that in-process map is consulted before the archive, so clearing Mongo alone
+/// left a poisoned shell serving with no way to evict it (2026-09-04). Returns
+/// the number of documents removed.
 pub async fn cache_clear_slug(state: Arc<AppState>, slug: &str) -> Response<Full<Bytes>> {
     let removed = if let Some(ref afc) = state.app_file_cache {
         let count = afc.clear_slug(slug).await;
@@ -110,6 +112,7 @@ pub async fn cache_clear_slug(state: Arc<AppState>, slug: &str) -> Response<Full
     } else {
         0
     };
+    state.warm_shell.evict(slug);
 
     json_response(
         StatusCode::OK,

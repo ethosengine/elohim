@@ -1358,8 +1358,11 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         (&state.projection, &state.app_file_cache)
     {
         let update_rx = projection_store.subscribe();
-        let _invalidation_handle =
-            doorway::cache::spawn_app_cache_invalidation_task(Arc::clone(app_cache), update_rx);
+        let _invalidation_handle = doorway::cache::spawn_app_cache_invalidation_task(
+            Arc::clone(app_cache),
+            Arc::clone(&state.warm_shell),
+            update_rx,
+        );
         info!("App file cache invalidation hook started");
     }
 

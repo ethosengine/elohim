@@ -44,6 +44,10 @@ pub struct CachedFile {
     pub content_type: String,
     /// Blob hash of the source zip bundle
     pub blob_hash: String,
+    /// See `AppFileCacheDoc::head_bound` — whether these bytes were fetched by
+    /// `blob_hash` rather than merely stocked under it. Legacy docs read
+    /// `false`, and the warm-shell path refuses to call those at-head.
+    pub head_bound: bool,
 }
 
 // =============================================================================
@@ -144,6 +148,7 @@ impl AppFileCacheService {
             data: doc.data,
             content_type: doc.content_type,
             blob_hash: doc.blob_hash,
+            head_bound: doc.head_bound,
         })
     }
 
@@ -171,6 +176,7 @@ impl AppFileCacheService {
                 data: doc.data,
                 content_type: doc.content_type,
                 blob_hash: doc.blob_hash,
+                head_bound: doc.head_bound,
             }),
             Ok(None) => None,
             Err(e) => {
@@ -192,6 +198,36 @@ impl AppFileCacheService {
         content_type: &str,
         data: Vec<u8>,
     ) {
+        self.put_marked(slug, file_path, blob_hash, content_type, data, false)
+            .await
+    }
+
+    /// [`Self::put`] for bytes that were FETCHED by `blob_hash` — a
+    /// hash-addressed `/apps/{blob_hash}/{file}` read, not a slug read.
+    ///
+    /// Only such a doc is proof of its own address, so only such a doc lets the
+    /// warm-shell path classify a shell `AtHead`. See `AppFileCacheDoc::head_bound`.
+    pub async fn put_head_bound(
+        &self,
+        slug: &str,
+        file_path: &str,
+        blob_hash: &str,
+        content_type: &str,
+        data: Vec<u8>,
+    ) {
+        self.put_marked(slug, file_path, blob_hash, content_type, data, true)
+            .await
+    }
+
+    async fn put_marked(
+        &self,
+        slug: &str,
+        file_path: &str,
+        blob_hash: &str,
+        content_type: &str,
+        data: Vec<u8>,
+        head_bound: bool,
+    ) {
         let doc = AppFileCacheDoc::new(
             slug.to_string(),
             file_path.to_string(),
@@ -200,6 +236,11 @@ impl AppFileCacheService {
             content_type.to_string(),
             data,
         );
+        let doc = if head_bound {
+            doc.mark_head_bound()
+        } else {
+            doc
+        };
 
         let mongo_id = doc
             .mongo_id
@@ -563,8 +604,12 @@ fn extract_app_slug_from_data(data: &bson::Document) -> Option<String> {
 /// 1. `invalidate_app(app_id)` — clears all cached files for that app
 /// 2. `refresh_app(app_id)` — clears the blob hash index entry so the next
 ///    request re-resolves with the fresh blob_hash
+/// 3. `warm_shell.evict(app_id)` — drops the in-process warm shell. That hot
+///    map is consulted BEFORE the archive, so without this step an invalidation
+///    cleared Mongo and left the old shell serving (2026-09-04).
 pub fn spawn_app_cache_invalidation_task(
     cache: Arc<AppFileCacheService>,
+    warm_shell: Arc<crate::render::warm_shell::WarmShellStore>,
     mut update_rx: tokio::sync::broadcast::Receiver<crate::projection::document::ProjectedDocument>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -581,6 +626,7 @@ pub fn spawn_app_cache_invalidation_task(
                         );
                         let deleted = cache.invalidate_app(&slug).await;
                         cache.refresh_app(&slug).await;
+                        warm_shell.evict(&slug);
                         debug!(
                             slug = %slug,
                             deleted_files = deleted,

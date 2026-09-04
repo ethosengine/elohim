@@ -39,6 +39,20 @@ pub struct AppFileCacheDoc {
     /// Blob hash of the zip bundle — invalidation key
     pub blob_hash: String,
 
+    /// True when these bytes were FETCHED by `blob_hash` (a hash-addressed
+    /// `/apps/{blob_hash}/{file}` read), not merely stocked under whatever head
+    /// the doorway happened to declare at the time.
+    ///
+    /// A slug is a moving pointer: the warm-shell path used to fetch
+    /// `/apps/{slug}/index.html` and archive the result under the locally
+    /// declared head, so a projection advance between the two reads wrote
+    /// old-era bytes at the new address — served `AtHead`, forever. Docs
+    /// written before that fix have no such field and deserialize `false`,
+    /// which is what makes the deployed archive self-heal on the next deploy:
+    /// unmarked ⇒ not proof of the head ⇒ one hash-addressed re-fetch.
+    #[serde(default)]
+    pub head_bound: bool,
+
     /// EPR agreement authorizing this cache entry
     pub agreement_id: String,
 
@@ -68,6 +82,7 @@ impl Default for AppFileCacheDoc {
             slug: String::new(),
             file_path: String::new(),
             blob_hash: String::new(),
+            head_bound: false,
             agreement_id: String::new(),
             content_type: String::new(),
             data: Vec::new(),
@@ -94,6 +109,7 @@ impl AppFileCacheDoc {
             slug,
             file_path,
             blob_hash,
+            head_bound: false,
             agreement_id,
             content_type,
             data,
@@ -101,6 +117,13 @@ impl AppFileCacheDoc {
             last_accessed: now,
             metadata: Metadata::new(),
         }
+    }
+
+    /// Mark this doc as head-bound — see the `head_bound` field. Only a
+    /// hash-addressed fetch may call it.
+    pub fn mark_head_bound(mut self) -> Self {
+        self.head_bound = true;
+        self
     }
 }
 

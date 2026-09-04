@@ -3004,20 +3004,20 @@ fn epr_dispatch_shed_response(
 }
 
 /// Stock a freshly-proxied shell document into the warm-boot cache under the
-/// head the doorway's own projection declares. Best-effort and non-fatal: with
-/// no declared head there is no content address to key it under, so only the
-/// in-process hot layer takes it (the archive write is skipped rather than
-/// inventing an address).
+/// head the fetch was ADDRESSED by. Best-effort and non-fatal: with no declared
+/// head the read was necessarily slug-addressed, so there is no content address
+/// to key it under and the archive write is skipped rather than inventing one.
+///
+/// `declared` is captured at LOOKUP time by the caller and passed in — this
+/// function used to re-resolve it after the fetch, which is precisely how a
+/// projection advance mid-fetch relabelled old-era bytes as the new head.
 async fn stock_warm_shell(
     state: &AppState,
     projection: &elohim_views::projection::EprProjectionView,
+    declared: Option<String>,
     bytes: Vec<u8>,
     content_type: &str,
 ) {
-    let declared = match state.app_file_cache.as_ref() {
-        Some(cache) => cache.resolve_blob_hash(&projection.epr_id).await,
-        None => None,
-    };
     match declared {
         Some(hash) => {
             state
@@ -3032,13 +3032,54 @@ async fn stock_warm_shell(
                 .await;
         }
         None => {
+            // No content address to archive under — but the HOT entry must
+            // still take these bytes, or the next SHELL_UPGRADE_RETRY_SECS of
+            // requests re-serve the stale shell this read just replaced and
+            // convergence never sticks.
             tracing::debug!(
                 target: "doorway::ssr",
                 epr_id = %projection.epr_id,
-                "warm shell not archived — the projection declares no blob hash for this app"
+                "warm shell stocked hot-only — the projection declares no blob hash for this app"
             );
+            state
+                .warm_shell
+                .stock_unbound(
+                    &projection.epr_id,
+                    &projection.entry_file,
+                    content_type,
+                    bytes,
+                )
+                .await;
         }
     }
+}
+
+/// One shape for every shell the EPR dispatch serves — warm, upgraded, or
+/// slug-resolved — so the chrome island, the cache-control parity and the
+/// provenance marker cannot drift between arms.
+fn projected_shell_response(
+    bytes: Vec<u8>,
+    content_type: &str,
+    chrome_context_json: &str,
+    provenance: ShellProvenance,
+) -> Response<Full<Bytes>> {
+    let (body_bytes, chrome_injected) =
+        maybe_inject_chrome(200, content_type, Bytes::from(bytes), chrome_context_json);
+    let mut builder = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", content_type)
+        .header("x-epr-router", "dispatched");
+    if chrome_injected {
+        // An injected page carries this request's omnibar context, so it must
+        // not be shared-cached.
+        builder = builder.header("cache-control", "no-store");
+    }
+    with_bundle_provenance_header(
+        builder
+            .body(Full::new(body_bytes))
+            .expect("infallible shell response"),
+        provenance,
+    )
 }
 
 /// Dispatch a request to a projected EPR (B13).
@@ -3137,52 +3178,103 @@ async fn dispatch_to_projected_epr(
     // fetch and then shedding. Assets (.js/.css/images) and every other
     // sub-path fall through to the unchanged proxy below, so the honest-shed
     // contract for data reads is untouched.
+    // The head this dispatch classified against, captured ONCE. It addresses
+    // the upstream read below and keys the stock — a slug is a moving pointer,
+    // so the two must never be resolved separately.
+    let mut shell_head: Option<String> = None;
     if sub_path == projection.entry_file {
-        let (class, warm) = state
-            .warm_shell
-            .lookup(&projection.epr_id, &projection.entry_file)
-            .await;
+        use crate::render::warm_shell::{FetchBudget, ShellPlan};
         // `would_shed` is a READ. The obvious `is_open` is a gate: it consumes
         // the one half-open trial, and this planner has no guard to record an
         // outcome with — so it would steal the trial from the `begin()` caller
         // a few lines below and leave the breaker shedding every route on the
         // peer. (2026-08-20: that is exactly what latched elohim.host.)
         let upstream_available = !state.upstream_breakers.would_shed(&storage_url);
-        // Serve warm whenever the decision says so; an upgrade/fetch falls
-        // through to the proxy below, which stocks nothing but behaves exactly
-        // as it does today.
-        if let (crate::render::warm_shell::ShellPlan::ServeWarm, Some(shell)) = (
-            crate::render::warm_shell::decide_shell_serve(class, upstream_available),
-            warm,
-        ) {
-            tracing::debug!(
-                request_path = %request_path,
-                epr_id = %projection.epr_id,
-                head = %shell.blob_hash,
-                upstream_available,
-                "EPR router: shell served from the warm-boot cache — no upstream fetch"
-            );
-            let (body_bytes, chrome_injected) = maybe_inject_chrome(
-                200,
-                &shell.content_type,
-                Bytes::from(shell.bytes),
-                chrome_context_json,
-            );
-            let mut builder = Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", &shell.content_type)
-                .header("x-epr-router", "dispatched");
-            if chrome_injected {
-                // Same cache-control parity as the proxied arm: an injected page
-                // carries this request's omnibar context.
-                builder = builder.header("cache-control", "no-store");
+        // ONE decision site, shared with the SSR path's `resolve_shell` — and
+        // one ATOMIC upgrade claim, so concurrent `/` requests cannot all
+        // launch the same upgrade.
+        let decision = crate::render::warm_shell::plan_shell_serve(
+            &state.warm_shell,
+            &projection.epr_id,
+            &projection.entry_file,
+            upstream_available,
+        )
+        .await;
+        shell_head = decision.declared.clone();
+        match decision.plan {
+            ShellPlan::ServeWarm => {
+                if let Some(shell) = decision.warm {
+                    tracing::debug!(
+                        request_path = %request_path,
+                        epr_id = %projection.epr_id,
+                        head = %shell.blob_hash,
+                        upstream_available,
+                        "EPR router: shell served from the warm-boot cache — no upstream fetch"
+                    );
+                    return projected_shell_response(
+                        shell.bytes,
+                        &shell.content_type,
+                        chrome_context_json,
+                        ShellProvenance::LastReconciled,
+                    );
+                }
             }
-            return with_bundle_provenance_header(
-                builder
-                    .body(Full::new(body_bytes))
-                    .expect("infallible warm shell response"),
-                ShellProvenance::LastReconciled,
-            );
+            ShellPlan::UpgradeThenWarm => {
+                // We already hold a serviceable answer, so this read gets the
+                // TIGHT upgrade budget, and its failure is OUR problem, never
+                // the visitor's: a hash-addressed 404 (storage has not
+                // extracted that head yet), a 503, or a timeout must fall back
+                // to the bytes in hand. Falling through to the ordinary 10s
+                // proxy handed those statuses straight to the browser.
+                let shell_url =
+                    projected_shell_url(&storage_url, &projection, shell_head.as_deref());
+                let upgraded = fetch_shell_from_upstream(
+                    state,
+                    &storage_url,
+                    &shell_url,
+                    FetchBudget::Upgrade,
+                )
+                .await;
+                match (upgraded, decision.warm) {
+                    (Some(fresh), _) => {
+                        stock_warm_shell(
+                            state,
+                            &projection,
+                            shell_head.clone(),
+                            fresh.bytes.clone(),
+                            &fresh.content_type,
+                        )
+                        .await;
+                        return projected_shell_response(
+                            fresh.bytes,
+                            &fresh.content_type,
+                            chrome_context_json,
+                            ShellProvenance::for_fresh(shell_head.is_some()),
+                        );
+                    }
+                    (None, Some(shell)) => {
+                        tracing::debug!(
+                            request_path = %request_path,
+                            epr_id = %projection.epr_id,
+                            head = %shell.blob_hash,
+                            "EPR router: shell upgrade did not land — serving the bytes in hand"
+                        );
+                        return projected_shell_response(
+                            shell.bytes,
+                            &shell.content_type,
+                            chrome_context_json,
+                            ShellProvenance::LastReconciled,
+                        );
+                    }
+                    // Unreachable by construction (UpgradeThenWarm only follows
+                    // a hit); fall through rather than unwrap on the hot path.
+                    (None, None) => {}
+                }
+            }
+            // COLD only. Keeps the existing full-budget proxy below, whose
+            // status pass-through is what lets a genuine 404 reach the browser
+            // as a 404 instead of a shed.
+            ShellPlan::Fetch | ShellPlan::Shed => {}
         }
     }
 
@@ -3194,12 +3286,17 @@ async fn dispatch_to_projected_epr(
     // doorway in the loop). When this projection opts out, propagate the
     // decision via `?spaFallback=0` so storage's convention layer honours it and
     // the two layers stay consistent.
+    // Address the SHELL read by the head captured above (the same binding
+    // `routes/apps.rs::resolved_app_path` makes), so the bytes that come back
+    // are provably the bytes of the head they will be stocked under. Every
+    // other sub-path keeps the slug address it has always used.
+    let dispatch_address = shell_head.as_deref().unwrap_or(projection.epr_id.as_str());
     let storage_apps_path = if projection.spa_fallback {
-        format!("{}/apps/{}/{}", storage_url, projection.epr_id, sub_path)
+        format!("{}/apps/{}/{}", storage_url, dispatch_address, sub_path)
     } else {
         format!(
             "{}/apps/{}/{}?spaFallback=0",
-            storage_url, projection.epr_id, sub_path
+            storage_url, dispatch_address, sub_path
         )
     };
 
@@ -3271,9 +3368,18 @@ async fn dispatch_to_projected_epr(
                     // shell document is what makes the NEXT catch-up window
                     // survivable. Stocked PRE-injection — the chrome island is
                     // request-specific and must never be baked into the archive.
+                    // A non-2xx (a 404 for a hash storage has not extracted
+                    // yet, say) stocks NOTHING — never invent a shell for a
+                    // head we could not read.
                     if status.is_success() && sub_path == projection.entry_file {
-                        stock_warm_shell(state, &projection, body_bytes.to_vec(), &content_type)
-                            .await;
+                        stock_warm_shell(
+                            state,
+                            &projection,
+                            shell_head.clone(),
+                            body_bytes.to_vec(),
+                            &content_type,
+                        )
+                        .await;
                     }
                     // Native runtime chrome: an HTML page served via this proxy is
                     // an EPR-router HTML serve (the landing `/`, a pillar mount),
@@ -3449,10 +3555,11 @@ mod epr_dispatch_breaker_tests {
     fn projected_shell_url_targets_the_apps_entry_file() {
         // The shell composed into is the app's index.html entry — the same
         // /apps/{epr}/{entry} surface the CSR fallback serves — NOT the request
-        // sub-path. Base storage_url is trimmed of any trailing slash.
+        // sub-path. Base storage_url is trimmed of any trailing slash. With no
+        // declared head there is nothing to bind to, so the slug still names it.
         let p = shell_projection(true);
         assert_eq!(
-            projected_shell_url("http://storage:8090/", &p),
+            projected_shell_url("http://storage:8090/", &p, None),
             "http://storage:8090/apps/elohim-host-landing/index.html"
         );
     }
@@ -3463,8 +3570,28 @@ mod epr_dispatch_breaker_tests {
         // ?spaFallback=0 so storage's convention layer stays consistent.
         let p = shell_projection(false);
         assert_eq!(
-            projected_shell_url("http://storage:8090", &p),
+            projected_shell_url("http://storage:8090", &p, None),
             "http://storage:8090/apps/elohim-host-landing/index.html?spaFallback=0"
+        );
+    }
+
+    /// THE MOVING-POINTER FIX. When the projection declares a head, the shell
+    /// fetch is addressed by that HASH — the same binding `routes/apps.rs`
+    /// already makes via `resolved_app_path` — so the bytes that come back are
+    /// provably the bytes of the head they will be stocked under. Addressing
+    /// the slug while stocking under the declared head is what served
+    /// 2026-09-04's old-era `main-EAKNZDUP.js` shell labelled `sha256-7725d4…`.
+    #[test]
+    fn projected_shell_url_binds_to_the_declared_head_not_the_moving_slug() {
+        let p = shell_projection(true);
+        assert_eq!(
+            projected_shell_url("http://storage:8090/", &p, Some("sha256-7725d4")),
+            "http://storage:8090/apps/sha256-7725d4/index.html"
+        );
+        let opted_out = shell_projection(false);
+        assert_eq!(
+            projected_shell_url("http://storage:8090", &opted_out, Some("sha256-7725d4")),
+            "http://storage:8090/apps/sha256-7725d4/index.html?spaFallback=0"
         );
     }
 
@@ -4056,20 +4183,29 @@ async fn ssr_fallback_response(
 /// `dispatch_to_projected_epr` serves on a CSR fallback; a successful SSR render
 /// is composed INTO it (see `compose_render_with_shell`) so it can hydrate.
 /// Mirrors `dispatch_to_projected_epr`'s `spaFallback=0` propagation.
+///
+/// `declared_head` BINDS the read to the release the bytes will be archived
+/// under. A slug is a moving pointer: fetching `/apps/{slug}/index.html` and
+/// stocking the answer under the head the doorway's own projection declares are
+/// two reads of a pointer that moves between them, and on 2026-09-04 that
+/// stocked an old-era shell (referencing a `main-*.js` no longer in the bundle)
+/// under `sha256-7725d4…`, where it classified `AtHead` and served forever.
+/// `routes/apps.rs::resolved_app_path` has always been immune for exactly this
+/// reason. With no declared head only the slug can name the app — the answer is
+/// then served but never archived (see `warm_shell::stock_and_return`).
 fn projected_shell_url(
     storage_url: &str,
     projection: &elohim_views::projection::EprProjectionView,
+    declared_head: Option<&str>,
 ) -> String {
     let base = storage_url.trim_end_matches('/');
+    let address = declared_head.unwrap_or(projection.epr_id.as_str());
     if projection.spa_fallback {
-        format!(
-            "{}/apps/{}/{}",
-            base, projection.epr_id, projection.entry_file
-        )
+        format!("{}/apps/{}/{}", base, address, projection.entry_file)
     } else {
         format!(
             "{}/apps/{}/{}?spaFallback=0",
-            base, projection.epr_id, projection.entry_file
+            base, address, projection.entry_file
         )
     }
 }
@@ -4154,14 +4290,19 @@ async fn resolve_projected_shell(
 
     let endpoint = storage_url.trim_end_matches('/');
     let upstream_available = !state.upstream_breakers.would_shed(endpoint);
-    let shell_url = projected_shell_url(storage_url, projection);
 
     let outcome = crate::render::warm_shell::resolve_shell(
         &state.warm_shell,
         &projection.epr_id,
         &projection.entry_file,
         upstream_available,
-        |budget| fetch_shell_from_upstream(state, endpoint, &shell_url, budget),
+        // The URL is built INSIDE the closure from the head `resolve_shell`
+        // classified against, so the read is addressed by the very hash its
+        // answer will be stocked under — never by the moving slug.
+        |budget, declared_head| {
+            let shell_url = projected_shell_url(storage_url, projection, declared_head.as_deref());
+            async move { fetch_shell_from_upstream(state, endpoint, &shell_url, budget).await }
+        },
     )
     .await;
 
@@ -4176,7 +4317,9 @@ async fn resolve_projected_shell(
             Ok((shell.html(), ShellProvenance::LastReconciled))
         }
         crate::render::warm_shell::ShellOutcome::Fresh(shell) => {
-            Ok((shell.html(), ShellProvenance::DeclaredHead))
+            // A slug-addressed read confirmed no head — say so on the wire.
+            let provenance = ShellProvenance::for_fresh(shell.head_bound);
+            Ok((shell.html(), provenance))
         }
         crate::render::warm_shell::ShellOutcome::Unavailable => {
             // Cold cache AND no upstream answer. Name which one so the shed
@@ -7394,6 +7537,24 @@ mod ssr_session_tests {
                 .get(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS)
                 .is_none(),
             "an upstream-confirmed shell claims no freshness colour of its own"
+        );
+
+        // The third word in the vocabulary (2026-09-04): bytes read from the
+        // upstream by SLUG, because the projection declared no head to bind
+        // to. A fetch happened, so it is not `last-reconciled` — but nothing
+        // confirmed a head, so it must NOT borrow the confirmed-head silence.
+        let slug = with_bundle_provenance_header(body(), ShellProvenance::SlugResolved);
+        assert_eq!(
+            slug.headers().get("x-elohim-bundle").unwrap(),
+            "slug-resolved",
+            "an unconfirmed read declares itself rather than passing as at-head"
+        );
+        assert_eq!(
+            slug.headers()
+                .get(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS)
+                .unwrap(),
+            "amber",
+            "any non-confirmed shell is amber in the shared freshness vocabulary"
         );
     }
 
