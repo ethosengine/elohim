@@ -20,7 +20,10 @@ index already run under.
 """
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -48,14 +51,121 @@ def render(root: Path) -> tuple[str, list[str]]:
     return eh.project(habits, header, raw), errs
 
 
-def main() -> int:
-    args = set(sys.argv[1:])
-    text, errs = render(_ROOT)
+def _timestamp(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _committed_statuses(root: Path) -> dict[str, str]:
+    result = subprocess.run(
+        ["git", "show", "HEAD:genesis/manifests/habits.yaml"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or eh.yaml is None:
+        return {}
+    try:
+        document = eh.yaml.safe_load(result.stdout) or {}
+    except Exception:  # noqa: BLE001 — a malformed committed projection is handled as no baseline
+        return {}
+    rows = document.get("habits", []) if isinstance(document, dict) else []
+    return {
+        row["id"]: row["status"]
+        for row in rows
+        if isinstance(row, dict)
+        and isinstance(row.get("id"), str)
+        and isinstance(row.get("status"), str)
+    }
+
+
+def _last_commit_at(root: Path, path: Path) -> datetime | None:
+    try:
+        label = path.resolve().relative_to(root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return None
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%cI", "--", label],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return _timestamp(result.stdout.strip()) if result.returncode == 0 else None
+
+
+def _latest_rulings(root: Path) -> dict[str, datetime]:
+    ledger = root / ".eprfs" / "status" / "flows.jsonl"
+    if not ledger.is_file():
+        return {}
+    latest: dict[str, datetime] = {}
+    for line in ledger.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            record = json.loads(line).get("record", {})
+        except (json.JSONDecodeError, AttributeError):
+            continue
+        labels = record.get("classifiedAs")
+        occurred_at = _timestamp(record.get("occurredAt"))
+        if (
+            record.get("kind") != "event"
+            or record.get("action") != "cite"
+            or not isinstance(labels, list)
+            or len(labels) < 2
+            or labels[0] != "run:ruling"
+            or not isinstance(labels[1], str)
+            or occurred_at is None
+        ):
+            continue
+        prior = latest.get(labels[1])
+        if prior is None or occurred_at > prior:
+            latest[labels[1]] = occurred_at
+    return latest
+
+
+def status_flip_errors(root: Path, habits: list[dict]) -> list[str]:
+    """Require a post-commit ruling for every status change against HEAD's projection."""
+    committed = _committed_statuses(root)
+    rulings = _latest_rulings(root)
+    errors: list[str] = []
+    for habit in habits:
+        habit_id = habit.get("id")
+        new_status = habit.get("status")
+        old_status = committed.get(habit_id)
+        source = habit.get("_source")
+        if (
+            not isinstance(habit_id, str)
+            or not isinstance(new_status, str)
+            or old_status is None
+            or old_status == new_status
+            or not isinstance(source, Path)
+        ):
+            continue
+        try:
+            label = source.resolve().relative_to(root.resolve()).as_posix()
+        except (OSError, ValueError):
+            continue
+        last_commit = _last_commit_at(root, source)
+        ruling = rulings.get(label)
+        if last_commit is None or ruling is None or ruling <= last_commit:
+            errors.append(
+                f"FLIP-WITHOUT-RULING {habit_id} {old_status}->{new_status}: record it with "
+                f"epr flow note --on {label} --kind ruling --reason '<evidence>'"
+            )
+    return errors
+
+
+def main(root: Path = _ROOT, argv: list[str] | None = None) -> int:
+    args = set(sys.argv[1:] if argv is None else argv)
+    target = root / "genesis" / "manifests" / "habits.yaml"
+    text, errs = render(root)
 
     if "--census" in args:
-        habits, _ = eh.census(_ROOT)
+        habits, _ = eh.census(root)
         for h in habits:
-            src = Path(h["_source"]).relative_to(_ROOT).as_posix()
+            src = Path(h["_source"]).relative_to(root).as_posix()
             flag = " ACTIVE" if h.get("active") else ""
             print(f"{str(h.get('status')):<8}{flag:<8}{str(h.get('id')):<36} {src}")
         for e in errs:
@@ -69,16 +179,22 @@ def main() -> int:
         return 1
 
     if "--check" in args:
-        current = TARGET.read_text(encoding="utf-8") if TARGET.is_file() else ""
+        habits, _ = eh.census(root)
+        flip_errors = status_flip_errors(root, habits)
+        if flip_errors:
+            for error in flip_errors:
+                print(error, file=sys.stderr)
+            return 1
+        current = target.read_text(encoding="utf-8") if target.is_file() else ""
         if current != text:
-            print(f"{TARGET.relative_to(_ROOT)} is STALE — run "
+            print(f"{target.relative_to(root)} is STALE — run "
                   f".claude/scripts/habits-project.py", file=sys.stderr)
             return 1
-        print(f"{TARGET.relative_to(_ROOT)} is current ({text.count(chr(10)) + 1} lines)")
+        print(f"{target.relative_to(root)} is current ({text.count(chr(10)) + 1} lines)")
         return 0
 
-    TARGET.write_text(text, encoding="utf-8")
-    print(f"projected {len(eh.census(_ROOT)[0])} habits -> {TARGET.relative_to(_ROOT)}")
+    target.write_text(text, encoding="utf-8")
+    print(f"projected {len(eh.census(root)[0])} habits -> {target.relative_to(root)}")
     return 0
 
 
