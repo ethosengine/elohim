@@ -1,5 +1,6 @@
 use hdk::prelude::*;
 use node_registry_integrity::*;
+use sha2::{Digest, Sha256};
 
 // Re-export integrity types for convenience
 pub use node_registry_integrity::{
@@ -1277,6 +1278,70 @@ pub fn get_signed_action(action_hash: ActionHash) -> ExternResult<Option<SignedA
         .into_iter()
         .find(|r| r.action_address() == &action_hash)
         .map(|r| r.signed_action))
+}
+
+/// Input to [`export_records`]: an opaque page cursor (`None` starts at the
+/// beginning of the app-entry portion of the chain) and a page size, capped
+/// at [`EXPORT_CAP`].
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExportInput {
+    pub cursor: Option<u32>,
+    pub limit: u32,
+}
+
+/// One bounded, cursor-resumable page of this agent's own app-entry records,
+/// plus a chain digest that is the SAME on every page (computed once over the
+/// whole chain, not the page) — Task 7 compares it to the carry receipt.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExportPage {
+    pub records: Vec<SignedActionHashed>,
+    pub entries: Vec<Option<Entry>>,
+    pub next_cursor: Option<u32>,
+    pub digest: String,
+}
+
+const EXPORT_CAP: u32 = 64;
+
+/// v1 bounded export (Holochain Evolution Epic Task 1). Exports THIS agent's
+/// own chain actions of app entry types — genesis actions, capability
+/// grants, and agent-validation packages are conductor bookkeeping, not
+/// facts to carry — ordered by `action_seq`, paged by an opaque numeric
+/// cursor, at most `EXPORT_CAP` per page. `digest` is a hex sha256 over the
+/// concatenated action hashes of the WHOLE chain (page-independent: every
+/// page of the same chain returns the same digest).
+///
+/// Local-only by construction (`query`), so it is deterministic and never
+/// waits on the network — the same property `get_signed_action` relies on.
+#[hdk_extern]
+pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
+    let limit = input.limit.clamp(1, EXPORT_CAP) as usize;
+    let all = query(ChainQueryFilter::new().include_entries(true))?;
+    let mut app: Vec<Record> = all
+        .into_iter()
+        .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
+        .collect();
+    app.sort_by_key(|r| r.action().action_seq());
+
+    let mut hasher = Sha256::new();
+    for r in &app {
+        hasher.update(r.action_address().get_raw_39());
+    }
+    let digest = hex::encode(hasher.finalize());
+
+    let start = input.cursor.unwrap_or(0) as usize;
+    let page: Vec<Record> = app.into_iter().skip(start).take(limit).collect();
+    let next_cursor = if page.len() == limit {
+        Some((start + limit) as u32)
+    } else {
+        None
+    };
+
+    Ok(ExportPage {
+        entries: page.iter().map(|r| r.entry().as_option().cloned()).collect(),
+        records: page.into_iter().map(|r| r.signed_action).collect(),
+        next_cursor,
+        digest,
+    })
 }
 
 /// Close this chain toward a successor DNA. Returns the real `CloseChain`

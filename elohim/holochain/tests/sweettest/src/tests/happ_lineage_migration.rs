@@ -78,6 +78,22 @@ struct NotarizationWitness {
     proofs: Vec<CarriedProof>,
 }
 
+/// Mirror of `node_registry_coordinator::ExportInput` (Task 1, v1 bounded export).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ExportInput {
+    cursor: Option<u32>,
+    limit: u32,
+}
+
+/// Mirror of `node_registry_coordinator::ExportPage`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ExportPage {
+    records: Vec<SignedActionHashed>,
+    entries: Vec<Option<Entry>>,
+    next_cursor: Option<u32>,
+    digest: String,
+}
+
 /// The properties both node_registry versions read.
 ///
 /// `progenitor_pubkey` is the pre-existing bootstrap-steward property;
@@ -747,6 +763,63 @@ async fn probe_b2_remote_authority_after_close() -> Result<()> {
         alice_activity.rejected_activity,
         alice_activity.warrants.len()
     );
+
+    Ok(())
+}
+
+// ============================================================================
+// Task 1 (v1 bounded export): `export_records` returns bounded, cursor-
+// resumable pages of the agent's own signed actions with a page-independent
+// chain digest. v1-only — no v2 bundle needed.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_records_is_bounded_and_resumable() -> Result<()> {
+    let (mut conductor, alice) = single_agent_conductor().await?;
+    let seed = network_seed(DNA);
+    let v1 = load_dna_from_path(&v1_path(), &seed, None).await?;
+    let app = conductor
+        .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1])
+        .await?;
+    let cell = app.cells().first().unwrap().clone();
+    let zome = cell.zome(ZOME);
+
+    for i in 0..5u32 {
+        let _ah: ActionHash = conductor
+            .call(&zome, "register_node", node_registration(&format!("n{i}"), &alice))
+            .await;
+    }
+
+    let p1: ExportPage = conductor
+        .call(&zome, "export_records", ExportInput { cursor: None, limit: 2 })
+        .await;
+    assert_eq!(p1.records.len(), 2, "page 1 must be bounded to the requested limit");
+    assert_eq!(p1.entries.len(), 2);
+    assert!(p1.next_cursor.is_some(), "a full page must offer a cursor to resume from");
+
+    let p2: ExportPage = conductor
+        .call(
+            &zome,
+            "export_records",
+            ExportInput { cursor: p1.next_cursor, limit: 64 },
+        )
+        .await;
+
+    // Measured (holochain 0.7.0, 2026-09-04): register_node commits exactly
+    // ONE app entry per call (the NodeRegistration Create) — the region/
+    // status/tier/node_id/custodian anchors are `hash_entry`-only bases for
+    // `create_link`, never `create_entry`d, so they never appear on the
+    // source chain. No coordinator `init` creates an app entry at genesis.
+    // Five `register_node` calls therefore produce exactly 5 app-entry
+    // records on the chain — no hidden genesis-era app records.
+    assert_eq!(
+        p1.records.len() + p2.records.len(),
+        5,
+        "all 5 registered app-entry records must be reachable across the two pages"
+    );
+    assert_eq!(p1.digest, p2.digest, "digest is page-independent — computed once over the whole chain");
+    assert!(!p1.digest.is_empty());
+    assert!(p2.next_cursor.is_none(), "the last page must not offer a further cursor");
 
     Ok(())
 }
