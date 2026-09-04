@@ -29,6 +29,21 @@ This settles leak (anon-heap, growing) vs bounded (file-mmap SQLite page cache) 
 - **Revert jessica + james to default `arc=1`?** Leecher gives no memory benefit and slightly reduces DHT coverage participation — but reverting churns a disruptive image-roll deploy. Low priority; operator call. (Coverage is currently safe: 2 leechers, 12 full holders.)
 - matthew's 503 (doorway OOM-stall co-location park, 100 restarts) is unchanged by arc — needs the operator levers (RAM 8→16 / podAntiAffinity / route alpha→adam), staged separately.
 
+## 2026-09-04 update — local mesh runs STOCK holochain 0.7.0, not the jemalloc fork
+
+The fleet cure above (glibc→jemalloc) lives in the fleet's conductor fork/image; the **local
+household mesh does not carry it** — it runs stock holochain 0.7.0 conductors. Measured overnight
+2026-09-04 (rung-5 c3 shift, journal gitignored): the three mesh conductors grew from ~2.0 GB RSS
+at 01:24Z to ~4.3 GB each by 08:10Z (12.6 GB total) across ~5 a2o runs + 3 rung-5 ceremonies —
+sawtooth-free, monotonic growth over the session, not the fleet's arc-independent OOM-cycle shape
+this record falsified, but growth all the same. This left `elohim-storage` unbuildable under the
+RAM guard for the rest of the night; cured only for the session by
+`--config profile.dev.package.elohim-storage.debug=0` (debug-info stripping, not a memory fix).
+Resource finding for the conductor-arc habit / `conductor-image` line: the fork's jemalloc cure
+has no local-mesh equivalent, so local-mesh sessions accumulate conductor RSS the fleet no longer
+does — worth either backporting the fork to the local dev conductor slot or budgeting mesh-session
+length/restarts against it. No RCA attempted this shift; capturing the measurement only.
+
 ## Links
 - Soak evidence + judgment: shift journal `.claude/shifts/2026-06-16T0357-alpha-conductor-oom-arc-leecher.journal.md` (iteration 2)
 - RCA: `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` (§4 instrumentation, §5 staged experiments)
