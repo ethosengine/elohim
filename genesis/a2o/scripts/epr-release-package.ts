@@ -764,10 +764,24 @@ function readJsonArgument(raw: string, flag: string): JsonObject {
   }
 }
 
+/**
+ * The dual-cell view `HappRolePassport.lineage` carries (Task 8/14b), read
+ * loosely the same way the rest of this file reads passport JSON — every
+ * field is `unknown` until narrowed, never assumed present.
+ */
+interface PassportRoleLineage {
+  readingAppId?: unknown;
+  authoringAppId?: unknown;
+  authoringDnaHash?: unknown;
+  authoringCoordinatorWasmHashes?: unknown;
+  closed?: unknown;
+}
+
 interface PassportRole {
   role?: unknown;
   dnaHash?: unknown;
   coordinatorWasmHashes?: unknown;
+  lineage?: PassportRoleLineage;
 }
 
 /**
@@ -780,15 +794,65 @@ interface PassportRole {
  * own drift. `GET /version` reports the same hashes `happ_manager::bundle_dna_hashes`
  * resolves, already authoritative, so the packager reads them instead of
  * recomputing them.
+ *
+ * **rung-5 workspace Task 1.** A role whose passport carries a `lineage` view
+ * that is CROSSED — a window open (`authoringAppId !== readingAppId`) or
+ * closed-after-sunset (`closed`) — answers from the AUTHORING cell, not the
+ * base app's: the role-level `dnaHash` / `coordinatorWasmHashes` describe v1,
+ * and the cell actually answering for the role after a crossing is the side
+ * app's. This mirrors `InstalledReality::from_happ_passport` in
+ * `elohim/elohim-storage/src/services/release_adoption/verify.rs`, which
+ * already reads the authoring cell for the identical reason — the adoption
+ * controller and the packager must agree on which cell a crossed role IS, or
+ * a release packaged against the wrong cell would verify-refuse (or worse,
+ * silently verify against v1 while the fleet reads v2). An authoring lookup
+ * that failed (`authoringDnaHash === "unknown"`) demotes the role exactly as
+ * the Rust side does, rather than falling back to the base cell's identity
+ * wearing the crossed role's name.
  */
 function roleBindingFrom(entry: PassportRole): [string, RoleBinding] | null {
   const role = typeof entry.role === 'string' ? entry.role : null;
-  const dnaHash = typeof entry.dnaHash === 'string' ? entry.dnaHash : null;
-  if (!role || !dnaHash) return null;
-  const zomes =
+  const baseDnaHash = typeof entry.dnaHash === 'string' ? entry.dnaHash : null;
+  if (!role || !baseDnaHash) return null;
+  const baseZomes =
     typeof entry.coordinatorWasmHashes === 'object' && entry.coordinatorWasmHashes !== null
       ? (entry.coordinatorWasmHashes as Record<string, string>)
       : {};
+
+  const lineage = entry.lineage;
+  const readingAppId = typeof lineage?.readingAppId === 'string' ? lineage.readingAppId : null;
+  const authoringAppId =
+    typeof lineage?.authoringAppId === 'string' ? lineage.authoringAppId : null;
+  const closed = lineage?.closed === true;
+  const crossed =
+    lineage !== undefined &&
+    (closed || (authoringAppId !== null && authoringAppId !== readingAppId));
+
+  let dnaHash = baseDnaHash;
+  let zomes = baseZomes;
+  let cell: 'authoring' | 'base' = 'base';
+
+  if (crossed) {
+    const authoringDnaHash =
+      typeof lineage?.authoringDnaHash === 'string' ? lineage.authoringDnaHash : null;
+    if (!authoringDnaHash || authoringDnaHash === 'unknown') {
+      console.error(
+        `role "${role}": crossed, but the authoring cell could not be read — demoting ` +
+          `the role rather than reporting the base cell's identity under its name`
+      );
+      return null;
+    }
+    dnaHash = authoringDnaHash;
+    zomes =
+      typeof lineage?.authoringCoordinatorWasmHashes === 'object' &&
+      lineage.authoringCoordinatorWasmHashes !== null
+        ? (lineage.authoringCoordinatorWasmHashes as Record<string, string>)
+        : {};
+    cell = 'authoring';
+  }
+
+  console.error(`role "${role}": appliesTo read from the ${cell} cell (dnaHash ${dnaHash})`);
+
   return [
     role,
     {
