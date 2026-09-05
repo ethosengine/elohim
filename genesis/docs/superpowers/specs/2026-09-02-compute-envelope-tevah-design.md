@@ -927,6 +927,16 @@ envelope, every household-lane assertion is vacuous by construction.
 29. **Container power, split**: closure = hermetic FS; isolation = floor, commitment + reach =
     ceiling; composability = manifest recursion. Named gap: content bundles are served, not
     sandboxed (Moss iframe + capability API); the `app-manifest` owns that contract when it comes.
+30. **k8s is a lockfile-render of the manifest, declared not derived** (2026-09-05, operator-steered
+    after the integration push was refused by a stale capacity envelope). `RuntimeManifest.envelope.bound`
+    is the one declaration of a peer's compute envelope; `deployments.json`'s `edgenode*` fields stay
+    in place for every consumer but become a verified render of a pinned manifest CID (the pin is the
+    declared head at the k8s packaging; DHT anchoring stays S1 station 4); the cluster envelope is
+    observed by a command, never hand-promoted; ratification is a typed record both validators read,
+    never a push-time flag. Sequencing: declaration-only, compatible with quota at S3. **Guide-star
+    check (register 21): passes** — the `k8s-bridge` crate renders resources only, `Berth.data_root`
+    stays a reserved volume head with no semantics, and the epr-pvc arm lands in the same seam later.
+    Spec: `genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md`.
 
 ## 13. What was rejected, per external model
 
