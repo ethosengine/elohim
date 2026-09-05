@@ -2,9 +2,9 @@
 
 # Concern x Seam Matrix
 
-**16 concern classes x 16 seams = 256 cells** — conformant 19 · variant 39 · n-a 2 · unexamined 196.
+**16 concern classes x 16 seams = 256 cells** — conformant 21 · variant 51 · n-a 2 · unexamined 182.
 
-Digest `sha256:fc44c33e31ccedec92a05d3025276b82`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
+Digest `sha256:d3057d836d0c380b8425b3f1b64dce3f`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
 
 State vocabulary: `conformant` = every citing point answered **and** cites a contract test that exists and contains the named fn · `variant` = a documented waiver (status partial/unbound) **or** an answered point with no verified test · `unexamined` = nobody has looked · `n-a` = declared inapplicable with justification.
 
@@ -55,22 +55,22 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 | Class | S3.1 | S3.4 | S3.5 | S3.7 | S3.12 | S3.14 | S3.2 | S3.3 | S3.10 | S3.11 | S3.13 | S3.15 | S3.8 | S3.9 | S3.6 | SGOV |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **C0** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | ✓ | · | ✓ |
-| **C1** | · | · | · | · | ~ | · | · | · | ~ | · | · | · | · | ✓ | · | ~ |
-| **C2** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ✓ | · | ✓ |
-| **C3** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ~ | · | ✓ |
-| **C4** | · | · | · | · | ~ | · | · | · | ~ | · | · | ✓ | · | ~ | ~ | ~ |
-| **C5** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ~ | ~ | ~ |
-| **C6a** | · | · | · | · | · | · | · | · | ~ | · | · | ~ | · | ~ | · | ✓ |
-| **C6b** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ✓ | · | ✓ |
-| **C7** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ~ | ✓ | ~ |
-| **C8** | · | · | · | · | · | · | · | · | ~ | · | · | ✓ | · | ~ | ~ | ~ |
+| **C0** | · | · | · | · | · | · | · | ~ | ✓ | · | · | · | · | ✓ | · | ✓ |
+| **C1** | · | · | · | · | ~ | · | · | ~ | ~ | · | · | · | · | ✓ | · | ~ |
+| **C2** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ✓ | · | ✓ |
+| **C3** | · | · | · | · | · | · | · | ✓ | ~ | · | · | · | · | ~ | · | ✓ |
+| **C4** | · | · | · | · | ~ | · | · | ~ | ~ | · | · | ✓ | · | ~ | ~ | ~ |
+| **C5** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ~ | ~ | ~ |
+| **C6a** | · | · | · | · | · | · | · | ✓ | ~ | · | · | ~ | · | ~ | · | ~ |
+| **C6b** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ✓ | · | ✓ |
+| **C7** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ~ | ✓ | ~ |
+| **C8** | · | · | · | · | · | · | · | ~ | ~ | · | · | ✓ | · | ~ | ~ | ~ |
 | **C9** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | - | ✓ | ~ |
 | **C10** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | ~ | · | ✓ |
-| **C11** | · | · | · | · | · | · | · | · | ~ | · | · | ✓ | · | ~ | · | ~ |
-| **C12** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ~ | ~ | - |
-| **C13** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ✓ | · | ~ |
-| **C14** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | ~ | · | ✓ |
+| **C11** | · | · | · | · | · | · | · | ✓ | ~ | · | · | ✓ | · | ~ | · | ~ |
+| **C12** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ~ | ~ | - |
+| **C13** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ✓ | · | ~ |
+| **C14** | · | · | · | · | · | · | · | ~ | ~ | · | · | · | · | ~ | · | ✓ |
 
 Legend: `✓` conformant · `~` variant · `·` unexamined · `-` n-a
 
@@ -102,103 +102,117 @@ Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, 
 | # | Class | Seam | Score | Recurrence | Severity | Rung proximity |
 |---|---|---|---|---|---|---|
 | 1 | C2 | `S3.12` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 2 | C5 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 3 | C8 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 4 | C0 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 5 | C13 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 6 | C7 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 7 | C3 | `S3.12` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 8 | C10 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 9 | C12 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 10 | C14 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 11 | C6a | `S3.12` | 12.0 | 4 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 12 | C6b | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 13 | C9 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 14 | C2 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 15 | C2 | `S3.15` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 16 | C2 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 17 | C4 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 18 | C4 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 19 | C11 | `S3.12` | 9.0 | 3 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 20 | C1 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 21 | C1 | `S3.15` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 22 | C1 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 23 | C5 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 24 | C5 | `S3.15` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 25 | C5 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 26 | C8 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 27 | C8 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 28 | C0 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 29 | C0 | `S3.15` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 30 | C0 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 31 | C13 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 32 | C13 | `S3.15` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 33 | C13 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 34 | C7 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 35 | C7 | `S3.15` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (doorway-failover green) |
-| 36 | C7 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 37 | C2 | `S3.1` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 38 | C2 | `S3.13` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 39 | C2 | `S3.14` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 40 | C2 | `S3.2` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
+| 2 | C2 | `S3.15` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 3 | C1 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 4 | C5 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 5 | C5 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 6 | C8 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 7 | C0 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 8 | C0 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 9 | C13 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 10 | C13 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 11 | C7 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 12 | C7 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 13 | C3 | `S3.12` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 14 | C3 | `S3.15` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (doorway-failover red) |
+| 15 | C10 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 16 | C10 | `S3.15` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 17 | C12 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 18 | C12 | `S3.15` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 19 | C14 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 20 | C14 | `S3.15` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 21 | C6a | `S3.12` | 12.0 | 4 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 22 | C6b | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 23 | C6b | `S3.15` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 24 | C9 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 25 | C9 | `S3.15` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 26 | C2 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 27 | C2 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 28 | C4 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 29 | C4 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 30 | C11 | `S3.12` | 9.0 | 3 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 31 | C1 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 32 | C1 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 33 | C5 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 34 | C5 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 35 | C8 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 36 | C8 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 37 | C0 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 38 | C0 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
+| 39 | C13 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 40 | C13 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
 
 ## Examined cells
 
 | Class | Seam | State | Why | Points |
 |---|---|---|---|---|
-| C0 | `S3.10` | conformant | 11 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::select_path`, `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
+| C0 | `S3.10` | conformant | 15 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::select_path`, `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
+| C0 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C0 | `S3.9` | conformant | 10 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
 | C0 | `SGOV` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Composition::fold`, `elohim-epr-rea::scope::Scopes::contains`, `elohim-epr-rea::stock::Within::admits` |
 | C1 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: adopt_peer_with_provenance, verify_carried_election | `elohim-storage::ghost_decay_authorizes_author`, `elohim-storage::decide_head_action`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)`, `elohim-storage::AcquisitionReconcileOutcome` |
 | C1 | `S3.12` | variant | documented waiver: status unbound | `elohim-node::ConsensusManager::request_consensus`, `elohim-node::ConsensusOutcome` |
+| C1 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C1 | `S3.9` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
 | C1 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-cli::note::resolve_target`, `elohim-epr-cli::stocks::equilibrium_verdict` |
-| C10 | `S3.10` | conformant | 11 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::select_rotation_candidates` |
+| C10 | `S3.10` | conformant | 16 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::select_rotation_candidates` |
 | C10 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
 | C10 | `SGOV` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-cli::note::NoteKind`, `elohim-epr-cli::stocks::classify_record` |
 | C11 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::select_path`, `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::MissLedger::admit`, `elohim-storage::HeadCorpusDigestReadiness` |
 | C11 | `S3.15` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-node::AdmissionController::evaluate`, `elohim-node::AdmissionDecision`, `elohim-node::DeferReason` |
+| C11 | `S3.3` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-ark-core::verdict` |
 | C11 | `S3.9` | variant | documented waiver: status partial | `doorway::discovery_verdict`, `doorway::is_diagnostic_probe`, `doorway::is_head_declare_write`, `doorway::ShellOutcome` |
-| C11 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict` |
+| C11 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append` |
 | C12 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::price_adopt_slice` |
+| C12 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C12 | `S3.6` | variant | documented waiver: status unbound | `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::assemble_deactivated_document` |
 | C12 | `S3.9` | variant | documented waiver: status partial | `doorway::should_serve_response`, `doorway::op_gate_capability`, `doorway::StorageServingStatus`, `doorway::read_class` |
 | C12 | `SGOV` | n-a | 1 point(s) declare n-a with justification | `elohim-seam-contracts::verdict` |
 | C13 | `S3.10` | variant | documented waiver: status unbound | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::StakesResolver::stage_for` |
+| C13 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C13 | `S3.9` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
 | C13 | `SGOV` | variant | documented waiver: status unbound | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-cli::stocks::equilibrium_verdict` |
 | C14 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::ElectionObeyProbe`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
+| C14 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C14 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
 | C14 | `SGOV` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-cli::note::NoteKind`, `elohim-epr-cli::stocks::equilibrium_verdict` |
 | C2 | `S3.10` | variant | answered but NO verified contract test: verify_carried_election | `elohim-storage::decide_head_action`, `elohim-storage::canonical_move_verdict`, `elohim-storage::StaleReason`, `elohim-storage::AcquisitionReconcileOutcome` |
+| C2 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C2 | `S3.9` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::discovery_verdict`, `doorway::is_diagnostic_probe`, `doorway::is_head_declare_write`, `doorway::StorageServingStatus` |
-| C2 | `SGOV` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::ActorStore::current_for`, `elohim-epr-cli::stocks::classify_record` |
+| C2 | `SGOV` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-rea::ActorStore::current_for` |
 | C3 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::ghost_decay_authorizes_author`, `elohim-storage::select_path`, `elohim-storage::decide_head_action`, `elohim-storage::AcquisitionReconcileOutcome` |
+| C3 | `S3.3` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::verdict` |
 | C3 | `S3.9` | variant | documented waiver: status partial | `doorway::UpstreamBreakers::would_shed`, `doorway::StorageServingStatus`, `doorway::ServingHealth`, `doorway::read_class` |
-| C3 | `SGOV` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict` |
+| C3 | `SGOV` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-cli::claim::claim / note::note / fulfill::fulfill_on` |
 | C4 | `S3.10` | variant | answered but NO verified contract test: LocalResolve, get_canonical_election_evidence, resolve_canonical_election | `elohim-storage::ghost_decay_authorizes_author`, `elohim-storage::select_path`, `elohim-storage::LocalResolve`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)` |
 | C4 | `S3.12` | variant | documented waiver: status partial | `elohim-node::ConsensusManager::request_consensus`, `elohim-node::ConsensusOutcome` |
 | C4 | `S3.15` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-node::AdmissionDecision` |
+| C4 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::verdict` |
 | C4 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::DidResolutionError`, `did-bridge::DidResolutionResult`, `did-bridge::DidWebResolver::resolve` |
 | C4 | `S3.9` | variant | documented waiver: status partial | `doorway::decide_reconcile`, `doorway::ReconcileDecision`, `doorway::adoption_targets`, `doorway::fetch_projections_with_fallback` |
 | C4 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-rea::Composition::fold` |
 | C5 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: verify_carried_election | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::adopt_before_author_param`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
+| C5 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C5 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::derive_did_web_url`, `did-bridge::DidWebResolver::resolve`, `did-bridge::ElohimResolver::resolve` |
 | C5 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
 | C5 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-cli::note::resolve_attribution`, `elohim-epr-cli::govern::actor_stamp` |
 | C6a | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: adopt_peer_with_provenance, get_canonical_election_evidence, resolve_canonical_election | `elohim-storage::ghost_decay_authorizes_author`, `elohim-storage::select_path`, `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::MissLedger::admit` |
 | C6a | `S3.15` | variant | documented waiver: status partial | `elohim-node::DeferReason` |
+| C6a | `S3.3` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::same_cause_key`, `elohim-ark-core::verdict` |
 | C6a | `S3.9` | variant | documented waiver: status partial | `doorway::K2Store::put_at (MemK2Store)`, `doorway::decide_shell_serve`, `doorway::StorageServingStatus`, `doorway::read_class` |
-| C6a | `SGOV` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::scope::Scopes::contains` |
+| C6a | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-rea::scope::Scopes::contains` |
 | C6b | `S3.10` | variant | documented waiver: status partial | `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::declared_divergence_should_route_to_contest`, `elohim-storage::undeclared_divergence_should_route_to_contest`, `elohim-storage::declaration_would_move` |
+| C6b | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict` |
 | C6b | `S3.9` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
-| C6b | `SGOV` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-cli::note::resolve_target`, `elohim-epr-cli::project::event_key (the act-identity dedupe guard)` |
+| C6b | `SGOV` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-cli::claim::claim / note::note / fulfill::fulfill_on`, `elohim-epr-cli::note::resolve_target` |
 | C7 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::select_path`, `elohim-storage::AcquisitionReconcileOutcome`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
+| C7 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::classify_readiness_outcome` |
 | C7 | `S3.6` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `did-bridge::assemble_deactivated_document`, `did-bridge::MethodRegistry::resolve` |
 | C7 | `S3.9` | variant | documented waiver: status partial | `doorway::classify_dispatch`, `doorway::select_route`, `doorway::Disposition`, `doorway::epr_should_serve_ssr` |
 | C7 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-cli::stocks::classify_record` |
 | C8 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::ghost_decay_authorizes_author`, `elohim-storage::select_path`, `elohim-storage::StaleReason`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)` |
 | C8 | `S3.15` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-node::AdmissionController::evaluate`, `elohim-node::DeferReason` |
+| C8 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::same_cause_key`, `elohim-ark-core::verdict` |
 | C8 | `S3.6` | variant | documented waiver: status partial | `did-bridge::DidResolutionError` |
 | C8 | `S3.9` | variant | documented waiver: status partial/unbound | `doorway::SsrFallbackReason`, `doorway::decide_shell_serve`, `doorway::ShellProvenance`, `doorway::StorageServingStatus` |
 | C8 | `SGOV` | variant | documented waiver: status partial/unbound | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-cli::stocks::equilibrium_verdict`, `elohim-epr-cli::stocks::RefusalReason` |

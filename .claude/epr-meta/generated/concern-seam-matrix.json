@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 134,
+ "n_points_routed": 145,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -150,7 +150,9 @@
     "T3"
    ],
    "reach_tier": "community",
-   "registry_crates": [],
+   "registry_crates": [
+    "elohim-ark-core"
+   ],
    "habits": [],
    "n_a_concerns": []
   },
@@ -413,9 +415,9 @@
   }
  },
  "counts": {
-  "unexamined": 196,
-  "conformant": 19,
-  "variant": 39,
+  "unexamined": 182,
+  "variant": 51,
+  "conformant": 21,
   "n-a": 2
  },
  "cells": [
@@ -472,15 +474,29 @@
    "concern": "C0",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C0",
    "seam": "S3.10",
    "plane": "data",
    "state": "conformant",
-   "reason": "11 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "15 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T1",
     "T2",
@@ -564,6 +580,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     }
    ]
   },
@@ -586,7 +637,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 6.0
+   "score": 18.0
   },
   {
    "concern": "C0",
@@ -811,8 +862,22 @@
    "concern": "C1",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C1",
@@ -975,6 +1040,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "select_canonical_winner",
      "status": "answered",
@@ -1023,7 +1130,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 8.0
+   "score": 24.0
   },
   {
    "concern": "C1",
@@ -1193,8 +1300,22 @@
    "concern": "C2",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C2",
@@ -1343,6 +1464,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "select_canonical_winner",
      "status": "answered",
@@ -1377,7 +1540,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 10.0
+   "score": 30.0
   },
   {
    "concern": "C2",
@@ -1481,7 +1644,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -1498,6 +1661,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-rea",
+     "point": "SidecarFlowTransaction::append / SidecarActorTransaction::append",
+     "status": "answered",
+     "verified": true,
+     "file": "src/store.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -1575,8 +1745,29 @@
    "concern": "C3",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.5
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "classify_readiness_outcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/exit.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C3",
@@ -1725,6 +1916,41 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "classify_chain_gate",
      "status": "partial",
@@ -1752,7 +1978,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 5.0
+   "score": 15.0
   },
   {
    "concern": "C3",
@@ -1828,7 +2054,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -1838,6 +2064,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "claim::claim / note::note / fulfill::fulfill_on",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/claim.rs"
     }
    ]
   },
@@ -1914,8 +2147,29 @@
    "concern": "C4",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "classify_readiness_outcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/exit.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C4",
@@ -2111,6 +2365,48 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     },
     {
      "crate": "content_store",
@@ -2605,8 +2901,22 @@
    "concern": "C5",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C5",
@@ -2720,6 +3030,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "declare_canonical_head_inner",
      "status": "answered",
@@ -2775,7 +3127,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 8.0
+   "score": 24.0
   },
   {
    "concern": "C5",
@@ -2987,8 +3339,36 @@
    "concern": "C6a",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "conformant",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "classify_readiness_outcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/exit.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "same_cause_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/tally.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C6a",
@@ -3179,6 +3559,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "resolve_canonical_election",
      "status": "answered",
@@ -3338,8 +3760,8 @@
    "concern": "C6a",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "conformant",
-   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -3356,6 +3778,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-rea",
+     "point": "SidecarFlowTransaction::append / SidecarActorTransaction::append",
+     "status": "partial",
+     "verified": true,
+     "file": "src/store.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -3419,8 +3848,22 @@
    "concern": "C6b",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C6b",
@@ -3562,6 +4005,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "classify_chain_gate",
      "status": "partial",
@@ -3589,7 +4074,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 4.0
+   "score": 12.0
   },
   {
    "concern": "C6b",
@@ -3658,7 +4143,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -3668,6 +4153,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-rea",
+     "point": "SidecarFlowTransaction::append / SidecarActorTransaction::append",
+     "status": "answered",
+     "verified": true,
+     "file": "src/store.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "claim::claim / note::note / fulfill::fulfill_on",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/claim.rs"
     },
     {
      "crate": "elohim-epr-cli",
@@ -3738,8 +4237,22 @@
    "concern": "C7",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "classify_readiness_outcome",
+     "status": "partial",
+     "verified": true,
+     "file": "src/exit.rs"
+    }
+   ]
   },
   {
    "concern": "C7",
@@ -3830,6 +4343,48 @@
      "status": "n-a",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     }
    ]
   },
@@ -3852,7 +4407,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 6.0
+   "score": 18.0
   },
   {
    "concern": "C7",
@@ -4085,8 +4640,29 @@
    "concern": "C8",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "same_cause_key",
+     "status": "partial",
+     "verified": true,
+     "file": "src/tally.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C8",
@@ -4275,6 +4851,48 @@
      "status": "partial",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     },
     {
      "crate": "content_store",
@@ -4658,6 +5276,48 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     }
    ]
   },
@@ -4680,7 +5340,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 4.0
+   "score": 12.0
   },
   {
    "concern": "C9",
@@ -4858,7 +5518,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "conformant",
-   "reason": "11 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "16 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T1",
     "T2",
@@ -4944,6 +5604,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "answered",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_deadline_admission",
      "status": "n-a",
@@ -4971,7 +5673,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 4.0
+   "score": 12.0
   },
   {
    "concern": "C10",
@@ -5141,8 +5843,22 @@
    "concern": "C11",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 1.5
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C11",
@@ -5247,6 +5963,48 @@
      "status": "n-a",
      "verified": true,
      "file": "src/p2p/sync_state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
     },
     {
      "crate": "content_store",
@@ -5419,6 +6177,13 @@
      "status": "partial",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-rea",
+     "point": "SidecarFlowTransaction::append / SidecarActorTransaction::append",
+     "status": "partial",
+     "verified": true,
+     "file": "src/store.rs"
     }
    ]
   },
@@ -5475,8 +6240,22 @@
    "concern": "C12",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C12",
@@ -5611,6 +6390,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "verify_carried_election",
      "status": "partial",
@@ -5638,7 +6459,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 4.0
+   "score": 12.0
   },
   {
    "concern": "C12",
@@ -5850,8 +6671,22 @@
    "concern": "C13",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C13",
@@ -5951,6 +6786,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "authorize_canonical_head_declarer",
      "status": "unbound",
@@ -5978,7 +6855,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 6.0
+   "score": 18.0
   },
   {
    "concern": "C13",
@@ -6141,8 +7018,22 @@
    "concern": "C14",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/verdict.rs"
+    }
+   ]
   },
   {
    "concern": "C14",
@@ -6235,6 +7126,48 @@
      "file": "src/p2p/sync_state.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "release_adoption::verify::verify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/verify.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::RefusalReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::state::ChannelAdoptionState::record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/state.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "release_adoption::apply::ApplyRegistry::apply",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/release_adoption/apply.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "private_serve_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/private_reach.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "judge_deliverability",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/app_deliverability.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_failure_disposition",
      "status": "answered",
@@ -6262,7 +7195,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "unexamined",
-   "score": 4.0
+   "score": 12.0
   },
   {
    "concern": "C14",
@@ -6366,6 +7299,30 @@
    }
   },
   {
+   "concern": "C2",
+   "seam": "S3.15",
+   "score": 30.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.15",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C5",
    "seam": "S3.12",
    "score": 24.0,
@@ -6375,6 +7332,18 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.15",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -6402,6 +7371,18 @@
    }
   },
   {
+   "concern": "C0",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C13",
    "seam": "S3.12",
    "score": 18.0,
@@ -6411,6 +7392,18 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
+   }
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -6426,6 +7419,18 @@
    }
   },
   {
+   "concern": "C7",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C3",
    "seam": "S3.12",
    "score": 15.0,
@@ -6435,6 +7440,18 @@
     "severity_class": "loud-fail",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
+   }
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.15",
+   "score": 15.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 1.0,
+    "severity_class": "loud-fail",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -6450,6 +7467,18 @@
    }
   },
   {
+   "concern": "C10",
+   "seam": "S3.15",
+   "score": 12.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C12",
    "seam": "S3.12",
    "score": 12.0,
@@ -6462,6 +7491,18 @@
    }
   },
   {
+   "concern": "C12",
+   "seam": "S3.15",
+   "score": 12.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C14",
    "seam": "S3.12",
    "score": 12.0,
@@ -6471,6 +7512,18 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
+   }
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.15",
+   "score": 12.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -6498,6 +7551,18 @@
    }
   },
   {
+   "concern": "C6b",
+   "seam": "S3.15",
+   "score": 12.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C9",
    "seam": "S3.12",
    "score": 12.0,
@@ -6510,6 +7575,18 @@
    }
   },
   {
+   "concern": "C9",
+   "seam": "S3.15",
+   "score": 12.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
    "concern": "C2",
    "seam": "S3.11",
    "score": 10.0,
@@ -6519,18 +7596,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 1.0,
     "rung_reason": "notary-authority green"
-   }
-  },
-  {
-   "concern": "C2",
-   "seam": "S3.15",
-   "score": 10.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
    }
   },
   {
@@ -6595,18 +7660,6 @@
   },
   {
    "concern": "C1",
-   "seam": "S3.15",
-   "score": 8.0,
-   "score_parts": {
-    "recurrence": 4,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
-   }
-  },
-  {
-   "concern": "C1",
    "seam": "S3.4",
    "score": 8.0,
    "score_parts": {
@@ -6627,18 +7680,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 1.0,
     "rung_reason": "notary-authority green"
-   }
-  },
-  {
-   "concern": "C5",
-   "seam": "S3.15",
-   "score": 8.0,
-   "score_parts": {
-    "recurrence": 4,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
    }
   },
   {
@@ -6691,18 +7732,6 @@
   },
   {
    "concern": "C0",
-   "seam": "S3.15",
-   "score": 6.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
-   }
-  },
-  {
-   "concern": "C0",
    "seam": "S3.4",
    "score": 6.0,
    "score_parts": {
@@ -6727,18 +7756,6 @@
   },
   {
    "concern": "C13",
-   "seam": "S3.15",
-   "score": 6.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
-   }
-  },
-  {
-   "concern": "C13",
    "seam": "S3.4",
    "score": 6.0,
    "score_parts": {
@@ -6747,90 +7764,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 1.0,
     "rung_reason": "operator-runtime-surface green"
-   }
-  },
-  {
-   "concern": "C7",
-   "seam": "S3.11",
-   "score": 6.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "notary-authority green"
-   }
-  },
-  {
-   "concern": "C7",
-   "seam": "S3.15",
-   "score": 6.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "doorway-failover green"
-   }
-  },
-  {
-   "concern": "C7",
-   "seam": "S3.4",
-   "score": 6.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 1.0,
-    "rung_reason": "operator-runtime-surface green"
-   }
-  },
-  {
-   "concern": "C2",
-   "seam": "S3.1",
-   "score": 5.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 0.5,
-    "rung_reason": "no linked habits article"
-   }
-  },
-  {
-   "concern": "C2",
-   "seam": "S3.13",
-   "score": 5.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 0.5,
-    "rung_reason": "no linked habits article"
-   }
-  },
-  {
-   "concern": "C2",
-   "seam": "S3.14",
-   "score": 5.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 0.5,
-    "rung_reason": "no linked habits article"
-   }
-  },
-  {
-   "concern": "C2",
-   "seam": "S3.2",
-   "score": 5.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 0.5,
-    "rung_reason": "no linked habits article"
    }
   }
  ],
@@ -6841,7 +7774,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:fc44c33e31ccedec92a05d3025276b82",
+ "digest": "sha256:d3057d836d0c380b8425b3f1b64dce3f",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

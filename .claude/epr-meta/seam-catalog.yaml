@@ -230,7 +230,27 @@ seams:
       Re-link both seams on the commit that returns it to `habits.yaml`.
     tracks: [T2, T3]
     reach_tier: community
-    registry_crates: []
+    # `elohim-ark-core` (elohim/ark/core) — the compute envelope's pure decision surface
+    # (readiness classification, same-cause death coalescing, the restart governor's verdict).
+    # Routed here 2026-09-05; its registry was born unrouted at d9a2dcc13 (2026-09-02) and had
+    # been contributing zero cells since, which is the exact silence the LIVE routing check in
+    # `_lib/__tests__/seam_matrix_test.py` exists to break.
+    # WHY §3.3 and not its two neighbours — the crate's own design spec
+    # (genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md) names the
+    # candidates in its frontmatter ("seam atlas 3.2 OS/packaging · 3.3 runtime/footprint ·
+    # 3.15 resource governance — the primitive both 3.2 and 3.3 assume and neither owns") and
+    # then eliminates one of them itself: §5.2.4 records that "Seam 3.15's home is misrouted for
+    # this concern: `bounds_validator` bounds *authority*, not processes." Between the remaining
+    # two, §3.2 is packaging/deploy target (which artifact is shipped where) while §3.3 is this
+    # atlas row verbatim — "in what compositional shape — thin vs fat, which cargo features,
+    # which embedded CHILDREN?" — and an ark IS the parent of embedded children
+    # (`MESH_CONDUCTOR_LAUNCH=ark` makes conductors children of an envelope). The spec's own
+    # concern-canon walk agrees on the plane: "C0 plane: the runtime seam's own crate, bridging
+    # to the p2p plane through storage".
+    # This is a routing of the CORE crate only, per the birth rule: `elohim-ark-supervisor` and
+    # `elohim-ark` carry no row-bearing registry yet (I/O and CLI instantiate decisions minted
+    # here). Route them on the commit that mints one.
+    registry_crates: [elohim-ark-core]
     # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
     habits: []
     n_a_concerns: []
