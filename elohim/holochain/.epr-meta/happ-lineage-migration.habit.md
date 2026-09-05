@@ -400,3 +400,9 @@ after boot, inside the 180 s grace + two 60 s samples — with the WARN naming t
 `hc-mesh.sh blocks`. james, who blocked both neighbours and therefore knows no peers in the space, was
 not named: his timeouts never rise. That isolated-peer shape is a classifier gap, sent to the Task 33
 seat as a bounded widening (`shape: timeouts | isolated`). Status unchanged (red).
+
+DELTA 2026-09-05 14:52Z (the isolated shape measured live). On 5d7e388e0 james — the peer that blocked
+both neighbours and therefore knows none — names the node-registry partition in `passport.lineage.partition`
+with `shape: "isolated"` (peers 0, peerTimeouts 0, arc null, completedRounds null) 270 s after boot; matthew
+and jessica name it with `shape: "timeouts"`. Every peer of the poisoned household now reports the partition
+from its own passport, which is what the a2o pre-flight reads. Status unchanged (red).

@@ -1904,6 +1904,8 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-09-05 (concurrent attribution station 1 verified; supersedes the HOLD below, no status flip): cargo berth acquired/released; just gate eprfs EXIT=0 (fmt, workspace clippy and tests); independent review approved and the existing commitment fulfilled. Exact claim references now survive governance, claim, note and report authoring without new caller steps. Plan expanded to six stations with cold-start valueflow discovery and verifiable care/accountability after failure; concurrent persistence and real harness integration remain unclaimed. Evidence: genesis/docs/superpowers/plans/concurrent-agent-attribution/task-1-report.md. One completed implementation event, not an equilibrium rate.
+      DELTA 2026-09-05 (concurrent attribution station 1, HOLD; no status flip): spec and five-station plan authored against existing EPR/REA primitives; exact ActorClaim references retained by governance and flow verbs with no new caller ritual. rustfmt and scoped diff checks EXIT=0; just gate eprfs NOT RUN because the live cargo-berth holder refused the prerequisite claim (EXIT=3). Integration tests authored but unexecuted; commitment remains undischarged. Evidence: genesis/docs/superpowers/plans/concurrent-agent-attribution/task-1-report.md. An implementation event, not evidence of equilibrium or concurrent runtime safety.
       DELTA 2026-09-05 (valueflow authoring surface closed through its own verbs; no status
       flip): the plan's 11 tasks were claimed and fulfilled with `epr flow claim` / `fulfill --on`,
       lifting commitments outflow 0.429 -> 2.000/day on the 2026-08-29..09-05 window (level 616,
@@ -3154,6 +3156,12 @@ habits:
       `hc-mesh.sh blocks`. james, who blocked both neighbours and therefore knows no peers in the space, was
       not named: his timeouts never rise. That isolated-peer shape is a classifier gap, sent to the Task 33
       seat as a bounded widening (`shape: timeouts | isolated`). Status unchanged (red).
+
+      DELTA 2026-09-05 14:52Z (the isolated shape measured live). On 5d7e388e0 james — the peer that blocked
+      both neighbours and therefore knows none — names the node-registry partition in `passport.lineage.partition`
+      with `shape: "isolated"` (peers 0, peerTimeouts 0, arc null, completedRounds null) 270 s after boot; matthew
+      and jessica name it with `shape: "timeouts"`. Every peer of the poisoned household now reports the partition
+      from its own passport, which is what the a2o pre-flight reads. Status unchanged (red).
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"
