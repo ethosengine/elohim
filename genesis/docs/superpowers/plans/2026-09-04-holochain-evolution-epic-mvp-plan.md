@@ -908,6 +908,17 @@ Why: the sunset ruling "routing, not a disable" (C14) is right for the app but t
 
 - [ ] **Task 32 deliverable: on the household mesh a `storage-restart` after a sunset adds no action to the closed v1 chain, and a partitioned space is named in the passport within two probe samples.**
 
+### Task 33: the disposable crossing — the lineage vehicle can seal a RUN-SCOPED v1, never only the household's
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/services/release_adoption/{lineage_roles.rs,sunset.rs,apply.rs}` and the `/admin/lineage/*` routes in `src/http.rs`: `HappLineageVehicle::seal_close` and `install_lineage` resolve v1 structurally today (`role_cell(&base_app_info, role)` with `base_app_id = HOLOCHAIN_APP_ID`, `install_lineage` inherits `base_role_seed`), so a sunset always seals the household's own chain. Add a settable per-role v1 binding for a crossing (`{"role","v1AppId"}` on the window-open / seal routes, defaulting to the base app), so a fixture can install a run-scoped v1 (per-run network seed on the same DNA, installed as a side app through the vehicle), cross it to a run-scoped v2, and seal THAT — the household's base cell is only ever read. The zome's lineage check (a `v1_cell` must be the v2's declared lineage) stays: the run-scoped v2 declares the run-scoped v1.
+- Modify: `genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts` + `lineage-candidate.ts` (Station 8 and the after-close fence in 9/10 target the disposable crossing; Task 31's pre-flight and the no-writes-after-close rail stay).
+- Test: storage unit tests for the binding (default = base app; explicit = the named side app; unknown app refused by name); live: two consecutive ten-station runs on a fresh mesh leave `hc-mesh.sh blocks` empty on all three peers (Task 31's deliverable, now reachable).
+
+Why: Task 31 (252ead282) removed every fixture-authored write after a close, but Station 8's own measured post-close write is the story's assertion and a neighbour will always warrant it — so the chain it lands on must be disposable. Storage is the seat that binds v1.
+
+- [ ] **Task 33 deliverable: a crossing can name its v1; Station 8 seals a run-scoped chain; two consecutive ten-station runs on a fresh household mesh leave every peer's block list empty.**
+
 ---
 
 ## Self-review (done at authoring, 2026-09-04)
