@@ -1,0 +1,37 @@
+# crates/hc-dbtool — the operator seat's read/lift tool for a Holochain 0.7
+# conductor's encrypted databases.
+#
+# Nested single-crate workspace root, matching the `crates/` siblings
+# (doorway-client / elohim-sdk / elohim-storage-client / seam-contracts): there
+# is NO root monorepo workspace, each crate resolves standalone with its own
+# Cargo.lock.
+[workspace]
+
+[package]
+name = "hc-dbtool"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Read and lift Holochain 0.7 conductor BlockSpan rows, and read rejected DHT ops, on an encrypted conductor database. Holochain 0.7 exposes no unblock admin call and no unblock host fn; a household must be able to see the block, read the rejected op that caused it, and lift the block under its own governance."
+authors = ["Elohim Protocol"]
+license = "AGPL-3.0"
+repository = "https://github.com/ethosengine/elohim"
+publish = false
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+# Pinned at the 0.7.0 line the conductor's own `holochain_data 0.7.0` holds, so
+# the BlockSpan msgpack payloads decode with the exact types that wrote them.
+holochain_serialized_bytes = "=0.0.57"
+holochain_timestamp = "=0.7.0"
+holochain_zome_types = "=0.7.0"
+# `bundled-sqlcipher` (NOT `-vendored-openssl`): links the system libcrypto that
+# `pkg-config --list-all` already exposes here, instead of compiling OpenSSL from
+# source. The cipher settings we apply are byte-identical either way.
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+sodoken = "=0.1.0"
+
+[dev-dependencies]
+tempfile = "3"

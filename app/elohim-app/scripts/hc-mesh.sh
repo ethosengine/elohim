@@ -104,6 +104,19 @@
 #                     cd elohim && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev \
 #                       RUSTFLAGS="" cargo build -p elohim-ark
 #
+#   DBTOOL_BIN      The `hc-dbtool` binary used by the `blocks` verb. Default:
+#                   the cargo-pool dev slot
+#                   /projects/.cargo-target-pool/family/dev/crates/dev/debug/hc-dbtool,
+#                   then whatever `hc-dbtool` is on PATH. Build it with
+#                     cd crates/hc-dbtool \
+#                       && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev \
+#                          RUSTFLAGS="" cargo build
+#
+#   MESH_BLOCKS_DNA Extra DNA hashes (comma-separated) for `blocks` to read
+#                   rejected ops from, on top of any DNA a block row names. Use
+#                   it when gossip is dead but no block row exists yet, to prove
+#                   whether the DNA holds rejected ops at all.
+#
 #   HOLOCHAIN_BIN   A conductor BINARY, or a DIRECTORY holding `holochain` +
 #                   `hc`, to use INSTEAD of what is on PATH (see the block above
 #                   stop_all). Unset = the auto-detected fork build, else stock.
@@ -271,6 +284,19 @@ absolutise_ark_bin() {
   return 0
 }
 absolutise_ark_bin
+
+# hc-dbtool (crates/hc-dbtool): reads a conductor's encrypted BlockSpan rows and
+# the rejected DHT ops behind them. The `crates/` siblings are each their own
+# workspace root, so this crate has its own pool slot rather than sharing
+# elohim's. Resolved here, required only by the `blocks` verb.
+DBTOOL_BIN_POOL_SLOT="$POOL/crates/dev/debug/hc-dbtool"
+if [ -z "${DBTOOL_BIN:-}" ]; then
+  if [ -x "$DBTOOL_BIN_POOL_SLOT" ]; then
+    DBTOOL_BIN="$DBTOOL_BIN_POOL_SLOT"
+  else
+    DBTOOL_BIN="$(command -v hc-dbtool 2>/dev/null || true)"
+  fi
+fi
 
 # MESH_DOORWAY_GATEWAY_SCOPING — does a mesh doorway name its humans the way a
 # FLEET doorway does? Every deployed doorway runs with DOORWAY_URL set, and
@@ -2891,6 +2917,90 @@ lineage_reset_all() {
   done
 }
 
+# `blocks [peer...]` — Task 30 (Holochain Evolution Epic MVP). READ-ONLY.
+#
+# Holochain 0.7's integrate_dht_ops_workflow blocks the AUTHOR'S CELL from now to
+# Timestamp::max() when one op that author wrote integrates as invalid
+# (CellBlockReason::InvalidOp). The peer store then drops that agent's infos and
+# gossip with them never starts again — and 0.7 exposes NO unblock: no admin
+# call, no HDK host fn. So a household that cannot read its own BlockSpan table
+# cannot tell "the peer is unreachable" apart from "I refuse to talk to this
+# peer, permanently, for one op eight hours ago". This verb reads the table.
+#
+# It never writes. Lifting a block is deliberately a THREE-STEP OPERATOR
+# SEQUENCE, because hc-dbtool refuses to write while any live process holds
+# conductor.db open:
+#
+#   ./hc-mesh.sh blocks james                    # 1. see the block and its cause
+#   ./hc-mesh.sh stop                            # 2. stop the conductors
+#   "$DBTOOL_BIN" --databases "$LOCAL_DEV_DIR/james/databases" \
+#       unblock --cell <dna>:<agent> --yes       # 3. lift it (omit --yes = dry run)
+#   ./hc-mesh.sh start                           # 4. bring the mesh back
+#
+# Step 3 is left explicit rather than wrapped in a verb: deleting a block is a
+# governance act on a peer's own refusal, and it should read like one in the
+# shell history that records it.
+mesh_blocks() {
+  local peers=("$@")
+  [ ${#peers[@]} -gt 0 ] || peers=("${PEERS[@]}")
+
+  if [ -z "${DBTOOL_BIN:-}" ] || [ ! -x "$DBTOOL_BIN" ]; then
+    echo "blocks: no executable hc-dbtool (DBTOOL_BIN='${DBTOOL_BIN:-}')" >&2
+    echo "  build it with:" >&2
+    echo "    cd '$REPO_ROOT/crates/hc-dbtool' && CARGO_TARGET_DIR='$POOL/crates/dev' RUSTFLAGS=\"\" cargo build" >&2
+    return 2
+  fi
+
+  local name databases out dna dnas extra rc=0
+  for name in "${peers[@]}"; do
+    databases="$LOCAL_DEV_DIR/$name/databases"
+    echo "=============================================================="
+    echo "PEER $name — $databases"
+    echo "=============================================================="
+    if [ ! -d "$databases" ]; then
+      echo "  no databases directory (peer never started?)"
+      rc=1
+      continue
+    fi
+
+    # BlockSpan lives in conductor.db. Capture it so the DNAs it names can drive
+    # the rejected read below, and echo it verbatim.
+    if ! out="$("$DBTOOL_BIN" --databases "$databases" --passphrase test blocks 2>&1)"; then
+      echo "$out"
+      echo "  blocks: hc-dbtool failed for $name" >&2
+      rc=1
+      continue
+    fi
+    echo "$out"
+    echo
+
+    # Every DNA a block row names, plus any the operator forced via
+    # MESH_BLOCKS_DNA — the forced list is what proves whether a DNA holds
+    # rejected ops when gossip is dead but no block row exists yet.
+    dnas="$(printf '%s\n' "$out" | grep -o 'uhC0k[A-Za-z0-9_-]*' | sort -u)"
+    if [ -n "${MESH_BLOCKS_DNA:-}" ]; then
+      extra="$(printf '%s' "$MESH_BLOCKS_DNA" | tr ',' '\n' | sed '/^$/d')"
+      dnas="$(printf '%s\n%s\n' "$dnas" "$extra" | sed '/^$/d' | sort -u)"
+    fi
+
+    if [ -z "$dnas" ]; then
+      echo "  no DNA to explain (no block rows, and MESH_BLOCKS_DNA unset)"
+      echo
+      continue
+    fi
+    while IFS= read -r dna; do
+      [ -n "$dna" ] || continue
+      if [ ! -f "$databases/dht-$dna.db" ]; then
+        echo "  (no dht-$dna.db on $name)"
+        continue
+      fi
+      "$DBTOOL_BIN" --databases "$databases" --passphrase test rejected --dna "$dna" || rc=1
+      echo
+    done <<< "$dnas"
+  done
+  return "$rc"
+}
+
 # Dispatch guard: only run the action switch when this file is EXECUTED, not
 # when it is SOURCED. hc-mesh-prologue.sh (and an operator's shell) source
 # this script to reuse conductor_csv/peer_csv/mesh_seed_env without risking an
@@ -2908,7 +3018,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
     lineage-reset) lineage_reset_all ;;
+    blocks)   shift; mesh_blocks "$@" ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi
