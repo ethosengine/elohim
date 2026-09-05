@@ -1555,7 +1555,7 @@ pub async fn try_adopt_canonical_head(
         HeadDecision::AdoptLocal => {
             // `canonical_head.is_some()` is what produced this arm.
             let head = canonical_head.expect("AdoptLocal implies a canonical head");
-            adopt_local(pool, ctx, id, head)
+            adopt_local(pool, ctx, id, head, local_declared.as_deref())
         }
         HeadDecision::AdoptPeer => {
             let hint = hint.expect("AdoptPeer implies a hint");
@@ -1596,6 +1596,85 @@ pub async fn try_adopt_canonical_head(
     }
 }
 
+/// T7 — the POINTER-HEAL predicate: may this conductor answer refresh the row's
+/// blob pointer, WITHOUT touching its head?
+///
+/// ## The residual this closes (measured 2026-09-02)
+///
+/// `elohim-host-landing` reached ONE declared head on both doorways and stayed
+/// there — and still served different bytes, because each peer's row carried a
+/// different `blob_hash`. Both blobs were present; nothing was missing. The
+/// pointer had simply drifted, and every path that could have converged it was
+/// correctly closed against it:
+///
+/// - The **amber drift-heal** ([`crate::sync::projector::reverse_project_content_doc`])
+///   rides `update_content`'s amber path, which by the **green-inviolable**
+///   guard never overwrites the `blob_hash` of a notarized (`dht_anchor_hash`)
+///   row. Both rows were green. That guard is right and stays untouched: a
+///   converged CRDT doc is unauthenticated peer input.
+/// - The **head heal** ([`adopt_local`]) re-stamped the same head every sweep
+///   ([`StampOutcome::Refreshed`]) and passed no patch, so it carried the
+///   conductor's answer without ever reading the pointer inside it.
+///
+/// So the drift was frozen between a guard that must not open and a heal that
+/// was not looking. This predicate is the narrow opening: the pointer comes from
+/// the row's OWN conductor, for the EXACT head the row already declares.
+///
+/// ## Why this is not authority laundering
+///
+/// Three conditions, all mandatory, and each one closes a specific way this
+/// could have become a head move wearing a pointer's clothes:
+///
+/// 1. **`conductor_verified`** — the answer is `canonical == true` from THIS
+///    node's own conductor ([`LocalResolve`], never a peer hint, never a
+///    fetched record). A peer's bytes reach the projection through the declare
+///    path or not at all.
+/// 2. **EXACT head equality** — `row_declared_head == head_action_hash`, trimmed
+///    on both sides exactly as [`declaration_would_move`] trims. Not "newer",
+///    not "supersedes", not "the conductor is canonical so it wins": the row
+///    must ALREADY be obeying this head. A different head is the head-move
+///    question, and it stays entirely with `canonical_move_verdict` and the
+///    canonical channels. This is the condition that makes the write
+///    head-neutral by construction rather than by care.
+/// 3. **A real, different pointer** — the record names a non-empty `blob_cid`
+///    that differs from the row's. Empty never wins (the same rule the amber
+///    heal holds), and an identical value writes nothing, so a converged corpus
+///    heals ZERO pointers per sweep.
+///
+/// `dht_anchor_hash` is untouched in VALUE for the same reason: the stamp writes
+/// it from `head_action_hash`, which condition 2 proved is what the row already
+/// holds.
+///
+/// Returns the pointer to write, or `None` to leave the row alone.
+///
+/// **Contract tests:** [`tests::pointer_heals_when_the_record_names_the_row_s_own_head`],
+/// [`tests::a_different_head_never_heals_the_pointer`],
+/// [`tests::an_unverified_record_never_heals_the_pointer`].
+pub fn pointer_heal_patch(
+    conductor_verified: bool,
+    row_declared_head: Option<&str>,
+    head_action_hash: &str,
+    row_blob_hash: Option<&str>,
+    record_blob_cid: Option<&str>,
+) -> Option<String> {
+    if !conductor_verified {
+        return None;
+    }
+    // (2) EXACT equality. `None` (undeclared) is NOT a match: an undeclared row
+    // is the FILL case, which the stamp itself handles as a head move — letting
+    // it through here would heal a pointer for a head the row does not yet obey.
+    let declared = row_declared_head?;
+    if declared.trim() != head_action_hash.trim() {
+        return None;
+    }
+    // (3) Empty never wins; identical writes nothing.
+    let incoming = record_blob_cid.map(str::trim).filter(|v| !v.is_empty())?;
+    if row_blob_hash.map(str::trim) == Some(incoming) {
+        return None;
+    }
+    Some(incoming.to_string())
+}
+
 /// Stamp a canonical head this node's OWN conductor resolved.
 ///
 /// Stamp mode is [`StampMode::HealCanonical`], NOT `Declare`. This runs inside
@@ -1606,7 +1685,28 @@ pub async fn try_adopt_canonical_head(
 /// healed back to the superseded head by #1188). `HealCanonical` FILLS an
 /// undeclared row unconditionally — which is the adopt case this arm exists for
 /// — and only MOVES a declared one with proof of forward ordering.
-fn adopt_local(pool: &DbPool, ctx: &AppContext, id: &str, head: &ContentHeadWire) -> AdoptOutcome {
+///
+/// # T7 — the pointer rides along, the head does not move
+///
+/// `local_declared` is the head the row ALREADY carries, read once by the
+/// caller. When it equals this answer's head exactly, the stamp is a
+/// [`StampOutcome::Refreshed`] no-op for the head — and that is precisely the
+/// moment the conductor is handing us the notarized `Content` entry for the head
+/// the row is already obeying. [`pointer_heal_patch`] decides whether that
+/// entry's `blob_cid` should replace a drifted row pointer; when it says yes the
+/// patch rides the SAME stamp call, so there is no second write path and no
+/// window where the row's head and pointer come from different answers.
+///
+/// `content_size_bytes` travels with the pointer, never alone: the two are one
+/// fact from one entry, and a refreshed pointer carrying the OTHER blob's length
+/// is a new inconsistency in place of the one being cured.
+fn adopt_local(
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    head: &ContentHeadWire,
+    local_declared: Option<&str>,
+) -> AdoptOutcome {
     let mut conn = match pool.get() {
         Ok(c) => c,
         Err(e) => {
@@ -1614,13 +1714,58 @@ fn adopt_local(pool: &DbPool, ctx: &AppContext, id: &str, head: &ContentHeadWire
             return AdoptOutcome::Held;
         }
     };
+
+    // T7. Read the row's pointer ONLY when the head matches — on a converged
+    // corpus every other candidate skips the query entirely.
+    let mut pointer_patch: Option<content_diesel::ContentProjectionPatch> = None;
+    if local_declared.is_some_and(|d| d.trim() == head.head_action_hash.as_str().trim()) {
+        let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
+            Ok(v) => v,
+            Err(e) => {
+                // A pointer we cannot read is a pointer we do not heal. The head
+                // stamp below is unaffected — this leg never gates it.
+                tracing::debug!(
+                    content_id = %id, error = %e,
+                    "pointer-heal: could not read the row's blob pointer — leaving it as is"
+                );
+                None
+            }
+        };
+        if let Some(healed) = pointer_heal_patch(
+            head.canonical,
+            local_declared,
+            head.head_action_hash.as_str(),
+            row_blob_hash.as_deref(),
+            head.content.blob_cid.as_deref(),
+        ) {
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                head = %head.head_action_hash,
+                from = ?row_blob_hash,
+                to = %healed,
+                "pointer-heal (T7): the own conductor's record for the head this row \
+                 ALREADY declares names a different blob — refreshing the pointer; \
+                 the declared head and dht_anchor_hash do not move"
+            );
+            pointer_patch = Some(content_diesel::ContentProjectionPatch {
+                blob_cid: Some(healed),
+                content_size_bytes: head
+                    .content
+                    .content_size_bytes
+                    .and_then(|v| i32::try_from(v).ok()),
+                ..Default::default()
+            });
+        }
+    }
+
     match content_diesel::stamp_declared_head_mode(
         &mut conn,
         ctx,
         id,
         head.head_action_hash.as_str(),
         Some(head.declared_at),
-        None,
+        pointer_patch,
         StampMode::HealCanonical,
         // The DHT election behind this answer — what the guard actually compares.
         head.canonical_ordering(),
@@ -3496,6 +3641,117 @@ mod tests {
             let canonical = resolve.head().filter(|h| h.canonical);
             assert!(canonical.is_none());
         }
+    }
+
+    // ─── T7: the pointer heal ────────────────────────────────────────────────
+
+    const HEAD_A: &str = "uhCkkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const HEAD_B: &str = "uhCkkBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+
+    /// SAME head → the pointer is refreshed. The live residual (2026-09-02):
+    /// `elohim-host-landing` held ONE declared head on both doorways and still
+    /// served different bytes, because each row's `blob_hash` had drifted and
+    /// every other path was correctly closed against fixing it.
+    #[test]
+    fn pointer_heals_when_the_record_names_the_row_s_own_head() {
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+            ),
+            Some("sha256-fresh".to_string())
+        );
+        // Whitespace on either side is padding, not a difference — the same
+        // trim `declaration_would_move` applies, so a stray-padding round trip
+        // cannot read as a mismatch and skip the heal.
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(&format!(" {HEAD_A} ")),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some(" sha256-fresh "),
+            ),
+            Some("sha256-fresh".to_string())
+        );
+        // A row already naming the value writes NOTHING — a converged corpus
+        // heals zero pointers per sweep.
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-x"),
+                Some("sha256-x")
+            ),
+            None
+        );
+        // Empty never wins (the same rule the amber drift-heal holds): a record
+        // with no pointer must not blank a row that has one.
+        for empty in [None, Some(""), Some("   ")] {
+            assert_eq!(
+                pointer_heal_patch(true, Some(HEAD_A), HEAD_A, Some("sha256-x"), empty),
+                None
+            );
+        }
+    }
+
+    /// DIFFERENT head → refused here, and left entirely to the existing guard.
+    ///
+    /// A record naming another head is the head-MOVE question, which
+    /// `content_diesel::canonical_move_verdict` arbitrates from the DHT's own
+    /// election under `StampMode::HealCanonical`. Healing a pointer alongside it
+    /// would be a head move wearing a pointer's clothes — the row would take the
+    /// other head's bytes while still declaring its own. An UNDECLARED row is
+    /// refused for the same reason: that is the FILL case, and the row does not
+    /// yet obey the head whose pointer is on offer.
+    #[test]
+    fn a_different_head_never_heals_the_pointer() {
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_B,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+            ),
+            None
+        );
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                None,
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh")
+            ),
+            None
+        );
+    }
+
+    /// UNVERIFIED record → no change, whatever else lines up.
+    ///
+    /// `conductor_verified` is `ContentHeadWire::canonical` from THIS node's own
+    /// conductor. A non-canonical answer is the root-author fallback a cold
+    /// conductor gives while the canonical link has not gossiped in; obeying its
+    /// pointer would launder an unelected answer into a green row's serving
+    /// path. Peer bytes never reach here at all — they travel the declare path
+    /// or not at all.
+    #[test]
+    fn an_unverified_record_never_heals_the_pointer() {
+        assert_eq!(
+            pointer_heal_patch(
+                false,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+            ),
+            None
+        );
     }
 
     /// `Probe` deliberately sits OUTSIDE the `Answer` triad: "I have not asked"

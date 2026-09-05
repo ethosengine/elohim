@@ -1992,6 +1992,7 @@ mod tests {
                 already_carried: Some(0),
                 resume: None,
                 scanned: None,
+                view: None,
             },
             CarryReceipt {
                 carried: 7,
@@ -2007,6 +2008,7 @@ mod tests {
                 already_carried: Some(0),
                 resume: None,
                 scanned: None,
+                view: None,
             },
         ]);
         let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
@@ -2053,6 +2055,7 @@ mod tests {
                 already_carried: Some(1),
                 resume: None,
                 scanned: None,
+                view: None,
             })
         })
         .await
@@ -2103,6 +2106,7 @@ mod tests {
             already_carried: Some(0),
             resume: None,
             scanned: None,
+            view: None,
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();

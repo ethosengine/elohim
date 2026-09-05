@@ -1281,6 +1281,32 @@ pub fn declared_head_for(
     Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
+/// Read the content row's CURRENT blob pointer (`blob_hash`), if the row exists.
+///
+/// The T7 pointer-heal's one read (`head_adoption::pointer_heal_patch`). Kept as
+/// a targeted single-column SELECT rather than a `get_content` because the heal
+/// sweep runs it per candidate per sweep and needs nothing else off the row —
+/// and because an idempotency check that costs a full row load is one that a
+/// future sweep will be tempted to skip.
+///
+/// `Ok(None)` covers BOTH "no such row" and "row exists with a NULL/empty
+/// pointer". The caller treats them identically: neither can be the value the
+/// heal is trying to converge FROM, and a heal is existing-row-only anyway.
+pub fn blob_hash_for(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<String>, StorageError> {
+    let found: Option<Option<String>> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(content::blob_hash)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("blob hash lookup failed: {e}")))?;
+    Ok(found.flatten().filter(|h| !h.trim().is_empty()))
+}
+
 /// Read the content row's CURRENT `reach` tier, if the row exists.
 ///
 /// Used by the projection-reconcile heal path's non-narrowing reach guard

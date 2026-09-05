@@ -222,10 +222,29 @@ pub struct AgentSweepView {
     /// into the chain the page sits. An unpinned page reports the whole chain's
     /// action count, because finding an arbitrary ordinal costs exactly that.
     ///
-    /// Absent while the v2 cell's `carry_from` does not forward its export
-    /// page's `scanned` — "not reported", never a fabricated 0.
+    /// Absent only from a v2 cell whose `carry_from` predates Task 29, which
+    /// landed the producer half — "not reported", never a fabricated 0.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scanned: Option<u32>,
+    /// **WHICH STORE ANSWERED the last page of this neighbour's walk** —
+    /// `"authority"`, `"local-only"` or `"unreachable"`.
+    ///
+    /// Read it FIRST, before `total`, `digest` or `observed_head`, because it
+    /// says whether those describe the NEIGHBOUR's chain or only this peer's
+    /// arc-scoped slice of it. Station 6 measured a held view frozen at 212
+    /// records against an `observed_head` of 732 — a partial-arc local read
+    /// that no amount of waiting fills — and it read identically to a chain
+    /// that was genuinely short. `local-only` is what tells them apart;
+    /// `unreachable` says nobody answered at all, so the walk confirmed
+    /// nothing and should be re-asked rather than banked.
+    ///
+    /// A confidence label, never a completeness proof: `authority` says the
+    /// read reached the agent-activity authorities, not that they were caught
+    /// up. Absent from a zome predating Task 29 — "not reported", never a
+    /// fabricated label. Deliberately an open string, not an enum: see
+    /// `carry::CarryReceipt::view`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_sweep: Option<String>,
     /// A page failure, or the `restarted:` note a mid-walk digest change
@@ -701,6 +720,7 @@ fn sweep_view_for(role: &str, sweep: &BTreeMap<SweepKey, AgentSweep>) -> Vec<Age
             digest: state.last_digest.clone(),
             carried: state.carried,
             scanned: state.scanned,
+            view: state.view.clone(),
             last_sweep: state.last_sweep.clone(),
             last_error: state.last_error.clone(),
         })
@@ -1057,6 +1077,7 @@ mod tests {
                 last_digest: Some("digest-a".into()),
                 resume: None,
                 scanned: Some(8),
+                view: Some("local-only".into()),
                 observed_head: Some(57),
                 total: Some(41),
                 carried: 16,

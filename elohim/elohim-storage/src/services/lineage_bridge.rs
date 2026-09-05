@@ -130,10 +130,26 @@ pub struct AgentSweep {
     ///
     /// Last non-`None` wins, the same discipline `observed_head` keeps: a page
     /// that cannot state it must not erase what an earlier page did. `None`
-    /// throughout while the v2 cell's `carry_from` does not forward its export
-    /// page's `scanned` — see [`carry::CarryReceipt::scanned`], where that
-    /// producer gap is named.
+    /// only from a v2 cell whose `carry_from` predates Task 29 — the producer
+    /// half landed there, so this is populated on a current mesh.
     pub scanned: Option<u32>,
+    /// **WHICH STORE ANSWERED the last page of this neighbour's walk** —
+    /// `"authority"`, `"local-only"`, `"unreachable"`, or `None` from a zome
+    /// predating Task 29. Projected per neighbour because it is the one field
+    /// that says whether the numbers beside it can be trusted as the
+    /// NEIGHBOUR's chain or only as this peer's arc-scoped slice of it.
+    ///
+    /// Station 6's root cause, made readable: a held view frozen at 212 records
+    /// against an `observed_head` of 732 looks identical to a short chain
+    /// unless the page says a partial-arc LOCAL read produced it. With
+    /// `local-only` beside `total`, a driver knows the number is a floor, not a
+    /// count — and `unreachable` says nobody confirmed anything at all.
+    ///
+    /// Last non-`None` wins, like its siblings: a page that cannot state which
+    /// store answered must not erase what an earlier page did. Kept as an OPEN
+    /// string all the way through — see [`carry::CarryReceipt::view`] for why a
+    /// closed enum here would break older peers on a future fourth label.
+    pub view: Option<String>,
     /// The highest action sequence the predecessor observed for this chain,
     /// last non-`None` wins. Never fabricated as 0.
     pub observed_head: Option<u32>,
@@ -195,9 +211,12 @@ pub struct AgentSweep {
 ///    the neighbour is halted with a `halted:` reason and the forward progress
 ///    already made is kept.
 /// 4. **`carried` accumulates NEW carriage only.**
-/// 5. **`total` / `observed_head` / `scanned` keep the last non-`None`.** A
-///    momentarily blind authority must not erase what an earlier page
-///    established.
+/// 5. **`total` / `observed_head` / `scanned` / `view` keep the last
+///    non-`None`.** A momentarily blind authority must not erase what an
+///    earlier page established. `view` joins them rather than tracking only the
+///    latest page because it QUALIFIES those same numbers: a `local-only` label
+///    dropped on a silent page would leave an arc-scoped `total` reading as if
+///    an authority had confirmed it.
 /// 6. **The resume pin follows the page, and dies with the walk.** A forward
 ///    page's pin is kept and handed back next tick; a restart clears it,
 ///    because a pin describes the walk that is being abandoned. The pin is
@@ -223,6 +242,7 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
         // `chain moved` refusal on the very next tick.
         resume: if restarted { None } else { page.resume.clone() },
         scanned: page.scanned.or(state.scanned),
+        view: page.view.clone().or_else(|| state.view.clone()),
         observed_head: page.v1_observed_head.or(state.observed_head),
         total: page.v1_total.or(state.total),
         carried: state.carried.saturating_add(page.newly_carried()),
@@ -585,6 +605,13 @@ impl LineageBridge {
                 witnessed,
                 cursor = ?after.cursor,
                 observed_head = ?after.observed_head,
+                // WHICH STORE ANSWERED (Task 29). Without it, a `local-only`
+                // page — one peer's arc-scoped slice of the neighbour's chain —
+                // logs identically to an authority-confirmed one, and a driver
+                // reading these numbers cannot tell a short chain from a
+                // truncated view of a long one.
+                view = ?after.view,
+                scanned = ?after.scanned,
                 "lineage bridge: held-carried a page of a neighbour's v1 records into v2"
             ),
             // `witness_hash == ""` and nothing new: the page re-walked records
@@ -738,6 +765,10 @@ mod tests {
                 cursor_seq: next_cursor.map(|c| (c, c * 6)),
             }),
             scanned: Some(8),
+            // A held page names WHICH store answered (Task 29). `authority`
+            // here so the fixture's default is the confident case and a test
+            // that cares about the arc-scoped one says so explicitly.
+            view: Some("authority".to_string()),
         }
     }
 
@@ -1165,6 +1196,49 @@ mod tests {
             .last_error
             .as_deref()
             .is_some_and(|note| note.starts_with("restarted:")));
+    }
+
+    /// **WHICH STORE ANSWERED reaches the state, and survives a silent page.**
+    ///
+    /// Station 6's root cause in one assertion: a held page that read short
+    /// because a partial-arc LOCAL store answered must be distinguishable from
+    /// one an authority confirmed, or a permanent truncation is banked as a
+    /// crossing. `view` rides the same last-non-`None` rule as its siblings
+    /// BECAUSE it qualifies them — a dropped `local-only` would leave an
+    /// arc-scoped `total` reading as authority-confirmed.
+    #[test]
+    fn the_answering_view_reaches_the_sweep_state_and_qualifies_the_numbers() {
+        let after = next_sweep(
+            &AgentSweep::default(),
+            &page(16, 0, Some(16), "d", None, None),
+        );
+        assert_eq!(after.view.as_deref(), Some("authority"));
+
+        // An arc-scoped page relabels the state — that IS the signal.
+        let local_only = CarryReceipt {
+            view: Some("local-only".into()),
+            ..page(16, 0, Some(32), "d", None, None)
+        };
+        let after = next_sweep(&after, &local_only);
+        assert_eq!(after.view.as_deref(), Some("local-only"));
+
+        // …and a page from a zome predating Task 29 must not ERASE it: an
+        // unqualified `total` is worse than a stale qualification.
+        let silent = CarryReceipt {
+            view: None,
+            ..page(16, 0, Some(48), "d", None, None)
+        };
+        assert_eq!(
+            next_sweep(&after, &silent).view.as_deref(),
+            Some("local-only")
+        );
+
+        // A fresh sweep whose first page cannot state it stays honestly unset.
+        let unlabelled = CarryReceipt {
+            view: None,
+            ..page(16, 0, Some(16), "d", None, None)
+        };
+        assert_eq!(next_sweep(&AgentSweep::default(), &unlabelled).view, None);
     }
 
     /// **R1's metric reaches the state.** `scanned` is what says the resumed

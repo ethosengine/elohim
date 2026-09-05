@@ -325,15 +325,49 @@ pub struct CarryReceipt {
     /// chain's action count, because finding an arbitrary ordinal costs exactly
     /// that; a pinned page reports only its own probe span.
     ///
-    /// **The producer half is not landed.** The predecessor's `ExportPage`
-    /// carries `scanned`, but the v2 cell's `carry_from` does not yet copy it
-    /// onto the receipt, so today this decodes `None` on every page and the
-    /// projections below read "not reported" rather than a fabricated 0. This
-    /// mirror is deliberately landed ahead of it: the reader is correct now, so
-    /// R1's metric becomes visible the moment the coordinator forwards the
-    /// field, with no second storage change.
+    /// **The producer half LANDED** at Task 29 (node-registry coordinator,
+    /// 9a56a361a): `carry_from` now forwards its export page's `scanned` onto
+    /// the receipt verbatim. This mirror was landed one task ahead of it (Task
+    /// 28) precisely so the reader was already correct when it arrived — no
+    /// second storage change was needed. `None` now means what it always said
+    /// it meant: a page from a zome that predates the field, never a fabricated
+    /// 0.
+    ///
+    /// It moves with [`Self::view`]: a `local-only` page reporting a small
+    /// `scanned` is reporting a small ARC, not a cheap walk.
     #[serde(default)]
     pub scanned: Option<u32>,
+    /// **Additive (Task 29).** WHICH read answered the export this page carried
+    /// — `"authority"`, `"local-only"`, `"unreachable"`, or `None` on a
+    /// [`CarrySource::Own`] page, where the predecessor read its own chain
+    /// locally and none of the three applies.
+    ///
+    /// **This is what makes a held receipt readable at all.** Station 6
+    /// measured a courier whose held view of a neighbour froze at 212 records
+    /// against an `observed_head` of 732 — a partial-arc LOCAL read that never
+    /// fills, and no amount of waiting changes it — while nothing in the
+    /// receipt said which store had answered. A page that reads short is
+    /// indistinguishable from a chain that IS short unless the page says so, so
+    /// the sweep banked a permanent truncation as a crossing.
+    ///
+    /// A driver reads it as a CONFIDENCE label, never a completeness proof:
+    /// `authority` says the read reached the agent-activity authorities, not
+    /// that they were caught up; `local-only` says "this number is scoped to
+    /// one peer's arc — do not record it as the neighbour's chain";
+    /// `unreachable` is the sharpest, a page nobody confirmed, which a sweep
+    /// should re-ask rather than bank.
+    ///
+    /// **An OPEN `String`, deliberately, and a closed enum would be a bug.**
+    /// The three labels are the zome's single home for the vocabulary; decoding
+    /// them into a closed enum here would turn a FOURTH label from some future
+    /// coordinator into a whole-page decode failure on an older peer — exactly
+    /// the refusal epic §7 C10 forbids (old peers keep working, loudly). The
+    /// mirror stays forward-tolerant and the labels stay strings.
+    ///
+    /// `#[serde(default)]`: `None` from a zome that predates the field, which
+    /// is honestly "not reported" rather than a fabricated label.
+    #[serde(default)]
+    pub view: Option<String>,
 }
 
 impl CarryReceipt {
@@ -598,6 +632,7 @@ mod tests {
             already_carried: Some(0),
             resume: None,
             scanned: None,
+            view: None,
         };
         assert_eq!(fresh.newly_carried(), 5);
         assert!(fresh.reports_idempotency());
@@ -676,6 +711,7 @@ mod tests {
                 cursor_seq: Some((32, 196)),
             }),
             scanned: Some(41),
+            view: Some("local-only".into()),
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
@@ -696,11 +732,56 @@ mod tests {
                 "cursor_seq": [32, 196],
             },
             "scanned": 41,
+            "view": "local-only",
         }))
         .unwrap();
         let decoded: CarryReceipt = rmp_serde::from_slice(&from_zome_shape).expect("zome shape");
         assert_eq!(decoded.resume, page.resume);
         assert_eq!(decoded.scanned, Some(41));
+        assert_eq!(decoded.view.as_deref(), Some("local-only"));
+    }
+
+    /// **Task 29's two additive fields are forward- AND backward-tolerant.**
+    ///
+    /// Backward: a receipt from a zome that predates them decodes to `None` on
+    /// both — "not reported", never a fabricated 0 or label.
+    ///
+    /// Forward, and this is the one that matters: `view` is an OPEN string, so
+    /// a FOURTH label some later coordinator invents decodes fine here instead
+    /// of failing the whole page. A closed enum would have turned a vocabulary
+    /// addition into a decode failure on every older peer — the refusal epic
+    /// §7 C10 forbids.
+    #[test]
+    fn the_task_29_fields_decode_both_ways_and_tolerate_an_unknown_label() {
+        let pre_task_29 = rmp_serde::to_vec_named(&serde_json::json!({
+            "carried": 1,
+            "next_cursor": serde_json::Value::Null,
+            "v1_digest": "digest",
+            "witness_hash": "uhCEkWitness",
+        }))
+        .unwrap();
+        let old: CarryReceipt = rmp_serde::from_slice(&pre_task_29).expect("pre-Task-29 shape");
+        assert_eq!(old.view, None);
+        assert_eq!(old.scanned, None);
+
+        for label in [
+            "authority",
+            "local-only",
+            "unreachable",
+            "some-future-label",
+        ] {
+            let bytes = rmp_serde::to_vec_named(&serde_json::json!({
+                "carried": 1,
+                "next_cursor": serde_json::Value::Null,
+                "v1_digest": "digest",
+                "witness_hash": "uhCEkWitness",
+                "view": label,
+            }))
+            .unwrap();
+            let decoded: CarryReceipt =
+                rmp_serde::from_slice(&bytes).expect("an unknown label must not fail the page");
+            assert_eq!(decoded.view.as_deref(), Some(label));
+        }
     }
 
     /// An UNPINNED input is byte-identical to the wire this driver sent before
@@ -780,6 +861,7 @@ mod tests {
                 cursor_seq: Some((next_cursor.unwrap_or(0), 196)),
             }),
             scanned: Some(8),
+            view: Some("authority".into()),
         }
     }
 

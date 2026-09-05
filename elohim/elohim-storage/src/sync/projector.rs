@@ -608,6 +608,23 @@ pub async fn backfill_content_docs(
 /// (3) **namespace** — writes under `default_lamad` (the serving scope), never
 /// the doc's `"elohim"` sync namespace (REQ-F5).
 ///
+/// # The green-inviolable guard stays shut — T7 heals the other side (2026-09-05)
+///
+/// Guard (2) is why a GREEN row whose `blob_hash` has drifted from a peer's
+/// cannot converge here, and it must stay that way: a converged CRDT doc is
+/// unauthenticated peer input, so opening the amber path onto a notarized row
+/// would let any peer repoint a green row's bytes. That is the whole point of
+/// the guard, and nothing in the pointer-drift cure touches it.
+///
+/// The cure for that drift lives on the CONDUCTOR side instead:
+/// [`crate::services::head_adoption::pointer_heal_patch`] refreshes a green
+/// row's pointer from the own conductor's notarized record for the head the row
+/// ALREADY declares — verified authority, exact-head equality, no head move.
+///
+/// So: if you arrive here because two peers serve different bytes for one
+/// agreed head, the fix is NOT to relax this guard. It is already handled a
+/// layer up, by a path that carries the authority this one deliberately lacks.
+///
 /// # REQ-N5 — the converged `headActionHash` doc field is NEVER consumed into SQL
 ///
 /// The doc also carries a `headActionHash` scalar (the author's declared
