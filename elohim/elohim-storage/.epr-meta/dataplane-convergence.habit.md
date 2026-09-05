@@ -573,3 +573,10 @@ line change itself was a wipe, not propagation: see runtime-upgrade-propagation'
   names it — so a future edit cannot quietly start staging divergence on the page visitors are reading. Both feature
   files came back READY; the parent's remaining MAJOR (scenario 2's negative assertion lives in a comment) is minted as
   plan Task 3. Status unchanged.
+
+DELTA 2026-09-05 (pain-points T7 closed in code — not yet measured live). convergence Task 2 (2a13ea872,
+c8a67a88c, approved): `pointer_heal_patch` refreshes a row's blob pointer AND its length together when a
+conductor-verified record names the row's EXISTING declared head (exact, untrimmed equality; no head move;
+absent size refuses; saturating downcast) — 5 unit tests. Live confirmation (both doorways' `blob_hash`
+for `elohim-host-landing` before/after a sweep, the `pointer-heal (T7)` WARN with `size_bytes`) waits for
+the rebuilt household mesh. Status unchanged.

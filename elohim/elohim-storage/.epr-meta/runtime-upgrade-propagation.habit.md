@@ -117,3 +117,9 @@ STABILITY 2026-09-04 11:2xZ: two consecutive full passes on the same binary — 
 117/117 (28m05s) and it9 `shift-it9-20260904T104809Z` 9/9 117/117 (28m12s); Station 9 200 s / 190 s. The `checks:`
 line's "Stations 1-8 RUNNABLE" now reads Stations 1–9 on the 0.7 line (this delta is the evidence). Not yet a
 Jenkins-confirmed batch (no push from the shift session).
+
+DELTA 2026-09-05 (a peer joins a channel through its own API). rung-5 Task 2 (ee12a04a2, approved):
+`POST /admin/runtime-config/follow` rewrites only the `ELOHIM_RELEASE_CHANNELS` line of the WATCHED
+runtime-config (temp + rename), reloads, refuses malformed ids/modes by name, 503 without a watched file;
+both delivery fixtures enrol through the route (byte-restore kept as the safety net); unit tests for the
+line rewrite. Stations 1–9 re-measured on the rebuilt mesh next. Status unchanged.

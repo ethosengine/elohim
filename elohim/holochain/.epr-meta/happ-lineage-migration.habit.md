@@ -372,3 +372,23 @@ chain — 7m50s with an answer instead of 21m with a timeout. Closing the stall 
 work (agent-activity propagation between two household peers) and is BLOCKED for this seat under its
 own stop conditions: it needs neither a step change nor a storage change, and a conductor restart —
 the obvious next probe — is refused here by dispatch.
+
+DELTA 2026-09-05 (Station 6's cause PROVEN and the cure minted — the register does not move; the story does).
+Task 29 (1056a0e72, 9a56a361a) hot-swapped hash-neutral: the courier's held page now says which store
+answered — `authority` | `local-only` | `unreachable` — and Station 6 rerun r38 still red, james's view
+of jessica frozen at 212 / observed head 732. Direct `export_held_records` on james: `local-only` for
+both neighbours. Metrics: node-registry space storageArc null on every peer, 0 completed gossip rounds,
+timeouts rising; every other space full-arc. The round deadline (15 s default → 60 s, 86acd1926) did not
+unstick it after 5 h. PROOF from the conductor databases (Task 30 `hc-dbtool`, 6968baf1e → d1a87013b,
+`hc-mesh.sh blocks <peer>`): jessica blocks matthew; james blocks matthew AND jessica; 3 blocks / 3
+warrants over 2 rejected chain ops — matthew seq 1052 and jessica seq 732, both `Create` of a `CapGrant`,
+warranted "No more actions are allowed after a chain close" at 03:32:39Z. Seq 732 IS the frozen head.
+Station 8's `seal_close` closed the household's real v1 chains; the next `authorizeSigningCredentials`
+(storage on reconnect, the a2o rail) wrote the grant; holochain 0.7 blocks the author's cell forever and
+exposes no unblock. Cure landed in three parts: Task 31 (252ead282, 663d0c693 — the fixture writes nothing
+after a close, a poisoned household is refused by name at the Background), Task 32 (0fb64726e, ddaf54383
+— storage's durable close ledger + persisted per-cell credentials: nothing is written on a closed cell,
+open cells re-mint once; `passport.lineage.partition` names a partitioned space), Task 33 dispatched
+(the disposable crossing: a crossing can name its v1, Station 8 seals a run-scoped chain, and the
+neighbour's block list becomes a Then). Station 6 stays RED until the household is rebuilt with fresh
+node-registry cells; the ten-station receipt is then re-run on Task 33's shape. Status unchanged (red).
