@@ -120,6 +120,17 @@ COPY elohim/epr-rea ./epr-rea
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
 COPY bridges ./bridges
+# Test fixtures the crate's unit tests read by RELATIVE path from the crate root
+# (release_adoption/{mod,verify}.rs: `../../genesis/a2o/scripts/__tests__/fixtures/*.json`
+# — the release-manifest fixtures shared with the a2o TS tests, one source of truth —
+# and `../rakia/schemas/v1/release-manifest.schema.json`, the T1 schema). In the flattened
+# /app layout those resolve to /genesis/… and /rakia/…, which did not exist, so the
+# `check` stage's `cargo test --lib` failed 52 tests with "No such file or directory"
+# (edge #1430, 2026-09-05 — "Quality Gate: Storage - failures (non-blocking while
+# stabilizing)", i.e. every storage image since the fixtures were introduced shipped
+# with that gate silently red). Copied to the paths the tests already name; ~130 KB.
+COPY genesis/a2o/scripts/__tests__/fixtures /genesis/a2o/scripts/__tests__/fixtures
+COPY elohim/rakia/schemas /rakia/schemas
 
 # Substrate-rea-replication-fix (2026-05-26): elohim-storage's
 # conductor_writes facade depends on `shefa-types` and `lamad-types` as
