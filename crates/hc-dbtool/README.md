@@ -27,6 +27,12 @@ on the warrantee; if the warrant was rejected it lands on the warrant's own auth
 network (`app/elohim-app/scripts/hc-mesh.sh`); the tool itself works on any 0.7
 conductor's data directory.
 
+**Prerequisites:** a built `hc-dbtool` binary (see "Building" — build first, then
+come back; `hc-mesh.sh blocks` finds it for you on the household mesh), the peer's
+`databases/` directory, its `db.key` passphrase, and for the household-mesh path the
+mesh script itself. Hashes written `uhC0k…` / `uhCAk…` in the examples are
+truncated placeholders — paste the full hash the tool prints.
+
 The sections "Verbs" and "Building" are how to use the tool. Everything after
 them is how it works inside, for when the output needs interpreting.
 
@@ -38,7 +44,8 @@ holding `conductor.db`, `db.key` and one `dht-<dna>.db` per DNA — and
 `--passphrase <text>` for `db.key` (default `test`, the local household mesh's
 passphrase). A real peer passes the lair passphrase its conductor was started with
 — the one piped to `holochain --piped` at launch; it is held by whoever launched the
-conductor and is not recoverable from disk. A real peer's data root is the
+conductor (a launcher's unit file or secret store) and is not recoverable from disk —
+without it, no verb can open the databases and this tool cannot help. A real peer's data root is the
 `data_root_path` in its `conductor-config.yaml` (`databases/` beneath it); the
 config path is the `--config-path` argument on the running `holochain` process. `apps` lists each role's DNA hash — that is where a
 `--dna` value comes from, and `blocks` prints the `dna:agent` pair `unblock` takes.
@@ -87,8 +94,10 @@ CFG=$(ps -o args= -p "$(pgrep -f 'holochain --piped')" | grep -o -- '--config-pa
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 1. see it
 kill -INT "$(pgrep -f 'holochain --piped')"   # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes   # 3.
-holochain --piped --config-path "$CFG" <<< '<lair passphrase>'   # 4. start it again (add any other
-                                                                  #    flags your launch used)
+holochain --piped --config-path "$CFG" <<< '<lair passphrase>'   # 4. start it again, with the same
+                                                                  #    argv the process had (copy it from
+                                                                  #    `ps -o args=` before step 2, or from
+                                                                  #    the unit file that launches it)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 5. no rows
 ```
 
@@ -96,8 +105,9 @@ Then confirm the peer rejoined the space through the admin interface's
 `dump_network_metrics` — per DNA it shows the local agent's `storage_arc` (null while
 blocked-out, a full range once a gossip round has completed) and
 `peer_meta[*].completed_rounds` climbing. One literal call, using the client this
-repository already carries (`ADMIN` = the peer's admin websocket port, `DNA` = the
-hash from `apps`):
+repository already carries (`ADMIN` = the peer's admin websocket port — on the
+household mesh matthew 4444, jessica 4454, james 4464; elsewhere the `admin_interfaces`
+port in `conductor-config.yaml` — `DNA` = the hash from `apps`):
 
 ```bash
 cd genesis/a2o && ADMIN=4464 DNA=uhC0k… npx tsx -e '
