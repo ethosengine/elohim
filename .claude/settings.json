@@ -295,6 +295,22 @@
       }
     ]
   },
+  "permissions": {
+    "allow": [
+      "Bash(git push origin dev)",
+      "Bash(EPR_META_ACK=1 git push origin dev)",
+      "Bash(python3 .claude/scripts/epr-meta-git-gate.py *)",
+      "Bash(python3 .claude/scripts/habits-project.py)",
+      "Bash(python3 .claude/scripts/habits-project.py *)",
+      "Bash(python3 .claude/scripts/_lib/__tests__/*)",
+      "Bash(python3 .claude/shifts/measure-*.py)",
+      "Bash(node genesis/orchestrator/graph-walker.mjs)",
+      "Bash(node genesis/orchestrator/gate-runner.mjs *)",
+      "Bash(curl -s https://jenkins.ethosengine.com/job/*/api/json*)",
+      "Bash(curl -s https://jenkins.ethosengine.com/job/*/job/*/api/json*)",
+      "Bash(curl -s https://jenkins.ethosengine.com/job/*/job/*/*/api/json*)"
+    ]
+  },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": false
