@@ -392,3 +392,11 @@ open cells re-mint once; `passport.lineage.partition` names a partitioned space)
 (the disposable crossing: a crossing can name its v1, Station 8 seals a run-scoped chain, and the
 neighbour's block list becomes a Then). Station 6 stays RED until the household is rebuilt with fresh
 node-registry cells; the ten-station receipt is then re-run on Task 33's shape. Status unchanged (red).
+
+DELTA 2026-09-05 13:59Z (the partition probe measured LIVE on the poisoned household). After the storage
+restart on ddaf54383, `passport.lineage.partition` named the node-registry space on matthew (peers 2,
+peerTimeouts 377→378, arc null, completedRounds null) and jessica (peers 1, 378→379) at 13:52Z — 4 min
+after boot, inside the 180 s grace + two 60 s samples — with the WARN naming the known cause and
+`hc-mesh.sh blocks`. james, who blocked both neighbours and therefore knows no peers in the space, was
+not named: his timeouts never rise. That isolated-peer shape is a classifier gap, sent to the Task 33
+seat as a bounded widening (`shape: timeouts | isolated`). Status unchanged (red).
