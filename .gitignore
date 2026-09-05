@@ -116,3 +116,6 @@ genesis/research/repos/
 # reconstruction = re-run `epr flow project`. Never source-of-truth.
 .eprfs/
 .stage0-logs/
+
+# Angular CLI cache written when ng runs from the repo root (app-level .gitignore covers app/elohim-app/.angular/cache)
+/.angular/
