@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: "blocked"
 severity: "low"
-fingerprints: [4889dfbac5bb, 9bcf23319dde, 7ed1280ab87e, 31e6d68d12f3, ebc68ea93525, 360b6083b7cd, 13cd6287f972, 8abc1eb04dcb]
+fingerprints: [4889dfbac5bb, 9bcf23319dde, 7ed1280ab87e, 31e6d68d12f3, ebc68ea93525, 360b6083b7cd, 13cd6287f972, 8abc1eb04dcb, ce58ac673679]
 relatedNodeIds: []
 tags: [deprecation, learning-path, content-store, zome, ts-rs, sdk, seeder, dna-migration]
 cites:
@@ -134,6 +134,19 @@ would leave the concern open anyway, so they ride with the sprint.
 No action lands this run beyond canonicalization. The sentinel cites THIS
 decision deterministically on every re-encounter of the six fingerprints; the
 stasis sweep re-checks when the paths→Content migration sprint is scheduled.
+
+**2026-08-11 — `ce58ac673679` added: a Class-3 re-mint, not a new finding.** A
+scope grep with `grep -n` re-captured the `add_path_step` error string
+(`content_store/src/lib.rs` L6658) with a `6658:` line-number prefix. Recomputing
+the live `fingerprint()` on the prefix-stripped line yields **`ebc68ea93525`
+exactly** — the row already held here as `blocked`. Same warning, same file, same
+decision; only the capture prefix differed, so fp-dedupe could not collapse it and
+it cost a background Opus dispatch for a concern blocked since 2026-06-11. Nothing
+about this retirement changed: the deprecated write surface still returns errors,
+still compiles clean, and still needs the operator-initiated DNA-dispatch + ts-rs
+sprint. The defect is the sentinel's, and it is canonicalized as Class 3 in
+`deprecation-sentinel-redundant-capture-surfaces.md` (blocked on a 23-group
+ledger migration).
 
 ## Verification
 
