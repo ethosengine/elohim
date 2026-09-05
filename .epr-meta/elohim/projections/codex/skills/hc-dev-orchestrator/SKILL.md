@@ -128,6 +128,19 @@ launch. The receipt probe is `genesis/a2o/scripts/late-joiner-receipt.ts` (run
 from `genesis/a2o`): exact signed NodeId discovery by every warm incumbent, no
 restarts, bounded by three announce cadences.
 
+`hc-mesh.sh blocks [peer...]` reads each peer's `BlockSpan` rows and the
+rejected ops behind them (`crates/hc-dbtool`, resolved from the `crates`
+cargo-pool slot via `DBTOOL_BIN`; `MESH_BLOCKS_DNA=<hash,...>` forces a
+rejected read for a DNA no block row names). It is READ-ONLY. Holochain 0.7
+blocks the AUTHOR'S CELL until `Timestamp::max()` when one op that author wrote
+integrates as invalid, and exposes no unblock — no admin call, no HDK host fn —
+so a permanent refusal looks exactly like an unreachable peer: null arcs, zero
+completed gossip rounds, nothing in the log. Lifting is a deliberate three-step
+operator sequence, because `hc-dbtool` refuses to write while any live process
+holds `conductor.db` open: `hc-mesh.sh blocks <peer>` -> `hc-mesh.sh stop` ->
+`hc-dbtool --databases <local-dev>/<peer>/databases unblock --cell <dna>:<agent> --yes`
+(omit `--yes` for a dry run) -> `hc-mesh.sh start`.
+
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
 write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never
