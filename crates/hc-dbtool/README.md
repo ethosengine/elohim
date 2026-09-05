@@ -31,9 +31,11 @@ All reads open the database `SQLITE_OPEN_READ_ONLY`, so they are safe against a
 running conductor. Every command takes `--databases <dir>` — the peer's data root
 holding `conductor.db`, `db.key` and one `dht-<dna>.db` per DNA — and
 `--passphrase <text>` for `db.key` (default `test`, the local household mesh's
-passphrase; a real peer passes the lair passphrase its conductor was started with).
-A real peer's data root is the `data_root_path` in its `conductor-config.yaml`
-(`databases/` beneath it). `apps` lists each role's DNA hash — that is where a
+passphrase). A real peer passes the lair passphrase its conductor was started with
+— the one piped to `holochain --piped` at launch; it is held by whoever launched the
+conductor and is not recoverable from disk. A real peer's data root is the
+`data_root_path` in its `conductor-config.yaml` (`databases/` beneath it); the
+config path is the `--config-path` argument on the running `holochain` process. `apps` lists each role's DNA hash — that is where a
 `--dna` value comes from, and `blocks` prints the `dna:agent` pair `unblock` takes.
 
 ```bash
@@ -69,13 +71,28 @@ hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
                                                     #    storageArc no longer null means the peer rejoined
 ```
 
+Outside the household mesh, the same sequence on one peer:
+
+```bash
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 1. see it
+kill -INT <holochain pid>   # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes   # 3.
+holochain --piped --config-path <conductor-config.yaml> <<< '<lair passphrase>'   # 4. start it again
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 5. no rows
+```
+
+Then confirm the peer rejoined the space: the admin interface's `dump_network_metrics`
+(any Holochain admin client; `include_dht_summary: false`) shows, per DNA, the local
+agent's `storage_arc` (null while blocked-out, a full range once a gossip round has
+completed) and `peer_meta[*].completed_rounds` climbing.
+
 Lifting is not a cure by itself: whatever wrote the rejected op (in the first
 observed case, a `CapGrant` written after a chain close) re-earns the block on its
-next write. Fix the writer first. Quote the `*` in `--cell <dna>:'*'` so the shell
-does not expand it.
+next write. Fix the writer first.
 
-`--cell <dna>:*` lifts every agent blocked in that DNA. Omitting `--yes` prints
-what would be deleted and changes nothing.
+`--cell <dna>:*` lifts every agent blocked in that DNA (quote it as `'<dna>:*'`
+so the shell does not expand the `*`). Omitting `--yes` prints what would be
+deleted and changes nothing.
 
 `BlockSpan` is the **only** table this tool ever writes. Source chains, `Action`,
 `ChainOp`, `LimboChainOp`, `Warrant` and every other DHT row are read-only at
