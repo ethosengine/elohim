@@ -491,7 +491,7 @@ interface RoleConductorRail {
 // `CellId | undefined` from a loop is the correct, narrow return type; the next line's sonarjs
 // check false-positives on it the same way it does on runtime-upgrade-propagation.steps.ts's own
 // `findChannelRow` (a plain `.find()`).
-// eslint-disable-next-line sonarjs/function-return-type
+
 function findProvisionedCellId(app: AppInfo, role: string): CellId | undefined {
   for (const info of app.cell_info[role] ?? []) {
     if (info.type === CellType.Provisioned) return info.value.cell_id;
@@ -747,11 +747,35 @@ interface RevertReceiptView {
   readopt?: ReadoptStatusView;
 }
 
+/**
+ * **Task 14b.** One sunset window's own ceremony, on `/admin/adoption` —
+ * `release_adoption::sunset::SunsetReceipt`, camelCase on the wire.
+ *
+ * Every field is an observation of what THIS peer did to ITS OWN chains: the
+ * `CloseChain` on v1, the `OpenChain` on v2 naming it, and the witness that
+ * carried the close into v2 — the three acts `seal_close` performs in that
+ * order, atomically, inside one zome call.
+ */
+interface SunsetReceiptView {
+  role: string;
+  lineageAppId: string;
+  sunsetCommitmentCid: string;
+  closeHash: string;
+  openHash: string;
+  /** Empty when a prior seal was found without one. */
+  witnessHash: string;
+  alreadySealed: boolean;
+  resumed: boolean;
+  at: number;
+}
+
 interface AdoptionReport {
   controller: { running: boolean };
   channels: AdoptionChannelRow[];
   /** **Task 13a.** Absent on a build with no revert arm, empty until one fires. */
   reverts?: RevertReceiptView[];
+  /** **Task 14b.** Absent on a build with no sunset arm, empty until one fires. */
+  sunsets?: SunsetReceiptView[];
 }
 
 /**
@@ -826,9 +850,40 @@ async function getAdoptionReport(
   return { report: JSON.parse(text) as AdoptionReport, rawText: text };
 }
 
-// eslint-disable-next-line sonarjs/function-return-type -- see `findProvisionedCellId`'s comment.
 function findChannelRow(report: AdoptionReport, channelId: string): AdoptionChannelRow | undefined {
   return report.channels.find(row => row.channelId === channelId);
+}
+
+/**
+ * How long one peer's own runtime gets to notice a notarized sunset and seal.
+ *
+ * The controller sweep, not the bridge, is the clock here, and the walk it has
+ * to make is longer than a tick: read the path, read the sunset through the
+ * successor link, check this peer's carry converged, then run the seal
+ * (three zome calls in one ceremony, on a cell holding a few hundred carried
+ * records). Generous on purpose — a timeout here should mean the arm did not
+ * fire, never that it was still working.
+ */
+const SUNSET_SEAL_BUDGET_MS = 360_000;
+
+/** Wait for ONE peer's own sunset ceremony to appear on `/admin/adoption`. */
+async function pollSunsetReceipt(peer: PeerName, timeoutMs: number): Promise<SunsetReceiptView> {
+  const start = Date.now();
+  let lastSeen = 'none';
+  while (Date.now() - start < timeoutMs) {
+    const { report } = await getAdoptionReport(peer);
+    const receipt = report.sunsets?.find(s => s.role === NODE_REGISTRY_ROLE);
+    if (receipt) return receipt;
+    lastSeen = JSON.stringify(report.sunsets ?? null);
+    await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+  }
+  assert.fail(
+    `${peer}'s own runtime did not seal the close within ${timeoutMs}ms — no ${NODE_REGISTRY_ROLE} ` +
+      `receipt on /admin/adoption sunsets[] (last seen: ${lastSeen}). The sunset arm holds rather ` +
+      "than seals when the sunset is not discoverable through the migration's successor link " +
+      "(Task 27) or when this peer's own carry has not converged."
+  );
+  throw new Error('unreachable');
 }
 
 /**
@@ -894,7 +949,6 @@ async function readRoles(peer: PeerName): Promise<VersionRole[]> {
   return body.passport?.happ?.roles ?? [];
 }
 
-// eslint-disable-next-line sonarjs/function-return-type -- see `findProvisionedCellId`'s comment.
 function nodeRegistryRole(roles: VersionRole[]): VersionRole | undefined {
   return roles.find(role => role.role === NODE_REGISTRY_ROLE);
 }
@@ -1841,45 +1895,37 @@ When("each peer's runtime next reconciles", { timeout: 400_000 }, async function
     // is nothing for a reconcile to do that the passport doesn't already
     // show — the following Then reads it directly.
     if (!c.sunsetCommitmentCid) return;
-    // AFTER the sunset (the second occurrence): NAMED GAP — nothing in
-    // production reacts to a notarized sunset commitment by calling the
-    // coordinator's own `seal_close` (grepped `elohim-storage/src` for the
-    // name outside this file and the epic's own sweettest;
-    // `services/lineage_bridge.rs`'s own module doc says the same of
-    // `revert`/`sunset`: "Deliberately NOT called by
-    // LineageRoles::revert/sunset — those are Task 13/14's ceremonies", and
-    // Task 14's own ruling splits 14a — this DNA-side seal — from 14b, "the
-    // storage vehicle + LineageRoles::sunset", not yet landed). This step
-    // calls the coordinator's OWN one-call ceremony directly, through each
-    // peer's OWN key on each peer's OWN cells — never a forgery — standing
-    // in for the missing reconcile trigger exactly as Station 9's harness
-    // stands in for a fourth peer and Station 10's for the council.
-    // `seal_close` closes v1, opens v2 naming that close, AND carries the
-    // close itself into v2 as a witness, atomically — the Thens below read
-    // its receipt rather than re-deriving any of that. The storage-side
-    // `closed` flag 14b would also flip has no admin trigger at all (see
-    // the Thens below); this step does not attempt to fake that half.
-    if (c.closeActionHashes) return; // idempotent — already performed
+    // AFTER the sunset (the second occurrence): WAIT for the peer's OWN
+    // runtime to seal, and read its receipt. Nothing here acts.
+    //
+    // CORRECTED 2026-09-05, from a measured red (`-r26`). This step used to
+    // call the coordinator's `seal_close` itself, standing in for a trigger
+    // that did not exist when it was written. Task 14b landed that trigger:
+    // `watch.rs`'s sunset arm reads the sunset through the successor link
+    // (Task 27), asks `sunset::sunset_decision`, and on `Seal` runs
+    // `perform_sunset` — seal first, then close the window. So the harness
+    // and the runtime were racing for the same source chain, and the run said
+    // so in one line: `Source chain error: … the source chain head has moved
+    // since the bundle began`. A harness that acts where the runtime already
+    // acts is not measuring the story, it is competing with it.
+    //
+    // The receipt on `/admin/adoption` (`sunsets[]`, `SunsetReceipt`) carries
+    // the close, the open and the seal witness the Thens below read — from
+    // the peer's own ceremony, which is what the story's "each peer's runtime
+    // seals" actually claims.
+    if (c.closeActionHashes) return; // idempotent — already observed
     c.closeActionHashes = {};
     c.openActionHashes = {};
     c.sealWitnessHashes = {};
     for (const peer of PEER_NAMES) {
-      const passport = await readPassport(peer);
-      const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
-      assert.ok(role?.lineage, `${peer} has no lineage view — not dual-celled`);
-      const sideAppId = peer === 'james' ? await jamesLineageAppId() : await lineageAppIdOf(peer);
-      const agent = await baseAgentKey(peer);
-      const receipt = await sealClose(peer, sideAppId, role.lineage.readingDnaHash, agent);
-      assert.ok(
-        !receipt.already_sealed,
-        `${peer}'s v1 chain was already sealed before this step ran`
-      );
-      c.closeActionHashes[peer] = receipt.close_hash;
-      c.openActionHashes[peer] = receipt.open_hash;
-      c.sealWitnessHashes[peer] = receipt.witness_hash;
+      const receipt = await pollSunsetReceipt(peer, SUNSET_SEAL_BUDGET_MS);
+      c.closeActionHashes[peer] = receipt.closeHash;
+      c.openActionHashes[peer] = receipt.openHash;
+      c.sealWitnessHashes[peer] = receipt.witnessHash;
       console.error(
-        `[happ-lineage-migration] Station 8: ${peer} sealed — close ${receipt.close_hash}, open ` +
-          `${receipt.open_hash}, seal witness ${receipt.witness_hash}`
+        `[happ-lineage-migration] Station 8: ${peer}'s OWN runtime sealed — close ` +
+          `${receipt.closeHash}, open ${receipt.openHash}, seal witness ${receipt.witnessHash}, ` +
+          `alreadySealed=${String(receipt.alreadySealed)}, resumed=${String(receipt.resumed)}`
       );
     }
     return;
@@ -2235,17 +2281,13 @@ async function readV1Export(
  * A record whose action carries no entry hash contributes nothing rather than
  * an empty string, which would read as a record with a blank address.
  */
-/* eslint-disable sonarjs/function-return-type -- `string | undefined` is the honest
-   return here: a record whose action carries no entry hash contributes NOTHING, and an
-   empty string would read as a record with a blank address. Same posture as
-   `findProvisionedCellId` and `findChannelRow` above. */
+
 function entryHashOfSignedAction(record: unknown): string | undefined {
   const data = (record as { hashed?: { content?: { data?: { entry_hash?: Uint8Array } } } })?.hashed
     ?.content?.data;
   const entryHash = data?.entry_hash;
   return entryHash instanceof Uint8Array ? encodeHashToBase64(entryHash) : undefined;
 }
-/* eslint-enable sonarjs/function-return-type */
 
 /** Every app installed on a peer's conductor, with its agent key — the fact the
  * passport does not carry and Station 3's "under james's existing agent key"
@@ -2806,38 +2848,18 @@ async function walkV1Records(
 }
 
 /**
- * `seal_close(v1_cell)` on one peer's OWN v2 side app cell — the coordinator's
- * OWN one-call ceremony (Station 8's own section in
- * `node_registry_coordinator/src/lib.rs`): closes v1 toward v2, opens v2 from
- * that close, and carries the close itself into v2 as a `NotarizationWitness`
- * proof, in that order, atomically. `agentB64` is the one key both cells
- * share — `v1_cell` is built from it here rather than read back from
- * `listApps`, so a caller who already has it need not re-fetch.
+ * The harness NEVER calls `seal_close` — that is deliberate, and this note is
+ * where the reason lives so a future edit cannot quietly re-add it.
  *
- * Every field of `SealReceipt` is already rendered as canonical base64 by the
- * zome (its own doc: "the zome renders; storage never re-derives a hash"),
- * so no `encodeHashToBase64` round trip is needed on the read side.
+ * Task 14b made the seal the RUNTIME's act: `watch.rs`'s sunset arm reads the
+ * sunset through the migration's successor link (Task 27), asks
+ * `sunset::sunset_decision`, and on `Seal` runs `perform_sunset`, which calls
+ * the coordinator's `seal_close` and then closes the window. A harness that
+ * also called it would race the runtime for the same source chain — measured
+ * on 2026-09-05 as `Source chain error: … the source chain head has moved
+ * since the bundle began` (receipt `-r26`). Station 8 reads each peer's own
+ * `SunsetReceipt` off `/admin/adoption` instead; see `pollSunsetReceipt`.
  */
-interface SealReceiptWire {
-  close_hash: string;
-  open_hash: string;
-  witness_hash: string;
-  already_sealed: boolean;
-}
-async function sealClose(
-  peer: PeerName,
-  sideAppId: string,
-  v1DnaHashB64: string,
-  agentB64: string
-): Promise<SealReceiptWire> {
-  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
-  try {
-    const v1CellId = [decodeHashFromBase64(v1DnaHashB64), decodeHashFromBase64(agentB64)];
-    return (await rail.call('seal_close', v1CellId)) as SealReceiptWire;
-  } finally {
-    await rail.close();
-  }
-}
 
 /**
  * `get_closes_for((lineageDnaHash, author))` — the coordinator-side read
@@ -3613,12 +3635,13 @@ Then(
           'before it'
       );
     }
-    // "In that order" is enforced by CONSTRUCTION, not merely observed: the
-    // shared "each peer's runtime next reconciles" step (above) calls the
-    // coordinator's own `seal_close`, whose internal order is close v1 first,
-    // read the signed close BACK, then open v2 naming that close's own
-    // returned hash — an order it cannot invert (there is no close hash to
-    // name until the predecessor call has returned one).
+    // "In that order" is enforced by CONSTRUCTION, not merely observed. The
+    // hashes above come off each peer's OWN sunset receipt (`sunsets[]` on
+    // `/admin/adoption`), authored by that peer's runtime through the
+    // coordinator's `seal_close`, whose internal order is: close v1, read the
+    // signed close BACK, then open v2 naming that close's own returned hash —
+    // an order it cannot invert, because there is no close hash to name until
+    // the predecessor call has returned one.
   }
 );
 
@@ -3672,15 +3695,17 @@ Then(
   "each peer's runtime has disabled its v1 cell, so nothing of its own is written there again",
   { timeout: 60_000 },
   async function (this: E2EWorld) {
-    // NAMED GAP: "disabled" here is the storage-side `RoleLineage.closed`
-    // flag, which only `LineageRoles::sunset()` sets — a pure in-process
-    // call with no HTTP admin route (grepped `http.rs` for every
-    // `/admin/lineage/*` route: only `reset` exists). The DNA-level seal the
-    // shared "next reconciles" step's `close_chain_for`/`open_chain_from`
-    // calls just performed is real; the STORAGE bookkeeping that would flip
-    // this flag is not reachable from outside the process on this build, by
-    // anyone, harness included. Checked anyway, honestly, against the real
-    // contract.
+    // CORRECTED 2026-09-05 — Task 14b wired the storage half: `perform_sunset`
+    // calls `LineageRoles::sunset(role)` immediately after the seal returns,
+    // so `closed` flips as part of the peer's OWN ceremony and this Then reads
+    // a real flag rather than an unreachable one.
+    //
+    // READ THE STORY'S WORD CAREFULLY: "disabled" here is that `closed` flag,
+    // NOT `disable_app`. The admin seam disables a WHOLE app, and the base app
+    // carries every other role — disabling it to close one role's v1 cell
+    // would take lamad, imagodei and infrastructure down with it. The sunset
+    // disables nothing and uninstalls nothing; what stops this peer writing to
+    // v1 again is that routing no longer points there.
     for (const peer of PEER_NAMES) {
       const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
       assert.equal(

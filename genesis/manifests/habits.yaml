@@ -2985,6 +2985,39 @@ habits:
       (`internal_error: … CellDisabled(CellId(…))`, `-r24`). A step that reached in there was asking the
       wrong surface — the story says "reported by its author's PASSPORT", and Task 13c's
       `RevertReceipt.readopt` is that report, with numbers.
+
+      DELTA 2026-09-05 (Station 8 GREEN on the household mesh — the sunset is the runtime's own act, and
+      the after-close fence fires exactly where HDI 0.8 lets it; receipt
+      `genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r27.{log,json}`, run stamp
+      20260905033519, 1 scenario / 22 steps passed, 1m32s; the red it was driven from is `-r26`): with all
+      three peers dual-celled and carry-attested and NO sunset commitment, no peer closed anything. matthew
+      then notarized a `sunsets-lineage` naming the migration, and each peer's OWN runtime found it,
+      sealed, and reported the ceremony on its own `/admin/adoption` — matthew close
+      `uhCkkgynKaI8RNRVFLFT6V8vdvDc0h5kT0XmLN6_Txmwq9W5tLDqo`, jessica
+      `uhCkk5vlyA3EVnsQUhu_IEtXqr-tSG6QhwlXHUCGLNYIzVqyAfrSp`, james
+      `uhCkkUZ5e_lUTFHefpfO-qg-KT67WFCPrviEmmuvbCSbYRhuHig7u`, each with its own open naming that close and
+      its own seal witness carrying the close into v2, `get_closes_for` answering one `AuthorToClose` link
+      per peer. All three v1 chains stayed readable, all three passports read v2 authoring / v1 closed, and
+      the post-sunset revocation changed nothing.
+      THE FENCE, MEASURED, exactly as the Station was narrowed to claim: james self-carrying his own
+      post-close fact into his own v2 is REFUSED —
+      `NotarizationWitness proof 0: after close — uhCAkTlfAatal8yJHFgPfUTt…` — while matthew and jessica,
+      couriers whose own v2 chains hold their own close and never james's, ACCEPT it. That is filed gap G6
+      (Task 23), and this run is the first live evidence of the shape rather than an argument from the
+      source.
+      THREE MEASURED FACTS. (1) DEFECT in the harness, fixed by DELETION: the step used to call the
+      coordinator's `seal_close` itself, standing in for a trigger that did not exist when it was written.
+      Task 14b landed that trigger, so the harness and the runtime raced for the same source chain —
+      `-r26`'s `Source chain error: … the source chain head has moved since the bundle began`. `sealClose`
+      is gone from the steps file entirely and a comment holds its place, so a future edit cannot quietly
+      re-add it; the Thens read each peer's own `SunsetReceipt` instead, which is what the story's "each
+      peer's runtime seals" actually claims. (2) All three seals report `resumed: true` — `-r26`'s race HAD
+      closed the v1 chains before it died, and a CloseChain is permanent (no reset un-closes a chain), so
+      Task 14a's half-seal resume is what let the ceremony complete rather than closing v1 twice. That is
+      the fix round `27532918a` earning itself on a live mesh. (3) "Disabled" in this Station is the
+      storage-side `closed` flag, NOT `disable_app`: the admin seam disables a whole app and the base app
+      carries lamad, imagodei and infrastructure too, so the sunset disables nothing and uninstalls
+      nothing — what stops a peer writing to v1 again is that routing no longer points there.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"

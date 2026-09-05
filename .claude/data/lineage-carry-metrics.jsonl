@@ -27,3 +27,6 @@
 {"at":"2026-09-05T03:28:07.699Z","run":"20260905032540","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"matthew","records":341,"total":341,"maxPageScanned":1034,"elapsedSecs":0.5}
 {"at":"2026-09-05T03:28:08.047Z","run":"20260905032540","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"james","records":213,"total":213,"maxPageScanned":761,"elapsedSecs":0.3}
 {"at":"2026-09-05T03:28:08.373Z","run":"20260905032540","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"jessica","records":207,"total":207,"maxPageScanned":714,"elapsedSecs":0.3}
+{"at":"2026-09-05T03:34:09.556Z","run":"20260905033238","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"matthew","records":351,"total":351,"maxPageScanned":1071,"elapsedSecs":0.6}
+{"at":"2026-09-05T03:34:09.904Z","run":"20260905033238","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"jessica","records":217,"total":217,"maxPageScanned":752,"elapsedSecs":0.3}
+{"at":"2026-09-05T03:34:10.260Z","run":"20260905033238","concern":"happ-lineage-migration","measure":"v1-export-walk","peer":"james","records":223,"total":223,"maxPageScanned":800,"elapsedSecs":0.3}
