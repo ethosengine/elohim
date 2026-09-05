@@ -31,7 +31,10 @@ All reads open the database `SQLITE_OPEN_READ_ONLY`, so they are safe against a
 running conductor. Every command takes `--databases <dir>` — the peer's data root
 holding `conductor.db`, `db.key` and one `dht-<dna>.db` per DNA — and
 `--passphrase <text>` for `db.key` (default `test`, the local household mesh's
-passphrase; a real peer passes its own).
+passphrase; a real peer passes the lair passphrase its conductor was started with).
+A real peer's data root is the `data_root_path` in its `conductor-config.yaml`
+(`databases/` beneath it). `apps` lists each role's DNA hash — that is where a
+`--dna` value comes from, and `blocks` prints the `dna:agent` pair `unblock` takes.
 
 ```bash
 DB=elohim/holochain/local-dev/james/databases   # substitute your own peer's directory
@@ -55,9 +58,10 @@ refuses without `--yes`:
 
 ```bash
 ./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it
-./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors (only the blocked peer's own
-                                                    #    conductor must be down — the tool checks its
-                                                    #    conductor.db; the household script stops all three)
+./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors. hc-dbtool itself needs only the
+                                                    #    blocked peer's own conductor.db closed; hc-mesh.sh is
+                                                    #    the household mesh's lifecycle script and stops all
+                                                    #    three — outside that mesh, stop your one conductor
 hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
 ./app/elohim-app/scripts/hc-mesh.sh start           # 4. bring the mesh back
 ./app/elohim-app/scripts/hc-mesh.sh blocks james    # 5. confirm: no rows; then watch the space's
@@ -65,9 +69,10 @@ hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
                                                     #    storageArc no longer null means the peer rejoined
 ```
 
-Lifting is not a cure by itself: whatever wrote the rejected op (for the household
-it was a `CapGrant` written after a chain close) re-earns the block on its next
-write. Fix the writer first.
+Lifting is not a cure by itself: whatever wrote the rejected op (in the first
+observed case, a `CapGrant` written after a chain close) re-earns the block on its
+next write. Fix the writer first. Quote the `*` in `--cell <dna>:'*'` so the shell
+does not expand it.
 
 `--cell <dna>:*` lifts every agent blocked in that DNA. Omitting `--yes` prints
 what would be deleted and changes nothing.
