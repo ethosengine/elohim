@@ -876,6 +876,17 @@ The rehearsal measures with these open and says so in every receipt. They are in
 
 - [ ] **Task 29 deliverable: on the household mesh a courier's held view of a neighbour reaches the neighbour's real chain head (the ten-station receipt goes 10/10); the page names which view answered.**
 
+### Task 30: `hc-dbtool` — the operator seat can SEE a block and LIFT it (holochain 0.7 has no unblock)
+
+**Files:**
+- Create: `crates/hc-dbtool/` (bin crate in the native `crates` workspace; `CARGO_TARGET_DIR` = the pool's `crates` slot): opens a conductor's `conductor.db` and `dht-<dna>.db` with `holochain_data 0.7.0`'s `DbKey::load(<db.key contents>, <passphrase>)` + `apply_pragmas` (feature `encryption`), read-only by default. Subcommands: `blocks` (rows of `BlockSpan` decoded to target cell / reason / interval), `rejected --dna <hash>` (DhtOp rows whose `sys_validation_status` or `app_validation_status` = 2, with op type, author, action seq, timestamp), `unblock --cell <dna>:<agent> --yes` (deletes the matching `BlockSpan` rows; refuses while the conductor holds the db lock — the operator stops the conductor first; prints what it removed).
+- Modify: `app/elohim-app/scripts/hc-mesh.sh` (a `blocks <peer>` verb that runs the tool against `$LOCAL_DEV_DIR/<peer>/databases` with passphrase `test`, and documents the stop → unblock → start sequence).
+- Test: unit tests over a fixture db built by the tool itself (create the schema subset, insert a block row, list, delete); a live run on the household mesh listing james's blocks and rejected node-registry ops is the measurement.
+
+Why: holochain 0.7 `integrate_dht_ops_workflow` blocks the AUTHOR'S CELL from now to `Timestamp::max` when one op it authored is integrated as invalid (`CellBlockReason::InvalidOp`), the peer store then drops that agent's infos, gossip with it never starts, and 0.7 exposes no unblock (no admin call, no HDK host fn). Measured 2026-09-05 on the household mesh: in the node-registry space james had blocked jessica and matthew, jessica had blocked matthew, no round ever completed, every storage arc stayed null, no authorities existed, and the courier's held view could only read its own stale copy (Station 6 red across r30–r38). One rejected op per author is enough to partition a household forever; a household must be able to see the block, read the rejected op, and lift the block under its own governance.
+
+- [ ] **Task 30 deliverable: `hc-mesh.sh blocks james` lists the BlockSpan rows and the rejected node-registry ops that caused them; after `unblock` and a conductor restart, a node-registry gossip round completes and every peer's storage arc goes FULL on the household mesh (watcher receipt).**
+
 ---
 
 ## Self-review (done at authoring, 2026-09-04)
