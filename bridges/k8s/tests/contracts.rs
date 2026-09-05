@@ -265,11 +265,8 @@ fn pin_path_cannot_escape_manifest_directory() {
 }
 
 #[test]
-fn cli_observe_is_explicitly_unimplemented_and_render_reports_cid() {
+fn cli_render_reports_cid() {
     let bin = env!("CARGO_BIN_EXE_k8s-bridge");
-    let output = Command::new(bin).arg("observe").output().unwrap();
-    assert_eq!(output.status.code(), Some(64));
-    assert_eq!(output.stdout, b"not yet: Station 3b\n");
     let output = Command::new(bin)
         .args([
             "render",

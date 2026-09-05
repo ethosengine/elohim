@@ -278,3 +278,6 @@ pub fn verify(deployments: &Path, manifests_dir: &Path) -> Result<Vec<DriftVerdi
     }
     Ok(verdicts)
 }
+
+pub mod observe;
+pub use observe::{fold_observation, FieldChange, Observation, ObserveRefusal};

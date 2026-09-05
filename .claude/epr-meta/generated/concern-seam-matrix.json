@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 149,
+ "n_points_routed": 151,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -417,9 +417,9 @@
  },
  "counts": {
   "unexamined": 170,
-  "variant": 55,
-  "conformant": 26,
-  "n-a": 5
+  "variant": 57,
+  "conformant": 25,
+  "n-a": 4
  },
  "cells": [
   {
@@ -749,7 +749,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -769,6 +769,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -1276,6 +1290,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -1722,7 +1750,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "n-a",
-   "reason": "2 point(s) declare n-a with justification",
+   "reason": "4 point(s) declare n-a with justification",
    "tracks": [
     "T3",
     "T4"
@@ -1742,6 +1770,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -2167,7 +2209,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -2187,6 +2229,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -2898,6 +2954,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -3441,6 +3511,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -3985,6 +4069,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -4381,8 +4479,8 @@
    "concern": "C6b",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
@@ -4402,6 +4500,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -4813,7 +4925,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -4847,6 +4959,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -5405,6 +5531,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -5787,6 +5927,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -6114,7 +6268,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -6134,6 +6288,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -6573,8 +6741,8 @@
    "concern": "C11",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "n-a",
-   "reason": "2 point(s) declare n-a with justification",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
@@ -6594,6 +6762,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -7060,6 +7242,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -7408,7 +7604,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -7428,6 +7624,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -7782,6 +7992,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "fold_observation",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "ObserveRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/observe.rs"
     }
    ]
   },
@@ -8307,7 +8531,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:57ac50f8ed8f58f23ca850b1f299d82e",
+ "digest": "sha256:847357cc8289d5c53ec3b5483c455b79",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

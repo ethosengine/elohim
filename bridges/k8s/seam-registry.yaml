@@ -1,7 +1,7 @@
 seamRegistryVersion: 1
 crate: k8s-bridge
 crateRoot: bridges/k8s
-seamLocus: S3.6 orchestrator resource render outward; no enforcement, anchoring or observation.
+seamLocus: S3.6 orchestrator resource render outward; capacity observation; no enforcement or anchoring.
 decisionPoints:
 - name: render_envelope
   kind: verdict-fn
@@ -40,12 +40,10 @@ decisionPoints:
     justification: The golden tests exercise pure deterministic rendering without effects or records.
   - id: C7
     status: answered
-    justification: cli_observe_is_explicitly_unimplemented_and_render_reports_cid proves no advertised capacity
-      service; declaration is not enforcement.
+    justification: cli_render_reports_cid proves render reports its declaration CID; declaration is not enforcement.
   - id: C8
     status: answered
-    justification: cli_observe_is_explicitly_unimplemented_and_render_reports_cid pins the manifest CID on render
-      stderr.
+    justification: cli_render_reports_cid pins the manifest CID on render stderr.
   - id: C9
     status: n-a
     justification: No agent keys, control binding, recovery, re-keying, or identity lineage is changed.
@@ -61,7 +59,7 @@ decisionPoints:
     justification: The pure renderer has no filesystem, cluster or network authority.
   - id: C13
     status: answered
-    justification: Rendering declares resources without quota enforcement; observe remains explicitly unimplemented.
+    justification: Rendering declares resources without quota enforcement; observe promotes only measured capacity.
   - id: C14
     status: partial
     justification: Render errors retain textual schema/archetype/request reasons; no typed reason taxonomy or witness
@@ -83,7 +81,7 @@ decisionPoints:
     testName: superseding_manifest_pins_request_override_and_archetype_lineage
     kind: integration
   - path: bridges/k8s/tests/contracts.rs
-    testName: cli_observe_is_explicitly_unimplemented_and_render_reports_cid
+    testName: cli_render_reports_cid
     kind: integration
 - name: drift_verdict
   kind: boundary-answer-type
@@ -168,4 +166,186 @@ decisionPoints:
     kind: integration
   - path: bridges/k8s/tests/contracts.rs
     testName: cli_missing_pin_refuses
+    kind: integration
+- name: fold_observation
+  kind: verdict-fn
+  sourceLocation:
+    file: src/observe.rs
+    modulePath: k8s_bridge::observe
+  summary: Validate complete known-node evidence before replacing only observed capacity fields; refuse without
+    mutation.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Category C operator capacity projection in the S3.6 outward bridge; no substrate heads.
+  - id: C1
+    status: n-a
+    justification: Observation does not select a manifest or elect a declared head.
+  - id: C2
+    status: n-a
+    justification: No canonical channel, shared head or healing operation exists.
+  - id: C3
+    status: answered
+    justification: A refusal leaves the ledger untouched; restore missing evidence and retry explicitly.
+  - id: C4
+    status: answered
+    justification: missing_node_refuses_without_mutation and prometheus_error_status_refuses distinguish missing
+      evidence from zero capacity.
+  - id: C5
+    status: answered
+    justification: canned_promotion_changes_only_observed_fields re-derives totals from known nodes; unknown_node_warns_without_adding_or_counting
+      prevents self-enrollment.
+  - id: C6a
+    status: partial
+    justification: Three sequential HTTP requests, each with a 30-second timeout and no redirects or retry loop;
+      response size has no admission ceiling.
+  - id: C6b
+    status: partial
+    justification: No additive effects; capacities overwrite measurements. Provenance intentionally names the previous
+      snapshot on each promotion.
+  - id: C7
+    status: answered
+    justification: cli_missing_prometheus_url_refuses_65 pins explicit endpoint configuration; observe measures
+      allocatable, not runtime enforcement.
+  - id: C8
+    status: partial
+    justification: FieldChange retains JSON pointer and old/new values; warning and refusal text names nodes, but
+      no metrics counter is emitted.
+  - id: C9
+    status: n-a
+    justification: No identity, key, lineage or agent binding changes.
+  - id: C10
+    status: answered
+    justification: Unknown nodes warn without joining the ledger; status and vector shape are checked; extra Prometheus
+      metadata is ignored.
+  - id: C11
+    status: partial
+    justification: HTTP failures and timeout refuse with exit 65 and preserve the ledger; no retry or counted backpressure
+      policy.
+  - id: C12
+    status: answered
+    justification: Only explicit CLI invocation writes the supplied ledger; endpoint comes from PROMETHEUS_URL or
+      --prometheus-url, never a production default.
+  - id: C13
+    status: answered
+    justification: Operator-promoted Category C evidence; successor is runtime HostPassport allocatable reporting
+      per design section 6.
+  - id: C14
+    status: partial
+    justification: ObserveRefusal carries a refusal reason; no durable residual witness or taxonomy is claimed.
+  contractTests:
+  - path: bridges/k8s/tests/observe.rs
+    testName: canned_promotion_changes_only_observed_fields
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: missing_node_refuses_without_mutation
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: zero_and_nonfinite_allocatable_refuse
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: unknown_node_warns_without_adding_or_counting
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: prometheus_error_status_refuses
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: key_order_and_untouched_fields_round_trip_identically
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: cli_missing_prometheus_url_refuses_65
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: not_ready_is_evidence_not_zero_capacity
+    kind: integration
+- name: ObserveRefusal
+  kind: boundary-answer-type
+  sourceLocation:
+    file: src/observe.rs
+    modulePath: k8s_bridge::observe
+  summary: Validate complete known-node evidence before replacing only observed capacity fields; refuse without
+    mutation.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Category C operator capacity projection in the S3.6 outward bridge; no substrate heads.
+  - id: C1
+    status: n-a
+    justification: Observation does not select a manifest or elect a declared head.
+  - id: C2
+    status: n-a
+    justification: No canonical channel, shared head or healing operation exists.
+  - id: C3
+    status: answered
+    justification: A refusal leaves the ledger untouched; restore missing evidence and retry explicitly.
+  - id: C4
+    status: answered
+    justification: missing_node_refuses_without_mutation and prometheus_error_status_refuses distinguish missing
+      evidence from zero capacity.
+  - id: C5
+    status: answered
+    justification: canned_promotion_changes_only_observed_fields re-derives totals from known nodes; unknown_node_warns_without_adding_or_counting
+      prevents self-enrollment.
+  - id: C6a
+    status: partial
+    justification: Three sequential HTTP requests, each with a 30-second timeout and no redirects or retry loop;
+      response size has no admission ceiling.
+  - id: C6b
+    status: partial
+    justification: No additive effects; capacities overwrite measurements. Provenance intentionally names the previous
+      snapshot on each promotion.
+  - id: C7
+    status: answered
+    justification: cli_missing_prometheus_url_refuses_65 pins explicit endpoint configuration; observe measures
+      allocatable, not runtime enforcement.
+  - id: C8
+    status: partial
+    justification: FieldChange retains JSON pointer and old/new values; warning and refusal text names nodes, but
+      no metrics counter is emitted.
+  - id: C9
+    status: n-a
+    justification: No identity, key, lineage or agent binding changes.
+  - id: C10
+    status: answered
+    justification: Unknown nodes warn without joining the ledger; status and vector shape are checked; extra Prometheus
+      metadata is ignored.
+  - id: C11
+    status: partial
+    justification: HTTP failures and timeout refuse with exit 65 and preserve the ledger; no retry or counted backpressure
+      policy.
+  - id: C12
+    status: answered
+    justification: Only explicit CLI invocation writes the supplied ledger; endpoint comes from PROMETHEUS_URL or
+      --prometheus-url, never a production default.
+  - id: C13
+    status: answered
+    justification: Operator-promoted Category C evidence; successor is runtime HostPassport allocatable reporting
+      per design section 6.
+  - id: C14
+    status: partial
+    justification: ObserveRefusal carries a refusal reason; no durable residual witness or taxonomy is claimed.
+  contractTests:
+  - path: bridges/k8s/tests/observe.rs
+    testName: canned_promotion_changes_only_observed_fields
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: missing_node_refuses_without_mutation
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: zero_and_nonfinite_allocatable_refuse
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: unknown_node_warns_without_adding_or_counting
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: prometheus_error_status_refuses
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: key_order_and_untouched_fields_round_trip_identically
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: cli_missing_prometheus_url_refuses_65
+    kind: integration
+  - path: bridges/k8s/tests/observe.rs
+    testName: not_ready_is_evidence_not_zero_capacity
     kind: integration
