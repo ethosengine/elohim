@@ -5398,10 +5398,26 @@ impl HttpServer {
     ///    re-aiming it mid-crossing would close a chain nothing was carried
     ///    out of.
     ///
-    /// Response 200: `{"role", "v1AppId", "previousV1AppId", "baseAppId"}`,
-    /// where `v1AppId` is the RESOLVED predecessor (never null — a cleared
-    /// binding reports the base app id, because that is the chain the role now
-    /// crosses from). Node-local: deliberately NOT in build_manifest().
+    /// # The ordering that matters: BIND AFTER THE RESET
+    ///
+    /// `POST /admin/lineage/reset` CLEARS bindings (a baseline is the
+    /// household's own chain, and the reset's `uninstall` arm removes the very
+    /// side app a preserved binding would point at). A run that binds and then
+    /// lets the fixture's `Before` hook run has no binding left — so a role
+    /// whose binding a reset cleared now REFUSES to cross or to seal until
+    /// something is declared again, by name, at both the apply and the seal
+    /// (`HappLineageVehicle::cleared_binding_refusal`). This route is what
+    /// discharges that latch; naming the base app explicitly is allowed and
+    /// discharges it too, because after a reset the household's own chain has
+    /// to be chosen rather than fallen back to.
+    ///
+    /// Response 200: `{"role", "v1AppId", "previousV1AppId", "baseAppId",
+    /// "dischargedClearedBinding"}`, where `v1AppId` is the RESOLVED
+    /// predecessor (never null — a cleared binding reports the base app id,
+    /// because that is the chain the role now crosses from) and
+    /// `dischargedClearedBinding` names the app a reset had dropped when this
+    /// call lifted that refusal. Node-local: deliberately NOT in
+    /// build_manifest().
     async fn handle_lineage_v1_binding(
         &self,
         req: Request<Incoming>,
@@ -5460,6 +5476,10 @@ impl HttpServer {
             }
         };
 
+        // Read BEFORE the bind, because `bind_v1` discharges it — this is the
+        // one moment the response can tell the caller that its declaration
+        // just lifted a refusal rather than merely set a value.
+        let discharged = lineage_roles.v1_binding_cleared_from(&role);
         let previous = match lineage_roles.bind_v1(&role, resolved.as_deref()) {
             Ok(previous) => previous,
             Err(refusal) => {
@@ -5480,6 +5500,10 @@ impl HttpServer {
             "v1AppId": effective,
             "previousV1AppId": previous.unwrap_or_else(|| base_app_id.clone()),
             "baseAppId": base_app_id,
+            // Task 33 fix round 1: non-null when this declaration DISCHARGED a
+            // reset's cleared-binding latch, naming the app the reset dropped.
+            // Absent on every ordinary bind.
+            "dischargedClearedBinding": discharged,
         })))
     }
 
@@ -5519,10 +5543,22 @@ impl HttpServer {
     /// default `false` — disable only, never uninstall, never touch a closed
     /// role, unless the caller explicitly opts in.
     ///
+    /// # A cleared v1 binding is remembered (Task 33, fix round 1)
+    ///
+    /// This route also clears every role's v1 binding, and it should: a
+    /// baseline IS the household's own chain, and the `uninstall` arm removes
+    /// the very side app a preserved binding would point at. But a run that
+    /// staged a disposable predecessor and then let this hook run would
+    /// otherwise cross and SEAL the household's own chain with nothing
+    /// anywhere saying so. So each cleared binding is reported on
+    /// `clearedV1Bindings` AND latched: those roles refuse to cross or seal
+    /// until `POST /admin/lineage/v1-binding` declares one again. **Bind after
+    /// the reset, never before it.**
+    ///
     /// Response 200: `{ "reset": [<roles actually rolled back>],
     /// "skippedClosed": [<roles left sealed>], "disabled": [<app ids>],
     /// "uninstalled": [<app ids>], "protectedClosed": [<side app ids held
-    /// back>] }`. A per-app `disable_app`/`uninstall_app` failure is logged
+    /// back>], "clearedV1Bindings": [{role, v1AppId}] }`. A per-app `disable_app`/`uninstall_app` failure is logged
     /// and simply excluded from its list — one stuck side app never blocks
     /// the reset of the others or of `LineageRoles`.
     ///
@@ -5662,7 +5698,9 @@ impl HttpServer {
             // Task 33: a run-scoped predecessor belongs to the run that staged
             // it, so a baseline reset drops the binding — and says which one,
             // because a silent return to the household's own chain is the one
-            // step back toward spending it.
+            // step back toward spending it. Fix round 1: every role named here
+            // is also LATCHED and refuses to cross or seal until re-bound, so
+            // this list is an instruction ("bind again"), not a footnote.
             "clearedV1Bindings": cleared_v1_bindings
                 .iter()
                 .map(|(role, app_id)| serde_json::json!({"role": role, "v1AppId": app_id}))

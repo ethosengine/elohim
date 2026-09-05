@@ -158,6 +158,29 @@ impl PartitionShape {
     }
 }
 
+/// The WARN's evidence clause — ONE SENTENCE PER SHAPE.
+///
+/// The two preconditions (empty arc, no completed round) are shared and stay in
+/// the message body; the evidence is what differs. Saying "peer timeouts are
+/// still rising" over the ISOLATED shape would be a false statement about the
+/// one peer the widening exists to name — the BLOCKER, who knows nobody in the
+/// space and therefore times nothing out. The remediation is the same for both,
+/// so it stays shared.
+///
+/// Pure and public so the two clauses can be pinned by a test; a `tracing`
+/// macro's rendered output is not otherwise reachable.
+pub fn shape_evidence(shape: PartitionShape) -> &'static str {
+    match shape {
+        PartitionShape::Timeouts => {
+            "and peer timeouts are still RISING — it keeps reaching for peers that refuse it"
+        }
+        PartitionShape::Isolated => {
+            "and it holds NO peer metadata for this space at all while it still knows peers in \
+             others — nothing left to reach, which is the BLOCKER's own view of this event"
+        }
+    }
+}
+
 /// A space this node believes it is partitioned from, as rendered on the
 /// passport under `passport.lineage.partition`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -435,6 +458,7 @@ impl LineagePartitionProbe {
             return;
         }
         last.insert(partition.space.clone(), now);
+        let evidence = shape_evidence(partition.shape);
         tracing::warn!(
             space = %partition.space,
             peer_timeouts = partition.peer_timeouts,
@@ -442,10 +466,10 @@ impl LineagePartitionProbe {
             peers = partition.peers,
             shape = partition.shape.as_str(),
             "SPACE PARTITIONED — this node declares an empty storage arc, no peer has completed a \
-             gossip round with it, and peer timeouts are still rising. The known cause of this \
-             shape is a permanent cell block earned by an action authored after a chain close \
-             (holochain 0.7 cannot lift one). Read the blocks with `hc-mesh.sh blocks`; the \
-             partition is named on /version under passport.lineage.partition."
+             gossip round with it, {evidence}. The known cause of this shape is a permanent cell \
+             block earned by an action authored after a chain close (holochain 0.7 cannot lift \
+             one). Read the blocks with `hc-mesh.sh blocks`; the partition is named on /version \
+             under passport.lineage.partition."
         );
     }
 
@@ -812,6 +836,25 @@ mod tests {
         let named = probe.snapshot();
         assert_eq!(named.len(), 1);
         assert_eq!(named[0].space, "space-a");
+    }
+
+    /// **Fix round 1, M2.** The evidence clause is per shape, and the
+    /// `isolated` one must not claim rising timeouts — that is exactly what is
+    /// NOT true of the blocker.
+    #[test]
+    fn the_warn_evidence_clause_says_one_true_thing_per_shape() {
+        let timeouts = shape_evidence(PartitionShape::Timeouts);
+        let isolated = shape_evidence(PartitionShape::Isolated);
+        assert_ne!(timeouts, isolated);
+        assert!(timeouts.contains("RISING"), "{timeouts}");
+        assert!(
+            !isolated.to_lowercase().contains("rising"),
+            "the blocker times nothing out; claiming rising timeouts about it is a lie: {isolated}"
+        );
+        assert!(
+            isolated.contains("NO peer metadata"),
+            "the isolated clause names the emptiness that IS its signal: {isolated}"
+        );
     }
 
     #[test]

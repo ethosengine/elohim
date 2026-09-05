@@ -792,6 +792,42 @@ impl HappLineageVehicle {
         self.lineage.v1_app_id_for(role)
     }
 
+    /// **Task 33, fix round 1.** Refuse BY NAME when this role's v1 binding
+    /// was cleared by a baseline reset and nobody has declared a predecessor
+    /// since.
+    ///
+    /// `reset_all` clears a binding (a baseline is the household's own chain,
+    /// and the reset's `uninstall` arm removes the very app a preserved
+    /// binding would point at). But "cleared by a reset" and "never bound" are
+    /// not the same fact: the second is a real peer, the first is a run that
+    /// staged a disposable chain and then let the fixture's `Before` hook —
+    /// `POST /admin/lineage/reset {"uninstall": true, "forceClosed": true}` —
+    /// wipe it. Crossing or SEALING in that state closes the household's own
+    /// chain, permanently, and until this check existed nothing anywhere said
+    /// so.
+    ///
+    /// Both call sites are guarded: the APPLY (early, and a refused apply is
+    /// retried by the next sweep, so re-binding fixes it) and the SEAL (the
+    /// irreversible act). Any `bind_v1` discharges the latch, including an
+    /// explicit `None` — after a reset, naming the household's own chain is an
+    /// act, never a default.
+    ///
+    /// A role that was never bound answers `None` here, so every real peer
+    /// takes exactly the pre-Task-33 path.
+    fn cleared_binding_refusal(&self, role: &str) -> Option<String> {
+        self.lineage.v1_binding_cleared_from(role).map(|prior| {
+            format!(
+                "role '{role}' was bound to v1 app '{prior}' and a baseline reset CLEARED that \
+                 binding. Crossing or sealing now would carry out of, and close, the base app's \
+                 own chain — irreversibly, and every neighbour permanently blocks the cell that \
+                 writes after a close. Declare the predecessor again first: POST \
+                 /admin/lineage/v1-binding {{\"role\":\"{role}\",\"v1AppId\":\"…\"}}. Naming \
+                 the base app there is allowed and discharges this refusal — after a reset the \
+                 household's own chain has to be chosen out loud, not fallen back to."
+            )
+        })
+    }
+
     /// This conductor's record of the role's V1 app — the agent key the side
     /// app inherits, the network seed it joins on, and the cell the carry
     /// reads from.
@@ -880,6 +916,12 @@ impl ApplyVehicle for HappLineageVehicle {
         // Both crossing refusals land HERE — before `list_apps`, before any
         // install, before anything on this conductor changes.
         let (role, binding) = Self::sole_crossing(&verified.manifest)?;
+        // **Task 33, fix round 1.** BEFORE `list_apps`, before any install:
+        // a role whose binding a baseline reset cleared does not silently fall
+        // back to the household's own chain.
+        if let Some(refusal) = self.cleared_binding_refusal(role) {
+            return Err(AdoptionRefusal::new(RefusalReason::ApplyFailed, refusal));
+        }
         // **Task 33.** The PREDECESSOR is declared, not derived: an unbound
         // role answers the base app (every household peer), a bound one
         // answers the run-scoped side app a fixture staged, and everything
@@ -1172,6 +1214,13 @@ impl super::sunset::ChainSealer for HappLineageVehicle {
         // sees a write after it. Resolving v1 through the binding is what lets
         // a rehearsal seal a chain made for the purpose. An unbound role
         // answers the base app, so a real peer's sunset is unchanged.
+        // **Task 33, fix round 1.** The seal is the irreversible act, so the
+        // cleared-binding latch is checked here too and not only at the apply:
+        // a window opened before a reset would otherwise reach this line with
+        // the binding already gone.
+        if let Some(refusal) = self.cleared_binding_refusal(role) {
+            return Err(refusal);
+        }
         let v1_app_id = self.v1_app_id(role);
         let v1_app = self.app_info(&v1_app_id).await?;
         let v1_cell = Self::role_cell(&v1_app, role).ok_or_else(|| {

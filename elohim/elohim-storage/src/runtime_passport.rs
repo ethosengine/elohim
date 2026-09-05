@@ -1094,6 +1094,7 @@ mod tests {
                 closed: false,
                 origin: None,
                 v1_app_id: None,
+                v1_binding_cleared_from: None,
             },
         );
         let view = lineage_view_for(
@@ -1149,6 +1150,7 @@ mod tests {
                 closed: false,
                 origin: None,
                 v1_app_id: None,
+                v1_binding_cleared_from: None,
             },
         );
         let mut sweep = BTreeMap::new();
@@ -1227,6 +1229,7 @@ mod tests {
                 closed: true,
                 origin: None,
                 v1_app_id: None,
+                v1_binding_cleared_from: None,
             },
         );
         let view = lineage_view_for(
@@ -1261,6 +1264,7 @@ mod tests {
                 closed: false,
                 origin: None,
                 v1_app_id: None,
+                v1_binding_cleared_from: None,
             },
         );
         assert!(lineage_view_for(

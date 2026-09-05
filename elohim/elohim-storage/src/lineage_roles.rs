@@ -86,6 +86,42 @@ pub struct RoleLineage {
     /// projects this struct, and an `Option` that is absent cannot drift from
     /// a base app id that moves.
     pub v1_app_id: Option<String>,
+    /// **Task 33, fix round 1 — the LATCH.** The app id a baseline reset
+    /// cleared off this role, held until somebody DECLARES a predecessor
+    /// again.
+    ///
+    /// # The hole it closes
+    ///
+    /// `reset_all` clears the binding, and it should: a run-scoped
+    /// predecessor belongs to the run that staged it, and a baseline is the
+    /// household's own chain. But "cleared" and "never bound" then look
+    /// identical, and they are not the same fact at all — the second is a real
+    /// peer, the first is a fixture that staged a disposable chain and then
+    /// ran the `Before` hook (`{"uninstall": true, "forceClosed": true}`)
+    /// over it. Crossing or SEALING in that state closes the household's own
+    /// chain, permanently, with no refusal anywhere.
+    ///
+    /// So the clear is remembered, and while it is remembered the vehicle
+    /// refuses to apply a crossing or to seal this role BY NAME. Any
+    /// [`LineageRoles::bind_v1`] discharges it — including
+    /// `bind_v1(role, None)`, which is naming the household's own chain out
+    /// loud. That is the whole point: after a reset the predecessor has to be
+    /// an ACT, never a default.
+    ///
+    /// # Why the reset still clears, rather than preserving the binding
+    ///
+    /// The alternative was to have `reset_all` keep `v1_app_id`. It is worse
+    /// on both counts. §7 C14's *"kept, never deleted"* is about the
+    /// witnessed residual — the carried notarizations on a closed cell's
+    /// chain — and `closed_role_app_ids` already protects those from both the
+    /// disable and uninstall arms; a binding is ROUTING, and routing is
+    /// exactly what a baseline converges. Worse, the reset's `uninstall` arm
+    /// removes the very side app a preserved binding would point at, so
+    /// "preserve" would leave the role aimed at an app that is gone — state
+    /// pointing at nothing, refused much later and about the wrong thing.
+    /// Clearing plus a latch keeps the baseline a baseline AND makes the
+    /// dangerous next step impossible.
+    pub v1_binding_cleared_from: Option<String>,
     /// **Task 13a.** What opened this window, or `None` for a role that was
     /// never crossed (and for a window opened without an origin — see
     /// [`WindowOrigin`]). Carried THROUGH a revert and a sunset rather than
@@ -110,6 +146,12 @@ pub struct ResetReport {
     /// quietly returned a role to the household's own chain — the chain the
     /// binding exists to keep out of the ceremony — would be the one silent
     /// step back toward spending it.
+    ///
+    /// **Every role named here now REFUSES to cross or to seal until it is
+    /// re-bound** ([`RoleLineage::v1_binding_cleared_from`]). A non-empty list
+    /// in a reset response after a run staged a predecessor is not a warning
+    /// to read later: it is the run's instruction to bind again, and the
+    /// vehicle will refuse by name until it does.
     pub cleared_v1_bindings: Vec<(String, String)>,
 }
 
@@ -128,6 +170,7 @@ impl RoleLineage {
             closed: false,
             origin: None,
             v1_app_id: None,
+            v1_binding_cleared_from: None,
         }
     }
 }
@@ -196,6 +239,21 @@ impl LineageRoles {
             .unwrap_or_else(|| self.base_app_id.clone())
     }
 
+    /// **Task 33, fix round 1.** The predecessor a baseline reset cleared off
+    /// `role`, or `None` when nothing was cleared (which is every real peer,
+    /// forever).
+    ///
+    /// While this answers `Some`, the lineage vehicle refuses to apply a
+    /// crossing or to seal this role — see [`RoleLineage::v1_binding_cleared_from`]
+    /// for the hole that closes and why the reset still clears.
+    pub fn v1_binding_cleared_from(&self, role: &str) -> Option<String> {
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(role)
+            .and_then(|lineage| lineage.v1_binding_cleared_from.clone())
+    }
+
     /// **Task 33.** Declare (or clear, with `None`) the v1 binding for `role`.
     /// Returns the binding that was in force before this call.
     ///
@@ -235,6 +293,11 @@ impl LineageRoles {
         }
         let previous = entry.v1_app_id.clone();
         entry.v1_app_id = v1_app_id.map(str::to_string);
+        // ANY declaration discharges the latch, including a deliberate
+        // `None` — after a baseline reset, naming the household's own chain
+        // has to be an act rather than a default. See
+        // `RoleLineage::v1_binding_cleared_from`.
+        entry.v1_binding_cleared_from = None;
         // The untouched state is defined against the PREDECESSOR, so moving
         // the binding moves both ids with it. Without this a bound role would
         // read as an open window (`reading != authoring` is not the test, but
@@ -379,10 +442,15 @@ impl LineageRoles {
                 report.skipped_closed.push(role.clone());
                 continue;
             }
-            if let Some(bound) = lineage.v1_app_id.clone() {
+            let cleared = lineage.v1_app_id.clone();
+            if let Some(bound) = cleared.clone() {
                 report.cleared_v1_bindings.push((role.clone(), bound));
             }
             *lineage = RoleLineage::at_base(&self.base_app_id);
+            // The clear is REMEMBERED. "Cleared by a reset" and "never bound"
+            // are not the same fact, and treating them as one is how a run
+            // that staged a disposable chain ends up sealing the household's.
+            lineage.v1_binding_cleared_from = cleared;
             report.reset.push(role.clone());
         }
         report
@@ -799,5 +867,59 @@ mod tests {
         );
         assert_eq!(l.v1_app_id_for("node_registry"), "elohim");
         assert_eq!(l.v1_app_id_for("lamad"), "elohim");
+    }
+
+    /// **Fix round 1 — the latch.** "Cleared by a reset" and "never bound" are
+    /// not the same fact. A run that staged a disposable predecessor and then
+    /// ran the fixture's `Before` hook would otherwise cross and SEAL the
+    /// household's own chain with nothing anywhere saying so.
+    #[test]
+    fn a_reset_latches_the_cleared_binding_until_someone_declares_one_again() {
+        let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
+        assert_eq!(
+            l.v1_binding_cleared_from("node_registry"),
+            None,
+            "a role that was never bound latches nothing — every real peer"
+        );
+
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905"))
+            .expect("at base");
+        assert_eq!(l.v1_binding_cleared_from("node_registry"), None);
+
+        l.reset_all(true);
+        assert_eq!(
+            l.v1_binding_cleared_from("node_registry"),
+            Some("elohim@a2o-v1-20260905".to_string()),
+            "the clear is remembered, and the vehicle refuses while it is"
+        );
+        assert_eq!(
+            l.v1_binding_cleared_from("lamad"),
+            None,
+            "a role that carried no binding is untouched by the reset's latch"
+        );
+
+        // Re-binding the SAME predecessor discharges it.
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260906"))
+            .expect("at base after the reset");
+        assert_eq!(l.v1_binding_cleared_from("node_registry"), None);
+    }
+
+    /// Naming the household's own chain out loud is a legal way to discharge
+    /// the latch — and it is the ONLY way to get back to the base app after a
+    /// reset cleared a binding. That asymmetry is the point: the default is
+    /// unreachable, the act is available.
+    #[test]
+    fn an_explicit_none_discharges_the_latch_because_the_base_app_is_then_chosen() {
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905"))
+            .expect("at base");
+        l.reset_all(true);
+        assert!(l.v1_binding_cleared_from("node_registry").is_some());
+
+        l.bind_v1("node_registry", None)
+            .expect("declaring the base app is allowed");
+
+        assert_eq!(l.v1_binding_cleared_from("node_registry"), None);
+        assert_eq!(l.v1_app_id_for("node_registry"), "elohim");
     }
 }
