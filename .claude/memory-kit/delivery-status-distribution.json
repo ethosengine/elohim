@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-08-24",
+  "generated_at": "2026-09-02",
   "totals": {
     "stable": 0,
     "active.latest-stable": 0,
     "active.beta": 0,
     "active.alpha": 1,
-    "wip": 58,
-    "refined": 30,
-    "backlog": 197,
+    "wip": 71,
+    "refined": 29,
+    "backlog": 204,
     "envisioned": 16,
-    "unknown": 181,
+    "unknown": 228,
     "undelivered": 6,
     "regression": 0
   },
@@ -62,7 +62,7 @@
       "delivery_status_updated": "2026-05-14",
       "delivery_status_source": "deliver-bridge-floor",
       "declared_feature": "stewarded-device-sync",
-      "feature_file_exists": false
+      "feature_file_exists": true
     },
     {
       "slug": "the-dowells-hold-gertrudes-share",
@@ -529,6 +529,16 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "compute-envelope-virtual-peer-contract",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/2026-08-29-compute-envelope-virtual-peer-contract.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "backlog-clusters-index",
       "path": "/projects/elohim/genesis/data/timeline/backlog/CLUSTERS.md",
       "author_status": "",
@@ -572,6 +582,17 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:resolved"
     },
     {
+      "slug": "a2o-conductor-rail-shared-typed-module",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/a2o-conductor-rail-shared-typed-module.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "a2o-console-error-allowlist",
       "path": "/projects/elohim/genesis/data/timeline/backlog/a2o-console-error-allowlist.md",
       "author_status": "",
@@ -601,6 +622,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "a2o-reconnect-storm-needs-process-control-pending",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/a2o-reconnect-storm-needs-process-control-pending.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
     },
     {
       "slug": "a2o-report-body-cids",
@@ -771,6 +803,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "alpha-pull-leg-fetch-error-storm",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/alpha-pull-leg-fetch-error-storm.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "alpha-spa-blob-patch-503",
       "path": "/projects/elohim/genesis/data/timeline/backlog/alpha-spa-blob-patch-503.md",
       "author_status": "",
@@ -820,6 +863,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "app-generated-manifest-types-stale-vs-codegen",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/app-generated-manifest-types-stale-vs-codegen.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "app-port-4445-auth-timeout-fleet-wide",
@@ -956,10 +1010,31 @@
       "legacy_status_translated_from": "proposed"
     },
     {
+      "slug": "attestation-projection-id-collision",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/attestation-projection-id-collision.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:complete"
+    },
+    {
       "slug": "audit-substrate-coverage-and-drift-fidelity",
       "path": "/projects/elohim/genesis/data/timeline/backlog/audit-substrate-coverage-and-drift-fidelity.md",
       "author_status": "",
       "delivery_status": "envisioned",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "auth-doorway-to-app-session-handoff-unwired",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/auth-doorway-to-app-session-handoff-unwired.md",
+      "author_status": "",
+      "delivery_status": "backlog",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
@@ -1133,7 +1208,7 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false,
-      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+      "frontmatter_anomaly": "unknown_delivery_status_value:resolved"
     },
     {
       "slug": "ci-alpha-cluster-degraded-substrate",
@@ -1144,6 +1219,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "ci-app-apex-seed-403-doorway-b-admin-key",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-app-apex-seed-403-doorway-b-admin-key.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:resolved-pending-deploy"
     },
     {
       "slug": "ci-app-data-loader-stale-getattestations-test",
@@ -1187,6 +1273,16 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "ci-cid-artifact-twin-source-side-freshness-gap",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-cid-artifact-twin-source-side-freshness-gap.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "ci-cucumber-report-plugin-double-counts-browser-json",
       "path": "/projects/elohim/genesis/data/timeline/backlog/ci-cucumber-report-plugin-double-counts-browser-json.md",
       "author_status": "",
@@ -1212,6 +1308,16 @@
       "path": "/projects/elohim/genesis/data/timeline/backlog/ci-doorway-dockerfile-fixture-context.md",
       "author_status": "",
       "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "ci-edge-a2o-steps-glob-redeploys-fleet",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md",
+      "author_status": "",
+      "delivery_status": "backlog",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
@@ -1282,7 +1388,7 @@
       "slug": "ci-genesis-doorway-503-seed-phase-wedge",
       "path": "/projects/elohim/genesis/data/timeline/backlog/ci-genesis-doorway-503-seed-phase-wedge.md",
       "author_status": "",
-      "delivery_status": "backlog",
+      "delivery_status": "wip",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
@@ -1383,6 +1489,16 @@
       "path": "/projects/elohim/genesis/data/timeline/backlog/ci-genesis-topology-tab-loading-race.md",
       "author_status": "",
       "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "ci-governance-mechanism-accumulation-routes-not-in-manifest",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-governance-mechanism-accumulation-routes-not-in-manifest.md",
+      "author_status": "",
+      "delivery_status": "backlog",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
@@ -1490,6 +1606,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "ci-orchestrator-genesis-dispatched-on-manifest-only-diff",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/ci-orchestrator-genesis-dispatched-on-manifest-only-diff.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "ci-orchestrator-graph-only-pipeline-dispatch-leak",
@@ -1868,6 +1995,17 @@
       "frontmatter_anomaly": "missing_delivery_status"
     },
     {
+      "slug": "conductor-pin-ships-base-binary",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/conductor-pin-ships-base-binary.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "in-progress"
+    },
+    {
       "slug": "conductor-slow-batch-starvation-jessica-class",
       "path": "/projects/elohim/genesis/data/timeline/backlog/conductor-slow-batch-starvation-jessica-class.md",
       "author_status": "",
@@ -1899,6 +2037,16 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "console-noise-signal-emit-503-per-content-view",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/console-noise-signal-emit-503-per-content-view.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     },
     {
       "slug": "constants-sync-gate-enoent-untracked-lens-market-view",
@@ -1944,6 +2092,17 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "content-doc-blobhash-representation-drift",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/content-doc-blobhash-representation-drift.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "in-progress"
+    },
+    {
       "slug": "content-edit-dht-propagation-sweettest",
       "path": "/projects/elohim/genesis/data/timeline/backlog/content-edit-dht-propagation-sweettest.md",
       "author_status": "",
@@ -1975,6 +2134,16 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:deferred"
     },
     {
+      "slug": "content-id-with-spaces-unreachable-by-id",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/content-id-with-spaces-unreachable-by-id.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "content-projection-plateau-ethosengine-household",
       "path": "/projects/elohim/genesis/data/timeline/backlog/content-projection-plateau-ethosengine-household.md",
       "author_status": "",
@@ -1996,8 +2165,30 @@
       "feature_file_exists": false
     },
     {
+      "slug": "content-store-update-content-targets-root-not-latest-version",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/content-store-update-content-targets-root-not-latest-version.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:in-tree"
+    },
+    {
       "slug": "content-view-regen-blocked-conductor-normalizer-trust",
       "path": "/projects/elohim/genesis/data/timeline/backlog/content-view-regen-blocked-conductor-normalizer-trust.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "coordswap-integrity-digest-annotation",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/coordswap-integrity-digest-annotation.md",
       "author_status": "",
       "delivery_status": "unknown",
       "delivery_status_updated": "",
@@ -2052,11 +2243,12 @@
       "slug": "dataplane-peer-fallback-and-blob-replication",
       "path": "/projects/elohim/genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md",
       "author_status": "",
-      "delivery_status": "backlog",
+      "delivery_status": "unknown",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
-      "feature_file_exists": false
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:superseded-in-code"
     },
     {
       "slug": "dataplane-validation-suite-hardening",
@@ -2457,6 +2649,16 @@
       "feature_file_exists": false
     },
     {
+      "slug": "deprecation-storage-client-ts-moduleresolution-node10",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-storage-client-ts-moduleresolution-node10.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "deprecation-storybook-test-runner-jest-island-retire",
       "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-storybook-test-runner-jest-island-retire.md",
       "author_status": "",
@@ -2695,6 +2897,16 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "doorway-portal-domain-suffix-not-submitted",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/doorway-portal-domain-suffix-not-submitted.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "doorway-recovery-reconstruction-residue",
       "path": "/projects/elohim/genesis/data/timeline/backlog/doorway-recovery-reconstruction-residue.md",
       "author_status": "",
@@ -2703,6 +2915,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "doorway-schema-contract-test-runs-nowhere",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/doorway-schema-contract-test-runs-nowhere.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "doorway-substrate-stats-unmeasured-not-zero",
@@ -2800,6 +3023,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "edge-quiesce-gate-timeout-aborts",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:in-tree"
+    },
+    {
       "slug": "edge-rollout-walltimeout",
       "path": "/projects/elohim/genesis/data/timeline/backlog/edge-rollout-walltimeout.md",
       "author_status": "",
@@ -2809,6 +3043,17 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "elohim-app-gate-lint-debt-blocks-push",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/elohim-app-gate-lint-debt-blocks-push.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "elohim-app-lint-debt-gate-scope",
@@ -3189,6 +3434,17 @@
       "legacy_status_translated_from": "ready"
     },
     {
+      "slug": "fleet-per-human-runtime-config-follow-channels",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/fleet-per-human-runtime-config-follow-channels.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:in-tree"
+    },
+    {
       "slug": "fleet-quiesce-pass-not-convergence",
       "path": "/projects/elohim/genesis/data/timeline/backlog/fleet-quiesce-pass-not-convergence.md",
       "author_status": "",
@@ -3260,6 +3516,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "genesis-pipeline-seeds-on-lint-scoped-changes",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/genesis-pipeline-seeds-on-lint-scoped-changes.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "genesis-pipeline-substrate-gated-adam-arc-saturation",
@@ -3551,6 +3818,16 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "inventory-refresh-pages-dropped-as-gaps",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/inventory-refresh-pages-dropped-as-gaps.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
       "slug": "iroh-cross-relay-preflight-fails-closed",
       "path": "/projects/elohim/genesis/data/timeline/backlog/iroh-cross-relay-preflight-fails-closed.md",
       "author_status": "",
@@ -3580,6 +3857,27 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "iroh-only-content-projection-loop-gap",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/iroh-only-content-projection-loop-gap.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:done"
+    },
+    {
+      "slug": "iroh-quinn-gso-assert-crashes-storage",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/iroh-quinn-gso-assert-crashes-storage.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     },
     {
       "slug": "iroh-sync-round-driver-gap",
@@ -3668,6 +3966,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "lamad-dna-workspace-hc-rna-cdylib-link-breaks-coordinator-build",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/lamad-dna-workspace-hc-rna-cdylib-link-breaks-coordinator-build.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:in-tree"
+    },
+    {
       "slug": "lamad-expertise-discovery-integration",
       "path": "/projects/elohim/genesis/data/timeline/backlog/lamad-expertise-discovery-integration.md",
       "author_status": "",
@@ -3748,6 +4057,17 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "late-joiner-peer-discovery-boot-only-board",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/late-joiner-peer-discovery-boot-only-board.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:resolved"
     },
     {
       "slug": "lens-version-dag-policy-dependency",
@@ -3888,6 +4208,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "mesh-fixture-fidelity-regimes",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/mesh-fixture-fidelity-regimes.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "mesh-prologue-cast-and-env-gaps",
       "path": "/projects/elohim/genesis/data/timeline/backlog/mesh-prologue-cast-and-env-gaps.md",
       "author_status": "",
@@ -3896,6 +4227,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "mesh-recovery-timeline-not-durable",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/mesh-recovery-timeline-not-durable.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:done"
     },
     {
       "slug": "minimal-cast-story-retune-three-epics",
@@ -4090,6 +4432,17 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "p1-dht-authored-content-not-projected",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/p1-dht-authored-content-not-projected.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "p2p-mod-loc-ceiling-decomposition",
       "path": "/projects/elohim/genesis/data/timeline/backlog/p2p-mod-loc-ceiling-decomposition.md",
       "author_status": "",
@@ -4174,6 +4527,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "portal-login-step-domain-scoped-identifier",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/portal-login-step-domain-scoped-identifier.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:triaged"
+    },
+    {
       "slug": "prepared-alpha-iroh-transport-flip",
       "path": "/projects/elohim/genesis/data/timeline/backlog/prepared-alpha-iroh-transport-flip.md",
       "author_status": "",
@@ -4237,6 +4601,16 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "pull-leg-drains-before-iroh-book-warms",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/pull-leg-drains-before-iroh-book-warms.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     },
     {
       "slug": "qahal-collective-cid-formation-projection-gap",
@@ -4416,6 +4790,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "relationships-table-per-host-rides-no-sync-plane",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/relationships-table-per-host-rides-no-sync-plane.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "resilience-card-membership-humans-projection-gap-2026-06-19",
       "path": "/projects/elohim/genesis/data/timeline/backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md",
       "author_status": "",
@@ -4476,6 +4861,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "runtime-shem-edgenode-container-exit-139-chronic",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/runtime-shem-edgenode-container-exit-139-chronic.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "runtime-sync-status-and-node-repair-endpoints",
@@ -4541,6 +4937,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "security-attestation-issuer-relaundering",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-attestation-issuer-relaundering.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "security-ci-substrate-authorization-grant-coherence",
       "path": "/projects/elohim/genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md",
       "author_status": "",
@@ -4550,6 +4957,17 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "security-client-doorway-origin-synthesis-credential-exfil",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-client-doorway-origin-synthesis-credential-exfil.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:resolved"
     },
     {
       "slug": "security-declare-carries-record-carried-evidence-bounds",
@@ -4584,6 +5002,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "security-doorway-devmode-auth-bypass",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-doorway-devmode-auth-bypass.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "security-doorway-logout-token-version-revocation",
       "path": "/projects/elohim/genesis/data/timeline/backlog/security-doorway-logout-token-version-revocation.md",
       "author_status": "",
@@ -4593,6 +5022,26 @@
       "declared_feature": "",
       "feature_file_exists": false,
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "security-doorway-oauth-redirect-uri-interception",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-doorway-oauth-redirect-uri-interception.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "security-federation-record-signature-serialized-never-verified",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-federation-record-signature-serialized-never-verified.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
     },
     {
       "slug": "security-jquery-2-1-1-shipped-in-sophia-umd-bundle",
@@ -4613,6 +5062,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "security-unsigned-gossip-peer-becomes-jwt-trust-anchor",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/security-unsigned-gossip-peer-becomes-jwt-trust-anchor.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:resolved"
     },
     {
       "slug": "security-vite-dev-server-fs-access-advisory-family",
@@ -4644,6 +5104,17 @@
       "delivery_status_source": "",
       "declared_feature": "",
       "feature_file_exists": false
+    },
+    {
+      "slug": "seed-relationship-type-step-rejected",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/seed-relationship-type-step-rejected.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
       "slug": "seeder-onto-doorway-session-client",
@@ -4778,6 +5249,17 @@
       "feature_file_exists": false
     },
     {
+      "slug": "sovereign-peer-network-read-no-authorities",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/sovereign-peer-network-read-no-authorities.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "sovereign-turn-relay-transport-commons",
       "path": "/projects/elohim/genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md",
       "author_status": "",
@@ -4877,7 +5359,7 @@
       "slug": "stewarded-device-sync-feature-authoring",
       "path": "/projects/elohim/genesis/data/timeline/backlog/stewarded-device-sync-feature-authoring.md",
       "author_status": "",
-      "delivery_status": "refined",
+      "delivery_status": "wip",
       "delivery_status_updated": "",
       "delivery_status_source": "",
       "declared_feature": "",
@@ -5018,6 +5500,17 @@
       "frontmatter_anomaly": "unknown_delivery_status_value:open"
     },
     {
+      "slug": "sync-edge-susan-timeouts-per-edge-observability",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/sync-edge-susan-timeouts-per-edge-observability.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
       "slug": "sync-surfaces-epr-and-doorway",
       "path": "/projects/elohim/genesis/data/timeline/backlog/sync-surfaces-epr-and-doorway.md",
       "author_status": "",
@@ -5028,8 +5521,226 @@
       "feature_file_exists": false
     },
     {
+      "slug": "task-conductor-image-tag-runtime-visibility",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-conductor-image-tag-runtime-visibility.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:done"
+    },
+    {
+      "slug": "task-fleet-version-matrix-probe",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-fleet-version-matrix-probe.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-gso-burst-disconnect-t2-receipt",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-gso-burst-disconnect-t2-receipt.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "task-iroh-plane-version-advertisement",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-iroh-plane-version-advertisement.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:done"
+    },
+    {
+      "slug": "task-iroh-user-agent-observed-receipt",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-iroh-user-agent-observed-receipt.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:done"
+    },
+    {
+      "slug": "task-late-joiner-peer-discovery-refresh",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-late-joiner-peer-discovery-refresh.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:complete"
+    },
+    {
+      "slug": "task-mesh-late-joiner-staging-regime",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-mesh-late-joiner-staging-regime.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:complete"
+    },
+    {
+      "slug": "task-mesh-orphaned-conductor-guard",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-mesh-orphaned-conductor-guard.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:complete"
+    },
+    {
+      "slug": "task-peer-carried-sweep-mesh-receipt",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-peer-carried-sweep-mesh-receipt.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-release-adoption-controller-observe",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-release-adoption-controller-observe.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-release-apply-vehicles",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-release-apply-vehicles.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-release-channel-ceremony-driver",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-release-channel-ceremony-driver.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-release-manifest-schema-packager",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-release-manifest-schema-packager.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-release-soak-attestation-rail",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-release-soak-attestation-rail.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-rollout-evidence-capture",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-rollout-evidence-capture.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "in-progress"
+    },
+    {
+      "slug": "task-runtime-passport-endpoint",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-runtime-passport-endpoint.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "task-runtime-upgrade-a2o-receipt",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/task-runtime-upgrade-a2o-receipt.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "test-infra-elohim-service-angular-specs-orphaned",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/test-infra-elohim-service-angular-specs-orphaned.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "transport-route-metrics-pretouch-zero",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/transport-route-metrics-pretouch-zero.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:triaged"
+    },
+    {
       "slug": "turn-relay-pod-cidr-carveout-port-pool-shem-leg",
       "path": "/projects/elohim/genesis/data/timeline/backlog/turn-relay-pod-cidr-carveout-port-pool-shem-leg.md",
+      "author_status": "",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "frontmatter_anomaly": "unknown_delivery_status_value:open"
+    },
+    {
+      "slug": "upgrade-propagation-p2p-design-arc",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md",
       "author_status": "",
       "delivery_status": "unknown",
       "delivery_status_updated": "",
@@ -5127,7 +5838,7 @@
   "pickup_queue_for_deliver": [
     {
       "slug": "james-and-the-spoke",
-      "reason": "delivery_status=undelivered ; feature_file_missing:stewarded-device-sync.feature"
+      "reason": "delivery_status=undelivered ; feature_file_present:stewarded-device-sync.feature"
     },
     {
       "slug": "the-coop-decides",

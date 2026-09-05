@@ -20,3 +20,16 @@ Folds the multi-agent fleet-sizing, delegation and workflow-harness trap cluster
 - [[feedback_workflow_structuredoutput_hang]] — schema'd workflow agents retry empty {} StructuredOutput forever (48→481 calls, no completion notify) and hang the run — go schemaless prose + stall-watcher
 - [[feedback_subagent_liveness_clock_skew]] — Container clocks skew hours apart — never infer agent death from transcript mtime vs date; check writer-relative freshness and TaskStop live racers first.
 - [[feedback_overnight_permission_stalls]] — An idle overnight session may be blocked on a permission prompt (auth paths), not done; check the transcript tail and never race a blocked session.
+
+**Shared-index race (2026-09-05):** two agents committing in ONE worktree raced on the git
+index — the Rust implementer's `git add` landed between the Codex lane's staging audit and its
+`git commit`, so Codex's commit a5fe238fc swept four Rust files in under the wrong message.
+Neither agent misbehaved; `git add` + `git commit` is not atomic across agents. Rule for
+parallel committers in one tree: commit by PATHSPEC (`git commit -m … -- <paths>`), which
+commits only the named paths regardless of what else is staged; or give each agent its own
+worktree. Put the rule in every implementer dispatch that shares a tree.
+
+**Subagents parked on a Monitor never resume (2026-09-04, verified twice):** an implementer that "waits for the monitor to signal the other build finished" stops its turn and is never re-invoked when the thing it waits for was already gone — two seats sat idle ~3 h with uncommitted edits while cargo was free. Rule: seats never wait on a Monitor for a shared resource; they retry in the foreground (`sleep 60`, bounded ≤20×) or report BLOCKED; the controller checks `berth who` + `ps` for cargo when a seat is silent > 30 min and nudges with SendMessage.
+**Root cause (2026-09-04):** the waiters used `pgrep -f 'cargo (build|test|check|clippy)'` — which matches OTHER waiter shells whose command line contains that very pattern — so the loops never exited (the one-build-at-a-time hook's suggested loop has the same bug). Use `pgrep -x cargo` / `pgrep -x rustc` (exact process names), never `pgrep -f` with a pattern that appears in the waiter's own command line.
+
+**berth cannot separate seats of one session (2026-09-05):** the lease is keyed on session id, so a subagent`s `berth claim` succeeds while a sibling seat of the same session holds the resource. Rule: the controller holds mesh/cargo leases on behalf of its seats and sequences them by message; a seat never claims the mesh on its own initiative when told another seat may be measuring.

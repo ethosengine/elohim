@@ -25,3 +25,8 @@ absolute `/tmp` path written by `sh` does not exist there (NoSuchFile → whatev
 unauthenticated and only passed via the doorway dev_mode hole until 62b658784 closed it (genesis #1503 403 →
 fixed 47fb60f58 with `sh(returnStdout:true)`). Rule: read container-side files back with `sh 'cat …'`, or write
 them under `${WORKSPACE}` (shared volume) — never `readFile` an absolute `/tmp` path.
+- **App builder agent needs a memory request (2026-09-04):** the root Jenkinsfile's builder pod had only ephemeral-storage
+  resources, so the scheduler put the Angular build on a 7.6 GB ThinkPad (node-type: edge includes the dqlite voters
+  .110/.111/.112); the node hit 0.13 GB free ~3 min into `Build App`, the JNLP channel closed and the controller's exec
+  fallback got "Expected HTTP 101 but was 500" ×5 — reads as a control-plane fault but is node OOM. Fixed with
+  requests 6Gi / limits 10Gi. Rule: any CI agent running a multi-GB build declares memory, or the ThinkPads eat it.

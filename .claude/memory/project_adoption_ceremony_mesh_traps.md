@@ -38,3 +38,21 @@ release, `--lineage-parent <current>`, `--attestation-threshold 0` for bytes the
 refused channel sits in the backoff ladder (up to 1800 s) — a warm `storage-restart` clears it; a fresh
 channel id costs one runtime-config reload. Related: [[project_local_mesh_binary_slot_and_restart]],
 [[feedback_upgrade_propagation_north_star_wall_clock]], [[project_upgrade_authority_constitutional_elohim]].
+
+**2026-09-04 overnight (rung 5 on the 0.7 mesh; Station 9 = second release on a long-lived channel):**
+(5) the a2o fixture converges every peer to its pinned BASELINE pair before/after each run — if the pin
+(`E2E_BASELINE_HAPP` + `E2E_BASELINE_COORDINATOR_WASM_HASH`) names older bytes than the mesh runs, the run silently
+REVERTS earlier deliveries (it hot-swapped lamad back to the old content_store zome); pin to a bundle carrying the
+mesh's current bytes for EVERY role (`genesis/a2o/reports/release-ceremony/2026-09-04/baseline-N/elohim-c3.happ`
+shape: baseline lamad.dna with only the coordinator wasm swapped, other roles from the epic bundle). (6) a
+registered channel in `apply` mode is a standing force: after the fixture moved bytes, the still-registered c3
+channel re-asserted its earned head on the next sweep — de-register experiment channels (restore the
+`runtime-config.toml` byte backup + reload) before a measure run. (7) an apply-mode row's `attestations` block is
+evidence for the release THAT ROW RESOLVED (the winner); a candidate staged beneath an earned head shows its
+attestation only on the canary's row (its resolvedHead IS the candidate) — read evidence there, or by cid via the
+zome (`get_attestations_for_subject`; no HTTP route). (8) `release-ceremony.ts channel create` accepts ids the
+release-manifest schema refuses (uppercase stamp) and authors an empty root before the packager rejects — lowercase
+stamps; backlog row filed. (9) every NON-FIRST release on a channel must declare `--lineage-parent <head cid>` on
+0.7 (the chain orders releases now; a null parent is `lineage_parent_mismatch`); first releases and fresh teardown
+channels keep null. (10) `artifact_unavailable` on followers was structural until the peer-pull source (storage
+35f0746ad + c8930c2f2, shard-manifest following); before it every non-packaging peer needed a hand `PUT /blob`.

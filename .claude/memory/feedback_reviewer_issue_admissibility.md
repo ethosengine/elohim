@@ -13,3 +13,12 @@ In autonomous implement→review→fix loops (SDD workflows), spec reviewers wil
 **Why:** a reviewer prompted to "verify every step" has no concept of fixability; an implementer correctly refusing to rewrite history reads as non-compliance.
 
 **How to apply:** every reviewer prompt in an autonomous loop gets an *issue-admissibility* clause: (1) judge tree+history AS-IS, never demand history rewrites; (2) evidence pasted in the implementer's report satisfies transient-state steps; (3) a minimal, separately-committed, documented pre-existing-bug fix is a NOTE, not an issue; verdict = compliant when only NOTE-class findings remain. Implementer prompts get the dual: prerequisite fixes go in a SEPARATE scoped commit, history is append-only.
+
+**Blind-reader loops drift the same way (2026-09-05, valueflow-authoring.feature):** three
+fresh readers on one a2o story went READY → REVISE → REVISE, each round raising a DISJOINT set of
+"major" vocabulary findings (scratch repository, provider, dedicated slot; then valueflow, actor
+identity, task report, REA) after the previous round's had been fixed. That is reader variance,
+not convergence. Cap the loop at ~3 rounds: take the one STRUCTURAL finding per round (e.g. the
+title promised a journey no scenario walked → add the journey scenario), fold cheap glossary
+lines, then record the residue as a deferral note (`epr flow note --kind observation`) and stop.
+A first-round READY is the loop's exit even if a later reader reopens it.
