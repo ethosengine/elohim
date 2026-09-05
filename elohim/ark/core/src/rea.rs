@@ -16,8 +16,8 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use cid::Cid;
 use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Period, Quantity};
 use elohim_epr_rea::model::{
-    atom_cid, AgentRef, Bound, FlowEvent, Intent as ReaIntent, PinnedRef, Process as ReaProcess,
-    ResourceSpec,
+    atom_cid, AgentRef, Bound, Composition, FlowEvent, Intent as ReaIntent, LimitSource, PinnedRef,
+    Process as ReaProcess, ResourceSpec,
 };
 use elohim_epr_rea::stock::Window;
 use elohim_epr_rea::{AlgedonicEvidence, Magnitude, ReaVerb};
@@ -25,7 +25,7 @@ use elohim_epr_rea::{AlgedonicEvidence, Magnitude, ReaVerb};
 use crate::{
     berth::Berth,
     intent::{Intent, IntentAction},
-    manifest::ChildPolicy,
+    manifest::{ChildPolicy, RuntimeEnvelope, RuntimeManifest},
     passport::Passport,
     sample::ProcessSample,
     tally::DeathTally,
@@ -293,6 +293,50 @@ impl Incident {
     }
 }
 
+impl RuntimeEnvelope {
+    /// Provider's declared memory ceiling, not enforcement or a measurement.
+    ///
+    /// The envelope has no children: its root is declared, not a sum. Use
+    /// [`RuntimeManifest::memory_bound`] for the folded child allocation plus headroom.
+    pub fn memory_bound(&self, threshold_pct: u8) -> Option<Bound> {
+        Bound::new(
+            self.bound.memory_bytes? as f64,
+            "bytes".into(),
+            f64::from(threshold_pct),
+        )
+        .ok()
+    }
+}
+
+impl RuntimeManifest {
+    /// Fold the same child allocations and explicit headroom checked by validation.
+    ///
+    /// This is a declared allocation, not enforcement. The folded limit may be below
+    /// the provider's root ceiling; that ceiling is [`RuntimeEnvelope::memory_bound`].
+    /// No child memory quotas means no answer, even with headroom. An undeclared root
+    /// or a zero limit or invalid percentage also yields no bound. Floating point exists only at the
+    /// inherited REA boundary; the manifest and its refusal arithmetic stay integers.
+    pub fn memory_bound(&self, threshold_pct: u8) -> Option<Bound> {
+        let envelope = self.envelope.as_ref()?;
+        envelope.bound.memory_bytes?;
+        let mut parts: Vec<f64> = self
+            .memory_quota_parts()
+            .map(|bytes| bytes as f64)
+            .collect();
+        // Let the inherited fold refuse absence before adding optional headroom.
+        Composition::Sum.fold(&parts).ok()?;
+        if let Some(headroom) = envelope.headroom_bytes {
+            parts.push(headroom as f64);
+        }
+        let limit = Composition::Sum.fold(&parts).ok()?;
+        let mut bound = Bound::new(limit, "bytes".into(), f64::from(threshold_pct)).ok()?;
+        bound.source = Some(LimitSource::Folded {
+            rule: Composition::Sum,
+        });
+        Some(bound)
+    }
+}
+
 impl ChildPolicy {
     /// The intensity limit expressed as the substrate's [`Bound`] — a ceiling this runtime
     /// declares on its own promise, denominated in [`UNIT_DEATHS`].
@@ -501,6 +545,109 @@ mod tests {
         witness::WITNESS_KIND,
         RestartVerdict,
     };
+
+    fn memory_manifest() -> RuntimeManifest {
+        use crate::manifest::{Bands, ChildSpec, ProcessQuota, ResourceQuota};
+        RuntimeManifest {
+            envelope: Some(RuntimeEnvelope {
+                bound: ResourceQuota {
+                    memory_bytes: Some(1000),
+                    ..Default::default()
+                },
+                headroom_bytes: Some(100),
+                graded: Some(Bands {
+                    soft_pct: 70,
+                    high_pct: 85,
+                    hard_pct: 100,
+                }),
+                ..Default::default()
+            }),
+            processes: [600, 300]
+                .into_iter()
+                .map(|bytes| ChildSpec {
+                    quota: Some(ProcessQuota {
+                        memory_max_bytes: Some(bytes),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn memory_bound_folds_bytes_and_agrees_with_declared_bands() {
+        let manifest = memory_manifest();
+        let bands = manifest.envelope.as_ref().unwrap().graded.as_ref().unwrap();
+        for (pct, edge) in [
+            (bands.soft_pct, 700.0),
+            (bands.high_pct, 850.0),
+            (bands.hard_pct, 1000.0),
+        ] {
+            let bound = manifest.memory_bound(pct).unwrap();
+            assert_eq!(bound.unit, "bytes");
+            assert_eq!(bound.limit, 1000.0);
+            assert_eq!(
+                bound.source,
+                Some(LimitSource::Folded {
+                    rule: Composition::Sum
+                })
+            );
+            assert!(!bound.approached_by(edge - 1.0));
+            assert!(bound.approached_by(edge));
+            assert!(!bound.breached_by(999.0));
+            assert!(bound.breached_by(1000.0));
+        }
+    }
+
+    #[test]
+    fn memory_bound_preserves_absence_and_rejects_invalid_thresholds() {
+        let mut manifest = memory_manifest();
+        assert!(manifest.memory_bound(0).is_none());
+        assert!(manifest.memory_bound(101).is_none());
+        for child in &mut manifest.processes {
+            child.quota = None;
+        }
+        assert!(manifest.memory_bound(85).is_none());
+        manifest.processes.clear();
+        assert!(manifest.memory_bound(85).is_none());
+        manifest = memory_manifest();
+        manifest.envelope.as_mut().unwrap().bound.memory_bytes = None;
+        assert!(manifest.memory_bound(85).is_none());
+        assert!(manifest
+            .envelope
+            .as_ref()
+            .unwrap()
+            .memory_bound(85)
+            .is_none());
+        manifest.envelope = None;
+        assert!(manifest.memory_bound(85).is_none());
+    }
+
+    #[test]
+    fn memory_bound_distinguishes_folded_allocation_from_declared_root() {
+        let mut manifest = memory_manifest();
+        manifest.envelope.as_mut().unwrap().bound.memory_bytes = Some(2000);
+        let root = manifest
+            .envelope
+            .as_ref()
+            .unwrap()
+            .memory_bound(85)
+            .unwrap();
+        assert_eq!(root.limit, 2000.0);
+        assert_eq!(root.source, None); // The substrate's canonical Declared encoding.
+        assert_eq!(manifest.memory_bound(85).unwrap().limit, 1000.0);
+        manifest.envelope.as_mut().unwrap().headroom_bytes = None;
+        assert_eq!(manifest.memory_bound(85).unwrap().limit, 900.0);
+        for child in &mut manifest.processes {
+            child.quota.as_mut().unwrap().memory_max_bytes = Some(0);
+        }
+        assert!(
+            manifest.memory_bound(85).is_none(),
+            "Bound requires a positive limit"
+        );
+    }
 
     fn cid_of(label: &str) -> Cid {
         elohim_epr::cid::compute_cid(label.as_bytes())

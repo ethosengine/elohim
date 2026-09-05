@@ -1,0 +1,171 @@
+# Schema: elohim/sdk/schemas/v1/manifest/seam-registry.schema.json
+seamRegistryVersion: 1
+crate: elohim-ark-core
+crateRoot: elohim/ark
+seamLocus: Station 1 envelope declaration and REA projection at S3.3; no enforcement, anchoring or new head-selection
+  policy.
+decisionPoints:
+- name: RuntimeManifest::validate
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: core/src/manifest.rs
+    modulePath: ark_core::manifest
+  summary: Refuse child memory plus headroom above the declared root and invalid shedding names.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: S3.3 pure runtime declaration; manifest is A-class content-addressed bytes, with anchoring deferred.
+  - id: C1
+    status: n-a
+    justification: Neither decision selects or crowns a head or an authority.
+  - id: C2
+    status: n-a
+    justification: Pure reads do not move declared heads or shared state.
+  - id: C3
+    status: answered
+    justification: A refused declaration can be revised to fit its root; no runtime state machine is added.
+  - id: C4
+    status: partial
+    justification: Absent root and child quotas remain absent; the requested Option projection conflates invalid
+      thresholds with absence.
+  - id: C5
+    status: answered
+    justification: Validation re-derives integer sums; projection carries declarations and confers no enforcement
+      authority.
+  - id: C6a
+    status: partial
+    justification: Work is finite over the supplied manifest, but no serialized-input size budget is imposed in
+      core.
+  - id: C6b
+    status: answered
+    justification: Repeated pure validation and projection perform no effects and mint no records.
+  - id: C7
+    status: answered
+    justification: Documented declaration-only semantics preserve EffectiveTier None; no runtime quota service is
+      advertised.
+  - id: C8
+    status: partial
+    justification: Invalid names and exact sum totals are returned; no labeled counters or typed reason labels exist
+      in pure core.
+  - id: C9
+    status: n-a
+    justification: No agent keys, re-keying or identity lineage are introduced.
+  - id: C10
+    status: partial
+    justification: Old absent-field CIDs are pinned and unknown schema is refused; existing serde unknown-field
+      acceptance remains.
+  - id: C11
+    status: n-a
+    justification: No external calls or backpressure receiver exists in these pure decisions.
+  - id: C12
+    status: n-a
+    justification: Declaration parsing neither grants authority nor acts on a host.
+  - id: C13
+    status: answered
+    justification: Declaration-only scaffold names future witnessed runtime enforcement; DHT anchoring remains a
+      later station.
+  - id: C14
+    status: partial
+    justification: Validator uses existing Invalid errors; Option projection has no witnessed residual reason for
+      invalid thresholds.
+  contractTests:
+  - path: elohim/ark/core/src/manifest.rs
+    testName: live_manifest_cid_is_unmoved_by_absent_envelope
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: manifest_cid_is_unmoved_by_the_child_spec_rename
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: memory_sum_plus_headroom_over_root_names_totals
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: memory_sum_at_root_minus_headroom_passes
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: undeclared_memory_never_refuses_the_sum
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: memory_sum_cannot_wrap_past_root
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: unknown_shed_order_process_is_refused
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: unknown_protected_process_and_conflicting_lists_are_refused
+    kind: unit
+  - path: elohim/ark/core/src/manifest.rs
+    testName: envelope_json_dag_cbor_round_trip_keeps_cid
+    kind: unit
+- name: RuntimeManifest::memory_bound
+  kind: verdict-fn
+  sourceLocation:
+    file: core/src/rea.rs
+    modulePath: ark_core::rea
+  summary: Project child memory plus headroom through the inherited Sum fold, distinct from the declared root ceiling.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: S3.3 pure runtime declaration; manifest is A-class content-addressed bytes, with anchoring deferred.
+  - id: C1
+    status: n-a
+    justification: Neither decision selects or crowns a head or an authority.
+  - id: C2
+    status: n-a
+    justification: Pure reads do not move declared heads or shared state.
+  - id: C3
+    status: answered
+    justification: A refused declaration can be revised to fit its root; no runtime state machine is added.
+  - id: C4
+    status: partial
+    justification: Absent root and child quotas remain absent; the requested Option projection conflates invalid
+      thresholds with absence.
+  - id: C5
+    status: answered
+    justification: Validation re-derives integer sums; projection carries declarations and confers no enforcement
+      authority.
+  - id: C6a
+    status: partial
+    justification: Work is finite over the supplied manifest, but no serialized-input size budget is imposed in
+      core.
+  - id: C6b
+    status: answered
+    justification: Repeated pure validation and projection perform no effects and mint no records.
+  - id: C7
+    status: answered
+    justification: Documented declaration-only semantics preserve EffectiveTier None; no runtime quota service is
+      advertised.
+  - id: C8
+    status: partial
+    justification: Invalid names and exact sum totals are returned; no labeled counters or typed reason labels exist
+      in pure core.
+  - id: C9
+    status: n-a
+    justification: No agent keys, re-keying or identity lineage are introduced.
+  - id: C10
+    status: partial
+    justification: Old absent-field CIDs are pinned and unknown schema is refused; existing serde unknown-field
+      acceptance remains.
+  - id: C11
+    status: n-a
+    justification: No external calls or backpressure receiver exists in these pure decisions.
+  - id: C12
+    status: n-a
+    justification: Declaration parsing neither grants authority nor acts on a host.
+  - id: C13
+    status: answered
+    justification: Declaration-only scaffold names future witnessed runtime enforcement; DHT anchoring remains a
+      later station.
+  - id: C14
+    status: partial
+    justification: Validator uses existing Invalid errors; Option projection has no witnessed residual reason for
+      invalid thresholds.
+  contractTests:
+  - path: elohim/ark/core/src/rea.rs
+    testName: memory_bound_folds_bytes_and_agrees_with_declared_bands
+    kind: unit
+  - path: elohim/ark/core/src/rea.rs
+    testName: memory_bound_preserves_absence_and_rejects_invalid_thresholds
+    kind: unit
+  - path: elohim/ark/core/src/rea.rs
+    testName: memory_bound_distinguishes_folded_allocation_from_declared_root
+    kind: unit

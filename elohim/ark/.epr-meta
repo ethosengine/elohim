@@ -1,0 +1,24 @@
+---
+epr-meta-version: 1
+id: ark-envelope-declaration
+purpose: >
+  The ark compute-envelope crate family declares runtime resources in pure core;
+  the supervisor owns effects and the CLI owns invocation.
+rules:
+  - id: declaration-is-not-enforcement
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["RuntimeEnvelope", "ResourceQuota", "ProcessQuota", "memory_bound"]
+    dedupe-of: "elohim/ark/CLAUDE.md (Declared S0 simplifications) + elohim/ark/core/src/passport.rs (EffectiveTier)"
+    why: >
+      A manifest field never implies enforcement. Envelope limits, protected children,
+      shed order and graded obligations are declarations only; EffectiveTier stays None
+      until a later runtime implements and witnesses enforcement. Reuse epr-rea Bound
+      and Composition for projection; never mint a parallel bound ontology.
+---
+
+# ark — envelope declaration
+
+The two Station 1 decisions are registered in seam-registry.yaml. Reciprocity
+ledger events belong to the future enforcing runtime, not the manifest declaration.
