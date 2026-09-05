@@ -32,6 +32,13 @@ const deployments = JSON.parse(read("genesis/orchestrator/data/deployments.json"
 
 const PLACEHOLDER = "RUNTIME_CONFIG_BODY_PLACEHOLDER";
 
+// The one mint site for the workspace release channel id (rung5 workspace
+// orchestration Task 3, 2026-09-05) — deployments.json's alpha humans all
+// follow THIS channel, at a per-human adoption mode. Kept as a single JS
+// constant here so a future rename only moves one line; deployments.json's
+// own $releaseChannelIdComment is the human-readable mint record.
+const WORKSPACE_CHANNEL_ID = "runtime:coordinators:elohim:workspace";
+
 // The documented rule, mirrored (see runtimeConfigSedExpr).
 function sedExprFor(runtimeConfig) {
   if (!runtimeConfig || Object.keys(runtimeConfig).length === 0) {
@@ -118,5 +125,68 @@ test("every runtimeConfig declared in deployments.json is renderable", () => {
     if (human.runtimeConfig === undefined) continue;
     assert.equal(typeof human.runtimeConfig, "object", `${human.name}: runtimeConfig is a map`);
     sedExprFor(human.runtimeConfig); // asserts key/value shape
+  }
+});
+
+function humanNamed(name) {
+  const human = deployments.humans.find((h) => h.name === name);
+  assert.ok(human, `deployments.json declares a human named ${name}`);
+  return human;
+}
+
+test("every declared ELOHIM_RELEASE_CHANNELS follows the one workspace channel id", () => {
+  const withChannel = deployments.humans.filter(
+    (h) => h.runtimeConfig?.ELOHIM_RELEASE_CHANNELS !== undefined,
+  );
+  assert.ok(withChannel.length > 0, "at least one alpha human declares the channel");
+  for (const human of withChannel) {
+    const value = human.runtimeConfig.ELOHIM_RELEASE_CHANNELS;
+    assert.match(
+      value,
+      new RegExp(`^${WORKSPACE_CHANNEL_ID.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=(observe|canary|apply)$`),
+      `${human.name}: ELOHIM_RELEASE_CHANNELS must be the single workspace channel id at a valid mode`,
+    );
+  }
+});
+
+test("a shem-hosted alpha human (no field before rung5 Task 3) without runtimeConfig would render byte-identical", () => {
+  // terrance is a real deployments.json human that still carries no runtimeConfig
+  // (suspended shem fixture) -- proves the "field absent" arm of the per-human
+  // contract on real data, not just the abstract sed mechanism above.
+  const human = humanNamed("terrance");
+  assert.equal(human.runtimeConfig, undefined, "terrance carries no runtimeConfig");
+  const rendered = renderWithSed(template, sedExprFor(human.runtimeConfig));
+  const expected = template.split("\n").filter((l) => l !== `    ${PLACEHOLDER}`).join("\n");
+  assert.equal(rendered, expected, "no field -> byte-identical to the comment-only body");
+  assert.doesNotMatch(rendered, /RUNTIME_CONFIG_BODY/);
+});
+
+test("alpha humans WITH the field render the real workspace channel line at their declared mode", () => {
+  // james = canary (first household adopter), matthew/jessica = apply (bootstrap
+  // pair), adam/gertrude/susan/eve = observe (shem-hosted) -- rung5 workspace
+  // orchestration Task 3 data.
+  for (const [name, mode] of [
+    ["james", "canary"],
+    ["matthew", "apply"],
+    ["jessica", "apply"],
+    ["adam", "observe"],
+    ["gertrude", "observe"],
+    ["susan", "observe"],
+    ["eve", "observe"],
+  ]) {
+    const human = humanNamed(name);
+    const expectedValue = `${WORKSPACE_CHANNEL_ID}=${mode}`;
+    assert.equal(
+      human.runtimeConfig?.ELOHIM_RELEASE_CHANNELS,
+      expectedValue,
+      `${name}: declared channel/mode`,
+    );
+    const rendered = renderWithSed(template, sedExprFor(human.runtimeConfig));
+    const body = configMapBody(rendered, "RESOURCE_PREFIX_PLACEHOLDER");
+    assert.match(
+      body,
+      new RegExp(`\\n    ELOHIM_RELEASE_CHANNELS = "${expectedValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"\\n`),
+      `${name}: renders the workspace channel line at ${mode}`,
+    );
   }
 });
