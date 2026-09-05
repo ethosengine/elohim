@@ -200,8 +200,10 @@ Feature: The network changes the rules its peers hold each other to without losi
     # closed chain must not be authored on again: every neighbour WARRANTS such a write and BLOCKS
     # the writing cell (see the vocabulary). Station 8's own post-close write therefore leaves a real
     # block behind on this household, which is why a story that began on an already-sealed household
-    # would poison itself with its first write — and why this precondition refuses such a household
-    # by name before anything is written. Station 8's comment says what it measures and what it does not.
+    # would poison itself with its first write — any ordinary v1 write on a closed chain IS such a
+    # write, which is why the guard tests "closed", the cause, and not "blocked", the consequence —
+    # and why this precondition refuses such a household by name before anything is written.
+    # Station 8's comment says what it measures and what it does not.
     And no peer's v1 node-registry chain is already closed
     And each peer's runtime follows release channel "runtime:lineage:node_registry:commons"
     And matthew, james and jessica each hold node-registry records they authored on v1
