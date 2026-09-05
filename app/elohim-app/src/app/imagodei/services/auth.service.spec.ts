@@ -9,7 +9,6 @@ import {
   type AuthProvider,
   type AuthCredentials,
   type AuthResult,
-  type RegisterCredentials,
   type AuthProviderType,
   AUTH_TOKEN_KEY,
   AUTH_PROVIDER_KEY,
@@ -40,16 +39,6 @@ describe('AuthService', () => {
       } as AuthResult)
     ),
     logout: vi.fn().mockReturnValue(Promise.resolve()),
-    register: vi.fn().mockReturnValue(
-      Promise.resolve({
-        success: true,
-        token: 'test-token-456',
-        humanId: 'human-456',
-        agentPubKey: 'agent-pub-key-456',
-        expiresAt: Date.now() + 3600000,
-        identifier: 'newuser@example.com',
-      } as AuthResult)
-    ),
     refreshToken: vi.fn().mockReturnValue(
       Promise.resolve({
         success: true,
@@ -302,109 +291,9 @@ describe('AuthService', () => {
     });
   });
 
-  // ==========================================================================
-  // Register Tests
-  // ==========================================================================
-
-  describe('register', () => {
-    it('should return error when provider not registered', async () => {
-      const credentials: RegisterCredentials = {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      };
-
-      const result = await service.register('password', credentials);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('not registered');
-        expect(result.code).toBe('NOT_ENABLED');
-      }
-    });
-
-    it('should return error when provider does not support registration', async () => {
-      const provider = createMockProvider('password', {
-        register: undefined,
-      });
-      service.registerProvider(provider);
-
-      const credentials: RegisterCredentials = {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      };
-
-      const result = await service.register('password', credentials);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('does not support registration');
-        expect(result.code).toBe('NOT_ENABLED');
-      }
-    });
-
-    it('should register successfully with valid credentials', async () => {
-      const provider = createMockProvider('password');
-      service.registerProvider(provider);
-
-      const credentials: RegisterCredentials = {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      };
-
-      const result = await service.register('password', credentials);
-
-      expect(result.success).toBe(true);
-      expect(provider.register).toHaveBeenCalledWith(credentials);
-      expect(service.isAuthenticated()).toBe(true);
-      expect(service.token()).toBe('test-token-456');
-      expect(service.humanId()).toBe('human-456');
-    });
-
-    it('should handle registration failure', async () => {
-      const provider = createMockProvider('password', {
-        register: vi
-          .fn()
-          .mockReturnValue(Promise.resolve({ success: false, error: 'User already exists' })),
-      });
-      service.registerProvider(provider);
-
-      const result = await service.register('password', {
-        identifier: 'existing@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'Existing User',
-      });
-
-      expect(result.success).toBe(false);
-      expect(service.error()).toBe('User already exists');
-    });
-
-    it('should handle registration network error', async () => {
-      const provider = createMockProvider('password', {
-        register: vi.fn().mockReturnValue(Promise.reject(new Error('Connection failed'))),
-      });
-      service.registerProvider(provider);
-
-      const result = await service.register('password', {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Connection failed');
-        expect(result.code).toBe('NETWORK_ERROR');
-      }
-    });
-  });
+  // AuthService has no `register`. Registration is the doorway portal's — the
+  // app asks for it with OAuth prompt=create and only ever receives the session
+  // that comes back — so there is no registration surface here to test.
 
   // ==========================================================================
   // Logout Tests
@@ -845,8 +734,8 @@ describe('AuthService', () => {
       expect(typeof service.login).toBe('function');
     });
 
-    it('should have register method', () => {
-      expect(typeof service.register).toBe('function');
+    it('should have NO register method — apps do not register humans', () => {
+      expect((service as unknown as Record<string, unknown>)['register']).toBeUndefined();
     });
 
     it('should have logout method', () => {
@@ -891,22 +780,6 @@ describe('AuthService', () => {
         type: 'password',
         identifier: 'test@example.com',
         password: 'password123',
-      });
-
-      expect(result).toBeDefined();
-      expect(typeof result === 'object').toBe(true);
-      expect('success' in result).toBe(true);
-    });
-
-    it('register should return Promise<AuthResult>', async () => {
-      const provider = createMockProvider('password');
-      service.registerProvider(provider);
-
-      const result = await service.register('password', {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
       });
 
       expect(result).toBeDefined();
@@ -991,21 +864,6 @@ describe('AuthService', () => {
 
       expect(() => service.login('password', credentials)).not.toThrow();
       await service.login('password', credentials);
-    });
-
-    it('register should accept provider type and registration credentials', async () => {
-      const provider = createMockProvider('password');
-      service.registerProvider(provider);
-
-      const credentials: RegisterCredentials = {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      };
-
-      expect(() => service.register('password', credentials)).not.toThrow();
-      await service.register('password', credentials);
     });
 
     it('setAuthFromResult should accept AuthResult with optional provider type', () => {

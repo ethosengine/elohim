@@ -121,7 +121,9 @@ describe('resolveGatewayToDoorwayUrl', () => {
   describe('hostile input', () => {
     // Each of these returned a usable https:// origin before the fix, and each
     // is a live credential-exfiltration vector: whatever comes back here is
-    // where PasswordAuthProvider POSTs {identifier, password}.
+    // the origin the human is REDIRECTED to in order to type their password.
+    // The app no longer posts the credential itself, but sending someone to a
+    // hostile sign-in page is the same theft with an extra step.
     it('refuses a bare attacker domain', () => {
       expect(resolveGatewayToDoorwayUrl('evil.tld')).toBeNull();
     });

@@ -72,33 +72,12 @@ export interface OAuthCredentials {
 /** Union of all credential types */
 export type AuthCredentials = PasswordCredentials | PasskeyCredentials | OAuthCredentials;
 
-// ProfileReach imported from identity.model.ts to avoid duplication
-import type { ProfileReach } from './identity.model';
-
 // @coverage: 75.0% (2026-02-24)
 
-/** Registration credentials (for creating new auth) */
-export interface RegisterCredentials {
-  identifier: string;
-  identifierType: IdentifierType;
-  password: string;
-  // Profile fields - doorway creates Holochain identity
-  /** Display name for profile */
-  displayName: string;
-  /** Optional bio/description */
-  bio?: string;
-  /** User interests/affinities */
-  affinities?: string[];
-  /** Profile visibility (public, connections, private) */
-  profileReach?: ProfileReach;
-  /** Optional location */
-  location?: string;
-  // Legacy fields - only used for external registration flow
-  /** Holochain human ID (optional - doorway generates if not provided) */
-  humanId?: string;
-  /** Holochain agent public key (optional - doorway provides) */
-  agentPubKey?: string;
-}
+// There is no RegisterCredentials type here any more. Registration is not a
+// capability of this app: a hosted human's account is created at their
+// doorway's own portal, and profile fields (bio, affinities, reach, location)
+// are set on the profile surface after sign-in, never at sign-up.
 
 // =============================================================================
 // Auth Results
@@ -190,12 +169,13 @@ export const INITIAL_AUTH_STATE: AuthState = {
  * Abstract interface for authentication providers.
  *
  * Implementations:
- * - PasswordAuthProvider: Email/username + password authentication
+ * - OAuthAuthProvider: authorization-code flow against the human's doorway
  * - PasskeyAuthProvider (future): WebAuthn passkey authentication
- * - OAuthProvider (future): Social login (Google, GitHub, etc.)
  *
- * This abstraction allows swapping authentication methods without
- * changing the rest of the application.
+ * No implementation registers a credential — apps are relying parties, so
+ * there is no `register` capability on this interface and no provider that
+ * takes a password. This abstraction allows swapping authentication methods
+ * without changing the rest of the application.
  */
 export interface AuthProvider {
   /** Provider type identifier */
@@ -208,15 +188,6 @@ export interface AuthProvider {
    * @returns Authentication result with token on success
    */
   login(credentials: AuthCredentials): Promise<AuthResult>;
-
-  /**
-   * Register authentication credentials (optional).
-   * Some providers (like OAuth) may not support registration.
-   *
-   * @param credentials - Registration data including Holochain identity
-   * @returns Authentication result with token on success
-   */
-  register?(credentials: RegisterCredentials): Promise<AuthResult>;
 
   /**
    * Clear authentication state.
@@ -237,27 +208,8 @@ export interface AuthProvider {
 // API Types (matching edge node)
 // =============================================================================
 
-/** Request body for POST /auth/register */
-export interface RegisterAuthRequest {
-  identifier: string;
-  identifierType: IdentifierType;
-  password: string;
-  // Profile fields - doorway creates identity
-  displayName: string;
-  bio?: string;
-  affinities?: string[];
-  profileReach?: ProfileReach;
-  location?: string;
-  // Legacy fields (optional)
-  humanId?: string;
-  agentPubKey?: string;
-}
-
-/** Request body for POST /auth/login */
-export interface LoginRequest {
-  identifier: string;
-  password: string;
-}
+// POST /auth/register and POST /auth/login have no request type here: this app
+// posts to neither. Both are the doorway portal's own surfaces.
 
 /**
  * Auth wire shapes — the schema-contract-pinned generated contracts,

@@ -48,7 +48,6 @@ import {
   type AuthProvider,
   type AuthProviderType,
   type AuthCredentials,
-  type RegisterCredentials,
   type AuthResult,
   type AuthFailure,
   type AuthErrorCode,
@@ -241,53 +240,9 @@ export class AuthService {
     }
   }
 
-  /**
-   * Register authentication credentials for a Holochain identity.
-   *
-   * @param type - Provider type to use
-   * @param credentials - Registration credentials including Holochain identity
-   * @returns Authentication result
-   */
-  async register(type: AuthProviderType, credentials: RegisterCredentials): Promise<AuthResult> {
-    const provider = this.providers.get(type);
-
-    if (!provider) {
-      return {
-        success: false,
-        error: `Authentication provider '${type}' not registered`,
-        code: 'NOT_ENABLED',
-      };
-    }
-
-    if (!provider.register) {
-      return {
-        success: false,
-        error: `Provider '${type}' does not support registration`,
-        code: 'NOT_ENABLED',
-      };
-    }
-
-    this.updateState({ isLoading: true, error: null });
-
-    try {
-      const result = await provider.register(credentials);
-
-      if (result.success) {
-        this.handleAuthSuccess(result, type);
-      } else {
-        this.updateState({
-          isLoading: false,
-          error: result.error,
-        });
-      }
-
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'Registration failed';
-      this.updateState({ isLoading: false, error });
-      return { success: false, error, code: 'NETWORK_ERROR' };
-    }
-  }
+  // There is no `register` here. Registration is the doorway portal's, reached
+  // through OAuthAuthProvider.initiateRegistration (prompt=create); this
+  // service only ever receives the session that comes back.
 
   /**
    * Logout and clear authentication state.
@@ -514,10 +469,9 @@ export class AuthService {
   /**
    * Doorway base URL for session walking. The service owns this derivation —
    * the client receives a plain origin (no strategy logic in the client).
-   * Mirrors PasswordAuthProvider.getAuthBaseUrl() priority:
-   * PROVEN doorway selection > this workspace's doorway > environment authUrl
-   * > adminUrl. Bearer tokens ride this URL, so the environment is the default
-   * and a selection only overrides it with proof.
+   * Priority: PROVEN doorway selection > this workspace's doorway > environment
+   * authUrl > adminUrl. Bearer tokens ride this URL, so the environment is the
+   * default and a selection only overrides it with proof.
    *
    * @returns Base URL, or null when no configuration is available
    */

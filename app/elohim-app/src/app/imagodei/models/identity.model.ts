@@ -132,15 +132,12 @@ export interface HumanProfile {
 }
 
 /**
- * Input for registering a new human.
+ * Input for registering a new human on a LOCAL conductor (`registerHumanNative`).
  *
- * For hosted mode (doorway registration):
- * - email and password are required
- * - Doorway creates identity and credentials atomically
- *
- * For native mode (local conductor):
- * - email/password optional
- * - Use registerHumanNative() instead
+ * There is no hosted counterpart and no credential here: a hosted human's
+ * account is created at their doorway's own portal, so the app carries neither
+ * email nor password. A steward whose own runtime holds their key registers
+ * through the conductor with nothing but their profile.
  */
 export interface RegisterHumanRequest {
   displayName: string;
@@ -148,10 +145,6 @@ export interface RegisterHumanRequest {
   affinities: string[];
   profileReach: ProfileReach;
   location?: string;
-  /** Email for authentication (required for hosted mode) */
-  email?: string;
-  /** Password for authentication (required for hosted mode) */
-  password?: string;
   /** If true, migrate session data to new Holochain identity */
   migrateFromSession?: boolean;
 }

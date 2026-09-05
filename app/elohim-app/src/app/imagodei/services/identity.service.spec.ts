@@ -10,7 +10,6 @@ import { AuthService } from './auth.service';
 import { SessionHumanService } from './session-human.service';
 import { AgencyService } from './agency.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { DoorwayRegistryService } from './doorway-registry.service';
 import { signal } from '@angular/core';
 import type { RegisterHumanRequest, HumanProfile } from '../models/identity.model';
@@ -142,16 +141,6 @@ function buildMockAgencyService() {
   };
 }
 
-function buildMockPasswordProvider() {
-  return {
-    type: 'password' as const,
-    login: vi.fn(),
-    register: vi.fn(),
-    getCurrentUser: vi.fn(),
-    logout: vi.fn(),
-  };
-}
-
 function buildMockDoorwayRegistry() {
   return {
     hasSelection: signal(false),
@@ -178,7 +167,6 @@ describe('IdentityService', () => {
   let mockSessionHumanService: ReturnType<typeof buildMockSessionHumanService>;
   let mockHolochainClient: ReturnType<typeof buildMockHolochainClient>;
   let mockAgencyService: ReturnType<typeof buildMockAgencyService>;
-  let mockPasswordProvider: ReturnType<typeof buildMockPasswordProvider>;
   let mockDoorwayRegistry: ReturnType<typeof buildMockDoorwayRegistry>;
   let mockIdentityApi: IIdentityApi;
 
@@ -191,7 +179,6 @@ describe('IdentityService', () => {
         { provide: AgencyService, useValue: mockAgencyService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: IDENTITY_API, useValue: mockIdentityApi },
-        { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
       ],
     });
@@ -204,7 +191,6 @@ describe('IdentityService', () => {
     mockSessionHumanService = buildMockSessionHumanService();
     mockHolochainClient = buildMockHolochainClient(false);
     mockAgencyService = buildMockAgencyService();
-    mockPasswordProvider = buildMockPasswordProvider();
     mockDoorwayRegistry = buildMockDoorwayRegistry();
     mockIdentityApi = buildMockIdentityApi();
   });
@@ -316,18 +302,9 @@ describe('IdentityService', () => {
       expect(service.canUpgrade()).toBe(false);
     });
 
-    it('should register password provider if not already registered', () => {
-      expect(mockAuthService.hasProvider).toHaveBeenCalledWith('password');
-      expect(mockAuthService.registerProvider).toHaveBeenCalledWith(mockPasswordProvider);
-    });
-
-    it('should NOT register password provider if already registered', () => {
-      // Reset and reconfigure with provider already registered
-      TestBed.resetTestingModule();
-      mockAuthService = buildMockAuthService();
-      mockAuthService.hasProvider.mockReturnValue(true);
-      setupTestBed();
-
+    it('should register NO credential provider — the app is a relying party', () => {
+      // A password provider used to be registered here on construction. There
+      // is none: sign-in and registration happen at the doorway's own portal.
       expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
     });
   });
@@ -377,52 +354,6 @@ describe('IdentityService', () => {
   });
 
   // ==========================================================================
-  // loginWithPassword
-  // ==========================================================================
-
-  describe('loginWithPassword()', () => {
-    beforeEach(() => {
-      setupTestBed();
-    });
-
-    it('should delegate to auth service login', async () => {
-      const mockResult = { success: true, humanId: 'human-1', agentPubKey: 'key-1' };
-      mockAuthService.login.mockResolvedValue(mockResult);
-
-      const result = await service.loginWithPassword('user@example.com', 'password123');
-
-      expect(mockAuthService.login).toHaveBeenCalledWith('password', {
-        type: 'password',
-        identifier: 'user@example.com',
-        password: 'password123',
-      });
-      expect(result).toEqual(mockResult);
-    });
-
-    it('should return failure result from auth service', async () => {
-      const mockResult = {
-        success: false,
-        error: 'Invalid credentials',
-        code: 'INVALID_CREDENTIALS',
-      };
-      mockAuthService.login.mockResolvedValue(mockResult);
-
-      const result = await service.loginWithPassword('bad@example.com', 'wrong');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid credentials');
-    });
-
-    it('should propagate errors thrown by auth service', async () => {
-      mockAuthService.login.mockRejectedValue(new Error('Network error'));
-
-      await expect(service.loginWithPassword('user@example.com', 'pass')).rejects.toThrow(
-        'Network error'
-      );
-    });
-  });
-
-  // ==========================================================================
   // logout
   // ==========================================================================
 
@@ -450,7 +381,6 @@ describe('IdentityService', () => {
       mockAuthService = buildMockAuthService();
       mockHolochainClient = buildMockHolochainClient(false);
       mockAgencyService = buildMockAgencyService();
-      mockPasswordProvider = buildMockPasswordProvider();
       mockDoorwayRegistry = buildMockDoorwayRegistry();
       setupTestBed();
 
@@ -463,110 +393,8 @@ describe('IdentityService', () => {
     });
   });
 
-  // ==========================================================================
-  // registerHuman (hosted mode)
-  // ==========================================================================
-
-  describe('registerHuman()', () => {
-    const mockRequest: RegisterHumanRequest = {
-      email: 'new@example.com',
-      password: 'secure-pass-123',
-      displayName: 'New User',
-      bio: 'A new human',
-      affinities: ['learning'],
-      profileReach: 'public',
-    };
-
-    const mockAuthResult = {
-      success: true,
-      humanId: 'new-human-789',
-      agentPubKey: 'new-agent-key',
-      token: 'jwt-token',
-    };
-
-    beforeEach(() => {
-      mockAuthService.register = vi.fn().mockResolvedValue(mockAuthResult);
-      setupTestBed();
-    });
-
-    it('should call auth service register with correct payload', async () => {
-      await service.registerHuman(mockRequest);
-
-      expect(mockAuthService.register).toHaveBeenCalledWith('password', {
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'secure-pass-123',
-        displayName: 'New User',
-        bio: 'A new human',
-        affinities: ['learning'],
-        profileReach: 'public',
-        location: undefined,
-      });
-    });
-
-    it('should return HumanProfile on success', async () => {
-      const profile = await service.registerHuman(mockRequest);
-
-      expect(profile).toBeDefined();
-      expect(profile.id).toBe('new-human-789');
-      expect(profile.displayName).toBe('New User');
-    });
-
-    it('should update state to hosted mode on success', async () => {
-      await service.registerHuman(mockRequest);
-
-      expect(service.mode()).toBe('hosted');
-      expect(service.isAuthenticated()).toBe(true);
-    });
-
-    it('should throw if email is missing', async () => {
-      const request = { ...mockRequest, email: undefined } as unknown as RegisterHumanRequest;
-      await expect(service.registerHuman(request)).rejects.toThrow('Email is required');
-    });
-
-    it('should throw if password is missing', async () => {
-      const request = { ...mockRequest, password: undefined } as unknown as RegisterHumanRequest;
-      await expect(service.registerHuman(request)).rejects.toThrow('Password is required');
-    });
-
-    it('should throw and set error state if auth service register fails', async () => {
-      mockAuthService.register = vi.fn().mockResolvedValue({
-        success: false,
-        error: 'Email already in use',
-      });
-
-      await expect(service.registerHuman(mockRequest)).rejects.toThrow('Email already in use');
-      expect(service.error()).toBe('Email already in use');
-    });
-
-    it('should throw with fallback message if non-Error thrown', async () => {
-      mockAuthService.register = vi.fn().mockRejectedValue('Unknown string error');
-
-      await expect(service.registerHuman(mockRequest)).rejects.toBe('Unknown string error');
-      expect(service.error()).toBe('Registration failed. Please try again.');
-    });
-
-    it('should mark session as migrated if session exists', async () => {
-      // Reset with active session
-      TestBed.resetTestingModule();
-      const session = createMockSessionHuman();
-      mockSessionHumanService = buildMockSessionHumanService(session);
-      mockAuthService = buildMockAuthService();
-      mockAuthService.register = vi.fn().mockResolvedValue(mockAuthResult);
-      mockHolochainClient = buildMockHolochainClient(false);
-      mockAgencyService = buildMockAgencyService();
-      mockPasswordProvider = buildMockPasswordProvider();
-      mockDoorwayRegistry = buildMockDoorwayRegistry();
-      setupTestBed();
-
-      await service.registerHuman(mockRequest);
-
-      expect(mockSessionHumanService.markAsMigrated).toHaveBeenCalledWith(
-        'new-agent-key',
-        'new-human-789'
-      );
-    });
-  });
+  // registerHuman (hosted mode) is GONE — a hosted human's account is created
+  // at their doorway's own portal, so there is no in-app registration to test.
 
   // ==========================================================================
   // registerHumanNative (steward mode - local conductor)
@@ -591,7 +419,6 @@ describe('IdentityService', () => {
       mockAuthService = buildMockAuthService();
       mockSessionHumanService = buildMockSessionHumanService();
       mockAgencyService = buildMockAgencyService();
-      mockPasswordProvider = buildMockPasswordProvider();
       mockDoorwayRegistry = buildMockDoorwayRegistry();
       setupTestBed();
 
@@ -769,22 +596,15 @@ describe('IdentityService', () => {
       });
     });
 
-    describe('when connected and in hosted mode', () => {
+    describe('when connected and in a network mode', () => {
       beforeEach(async () => {
         mockHolochainClient = buildMockHolochainClient(true);
         mockAuthService = buildMockAuthService();
-        mockAuthService.register = vi.fn().mockResolvedValue({
-          success: true,
-          humanId: 'human-999',
-          agentPubKey: 'agent-999',
-          token: 'token',
-        });
         setupTestBed();
 
-        // Put service into hosted mode
-        await service.registerHuman({
-          email: 'test@example.com',
-          password: 'password',
+        // Put the service into a network mode through the NATIVE path — the
+        // only registration this app performs.
+        await service.registerHumanNative({
           displayName: 'Test',
           affinities: [],
           profileReach: 'public',
@@ -961,19 +781,15 @@ describe('IdentityService', () => {
 
   describe('clearError()', () => {
     beforeEach(() => {
-      mockAuthService.register = vi.fn().mockResolvedValue({
-        success: false,
-        error: 'Test error',
-      });
+      mockHolochainClient = buildMockHolochainClient(true);
+      mockIdentityApi.createHuman = vi.fn().mockRejectedValue(new Error('Test error'));
       setupTestBed();
     });
 
     it('should clear error state', async () => {
       // Trigger an error
       try {
-        await service.registerHuman({
-          email: 'test@example.com',
-          password: 'pass',
+        await service.registerHumanNative({
           displayName: 'Test',
           affinities: [],
           profileReach: 'public',

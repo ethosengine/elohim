@@ -16,7 +16,6 @@ export { TauriAuthService } from './tauri-auth.service';
 export { DoorwayRegistryService } from './doorway-registry.service';
 
 // Auth providers
-export { PasswordAuthProvider } from './providers/password-auth.provider';
 export { OAuthAuthProvider } from './providers/oauth-auth.provider';
 
 // Hosting

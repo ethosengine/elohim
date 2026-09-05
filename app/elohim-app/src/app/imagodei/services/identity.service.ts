@@ -20,7 +20,6 @@ import { Injectable, inject, signal, computed, effect, untracked } from '@angula
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { IDENTITY_API } from '../interfaces/identity.interface';
-import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 import {
   type IdentityState,
   type IdentityMode,
@@ -40,7 +39,6 @@ import {
 
 import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
-import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { SessionHumanService } from './session-human.service';
 
 const STAGE_APP_STEWARD = 'app-steward';
@@ -203,7 +201,6 @@ export class IdentityService {
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly agencyService = inject(AgencyService);
   private readonly authService = inject(AuthService);
-  private readonly passwordProvider = inject(PasswordAuthProvider);
 
   // ==========================================================================
   // State
@@ -284,10 +281,9 @@ export class IdentityService {
   // ==========================================================================
 
   constructor() {
-    // Register password auth provider
-    if (!this.authService.hasProvider('password')) {
-      this.authService.registerProvider(this.passwordProvider);
-    }
+    // No credential provider is registered here. elohim-app is a relying party:
+    // sign-in and registration happen at the doorway's own portal, and the
+    // session that comes back is carried by AuthService/DoorwaySessionClient.
 
     // Watch for Holochain connection changes
     // Use untracked() to read identity mode without creating a dependency
@@ -395,48 +391,12 @@ export class IdentityService {
       await this.checkHolochainIdentity();
     }
 
-    // Check for restored auth session that needs identity fetch
-    // This handles the case where AuthService restored a token from localStorage
-    // but doesn't have humanId/agentPubKey (they weren't persisted)
-    await this.fetchRestoredSessionIdentity();
+    // A restored token's missing humanId/agentPubKey used to be re-fetched from
+    // /auth/me through the password provider. Session restore now rides
+    // AuthService -> DoorwaySessionClient, which carries the identity itself.
 
     // Signal that init is complete - auth effect can now process new logins
     this.initCompleted.set(true);
-  }
-
-  /**
-   * Fetch identity from server if we have a restored auth session without humanId/agentPubKey.
-   * This completes the session restoration by fetching the missing identity data.
-   */
-  private async fetchRestoredSessionIdentity(): Promise<void> {
-    const auth = this.authService.auth();
-
-    // Only fetch if we have a token but missing identity fields
-    if (!auth.isAuthenticated || !auth.token || (auth.humanId && auth.agentPubKey)) {
-      return;
-    }
-
-    // Use the password provider to fetch current user from /auth/me
-    const provider = this.authService.getProvider('password') as PasswordAuthProvider | undefined;
-    if (!provider?.getCurrentUser) {
-      return;
-    }
-
-    try {
-      const identity = await provider.getCurrentUser(auth.token);
-      if (identity) {
-        // Now connect as the authenticated user (this is a restore, not a fresh login)
-        await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey, true);
-      }
-    } catch (error) {
-      // Token is unvalidated - clear it to prevent partial login state
-      // This handles: 1) expired token, 2) server session invalidated, 3) network unavailable
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('NetworkError') || message.includes('timeout')) {
-        console.warn('[IdentityService] Session restoration failed due to network:', message);
-      }
-      await this.authService.logout();
-    }
   }
 
   /**
@@ -685,100 +645,12 @@ export class IdentityService {
   // ==========================================================================
 
   /**
-   * Register a new human identity via doorway (hosted mode).
-   *
-   * Doorway handles atomically:
-   * 1. Creating Holochain identity via imagodei zome
-   * 2. Storing auth credentials in MongoDB
-   * 3. Returning JWT + profile
-   *
-   * For native/steward mode (local conductor), use registerHumanNative().
+   * There is no hosted `registerHuman` here. A hosted human's account is
+   * created at their doorway's own portal (`/threshold/register`, reached with
+   * OAuth `prompt=create`); the app never posts a registration and never sees a
+   * password. `registerHumanNative` below is the NATIVE path — a steward whose
+   * own conductor holds their key — and is unaffected by that rule.
    */
-  async registerHuman(request: RegisterHumanRequest): Promise<HumanProfile> {
-    // Validate email is provided
-    if (!request.email) {
-      throw new Error('Email is required for registration');
-    }
-
-    if (!request.password) {
-      throw new Error('Password is required for registration');
-    }
-
-    this.updateState({ isLoading: true, error: null });
-
-    try {
-      // Register via doorway (handles identity creation + credentials atomically)
-      const authResult = await this.authService.register('password', {
-        identifier: request.email,
-        identifierType: 'email',
-        password: request.password,
-        displayName: request.displayName,
-        bio: request.bio,
-        affinities: request.affinities,
-        profileReach: request.profileReach,
-        location: request.location,
-      });
-
-      if (!authResult.success) {
-        throw new Error(authResult.error);
-      }
-
-      // Auth service effect will update identity state
-      // Build profile from auth result
-      const profile: HumanProfile = {
-        id: authResult.humanId,
-        displayName: request.displayName,
-        bio: request.bio ?? null,
-        affinities: request.affinities,
-        profileReach: request.profileReach,
-        location: request.location ?? null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Update state with registered profile
-      const session = this.sessionHumanService.getSession();
-      const did = generateDID(
-        'hosted',
-        authResult.humanId,
-        authResult.agentPubKey,
-        session?.sessionId ?? null
-      );
-
-      this.updateState({
-        mode: 'hosted',
-        isAuthenticated: true,
-        humanId: authResult.humanId,
-        displayName: request.displayName,
-        agentPubKey: authResult.agentPubKey,
-        did,
-        profile,
-        attestations: [],
-        agencyStage: 'hosted',
-        keyLocation: 'custodial',
-        canExportKeys: true,
-        keyBackup: null,
-        isLocalConductor: false,
-        conductorUrl: null,
-        linkedSessionId: session?.sessionId ?? null,
-        hasPendingMigration: false,
-        hostingCost: this.getDefaultHostingCost(),
-        nodeOperatorIncome: null,
-        isLoading: false,
-      });
-
-      // Mark session as migrated if it exists
-      if (session) {
-        this.sessionHumanService.markAsMigrated(authResult.agentPubKey, authResult.humanId);
-      }
-
-      return profile;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : REGISTRATION_FAILED_MESSAGE;
-      this.updateState({ isLoading: false, error: errorMessage });
-      throw err;
-    }
-  }
 
   /**
    * Register a new human identity via local conductor (steward mode).
@@ -914,23 +786,6 @@ export class IdentityService {
   // ==========================================================================
 
   /**
-   * Login with email/username and password.
-   *
-   * @param identifier - Email or username
-   * @param password - Password
-   * @returns Authentication result
-   */
-  async loginWithPassword(identifier: string, password: string): Promise<AuthResult> {
-    const credentials: PasswordCredentials = {
-      type: 'password',
-      identifier,
-      password,
-    };
-
-    return this.authService.login('password', credentials);
-  }
-
-  /**
    * Logout and return to visitor session.
    */
   async logout(): Promise<void> {
@@ -975,8 +830,8 @@ export class IdentityService {
 
   /**
    * Connect to Holochain as an authenticated user (after login or session restore).
-   * This is called by the auth state effect when login succeeds, or by
-   * fetchRestoredSessionIdentity when restoring a persisted session.
+   * This is called by the auth state effect when login succeeds — including
+   * the effect that fires when a persisted session is restored.
    *
    * @param humanId - The authenticated human ID
    * @param agentPubKey - The agent public key
