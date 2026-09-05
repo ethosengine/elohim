@@ -96,7 +96,8 @@ hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes    # 3b. lift it
 ./app/elohim-app/scripts/hc-mesh.sh blocks james    # 5. confirm: no rows — then the check below
 ```
 
-**On a single peer** (no mesh script), the same sequence:
+**On a single peer** (no mesh script), the same sequence — run it in one shell so
+`$DB`, `$ARGS` and `$PID` persist:
 
 ```bash
 DB=<your peer's data_root_path>/databases            # from its conductor-config.yaml
@@ -114,8 +115,9 @@ hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks               
 ```
 
 **Confirm the peer rejoined** (both cases): the admin interface's `dump_network_metrics`
-shows, per DNA, the local agent's `storage_arc` (null while blocked-out, a full range
-once a gossip round has completed) and `peer_meta[*].completed_rounds` climbing. One
+shows, per DNA, the local agent's `storage_arc` — the single-call signal: null while
+blocked-out, a full range once a gossip round has completed — and, on a second call
+a minute later, `peer_meta[*].completed_rounds` climbing. One
 literal call, run from `genesis/a2o` because the `@holochain/client` dependency is
 installed there (`ADMIN` = the peer's admin websocket port — household mesh: matthew
 4444, jessica 4454, james 4464; elsewhere the `admin_interfaces` port in
