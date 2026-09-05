@@ -9,7 +9,12 @@ import { request } from 'undici';
 import { BrowserDevice } from '../../src/framework/devices/browser-device.js';
 import { PlaywrightDevice, type PWPage } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
-import { ACCOUNT, LANDING, THRESHOLD_REGISTER, TOOLBAR } from '../../src/framework/pages/selectors.js';
+import {
+  ACCOUNT,
+  LANDING,
+  THRESHOLD_REGISTER,
+  TOOLBAR,
+} from '../../src/framework/pages/selectors.js';
 import { ThresholdLoginPage } from '../../src/framework/pages/threshold-login.page.js';
 
 import type { AuthResponse } from '../../src/framework/api/doorway-client.js';
@@ -32,11 +37,30 @@ const TEST_ID = {
 } as const;
 
 type Json = Record<string, unknown>;
-type BrowserResponse = { url(): string; status(): number; text(): Promise<string>; request(): { method(): string } };
-type ResponsePage = PWPage & { waitForResponse(predicate: (response: BrowserResponse) => boolean, options?: Json): Promise<BrowserResponse> };
-type PortalBridge = { localPart?: string; canonicalIdentifier?: string; password?: string; device?: PlaywrightDevice; doorwayUrl?: string };
-type Attempt = { status: number; body: Json };
-type HostedHuman = {
+interface BrowserResponse {
+  url(): string;
+  status(): number;
+  text(): Promise<string>;
+  request(): { method(): string };
+}
+type ResponsePage = PWPage & {
+  waitForResponse(
+    predicate: (response: BrowserResponse) => boolean,
+    options?: Json
+  ): Promise<BrowserResponse>;
+};
+interface PortalBridge {
+  localPart?: string;
+  canonicalIdentifier?: string;
+  password?: string;
+  device?: PlaywrightDevice;
+  doorwayUrl?: string;
+}
+interface Attempt {
+  status: number;
+  body: Json;
+}
+interface HostedHuman {
   human: Human;
   localPart: string;
   doorwayUrl: string;
@@ -45,8 +69,11 @@ type HostedHuman = {
   registrationDisplayName?: string;
   preClosureToken?: string;
   attempt?: Attempt;
-};
-type PipelineStep = { label: string; classes: string[] };
+}
+interface PipelineStep {
+  label: string;
+  classes: string[];
+}
 
 const peopleByWorld = new WeakMap<E2EWorld, HostedHuman[]>();
 
@@ -109,11 +136,26 @@ async function closeAccount(person: HostedHuman, token: string): Promise<Attempt
 }
 
 async function watch(page: PWPage, path: string): Promise<BrowserResponse> {
-  return (page as ResponsePage).waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === 'POST', { timeout: 30_000 });
+  return (page as ResponsePage).waitForResponse(
+    response => new URL(response.url()).pathname === path && response.request().method() === 'POST',
+    { timeout: 30_000 }
+  );
 }
 
-function remember(world: E2EWorld, displayName: string, localPart: string, doorwayId: string, doorwayUrl: string, auth: AuthResponse, device: BrowserDevice | PlaywrightDevice): void {
-  assert.equal(auth.identifier.split('@')[0], localPart, 'The doorway registered a different human.');
+function remember(
+  world: E2EWorld,
+  displayName: string,
+  localPart: string,
+  doorwayId: string,
+  doorwayUrl: string,
+  auth: AuthResponse,
+  device: BrowserDevice | PlaywrightDevice
+): void {
+  assert.equal(
+    auth.identifier.split('@')[0],
+    localPart,
+    'The doorway registered a different human.'
+  );
   const ordinal = people(world).length === 0 ? 'first human' : 'second human';
   const model = new Human(ordinal, {
     identifier: auth.identifier,
@@ -166,12 +208,28 @@ async function registerThroughPortal(world: E2EWorld, displayName: string): Prom
   const text = await response.text();
   if (response.status() >= 300) {
     const error = device.page.getByTestId(TEST_ID.registerError);
-    assert.fail(`Registration returned ${response.status()}: ${(await error.count()) ? await error.innerText() : text}`);
+    assert.fail(
+      `Registration returned ${response.status()}: ${(await error.count()) ? await error.innerText() : text}`
+    );
   }
-  await device.page.waitForFunction((key: string) => globalThis.localStorage.getItem(key) !== null, AUTH_TOKEN_KEY, { timeout: 20_000 });
-  const doorwayId = [...world.doorways].find(([, d]) => withoutTrailingSlash(d.url) === doorwayUrl)?.[0];
+  await device.page.waitForFunction(
+    (key: string) => globalThis.localStorage.getItem(key) !== null,
+    AUTH_TOKEN_KEY,
+    { timeout: 20_000 }
+  );
+  const doorwayId = [...world.doorways].find(
+    ([, d]) => withoutTrailingSlash(d.url) === doorwayUrl
+  )?.[0];
   assert.ok(doorwayId, 'The portal origin is not a registered doorway.');
-  remember(world, displayName, localPart, doorwayId, doorwayUrl, json(text) as unknown as AuthResponse, device);
+  remember(
+    world,
+    displayName,
+    localPart,
+    doorwayId,
+    doorwayUrl,
+    json(text) as unknown as AuthResponse,
+    device
+  );
 }
 
 async function assertDisplayName(person: HostedHuman, expected: string): Promise<void> {
@@ -189,8 +247,12 @@ async function assertDisplayName(person: HostedHuman, expected: string): Promise
 async function cellsFor(world: E2EWorld, person: HostedHuman): Promise<string[]> {
   const admin = await world.getAdminClient(person.doorwayUrl);
   const conductors = (await admin.adminConductors()).conductors;
-  const listings = await Promise.all(conductors.map(async c => admin.adminConductorAgents(c.conductorId)));
-  return listings.flatMap(c => c.agents.filter(agent => agent.agentPubKey === person.agentPubKey).map(() => c.conductorId));
+  const listings = await Promise.all(
+    conductors.map(async c => admin.adminConductorAgents(c.conductorId))
+  );
+  return listings.flatMap(c =>
+    c.agents.filter(agent => agent.agentPubKey === person.agentPubKey).map(() => c.conductorId)
+  );
 }
 
 async function beginClosure(device: PlaywrightDevice): Promise<void> {
@@ -217,22 +279,54 @@ async function pipeline(device: PlaywrightDevice): Promise<PipelineStep[]> {
 
 type BrowserBody = (world: E2EWorld, device: PlaywrightDevice, ...args: string[]) => Promise<void>;
 
-function browserWhen(pattern: string | RegExp, body: BrowserBody): void {
-  When(pattern, async function (this: E2EWorld, ...args: string[]) {
-    const device = requirePlaywright(this);
+/**
+ * cucumber-js validates a step function's DECLARED parameter count against the
+ * expression's capture count, and a rest-parameter wrapper declares zero — which
+ * is why a `{string}` step wrapped that way fails at run time with "function has 0
+ * arguments, should have 1". So the wrapper is minted at the arity the pattern
+ * needs (0–3 captures cover every step in this file).
+ */
+function arityOf(pattern: string | RegExp): number {
+  if (typeof pattern === 'string') return (pattern.match(/\{[a-z]+\}/g) ?? []).length;
+  const probe = new RegExp(`${pattern.source}|`).exec('');
+  return probe ? probe.length - 1 : 0;
+}
+
+type StepFn = (this: E2EWorld, ...args: string[]) => Promise<void | 'pending'>;
+
+function withDevice(body: BrowserBody, arity: number): StepFn {
+  const run = async (world: E2EWorld, args: string[]): Promise<void | 'pending'> => {
+    const device = requirePlaywright(world);
     if (!device) return 'pending';
-    await body(this, device, ...args);
+    await body(world, device, ...args);
     return undefined;
-  });
+  };
+  switch (arity) {
+    case 0:
+      return async function (this: E2EWorld) {
+        return run(this, []);
+      };
+    case 1:
+      return async function (this: E2EWorld, a: string) {
+        return run(this, [a]);
+      };
+    case 2:
+      return async function (this: E2EWorld, a: string, b: string) {
+        return run(this, [a, b]);
+      };
+    default:
+      return async function (this: E2EWorld, a: string, b: string, c: string) {
+        return run(this, [a, b, c]);
+      };
+  }
+}
+
+function browserWhen(pattern: string | RegExp, body: BrowserBody): void {
+  When(pattern, withDevice(body, arityOf(pattern)));
 }
 
 function browserThen(pattern: string | RegExp, body: BrowserBody): void {
-  Then(pattern, async function (this: E2EWorld, ...args: string[]) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
-    await body(this, device, ...args);
-    return undefined;
-  });
+  Then(pattern, withDevice(body, arityOf(pattern)));
 }
 
 browserWhen('the browser opens the doorway registration portal', async (world, device) => {
@@ -243,35 +337,55 @@ browserWhen('the browser opens the doorway registration portal', async (world, d
 });
 
 browserThen('the portal renders its registration form', async (_world, device) => {
-  await Promise.all([THRESHOLD_REGISTER.DISPLAY_NAME, THRESHOLD_REGISTER.EMAIL, THRESHOLD_REGISTER.PASSWORD, THRESHOLD_REGISTER.CONFIRM_PASSWORD, THRESHOLD_REGISTER.SUBMIT].map(async id => device.page.getByTestId(id).waitFor({ state: 'visible' })));
+  await Promise.all(
+    [
+      THRESHOLD_REGISTER.DISPLAY_NAME,
+      THRESHOLD_REGISTER.EMAIL,
+      THRESHOLD_REGISTER.PASSWORD,
+      THRESHOLD_REGISTER.CONFIRM_PASSWORD,
+      THRESHOLD_REGISTER.SUBMIT,
+    ].map(async id => device.page.getByTestId(id).waitFor({ state: 'visible' }))
+  );
 });
 
-browserWhen(/^(?:the|that browser's) newcomer creates an account through the portal with the display name "([^"]+)"$/, async (world, _device, name) => {
-  await registerThroughPortal(world, name);
-});
+browserWhen(
+  /^(?:the|that browser's) newcomer creates an account through the portal with the display name "([^"]+)"$/,
+  async (world, _device, name) => {
+    await registerThroughPortal(world, name);
+  }
+);
 
-Given('a hosted human {string} is registered on doorway {string}', async function (this: E2EWorld, name: string, doorwayId: string) {
-  const doorway = this.getDoorway(doorwayId);
-  const localPart = `hh-${randomUUID()}`;
-  const device = new BrowserDevice(`${name}-api`, doorway.url);
-  const auth = await device.register({
-    identifier: localPart,
-    password: PASSWORD,
-    displayName: name,
-  });
-  remember(this, name, localPart, doorwayId, withoutTrailingSlash(doorway.url), auth, device);
-});
+Given(
+  'a hosted human {string} is registered on doorway {string}',
+  async function (this: E2EWorld, name: string, doorwayId: string) {
+    const doorway = this.getDoorway(doorwayId);
+    const localPart = `hh-${randomUUID()}`;
+    const device = new BrowserDevice(`${name}-api`, doorway.url);
+    const auth = await device.register({
+      identifier: localPart,
+      password: PASSWORD,
+      displayName: name,
+    });
+    remember(this, name, localPart, doorwayId, withoutTrailingSlash(doorway.url), auth, device);
+  }
+);
 
-Then(/^the doorway names (that|the first|the second) human "([^"]+)"$/, async function (this: E2EWorld, which: string, name: string) {
-  let person = human(this);
-  if (which === 'the first') person = human(this, 0);
-  if (which === 'the second') person = human(this, 1);
-  await assertDisplayName(person, name);
-});
+Then(
+  /^the doorway names (that|the first|the second) human "([^"]+)"$/,
+  async function (this: E2EWorld, which: string, name: string) {
+    let person = human(this);
+    if (which === 'the first') person = human(this, 0);
+    if (which === 'the second') person = human(this, 1);
+    await assertDisplayName(person, name);
+  }
+);
 
-Then(/^(the doorway holds a cell for that human on one of its pool conductors|no pool conductor holds a cell for that human)$/, async function (this: E2EWorld, phrase: string) {
-  assert.equal((await cellsFor(this, human(this))).length, phrase.startsWith('no ') ? 0 : 1);
-});
+Then(
+  /^(the doorway holds a cell for that human on one of its pool conductors|no pool conductor holds a cell for that human)$/,
+  async function (this: E2EWorld, phrase: string) {
+    assert.equal((await cellsFor(this, human(this))).length, phrase.startsWith('no ') ? 0 : 1);
+  }
+);
 
 Then('that cell belongs to no other account on the doorway', async function (this: E2EWorld) {
   const person = human(this);
@@ -281,7 +395,9 @@ Then('that cell belongs to no other account on the doorway', async function (thi
   const result = await api(`${person.doorwayUrl}/admin/hosted-users`, token);
   assert.equal(result.status, 200);
   assert.ok(Array.isArray(result.body['users']), 'The hosted-user listing omitted users.');
-  const owners = (result.body['users'] as Json[]).filter(row => row['agentPubKey'] === person.agentPubKey);
+  const owners = (result.body['users'] as Json[]).filter(
+    row => row['agentPubKey'] === person.agentPubKey
+  );
   assert.deepEqual(
     owners.map(row => row['identifier']),
     [person.human.credentials.identifier]
@@ -293,18 +409,26 @@ browserWhen('the human opens their doorway account page', async (world, device) 
   await device.page.getByTestId(ACCOUNT.BACK).waitFor({ state: 'visible' });
 });
 
-browserThen('the account page shows the identifier the doorway issued at registration', async (world, device) => {
-  const identifier = human(world).human.credentials.identifier;
-  const testId = device.page.getByTestId(TEST_ID.accountIdentifier);
-  const shown = (await testId.count()) ? testId : device.page.getByText(identifier, { exact: false });
-  await shown.first().waitFor({ state: 'visible' });
-});
+browserThen(
+  'the account page shows the identifier the doorway issued at registration',
+  async (world, device) => {
+    const identifier = human(world).human.credentials.identifier;
+    const testId = device.page.getByTestId(TEST_ID.accountIdentifier);
+    const shown = (await testId.count())
+      ? testId
+      : device.page.getByText(identifier, { exact: false });
+    await shown.first().waitFor({ state: 'visible' });
+  }
+);
 
-browserThen('the agency pipeline marks {string} as the current step', async (_world, device, label) => {
-  const step = (await pipeline(device)).find(item => item.label === label);
-  assert.ok(step, `Agency pipeline has no "${label}" step.`);
-  assert.ok(step.classes.includes('current'), `${label} is not the current agency step.`);
-});
+browserThen(
+  'the agency pipeline marks {string} as the current step',
+  async (_world, device, label) => {
+    const step = (await pipeline(device)).find(item => item.label === label);
+    assert.ok(step, `Agency pipeline has no "${label}" step.`);
+    assert.ok(step.classes.includes('current'), `${label} is not the current agency step.`);
+  }
+);
 
 browserThen('the agency pipeline marks no later step as completed', async (_world, device) => {
   const steps = await pipeline(device);
@@ -317,9 +441,12 @@ browserWhen('the human begins closing their account', async (_world, device) => 
   await beginClosure(device);
 });
 
-browserThen('the portal asks the human to confirm by typing their identifier', async (_world, device) => {
-  await device.page.getByTestId(TEST_ID.closeInput).waitFor({ state: 'visible' });
-});
+browserThen(
+  'the portal asks the human to confirm by typing their identifier',
+  async (_world, device) => {
+    await device.page.getByTestId(TEST_ID.closeInput).waitFor({ state: 'visible' });
+  }
+);
 
 browserWhen('the human confirms with the wrong identifier', async (world, device) => {
   world.expectBrowserError(/status of 400/);
@@ -341,39 +468,55 @@ Then('the doorway still confirms a session for that human', async function (this
   assert.equal(result.body['identifier'], person.human.credentials.identifier);
 });
 
-browserWhen(/^the human (confirms with their own identifier|closes their account through the portal)$/, async (world, device, action) => {
-  const person = human(world);
-  person.preClosureToken ??= person.token;
-  if (action.startsWith('closes')) await beginClosure(device);
-  person.attempt = await submitClosure(device, person.human.credentials.identifier);
-  assert.equal(person.attempt.status, 200);
-  assert.equal(person.attempt.body['closed'], true);
-});
+browserWhen(
+  /^the human (confirms with their own identifier|closes their account through the portal)$/,
+  async (world, device, action) => {
+    const person = human(world);
+    person.preClosureToken ??= person.token;
+    if (action.startsWith('closes')) await beginClosure(device);
+    person.attempt = await submitClosure(device, person.human.credentials.identifier);
+    assert.equal(person.attempt.status, 200);
+    assert.equal(person.attempt.body['closed'], true);
+  }
+);
 
 browserThen('the portal returns to the signed-out doorway landing', async (_world, device) => {
-  await device.page.waitForURL(url => url.pathname === '/threshold/' || url.pathname === '/threshold');
+  await device.page.waitForURL(
+    url => url.pathname === '/threshold/' || url.pathname === '/threshold'
+  );
   await device.page.getByTestId(LANDING.SIGN_IN).waitFor({ state: 'visible' });
   const profile = device.page.getByTestId(TOOLBAR.PROFILE_BUBBLE);
   assert.ok((await profile.count()) === 0 || !(await profile.first().isVisible()));
 });
 
-browserWhen('the human attempts to sign in through the portal with the password they registered with', async (world, device) => {
-  const person = human(world);
-  world.expectBrowserError(/status of 401/);
-  const login = new ThresholdLoginPage(device.page);
-  await login.login(person.localPart, person.human.credentials.password);
-  await login.waitForError(20_000);
-});
+browserWhen(
+  'the human attempts to sign in through the portal with the password they registered with',
+  async (world, device) => {
+    const person = human(world);
+    world.expectBrowserError(/status of 401/);
+    const login = new ThresholdLoginPage(device.page);
+    await login.login(person.localPart, person.human.credentials.password);
+    await login.waitForError(20_000);
+  }
+);
 
-Then("the doorway's account store holds no active account for that identifier", async function (this: E2EWorld) {
-  const person = human(this);
-  const admin = await this.getAdminClient(person.doorwayUrl);
-  const result = await admin.adminListUsers({
-    search: person.human.credentials.identifier,
-    limit: 50,
-  });
-  assert.equal(result.users.filter(row => row.identifier === person.human.credentials.identifier && row.isActive).length, 0);
-});
+Then(
+  "the doorway's account store holds no active account for that identifier",
+  async function (this: E2EWorld) {
+    const person = human(this);
+    const admin = await this.getAdminClient(person.doorwayUrl);
+    const result = await admin.adminListUsers({
+      search: person.human.credentials.identifier,
+      limit: 50,
+    });
+    assert.equal(
+      result.users.filter(
+        row => row.identifier === person.human.credentials.identifier && row.isActive
+      ).length,
+      0
+    );
+  }
+);
 
 browserWhen('a second browser opens the doorway registration portal', async (world, _first) => {
   const doorwayUrl = human(world).doorwayUrl;
@@ -388,13 +531,16 @@ browserWhen('a second browser opens the doorway registration portal', async (wor
   await device.page.getByTestId(THRESHOLD_REGISTER.DISPLAY_NAME).waitFor({ state: 'visible' });
 });
 
-Then("the two humans hold different cells on the doorway's pool conductors", async function (this: E2EWorld) {
-  const first = human(this, 0);
-  const second = human(this, 1);
-  assert.notEqual(first.agentPubKey, second.agentPubKey);
-  assert.equal((await cellsFor(this, first)).length, 1);
-  assert.equal((await cellsFor(this, second)).length, 1);
-});
+Then(
+  "the two humans hold different cells on the doorway's pool conductors",
+  async function (this: E2EWorld) {
+    const first = human(this, 0);
+    const second = human(this, 1);
+    assert.notEqual(first.agentPubKey, second.agentPubKey);
+    assert.equal((await cellsFor(this, first)).length, 1);
+    assert.equal((await cellsFor(this, second)).length, 1);
+  }
+);
 
 Given('the human has closed their account', async function (this: E2EWorld) {
   const person = human(this);
@@ -404,11 +550,14 @@ Given('the human has closed their account', async function (this: E2EWorld) {
   assert.equal(person.attempt.body['closed'], true);
 });
 
-When('the closure is requested again with the session the human held before closing', async function (this: E2EWorld) {
-  const person = human(this);
-  assert.ok(person.preClosureToken, 'The pre-closure session was not retained.');
-  person.attempt = await closeAccount(person, person.preClosureToken);
-});
+When(
+  'the closure is requested again with the session the human held before closing',
+  async function (this: E2EWorld) {
+    const person = human(this);
+    assert.ok(person.preClosureToken, 'The pre-closure session was not retained.');
+    person.attempt = await closeAccount(person, person.preClosureToken);
+  }
+);
 
 Then('the doorway answers that the account is already closed', function (this: E2EWorld) {
   const attempt = human(this).attempt;
