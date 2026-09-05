@@ -887,6 +887,27 @@ Why: holochain 0.7 `integrate_dht_ops_workflow` blocks the AUTHOR'S CELL from no
 
 - [ ] **Task 30 deliverable: `hc-mesh.sh blocks james` lists the BlockSpan rows and the rejected node-registry ops that caused them; after `unblock` and a conductor restart, a node-registry gossip round completes and every peer's storage arc goes FULL on the household mesh (watcher receipt).**
 
+### Task 31: Station 8 closes a RUN-SCOPED cell, never the household's reusable v1
+
+**Files:**
+- Modify: `genesis/a2o/features/delivery/happ-lineage-migration.feature` (Station 8 and the fixture manifest: the sunset's `seal_close` runs on a cell that no later run authors on — a run-scoped node-registry install (network seed = run id) provisioned for the sunset stations, or the v2-test DNA; the household's base v1 cell is NEVER closed by a fixture), `genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts` + `lineage-candidate.ts` (provision the run-scoped cell; every write after a close targets only the successor), and a pre-flight Given that REFUSES to run on a peer whose base v1 chain is already closed (read the chain head's action type through the storage passport or a `get_closes_for` call) so a poisoned mesh reds by name instead of failing five stations later.
+- Test: dry-run clean; on a fresh household mesh the ten stations run twice in a row without a rejected op appearing (`hc-mesh.sh blocks <peer>` empty after run 2).
+
+Why (measured 2026-09-05): Station 8 closed matthew's and jessica's REAL node-registry v1 chains at 03:32:39Z; the next write on those chains — a `CapGrant` from a client's `authorizeSigningCredentials` — was integrated as invalid by every neighbour ("No more actions are allowed after a chain close"), which blocked the author's cell forever and partitioned the space (Task 30's proof). A close is a sealing act on a chain that is never authored on again; a re-runnable fixture that closes a reusable cell poisons the mesh for every later run.
+
+- [ ] **Task 31 deliverable: two consecutive ten-station runs on a fresh household mesh leave `hc-mesh.sh blocks` empty on all three peers, and a run against a peer with a closed base chain refuses by name at the pre-flight.**
+
+### Task 32: the post-close write fence in storage — nothing is written on a closed cell, CapGrants included, and a partitioned space is observable
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/hc_client.rs` (:293-:327) and `src/signing.rs` (:179): `authorize_signing_credentials` is a CHAIN WRITE (a `CapGrant`); on (re)connect it must not run against a cell whose chain is closed (the reading cell of a sunset role) — read the role's lineage state first, reuse persisted signing credentials for closed cells (persist the keypair + cap secret per cell under the data dir so a storage restart re-mints nothing), and refuse any zome call that would write on a closed cell by name; `src/services/release_adoption/sunset.rs` (the sunset routes reads to v1 with credentials minted BEFORE the close, or through v2 only).
+- Add: a per-space partition probe (dumpNetworkMetrics is already fetched at `src/hc_client.rs:654`): after boot grace, `storageArc == null` + `completed_rounds` null + `peer_timeouts` rising across two samples → a named WARN and a passport `lineage.partition` field; the a2o `@concern:happ-lineage-migration` pre-flight reads it.
+- Test: unit tests for the fence (closed role → no authorize call, persisted credentials reused; open role → unchanged) and the probe's classifier; live: `storage-restart` on a mesh with a sunset role adds no `CapGrant` to the closed chain (`hc-dbtool rejected` stays empty on the neighbours).
+
+Why: the sunset ruling "routing, not a disable" (C14) is right for the app but the conductor still lets the author write on a closed chain (close is not self-enforcing, Probe A/B) and every neighbour punishes the first such write with a permanent block. Storage is the writer that restarts most often.
+
+- [ ] **Task 32 deliverable: on the household mesh a `storage-restart` after a sunset adds no action to the closed v1 chain, and a partitioned space is named in the passport within two probe samples.**
+
 ---
 
 ## Self-review (done at authoring, 2026-09-04)
