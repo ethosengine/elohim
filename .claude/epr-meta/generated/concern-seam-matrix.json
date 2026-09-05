@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 145,
+ "n_points_routed": 149,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -278,7 +278,8 @@
    ],
    "reach_tier": "public",
    "registry_crates": [
-    "did-bridge"
+    "did-bridge",
+    "k8s-bridge"
    ],
    "habits": [],
    "n_a_concerns": []
@@ -415,10 +416,10 @@
   }
  },
  "counts": {
-  "unexamined": 182,
-  "variant": 51,
-  "conformant": 21,
-  "n-a": 2
+  "unexamined": 170,
+  "variant": 55,
+  "conformant": 26,
+  "n-a": 5
  },
  "cells": [
   {
@@ -488,6 +489,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -733,8 +748,29 @@
    "concern": "C0",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C0",
@@ -876,6 +912,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -1205,8 +1255,29 @@
    "concern": "C1",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C1",
@@ -1314,6 +1385,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -1636,8 +1721,29 @@
    "concern": "C2",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C2",
@@ -1746,7 +1852,7 @@
    "seam": "S3.3",
    "plane": "control-truth",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T2",
     "T3"
@@ -1766,6 +1872,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -2046,8 +2166,29 @@
    "concern": "C3",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.5
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C3",
@@ -2168,6 +2309,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -2729,6 +2884,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/registry.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -2915,6 +3084,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -3244,6 +3427,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -3339,8 +3536,8 @@
    "concern": "C6a",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T2",
     "T3"
@@ -3367,6 +3564,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -3753,8 +3964,29 @@
    "concern": "C6a",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C6a",
@@ -3862,6 +4094,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -4135,8 +4381,29 @@
    "concern": "C6b",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C6b",
@@ -4251,6 +4518,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/exit.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -4532,7 +4813,7 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T3",
     "T4"
@@ -4552,6 +4833,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/registry.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -4661,6 +4956,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -5082,6 +5391,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/resolver.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -5184,8 +5507,29 @@
    "concern": "C9",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/rea.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -5429,6 +5773,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -5510,8 +5868,29 @@
    "concern": "C10",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/rea.rs"
+    }
+   ]
   },
   {
    "concern": "C10",
@@ -5734,8 +6113,29 @@
    "concern": "C10",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C10",
@@ -5857,6 +6257,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -6159,8 +6573,29 @@
    "concern": "C11",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 1.5
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C11",
@@ -6254,6 +6689,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "n-a",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -6597,6 +7046,20 @@
      "status": "unbound",
      "verified": true,
      "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -6685,6 +7148,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "answered",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -6930,8 +7407,29 @@
    "concern": "C13",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C13",
@@ -7032,6 +7530,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/verdict.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::validate",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/manifest.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "RuntimeManifest::memory_bound",
+     "status": "partial",
+     "verified": true,
+     "file": "core/src/rea.rs"
     }
    ]
   },
@@ -7249,8 +7761,29 @@
    "concern": "C14",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "k8s-bridge",
+     "point": "render_envelope",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "k8s-bridge",
+     "point": "drift_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C14",
@@ -7774,7 +8307,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:d3057d836d0c380b8425b3f1b64dce3f",
+ "digest": "sha256:57ac50f8ed8f58f23ca850b1f299d82e",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

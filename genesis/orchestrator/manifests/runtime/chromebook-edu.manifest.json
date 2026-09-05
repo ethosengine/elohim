@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "kind": "runtime-manifest",
+  "reach": "trusted",
+  "processes": [
+    {
+      "name": "conductor",
+      "kind": "native",
+      "artifact": {
+        "pinned": {
+          "sha256": "ffa40a0c6fab5ce062c4af76328dfe2de143256ddf791a504d72bca698a9ba20"
+        }
+      },
+      "argv": [
+        "{artifact}",
+        "--piped",
+        "--structured=Log",
+        "--config-path",
+        "{data_root}/conductor-config.yaml"
+      ],
+      "stdin": "passphrase",
+      "readiness": [
+        {
+          "stdout_line": {
+            "contains": "Conductor ready.",
+            "patience_ms": 120000
+          }
+        },
+        {
+          "tcp_listen": {
+            "port_key": "admin_ws",
+            "patience_ms": 30000
+          }
+        }
+      ],
+      "policy": {
+        "shutdown": {
+          "signal": 2,
+          "grace_ms": 20000
+        }
+      }
+    }
+  ],
+  "archetype": "device-chromebook-edu",
+  "envelope": {
+    "bound": {
+      "memory_bytes": 6442450944,
+      "cpu_millis": 1000
+    },
+    "headroom_bytes": 0,
+    "measure": "committed",
+    "protected": [
+      "conductor"
+    ],
+    "shed_order": []
+  }
+}

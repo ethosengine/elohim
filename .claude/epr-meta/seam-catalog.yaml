@@ -355,7 +355,7 @@ seams:
       COMPILE-TIME instance of native extension; the discriminator is direction + bind-time.
     tracks: [T3, T4]
     reach_tier: public
-    registry_crates: [did-bridge]
+    registry_crates: [did-bridge, k8s-bridge]
     habits: []
     n_a_concerns: []
 

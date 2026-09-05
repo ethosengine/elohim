@@ -33,6 +33,12 @@ pub struct RuntimeManifest {
     /// Processes declared in this runtime.
     #[serde(default)]
     pub processes: Vec<ChildSpec>,
+    /// Six-field compute contract declaration; declaration is not enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<RuntimeEnvelope>,
+    /// Device archetype selecting the outward renderer's request floor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archetype: Option<String>,
 }
 
 impl Default for RuntimeManifest {
@@ -43,6 +49,8 @@ impl Default for RuntimeManifest {
             supersedes: None,
             reach: default_reach(),
             processes: Vec::new(),
+            envelope: None,
+            archetype: None,
         }
     }
 }
@@ -87,6 +95,9 @@ pub struct ChildSpec {
     /// Output retention policy.
     #[serde(default)]
     pub listen: Listen,
+    /// Provider envelope and shedding hints; declaration is not enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota: Option<ProcessQuota>,
 }
 
 impl Default for ChildSpec {
@@ -102,8 +113,88 @@ impl Default for ChildSpec {
             readiness: Vec::new(),
             policy: ChildPolicy::default(),
             listen: Listen::default(),
+            quota: None,
         }
     }
+}
+
+/// The six-field compute contract's declaration (2026-08-29 virtual-peer contract).
+/// Declaration is not enforcement; reciprocity events belong to the future enforcing runtime.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default, rename_all = "snake_case")]
+pub struct RuntimeEnvelope {
+    /// Provider's envelope: resources consented to, not enforced here.
+    pub bound: ResourceQuota,
+    /// Optional scheduler request override; absence uses the device archetype floor.
+    /// This is a declaration, not runtime enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requests: Option<ResourceQuota>,
+    /// Provider's envelope: explicit memory reserved outside child quotas, not inferred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headroom_bytes: Option<u64>,
+    /// The measure: declares what memory counts; does not take a measurement.
+    pub measure: Measure,
+    /// Provider's protected set: named children a future shedder must preserve.
+    pub protected: Vec<String>,
+    /// Recipient's shed order: named children, disposable first; no shedding occurs here.
+    pub shed_order: Vec<String>,
+    /// Graded obligations: declared soft/high/hard bands, not enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graded: Option<Bands>,
+}
+
+/// The contract's memory measure; declaration is not enforcement.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Measure {
+    /// Committed anon + kernel + shmem; reclaimable page cache is not charged.
+    #[default]
+    Committed,
+}
+
+/// Graded obligations as integer percentages; declaration is not enforcement.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Bands {
+    /// Soft obligation: recipient self-throttles at this percentage.
+    pub soft_pct: u8,
+    /// High obligation: recipient cooperatively sheds at this percentage.
+    pub high_pct: u8,
+    /// Hard obligation: provider sheds at this percentage.
+    pub hard_pct: u8,
+}
+
+/// Provider's resource envelope; declaration is not enforcement.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct ResourceQuota {
+    /// Provider's envelope: memory ceiling in bytes; absent means undeclared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<u64>,
+    /// Provider's envelope: CPU budget in thousandths of a core.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_millis: Option<u32>,
+    /// Provider's envelope: process-count ceiling.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pids: Option<u32>,
+    /// Provider's envelope: disk ceiling in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disk_bytes: Option<u64>,
+}
+
+/// Child's share of the six-field contract; declaration is not enforcement.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct ProcessQuota {
+    /// Provider's envelope: this child's memory ceiling in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_max_bytes: Option<u64>,
+    /// Provider's envelope: this child's CPU share in thousandths of a core.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_share_millis: Option<u32>,
+    /// Recipient's shedding contract: whether the child is one OOM shed unit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oom_group: Option<bool>,
+    /// Recipient's shedding contract: requested kernel victim preference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oom_score_adj: Option<i16>,
 }
 
 /// Process execution model.
@@ -385,6 +476,16 @@ impl RuntimeManifest {
         self.processes.iter().find(|process| process.name == name)
     }
 
+    /// Declared child memory parts shared by validation and the REA projection.
+    pub(crate) fn memory_quota_parts(&self) -> impl Iterator<Item = u64> + '_ {
+        self.processes.iter().filter_map(|child| {
+            child
+                .quota
+                .as_ref()
+                .and_then(|quota| quota.memory_max_bytes)
+        })
+    }
+
     fn validate(&self) -> Result<(), ManifestError> {
         if self.schema != MANIFEST_SCHEMA {
             return Err(ManifestError::Schema(format!(
@@ -432,6 +533,39 @@ impl RuntimeManifest {
                     return Err(ManifestError::Invalid(format!(
                         "process {} pinned artifact sha256 must be 64 lowercase hexadecimal characters",
                         process.name
+                    )));
+                }
+            }
+        }
+
+        if let Some(envelope) = &self.envelope {
+            for (list, entries) in [
+                ("protected", &envelope.protected),
+                ("shed_order", &envelope.shed_order),
+            ] {
+                for name in entries {
+                    if !names.contains(name.as_str()) {
+                        return Err(ManifestError::Invalid(format!(
+                            "{list} names unknown process: {name}"
+                        )));
+                    }
+                }
+            }
+            for name in &envelope.protected {
+                if envelope.shed_order.contains(name) {
+                    return Err(ManifestError::Invalid(format!(
+                        "process {name} appears in both protected and shed_order"
+                    )));
+                }
+            }
+            if let Some(root) = envelope.bound.memory_bytes {
+                // u128 keeps the refusal exact even when u64 child quotas overflow u64.
+                let children: u128 = self.memory_quota_parts().map(u128::from).sum();
+                let headroom = envelope.headroom_bytes.unwrap_or(0);
+                let total = children + u128::from(headroom);
+                if total > u128::from(root) {
+                    return Err(ManifestError::Invalid(format!(
+                        "child memory total {children} + headroom {headroom} = {total} exceeds root memory {root}"
                     )));
                 }
             }
@@ -500,6 +634,193 @@ fn default_tail_lines() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_manifest_cid_is_unmoved_by_absent_envelope() {
+        // Embedded verbatim from the main tree's matthew/ark/manifest.json:
+        // local-dev berths are untracked and absent in this worktree. No runtime I/O.
+        let manifest = RuntimeManifest::from_json(
+            r#"{
+  "schema": 1,
+  "kind": "runtime-manifest",
+  "reach": "trusted",
+  "processes": [
+    {
+      "name": "conductor",
+      "kind": "native",
+      "artifact": {
+        "pinned": {
+          "sha256": "ffa40a0c6fab5ce062c4af76328dfe2de143256ddf791a504d72bca698a9ba20"
+        }
+      },
+      "argv": [
+        "{artifact}",
+        "--piped",
+        "--structured=Log",
+        "--config-path",
+        "{data_root}/conductor-config.yaml"
+      ],
+      "stdin": "passphrase",
+      "readiness": [
+        {
+          "stdout_line": {
+            "contains": "Conductor ready.",
+            "patience_ms": 120000
+          }
+        },
+        {
+          "tcp_listen": {
+            "port_key": "admin_ws",
+            "patience_ms": 30000
+          }
+        }
+      ],
+      "policy": {
+        "shutdown": {
+          "signal": 2,
+          "grace_ms": 20000
+        }
+      }
+    }
+  ]
+}
+"#,
+        )
+        .unwrap();
+        assert!(manifest.envelope.is_none());
+        assert!(manifest.processes.iter().all(|child| child.quota.is_none()));
+        assert_eq!(
+            manifest.cid().unwrap(),
+            "bafyreihagg75knog3e2fkiygpghcgqge35ovzka3vxken2zjleqnerdcaa"
+        );
+    }
+
+    fn quota_manifest(root: Option<u64>, child: u64, headroom: u64) -> RuntimeManifest {
+        let mut manifest = RuntimeManifest::from_json(&minimal_manifest_json()).unwrap();
+        manifest.envelope = Some(RuntimeEnvelope {
+            bound: ResourceQuota {
+                memory_bytes: root,
+                ..Default::default()
+            },
+            headroom_bytes: Some(headroom),
+            ..Default::default()
+        });
+        manifest.processes[0].quota = Some(ProcessQuota {
+            memory_max_bytes: Some(child),
+            ..Default::default()
+        });
+        manifest
+    }
+
+    #[test]
+    fn memory_sum_plus_headroom_over_root_names_totals() {
+        let manifest = quota_manifest(Some(100), 90, 11);
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(
+                "child memory total 90 + headroom 11 = 101 exceeds root memory 100".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn memory_sum_at_root_minus_headroom_passes() {
+        let mut manifest = quota_manifest(Some(100), 60, 10);
+        let mut second = manifest.processes[0].clone();
+        second.name = "storage".into();
+        second.quota.as_mut().unwrap().memory_max_bytes = Some(30);
+        manifest.processes.push(second);
+        assert_eq!(manifest.validate(), Ok(()));
+    }
+
+    #[test]
+    fn undeclared_memory_never_refuses_the_sum() {
+        assert_eq!(quota_manifest(None, u64::MAX, u64::MAX).validate(), Ok(()));
+    }
+
+    #[test]
+    fn memory_sum_cannot_wrap_past_root() {
+        let mut manifest = quota_manifest(Some(u64::MAX), u64::MAX, 1);
+        assert!(matches!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(_))
+        ));
+        let mut child = manifest.processes[0].clone();
+        child.name = "storage".into();
+        manifest.processes.push(child);
+        let error = manifest.validate().unwrap_err().to_string();
+        assert!(error.contains("36893488147419103230"));
+        assert!(error.contains("36893488147419103231"));
+    }
+
+    #[test]
+    fn unknown_shed_order_process_is_refused() {
+        let mut manifest = quota_manifest(None, 10, 0);
+        manifest
+            .envelope
+            .as_mut()
+            .unwrap()
+            .shed_order
+            .push("missing".into());
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(
+                "shed_order names unknown process: missing".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn unknown_protected_process_and_conflicting_lists_are_refused() {
+        let mut manifest = quota_manifest(None, 10, 0);
+        let envelope = manifest.envelope.as_mut().unwrap();
+        envelope.protected.push("missing".into());
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(
+                "protected names unknown process: missing".into()
+            ))
+        );
+        let envelope = manifest.envelope.as_mut().unwrap();
+        envelope.protected = vec!["conductor".into()];
+        envelope.shed_order = vec!["conductor".into()];
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(
+                "process conductor appears in both protected and shed_order".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn envelope_json_dag_cbor_round_trip_keeps_cid() {
+        let mut manifest = quota_manifest(Some(100), 90, 10);
+        let envelope = manifest.envelope.as_mut().unwrap();
+        envelope.bound.cpu_millis = Some(500);
+        envelope.bound.pids = Some(32);
+        envelope.bound.disk_bytes = Some(4096);
+        envelope.graded = Some(Bands {
+            soft_pct: 70,
+            high_pct: 85,
+            hard_pct: 100,
+        });
+        envelope.protected.push("conductor".into());
+        let quota = manifest.processes[0].quota.as_mut().unwrap();
+        quota.cpu_share_millis = Some(250);
+        quota.oom_group = Some(false);
+        quota.oom_score_adj = Some(-100);
+        let json = serde_json::to_string(&manifest).unwrap();
+        let decoded = RuntimeManifest::from_json(&json).unwrap();
+        let bytes = decoded.canonical_bytes().unwrap();
+        let from_cbor: RuntimeManifest = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
+        assert_eq!(from_cbor, manifest);
+        assert_eq!(from_cbor.canonical_bytes().unwrap(), bytes);
+        assert_eq!(from_cbor.cid().unwrap(), manifest.cid().unwrap());
+        assert_eq!(
+            manifest.cid().unwrap(),
+            "bafyreifvczj4a37ijg5m3xtklkpdhb4xijmygkqvsva4y7w73o4rxidsaa"
+        );
+    }
 
     const SHA256: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

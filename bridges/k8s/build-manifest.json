@@ -1,0 +1,50 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "k8s-bridge",
+  "description": "Runtime envelope render and deployment pin verification",
+  "steps": {
+    "gate-k8s": {
+      "description": "fmt, clippy, tests",
+      "inputs": {
+        "sources": [
+          "bridges/k8s/**",
+          "elohim/ark/core/**",
+          "genesis/data/devices/archetype-resource-budgets.json",
+          "genesis/orchestrator/manifests/runtime/**",
+          "genesis/orchestrator/data/deployments.json",
+          "scripts/ci/conductor-split-budget.sh"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate K8s Bridge",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "k8s-bridge": {
+        "dir": "bridges/k8s",
+        "steps": [
+          "gate-k8s"
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "k8s-bridge",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      }
+    }
+  },
+  "deployment": {}
+}

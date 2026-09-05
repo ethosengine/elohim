@@ -193,3 +193,47 @@ test("alpha humans WITH the field render the real workspace channel line at thei
     );
   }
 });
+
+const MANIFEST_PLACEHOLDER = "RUNTIME_MANIFEST_CID_PLACEHOLDER";
+const conductorTemplate = read("genesis/orchestrator/manifests/humans/_edgenode-conductor.template.yaml");
+
+function manifestSedExpr(pin) {
+  if (pin?.cid == null) return `/${MANIFEST_PLACEHOLDER}/d`;
+  assert.match(pin.cid, /^bafyre[a-z2-7]+$/);
+  return `s|${MANIFEST_PLACEHOLDER}|${pin.cid}|`;
+}
+
+test("runtime manifest Jenkins helper validates CID and renders both arms in the shared sed list", () => {
+  assert.match(jenkinsfile, /def runtimeManifestSedExpr\(Map humanConfig\)/);
+  assert.match(jenkinsfile, /'\/RUNTIME_MANIFEST_CID_PLACEHOLDER\/d'/);
+  assert.ok(jenkinsfile.includes('return "s|RUNTIME_MANIFEST_CID_PLACEHOLDER|${cid}|"'));
+  assert.match(jenkinsfile, /bafyre\[a-z2-7\]\+/);
+  assert.match(jenkinsfile, /runtimeManifestSedExpr\(humanConfig\),/);
+});
+
+test("runtime manifest annotation is inside each pod template; absence preserves all other bytes", () => {
+  for (const text of [template, conductorTemplate]) {
+    assert.equal(text.split(MANIFEST_PLACEHOLDER).length - 1, 1);
+    assert.ok(text.includes(`  template:\n    metadata:\n      annotations:\n        elohim.protocol/runtime-manifest: ${MANIFEST_PLACEHOLDER}\n`));
+    const expected = text.split("\n").filter((line) => !line.includes(MANIFEST_PLACEHOLDER)).join("\n");
+    assert.equal(renderWithSed(text, manifestSedExpr(undefined)), expected);
+  }
+});
+
+test("every active pin renders the exact CID in both pod templates without altering other bytes", () => {
+  for (const human of deployments.humans.filter((h) => !h.suspended)) {
+    assert.ok(human.runtimeManifest, `${human.name}: pinned`);
+    for (const text of [template, conductorTemplate]) {
+      assert.equal(
+        renderWithSed(text, manifestSedExpr(human.runtimeManifest)),
+        text.replace(MANIFEST_PLACEHOLDER, human.runtimeManifest.cid),
+      );
+    }
+  }
+});
+
+test("runtime manifest annotation rejects sed and shell injection", () => {
+  for (const cid of ["", "abc", "bafyre&bad", "bafyre|bad", "bafyre'bad", "bafyre\nbad"]) {
+    assert.throws(() => manifestSedExpr({ cid }));
+  }
+});
