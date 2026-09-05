@@ -19,8 +19,9 @@ decide. That is the whole tool.
 
 Two words the output uses: a **warrant** is the DHT record one peer publishes to
 accuse an op of being invalid; the **warrantee** is the agent the warrant accuses.
-A block cites the warrant, and the party it lands on is the warrantee when the
-warrant itself validated (details under "What hash a block actually cites").
+A block cites the warrant. If the warrant itself passed validation the block lands
+on the warrantee; if the warrant was rejected it lands on the warrant's own author
+(mechanics under "What hash a block actually cites").
 
 "The household mesh" below is this repository's local three-conductor development
 network (`app/elohim-app/scripts/hc-mesh.sh`); the tool itself works on any 0.7
@@ -63,7 +64,9 @@ The one write verb refuses while any live process holds `conductor.db` open, and
 refuses without `--yes`:
 
 ```bash
-./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it (james = your peer's mesh name)
+# $DB as set under Verbs — your peer's databases/ directory
+./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it (james = your peer's mesh name; same
+                                                    #    dna:agent output as `hc-dbtool blocks`)
 ./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors. hc-dbtool itself needs only the
                                                     #    blocked peer's own conductor.db closed; hc-mesh.sh is
                                                     #    the household mesh's lifecycle script and stops all
@@ -78,10 +81,14 @@ hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
 Outside the household mesh, the same sequence on one peer:
 
 ```bash
+DB=<your peer's data_root_path>/databases            # from its conductor-config.yaml
+CFG=$(ps -o args= -p "$(pgrep -f 'holochain --piped')" | grep -o -- '--config-path [^ ]*' | cut -d' ' -f2)
+#   capture the config path from the running process NOW — step 4 needs it and step 2 kills the process
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 1. see it
-kill -INT <holochain pid>   # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
+kill -INT "$(pgrep -f 'holochain --piped')"   # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes   # 3.
-holochain --piped --config-path <conductor-config.yaml> <<< '<lair passphrase>'   # 4. start it again
+holochain --piped --config-path "$CFG" <<< '<lair passphrase>'   # 4. start it again (add any other
+                                                                  #    flags your launch used)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 5. no rows
 ```
 
