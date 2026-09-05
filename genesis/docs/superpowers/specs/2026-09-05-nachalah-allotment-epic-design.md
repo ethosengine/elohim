@@ -80,7 +80,7 @@ Three slices, in the order they can be measured:
 
 | Slice | Name | What it changes | Lever available |
 |---|---|---|---|
-| 1 | **Gold and paper** | A tier policy per record class and DNA seams drawn along it | today (DNA + network seed) |
+| 1 | **Gold and paper, per level (Gevul)** | A tier policy per record class, relative to the holon level, and DNA seams drawn along it | today (DNA + network seed) |
 | 2 | **Earned arcs** | Our 0.7 conductor line with sharding on, an arc policy hook driven by the valueflow trust gradient, block governance under Mishpat | needs the fork |
 | 3 | **The conductor as an artifact** | The ark adopts a conductor binary through rung 5; the fork joins the primary repo's watch; Jenkins only builds | needs slice 2's fork to have something worth shipping |
 
@@ -112,6 +112,47 @@ Gaps (each becomes a plan task when the operator accepts the tier policy):
   three seeds.
 - G1.4 Reach and holding agree: the Reach vocabulary spec gains the holding axis so a record's
   audience and its floor are one declaration, not two.
+
+## 2b. Gevul — the boundary of a holon's allotment: the fractal, not a single tier policy
+
+*Gevul*: boundary — the edge of a holon's allotment, where a record's holding stops. Nachalah is
+the portion inside it. The two words are one construction.
+
+The physics (operator, 2026-09-05): seven-plus billion people make a global full-arc DHT
+physically non-viable, whatever the conductor allows. So §2's tiers are not one policy for one
+DHT; they are **relative to a level**, and the levels are the holarchy the protocol already
+names — device → household → neighbourhood → collective → commons → the global orchestra. Every
+holon has a gevul and, inside it, a nachalah. **What is gold at one level is paper at the level
+above.** A household's records are gold to the household (every device holds and validates them)
+and paper to the planet (never gossiped past the household). A collective's deeds are gold to the
+collective and paper to the commons. Only the values agreement — the covenant that centres human
+flourishing — is gold at every level, and that is precisely the set small enough for seven
+billion peers to hold at full arc.
+
+A record's reach is therefore a **path up the holarchy** with a floor at each level it crosses:
+three devices at the household, seven diverse hubs at the commons, every peer at the orchestra.
+Crossing a gevul upward is an act — a witnessed event with a steward, the same shape as the
+earned-reach PR-ceremony — never a side effect of gossip. Crossing downward (a commons record
+reaching a household) is projection through storage and doorways, not holding.
+
+This is the Reach vocabulary (household → neighbourhood → commons) extended by one axis: reach
+already says *who may read*; gevul says *who is asked to hold and validate*; the two are one
+declaration on the record. It is also the hyperscaler inversion named on the seam atlas — no
+hyperscaler has a social plane that can decide where a record's holding stops.
+
+Gaps added by this reading:
+
+- G2b.1 The level ladder as data: each DNA seam declares the holon level it serves and its floor
+  recipe; a record's tier is read relative to that level (gold-here / paper-above), never as an
+  absolute.
+- G2b.2 The upward crossing as a ceremony: promoting a record across a gevul is a witnessed,
+  stewarded event (earned reach), with the receiving level's floor as its precondition.
+- G2b.3 The global tier is enumerable: a standing list of what is gold at the orchestra level
+  (the covenant, roots, elections), reviewed as a Mishpat matter; anything not on it is paper
+  above its own holon by default.
+- G2b.4 Fractal measurement: the allotment habit runs at two levels on the household mesh (device
+  and household) before any collective level exists, so the relative-tier rule is measured, not
+  asserted.
 
 ## 3. Slice 2 — Earned arcs: sharding on, arcs from the trust gradient, blocks under Mishpat
 
@@ -237,6 +278,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — steering (operator): the construction is fractal — every holon has a gevul (boundary) and a nachalah inside it; gold at one level is paper at the level above; only the covenant is gold everywhere; a record's reach is a path up the holarchy with a floor at each level — §2b added (gaps G2b.1–4).
 - 2026-09-05 — steering (operator): allotment is the performance slice; the REA + VSM primitives are what make the DHT a living ecology — §3b added (allotment = REA commitment; five VSM seats; Ashby as the design rule; gaps G3b.1–3).
 - 2026-09-05 — epic planted from the operator's sidebar after the sunset partition finding
   (companion §11.4). Brand *Nachalah*, name *Allotment*. Boundary with the companion recorded in
