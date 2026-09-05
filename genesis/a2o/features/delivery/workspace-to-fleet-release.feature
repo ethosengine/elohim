@@ -31,7 +31,15 @@ Feature: A developer's own peer carries a coordinator release to the fleet, and 
 
   Vocabulary this story leans on.
 
-  The WORKSPACE PEER is the developer's own runtime — a conductor started on his workstation and
+  MATTHEW is the developer this story follows: one of the household's own people, at his own
+  workstation, with a coordinator change in hand. He stewards this channel, and he is the only
+  person in the story — nobody on the fleet side is asked to do anything at all.
+
+  A peer's CONDUCTOR is the process that holds its identity, keeps its copy of the network's
+  records, and answers for it on the network. "Through his own conductor" means the answer was
+  computed by his own machine from records it holds, rather than accepted from someone else's.
+
+  The WORKSPACE PEER is matthew's own runtime — a conductor started on his workstation and
   JOINED to the fleet's network, so it holds the fleet's validation-rule identity and gossips on
   the fleet's own network, exactly like any deployed peer. It is not a client of the fleet and it
   is not an operator console; it is a peer, and everything this story reads about the fleet is
@@ -43,7 +51,8 @@ Feature: A developer's own peer carries a coordinator release to the fleet, and 
   runtime plane, then coordinator artifacts, then this network, then a channel called "workspace".
   A THROWAWAY CHANNEL is one minted for a single measurement and never promoted: a
   channel nobody's runtime is asked to treat as authoritative. It exists so this first crossing
-  can be made on a channel whose worst case is that it is ignored.
+  can be made on a channel whose worst case is that it is ignored. The channel these scenarios
+  name IS that throwaway — it carries this measurement and nothing the fleet depends on.
 
   A head has two tiers and moves only by a deliberate act. Publishing declares a release STAGING:
   visible, fetchable, resolvable by every peer, and authoritative for nobody. A separate
@@ -61,7 +70,10 @@ Feature: A developer's own peer carries a coordinator release to the fleet, and 
   watches the channel's head, fetches the release's bytes, verifies them against what it itself
   has installed, and reports what it found. It applies nothing, ever — applying is what the other
   two modes ask for by name, per channel. Every deployed peer follows this story's channel in
-  observe, and that is declared in the fleet's own deployment data, not arranged by this test.
+  observe, and that is declared in the fleet's own DEPLOYMENT DATA — the committed, reviewed
+  record of what each deployed peer is, which reaches the peers only when the fleet is next
+  rendered from it. It is not arranged by this test and cannot be changed by it: an applying mode
+  would have to be committed, reviewed and rendered first, by a person, deliberately.
 
   ADMISSIBLE is the verdict this story is after: the release passed verification, so a peer that
   WAS in an applying mode would have been allowed to proceed. Admissible is not applied, and this
