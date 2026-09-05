@@ -2,20 +2,18 @@
   "version": "1.0",
   "$schemaVersion": "rakia-steward-commitment-1.0",
   "description": "Operator-authored ledger of cluster compute commitments. Genesis devops artifact (Category C). Derived from compute-capacity-snapshot.json (live kubectl snapshot).",
-  "snapshotTimestamp": "2026-05-04T00:00:00Z",
-  "snapshotMethod": "live kubectl from intel-nuc, hand-curated by operator (Matthew). Raw audit trail archived at genesis/data/rakia/snapshots/2026-05-04/snapshot.json with operator's narrative at .../REVIEW.md. Future: regenerate via genesis/orchestrator/scripts/snapshot-capacity.sh.",
+  "snapshotTimestamp": "2026-09-05T18:54:00Z",
+  "snapshotMethod": "Allocatable + readiness re-observed 2026-09-05 from Prometheus kube-state-metrics (kube_node_status_allocatable, kube_node_status_condition) via the observability MCP: 7/7 nodes Ready, shem back in the fleet (24 cores / 128751 Mi), cluster allocatable 70000m / 246980 Mi. Promoted by the integrator session at the operator's direction during the 2026-09-05 integration push, because the 2026-05-04 envelope (46000m, shem cordoned) made every deployments.json write fail test-bench-aggregate-capacity on a portfolio the live cluster schedules with headroom. Per-node commitments (requests/limits), actuals and ephemeral storage are still the 2026-05-04 live-kubectl snapshot hand-curated by the operator (audit trail: genesis/data/rakia/snapshots/2026-05-04/snapshot.json, narrative in .../REVIEW.md); a full re-promotion runs genesis/orchestrator/scripts/snapshot-capacity.sh.",
 
   "cluster": {
     "name": "alpha",
     "kubernetesVersion": "microk8s v1.29.15",
     "nodeCount": 7,
-    "readyNodeCount": 6,
-    "notReadyNodes": [
-      "shem (cordoned 2026-05-04, PSU failure, treat as decommissioned — node-type=remote no longer available)"
-    ],
+    "readyNodeCount": 7,
+    "notReadyNodes": [],
     "totalAllocatable": {
-      "cpu_m": 46000,
-      "memory_Mi": 133726,
+      "cpu_m": 70000,
+      "memory_Mi": 246980,
       "ephemeralStorage_Gi": 6943
     },
     "totalCommitted": {
@@ -23,8 +21,8 @@
       "memory_Mi": 23142
     },
     "totalHeadroom": {
-      "cpu_m": 34820,
-      "memory_Mi": 110584
+      "cpu_m": 58820,
+      "memory_Mi": 223838
     },
     "actuals": {
       "ethosengine": { "cpu_m": 3477, "cpu_pct": 14, "mem_Mi": 24747, "mem_pct": 38 },
@@ -33,7 +31,7 @@
       "thinkc-p0h":  { "cpu_m": 3780, "cpu_pct": 94, "mem_Mi": 4082,  "mem_pct": 52, "note": "transient Jenkins build storm" },
       "thinkc-p0t":  { "cpu_m": 3197, "cpu_pct": 79, "mem_Mi": 4898,  "mem_pct": 63, "note": "transient Jenkins build storm" },
       "thinkc-p1s":  { "cpu_m": 3060, "cpu_pct": 76, "mem_Mi": 4117,  "mem_pct": 53, "note": "transient Jenkins build storm" },
-      "shem":        { "status": "unreachable; cordoned" }
+      "shem":        { "status": "Ready again (observed 2026-09-05 via Prometheus); utilization not re-sampled in this promotion" }
     },
     "nodeTypes": {
       "performance": {
@@ -129,14 +127,14 @@
         "nodes": [
           {
             "name": "shem",
-            "ready": false,
+            "ready": true,
             "role": "worker",
             "allocatable": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 },
             "committed": { "cpu_m": 0, "memory_Mi": 0 },
-            "headroom": { "cpu_m": 0, "memory_Mi": 0 },
-            "lastSeenReady": "before 2026-04-30T19:11:21Z",
-            "outageTaintAge": "4 days",
-            "warning": "PSU failure; physical death; treat as decommissioned. openebs-hostpath PVCs unrecoverable.",
+            "headroom": { "cpu_m": 24000, "memory_Mi": 128751 },
+            "lastSeenReady": "2026-09-05T18:54:00Z (Prometheus kube_node_status_condition Ready=true)",
+            "outageTaintAge": "none",
+            "warning": "Returned to the fleet after the 2026-05-04 PSU failure — the operator resolved it by keeping the PSU fan running (thermal, not a dead supply); shem-only humans were re-enrolled by the 2026-06-03 scope-reconcile. Committed figures below are still the 2026-05-04 snapshot (0 — nothing was scheduled there); re-run snapshot-capacity.sh to refresh them. The openebs-hostpath PVCs lost in the outage were not recovered; the orphanedPods list is historical.",
             "orphanedPods": [
               "elohim-alpha/elohim-adam-alpha-0",
               "elohim-alpha/elohim-frank-alpha-0",
@@ -145,7 +143,7 @@
             ]
           }
         ],
-        "totals": { "cpu_m": 0, "memory_Mi": 0, "ephemeralStorage_Gi": 0 }
+        "totals": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 }
       }
     }
   },
