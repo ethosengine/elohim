@@ -64,6 +64,18 @@
         "steps": ["ts-test"],
         "run": { "kind": "root-just", "recipe": "_gate-epr-ts" }
       },
+      "hc-dbtool": {
+        "dir": "crates/hc-dbtool",
+        "inputs": {
+          "sources": ["crates/hc-dbtool/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-hc-dbtool",
+          "cargo": { "workspace": "crates/hc-dbtool", "profile": "dev", "rustflags": "" }
+        }
+      },
       "seam-contracts": {
         "dir": "crates/seam-contracts",
         "inputs": {
