@@ -74,7 +74,8 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     elohim.host  /db/content/elohim-host-landing.blobHash      = sha256-f0f0e637816611570740a56221c7b9900d27a324f2bb038b1b3b8d76cc7940ad (non-null, passing)
                  updatedAt 2026-08-31T02:47:27Z
     Both peers report the SAME dhtAnchorHash uhCkkvfsTSJ-Ti3fscryEhYv7Nmdwy_LpMEjTFg8PKYv5FIoSuotF — the pointer-propagation
-    gap this feature was written to close is closed. What remains open is the SECOND failure mode below: the two
+    gap this feature was written to close is closed. What remains open is the SECOND failure mode, which now has its
+    own file (features/dataplane/federation-version-convergence.feature): the two
     blobHashes differ, so the doorways hold two different VERSIONS of the same EPR — version divergence, not a missing
     pointer. Both doorways' `/health` report `p2p.caughtUp: false`, `p2p.converged: false`, with `divergentAnchor` counts
     of 2131 (alpha-A) and 1011 (elohim.host) — the reconcile sweep has not settled the fleet.
