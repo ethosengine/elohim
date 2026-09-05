@@ -189,6 +189,115 @@ fn author_lifecycle_link(
         LinkTypes::CommitmentByState,
         LinkTag::new(tag.as_bytes().to_vec()),
     )?;
+
+    // **Epic Task 27 (G11).** The lifecycle link above says what happened TO
+    // this commitment. The successor link below says what this commitment did
+    // to the one BEFORE it — and it is the only reason a peer that authored
+    // neither entry can walk from a migration to the sunset that closes it.
+    author_successor_link(&input.action, &payload, entry_hash, action_hash)?;
+    Ok(())
+}
+
+/// The successor kind a `sunsets-lineage` records on the migration it closes.
+/// Deliberately NOT a lifecycle state: a sunset does not change what the
+/// migration IS, it names what came after it.
+const SUCCESSOR_SUNSET: &str = "sunset";
+
+/// Which lineage SUCCESSOR link a freshly-notarized commitment authors, if any:
+/// `(kind, predecessor_cid)` — the tag's kind segment, and the anchor the link
+/// hangs off, read from the arm's OWN body.
+///
+/// # Why the predecessor is the base (epic §4 step 5, §7 C5)
+///
+/// A sunset names its migration (`migration_commitment_cid`); a lineage
+/// revocation names its target (`target_cid`). Both facts already exist in the
+/// notarized body — but a body is only readable by someone who already knows
+/// the commitment's address, and the peer walking a lineage has the OPPOSITE
+/// half: it holds the migration and needs to find what came after. Hanging the
+/// link off the PREDECESSOR's anchor is what makes that walk possible, on every
+/// peer, through its own conductor.
+///
+/// `migrates-lineage` authors none — it IS the predecessor.
+///
+/// The revoke arm delegates its gate to [`lifecycle_link_for`] on purpose: a
+/// revocation speaks for a lineage commitment only when it was run through
+/// `validate_lineage_signatures`, and that is exactly the condition
+/// [`LifecycleLink::RevokesTarget`] encodes. One gate, two links.
+pub fn successor_link_for(
+    action: &str,
+    payload: &serde_json::Value,
+) -> Option<(&'static str, String)> {
+    match action {
+        "sunsets-lineage" => payload
+            .get("migration_commitment_cid")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|cid| (SUCCESSOR_SUNSET, cid.to_string())),
+        "revokes-commitment" => match lifecycle_link_for(action, payload)? {
+            LifecycleLink::RevokesTarget(target_cid) => Some((LIFECYCLE_REVOKED, target_cid)),
+            LifecycleLink::ActivatesSelf => None,
+        },
+        _ => None,
+    }
+}
+
+/// Author the successor link [`successor_link_for`] names, if it names one.
+///
+/// # Two tag genera on one link type
+///
+/// `CommitmentByState` carries `<first>|<second>`, and this adds a SECOND genus
+/// to it. A LIFECYCLE tag's second segment is a signing TIME; a SUCCESSOR tag's
+/// second segment is the successor commitment's own cid — an ADDRESS. That is
+/// the discriminator both readers use ([`get_commitment_state_links`] keeps the
+/// times, [`get_lineage_successors`] keeps the addresses), and it is why adding
+/// this link changes no lifecycle any peer already reads.
+///
+/// Reusing the declared link type is what keeps this coordinator-only and so
+/// DNA-hash-NEUTRAL: `mishpat_integrity::validate_create_link` admits any
+/// `<a>|<b>` with both segments non-empty, and a cid is non-empty.
+///
+/// # The honesty limit (gap G7) is inherited, not reduced
+///
+/// `create_commitment_state_link` is a public extern and the integrity
+/// validator binds no link author to any anchor, so a `sunset|<cid>` link is
+/// forgeable exactly as `active|<t>` and `revoked|<t>` already are. This link
+/// makes a true fact READABLE everywhere; it does not make it VERIFIED. The
+/// reading side must therefore keep re-confirming the successor's body against
+/// the migration it claims to close, which
+/// `release_adoption::path_evidence::fetch_sunset_evidence_for` does.
+///
+/// # An unaddressable predecessor is skipped, never a refusal
+///
+/// A `sunsets-lineage` whose `migration_commitment_cid` is not an `EntryHash`
+/// names no anchor, so there is nothing to hang a link from. That commitment
+/// still validates today (`validate_sunsets_lineage` requires the field to be
+/// present, not addressable), and newly refusing it would be a regression on a
+/// landed arm — so the link is skipped and the sunset stays undiscoverable,
+/// which is the fail-closed direction. The revoke arm cannot reach that state:
+/// [`author_lifecycle_link`] already refused an unaddressable `target_cid`
+/// loudly, above.
+fn author_successor_link(
+    action: &str,
+    payload: &serde_json::Value,
+    entry_hash: &EntryHash,
+    action_hash: &ActionHash,
+) -> ExternResult<()> {
+    let Some((kind, predecessor_cid)) = successor_link_for(action, payload) else {
+        return Ok(());
+    };
+    let Ok(base) = EntryHash::try_from(predecessor_cid) else {
+        return Ok(());
+    };
+    // The tag carries the successor's ENTRY hash (its cid — the value
+    // `get_commitment` takes), never its action hash. The link TARGET stays the
+    // action hash, so the two genera project through the same shape.
+    let tag = format!("{kind}|{entry_hash}");
+    create_link(
+        base,
+        action_hash.clone(),
+        LinkTypes::CommitmentByState,
+        LinkTag::new(tag.as_bytes().to_vec()),
+    )?;
     Ok(())
 }
 
@@ -404,9 +513,16 @@ pub fn get_commitment_state_links(
     let mut out = Vec::with_capacity(links.len());
     for link in links {
         let raw = String::from_utf8(link.tag.0.clone()).unwrap_or_default();
-        let mut parts = raw.splitn(2, '|');
-        let state = parts.next().unwrap_or("").to_string();
-        let signed_at = parts.next().unwrap_or("").to_string();
+        let (state, signed_at) = split_state_tag(&raw);
+        // **Epic Task 27.** A SUCCESSOR tag (`sunset|<cid>` / `revoked|<cid>`)
+        // hangs off the same anchor and the same link type, and its second
+        // segment is an ADDRESS rather than a signing time. Dropping it here is
+        // what keeps this reader — and every lifecycle ladder built on it —
+        // exactly what it was before successors existed: a commitment's
+        // `revoked_at` can never come back as a cid.
+        if is_successor_tag(&signed_at) {
+            continue;
+        }
         // Target is the graduating event's ActionHash; render as base64.
         let event_hash = ActionHash::try_from(link.target.clone())
             .map(|h| h.to_string())
@@ -415,6 +531,94 @@ pub fn get_commitment_state_links(
             state,
             signed_at,
             event_hash,
+        });
+    }
+    Ok(out)
+}
+
+/// Split a `CommitmentByState` tag into its two segments. `splitn(2, ..)` — the
+/// same split `mishpat_integrity::validate_commitment_by_state_tag` validates
+/// with, so a tag this reader accepts is a tag that validator accepted.
+fn split_state_tag(raw: &str) -> (String, String) {
+    let mut parts = raw.splitn(2, '|');
+    (
+        parts.next().unwrap_or("").to_string(),
+        parts.next().unwrap_or("").to_string(),
+    )
+}
+
+/// Is a `CommitmentByState` tag's second segment an ADDRESS (a successor
+/// pointer) rather than a signing TIME (a lifecycle transition)?
+///
+/// The discriminator between the two tag genera, and deliberately a PARSE
+/// rather than a vocabulary: a signing time is caller-supplied and its format
+/// is not pinned (ISO-8601 or epoch seconds), so the only thing that can be
+/// decided about it structurally is that it is not an `EntryHash`. No tag any
+/// caller has ever authored carries an address here, so this classifies every
+/// pre-existing link as a lifecycle transition, unchanged.
+fn is_successor_tag(second: &str) -> bool {
+    !second.is_empty() && EntryHash::try_from(second.to_string()).is_ok()
+}
+
+/// One lineage SUCCESSOR link projected to a wire shape — what came AFTER the
+/// commitment at the link's base.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LineageSuccessor {
+    /// The tag's first segment: `"sunset"` for a `sunsets-lineage`,
+    /// `"revoked"` for a quorum-checked lineage revocation.
+    pub kind: String,
+    /// The successor commitment's ENTRY hash — its cid, the value
+    /// `get_commitment` takes. Parsed from the tag's second segment.
+    pub commitment_cid: String,
+    /// The successor commitment's `ActionHash` (the link target), base64 — the
+    /// notarizing action a verifier replays.
+    pub action_hash: String,
+}
+
+/// **Epic Task 27 (G11).** Read every lineage SUCCESSOR hanging off a
+/// commitment's anchor — the walk from a migration to what closed or revoked
+/// it, through THIS peer's own conductor.
+///
+/// Discovery used to run over the local `mishpat_commitments` projection, which
+/// is written from a post-commit signal on the AUTHORING conductor: on every
+/// peer but one, "what sunsets this migration?" had no answer at all, so the
+/// sunset arm was permanently dormant there. These links are on the DHT and
+/// gossip like any other link, so every peer walks the same lineage.
+///
+/// Unconditional: it answers for any commitment anchor, and an empty `Vec` is
+/// an ANSWER ("this conductor's DHT view carries no successor") — never an
+/// error, which the caller must keep apart from a failure to ask (C4).
+///
+/// **Honesty limit (gap G7).** Nothing binds a link's author to its anchor, so a
+/// successor named here is a CLAIM that this migration was closed, not proof of
+/// it. The caller must read the named commitment's own body back and re-confirm
+/// it names this migration — the link is a pointer, the notarized bytes are the
+/// evidence.
+#[hdk_extern]
+pub fn get_lineage_successors(migration_cid: String) -> ExternResult<Vec<LineageSuccessor>> {
+    let base = EntryHash::try_from(migration_cid.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "get_lineage_successors: invalid migration_cid (expected base64 EntryHash): {migration_cid}"
+        )))
+    })?;
+
+    let query = LinkQuery::try_new(base, LinkTypes::CommitmentByState)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut out = Vec::new();
+    for link in links {
+        let raw = String::from_utf8(link.tag.0.clone()).unwrap_or_default();
+        let (kind, commitment_cid) = split_state_tag(&raw);
+        if !is_successor_tag(&commitment_cid) {
+            continue;
+        }
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map(|h| h.to_string())
+            .unwrap_or_default();
+        out.push(LineageSuccessor {
+            kind,
+            commitment_cid,
+            action_hash,
         });
     }
     Ok(out)
@@ -2329,5 +2533,116 @@ mod tests {
                 "{action} must author no CommitmentByState link"
             );
         }
+    }
+
+    // -------------------------------------------------------------------
+    // Epic Task 27 (G11) — the lineage SUCCESSOR link
+    // -------------------------------------------------------------------
+
+    /// A real `EntryHash`, rendered the way a cid reaches these functions.
+    fn a_cid() -> String {
+        EntryHash::from_raw_32(vec![0x5A; 32]).to_string()
+    }
+
+    /// A sunset hangs its successor link off the MIGRATION it names, read from
+    /// its own notarized body — which is the whole reason a peer holding only
+    /// the migration can find it.
+    #[test]
+    fn a_sunset_records_a_successor_on_the_migration_it_closes() {
+        let payload = serde_json::json!({
+            "action": "sunsets-lineage",
+            "role": "node_registry",
+            "migration_commitment_cid": "uhCEkMIGRATION",
+        });
+        assert_eq!(
+            successor_link_for("sunsets-lineage", &payload),
+            Some(("sunset", "uhCEkMIGRATION".to_string()))
+        );
+    }
+
+    /// A lineage revocation records a successor on the anchor it revokes — and
+    /// it rides the SAME quorum gate the lifecycle link does, so a revocation
+    /// that was never signature-checked names no successor either.
+    #[test]
+    fn a_lineage_revocation_records_a_successor_only_under_the_quorum_gate() {
+        let quorum_checked = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "uhCEkTARGET",
+            "target_action": "migrates-lineage",
+            "signed_at": "2026-09-05T00:00:00Z",
+        });
+        assert_eq!(
+            successor_link_for("revokes-commitment", &quorum_checked),
+            Some(("revoked", "uhCEkTARGET".to_string()))
+        );
+
+        let legacy = serde_json::json!({
+            "action": "revokes-commitment",
+            "target_cid": "uhCEkTARGET",
+            "signed_at": "2026-09-05T00:00:00Z",
+        });
+        assert_eq!(successor_link_for("revokes-commitment", &legacy), None);
+    }
+
+    /// The migration IS the predecessor — it records no successor of its own,
+    /// and neither does any other action.
+    #[test]
+    fn no_other_action_records_a_successor() {
+        let body = serde_json::json!({
+            "migration_commitment_cid": "uhCEkMIGRATION",
+            "target_cid": "uhCEkTARGET",
+            "target_action": "migrates-lineage",
+        });
+        for action in [
+            "migrates-lineage",
+            "delegates-compute",
+            "replicates-content",
+            "ratifies-limit-gradient",
+            "",
+        ] {
+            assert_eq!(
+                successor_link_for(action, &body),
+                None,
+                "{action} must author no successor link"
+            );
+        }
+    }
+
+    /// A sunset that names no migration names no anchor: no link rather than a
+    /// link on nothing.
+    #[test]
+    fn a_sunset_without_a_migration_records_no_successor() {
+        let empty = serde_json::json!({ "migration_commitment_cid": "" });
+        assert_eq!(successor_link_for("sunsets-lineage", &empty), None);
+        assert_eq!(
+            successor_link_for("sunsets-lineage", &serde_json::json!({})),
+            None
+        );
+    }
+
+    /// **The two genera stay apart.** A lifecycle tag's second segment is a
+    /// signing TIME; a successor tag's is an ADDRESS. Every tag any caller has
+    /// authored to date classifies as a lifecycle transition, which is what
+    /// makes this addition invisible to `get_commitment_state_links`.
+    #[test]
+    fn a_successor_tag_is_told_from_a_lifecycle_tag_by_its_second_segment() {
+        assert!(!is_successor_tag("2026-09-05T00:00:00Z"));
+        assert!(!is_successor_tag("1757030400"));
+        assert!(!is_successor_tag(""));
+        assert!(!is_successor_tag("uhCEkNOT-A-REAL-HASH"));
+        assert!(
+            is_successor_tag(&a_cid()),
+            "a real EntryHash in the second segment IS a successor pointer"
+        );
+
+        assert_eq!(
+            split_state_tag("sunset|uhCEkX"),
+            ("sunset".to_string(), "uhCEkX".to_string())
+        );
+        // `splitn(2, ..)` — a signing time carrying its own separator stays whole.
+        assert_eq!(
+            split_state_tag("active|a|b"),
+            ("active".to_string(), "a|b".to_string())
+        );
     }
 }

@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use elohim_sweettest::common::{
-    conductors::{load_dna, single_agent_conductor},
+    conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::network_seed,
 };
 
@@ -47,7 +47,7 @@ async fn bootstrap_steward_is_configured() -> Result<()> {
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain::sweettest::{SweetCell, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetCell, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::Signature;
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,17 @@ struct CommitmentStateLink {
     pub state: String,
     pub signed_at: String,
     pub event_hash: String,
+}
+
+/// Mirror of `mishpat::commitments::LineageSuccessor` (the
+/// `get_lineage_successors` reader's element). Every field is a `String` on the
+/// wire: `kind`/`commitment_cid` are parsed out of the LinkTag and `action_hash`
+/// is the link target rendered as base64.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct LineageSuccessor {
+    pub kind: String,
+    pub commitment_cid: String,
+    pub action_hash: String,
 }
 
 /// Single-conductor mishpat cell fixture — mirrors `bootstrap_steward_is_configured`'s
@@ -958,6 +969,187 @@ async fn a_non_lineage_revocation_records_no_transition() -> Result<()> {
         !links.iter().any(|l| l.state == "revoked"),
         "a revocation that was never quorum-checked must not speak for a lineage \
          commitment's lifecycle: {links:?}"
+    );
+    Ok(())
+}
+
+// =============================================================================
+// Holochain Evolution Epic Task 27 (G11) — a migration's successors are
+// discoverable by EVERY peer.
+//
+// Sunset discovery used to run over the local `mishpat_commitments` projection,
+// written from a post-commit signal on the AUTHORING conductor — so the
+// question "what closes this migration?" had an answer on exactly one peer, and
+// the sunset arm was permanently dormant everywhere else. The cure is the same
+// shape Task 19 took for the lifecycle: a coordinator-only, DNA-hash-neutral
+// link hung off the MIGRATION's anchor, which gossips like any other link.
+// @dna-scope: mishpat
+// =============================================================================
+
+/// **The Task 27 deliverable.** Bob authored neither entry, holds no projection
+/// row for either, and still walks from Alice's migration to the sunset that
+/// closes it — and to the revocation that pulls it back — off his own DHT view.
+///
+/// The lifecycle reader is asserted UNCHANGED in the same breath: successor
+/// tags carry an address where a lifecycle tag carries a signing time, and
+/// `get_commitment_state_links` keeps only the times. A commitment's
+/// `revoked_at` can never come back as a cid.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_peer_walks_from_a_migration_to_its_sunset_and_its_revocation() -> Result<()> {
+    let [(mut ca, alice), (mut cb, bob)] = two_agent_conductors().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(alice.clone())).await?;
+    let app_a = ca
+        .setup_app_for_agent("mishpat-app-alice-t27", alice.clone(), &[dna.clone()])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("mishpat-app-bob-t27", bob.clone(), &[dna])
+        .await?;
+    let cell_a = app_a.cells().first().expect("mishpat cell A").clone();
+    let cell_b = app_b.cells().first().expect("mishpat cell B").clone();
+
+    // --- Alice notarizes the migration (the predecessor every walk starts from).
+    let mig_cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb27";
+    let mig_sig = sign_cid(&ca, &alice, mig_cid).await?;
+    let migration: CommitmentOutput = ca
+        .call(
+            &cell_a.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "migrates-lineage".into(),
+                payload_json: migrates_lineage_payload(mig_cid, &mig_sig, &alice).to_string(),
+                signed_at: "2026-09-04T00:00:00Z".into(),
+            },
+        )
+        .await;
+    let migration_cid = migration.entry_hash.to_string();
+
+    // --- Alice notarizes the sunset that names it. The body's
+    // `migration_commitment_cid` is the REAL migration anchor — an unaddressable
+    // pointer would name nothing to hang a link from.
+    let sun_cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb28";
+    let sun_sig = sign_cid(&ca, &alice, sun_cid).await?;
+    let sunset_body = serde_json::json!({
+        "action": "sunsets-lineage",
+        "role": "node_registry",
+        "from_dna_hash": "uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH",
+        "to_dna_hash": "uhC0kEKiIscIk5BDdethLGMFGLnvSvP2gRP5o74v0vAvoRnEzbiJ1",
+        "migration_commitment_cid": migration_cid,
+        "signing_payload_cid": sun_cid,
+        "signatures": [{"agent": alice.to_string(), "signature": sun_sig}],
+        "evidence": {"convergence": ["bafyconv"], "soak": ["bafysoak"], "deliberation": "bafyd"},
+        "window": {"sunsets_at": "2026-09-11T00:00:00Z"}
+    });
+    let sunset: CommitmentOutput = ca
+        .call(
+            &cell_a.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "sunsets-lineage".into(),
+                payload_json: sunset_body.to_string(),
+                signed_at: "2026-09-05T00:00:00Z".into(),
+            },
+        )
+        .await;
+
+    // --- Alice notarizes a quorum-checked revocation of the same migration.
+    let rev_cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fb29";
+    let rev_sig = sign_cid(&ca, &alice, rev_cid).await?;
+    let revocation_body = serde_json::json!({
+        "action": "revokes-commitment",
+        "target_cid": migration_cid,
+        "target_action": "migrates-lineage",
+        "reason": "the courier was wrongly named",
+        "signed_at": "2026-09-06T00:00:00Z",
+        "signing_payload_cid": rev_cid,
+        "signatures": [{"agent": alice.to_string(), "signature": rev_sig}]
+    });
+    let revocation: CommitmentOutput = ca
+        .call(
+            &cell_a.zome("mishpat"),
+            "create_commitment",
+            CreateCommitmentInput {
+                action: "revokes-commitment".into(),
+                payload_json: revocation_body.to_string(),
+                signed_at: "2026-09-06T00:00:00Z".into(),
+            },
+        )
+        .await;
+
+    // --- Gossip: peer info, then consistency (never assume either).
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency_s(60, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after lineage successors: {e}"))?;
+
+    // --- BOB walks the lineage off his own conductor.
+    let successors: Vec<LineageSuccessor> = cb
+        .call(
+            &cell_b.zome("mishpat"),
+            "get_lineage_successors",
+            migration_cid.clone(),
+        )
+        .await;
+
+    let found_sunset = successors
+        .iter()
+        .find(|s| s.kind == "sunset")
+        .unwrap_or_else(|| {
+            panic!("a peer that authored nothing must find the sunset: {successors:?}")
+        });
+    assert_eq!(
+        found_sunset.commitment_cid,
+        sunset.entry_hash.to_string(),
+        "the successor tag must name the sunset's ENTRY hash — the cid `get_commitment` takes"
+    );
+    assert_eq!(
+        found_sunset.action_hash,
+        sunset.action_hash.to_string(),
+        "the link target is the notarizing action a verifier replays"
+    );
+
+    let found_revocation = successors
+        .iter()
+        .find(|s| s.kind == "revoked")
+        .unwrap_or_else(|| {
+            panic!("the revocation must be walkable from the migration too: {successors:?}")
+        });
+    assert_eq!(
+        found_revocation.commitment_cid,
+        revocation.entry_hash.to_string(),
+        "the revocation successor must name the revoking commitment's cid"
+    );
+
+    // --- And the lifecycle reader is untouched by either successor.
+    let links: Vec<CommitmentStateLink> = cb
+        .call(
+            &cell_b.zome("mishpat"),
+            "get_commitment_state_links",
+            migration_cid,
+        )
+        .await;
+    assert_eq!(
+        links.len(),
+        2,
+        "the migration's lifecycle is its activation and its revocation — successors \
+         are a second tag genus and must never appear here: {links:?}"
+    );
+    let revoked = links
+        .iter()
+        .find(|l| l.state == "revoked")
+        .unwrap_or_else(|| panic!("the revocation transition must be present: {links:?}"));
+    assert_eq!(
+        revoked.signed_at, "2026-09-06T00:00:00Z",
+        "a lifecycle tag carries a signing TIME — never a cid"
+    );
+    assert!(
+        links.iter().any(|l| l.state == "active"),
+        "the activation stays on the record: {links:?}"
     );
     Ok(())
 }
