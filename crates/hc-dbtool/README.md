@@ -1,6 +1,6 @@
 # hc-dbtool
 
-See a Holochain 0.7 cell block, read the warrant and the rejected op behind it, and lift it.
+See a Holochain 0.7 cell block, read the warrant (the accusation record) and the rejected op behind it, and lift it.
 
 ## Why this exists
 
@@ -33,33 +33,33 @@ come back; `hc-mesh.sh blocks` finds it for you on the household mesh), the peer
 mesh script itself. Hashes written `uhC0k…` / `uhCAk…` in the examples are
 truncated placeholders — paste the full hash the tool prints.
 
-The sections "Verbs" and "Building" are how to use the tool. Everything after
-them is how it works inside, for when the output needs interpreting.
+The sections "Verbs", "Lifting a block" and "Building" are how to use the tool.
+Everything after them is how it works inside, for when the output needs interpreting.
 
 ## Verbs
 
+Every command takes `--databases <dir>` — the peer's data root holding
+`conductor.db`, `db.key` and one `dht-<dna>.db` per DNA (a real peer's is the
+`data_root_path` in its `conductor-config.yaml`, `databases/` beneath it) — and
+`--passphrase <text>` for `db.key` (default `test`, the household mesh's; a real peer
+passes the lair passphrase piped to `holochain --piped` at launch, held by whoever
+launched it — a unit file or secret store — and not recoverable from disk; without it
+no verb can open the databases).
+
 All reads open the database `SQLITE_OPEN_READ_ONLY`, so they are safe against a
-running conductor. Every command takes `--databases <dir>` — the peer's data root
-holding `conductor.db`, `db.key` and one `dht-<dna>.db` per DNA — and
-`--passphrase <text>` for `db.key` (default `test`, the local household mesh's
-passphrase). A real peer passes the lair passphrase its conductor was started with
-— the one piped to `holochain --piped` at launch; it is held by whoever launched the
-conductor (a launcher's unit file or secret store) and is not recoverable from disk —
-without it, no verb can open the databases and this tool cannot help. A real peer's data root is the
-`data_root_path` in its `conductor-config.yaml` (`databases/` beneath it); the
-config path is the `--config-path` argument on the running `holochain` process. `apps` lists each role's DNA hash — that is where a
-`--dna` value comes from, and `blocks` prints the `dna:agent` pair `unblock` takes.
+running conductor:
 
 ```bash
 DB=elohim/holochain/local-dev/james/databases   # substitute your own peer's directory
 
 hc-dbtool --databases $DB apps
-#   this conductor's own agent key per installed app, and each role's DNA
+#   this conductor's own agent key per installed app, and each role's DNA hash
+#   (the --dna value the next verb takes)
 
 hc-dbtool --databases $DB blocks
 #   every BlockSpan row, decoded to dna:agent + reason + interval, each joined
 #   through the DNA's DHT database to the WARRANT it cites and to the rejected
-#   ops the warrantee authored
+#   ops the warrantee authored — the dna:agent pair is what `unblock --cell` takes
 
 hc-dbtool --databases $DB rejected --dna uhC0k…
 #   rejected ops in that DNA (ChainOp = integrated, LimboChainOp = still in
@@ -67,47 +67,51 @@ hc-dbtool --databases $DB rejected --dna uhC0k…
 #   carry the accusation
 ```
 
-The one write verb refuses while any live process holds `conductor.db` open, and
-refuses without `--yes`:
+## Lifting a block
+
+`BlockSpan` is the **only** table this tool ever writes; source chains, `Action`,
+`ChainOp`, `LimboChainOp`, `Warrant` and every other DHT row are read-only at every
+code path. The one write verb, `unblock`, refuses while any live process holds
+`conductor.db` open and refuses without `--yes` — run it first WITHOUT `--yes` to see
+what would be deleted. `--cell '<dna>:*'` (quoted, so the shell keeps the `*`) lifts
+every agent blocked in that DNA.
+
+**On the household mesh.** Only the blocked peer's own conductor needs to be down;
+`hc-mesh.sh stop` is the mesh's lifecycle script and stops all three, which is the
+convenient way here.
 
 ```bash
-# $DB as set under Verbs — your peer's databases/ directory
-./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it (james = your peer's mesh name; same
-                                                    #    dna:agent output as `hc-dbtool blocks`)
-./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors. hc-dbtool itself needs only the
-                                                    #    blocked peer's own conductor.db closed; hc-mesh.sh is
-                                                    #    the household mesh's lifecycle script and stops all
-                                                    #    three — outside that mesh, stop your one conductor
-hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
+DB=elohim/holochain/local-dev/james/databases        # this peer's databases/ (james = your peer's mesh name)
+./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it — prints the dna:agent pair step 3 takes
+./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors
+hc-dbtool --databases $DB unblock --cell <dna>:<agent>          # 3a. preview: what would be deleted
+hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes    # 3b. lift it
 ./app/elohim-app/scripts/hc-mesh.sh start           # 4. bring the mesh back
-./app/elohim-app/scripts/hc-mesh.sh blocks james    # 5. confirm: no rows; then watch the space's
-                                                    #    gossip metrics — completed_rounds climbing and
-                                                    #    storageArc no longer null means the peer rejoined
+./app/elohim-app/scripts/hc-mesh.sh blocks james    # 5. confirm: no rows — then the check below
 ```
 
-Outside the household mesh, the same sequence on one peer:
+**On a single peer** (no mesh script), the same sequence:
 
 ```bash
 DB=<your peer's data_root_path>/databases            # from its conductor-config.yaml
-CFG=$(ps -o args= -p "$(pgrep -f 'holochain --piped')" | grep -o -- '--config-path [^ ]*' | cut -d' ' -f2)
-#   capture the config path from the running process NOW — step 4 needs it and step 2 kills the process
-hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 1. see it
-kill -INT "$(pgrep -f 'holochain --piped')"   # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
-hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes   # 3.
-holochain --piped --config-path "$CFG" <<< '<lair passphrase>'   # 4. start it again, with the same
-                                                                  #    argv the process had (copy it from
-                                                                  #    `ps -o args=` before step 2, or from
-                                                                  #    the unit file that launches it)
-hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 5. no rows
+ARGS=$(ps -o args= -p "$(pgrep -f 'holochain --piped')")   # the running conductor's full argv —
+[ -n "$ARGS" ] || echo "no running holochain found: take the argv from the unit file that launches it"
+#   capture it NOW: step 4 relaunches with exactly this argv and step 2 kills the process
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks                                  # 1. see it
+kill -INT "$(pgrep -f 'holochain --piped')"          # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent>            # 3a. preview
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes      # 3b. lift it
+$ARGS <<< '<lair passphrase>'                        # 4. start it again with the same argv
+hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks                                  # 5. no rows — then the check below
 ```
 
-Then confirm the peer rejoined the space through the admin interface's
-`dump_network_metrics` — per DNA it shows the local agent's `storage_arc` (null while
-blocked-out, a full range once a gossip round has completed) and
-`peer_meta[*].completed_rounds` climbing. One literal call, using the client this
-repository already carries (`ADMIN` = the peer's admin websocket port — on the
-household mesh matthew 4444, jessica 4454, james 4464; elsewhere the `admin_interfaces`
-port in `conductor-config.yaml` — `DNA` = the hash from `apps`):
+**Confirm the peer rejoined** (both cases): the admin interface's `dump_network_metrics`
+shows, per DNA, the local agent's `storage_arc` (null while blocked-out, a full range
+once a gossip round has completed) and `peer_meta[*].completed_rounds` climbing. One
+literal call, run from `genesis/a2o` because the `@holochain/client` dependency is
+installed there (`ADMIN` = the peer's admin websocket port — household mesh: matthew
+4444, jessica 4454, james 4464; elsewhere the `admin_interfaces` port in
+`conductor-config.yaml`; `DNA` = the hash from `apps`):
 
 ```bash
 cd genesis/a2o && ADMIN=4464 DNA=uhC0k… npx tsx -e '
@@ -122,14 +126,6 @@ process.exit(0);'
 Lifting is not a cure by itself: whatever wrote the rejected op (in the first
 observed case, a `CapGrant` written after a chain close) re-earns the block on its
 next write. Fix the writer first.
-
-`--cell <dna>:*` lifts every agent blocked in that DNA (quote it as `'<dna>:*'`
-so the shell does not expand the `*`). Omitting `--yes` prints what would be
-deleted and changes nothing.
-
-`BlockSpan` is the **only** table this tool ever writes. Source chains, `Action`,
-`ChainOp`, `LimboChainOp`, `Warrant` and every other DHT row are read-only at
-every code path.
 
 ## Building
 
