@@ -329,6 +329,10 @@ pub struct OAuthAuthorizeRequest {
     pub scope: Option<String>,
     #[serde(default)]
     pub login_hint: Option<String>,
+    /// OIDC `prompt`. `create` means the human asked to make an account, so an
+    /// unauthenticated request enters the portal at registration instead of login.
+    #[serde(default)]
+    pub prompt: Option<String>,
 }
 
 /// OAuth token exchange request body.
@@ -3357,6 +3361,38 @@ async fn handle_elohim_verify_answer(
 // OAuth Handlers
 // =============================================================================
 
+/// Build the doorway-portal entry URL an *unauthenticated* OAuth request is sent to.
+///
+/// Pure: URL text only, no state, no I/O. The portal is the one place a hosted human's
+/// credential is ever seen, so an app never renders its own login or registration form —
+/// it sends the human here and consumes the code on its callback.
+///
+/// `prompt=create` (OIDC `prompt` semantics) means "this human asked to create an
+/// account", so they land on the portal's *registration* surface; anything else lands on
+/// login. Every OAuth parameter is carried through either way, so the portal can finish
+/// the same authorize round-trip and return the human to the app that asked.
+fn portal_entry_url(params: &OAuthAuthorizeRequest) -> String {
+    let mut portal_params = vec![
+        ("client_id", params.client_id.as_str()),
+        ("redirect_uri", params.redirect_uri.as_str()),
+        ("response_type", params.response_type.as_str()),
+        ("state", params.state.as_str()),
+        ("scope", params.scope.as_deref().unwrap_or("")),
+    ];
+    if let Some(ref hint) = params.login_hint {
+        portal_params.push(("login_hint", hint.as_str()));
+    }
+    let entry = if params.prompt.as_deref() == Some("create") {
+        "/threshold/register"
+    } else {
+        "/threshold/login"
+    };
+    format!(
+        "{entry}?{}",
+        serde_urlencoded::to_string(&portal_params).unwrap_or_default()
+    )
+}
+
 /// GET /auth/authorize
 ///
 /// OAuth 2.0 authorization endpoint. Validates the client and redirect URI,
@@ -3369,10 +3405,12 @@ async fn handle_elohim_verify_answer(
 /// - response_type: Must be "code" for authorization code flow
 /// - state: CSRF protection token (passed back to client)
 /// - scope: Optional requested scope
+/// - prompt: Optional; `create` sends an unauthenticated human to registration
 ///
 /// Flow:
 /// 1. Validate client_id and redirect_uri
-/// 2. If user not authenticated, redirect to /threshold/login with OAuth params
+/// 2. If user not authenticated, redirect to the portal entry named by `prompt`
+///    (`/threshold/register` for `prompt=create`, else `/threshold/login`) with OAuth params
 /// 3. If authenticated, generate auth code and redirect to redirect_uri
 async fn handle_authorize(
     req: Request<hyper::body::Incoming>,
@@ -3535,28 +3573,22 @@ async fn handle_authorize(
         }
     }
 
-    // User not authenticated - redirect to login page with OAuth params
-    // The login page will handle authentication and then call /auth/authorize again
-    let mut login_params = vec![
-        ("client_id", params.client_id.as_str()),
-        ("redirect_uri", params.redirect_uri.as_str()),
-        ("response_type", params.response_type.as_str()),
-        ("state", params.state.as_str()),
-        ("scope", params.scope.as_deref().unwrap_or("")),
-    ];
-    if let Some(ref hint) = params.login_hint {
-        login_params.push(("login_hint", hint.as_str()));
-    }
-    let login_url = format!(
-        "/threshold/login?{}",
-        serde_urlencoded::to_string(&login_params).unwrap_or_default()
-    );
+    // User not authenticated - redirect to the doorway portal with the OAuth params
+    // intact. The portal authenticates (or registers) and calls /auth/authorize again.
+    let portal_url = portal_entry_url(&params);
 
-    info!("OAuth authorize: redirecting to login page");
+    info!(
+        "OAuth authorize: redirecting to portal entry {}",
+        if params.prompt.as_deref() == Some("create") {
+            "register"
+        } else {
+            "login"
+        }
+    );
 
     Response::builder()
         .status(StatusCode::FOUND)
-        .header("Location", login_url)
+        .header("Location", portal_url)
         .header("Cache-Control", "no-store")
         .body(empty_body())
         .unwrap()
@@ -4673,6 +4705,65 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn authorize_params(prompt: Option<&str>) -> OAuthAuthorizeRequest {
+        OAuthAuthorizeRequest {
+            client_id: "elohim-app".to_string(),
+            redirect_uri: "https://alpha.elohim.host/auth/callback".to_string(),
+            response_type: "code".to_string(),
+            state: "st4te".to_string(),
+            scope: Some("openid profile".to_string()),
+            login_hint: Some("ruth@alpha.elohim.host".to_string()),
+            prompt: prompt.map(str::to_string),
+        }
+    }
+
+    /// An unauthenticated human asking to CREATE an account enters the portal at
+    /// registration — carrying the app's whole request, so they come back signed in.
+    #[test]
+    fn portal_entry_url_sends_prompt_create_to_registration() {
+        let url = portal_entry_url(&authorize_params(Some("create")));
+        assert!(
+            url.starts_with("/threshold/register?"),
+            "prompt=create must enter at registration, got {url}"
+        );
+        for carried in [
+            "client_id=elohim-app",
+            "response_type=code",
+            "state=st4te",
+            "scope=openid+profile",
+            "login_hint=ruth%40alpha.elohim.host",
+            "redirect_uri=https%3A%2F%2Falpha.elohim.host%2Fauth%2Fcallback",
+        ] {
+            assert!(url.contains(carried), "{carried} missing from {url}");
+        }
+    }
+
+    /// Every other request — no prompt, or an unrecognized one — enters at login,
+    /// exactly as before this parameter existed.
+    #[test]
+    fn portal_entry_url_defaults_to_login() {
+        for prompt in [None, Some("none"), Some("consent"), Some("CREATE")] {
+            let url = portal_entry_url(&authorize_params(prompt));
+            assert!(
+                url.starts_with("/threshold/login?"),
+                "prompt={prompt:?} must enter at login, got {url}"
+            );
+        }
+    }
+
+    /// A request with no scope and no login_hint still round-trips the required params.
+    #[test]
+    fn portal_entry_url_omits_absent_login_hint() {
+        let mut params = authorize_params(Some("create"));
+        params.scope = None;
+        params.login_hint = None;
+        let url = portal_entry_url(&params);
+        assert!(url.starts_with("/threshold/register?"), "{url}");
+        assert!(!url.contains("login_hint"), "{url}");
+        assert!(url.contains("scope="), "{url}");
+        assert!(url.contains("state=st4te"), "{url}");
+    }
 
     #[test]
     fn gateway_domain_strips_scheme_port_path_and_doorway_prefix() {
