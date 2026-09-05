@@ -1,12 +1,13 @@
 ---
 name: project_storage_build_under_ram_guard_debuginfo_off
+title: Storage builds under the RAM guard
 description: "elohim-storage cargo test/build gets shed by the 80% RAM guard while the mesh is up; cure in-tree since 2026-09-05 — line-tables-only debuginfo + cargo-jobs-flag -j1; just gate picks it up"
 metadata: 
   node_type: memory
   title: Storage builds under the RAM guard
   type: project
   originSessionId: f84d8f67-f26c-4b08-8a6f-6cfd7e6cf12d
-  modified: 2026-09-05T20:07:31.913Z
+  modified: 2026-09-05T20:35:17.227Z
 ---
 
 **Trap (2026-09-04 overnight):** with the 3-peer 0.7 mesh running, every plain `cargo build --features "p2p p2p-iroh"`
