@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:088e8b70e020a548 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:3855d752cdd009cd | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -854,6 +854,16 @@ The rehearsal measures with these open and says so in every receipt. They are in
 - Test: mishpat sweettest — bob's peer finds alice's sunset for alice's migration; storage unit test for the read.
 
 - [ ] **Task 27 deliverable: a non-authoring peer discovers the sunset that names its migration; the sunset arm is live on the canary; Station 8 can seal there.**
+
+---
+
+### Task 28: the resume pin travels through the bridge and the vehicle (G8, storage half)
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/services/release_adoption/carry.rs` (`CarryInput.resume: Option<ExportResume>` and `CarryReceipt.resume` mirrors of the zome's additive fields — read the zome's `ExportResume { head, digest, total, observed_head, cursor_seq }` and mirror byte-for-byte; `fold_carry` threads the page's `resume` into the next `CarryInput`; the named refusal `chain moved — restart at 0` restarts the walk at cursor 0 with no resume, exactly as a digest change does), `services/lineage_bridge.rs` (`AgentSweep` keeps the last `resume` per neighbour; `next_sweep` clears it on restart; the passport sweep view shows `scanned` so R1's metric is visible per neighbour).
+- Test: unit tests — the fold threads `resume`; a `chain moved` refusal restarts at 0; the sweep state round-trips `resume`; the `scanned` number reaches the view.
+
+- [ ] **Task 28 deliverable: on the mesh a multi-page carry's second and later pages report `scanned` ≪ the chain length (R1's metric), because the pin actually reaches the zome.**
 
 ---
 
