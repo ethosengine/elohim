@@ -136,7 +136,7 @@ use seam_contracts::Answer;
 use super::{ArtifactClass, PathEvidence, ReleaseManifest, RosterEvidence};
 use crate::db::DbPool;
 use crate::hc_client::HcClient;
-use crate::services::conductor_writes::CommitmentStateLink;
+use crate::services::conductor_writes::{CommitmentStateLink, LineageSuccessor};
 
 /// The lifecycle state a commitment is read as when its projection row has not
 /// landed (or could not be read). Fail-closed: `verify_path` establishes a path
@@ -753,44 +753,63 @@ pub struct SunsetEvidence {
     pub revoked_at: Option<String>,
 }
 
-/// Find the `sunsets-lineage` commitment that names `migration_cid`, and read
+/// The successor kind a `sunsets-lineage` records on the migration it closes.
+/// Mirrors the mishpat coordinator's `SUCCESSOR_SUNSET`.
+const SUNSET_SUCCESSOR_KIND: &str = "sunset";
+
+/// Find the `sunsets-lineage` commitment that closes `migration_cid`, and read
 /// it through THIS peer's own conductor.
 ///
-/// # Two sources, and only one of them is evidence
+/// # Task 27 (G11) — discovery moved from a private index to the DHT
 ///
-/// The mishpat DNA has no query-by-target extern, so there is no DHT read that
-/// answers "what sunsets this migration?". What this does instead:
+/// This used to discover candidates by searching the local `mishpat_commitments`
+/// projection. That table is written from `CommitmentCommitted`, a post-commit
+/// signal on the AUTHORING conductor, so on every peer but the one whose elohim
+/// notarized the sunset the search found nothing and the whole arm was dormant:
+/// fail-closed, but silently, and permanently.
 ///
-/// 1. **Discovery** — the local `mishpat_commitments` projection is searched
-///    for `sunsets-lineage` rows whose stored body mentions `migration_cid`.
-///    The row is a POINTER and nothing more; nothing it says is trusted.
-/// 2. **Evidence** — each candidate cid is then read back off the conductor
+/// Discovery now walks `mishpat::get_lineage_successors` — `CommitmentByState`
+/// links hung off the MIGRATION's anchor, which gossip like any other link — so
+/// every peer asks its own conductor the same question and gets the same
+/// answer. Both steps are now C5 reads, and the projection is out of the path
+/// entirely except as the lifecycle CACHE [`resolve_lifecycle`] consults when
+/// the DHT is silent.
+///
+/// # Two steps, and only the second is evidence
+///
+/// 1. **Discovery** — the successor links name candidate cids. A link is a
+///    POINTER and nothing more.
+/// 2. **Evidence** — each candidate is read back off the conductor
 ///    (`mishpat::get_commitment` for the body, `get_commitment_state_links` for
-///    the lifecycle — the same C5 rail [`fetch_path_evidence_for_cid`] uses),
-///    and the `migration_commitment_cid` is re-confirmed from the NOTARIZED
-///    bytes. A row that pointed at a commitment whose body says something else
-///    is dropped.
+///    the lifecycle — the same rail [`fetch_path_evidence_for_cid`] uses) and
+///    its `migration_commitment_cid` is re-confirmed from the NOTARIZED bytes.
+///    A link that pointed at a commitment whose body says something else is
+///    dropped.
 ///
-/// # KNOWN GAP — discovery is author-scoped, and the arm is dormant elsewhere
+/// **The honesty limit of a state link (gap G7) rides along unchanged.** Nothing
+/// in `mishpat_integrity` binds a link's author to its anchor, so a
+/// `sunset|<cid>` link is forgeable exactly as `active|<t>` and `revoked|<t>`
+/// already are. What a forged link can do here is bounded by step 2: it can
+/// only make this peer READ a commitment, and that commitment's own notarized
+/// body must name this migration, carry the `sunsets-lineage` action, and read
+/// ACTIVE on the DHT before [`super::sunset::sunset_decision`] will seal. A
+/// forged pointer at a commitment that does not exist, or exists and says
+/// something else, changes nothing.
 ///
-/// `mishpat_commitments` is written from `CommitmentCommitted`, a post-commit
-/// signal on the AUTHORING conductor (see this module's Task 19 section). So on
-/// every peer but the one whose elohim notarized the sunset, step 1 finds
-/// nothing and this returns [`Answer::Absent`] — the sunset arm simply never
-/// fires there.
+/// # The successor a walk returns is the ACTIVE one
 ///
-/// That is **fail-closed and deliberate at MVP**, not a silent hole: never
-/// sealing is the safe direction for the one act with no remedy, and a peer
-/// that does not seal keeps authoring on v2 with v1 open and readable, which
-/// costs nothing but the fence. The fleet-wide route is the same shape Task 19
-/// took for the lifecycle: a coordinator-only, DNA-hash-neutral link from the
-/// migration's anchor to its sunset (`MigrationToSunset`), read here instead of
-/// the projection. Filed rather than done because this seat may not touch the
-/// DNA.
+/// Successors are an unordered set and a migration can carry several — a sunset
+/// that was itself revoked, and a later one that stands. Returning whichever
+/// re-confirmed first would let a REVOKED successor mask a live one, which is a
+/// wrong hold; returning the revoked one when no successor is active is the
+/// right hold, and [`super::sunset::sunset_decision`] names it `SunsetNotActive`
+/// rather than the vaguer "no sunset exists". [`sunset_answer`] carries that
+/// ordering and is pure, so the masking case is pinned by a unit test.
 ///
-/// [`Answer::Unreachable`] is reserved for a read that could not be MADE — a
-/// projection that would not answer, or a conductor that would not — because a
-/// sunset held for our own blindness must never read as "no sunset exists".
+/// [`Answer::Unreachable`] stays reserved for a read that could not be MADE —
+/// a conductor that would not answer for the successors, or for a candidate we
+/// therefore cannot rule in — because a sunset held for our own blindness must
+/// never read as "no sunset exists".
 pub async fn fetch_sunset_evidence_for(
     hc: Option<&Arc<HcClient>>,
     db: Option<&DbPool>,
@@ -804,22 +823,34 @@ pub async fn fetch_sunset_evidence_for(
         );
         return Answer::Unreachable;
     };
-    let candidates = match sunset_candidates(db, migration_cid).await {
-        Some(candidates) => candidates,
-        // The discovery index would not answer. Not "no sunset" — we could not
-        // look (C4, applied to the index rather than to the conductor).
-        None => return Answer::Unreachable,
-    };
+
+    let successors =
+        match crate::services::conductor_writes::get_lineage_successors(hc, migration_cid).await {
+            Ok(successors) => successors,
+            // The conductor would not answer the lineage walk. Not "no sunset" —
+            // we could not look (C4, at the discovery step).
+            Err(e) => {
+                tracing::debug!(
+                    migration_cid,
+                    error = %e,
+                    "release-adoption: lineage successors unreadable — unreachable, never \
+                     'no sunset exists'"
+                );
+                return Answer::Unreachable;
+            }
+        };
+    let candidates = sunset_successor_cids(&successors);
     if candidates.is_empty() {
         return Answer::Absent;
     }
 
+    let mut found: Vec<SunsetEvidence> = Vec::new();
     let mut unreachable = false;
     for cid in candidates {
         let out = match crate::services::conductor_writes::get_commitment(hc, &cid).await {
             Ok(Some(out)) => out,
-            // The conductor answered "not on my DHT view" for a cid our own
-            // index named. Odd, and an absence for THIS candidate — keep going.
+            // The conductor answered "not on my DHT view" for a cid a link
+            // named. An absence for THIS candidate — keep going.
             Ok(None) => continue,
             Err(e) => {
                 tracing::debug!(
@@ -838,8 +869,8 @@ pub async fn fetch_sunset_evidence_for(
             unreachable = true;
             continue;
         };
-        // THE RE-CONFIRMATION. The index pointed here; the notarized bytes have
-        // to agree, or the pointer is dropped.
+        // THE RE-CONFIRMATION. A link pointed here; the notarized bytes have to
+        // agree, or the pointer is dropped.
         let migration = string_field(&payload, "migration_commitment_cid");
         if migration != migration_cid {
             continue;
@@ -863,7 +894,7 @@ pub async fn fetch_sunset_evidence_for(
             revoked = revoked_at.is_some(),
             "release-adoption: sunset lifecycle resolved from this peer's own DHT view"
         );
-        return Answer::Present(SunsetEvidence {
+        found.push(SunsetEvidence {
             // The commitment's CID is its ENTRY hash, never its action hash.
             commitment_cid: format!("{}", out.entry_hash),
             role: string_field(&payload, "role"),
@@ -875,55 +906,57 @@ pub async fn fetch_sunset_evidence_for(
         });
     }
 
-    if unreachable {
-        Answer::Unreachable
-    } else {
-        Answer::Absent
-    }
+    sunset_answer(found, unreachable)
 }
 
-/// The DISCOVERY index: `sunsets-lineage` cids whose projected body mentions
-/// `migration_cid`.
+/// The candidate cids a sunset walk reads back, deterministically ordered.
 ///
-/// `None` when the projection could not be READ — the same three-answer
-/// discipline [`lifecycle`] keeps, for the same reason.
+/// Three filters, each doing one job: `kind` keeps sunsets (a `revoked`
+/// successor is a different question); [`is_addressable_cid`] drops a pointer
+/// that cannot BE a commitment, so a junk tag costs no zome call; the sort +
+/// dedup make the walk's order — and therefore [`sunset_answer`]'s tie-break —
+/// independent of DHT link order.
+fn sunset_successor_cids(successors: &[LineageSuccessor]) -> Vec<String> {
+    let mut cids: Vec<String> = successors
+        .iter()
+        .filter(|s| s.kind == SUNSET_SUCCESSOR_KIND)
+        .map(|s| s.commitment_cid.clone())
+        .filter(|cid| is_addressable_cid(cid))
+        .collect();
+    cids.sort();
+    cids.dedup();
+    cids
+}
+
+/// Which re-confirmed sunset a walk answers with — pure, so the masking case is
+/// testable without a conductor.
 ///
-/// The `LIKE` is a narrowing filter over a small, notarized ledger, not the
-/// match: it exists so the walk above is bounded by "rows that could possibly
-/// be it" rather than by every sunset ever projected. The real match is the
-/// re-confirmation against the notarized body.
-async fn sunset_candidates(db: Option<&DbPool>, migration_cid: &str) -> Option<Vec<String>> {
-    use diesel::prelude::*;
-    let pool = db.cloned()?;
-    let needle = format!("%{migration_cid}%");
-    let joined = tokio::task::spawn_blocking(move || -> Result<Vec<String>, String> {
-        use crate::db::diesel_schema::mishpat_commitments::dsl as mc;
-        let mut conn = pool.get().map_err(|e| format!("db pool: {e}"))?;
-        mc::mishpat_commitments
-            .filter(mc::action.eq(SUNSET_ACTION))
-            .filter(mc::bounds_json.like(needle))
-            .select(mc::cid)
-            .load::<String>(&mut conn)
-            .map_err(|e| format!("query: {e}"))
-    })
-    .await;
-    match joined {
-        Ok(Ok(cids)) => Some(cids),
-        Ok(Err(e)) => {
-            tracing::warn!(
-                error = %e,
-                "release-adoption: sunset candidate index unreadable — unreachable, never \
-                 'no sunset exists'"
-            );
-            None
-        }
-        Err(e) => {
-            tracing::warn!(
-                error = %e,
-                "release-adoption: sunset candidate index read panicked/aborted — unreachable"
-            );
-            None
-        }
+/// 1. **An ACTIVE successor wins.** A migration can carry a revoked sunset and a
+///    live one; answering with whichever re-confirmed first would let the dead
+///    one mask the live one and hold a seal that should happen.
+/// 2. Otherwise the first re-confirmed successor, reported AS IT READS — the
+///    caller refuses it (`SunsetNotActive`), which says "a sunset exists and it
+///    does not stand" rather than "no sunset exists".
+/// 3. Otherwise a candidate we could not rule in makes the whole answer
+///    `Unreachable` — because the successor we could not read might be the
+///    active one.
+/// 4. Otherwise `Absent`.
+///
+/// Every branch but the first is a HOLD at the caller. There is no ordering of
+/// these facts that seals a crossing the evidence does not support.
+fn sunset_answer(found: Vec<SunsetEvidence>, unreachable: bool) -> Answer<SunsetEvidence> {
+    if let Some(active) = found
+        .iter()
+        .find(|s| s.state == ACTIVE_STATE && s.revoked_at.is_none())
+    {
+        return Answer::Present(active.clone());
+    }
+    if unreachable {
+        return Answer::Unreachable;
+    }
+    match found.into_iter().next() {
+        Some(first) => Answer::Present(first),
+        None => Answer::Absent,
     }
 }
 
@@ -1555,5 +1588,126 @@ mod tests {
             Some("2026-09-04T10:00:00Z"),
             "verify_path refuses `path_revoked` on this, terminally and independent of state"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Task 27 (G11) — the sunset walk reads successors off the DHT
+    // -----------------------------------------------------------------------
+
+    /// A real `EntryHash`, rendered as the cid a successor tag carries.
+    fn cid(byte: u8) -> String {
+        holochain_types::prelude::EntryHash::from_raw_32(vec![byte; 32]).to_string()
+    }
+
+    fn successor(kind: &str, commitment_cid: &str) -> LineageSuccessor {
+        LineageSuccessor {
+            kind: kind.to_string(),
+            commitment_cid: commitment_cid.to_string(),
+            action_hash: "uhCkkSuccessorAction".to_string(),
+        }
+    }
+
+    fn sunset_evidence(
+        commitment_cid: &str,
+        state: &str,
+        revoked_at: Option<&str>,
+    ) -> SunsetEvidence {
+        SunsetEvidence {
+            commitment_cid: commitment_cid.to_string(),
+            role: "node_registry".to_string(),
+            migration_commitment_cid: "uhCEkPATH".to_string(),
+            from_dna_hash: "uhC0kFROM".to_string(),
+            to_dna_hash: "uhC0kTO".to_string(),
+            state: state.to_string(),
+            revoked_at: revoked_at.map(str::to_string),
+        }
+    }
+
+    /// The walk reads SUNSET successors and nothing else: a `revoked`
+    /// successor is a different question, and a pointer that cannot be an
+    /// address is dropped before it costs a zome call.
+    #[test]
+    fn the_walk_reads_sunset_successors_and_drops_the_rest() {
+        let a = cid(0x11);
+        let b = cid(0x22);
+        let successors = [
+            successor("revoked", &b),
+            successor("sunset", &b),
+            successor("sunset", &a),
+            successor("sunset", "not-an-address"),
+            successor("sunset", &a),
+        ];
+        let mut expected = vec![a, b];
+        expected.sort();
+        assert_eq!(
+            sunset_successor_cids(&successors),
+            expected,
+            "sunsets only, addressable only, deduped, and in an order the DHT does not choose"
+        );
+    }
+
+    /// No successor at all is an ANSWER — the conductor was asked and its DHT
+    /// view carries no sunset for this migration.
+    #[test]
+    fn a_migration_with_no_sunset_successor_reads_absent() {
+        assert!(sunset_successor_cids(&[]).is_empty());
+        assert!(matches!(sunset_answer(vec![], false), Answer::Absent));
+    }
+
+    /// **The masking case.** A migration can carry a sunset that was itself
+    /// revoked and a later one that stands. Answering with whichever
+    /// re-confirmed first would let the dead one mask the live one and hold a
+    /// seal the evidence supports — so the ACTIVE successor wins, whatever
+    /// order the walk found them in.
+    #[test]
+    fn a_revoked_successor_never_masks_a_live_one() {
+        let revoked = sunset_evidence("uhCEkREVOKED", REVOKED_STATE, Some("2026-09-05T00:00:00Z"));
+        let active = sunset_evidence("uhCEkACTIVE", ACTIVE_STATE, None);
+        for found in [
+            vec![revoked.clone(), active.clone()],
+            vec![active.clone(), revoked.clone()],
+        ] {
+            match sunset_answer(found, false) {
+                Answer::Present(chosen) => assert_eq!(
+                    chosen.commitment_cid, "uhCEkACTIVE",
+                    "the sunset that STANDS is the one a seal may rest on"
+                ),
+                other => panic!("an active successor must be Present: {other:?}"),
+            }
+        }
+    }
+
+    /// A revoked sunset with no live sibling is reported AS IT READS, so the
+    /// caller refuses `SunsetNotActive` — "a sunset exists and it does not
+    /// stand" — rather than the vaguer "no sunset exists". Either way it holds.
+    #[test]
+    fn a_lone_revoked_successor_is_reported_rather_than_hidden() {
+        let revoked = sunset_evidence("uhCEkREVOKED", REVOKED_STATE, Some("2026-09-05T00:00:00Z"));
+        match sunset_answer(vec![revoked], false) {
+            Answer::Present(chosen) => {
+                assert_eq!(chosen.state, REVOKED_STATE);
+                assert!(chosen.revoked_at.is_some());
+            }
+            other => panic!("a revoked sunset must be reported, not swallowed: {other:?}"),
+        }
+    }
+
+    /// C4 at the walk: a candidate we could not rule in might have been the
+    /// active one, so nothing-active-plus-something-unreadable is Unreachable —
+    /// our blindness, never "no sunset exists". An ACTIVE successor we DID read
+    /// still answers, because no unread sibling can unmake it.
+    #[test]
+    fn an_unreadable_candidate_is_unreachable_unless_a_live_sunset_was_read() {
+        assert!(matches!(sunset_answer(vec![], true), Answer::Unreachable));
+        let revoked = sunset_evidence("uhCEkREVOKED", REVOKED_STATE, Some("2026-09-05T00:00:00Z"));
+        assert!(matches!(
+            sunset_answer(vec![revoked], true),
+            Answer::Unreachable
+        ));
+        let active = sunset_evidence("uhCEkACTIVE", ACTIVE_STATE, None);
+        assert!(matches!(
+            sunset_answer(vec![active], true),
+            Answer::Present(_)
+        ));
     }
 }

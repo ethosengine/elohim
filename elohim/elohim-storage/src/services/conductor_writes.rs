@@ -1670,6 +1670,60 @@ pub async fn get_commitment_state_links(
     Ok(out)
 }
 
+/// Wire mirror of one `mishpat::commitments::LineageSuccessor` — a lineage
+/// SUCCESSOR link projected to its wire shape by the coordinator.
+///
+/// The sibling genus of [`CommitmentStateLink`] on the same link type: a
+/// lifecycle tag's second segment is a signing TIME, a successor tag's is the
+/// successor commitment's own cid (an ADDRESS). The coordinator splits them, so
+/// neither reader ever sees the other's links.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LineageSuccessor {
+    /// `"sunset"` for a `sunsets-lineage`, `"revoked"` for a quorum-checked
+    /// lineage revocation.
+    pub kind: String,
+    /// The successor commitment's ENTRY hash — the cid [`get_commitment`] takes.
+    pub commitment_cid: String,
+    /// Base64 `ActionHash` of the successor's notarizing action.
+    pub action_hash: String,
+}
+
+/// Read every lineage SUCCESSOR hanging off a migration commitment's anchor
+/// through THIS peer's own conductor (`mishpat::get_lineage_successors`).
+///
+/// **Epic Task 27 (G11).** The walk from a migration to what closed or revoked
+/// it. It replaces a discovery step that ran over the local
+/// `mishpat_commitments` projection — a table written from a post-commit signal
+/// on the AUTHORING conductor, so on every peer but one the question had no
+/// answer at all. These links are on the DHT and gossip like any other, so
+/// every peer walks the same lineage.
+///
+/// Same C4 line as its siblings: an empty `Vec` is an ANSWER ("no successor on
+/// this conductor's DHT view"), an `Err` is a failure to ask.
+///
+/// The successors it names are POINTERS, not evidence (gap G7 — nothing binds a
+/// link's author to its anchor). The caller must read each named commitment's
+/// body back and re-confirm it names this migration.
+pub async fn get_lineage_successors(
+    hc: &Arc<HcClient>,
+    migration_cid: &str,
+) -> Result<Vec<LineageSuccessor>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&migration_cid.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode get_lineage_successors cid: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome_mishpat(MISHPAT_ZOME, "get_lineage_successors", payload)
+        .await?;
+    let out: Vec<LineageSuccessor> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Vec<LineageSuccessor>: {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod collective_cid_tests {
     use super::*;
