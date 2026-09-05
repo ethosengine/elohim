@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:3855d752cdd009cd | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:a231d58a96f4f0ba | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -864,6 +864,17 @@ The rehearsal measures with these open and says so in every receipt. They are in
 - Test: unit tests — the fold threads `resume`; a `chain moved` refusal restarts at 0; the sweep state round-trips `resume`; the `scanned` number reaches the view.
 
 - [ ] **Task 28 deliverable: on the mesh a multi-page carry's second and later pages report `scanned` ≪ the chain length (R1's metric), because the pin actually reaches the zome.**
+
+---
+
+### Task 29: the held view asks the authorities (Station 6's root cause, measured on fresh conductors)
+
+**Files:**
+- Modify: `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` (unconditional: `export_held_records` reads the neighbour's activity with `GetOptions::network()` first; when the network answer is empty and the local store holds records, use local and set an additive `ExportPage.view: "authority" | "local-only"` (`#[serde(default)]`); per-record `get` stays `network()`; `observed_head`/`total`/`digest` come from whichever view was used and the page says which)
+- Modify: storage `lineage_bridge.rs` sweep view carries `view` per neighbour (one field; the bridge seat owns it if it is mid-flight).
+- Test: sweettest still green (single conductor: network empty → local fallback, `view: local-only`); Station 6 on the mesh after a coordinator hot-swap: james's view of jessica reaches her real head.
+
+- [ ] **Task 29 deliverable: on the household mesh a courier's held view of a neighbour reaches the neighbour's real chain head (the ten-station receipt goes 10/10); the page names which view answered.**
 
 ---
 
