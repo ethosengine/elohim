@@ -135,6 +135,9 @@ pub mod path_evidence;
 pub mod readopt;
 pub mod revert;
 pub mod state;
+/// The seal ceremony and its trigger — Station 8's one irreversible act
+/// (Task 14b).
+pub mod sunset;
 pub mod verify;
 pub mod watch;
 

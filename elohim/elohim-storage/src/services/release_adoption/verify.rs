@@ -119,6 +119,28 @@ impl InstalledReality {
     /// inventory as "this peer runs nothing" would make every envelope check
     /// trivially refuse for a reason that is a fact about us, not the release.
     /// A per-role `error` demotes that ONE role, not the whole answer.
+    ///
+    /// # **Task 14b — a CROSSED role's installed reality is the AUTHORING cell**
+    ///
+    /// The passport walks the BASE app's cells, so `dna_hash`,
+    /// `coordinatorWasmHashes` and `constitutionRoot` all describe v1. For a
+    /// role that has crossed — a window open, or SUNSET — that is the wrong
+    /// cell: the one answering for the role is the side app's, and it is the
+    /// only one carrying the root `install_lineage` minted for the crossing.
+    ///
+    /// Reading the base cell there had a specific, silent cost:
+    /// `verify_path`'s root check fires only when the installed role declares
+    /// a root, so on every crossed role `RootSource::Installed` was dead and
+    /// the check fell through to the roster's root — the exact hole the Task
+    /// 17b review named as a design note for this task.
+    ///
+    /// So when the passport's lineage view says the role is crossed
+    /// (`closed`, or authoring pointing at a different app id from reading),
+    /// all three fields come from that view instead — and from ONE cell, so
+    /// they cannot describe two. A view whose authoring lookup failed reports
+    /// `"unknown"`, and that role is demoted exactly as an errored one is
+    /// rather than silently falling back to v1's identity, which would be a
+    /// fact about the wrong cell wearing the right role's name.
     pub fn from_happ_passport(happ: &crate::runtime_passport::HappPassport) -> Answer<Self> {
         if happ.error.is_some() {
             return Answer::Unreachable;
@@ -128,12 +150,26 @@ impl InstalledReality {
             if role.error.is_some() || role.dna_hash == "unknown" {
                 continue;
             }
+            let crossed = role
+                .lineage
+                .as_ref()
+                .filter(|l| l.closed || l.authoring_app_id != l.reading_app_id);
+            if crossed.is_some_and(|l| l.authoring_dna_hash == "unknown") {
+                // The authoring cell could not be read. Demoting the role is
+                // the honest answer; reporting v1's hash for a role that
+                // authors on v2 is not.
+                continue;
+            }
             roles.insert(
                 role.role.clone(),
                 InstalledRole {
                     role: role.role.clone(),
-                    dna_hash: role.dna_hash.clone(),
-                    coordinator_zomes: role.coordinator_wasm_hashes.clone(),
+                    dna_hash: crossed
+                        .map(|l| l.authoring_dna_hash.clone())
+                        .unwrap_or_else(|| role.dna_hash.clone()),
+                    coordinator_zomes: crossed
+                        .map(|l| l.authoring_coordinator_wasm_hashes.clone())
+                        .unwrap_or_else(|| role.coordinator_wasm_hashes.clone()),
                     // **Task 17.** Carried from the passport, which reads it
                     // off the INSTALLED cell's own DNA modifiers. Until this
                     // line, every role reported `None` and `verify_path`'s
@@ -141,7 +177,13 @@ impl InstalledReality {
                     // declares a root — could never fire on a live peer.
                     // `None` still means "this role declares no root", and
                     // imposes no root constraint.
-                    constitution_root: role.constitution_root.clone(),
+                    //
+                    // **Task 14b.** On a crossed role it is the AUTHORING
+                    // cell's root, for the reason in this function's docs.
+                    constitution_root: match crossed {
+                        Some(l) => l.authoring_constitution_root.clone(),
+                        None => role.constitution_root.clone(),
+                    },
                 },
             );
         }
@@ -1355,6 +1397,88 @@ mod tests {
             error: None,
             lineage_apps: Vec::new(),
         })
+    }
+
+    /// **Task 14b.** A CROSSED role's installed reality is the AUTHORING
+    /// cell's — hash, zomes and root together, from one cell.
+    ///
+    /// This is what makes `RootSource::Installed` live on a crossed role. The
+    /// passport walks the BASE app, so before this the root of a v2 cell that
+    /// `install_lineage` minted was invisible and the root check silently fell
+    /// through to the roster's.
+    #[test]
+    fn a_crossed_role_reports_the_authoring_cells_identity() {
+        use crate::runtime_passport::{BackwardCarry, RoleLineageView};
+
+        let view = |closed: bool, authoring_dna: &str| RoleLineageView {
+            reading_app_id: "elohim".to_string(),
+            authoring_app_id: "elohim@SIDE".to_string(),
+            reading_dna_hash: "uhC0k-v1".to_string(),
+            authoring_dna_hash: authoring_dna.to_string(),
+            authoring_constitution_root: Some("root-v2".to_string()),
+            authoring_coordinator_wasm_hashes: [(
+                "node_registry_coordinator".to_string(),
+                "uhCok-v2".to_string(),
+            )]
+            .into_iter()
+            .collect(),
+            closed,
+            backward_carry: BackwardCarry::Unavailable,
+            sweep: Vec::new(),
+        };
+        let passport = |lineage: Option<RoleLineageView>| HappPassport {
+            app_id: "elohim".to_string(),
+            roles: vec![HappRolePassport {
+                role: "node_registry".to_string(),
+                dna_hash: "uhC0k-v1".to_string(),
+                coordinator_wasm_hashes: [(
+                    "node_registry_coordinator".to_string(),
+                    "uhCok-v1".to_string(),
+                )]
+                .into_iter()
+                .collect(),
+                error: None,
+                lineage,
+                constitution_root: Some("root-v1".to_string()),
+            }],
+            error: None,
+            lineage_apps: Vec::new(),
+        };
+
+        // An OPEN window, and a SUNSET one, both read the authoring cell.
+        for closed in [false, true] {
+            let Answer::Present(reality) =
+                InstalledReality::from_happ_passport(&passport(Some(view(closed, "uhC0k-v2"))))
+            else {
+                panic!("a crossed role is still an installed reality");
+            };
+            let role = &reality.roles["node_registry"];
+            assert_eq!(role.dna_hash, "uhC0k-v2", "closed={closed}");
+            assert_eq!(
+                role.constitution_root.as_deref(),
+                Some("root-v2"),
+                "the root install_lineage minted into v2 — this is what makes \
+                 RootSource::Installed live on a crossed role"
+            );
+            assert_eq!(role.wasm_hashes(), ["uhCok-v2"].into_iter().collect());
+        }
+
+        // An UNCROSSED role is untouched — the base cell, exactly as before.
+        let Answer::Present(reality) = InstalledReality::from_happ_passport(&passport(None)) else {
+            panic!("an uncrossed role is an installed reality");
+        };
+        let role = &reality.roles["node_registry"];
+        assert_eq!(role.dna_hash, "uhC0k-v1");
+        assert_eq!(role.constitution_root.as_deref(), Some("root-v1"));
+        assert_eq!(role.wasm_hashes(), ["uhCok-v1"].into_iter().collect());
+
+        // An authoring lookup that FAILED demotes the role rather than
+        // reporting v1's identity for a role that authors on v2.
+        assert_eq!(
+            InstalledReality::from_happ_passport(&passport(Some(view(false, "unknown")))),
+            Answer::Unreachable,
+            "the only role was demoted, so nothing about this peer's roles could be read"
+        );
     }
 
     /// The vendored mirror accepts every manifest T2's packager actually

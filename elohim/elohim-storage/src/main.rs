@@ -5693,6 +5693,13 @@ async fn async_main(
         let mut lineage_reverter: Option<
             std::sync::Arc<dyn elohim_storage::services::release_adoption::revert::LineageReverter>,
         > = None;
+        // Task 14b: and as the sunset seam, for the same reason — the object
+        // that opened a window is the only one that can name its side app.
+        let mut lineage_sunsetter: Option<
+            std::sync::Arc<
+                dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
+            >,
+        > = None;
         if let Some(ref admin) = admin_for_adoption {
             vehicles = vehicles
                 .with(std::sync::Arc::new(apply::CoordinatorBundleVehicle::new(
@@ -5733,6 +5740,10 @@ async fn async_main(
                 lineage_reverter = Some(std::sync::Arc::clone(&vehicle)
                     as std::sync::Arc<
                         dyn elohim_storage::services::release_adoption::revert::LineageReverter,
+                    >);
+                lineage_sunsetter = Some(std::sync::Arc::clone(&vehicle)
+                    as std::sync::Arc<
+                        dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
                     >);
                 vehicles = vehicles.with(vehicle);
             }
@@ -5858,6 +5869,15 @@ async fn async_main(
         if let Some(reverter) = lineage_reverter {
             controller =
                 controller.with_lineage_revert(std::sync::Arc::clone(&lineage_roles), reverter);
+        }
+        // **Task 14b (Station 8) — the sunset arm.** Wired beside the revert
+        // arm and gated on the same vehicle. It additionally needs the
+        // resolver the line above supplies, so a sunsetter without a revert
+        // arm is inert rather than dangerous — and the arm itself never seals
+        // without an active path, an active sunset commitment naming it, and
+        // this peer's own carry complete.
+        if let Some(sunsetter) = lineage_sunsetter {
+            controller = controller.with_lineage_sunset(sunsetter);
         }
 
         if watch::spawn(controller) {

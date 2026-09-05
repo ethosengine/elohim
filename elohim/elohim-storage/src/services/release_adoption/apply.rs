@@ -1102,6 +1102,58 @@ impl super::revert::Readopter for HappLineageVehicle {
     }
 }
 
+/// **Task 14b — the seal, on the same object that opened the window.**
+///
+/// # Why the client is the SIDE app's
+///
+/// `seal_close` is a V2 extern, and it must be: only the successor can author
+/// the `OpenChain` that names the predecessor's close, and only the successor's
+/// witness log can carry the close into the DHT where the integrity zome's
+/// after-close rule can see it. So this connects to the side app and hands it
+/// the BASE app's cell for the role — the exact inverse of the readopt above,
+/// which is why both derive their cells through one [`HappLineageVehicle::role_cell`].
+#[async_trait::async_trait]
+impl super::sunset::ChainSealer for HappLineageVehicle {
+    async fn seal_close(
+        &self,
+        role: &str,
+        side_app_id: &str,
+    ) -> Result<super::sunset::SealReceipt, String> {
+        let base = self.app_info(&self.base_app_id).await?;
+        let v1_cell = Self::role_cell(&base, role).ok_or_else(|| {
+            format!(
+                "base app '{}' has no provisioned cell for role '{role}' — there is no chain to \
+                 close",
+                self.base_app_id
+            )
+        })?;
+        let client = self
+            .registry
+            .connect_app(side_app_id, role)
+            .await
+            .map_err(|e| format!("could not connect to side app '{side_app_id}' ({e})"))?;
+        super::sunset::call_seal_close(&client, &v1_cell).await
+    }
+}
+
+#[async_trait::async_trait]
+impl super::sunset::LineageSunsetter for HappLineageVehicle {
+    async fn sunset_window(
+        &self,
+        role: &str,
+        sunset_commitment_cid: &str,
+    ) -> Result<super::sunset::SunsetReceipt, AdoptionRefusal> {
+        super::sunset::perform_sunset(
+            self.lineage.as_ref(),
+            self,
+            role,
+            sunset_commitment_cid,
+            super::state::now_unix(),
+        )
+        .await
+    }
+}
+
 // ---------------------------------------------------------------------------
 // config-epr → the rung-4 watched runtime-config file
 // ---------------------------------------------------------------------------

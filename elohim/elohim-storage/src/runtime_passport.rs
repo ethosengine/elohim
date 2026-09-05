@@ -117,6 +117,29 @@ pub struct RoleLineageView {
     pub authoring_app_id: String,
     pub reading_dna_hash: String,
     pub authoring_dna_hash: String,
+    /// **Task 14b.** The constitutional root the AUTHORING cell declares, read
+    /// off the side app's own DNA modifiers exactly as
+    /// [`HappRolePassport::constitution_root`] is read off the base app's.
+    ///
+    /// It exists because after a crossing the two cells declare DIFFERENT
+    /// roots, and the role-level field reports the BASE app's. Before this
+    /// field, `release_adoption::verify::InstalledReality::from_happ_passport`
+    /// had no way to see the root that `happ_manager::install_lineage` minted
+    /// into the v2 cell — so `RootSource::Installed` was dead on every crossed
+    /// role, and the root check silently fell back to the roster's.
+    ///
+    /// `None` — and so omitted — when the authoring cell declares no root, or
+    /// when the lookup failed (which is reported on the role's `error`, never
+    /// smuggled in here as an absent root).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authoring_constitution_root: Option<String>,
+    /// **Task 14b.** The AUTHORING cell's coordinator wasm hashes, same
+    /// reasoning: after a crossing they are the zomes actually answering for
+    /// this role, and the role-level `coordinatorWasmHashes` still describes
+    /// the base cell. Empty — and absent — when the lookup failed or no window
+    /// is open.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub authoring_coordinator_wasm_hashes: BTreeMap<String, String>,
     pub closed: bool,
     /// **Task 12.** Whether a record authored on V2 during this window can
     /// travel BACKWARD into the v1 line.
@@ -445,21 +468,60 @@ async fn inspect_installed_happ(
             .get(role)
             .map(|entry| entry.authoring_app_id != entry.reading_app_id || entry.closed)
             .unwrap_or(false);
-        let authoring_dna_hash = if needs_lineage_view {
+        // **Task 14b.** When a window is open (or was sunset) the AUTHORING
+        // cell is the one actually answering for this role, so its identity is
+        // read too: its DNA hash, its constitutional root, and its coordinator
+        // wasm hashes. All three come from the SAME provisioned cell, in one
+        // pass, so they cannot describe different cells — which is exactly the
+        // failure mode a second lookup would introduce.
+        let (authoring_dna_hash, authoring_cell) = if needs_lineage_view {
             let authoring_app_id = &lineage[role].authoring_app_id;
-            match resolve_role_dna_hash(&apps, authoring_app_id, role) {
-                Ok(hash) => Some(hash),
+            match resolve_role_cell(&apps, authoring_app_id, role) {
+                Ok(provisioned) => (
+                    Some(provisioned.cell_id.dna_hash().to_string()),
+                    Some(provisioned),
+                ),
                 Err(lookup_error) => {
                     if role_error.is_none() {
                         role_error = Some(lookup_error);
                     }
-                    Some("unknown".to_string())
+                    (Some("unknown".to_string()), None)
                 }
             }
         } else {
-            None
+            (None, None)
         };
-        let lineage_view = lineage_view_for(role, &dna_hash, lineage, authoring_dna_hash, sweep);
+        let authoring_constitution_root = authoring_cell
+            .as_ref()
+            .and_then(|c| constitution_root_from_properties(c.dna_modifiers.properties.bytes()));
+        let authoring_coordinator_wasm_hashes = match authoring_cell {
+            Some(provisioned) => match admin.get_dna_definition(provisioned.cell_id).await {
+                Ok(definition) => definition
+                    .coordinator_zomes
+                    .iter()
+                    .filter_map(|(name, zome)| {
+                        crate::happ_manager::coordinator_wasm_hash(zome)
+                            .map(|hash| (name.to_string(), hash.to_string()))
+                    })
+                    .collect(),
+                Err(error) => {
+                    if role_error.is_none() {
+                        role_error = Some(format!("authoring get_dna_definition failed: {error}"));
+                    }
+                    BTreeMap::new()
+                }
+            },
+            None => BTreeMap::new(),
+        };
+        let lineage_view = lineage_view_for(
+            role,
+            &dna_hash,
+            lineage,
+            authoring_dna_hash,
+            authoring_constitution_root,
+            authoring_coordinator_wasm_hashes,
+            sweep,
+        );
 
         roles.push(HappRolePassport {
             role: role.to_string(),
@@ -540,11 +602,11 @@ fn lineage_apps_for(base_app_id: &str, installed_app_ids: &[String]) -> Vec<Stri
 /// resolve the AUTHORING cell's DNA hash for a dual-celled role; the
 /// READING cell's hash is already computed by the caller from the base
 /// app's own cell inventory.
-fn resolve_role_dna_hash(
+fn resolve_role_cell(
     apps: &[holochain_client::AppInfo],
     app_id: &str,
     role: &str,
-) -> Result<String, String> {
+) -> Result<holochain_client::ProvisionedCell, String> {
     let app = apps
         .iter()
         .find(|app| app.installed_app_id == app_id)
@@ -556,7 +618,7 @@ fn resolve_role_dna_hash(
     cells
         .iter()
         .find_map(|cell| match cell {
-            CellInfo::Provisioned(provisioned) => Some(provisioned.cell_id.dna_hash().to_string()),
+            CellInfo::Provisioned(provisioned) => Some(provisioned.clone()),
             _ => None,
         })
         .ok_or_else(|| format!("authoring app '{app_id}' role '{role}' has no provisioned cell"))
@@ -574,11 +636,14 @@ fn resolve_role_dna_hash(
 /// (`authoring_app_id == reading_app_id && !closed`) — the shape every role
 /// starts in and the shape a byte-identical-with-empty-snapshot response
 /// depends on.
+#[allow(clippy::too_many_arguments)]
 fn lineage_view_for(
     role: &str,
     dna_hash: &str,
     snapshot: &BTreeMap<String, RoleLineage>,
     authoring_dna_hash: Option<String>,
+    authoring_constitution_root: Option<String>,
+    authoring_coordinator_wasm_hashes: BTreeMap<String, String>,
     sweep: &BTreeMap<SweepKey, AgentSweep>,
 ) -> Option<RoleLineageView> {
     let entry = snapshot.get(role)?;
@@ -600,6 +665,8 @@ fn lineage_view_for(
         authoring_app_id: entry.authoring_app_id.clone(),
         reading_dna_hash: dna_hash.to_string(),
         authoring_dna_hash,
+        authoring_constitution_root,
+        authoring_coordinator_wasm_hashes,
         closed: entry.closed,
         backward_carry,
         sweep: sweep_view_for(role, sweep),
@@ -869,6 +936,8 @@ mod tests {
                     "uhC0k-example",
                     &BTreeMap::new(),
                     None,
+                    None,
+                    BTreeMap::new(),
                     &BTreeMap::new(),
                 ),
                 constitution_root: None,
@@ -892,6 +961,8 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             None,
+            None,
+            BTreeMap::new(),
             &BTreeMap::new()
         )
         .is_none());
@@ -914,6 +985,13 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             Some("uhC0k-lineage".to_string()),
+            Some("root-v2".to_string()),
+            [(
+                "node_registry_coordinator".to_string(),
+                "uhCok-v2".to_string(),
+            )]
+            .into_iter()
+            .collect(),
             &BTreeMap::new(),
         )
         .expect("open window projects a view");
@@ -921,6 +999,17 @@ mod tests {
         assert_eq!(view.authoring_app_id, "elohim@EKiIscIk5BDd");
         assert_eq!(view.reading_dna_hash, "uhC0k-base");
         assert_eq!(view.authoring_dna_hash, "uhC0k-lineage");
+        // **Task 14b.** The AUTHORING cell's own identity — the root
+        // `install_lineage` minted into v2, and the zomes actually answering
+        // for this role now. The role-level fields still describe the base
+        // cell, which is why these had to exist.
+        assert_eq!(view.authoring_constitution_root.as_deref(), Some("root-v2"));
+        assert_eq!(
+            view.authoring_coordinator_wasm_hashes
+                .get("node_registry_coordinator")
+                .map(String::as_str),
+            Some("uhCok-v2")
+        );
         assert!(!view.closed);
         // Task 12: the two cells are on different DNAs, so a v2 record has
         // nowhere to land in the v1 line.
@@ -970,6 +1059,8 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             Some("uhC0k-lineage".to_string()),
+            None,
+            BTreeMap::new(),
             &sweep,
         )
         .expect("open window projects a view");
@@ -986,6 +1077,10 @@ mod tests {
         // And it reaches the wire in camelCase, under the role's `lineage`.
         let json = serde_json::to_value(&view).unwrap();
         assert_eq!(json["backwardCarry"], "unavailable");
+        // Both Task 14b fields are omitted when the authoring lookup yielded
+        // nothing — a build with no root declared stays byte-identical here.
+        assert!(json.get("authoringConstitutionRoot").is_none());
+        assert!(json.get("authoringCoordinatorWasmHashes").is_none());
         assert_eq!(json["sweep"][0]["observedHead"], 57);
         assert_eq!(json["sweep"][0]["lastSweep"], "2026-09-04T00:00:00Z");
         assert!(json["sweep"][0].get("lastError").is_none());
@@ -1013,6 +1108,8 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             None,
+            None,
+            BTreeMap::new(),
             &BTreeMap::new(),
         )
         .expect("closed=true alone still projects a view");
@@ -1044,6 +1141,8 @@ mod tests {
             "uhC0k-base",
             &snapshot,
             None,
+            None,
+            BTreeMap::new(),
             &BTreeMap::new()
         )
         .is_none());

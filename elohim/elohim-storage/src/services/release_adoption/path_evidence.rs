@@ -712,6 +712,221 @@ async fn lifecycle(db: Option<&DbPool>, cid: &str) -> Option<Option<(String, Opt
     }
 }
 
+// ---------------------------------------------------------------------------
+// Task 14b — the SUNSET read (Station 8)
+// ---------------------------------------------------------------------------
+
+/// The mishpat commitment action that closes a crossing for good.
+const SUNSET_ACTION: &str = "sunsets-lineage";
+
+/// What this peer's own conductor says about a `sunsets-lineage` commitment.
+///
+/// A deliberately SEPARATE type from [`PathEvidence`] rather than a reuse of
+/// it: a sunset body carries no roster, no signature-count discipline this side
+/// checks, and no window with a revert horizon — it names a migration, a role,
+/// a DNA pair, and a `sunsets_at`. Projecting it through `PathEvidence` would
+/// mean fabricating a roster field and a required-signature count, and a
+/// fabricated field is exactly what the sunset — the one irreversible act —
+/// must not be decided on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SunsetEvidence {
+    /// The sunset commitment's own CID (its ENTRY hash).
+    pub commitment_cid: String,
+    /// The role this sunset closes. Compared against the window's role by
+    /// [`super::sunset::sunset_decision`] — an empty value never matches, which
+    /// is the fail-closed direction.
+    pub role: String,
+    /// The `migrates-lineage` commitment this sunset closes, read from the
+    /// NOTARIZED body — never from the local index that found the candidate.
+    pub migration_commitment_cid: String,
+    /// The DNA hash the crossing came FROM (spec §3 binds both lineage arms to
+    /// the same identity fields).
+    pub from_dna_hash: String,
+    /// The DNA hash the crossing went TO.
+    pub to_dna_hash: String,
+    /// The mishpat lifecycle state, resolved off this peer's own DHT view by
+    /// exactly the same [`resolve_lifecycle`] rail the path uses — so "active"
+    /// means one thing across both arms.
+    pub state: String,
+    /// Set once the sunset commitment is itself revoked. A revoked sunset is
+    /// not authority to close a chain.
+    pub revoked_at: Option<String>,
+}
+
+/// Find the `sunsets-lineage` commitment that names `migration_cid`, and read
+/// it through THIS peer's own conductor.
+///
+/// # Two sources, and only one of them is evidence
+///
+/// The mishpat DNA has no query-by-target extern, so there is no DHT read that
+/// answers "what sunsets this migration?". What this does instead:
+///
+/// 1. **Discovery** — the local `mishpat_commitments` projection is searched
+///    for `sunsets-lineage` rows whose stored body mentions `migration_cid`.
+///    The row is a POINTER and nothing more; nothing it says is trusted.
+/// 2. **Evidence** — each candidate cid is then read back off the conductor
+///    (`mishpat::get_commitment` for the body, `get_commitment_state_links` for
+///    the lifecycle — the same C5 rail [`fetch_path_evidence_for_cid`] uses),
+///    and the `migration_commitment_cid` is re-confirmed from the NOTARIZED
+///    bytes. A row that pointed at a commitment whose body says something else
+///    is dropped.
+///
+/// # KNOWN GAP — discovery is author-scoped, and the arm is dormant elsewhere
+///
+/// `mishpat_commitments` is written from `CommitmentCommitted`, a post-commit
+/// signal on the AUTHORING conductor (see this module's Task 19 section). So on
+/// every peer but the one whose elohim notarized the sunset, step 1 finds
+/// nothing and this returns [`Answer::Absent`] — the sunset arm simply never
+/// fires there.
+///
+/// That is **fail-closed and deliberate at MVP**, not a silent hole: never
+/// sealing is the safe direction for the one act with no remedy, and a peer
+/// that does not seal keeps authoring on v2 with v1 open and readable, which
+/// costs nothing but the fence. The fleet-wide route is the same shape Task 19
+/// took for the lifecycle: a coordinator-only, DNA-hash-neutral link from the
+/// migration's anchor to its sunset (`MigrationToSunset`), read here instead of
+/// the projection. Filed rather than done because this seat may not touch the
+/// DNA.
+///
+/// [`Answer::Unreachable`] is reserved for a read that could not be MADE — a
+/// projection that would not answer, or a conductor that would not — because a
+/// sunset held for our own blindness must never read as "no sunset exists".
+pub async fn fetch_sunset_evidence_for(
+    hc: Option<&Arc<HcClient>>,
+    db: Option<&DbPool>,
+    migration_cid: &str,
+) -> Answer<SunsetEvidence> {
+    let Some(hc) = hc else {
+        tracing::debug!(
+            migration_cid,
+            "release-adoption: no conductor bridge to read sunset evidence through — \
+             unreachable, which establishes nothing"
+        );
+        return Answer::Unreachable;
+    };
+    let candidates = match sunset_candidates(db, migration_cid).await {
+        Some(candidates) => candidates,
+        // The discovery index would not answer. Not "no sunset" — we could not
+        // look (C4, applied to the index rather than to the conductor).
+        None => return Answer::Unreachable,
+    };
+    if candidates.is_empty() {
+        return Answer::Absent;
+    }
+
+    let mut unreachable = false;
+    for cid in candidates {
+        let out = match crate::services::conductor_writes::get_commitment(hc, &cid).await {
+            Ok(Some(out)) => out,
+            // The conductor answered "not on my DHT view" for a cid our own
+            // index named. Odd, and an absence for THIS candidate — keep going.
+            Ok(None) => continue,
+            Err(e) => {
+                tracing::debug!(
+                    commitment_cid = %cid,
+                    error = %e,
+                    "release-adoption: sunset candidate unreadable — unreachable, never absence"
+                );
+                unreachable = true;
+                continue;
+            }
+        };
+        if out.action != SUNSET_ACTION {
+            continue;
+        }
+        let Ok(payload) = serde_json::from_str::<serde_json::Value>(&out.payload_json) else {
+            unreachable = true;
+            continue;
+        };
+        // THE RE-CONFIRMATION. The index pointed here; the notarized bytes have
+        // to agree, or the pointer is dropped.
+        let migration = string_field(&payload, "migration_commitment_cid");
+        if migration != migration_cid {
+            continue;
+        }
+        let links = match read_state_links(hc, &cid).await {
+            Ok(links) => links,
+            Err(()) => {
+                unreachable = true;
+                continue;
+            }
+        };
+        let Some(row) = lifecycle(db, &cid).await else {
+            unreachable = true;
+            continue;
+        };
+        let (state, revoked_at) = resolve_lifecycle(&links, row);
+        tracing::debug!(
+            commitment_cid = %cid,
+            migration_cid,
+            state = %state,
+            revoked = revoked_at.is_some(),
+            "release-adoption: sunset lifecycle resolved from this peer's own DHT view"
+        );
+        return Answer::Present(SunsetEvidence {
+            // The commitment's CID is its ENTRY hash, never its action hash.
+            commitment_cid: format!("{}", out.entry_hash),
+            role: string_field(&payload, "role"),
+            migration_commitment_cid: migration,
+            from_dna_hash: string_field(&payload, "from_dna_hash"),
+            to_dna_hash: string_field(&payload, "to_dna_hash"),
+            state,
+            revoked_at,
+        });
+    }
+
+    if unreachable {
+        Answer::Unreachable
+    } else {
+        Answer::Absent
+    }
+}
+
+/// The DISCOVERY index: `sunsets-lineage` cids whose projected body mentions
+/// `migration_cid`.
+///
+/// `None` when the projection could not be READ — the same three-answer
+/// discipline [`lifecycle`] keeps, for the same reason.
+///
+/// The `LIKE` is a narrowing filter over a small, notarized ledger, not the
+/// match: it exists so the walk above is bounded by "rows that could possibly
+/// be it" rather than by every sunset ever projected. The real match is the
+/// re-confirmation against the notarized body.
+async fn sunset_candidates(db: Option<&DbPool>, migration_cid: &str) -> Option<Vec<String>> {
+    use diesel::prelude::*;
+    let pool = db.cloned()?;
+    let needle = format!("%{migration_cid}%");
+    let joined = tokio::task::spawn_blocking(move || -> Result<Vec<String>, String> {
+        use crate::db::diesel_schema::mishpat_commitments::dsl as mc;
+        let mut conn = pool.get().map_err(|e| format!("db pool: {e}"))?;
+        mc::mishpat_commitments
+            .filter(mc::action.eq(SUNSET_ACTION))
+            .filter(mc::bounds_json.like(needle))
+            .select(mc::cid)
+            .load::<String>(&mut conn)
+            .map_err(|e| format!("query: {e}"))
+    })
+    .await;
+    match joined {
+        Ok(Ok(cids)) => Some(cids),
+        Ok(Err(e)) => {
+            tracing::warn!(
+                error = %e,
+                "release-adoption: sunset candidate index unreadable — unreachable, never \
+                 'no sunset exists'"
+            );
+            None
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "release-adoption: sunset candidate index read panicked/aborted — unreachable"
+            );
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

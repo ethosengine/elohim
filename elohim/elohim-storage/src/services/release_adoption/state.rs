@@ -606,6 +606,12 @@ struct Registry {
     /// EVENT, not a state, and collapsing two reverts of the same role onto
     /// one row would hide the second.
     reverts: Mutex<Vec<super::revert::RevertReceipt>>,
+    /// **Task 14b.** Every lineage window this process has SUNSET, newest
+    /// last, bounded at [`MAX_REVERTS_KEPT`]. Same reasoning as `reverts`: a
+    /// sunset is an EVENT. Unlike a revert it can happen at most once per
+    /// role per crossing, but a peer that crossed twice has two of them and
+    /// collapsing them onto a role key would hide the first.
+    sunsets: Mutex<Vec<super::sunset::SunsetReceipt>>,
 }
 
 /// How many revert receipts `/admin/adoption` keeps. A revert is a rare,
@@ -621,6 +627,7 @@ static REGISTRY: LazyLock<Registry> = LazyLock::new(|| Registry {
     last_sweep_unix: Mutex::new(None),
     sweeps: Mutex::new(0),
     reverts: Mutex::new(Vec::new()),
+    sunsets: Mutex::new(Vec::new()),
 });
 
 /// Record one reverted window. Called by the controller's revert sweep after
@@ -637,6 +644,22 @@ pub fn record_revert(receipt: super::revert::RevertReceipt) {
 /// Every revert this process has performed, oldest first.
 pub fn reverts() -> Vec<super::revert::RevertReceipt> {
     REGISTRY.reverts.lock().unwrap().clone()
+}
+
+/// Record one sunset window. Called by the controller's sunset arm after the
+/// vehicle's seal has landed and the window is closed.
+pub fn record_sunset(receipt: super::sunset::SunsetReceipt) {
+    let mut sunsets = REGISTRY.sunsets.lock().unwrap();
+    sunsets.push(receipt);
+    let overflow = sunsets.len().saturating_sub(MAX_REVERTS_KEPT);
+    if overflow > 0 {
+        sunsets.drain(..overflow);
+    }
+}
+
+/// Every sunset this process has performed, oldest first.
+pub fn sunsets() -> Vec<super::sunset::SunsetReceipt> {
+    REGISTRY.sunsets.lock().unwrap().clone()
 }
 
 pub fn now_unix() -> i64 {
@@ -791,6 +814,13 @@ pub fn report_json() -> serde_json::Value {
         // checking "did my revert land?" must be able to tell an empty list
         // from a field this build does not have.
         "reverts": reverts(),
+        // **Task 14b.** What this peer sealed shut, and under which commitment.
+        // Always present (an empty array on a peer that never sunset) for the
+        // same reason `reverts` is: an operator checking "did my sunset land?"
+        // must be able to tell an empty list from a field this build lacks.
+        // It is the ONLY place the close/open hashes surface outside a
+        // conductor.
+        "sunsets": sunsets(),
     })
 }
 

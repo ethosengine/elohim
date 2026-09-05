@@ -531,6 +531,11 @@ pub struct AdoptionController {
     /// **Task 13a.** Who performs a revert. In production this is the same
     /// `HappLineageVehicle` that opened the window.
     reverter: Option<Arc<dyn super::revert::LineageReverter>>,
+    /// **Task 14b.** Who performs a sunset — the same `HappLineageVehicle`
+    /// again. `None` leaves the sunset arm dark, which is the safe default for
+    /// the one act with no remedy: a node that cannot seal simply keeps
+    /// authoring on v2 with v1 open and readable.
+    sunsetter: Option<Arc<dyn super::sunset::LineageSunsetter>>,
     staging_root: PathBuf,
     cached_reality: tokio::sync::Mutex<Option<(i64, Answer<InstalledReality>)>>,
 }
@@ -546,6 +551,7 @@ impl AdoptionController {
             db: None,
             lineage: None,
             reverter: None,
+            sunsetter: None,
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
         }
@@ -613,6 +619,22 @@ impl AdoptionController {
     ) -> Self {
         self.lineage = Some(lineage);
         self.reverter = Some(reverter);
+        self
+    }
+
+    /// **Task 14b — equip the sunset arm (Station 8).**
+    ///
+    /// Separate from [`Self::with_lineage_revert`] rather than folded into it,
+    /// because the two arms are not the same promise: a build may reasonably
+    /// want the remedy without the irreversible act, and the reverse is never
+    /// wanted at all. The arm additionally requires the resolver
+    /// [`Self::with_lineage_revert`] supplies — without it there are no open
+    /// windows to select, so a sunsetter alone is inert rather than dangerous.
+    pub fn with_lineage_sunset(
+        mut self,
+        sunsetter: Arc<dyn super::sunset::LineageSunsetter>,
+    ) -> Self {
+        self.sunsetter = Some(sunsetter);
         self
     }
 
@@ -979,28 +1001,83 @@ impl AdoptionController {
     /// worth of reads per open window, and open windows are at most one per
     /// role (and, at MVP, one per release — `sole_crossing`).
     async fn sweep_lineage_windows(&self) {
-        self.revert_open_windows(|cid| async move {
-            // (C5) The path, re-read through THIS peer's own conductor — the
-            // same read `verify_path` consumes, so "revoked" means one thing.
-            super::path_evidence::fetch_path_evidence_for_cid(
-                self.hc.as_ref(),
-                self.db.as_ref(),
-                &cid,
-            )
-            .await
-        })
+        self.sweep_open_windows(
+            |cid| async move {
+                // (C5) The path, re-read through THIS peer's own conductor —
+                // the same read `verify_path` consumes, so "revoked" means one
+                // thing.
+                super::path_evidence::fetch_path_evidence_for_cid(
+                    self.hc.as_ref(),
+                    self.db.as_ref(),
+                    &cid,
+                )
+                .await
+            },
+            |cid| async move {
+                // **Task 14b.** The sunset that names that path, down the same
+                // C5 rail. Skipped entirely when no sunsetter is wired — the
+                // read costs a projection query and a zome call, and a
+                // controller that could not act on the answer has no business
+                // asking.
+                if self.sunsetter.is_none() {
+                    return Answer::Absent;
+                }
+                super::path_evidence::fetch_sunset_evidence_for(
+                    self.hc.as_ref(),
+                    self.db.as_ref(),
+                    &cid,
+                )
+                .await
+            },
+            // THIS peer's own carry, off the applied-release row the crossing
+            // left behind. Threaded rather than read inline so the arm's
+            // convergence gate is testable against a value instead of a
+            // process-global registry.
+            |channel_id| state::applied_release(&channel_id).and_then(|applied| applied.carry),
+        )
         .await
     }
 
-    /// [`sweep_lineage_windows`](Self::sweep_lineage_windows) with the path
-    /// read threaded in, so the arm's control flow — which windows it looks
-    /// at, what it does with an unreadable path, and whether a second pass
-    /// repeats itself — is testable without a conductor. Production passes the
-    /// real C5 read and nothing else differs.
+    /// The pre-Task-14b arm: revert only, with no sunset read. Retained as the
+    /// name the revert tests drive, and as a statement that the sunset half is
+    /// strictly additive — an `Absent` sunset holds every window exactly where
+    /// the revert-only build left it.
+    #[cfg(test)]
     async fn revert_open_windows<R, F>(&self, read_path: R)
     where
         R: Fn(String) -> F,
         F: std::future::Future<Output = Answer<super::PathEvidence>>,
+    {
+        self.sweep_open_windows(read_path, |_| async { Answer::Absent }, |_| None)
+            .await
+    }
+
+    /// [`sweep_lineage_windows`](Self::sweep_lineage_windows) with both
+    /// evidence reads threaded in, so the arm's control flow — which windows it
+    /// looks at, what it does with an unreadable path, which remedy outranks
+    /// which, and whether a second pass repeats itself — is testable without a
+    /// conductor. Production passes the real C5 reads and nothing else differs.
+    ///
+    /// # Two arms, one loop, and the ORDER between them is a rule
+    ///
+    /// Both arms want the same fact — this window's path, re-read now — so
+    /// reading it once and offering it to both is not merely cheaper, it is the
+    /// only way they cannot disagree about what the path says in a single
+    /// sweep.
+    ///
+    /// **Revert outranks sunset within a sweep.** A revoked path reverts and
+    /// `continue`s; it never falls through to the seal. That is Station 8's
+    /// own line read forward: a revocation before the sunset is the remedy, and
+    /// a revocation after it changes nothing (because the window is closed and
+    /// `open_windows` no longer selects it). The one ordering that would be
+    /// wrong is sealing a window whose permission was just withdrawn.
+    async fn sweep_open_windows<R, F, S, G, C>(&self, read_path: R, read_sunset: S, carry_of: C)
+    where
+        R: Fn(String) -> F,
+        F: std::future::Future<Output = Answer<super::PathEvidence>>,
+        S: Fn(String) -> G,
+        G: std::future::Future<Output = Answer<super::path_evidence::SunsetEvidence>>,
+        C: Fn(String) -> Option<super::LineageCarryReceipt>,
     {
         // Both halves or nothing — see `with_lineage_revert`.
         let (Some(lineage), Some(reverter)) = (self.lineage.as_ref(), self.reverter.as_ref())
@@ -1059,6 +1136,51 @@ impl AdoptionController {
                         "release-adoption: revert refused — the window is unchanged and the next \
                          sweep asks again"
                     ),
+                }
+                // The remedy outranks the seal. A window that just reverted is
+                // no longer open anyway; saying so here makes the precedence a
+                // fact of control flow rather than an accident of state.
+                continue;
+            }
+
+            // ── Task 14b: the sunset arm ────────────────────────────────────
+            let Some(sunsetter) = self.sunsetter.as_ref() else {
+                continue;
+            };
+            let sunset = read_sunset(origin.path_commitment_cid.clone()).await;
+            // THIS peer's own carry, off the applied-release row the crossing
+            // left behind. See `sunset::local_carry_converged` — and the module
+            // docs, which say plainly that fleet convergence stays the
+            // operator's gate at MVP.
+            let converged =
+                super::sunset::local_carry_converged(carry_of(origin.channel_id.clone()).as_ref());
+            match super::sunset::sunset_decision(&evidence, &sunset, &role, converged) {
+                super::sunset::SunsetVerdict::Hold(hold) => {
+                    tracing::debug!(
+                        role = role.as_str(),
+                        hold = hold.label(),
+                        "release-adoption: sunset held — the window stays open and the next \
+                         sweep asks again"
+                    );
+                }
+                super::sunset::SunsetVerdict::Seal => {
+                    let cid = match &sunset {
+                        Answer::Present(s) => s.commitment_cid.clone(),
+                        // Unreachable by construction: `Seal` is returned only
+                        // for a `Present` sunset. Named rather than unwrapped.
+                        _ => continue,
+                    };
+                    match sunsetter.sunset_window(&role, &cid).await {
+                        Ok(receipt) => state::record_sunset(receipt),
+                        Err(refusal) => tracing::warn!(
+                            role = role.as_str(),
+                            sunset_commitment_cid = %cid,
+                            refusal = %refusal.reason,
+                            detail = %refusal.detail,
+                            "release-adoption: sunset refused — the window stays OPEN and the \
+                             next sweep asks again"
+                        ),
+                    }
                 }
             }
         }
@@ -3170,5 +3292,241 @@ mod tests {
         controller
             .revert_open_windows(|_| async { panic!("no lineage resolver, no arm") })
             .await;
+    }
+
+    // ── Task 14b: the sunset arm ───────────────────────────────────────────
+
+    use crate::services::release_adoption::path_evidence::SunsetEvidence;
+    use crate::services::release_adoption::sunset as adoption_sunset;
+
+    /// Records what the arm asked it to seal, and sunsets for real — so the
+    /// idempotence claim is measured against the same OPEN predicate
+    /// production uses.
+    struct FakeSunsetter {
+        lineage: Arc<LineageRoles>,
+        calls: StdMutex<Vec<(String, String)>>,
+    }
+
+    impl FakeSunsetter {
+        fn new(lineage: Arc<LineageRoles>) -> Arc<Self> {
+            Arc::new(Self {
+                lineage,
+                calls: StdMutex::new(Vec::new()),
+            })
+        }
+        fn calls(&self) -> Vec<(String, String)> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl adoption_sunset::LineageSunsetter for FakeSunsetter {
+        async fn sunset_window(
+            &self,
+            role: &str,
+            sunset_commitment_cid: &str,
+        ) -> Result<adoption_sunset::SunsetReceipt, AdoptionRefusal> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((role.to_string(), sunset_commitment_cid.to_string()));
+            self.lineage.sunset(role);
+            Ok(adoption_sunset::SunsetReceipt {
+                role: role.to_string(),
+                lineage_app_id: "elohim@SIDE".to_string(),
+                sunset_commitment_cid: sunset_commitment_cid.to_string(),
+                close_hash: "uhCkkCLOSE".to_string(),
+                open_hash: "uhCkkOPEN".to_string(),
+                witness_hash: "uhCkkWITNESS".to_string(),
+                already_sealed: false,
+                resumed: false,
+                at: 1_700_000_000,
+            })
+        }
+    }
+
+    fn sunset_evidence(state: &str) -> SunsetEvidence {
+        SunsetEvidence {
+            commitment_cid: "uhCEkSUNSET".to_string(),
+            role: "node_registry".to_string(),
+            migration_commitment_cid: "uhCEkPATH".to_string(),
+            from_dna_hash: "uhC0kFROM".to_string(),
+            to_dna_hash: "uhC0kTO".to_string(),
+            state: state.to_string(),
+            revoked_at: None,
+        }
+    }
+
+    /// The carry the crossing left behind, carrying the ONE number the local
+    /// convergence gate reads. Handed to the arm directly — production reads it
+    /// off the applied-release row, which is a process-global registry no
+    /// parallel test may safely reconcile.
+    fn carry(
+        carried: u32,
+        v1_count: Option<u32>,
+    ) -> crate::services::release_adoption::LineageCarryReceipt {
+        crate::services::release_adoption::LineageCarryReceipt {
+            role: "node_registry".to_string(),
+            carried,
+            v1_count,
+            digest: "d".to_string(),
+            v1_digest: "d".to_string(),
+            witness_hashes: vec!["uhCkkW".to_string()],
+        }
+    }
+
+    fn window_on(channel_id: &str) -> Arc<LineageRoles> {
+        let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
+        lineage.open_window(
+            "node_registry",
+            "elohim@SIDE",
+            Some(WindowOrigin {
+                channel_id: channel_id.to_string(),
+                release_cid: "uhCkkRELEASE".to_string(),
+                path_commitment_cid: "uhCEkPATH".to_string(),
+            }),
+        );
+        lineage
+    }
+
+    /// **Station 8's deliverable, at the arm.** An active path, an active
+    /// sunset naming it, and a converged local carry — the window seals, once,
+    /// and the receipt names the commitment that authorised it.
+    #[tokio::test]
+    async fn the_sunset_arm_seals_on_an_active_sunset_and_only_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = window_on("runtime:coordinators:elohim:sunset-arm-seals");
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let sunsetter = FakeSunsetter::new(Arc::clone(&lineage));
+        let controller = AdoptionController::new(dir.path())
+            .with_lineage_revert(Arc::clone(&lineage), reverter.clone())
+            .with_lineage_sunset(sunsetter.clone());
+
+        for _ in 0..3 {
+            controller
+                .sweep_open_windows(
+                    |_| async { Answer::Present(revert_evidence("active", None)) },
+                    |cid| {
+                        assert_eq!(cid, "uhCEkPATH", "the sunset is looked up BY the migration");
+                        async { Answer::Present(sunset_evidence("active")) }
+                    },
+                    |_| Some(carry(5, Some(5))),
+                )
+                .await;
+        }
+
+        assert!(reverter.calls().is_empty(), "an active path never reverts");
+        assert_eq!(
+            sunsetter.calls(),
+            vec![("node_registry".to_string(), "uhCEkSUNSET".to_string())],
+            "sealed exactly once — the second sweep finds a CLOSED window"
+        );
+        assert!(lineage.snapshot()["node_registry"].closed);
+        assert!(lineage.open_windows().is_empty());
+    }
+
+    /// **Station 8's first Then.** With no sunset commitment, no peer closes
+    /// its v1 chain — and the window is left exactly as it was.
+    #[tokio::test]
+    async fn no_sunset_commitment_no_seal() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = window_on("runtime:coordinators:elohim:sunset-arm-none");
+        let sunsetter = FakeSunsetter::new(Arc::clone(&lineage));
+        let controller = AdoptionController::new(dir.path())
+            .with_lineage_revert(
+                Arc::clone(&lineage),
+                FakeReverter::new(Arc::clone(&lineage)),
+            )
+            .with_lineage_sunset(sunsetter.clone());
+
+        controller
+            .sweep_open_windows(
+                |_| async { Answer::Present(revert_evidence("active", None)) },
+                |_| async { Answer::Absent },
+                |_| Some(carry(5, Some(5))),
+            )
+            .await;
+
+        assert!(sunsetter.calls().is_empty());
+        assert!(!lineage.snapshot()["node_registry"].closed);
+        assert_eq!(lineage.open_windows().len(), 1);
+    }
+
+    /// **The remedy outranks the seal.** A revoked path reverts and never
+    /// falls through to the sunset — even when a sunset commitment is sitting
+    /// right there reading active.
+    #[tokio::test]
+    async fn a_revoked_path_reverts_and_never_seals() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = window_on("runtime:coordinators:elohim:sunset-arm-revoked");
+        let reverter = FakeReverter::new(Arc::clone(&lineage));
+        let sunsetter = FakeSunsetter::new(Arc::clone(&lineage));
+        let controller = AdoptionController::new(dir.path())
+            .with_lineage_revert(Arc::clone(&lineage), reverter.clone())
+            .with_lineage_sunset(sunsetter.clone());
+
+        controller
+            .sweep_open_windows(
+                |_| async { Answer::Present(revert_evidence("revoked", None)) },
+                |_| async { Answer::Present(sunset_evidence("active")) },
+                |_| Some(carry(5, Some(5))),
+            )
+            .await;
+
+        assert_eq!(reverter.calls().len(), 1);
+        assert!(sunsetter.calls().is_empty(), "the seal is never reached");
+        assert!(
+            !lineage.snapshot()["node_registry"].closed,
+            "a reverted role is not a sunset one"
+        );
+    }
+
+    /// The convergence gate at the arm: this peer has not carried its whole v1
+    /// chain, so it holds — with the sunset sitting there active.
+    #[tokio::test]
+    async fn an_unconverged_peer_holds_the_seal() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = window_on("runtime:coordinators:elohim:sunset-arm-unconverged");
+        let sunsetter = FakeSunsetter::new(Arc::clone(&lineage));
+        let controller = AdoptionController::new(dir.path())
+            .with_lineage_revert(
+                Arc::clone(&lineage),
+                FakeReverter::new(Arc::clone(&lineage)),
+            )
+            .with_lineage_sunset(sunsetter.clone());
+
+        controller
+            .sweep_open_windows(
+                |_| async { Answer::Present(revert_evidence("active", None)) },
+                |_| async { Answer::Present(sunset_evidence("active")) },
+                // Three of five carried — this peer is not converged.
+                |_| Some(carry(3, Some(5))),
+            )
+            .await;
+
+        assert!(sunsetter.calls().is_empty());
+        assert_eq!(lineage.open_windows().len(), 1);
+    }
+
+    /// A controller with a revert arm but NO sunsetter never reads a sunset at
+    /// all — the read costs a projection query plus a zome call, and a
+    /// controller that could not act on the answer has no business asking.
+    #[tokio::test]
+    async fn an_unequipped_controller_never_reads_a_sunset() {
+        let dir = tempfile::tempdir().unwrap();
+        let lineage = crossed_window();
+        let controller = AdoptionController::new(dir.path()).with_lineage_revert(
+            Arc::clone(&lineage),
+            FakeReverter::new(Arc::clone(&lineage)),
+        );
+
+        controller
+            .sweep_open_windows(
+                |_| async { Answer::Present(revert_evidence("active", None)) },
+                |_| async { panic!("no sunsetter wired, so no sunset read") },
+                |_| Some(carry(5, Some(5))),
+            )
+            .await;
+        assert!(!lineage.snapshot()["node_registry"].closed);
     }
 }
