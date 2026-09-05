@@ -63,6 +63,7 @@ pub mod resilience_hub;
 pub mod resources;
 pub mod risk;
 pub mod routing;
+pub mod runtime_config_follow;
 pub mod schedules;
 pub mod seed_delegates_compute;
 pub mod seed_network_stakes;

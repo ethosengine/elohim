@@ -684,6 +684,173 @@ pub fn parse(text: &str) -> BTreeMap<String, String> {
     map
 }
 
+// ─── writing (the operator seat) ──────────────────────────────────────────────
+//
+// Reading this file is the module's whole job everywhere else. This section is
+// the ONE exception, and it is deliberately narrow: an operator-seat route may
+// rewrite exactly ONE key's line and nothing else.
+//
+// Why the narrowness is load-bearing. The watched file is a SHARED surface — a
+// mounted ConfigMap on the fleet, a hand-editable file on the mesh, a
+// Jenkins-rendered artifact in between. A writer that rewrote the whole file
+// would silently delete every line it did not itself author: an operator's
+// comment, a second key another seat set, a `[section]` header. So the rewrite
+// below is line-scoped by construction — every line that does not declare the
+// named key is carried through VERBATIM — and there is no "write the file"
+// entry point at all.
+//
+// This is not a second source of truth. The file is still the only override
+// home; this just lets a peer edit its own copy of it through its own API
+// instead of requiring a shell on the box.
+
+/// Rewrite exactly the `key = "value"` line of a runtime-config text, carrying
+/// every other line through verbatim. Pure — no I/O, so the whole rule is
+/// testable without a filesystem.
+///
+/// - `value: Some(v)` — the key's line becomes `KEY = "v"`, **in place** (the
+///   first occurrence's position is kept, so an operator's ordering survives),
+///   or is APPENDED when the key is absent.
+/// - `value: None` — the key's line(s) are dropped. An absent key is a no-op,
+///   not an error: "stop following X" is satisfied by X not being there.
+/// - **Duplicates collapse.** A file that names the key twice (an accreted
+///   hand-edit — a shape this file has actually grown in the wild) leaves with
+///   exactly one line for it. `parse` already resolves duplicates last-wins
+///   silently; leaving the loser behind would make the file lie about what the
+///   node is doing.
+///
+/// The output always ends in a newline when non-empty, so an appended line can
+/// never fuse onto an unterminated last line.
+pub fn rewrite_key_line(text: &str, key: &str, value: Option<&str>) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let declares_key = !(trimmed.is_empty()
+            || trimmed.starts_with('#')
+            || trimmed.starts_with(';')
+            || trimmed.starts_with('['))
+            && trimmed
+                .split_once('=')
+                .is_some_and(|(raw_key, _)| raw_key.trim() == key);
+        if !declares_key {
+            out.push(line.to_string());
+            continue;
+        }
+        if !seen {
+            seen = true;
+            if let Some(v) = value {
+                out.push(format!("{key} = \"{v}\""));
+            }
+        }
+        // Every FURTHER declaration of the same key is dropped — see the
+        // duplicates-collapse rule above.
+    }
+    if !seen {
+        if let Some(v) = value {
+            out.push(format!("{key} = \"{v}\""));
+        }
+    }
+    if out.is_empty() {
+        return String::new();
+    }
+    let mut rendered = out.join("\n");
+    rendered.push('\n');
+    rendered
+}
+
+/// Why a [`set_watched_key`] call could not happen.
+#[derive(Debug, Clone)]
+pub enum SetKeyError {
+    /// No watched file is configured ([`PATH_ENV`] unset) — there is nothing to
+    /// write, and inventing a path would create a file nothing reads.
+    NotWatched,
+    /// The read, write or rename failed. The file is left exactly as it was:
+    /// the new bytes only ever become visible through the final `rename(2)`.
+    Io(String),
+}
+
+impl std::fmt::Display for SetKeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetKeyError::NotWatched => write!(
+                f,
+                "no runtime-config file is watched on this node ({PATH_ENV} is unset)"
+            ),
+            SetKeyError::Io(e) => write!(f, "runtime-config write failed: {e}"),
+        }
+    }
+}
+
+/// Set (or remove, with `value: None`) ONE key in the WATCHED file and reload.
+///
+/// Atomic by construction: the rewritten text is written to a sibling temp file
+/// and `rename(2)`d over the target, so a reader — the poller, another seat, a
+/// `kubectl exec cat` — never observes a half-written file, and a failure
+/// anywhere before the rename leaves the original bytes untouched.
+///
+/// A MISSING file is not an error: it is the "no overrides yet" state, and the
+/// first `follow` on a fresh peer legitimately creates it.
+///
+/// The reload is not an optimisation — it is what makes the call OBSERVABLE.
+/// Without it the caller would have to sleep out a poll interval before
+/// `/admin/adoption` could confirm anything, which is exactly the wait this
+/// route exists to remove.
+pub fn set_watched_key(
+    key: &str,
+    value: Option<&str>,
+) -> Result<(PathBuf, ReloadOutcome), SetKeyError> {
+    let path = config_path().ok_or(SetKeyError::NotWatched)?;
+
+    let current = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(SetKeyError::Io(format!("read {}: {e}", path.display()))),
+    };
+    let next = rewrite_key_line(&current, key, value);
+
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| SetKeyError::Io(format!("create {}: {e}", parent.display())))?;
+        }
+    }
+
+    // Sibling temp so the rename stays within one filesystem (a rename across
+    // devices is not atomic and would fail outright); pid-suffixed so two
+    // processes sharing a mount cannot collide on it.
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "runtime-config".to_string());
+    let tmp = path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()));
+    std::fs::write(&tmp, next.as_bytes())
+        .map_err(|e| SetKeyError::Io(format!("write {}: {e}", tmp.display())))?;
+    if let Err(e) = std::fs::rename(&tmp, &path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(SetKeyError::Io(format!(
+            "rename {} -> {}: {e}",
+            tmp.display(),
+            path.display()
+        )));
+    }
+
+    // Keep the poller from re-reading the very file we just wrote and logging a
+    // spurious "file change detected" for our own edit. Best-effort: if the
+    // signature read fails the poller simply reloads once more, which is
+    // idempotent.
+    *WATCH.last_signature.lock().unwrap() = signature(&path);
+
+    let outcome = reload_now();
+    info!(
+        path = %path.display(),
+        key,
+        removed = value.is_none(),
+        applied = outcome.changed,
+        "runtime-config: key rewritten through the operator seat and reloaded"
+    );
+    Ok((path, outcome))
+}
+
 // ─── watcher ─────────────────────────────────────────────────────────────────
 
 /// Cross-tick watcher state, so the admin route can report honestly whether the
@@ -1161,6 +1328,113 @@ not a pair
             assert!(!outcome.file_present);
             assert_eq!(outcome.changed, 0);
             assert!(outcome.error.is_none());
+        }
+    }
+
+    // ─── rewrite_key_line (the operator-seat write) ──────────────────────────
+
+    const CH: &str = "ELOHIM_RELEASE_CHANNELS";
+
+    #[test]
+    fn rewrite_replaces_the_key_line_in_place_and_touches_nothing_else() {
+        let text = "# operator note\n\
+                    [adoption]\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"old=observe\"\n\
+                    ELOHIM_OBEY_CARRIED_ELECTION = \"1\"\n";
+        let out = rewrite_key_line(text, CH, Some("new=canary"));
+        assert_eq!(
+            out,
+            "# operator note\n\
+             [adoption]\n\
+             CONTEST_BACKOFF_SECONDS = 600\n\
+             ELOHIM_RELEASE_CHANNELS = \"new=canary\"\n\
+             ELOHIM_OBEY_CARRIED_ELECTION = \"1\"\n",
+            "the key's line is replaced IN PLACE; every other line survives verbatim"
+        );
+    }
+
+    #[test]
+    fn rewrite_appends_an_absent_key_without_fusing_onto_an_unterminated_line() {
+        // No trailing newline on the last line — the append must not fuse.
+        let out = rewrite_key_line("CONTEST_BACKOFF_SECONDS = 600", CH, Some("a=observe"));
+        assert_eq!(
+            out,
+            "CONTEST_BACKOFF_SECONDS = 600\nELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"
+        );
+        // …and an empty file simply becomes the one line.
+        assert_eq!(
+            rewrite_key_line("", CH, Some("a=observe")),
+            "ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"
+        );
+    }
+
+    #[test]
+    fn rewrite_collapses_duplicate_declarations_to_exactly_one() {
+        // An accreted hand-edit: the key named twice. `parse` resolves that
+        // last-wins silently; leaving the loser behind would make the file lie
+        // about what the node is doing.
+        let text = "ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"b=apply\"\n";
+        let out = rewrite_key_line(text, CH, Some("c=canary"));
+        assert_eq!(
+            out,
+            "ELOHIM_RELEASE_CHANNELS = \"c=canary\"\nCONTEST_BACKOFF_SECONDS = 600\n"
+        );
+        assert_eq!(out.matches(CH).count(), 1);
+    }
+
+    #[test]
+    fn rewrite_removes_every_declaration_when_the_value_is_none() {
+        let text = "# keep me\n\
+                    ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"b=apply\"\n";
+        let out = rewrite_key_line(text, CH, None);
+        assert_eq!(out, "# keep me\nCONTEST_BACKOFF_SECONDS = 600\n");
+        // Removing an ABSENT key is a no-op, not an error.
+        assert_eq!(rewrite_key_line(&out, CH, None), out);
+        // Removing the only line leaves an empty file, not a stray newline.
+        assert_eq!(
+            rewrite_key_line("ELOHIM_RELEASE_CHANNELS = \"a\"\n", CH, None),
+            ""
+        );
+    }
+
+    #[test]
+    fn rewrite_never_matches_a_comment_a_section_or_a_key_that_merely_contains_the_name() {
+        let text = "# ELOHIM_RELEASE_CHANNELS = \"commented out\"\n\
+                    [ELOHIM_RELEASE_CHANNELS]\n\
+                    ELOHIM_RELEASE_CHANNELS_EXTRA = \"not the key\"\n\
+                    PREFIX_ELOHIM_RELEASE_CHANNELS = \"nor this\"\n";
+        let out = rewrite_key_line(text, CH, Some("a=observe"));
+        assert_eq!(
+            out,
+            format!("{text}ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"),
+            "only an exact KEY = … declaration is the target; everything else is carried through"
+        );
+    }
+
+    #[test]
+    fn rewrite_round_trips_through_parse() {
+        let out = rewrite_key_line("# note\n", CH, Some("runtime:coordinators:elohim:x=canary"));
+        assert_eq!(
+            parse(&out).get(CH).map(String::as_str),
+            Some("runtime:coordinators:elohim:x=canary"),
+            "what the writer emits is exactly what the reader reads back"
+        );
+    }
+
+    #[test]
+    fn set_watched_key_refuses_when_no_file_is_watched() {
+        // Guard, not a filesystem test: with the watcher off there is nothing to
+        // edit, and a silent success would write to a path nothing reads.
+        if config_path().is_none() {
+            assert!(matches!(
+                set_watched_key(CH, Some("a=observe")),
+                Err(SetKeyError::NotWatched)
+            ));
         }
     }
 

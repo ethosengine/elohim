@@ -1818,13 +1818,18 @@ storage_ark_env() { # <peer-name>
 #   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
 # The per-peer runtime-config file (rung 4: a flag flip or a release-channel
 # follow lands on the RUNNING peer within one poll, no restart). elohim-storage's
-# watcher is OFF unless ELOHIM_RUNTIME_CONFIG_PATH names a file, and the a2o
-# release ceremony writes `ELOHIM_RELEASE_CHANNELS = "…"` into exactly this path
-# (steps/delivery/runtime-upgrade-propagation.steps.ts `runtimeConfigPath`) then
-# POSTs /admin/runtime-config/reload — a peer started without it answers
-# `/admin/adoption` with `sweeps: 0, channels: []` forever and station 1 times
-# out on "waiting on <peer>'s /admin/adoption" (2026-09-03). Created empty so the
-# watcher is active from boot; a restart keeps it through restart_env_overlay.
+# watcher is OFF unless ELOHIM_RUNTIME_CONFIG_PATH names a file, so this script
+# creates the file EMPTY and exports the path — that is the whole of its job
+# here. It writes no channel entry and never edits the file again: since rung 5
+# Task 2 a peer is ENROLLED in a channel by being asked
+# (`POST <peer>/admin/runtime-config/follow` with {channel, mode}), which
+# rewrites exactly the ELOHIM_RELEASE_CHANNELS line of this file and reloads it.
+# The a2o ceremonies (steps/delivery/{runtime-upgrade-propagation,
+# happ-lineage-migration}.steps.ts) go through that route. A peer started
+# WITHOUT the path answers `/admin/adoption` with `sweeps: 0, channels: []`
+# forever, the follow route 503s, and station 1 times out on
+# "waiting on <peer>'s /admin/adoption" (2026-09-03). A restart keeps the path
+# through restart_env_overlay.
 # The conductor's agent key for a running sandbox, on either CLI line: hc 0.7
 # moved the admin call to `hc client call --port <admin> list-apps`; hc 0.6 had
 # `hc sandbox call --running <admin> list-apps`. Prints nothing when neither

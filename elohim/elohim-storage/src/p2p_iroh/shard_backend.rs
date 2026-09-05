@@ -65,9 +65,32 @@ mod tests {
         ShardServiceBackend::new(service)
     }
 
+    /// Transport parity for the db-less arm (19a746a77, station 3b follow-up):
+    /// a peer composed WITHOUT a content DB cannot hold private reference rows
+    /// at all, so the custody gate returns "nothing to gate" rather than failing
+    /// closed, and blob serving is exactly what it was before the gate existed.
+    ///
+    /// This mirrors `shard_service::tests::get_blob_on_a_peer_without_a_content_db_serves_as_before`
+    /// — the libp2p and iroh legs share one service, so a divergence here would
+    /// mean the two transports answered the same request differently. (The
+    /// previous expectation, `Error("reach-withheld: authority-unavailable")`,
+    /// went stale when that commit narrowed fail-closed to "configured authority
+    /// BROKE"; its `shard_service` sibling was updated and this one was missed.)
     #[tokio::test]
-    async fn get_without_reach_authority_fails_closed() {
-        let backend = fresh_backend().await;
+    async fn get_on_a_peer_without_a_content_db_serves_as_before() {
+        let dir = tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+        let stored = blob_store.store(b"db-less peer blob").await.unwrap();
+        let backend = ShardServiceBackend::new(Arc::new(ShardService::new(blob_store, None)));
+
+        match backend
+            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
+            .await
+        {
+            ShardResponse::Data(data) => assert_eq!(data, b"db-less peer blob"),
+            other => panic!("expected the blob to serve, got {other:?}"),
+        }
+        // …and a hash it does not hold is an honest miss, not an authority error.
         match backend
             .handle(
                 &Requester::local(),
@@ -77,10 +100,8 @@ mod tests {
             )
             .await
         {
-            ShardResponse::Error(message) => {
-                assert_eq!(message, "reach-withheld: authority-unavailable")
-            }
-            other => panic!("expected fail-closed Error, got {other:?}"),
+            ShardResponse::NotFound => {}
+            other => panic!("expected NotFound, got {other:?}"),
         }
     }
 

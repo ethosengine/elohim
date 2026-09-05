@@ -1964,6 +1964,25 @@ impl HttpServer {
                 Ok(response::ok(&crate::runtime_config::reload_json()))
             }
 
+            // Rung 5, Task 2: a peer JOINS (or leaves) a release channel through
+            // its OWN API instead of somebody editing its file. Body:
+            // `{"channel":"<id>", "mode":"observe|canary|apply", "remove":false}`.
+            // Rewrites exactly the `ELOHIM_RELEASE_CHANNELS` line of the WATCHED
+            // file (temp + rename), reloads, and reports the new follow set.
+            //
+            // The follow set is node-local OPERATOR CONFIGURATION (Ephemeral,
+            // class C per the p2p-design-gate): which channels THIS peer
+            // watches. It has no DHT entry type by design — the channel and its
+            // heads are the notarized entities, already on the DHT — and this
+            // route projects nothing. It writes the SAME file the boot config
+            // and the Jenkins ConfigMap render write, so there is exactly one
+            // config home, not a second one.
+            // Node-local (deliberately NOT in build_manifest); same posture as
+            // the other /admin routes.
+            (Method::POST, "/admin/runtime-config/follow") => {
+                crate::api::runtime_config_follow::handle(req).await
+            }
+
             // Rung 5 of the same snowball: the release-adoption controller's
             // report. Per followed channel — the resolved head (cid + election
             // tier, or null when this conductor could not resolve it at all),

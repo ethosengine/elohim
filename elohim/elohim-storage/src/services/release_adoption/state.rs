@@ -238,6 +238,100 @@ pub fn parse_followed_channels(raw: &str) -> FollowedChannels {
 }
 
 // ---------------------------------------------------------------------------
+// Editing the follow set (the operator seat behind POST /admin/runtime-config/follow)
+// ---------------------------------------------------------------------------
+
+/// Characters a channel id may NOT contain, because each one would change what
+/// the VALUE means once written back into `ELOHIM_RELEASE_CHANNELS`.
+///
+/// `,` `;` and a newline are entry separators; `=` separates a channel from its
+/// mode; `"` would terminate the TOML-subset value early; `#` would start a
+/// trailing comment on an unquoted read. An id carrying any of them cannot
+/// round-trip through this file, so it is refused BY NAME at the door rather
+/// than written and silently re-parsed as something else.
+const CHANNEL_ID_FORBIDDEN: [char; 7] = [',', ';', '\n', '\r', '=', '"', '#'];
+
+/// The longest channel id this seat will write. The live ids are ~45 chars
+/// (`runtime:coordinators:elohim:workspace`); the cap exists so a malformed
+/// caller cannot grow the watched file without bound, not to constrain naming.
+pub const MAX_CHANNEL_ID_LEN: usize = 256;
+
+/// Validate a channel id for WRITING into the follow set.
+///
+/// Deliberately stricter than [`parse_followed_channels`], which must remain
+/// tolerant of whatever is already on disk. Reading is forgiving; writing is
+/// not — this is the only place the file grows an entry, so it is the only
+/// place that can keep the file parseable.
+pub fn validate_channel_id(raw: &str) -> Result<&str, String> {
+    let id = raw.trim();
+    if id.is_empty() {
+        return Err("channel id is empty".to_string());
+    }
+    if id.len() > MAX_CHANNEL_ID_LEN {
+        return Err(format!(
+            "channel id is {} chars, over the {MAX_CHANNEL_ID_LEN}-char limit",
+            id.len()
+        ));
+    }
+    if let Some(bad) = id
+        .chars()
+        .find(|c| CHANNEL_ID_FORBIDDEN.contains(c) || (c.is_whitespace() || c.is_control()))
+    {
+        return Err(format!(
+            "channel id '{id}' contains {bad:?}, which cannot round-trip through \
+             {RELEASE_CHANNELS_KEY}"
+        ));
+    }
+    Ok(id)
+}
+
+/// Merge one follow declaration into a raw `ELOHIM_RELEASE_CHANNELS` value.
+///
+/// `mode: Some(m)` sets (or replaces) `channel_id`'s entry **in place**, so a
+/// mode switch never reorders the operator's list; `mode: None` removes it.
+/// Duplicate entries for the named channel collapse to one, exactly as
+/// [`crate::runtime_config::rewrite_key_line`] collapses duplicate KEY lines —
+/// the file must not keep a loser that [`parse_followed_channels`] would refuse.
+///
+/// **Every entry this call did not name is carried through VERBATIM** — mode
+/// text and all, even one `AdoptionMode::parse` would refuse. That is
+/// deliberate: this seat is asked about ONE channel, and silently repairing (or
+/// dropping) a neighbouring entry it was not asked about is how a config lever
+/// destroys state an operator was mid-way through. A malformed neighbour keeps
+/// showing up as a typed refusal on `/admin/adoption`, which is where it
+/// belongs.
+pub fn merge_follow_entry(raw: &str, channel_id: &str, mode: Option<AdoptionMode>) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = false;
+    for entry in raw
+        .split([',', '\n', ';'])
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+    {
+        let id = match entry.split_once('=') {
+            Some((c, _)) => c.trim(),
+            None => entry,
+        };
+        if id == channel_id {
+            if !seen {
+                seen = true;
+                if let Some(m) = mode {
+                    out.push(format!("{channel_id}={}", m.label()));
+                }
+            }
+            continue;
+        }
+        out.push(entry.to_string());
+    }
+    if !seen {
+        if let Some(m) = mode {
+            out.push(format!("{channel_id}={}", m.label()));
+        }
+    }
+    out.join(",")
+}
+
+// ---------------------------------------------------------------------------
 // Per-channel state
 // ---------------------------------------------------------------------------
 
@@ -833,6 +927,103 @@ mod tests {
             channel_id: id.to_string(),
             mode: AdoptionMode::Observe,
         }
+    }
+
+    // ─── merge_follow_entry / validate_channel_id (the operator seat) ────────
+
+    #[test]
+    fn merge_sets_a_channel_in_place_and_leaves_its_neighbours_alone() {
+        let raw = "a=observe,b=canary,c=apply";
+        assert_eq!(
+            merge_follow_entry(raw, "b", Some(AdoptionMode::Apply)),
+            "a=observe,b=apply,c=apply",
+            "a mode switch must not reorder the operator's list"
+        );
+    }
+
+    #[test]
+    fn merge_appends_a_new_channel_and_removes_a_named_one() {
+        assert_eq!(
+            merge_follow_entry("a=observe", "b", Some(AdoptionMode::Canary)),
+            "a=observe,b=canary"
+        );
+        assert_eq!(
+            merge_follow_entry("a=observe,b=canary", "b", None),
+            "a=observe"
+        );
+        // Removing the last entry leaves an EMPTY follow set, spelled out.
+        assert_eq!(merge_follow_entry("a=observe", "a", None), "");
+        // Removing an absent channel is a no-op, not an error.
+        assert_eq!(merge_follow_entry("a=observe", "zz", None), "a=observe");
+        // An empty starting value simply becomes the one entry.
+        assert_eq!(
+            merge_follow_entry("", "a", Some(AdoptionMode::Observe)),
+            "a=observe"
+        );
+    }
+
+    #[test]
+    fn merge_collapses_duplicates_of_the_named_channel() {
+        assert_eq!(
+            merge_follow_entry(
+                "a=observe,b=canary,a=apply",
+                "a",
+                Some(AdoptionMode::Canary)
+            ),
+            "a=canary,b=canary"
+        );
+        assert_eq!(merge_follow_entry("a=observe,a=apply", "a", None), "");
+    }
+
+    #[test]
+    fn merge_carries_a_malformed_neighbour_through_verbatim() {
+        // This seat was asked about `a`. Repairing — or dropping — `b=aply` is
+        // how a config lever destroys state an operator was mid-way through;
+        // the typo keeps showing up as a typed refusal on /admin/adoption.
+        let out = merge_follow_entry("b=aply,a=observe", "a", Some(AdoptionMode::Canary));
+        assert_eq!(out, "b=aply,a=canary");
+        let parsed = parse_followed_channels(&out);
+        assert_eq!(parsed.refused.len(), 1);
+        assert_eq!(
+            parsed.channels,
+            vec![FollowedChannel {
+                channel_id: "a".to_string(),
+                mode: AdoptionMode::Canary
+            }]
+        );
+    }
+
+    #[test]
+    fn merge_output_round_trips_through_the_parser() {
+        let out = merge_follow_entry(
+            "",
+            "runtime:coordinators:elohim:workspace",
+            Some(AdoptionMode::Canary),
+        );
+        let parsed = parse_followed_channels(&out);
+        assert!(parsed.refused.is_empty());
+        assert_eq!(
+            parsed.channels,
+            vec![FollowedChannel {
+                channel_id: "runtime:coordinators:elohim:workspace".to_string(),
+                mode: AdoptionMode::Canary,
+            }]
+        );
+    }
+
+    #[test]
+    fn validate_channel_id_refuses_anything_that_cannot_round_trip() {
+        assert_eq!(
+            validate_channel_id("  runtime:coordinators:elohim:workspace  ").unwrap(),
+            "runtime:coordinators:elohim:workspace"
+        );
+        for bad in ["", "   ", "a,b", "a;b", "a=b", "a\"b", "a#b", "a b", "a\nb"] {
+            assert!(
+                validate_channel_id(bad).is_err(),
+                "'{bad}' must be refused — it changes what the VALUE means"
+            );
+        }
+        assert!(validate_channel_id(&"x".repeat(MAX_CHANNEL_ID_LEN + 1)).is_err());
     }
 
     #[test]

@@ -25,10 +25,13 @@
  *                                     via `spawnSync('pnpm', ['exec','tsx',…])`
  *                                     exactly as the rung-5 steps' `runDriver`
  *   T3  `GET  <peer>/admin/adoption`  — each peer's OWN controller verdict
- *   T4  `runtime-config.toml` + `POST <peer>/admin/runtime-config/reload`
- *                                     — follow-set registration (run-owned,
- *                                     byte-restored in `AfterAll`, same
- *                                     discipline as the rung-5 steps)
+ *   T4  `POST <peer>/admin/runtime-config/follow`
+ *                                     — follow-set registration: the peer is
+ *                                     ASKED over its own API and rewrites one
+ *                                     line of its own watched file (rung 5 T2).
+ *                                     Still run-owned and still byte-restored
+ *                                     in `AfterAll`, same discipline as the
+ *                                     rung-5 steps
  *   T5  `lineage-commitments.ts`     — Task 10's `buildMigratesLineagePayload`
  *                                     / `notarizeMigration`, submitted over a
  *                                     conductor rail this file connects
@@ -288,6 +291,7 @@ const CANARY_PEER: PeerName = 'james';
 
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
+const RUNTIME_CONFIG_FOLLOW_PATH = '/admin/runtime-config/follow';
 const VERSION_PATH = '/version';
 /** Task 10 part 2 — the fixture's baseline-convergence vehicle (see the
  * `Before`/`AfterAll` hooks below). Resets `LineageRoles` to v1 base on the
@@ -1000,7 +1004,7 @@ function runtimeConfigPath(peer: PeerName): string {
 
 /**
  * The run's OWN follow set, per peer: channel id -> mode. Never read-merged
- * from disk — the file this run writes contains exactly what this run owns and
+ * from disk — this run asks each peer to follow exactly what this run owns and
  * nothing else (the 2026-09-01 leftover-channel hazard the rung-5 steps
  * document), and `AfterAll` byte-restores what was there before.
  *
@@ -1014,18 +1018,72 @@ const runOwnedFollow: Record<PeerName, Map<string, string>> = {
   james: new Map(),
 };
 
-async function applyFollowSet(peer: PeerName): Promise<void> {
-  const filePath = runtimeConfigPath(peer);
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  const csv = [...runOwnedFollow[peer].entries()]
-    .map(([channelId, mode]) => `${channelId}=${mode}`)
-    .join(',');
-  writeFileSync(filePath, `ELOHIM_RELEASE_CHANNELS = "${csv}"\n`, 'utf8');
-  const { status } = await postRaw(`${directPeerUrl(peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
+/**
+ * What this process has ASKED each peer to follow, as far as it knows — the
+ * diff basis for `applyFollowSet`. The fixture no longer overwrites the file,
+ * so "stop following X" has to be SAID; anything in here that `runOwnedFollow`
+ * no longer names is explicitly removed through the route. Seeded from each
+ * peer's TRUE pre-run bytes in `ensureRunOwnedFollowSet`, so a leftover channel
+ * from an earlier ceremony is dropped by the same one mechanism.
+ */
+const appliedFollow: Record<PeerName, Set<string>> = {
+  matthew: new Set<string>(),
+  jessica: new Set<string>(),
+  james: new Set<string>(),
+};
+
+/**
+ * Ask ONE peer, through its own API, to follow (or stop following) ONE channel
+ * (rung 5 Task 2). The route rewrites exactly the `ELOHIM_RELEASE_CHANNELS`
+ * line of that peer's watched file and reloads it in the same call — so no step
+ * in this file writes a runtime-config file, and the rest of the file (an
+ * operator comment, a second key another seat set) survives, where the
+ * whole-file write deleted it. The `AfterAll` byte-restore below stays as the
+ * safety net.
+ */
+async function postFollow(peer: PeerName, channelId: string, mode: string | null): Promise<void> {
+  const payload =
+    mode === null ? { channel: channelId, remove: true } : { channel: channelId, mode };
+  const { status, text } = await postRaw(
+    `${directPeerUrl(peer)}${RUNTIME_CONFIG_FOLLOW_PATH}`,
+    payload
+  );
   assert.ok(
     status >= 200 && status < 300,
-    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while registering "${csv}"`
+    `${peer}'s ${RUNTIME_CONFIG_FOLLOW_PATH} returned ${status} for ` +
+      `${JSON.stringify(payload)}: ${text.slice(0, 300)}`
   );
+}
+
+/**
+ * Seed the diff basis from a peer's TRUE pre-run bytes: every channel already
+ * on disk is one this run must explicitly ask the peer to STOP following,
+ * because the fixture no longer overwrites the file out from under it.
+ */
+function seedAppliedFollowFromOriginal(peer: PeerName, originalBytes: Buffer): void {
+  const match = /ELOHIM_RELEASE_CHANNELS\s*=\s*"([^"]*)"/.exec(originalBytes.toString('utf8'));
+  for (const entry of (match ? match[1] : '')
+    .split(/[,;\n]/)
+    .map(e => e.trim())
+    .filter(Boolean)) {
+    const entryId = entry.split('=')[0].trim();
+    if (entryId) appliedFollow[peer].add(entryId);
+  }
+}
+
+/** Converge one peer's follow set onto `runOwnedFollow[peer]`, one route call per change. */
+async function applyFollowSet(peer: PeerName): Promise<void> {
+  const desired = runOwnedFollow[peer];
+  for (const channelId of [...appliedFollow[peer]]) {
+    if (!desired.has(channelId)) {
+      await postFollow(peer, channelId, null);
+      appliedFollow[peer].delete(channelId);
+    }
+  }
+  for (const [channelId, mode] of desired) {
+    await postFollow(peer, channelId, mode);
+    appliedFollow[peer].add(channelId);
+  }
 }
 
 /** Register `channelId` on every peer at the given per-peer mode (default `observe`). */
@@ -1058,6 +1116,7 @@ async function ensureRunOwnedFollowSet(): Promise<void> {
         originalBytes = Buffer.from('', 'utf8');
       }
       originalRuntimeConfigBytes[peer] = originalBytes;
+      seedAppliedFollowFromOriginal(peer, originalBytes);
     }
     // One world's channels are not the next world's: drop what a previous
     // scenario registered rather than leaving this peer following a channel

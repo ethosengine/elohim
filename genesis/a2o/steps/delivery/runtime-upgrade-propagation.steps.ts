@@ -315,6 +315,7 @@ const FLAG_ADOPTION_URL = '--adoption-url';
 
 const ADOPTION_PATH = '/admin/adoption';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
+const RUNTIME_CONFIG_FOLLOW_PATH = '/admin/runtime-config/follow';
 const VERSION_PATH = '/version';
 const HEALTH_PATH = '/health';
 const LAMAD_ROLE = 'lamad';
@@ -871,12 +872,30 @@ async function putBlobRaw(baseUrl: string, sha256: string, bytes: Buffer): Promi
 // The fix: for the run's own channel(s), this file never reads the
 // pre-existing `ELOHIM_RELEASE_CHANNELS` value and merges into it. It keeps
 // an in-memory map of channel -> mode PER PEER (`runOwnedChannels`) and
-// every write derives the file's entire content from that map alone —
-// `applyRunOwnedChannels` is the ONE helper every follow/mode-switch in this
-// file goes through; nothing else ever touches the file. The true
-// pre-existing bytes are captured once (`ensureRunOwnedFollowSet`, driven by
-// the `Before` hook below) and restored byte-for-byte in the `AfterAll`
-// below — a leftover from THIS run can never become the next run's hazard.
+// converges each peer onto it — `applyRunOwnedChannels` is the ONE helper
+// every follow/mode-switch in this file goes through. The true pre-existing
+// bytes are captured once (`ensureRunOwnedFollowSet`, driven by the `Before`
+// hook below) and restored byte-for-byte in the `AfterAll` below — a leftover
+// from THIS run can never become the next run's hazard.
+//
+// ## The fixture ASKS the peer; it does not write the peer's file (rung 5 T2)
+//
+// Convergence used to mean "overwrite runtime-config.toml with the run-owned
+// value, then POST /admin/runtime-config/reload". It no longer does. Every
+// follow, mode switch and un-follow is a `POST /admin/runtime-config/follow`
+// on the peer's own API (`postFollow`), which rewrites exactly the
+// `ELOHIM_RELEASE_CHANNELS` line of that peer's watched file and reloads it in
+// the same call. Nothing in this file writes a runtime-config file except the
+// `AfterAll` byte-restore, which stays as the safety net.
+//
+// Two things this buys. (1) The peer is ENROLLED the way a real operator would
+// enrol it — over its API, from anywhere, with no filesystem access to the
+// box — which is the shape a p2p-native substrate has to have. (2) The rest of
+// the file survives: an operator comment, a `[section]`, a second key another
+// seat set are all carried through, where the whole-file write deleted them.
+// What it does NOT relax is run ownership: removals are now EXPLICIT (see
+// `appliedChannels`) instead of implied by an overwrite, so the leftover
+// hazard above is closed by exactly the same rule as before.
 // ---------------------------------------------------------------------------
 
 function runtimeConfigPath(peer: PeerName): string {
@@ -905,23 +924,45 @@ const runOwnedChannels: Record<PeerName, Map<string, string>> = {
   james: new Map<string, string>(),
 };
 
-/** Renders `runOwnedChannels[peer]` as the `channelId=mode,channelId=mode` value the conductor parses. */
-function ownedChannelsValue(peer: PeerName): string {
-  return [...runOwnedChannels[peer].entries()].map(([id, mode]) => `${id}=${mode}`).join(',');
-}
+/**
+ * What this process has ASKED each peer to follow, as far as it knows.
+ *
+ * The fixture no longer overwrites the file, so "stop following X" can no
+ * longer be expressed by simply not writing X — it has to be SAID. This set is
+ * the diff basis: anything in here that `runOwnedChannels` no longer names is
+ * explicitly removed through the route on the next apply.
+ *
+ * Seeded in `captureOriginalBytesOnce` from the peer's TRUE pre-run bytes, so a
+ * leftover channel from an earlier ceremony (the 2026-09-01 Station 6 hazard
+ * the module doc above describes) is removed by the same one mechanism rather
+ * than by a whole-file overwrite.
+ */
+const appliedChannels: Record<PeerName, Set<string>> = {
+  matthew: new Set<string>(),
+  jessica: new Set<string>(),
+  james: new Set<string>(),
+};
 
 /**
- * Writes the run-owned value as the file's ENTIRE content — never a
- * read-merge-write against whatever else is on disk. Every peer's real
- * runtime-config.toml carries only this one key (verified live on the
- * household mesh 2026-09-02), so this is the byte-for-byte "a file that
- * contains ONLY this run's channel lines" the fix calls for, not a
- * simplification that happens to work today.
+ * Ask ONE peer, through its own API, to follow (or stop following) ONE channel.
+ *
+ * `mode: null` removes. The route rewrites exactly the `ELOHIM_RELEASE_CHANNELS`
+ * line of the peer's watched file and reloads it in the same call — so no step
+ * in this file writes a runtime-config file any more, and there is no second
+ * config home that could disagree with the one the node reads.
  */
-function writeOwnedChannelsFile(peer: PeerName): void {
-  const filePath = runtimeConfigPath(peer);
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `ELOHIM_RELEASE_CHANNELS = "${ownedChannelsValue(peer)}"\n`, 'utf8');
+async function postFollow(peer: PeerName, channelId: string, mode: string | null): Promise<void> {
+  const payload =
+    mode === null ? { channel: channelId, remove: true } : { channel: channelId, mode };
+  const { status, text } = await postRaw(
+    `${directPeerUrl(peer)}${RUNTIME_CONFIG_FOLLOW_PATH}`,
+    payload
+  );
+  assert.ok(
+    status >= 200 && status < 300,
+    `${peer}'s ${RUNTIME_CONFIG_FOLLOW_PATH} returned ${status} for ` +
+      `${JSON.stringify(payload)}: ${text.slice(0, 300)}`
+  );
 }
 
 /**
@@ -934,8 +975,18 @@ let setPeerModeCallCount = 0;
 
 /**
  * THE one helper every follow/mode-switch in this file goes through.
- * Rewrites the WHOLE `ELOHIM_RELEASE_CHANNELS` value from `runOwnedChannels`
- * — never appends to, or preserves, whatever a prior ceremony left on disk.
+ * Converges the peer's follow set onto `runOwnedChannels[peer]` by ASKING the
+ * peer — one `POST /admin/runtime-config/follow` per channel added, changed or
+ * dropped — never by writing its file.
+ *
+ * The run still owns its own follow set (the 2026-09-01 leftover-channel
+ * hazard the module doc above records): removals are explicit rather than
+ * implied by a whole-file overwrite, and `appliedChannels` starts from the
+ * peer's TRUE pre-run bytes so a leftover from an earlier ceremony is dropped
+ * on the first apply exactly as it used to be. What CHANGED is that every
+ * other line of that file — an operator's comment, a second key another seat
+ * set — now survives, because the node rewrites one line instead of the fixture
+ * rewriting the file.
  *
  * Resolves the peer's URL directly from `E2E_STORAGE_<PEER>` (`directPeerUrl`,
  * defined below) rather than through `world.getDoorway`/`peerUrl` — this is
@@ -945,12 +996,17 @@ let setPeerModeCallCount = 0;
  * would throw `Unknown doorway` at exactly that call.
  */
 async function applyRunOwnedChannels(peer: PeerName): Promise<void> {
-  writeOwnedChannelsFile(peer);
-  const { status } = await postRaw(`${directPeerUrl(peer)}${RUNTIME_CONFIG_RELOAD_PATH}`);
-  assert.ok(
-    status >= 200 && status < 300,
-    `${peer}'s ${RUNTIME_CONFIG_RELOAD_PATH} returned ${status} while reloading its run-owned channel set`
-  );
+  const desired = runOwnedChannels[peer];
+  for (const channelId of [...appliedChannels[peer]]) {
+    if (!desired.has(channelId)) {
+      await postFollow(peer, channelId, null);
+      appliedChannels[peer].delete(channelId);
+    }
+  }
+  for (const [channelId, mode] of desired) {
+    await postFollow(peer, channelId, mode);
+    appliedChannels[peer].add(channelId);
+  }
 }
 
 async function setPeerMode(_world: E2EWorld, peer: PeerName, mode: string): Promise<void> {
@@ -1034,6 +1090,16 @@ function captureOriginalBytesOnce(peer: PeerName): void {
     originalBytes = Buffer.from('', 'utf8');
   }
   originalRuntimeConfigBytes[peer] = originalBytes;
+  // Seed the diff basis from the TRUE original: every channel already on disk
+  // is one this run must explicitly ask the peer to STOP following, because the
+  // fixture no longer overwrites the file out from under it.
+  for (const entry of extractChannelsValueFromToml(originalBytes.toString('utf8'))
+    .split(/[,;\n]/)
+    .map(e => e.trim())
+    .filter(Boolean)) {
+    const entryId = entry.split('=')[0].trim();
+    if (entryId) appliedChannels[peer].add(entryId);
+  }
   writeFileSync(path.join(REPORT_DIR, `runtime-config.${peer}.orig.toml`), originalBytes);
   logLeftoverChannels(peer, originalBytes);
 }
