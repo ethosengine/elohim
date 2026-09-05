@@ -159,7 +159,7 @@ Feature: The network changes the rules its peers hold each other to without losi
   forever. The close is a SEALING act: the peer's runtime issues it on the
   sunset commitment, under the peer's own key, regardless of the cell's
   declared reading posture — it is the one write a reading cell still takes
-  from its own runtime, and the last — as the epic's kernel test measured. The substrate itself does not stop a careless or hostile node
+  from its own runtime, and the last — as the epic's kernel test measured (elohim/holochain/tests/sweettest, happ_lineage_migration). The substrate itself does not stop a careless or hostile node
   writing after its own close — measured — so the household enforces the
   close where it already checks everything: v2 carries each close as a
   proof and refuses any carried fact that came after it, and each runtime
@@ -171,12 +171,15 @@ Feature: The network changes the rules its peers hold each other to without losi
   it, and they happen only at the sunset.
 
   A WARRANT is the record a peer publishes when a fact it received fails
-  validation — an accusation naming the fact and its author. A BLOCK is what
-  the substrate does with an accepted warrant: the accusing peer refuses to
-  gossip with the accused cell again, permanently, and nothing in the
+  validation — an accusation naming the fact and the cell that authored it.
+  A BLOCK is what the substrate does the moment a warrant it holds passes
+  its own validation (no quorum, no vote, no appeal): the accusing peer
+  refuses to gossip with the accused CELL — that one chain on that peer, not
+  the person's other cells — again, permanently, and nothing in the
   substrate lifts it. A write after a close earns both from every neighbour
   that sees it; that is the price of the sunset, and the reason a closed
-  chain is never written on again.
+  chain is never written on again. (Measured on the household 2026-09-05,
+  read from the conductors' own databases with crates/hc-dbtool.)
 
   The TEST HARNESS is the rehearsal's own hand: the a2o runner that drives
   the household mesh. It holds the fixture humans' keys and the bootstrap
@@ -198,7 +201,8 @@ Feature: The network changes the rules its peers hold each other to without losi
     # that happen when one is: the author's own conductor accepts the write, and v2's validation
     # refuses it wherever the close is known. The third — the neighbours WARRANT the write and BLOCK
     # the writer (see the vocabulary) — is measured on a chain nobody needs afterwards, in the sibling
-    # story of the disposable crossing (epic Task 33), because measuring it here would spend this
+    # story of the disposable crossing (epic Task 33 — a Station added to this feature once the
+    # runtime can seal a chain made for the purpose), because measuring it here would spend this
     # household's real chain. A story that began on an already-sealed household would poison it with
     # its first write, so this precondition refuses such a household by name before anything is written.
     And no peer's v1 node-registry chain is already closed
@@ -282,8 +286,8 @@ Feature: The network changes the rules its peers hold each other to without losi
   # post-close write below is the one write this story makes on purpose after a close, and it is the
   # measurement: the author's conductor accepts it (the substrate — the conductor and its DHT — does
   # not fence a closed chain), v2's validation refuses it where the close is known, and james's
-  # neighbours will warrant it (publish a record accusing the write) and block him (refuse to gossip
-  # with his cell again, permanently). That last consequence is measured in the sibling story of the
+  # neighbours will warrant it (publish a record accusing the write) and block his v1 cell (refuse to
+  # gossip with that chain again, permanently; his v2 cell is untouched). That last consequence is measured in the sibling story of the
   # disposable crossing (epic Task 33), not here, because it spends a real chain.
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
     Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
