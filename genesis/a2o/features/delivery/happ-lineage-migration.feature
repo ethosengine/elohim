@@ -172,8 +172,8 @@ Feature: The network changes the rules its peers hold each other to without losi
 
   A WARRANT is the record a peer publishes when a fact it received fails
   validation — an accusation naming the fact and the cell that authored it.
-  A BLOCK is what the substrate does the moment a warrant it holds passes
-  its own validation (no quorum, no vote, no appeal): the accusing peer
+  A BLOCK is what the substrate does the moment the accusing peer's own
+  validation confirms the warrant (no quorum, no vote, no appeal): that peer
   refuses to gossip with the accused CELL — that one chain on that peer, not
   the person's other cells — again, permanently, and nothing in the
   substrate lifts it. A write after a close earns both from every neighbour
@@ -197,14 +197,11 @@ Feature: The network changes the rules its peers hold each other to without losi
     Given the household mesh is running three peers, each on its own conductor, all built from the same conductor software
     And the household's node-registry role runs rule version v1
     # The sunset below is this story's one irreversible act, and it spends the chain it seals. A
-    # closed chain must not be authored on again, and Station 8 measures two of the three things
-    # that happen when one is: the author's own conductor accepts the write, and v2's validation
-    # refuses it wherever the close is known. The third — the neighbours WARRANT the write and BLOCK
-    # the writer (see the vocabulary) — is measured on a chain nobody needs afterwards, in the sibling
-    # story of the disposable crossing (epic Task 33 — a Station added to this feature once the
-    # runtime can seal a chain made for the purpose), because measuring it here would spend this
-    # household's real chain. A story that began on an already-sealed household would poison it with
-    # its first write, so this precondition refuses such a household by name before anything is written.
+    # closed chain must not be authored on again: every neighbour WARRANTS such a write and BLOCKS
+    # the writing cell (see the vocabulary). Station 8's own post-close write therefore leaves a real
+    # block behind on this household, which is why a story that began on an already-sealed household
+    # would poison itself with its first write — and why this precondition refuses such a household
+    # by name before anything is written. Station 8's comment says what it measures and what it does not.
     And no peer's v1 node-registry chain is already closed
     And each peer's runtime follows release channel "runtime:lineage:node_registry:commons"
     And matthew, james and jessica each hold node-registry records they authored on v1
@@ -287,8 +284,12 @@ Feature: The network changes the rules its peers hold each other to without losi
   # measurement: the author's conductor accepts it (the substrate — the conductor and its DHT — does
   # not fence a closed chain), v2's validation refuses it where the close is known, and james's
   # neighbours will warrant it (publish a record accusing the write) and block his v1 cell (refuse to
-  # gossip with that chain again, permanently; his v2 cell is untouched). That last consequence is measured in the sibling story of the
-  # disposable crossing (epic Task 33), not here, because it spends a real chain.
+  # gossip with that chain again, permanently; his v2 cell is untouched). That last consequence
+  # REALLY HAPPENS on this household — it is not prevented, only unmeasured here, and it is what
+  # makes the next run refuse at the Background — but this Station does not assert it, because the
+  # assertion belongs on a chain nobody needs afterwards. That Station does not exist yet: it is
+  # epic Task 33, "the disposable crossing", to be added to this feature once the runtime can seal
+  # a chain made for the purpose.
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
     Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
     But no sunset commitment exists
