@@ -7,12 +7,14 @@ See a Holochain 0.7 cell block, read the warrant (the accusation record) and the
 Holochain 0.7's `integrate_dht_ops_workflow` blocks the **author's cell** from
 `Timestamp::now()` to `Timestamp::max()` when one op that author wrote integrates
 as invalid (`CellBlockReason::InvalidOp`). The peer store then drops that agent's
-infos, and gossip with them never starts again.
+`agent_info` records, and gossip with that agent never starts again.
 
 0.7 ships no way back: no unblock admin call, no unblock HDK host function. One
 rejected op per author is enough to partition a household **permanently**, and
 from the outside it is indistinguishable from an unreachable peer — the log says
-nothing, the arc stays null, and the round count stays at zero.
+nothing, the peer's storage arc stays null and its completed gossip rounds stay at
+zero (both are read from the conductor's `dump_network_metrics`, shown at the end
+of "Lifting a block").
 
 A household has to be able to see the refusal, read the evidence behind it, and
 decide. That is the whole tool.
@@ -29,8 +31,9 @@ conductor's data directory.
 
 **Prerequisites:** a built `hc-dbtool` binary (see "Building" — build first, then
 come back; `hc-mesh.sh blocks` finds it for you on the household mesh), the peer's
-`databases/` directory, its `db.key` passphrase, and for the household-mesh path the
-mesh script itself. Hashes written `uhC0k…` / `uhCAk…` in the examples are
+`databases/` directory, its `db.key` passphrase, for the household-mesh path the
+mesh script itself, and for the confirm step a `genesis/a2o` with its Node
+dependencies installed (`pnpm install` once). Hashes written `uhC0k…` / `uhCAk…` in the examples are
 truncated placeholders — paste the full hash the tool prints.
 
 The sections "Verbs", "Lifting a block" and "Building" are how to use the tool.
@@ -58,8 +61,10 @@ hc-dbtool --databases $DB apps
 
 hc-dbtool --databases $DB blocks
 #   every BlockSpan row, decoded to dna:agent + reason + interval, each joined
-#   through the DNA's DHT database to the WARRANT it cites and to the rejected
-#   ops the warrantee authored — the dna:agent pair is what `unblock --cell` takes
+#   through the DNA's DHT database to the WARRANT it cites and to the rejected ops
+#   of whichever party the block landed on (the warrantee when the warrant validated,
+#   the warrant's author when it did not — the output says which); the dna:agent
+#   pair is what `unblock --cell` takes
 
 hc-dbtool --databases $DB rejected --dna uhC0k…
 #   rejected ops in that DNA (ChainOp = integrated, LimboChainOp = still in
@@ -78,7 +83,8 @@ every agent blocked in that DNA.
 
 **On the household mesh.** Only the blocked peer's own conductor needs to be down;
 `hc-mesh.sh stop` is the mesh's lifecycle script and stops all three, which is the
-convenient way here.
+convenient way here (to stop just one, use the single-peer sequence below against
+that peer's conductor).
 
 ```bash
 DB=elohim/holochain/local-dev/james/databases        # this peer's databases/ (james = your peer's mesh name)
@@ -98,10 +104,12 @@ ARGS=$(ps -o args= -p "$(pgrep -f 'holochain --piped')")   # the running conduct
 [ -n "$ARGS" ] || echo "no running holochain found: take the argv from the unit file that launches it"
 #   capture it NOW: step 4 relaunches with exactly this argv and step 2 kills the process
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks                                  # 1. see it
-kill -INT "$(pgrep -f 'holochain --piped')"          # 2. stop THIS peer's conductor (SIGINT = graceful; wait for exit)
+PID=$(pgrep -f 'holochain --piped'); kill -INT "$PID"   # 2. stop THIS peer's conductor (SIGINT = graceful)
+while kill -0 "$PID" 2>/dev/null; do sleep 1; done   #    …and wait until it has exited (unblock refuses while it holds the db)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent>            # 3a. preview
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' unblock --cell <dna>:<agent> --yes      # 3b. lift it
-$ARGS <<< '<lair passphrase>'                        # 4. start it again with the same argv
+nohup $ARGS <<< '<lair passphrase>' >> conductor.log 2>&1 &   # 4. start it again with the same argv, in the
+                                                              #    background (foreground would hold this shell)
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks                                  # 5. no rows — then the check below
 ```
 
@@ -125,7 +133,9 @@ process.exit(0);'
 
 Lifting is not a cure by itself: whatever wrote the rejected op (in the first
 observed case, a `CapGrant` written after a chain close) re-earns the block on its
-next write. Fix the writer first.
+next write. Fix the writer first: `rejected --dna <hash>` names the op's type,
+author, sequence and time, which is enough to find the client or service that
+committed it.
 
 ## Building
 
