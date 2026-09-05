@@ -7,6 +7,7 @@
 
 use std::{collections::HashMap, collections::HashSet, fs, path::Path};
 
+use eprfs_core::GovernanceRuleClass;
 use eprfs_meta::{ValidatorOutcome, ValidatorProvider, ValidatorRequest};
 use serde::Deserialize;
 use serde_json::Value;
@@ -62,7 +63,9 @@ impl ValidatorProvider for ElohimRepositoryValidators {
             "epr:validator-sovereignty-ontology-guard" => sovereignty_guard(request),
             "epr:validator-ownership-ontology-guard" => ownership_guard(request),
             "epr:validator-archetype-resource-alignment" => archetype_resource_alignment(request),
-            "epr:validator-test-bench-aggregate-capacity" => test_bench_aggregate_capacity(request),
+            "epr:validator-test-bench-aggregate-capacity" => {
+                return test_bench_aggregate_capacity(request).unwrap_or(ValidatorOutcome::Pass);
+            }
             "epr:validator-eprfs-meta-domain-neutrality" => eprfs_meta_domain_neutrality(request),
             "epr:validator-escalation-ladder" => escalation_ladder(request),
             reference => {
@@ -547,7 +550,79 @@ fn archetype_resource_alignment(request: &ValidatorRequest<'_>) -> Option<String
     (!drift.is_empty()).then(|| format!("intra-archetype drift at {}", drift.join(", ")))
 }
 
-fn test_bench_aggregate_capacity(request: &ValidatorRequest<'_>) -> Option<String> {
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapacityRatification {
+    policy: String,
+    dimension: String,
+    overcommit_pct: i64,
+    #[serde(rename = "ratifiedBy")]
+    ratified_by: String,
+    #[serde(rename = "ratifiedOn")]
+    ratified_on: String,
+    reason: String,
+}
+
+fn capacity_ratification(ledger: &Value) -> Result<Option<CapacityRatification>, String> {
+    let records: Vec<CapacityRatification> = serde_json::from_value(
+        ledger
+            .pointer("/cluster/ratifications")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([])),
+    )
+    .map_err(|error| format!("invalid capacity ratification: {error}"))?;
+    if records.len() > 1 {
+        return Err(
+            "cluster.ratifications must contain at most one CPU limits ratification".into(),
+        );
+    }
+    for record in &records {
+        if record.policy != "test-bench-aggregate-capacity" || record.dimension != "limits.cpu_m" {
+            return Err("only test-bench-aggregate-capacity limits.cpu_m may be ratified; requests reserve and memory is incompressible".into());
+        }
+        if record.overcommit_pct < 100
+            || record.ratified_by.trim().is_empty()
+            || record.reason.trim().is_empty()
+            || record.ratified_on.len() != 10
+            || chrono::NaiveDate::parse_from_str(&record.ratified_on, "%Y-%m-%d").is_err()
+            || !record.ratified_on.bytes().enumerate().all(|(i, c)| {
+                if i == 4 || i == 7 {
+                    c == b'-'
+                } else {
+                    c.is_ascii_digit()
+                }
+            })
+        {
+            return Err("invalid capacity ratification: integer overcommit_pct >=100, non-blank ratifiedBy/reason and YYYY-MM-DD ratifiedOn required".into());
+        }
+    }
+    Ok(records.into_iter().next())
+}
+
+fn capacity_freshness(ledger: &Value) -> Option<String> {
+    let snapshot = ledger
+        .get("snapshotTimestamp")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok());
+    let now = match std::env::var("EPR_META_NOW") {
+        Ok(value) if !value.is_empty() => chrono::DateTime::parse_from_rfc3339(&value).ok(),
+        _ => Some(chrono::Utc::now().fixed_offset()),
+    };
+    let (Some(snapshot), Some(now)) = (snapshot, now) else {
+        return Some(
+            "ledger freshness is unknown; run k8s-bridge observe (or correct EPR_META_NOW)".into(),
+        );
+    };
+    let age = now.signed_duration_since(snapshot);
+    (age > chrono::Duration::days(30)).then(|| {
+        format!(
+            "ledger is {} days old (>30 days); run k8s-bridge observe",
+            age.num_days()
+        )
+    })
+}
+
+fn test_bench_aggregate_capacity(request: &ValidatorRequest<'_>) -> Option<ValidatorOutcome> {
     let (deployments, ledger) = match basename(&request.write.path) {
         "deployments.json" => (
             parse_content(request.write.content.as_deref())?,
@@ -558,6 +633,16 @@ fn test_bench_aggregate_capacity(request: &ValidatorRequest<'_>) -> Option<Strin
             parse_content(request.write.content.as_deref())?,
         ),
         _ => return None,
+    };
+    let ratification = match capacity_ratification(&ledger) {
+        Ok(record) => record,
+        Err(reason) => {
+            return Some(ValidatorOutcome::Finding {
+                class: GovernanceRuleClass::Deny,
+                reason,
+                refer_reason: None,
+            })
+        }
     };
     let cluster = ledger.get("cluster")?;
     let allocatable = bundle(cluster.get("totalAllocatable"));
@@ -586,7 +671,11 @@ fn test_bench_aggregate_capacity(request: &ValidatorRequest<'_>) -> Option<Strin
     check_ceiling(
         "limits.cpu_m",
         projected_limits.cpu_m,
-        allocatable.cpu_m,
+        ratification.as_ref().map_or(allocatable.cpu_m, |record| {
+            // i128 keeps the percentage product exact before clamping to the input range.
+            ((i128::from(allocatable.cpu_m) * i128::from(record.overcommit_pct)) / 100)
+                .min(i128::from(i64::MAX)) as i64
+        }),
         &mut violations,
     );
     check_ceiling(
@@ -595,12 +684,42 @@ fn test_bench_aggregate_capacity(request: &ValidatorRequest<'_>) -> Option<Strin
         allocatable.memory_mi,
         &mut violations,
     );
-    (!violations.is_empty()).then(|| violations.join(", "))
+    let freshness = capacity_freshness(&ledger);
+    if violations.is_empty() && freshness.is_none() {
+        return None;
+    }
+    let mut reason = violations.join(", ");
+    if let Some(record) = ratification {
+        reason.push_str(&format!(
+            "; applied cluster.ratifications[0]: {} {} {}% of allocatable, ratified by {} on {}",
+            record.policy,
+            record.dimension,
+            record.overcommit_pct,
+            record.ratified_by,
+            record.ratified_on,
+        ));
+    }
+    Some(if let Some(freshness) = freshness {
+        ValidatorOutcome::Finding {
+            class: GovernanceRuleClass::Inject,
+            reason: format!(
+                "{freshness}; underlying aggregate: {}",
+                if reason.is_empty() {
+                    "within envelope"
+                } else {
+                    &reason
+                }
+            ),
+            refer_reason: Some("stale-evidence".into()),
+        }
+    } else {
+        ValidatorOutcome::Flag { reason }
+    })
 }
 
 fn check_ceiling(label: &str, actual: i64, ceiling: i64, violations: &mut Vec<String>) {
     if ceiling > 0 && actual > ceiling {
-        violations.push(format!("{label}={actual} > allocatable={ceiling}"));
+        violations.push(format!("{label}={actual} > ceiling={ceiling}"));
     }
 }
 

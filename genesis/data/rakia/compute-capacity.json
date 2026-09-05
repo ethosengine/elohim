@@ -6,6 +6,16 @@
   "snapshotMethod": "Allocatable + readiness re-observed 2026-09-05 from Prometheus kube-state-metrics (kube_node_status_allocatable, kube_node_status_condition) via the observability MCP: 7/7 nodes Ready, shem back in the fleet (24 cores / 128751 Mi), cluster allocatable 70000m / 246980 Mi. Promoted by the integrator session at the operator's direction during the 2026-09-05 integration push, because the 2026-05-04 envelope (46000m, shem cordoned) made every deployments.json write fail test-bench-aggregate-capacity on a portfolio the live cluster schedules with headroom. Per-node commitments (requests/limits), actuals and ephemeral storage are still the 2026-05-04 live-kubectl snapshot hand-curated by the operator (audit trail: genesis/data/rakia/snapshots/2026-05-04/snapshot.json, narrative in .../REVIEW.md); a full re-promotion runs genesis/orchestrator/scripts/snapshot-capacity.sh.",
 
   "cluster": {
+    "ratifications": [
+      {
+        "policy": "test-bench-aggregate-capacity",
+        "dimension": "limits.cpu_m",
+        "overcommit_pct": 125,
+        "ratifiedBy": "operator",
+        "ratifiedOn": "2026-07-16",
+        "reason": "2026-07-16: the test-bench-aggregate-capacity policy (genesis/data/rakia/.epr-meta) correctly flags that the prospective portfolio's aggregate CPU LIMIT sum (~49750m) exceeds cluster totalAllocatable (46000m, genesis/data/rakia/compute-capacity.json). Ratified as an intentional overcommit at reach: CPU limits are compressible ceilings, not reservations -- schedulability is governed by REQUESTS (which fit the envelope), and CPU contention throttles rather than OOMKills. The largest single limit (adam 8000m) is render-inert on adam-firstman.yaml and intentionally uncapped as the genesis anchor. Memory (incompressible) is NOT overcommitted. If steady-state CPU saturation reappears on any node, the lever is per-archetype limit realignment (cf. $shemCpuReliefComment), not lifting allocatable. 2026-08-09 re-ratification at ~50750m: the recycled-laptop class realignment to 2000m (archetype-resource-budgets.json $cpuLimitComment) adds +1000m each for the SUSPENDED caleb/emma/nancy (replicas 0 — prospective-sum inflation only, zero running-limit change; susan/jessica were already at 2000m via the overrides this replaces). Same calculus holds: requests unchanged and within envelope, limits compressible, memory not overcommitted. 2026-08-09 re-ratification at ~53750m (limit-cycle sprint G2/B0): gertrude/susan/eve 2000m->3000m justified resourceOverrides (+3000m running-limit change on shem, which carries only 4 conductors post-scope-directive — adam 8000m + 3x3000m = 17000m of limits on 24 allocatable shem cores, worst observed usage ~13 cores). Requests unchanged; memory untouched; same compressible-ceiling calculus. 125% is the ceiling the operator accepted in July, expressed as a percentage of allocatable."
+      }
+    ],
     "name": "alpha",
     "kubernetesVersion": "microk8s v1.29.15",
     "nodeCount": 7,

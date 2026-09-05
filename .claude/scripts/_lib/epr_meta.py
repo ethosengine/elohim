@@ -434,7 +434,10 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
                                rid, "unresolvable-validator")
             return Verdict(cls, f"validator `{ref}` not registered — advisory only, not "
                                 f"evaluated. {why}", rid, "unresolvable-validator")
-        if REFERENCE_VALIDATORS[ref](write):
+        result = REFERENCE_VALIDATORS[ref](write)
+        if isinstance(result, Verdict):
+            return Verdict(result.cls, result.reason, rid, result.refer_reason)
+        if result:
             return Verdict(cls, f"validator `{ref}` flagged this write. {why}", rid,
                            VALIDATOR_REFER_REASONS.get(ref))
         return None
@@ -822,7 +825,7 @@ def _observed_human_resources(ledger: dict, kind: str) -> tuple[int, int]:
         if human.get("suspended") is True:
             continue
         for deployment in (human.get("deployments") or {}).values():
-            resource = deployment.get(kind) or deployment.get(f"{kind}_sum") or {}
+            resource = deployment.get(kind, deployment.get(f"{kind}_sum")) or {}
             dcpu, dmemory = _bundle(resource)
             cpu += dcpu
             memory += dmemory
@@ -842,7 +845,61 @@ def _observed_total_limits(ledger: dict) -> tuple[int, int]:
     return cpu, memory
 
 
+def _capacity_ratification(ledger: dict) -> dict | None:
+    """Validate the governance record before allowing any exception (also on stale evidence)."""
+    from datetime import date
+
+    records = (ledger.get("cluster") or {}).get("ratifications", [])
+    if not isinstance(records, list) or len(records) > 1:
+        raise ValueError("cluster.ratifications must be an array with at most one CPU limits ratification")
+    keys = {"policy", "dimension", "overcommit_pct", "ratifiedBy", "ratifiedOn", "reason"}
+    for record in records:
+        if not isinstance(record, dict) or set(record) != keys:
+            raise ValueError("ratification requires exactly policy, dimension, overcommit_pct, ratifiedBy, ratifiedOn, reason")
+        if record["policy"] != "test-bench-aggregate-capacity" or record["dimension"] != "limits.cpu_m":
+            raise ValueError("only test-bench-aggregate-capacity limits.cpu_m may be ratified; requests reserve and memory is incompressible")
+        pct = record["overcommit_pct"]
+        if type(pct) is not int or not 100 <= pct <= 9223372036854775807:
+            raise ValueError("overcommit_pct must be an integer percentage of allocatable, at least 100")
+        if any(not isinstance(record[k], str) or not record[k].strip()
+               for k in ("ratifiedBy", "ratifiedOn", "reason")):
+            raise ValueError("ratifiedBy, ratifiedOn and reason must be non-blank strings")
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", record["ratifiedOn"]):
+            raise ValueError("ratifiedOn must be YYYY-MM-DD")
+        date.fromisoformat(record["ratifiedOn"])
+    return records[0] if records else None
+
+
+def _capacity_freshness(ledger: dict, now=None) -> str | None:
+    import os
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        snapshot = datetime.fromisoformat(ledger["snapshotTimestamp"].replace("Z", "+00:00"))
+        if now is None:
+            now = os.environ.get("EPR_META_NOW") or datetime.now(timezone.utc)
+        if isinstance(now, str):
+            now = datetime.fromisoformat(now.replace("Z", "+00:00"))
+        if snapshot.tzinfo is None or now.tzinfo is None:
+            raise ValueError("timestamps must include a timezone")
+        age = now - snapshot
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return "ledger freshness is unknown; run k8s-bridge observe (or correct EPR_META_NOW)"
+    if age > timedelta(days=30):
+        return f"ledger is {age.days} days old (>30 days); run k8s-bridge observe"
+    return None
+
+
+def _capacity_ratification_text(record: dict | None) -> str:
+    if record is None:
+        return ""
+    return (f"; applied cluster.ratifications[0]: {record['policy']} {record['dimension']} "
+            f"{record['overcommit_pct']}% of allocatable, ratified by {record['ratifiedBy']} "
+            f"on {record['ratifiedOn']}")
+
+
 def _aggregate_capacity_violations(deployments: dict, ledger: dict) -> list[tuple[str, str, int, int]]:
+    ratification = _capacity_ratification(ledger)
     cluster = ledger.get("cluster") or {}
     alloc_cpu, alloc_memory = _bundle(cluster.get("totalAllocatable"))
     committed_cpu, committed_memory = _bundle(cluster.get("totalCommitted"))
@@ -858,15 +915,16 @@ def _aggregate_capacity_violations(deployments: dict, ledger: dict) -> list[tupl
         ("limits", "cpu_m"): max(0, total_lim_cpu - observed_lim_cpu) + planned_lim_cpu,
         ("limits", "memory_Mi"): max(0, total_lim_memory - observed_lim_memory) + planned_lim_memory,
     }
-    ceilings = {"cpu_m": alloc_cpu, "memory_Mi": alloc_memory}
-    return [
-        (kind, resource, value, ceilings[resource])
-        for (kind, resource), value in projected.items()
-        if ceilings[resource] > 0 and value > ceilings[resource]
-    ]
+    ceilings = {(kind, resource): ceiling for kind in ("requests", "limits")
+                for resource, ceiling in (("cpu_m", alloc_cpu), ("memory_Mi", alloc_memory))}
+    if ratification:
+        ceilings[("limits", "cpu_m")] = alloc_cpu * ratification["overcommit_pct"] // 100
+    return [(kind, resource, value, ceilings[(kind, resource)])
+            for (kind, resource), value in projected.items()
+            if ceilings[(kind, resource)] > 0 and value > ceilings[(kind, resource)]]
 
 
-def _test_bench_aggregate_capacity(write: dict) -> bool:
+def _test_bench_aggregate_capacity(write: dict) -> Verdict | bool:
     import json as _json
     import sys as _sys
 
@@ -883,17 +941,24 @@ def _test_bench_aggregate_capacity(write: dict) -> bool:
     except Exception:
         return False  # syntax/IO diagnostics belong to their dedicated validators
 
-    violations = _aggregate_capacity_violations(deployments, ledger)
-    if not violations:
+    try:
+        violations = _aggregate_capacity_violations(deployments, ledger)
+        ratification = _capacity_ratification(ledger)
+    except ValueError as error:
+        detail = f"invalid capacity ratification: {error}"
+        print(detail, file=_sys.stderr)
+        return Verdict("deny", detail, "test-bench-aggregate-capacity")
+    freshness = _capacity_freshness(ledger)
+    if not violations and not freshness:
         return False
-    print("  test-bench-aggregate-capacity — prospective portfolio exceeds promoted envelope:",
-          file=_sys.stderr)
-    for kind, resource, value, ceiling in violations:
-        print(f"    · aggregate {kind}.{resource}={value} > allocatable {ceiling}",
-              file=_sys.stderr)
-    print("    FIX: reconcile active budgets, promote a newer operator-observed Rakia ledger, OR "
-          "acknowledge the intentional overcommit at reach.", file=_sys.stderr)
-    return True
+    detail = ", ".join(f"{kind}.{resource}={value} > ceiling={ceiling}"
+                       for kind, resource, value, ceiling in violations)
+    detail += _capacity_ratification_text(ratification)
+    if freshness:
+        detail = f"{freshness}; underlying aggregate: {detail or 'within envelope'}"
+    print(f"  test-bench-aggregate-capacity — {detail}", file=_sys.stderr)
+    return Verdict("inject" if freshness else "ask", detail,
+                   "test-bench-aggregate-capacity", "stale-evidence" if freshness else "rule-fired")
 
 
 # ══ Concern-canon validators (seam-concern-contract plan, design surface 4 / task P4.1) ═══════
@@ -1631,12 +1696,16 @@ def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls:
 def decision_for(verdict: Verdict | None) -> dict:
     """PURE: map a combined Verdict (deny/ask/inject, or None) to the keel decision shape
     {decision, cls, rule_id, refer}. deny -> refuse; ask -> refer (refer.reason = the verdict's
-    refer_reason, defaulting to 'rule-fired'); inject -> permit (advisory). measure/dispatch never
+    refer_reason, defaulting to 'rule-fired'); stale-evidence inject -> refer (advisory);
+    other inject -> permit (advisory). measure/dispatch never
     reach combine() (severity 0, always non-blocking) — callers handle them separately."""
     if verdict is None:
         return {"decision": "permit", "cls": None, "rule_id": None, "refer": None}
     if verdict.cls == "deny":
         return {"decision": "refuse", "cls": "deny", "rule_id": verdict.rule_id, "refer": None}
+    if verdict.cls == "inject" and verdict.refer_reason == "stale-evidence":
+        return {"decision": "refer", "cls": "inject", "rule_id": verdict.rule_id,
+                "refer": {"layer": "operator", "reason": "stale-evidence"}}
     if verdict.cls == "ask":
         reason = verdict.refer_reason or "rule-fired"
         return {"decision": "refer", "cls": "ask", "rule_id": verdict.rule_id,

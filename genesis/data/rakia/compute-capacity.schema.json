@@ -52,6 +52,54 @@
           "description": "Names of NotReady nodes plus reason.",
           "items": { "type": "string" }
         },
+        "ratifications": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "policy",
+              "dimension",
+              "overcommit_pct",
+              "ratifiedBy",
+              "ratifiedOn",
+              "reason"
+            ],
+            "properties": {
+              "policy": {
+                "type": "string",
+                "enum": [
+                  "test-bench-aggregate-capacity"
+                ]
+              },
+              "dimension": {
+                "type": "string",
+                "enum": [
+                  "limits.cpu_m"
+                ]
+              },
+              "overcommit_pct": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 9223372036854775807
+              },
+              "ratifiedBy": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "ratifiedOn": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              },
+              "reason": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
         "totalAllocatable": { "$ref": "#/definitions/resourceBundle" },
         "totalCommitted": { "$ref": "#/definitions/resourceBundle" },
         "totalHeadroom": { "$ref": "#/definitions/resourceBundle" },

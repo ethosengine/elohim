@@ -113,7 +113,8 @@ def decide(verdicts: list, *, ack: bool) -> tuple[int, list[str]]:
             continue
         if worst is None or _SEVERITY[v.cls] > _SEVERITY[worst.cls]:
             worst = v
-        msgs.append(f"[{v.cls}] {v.reason} (rule `{v.rule_id}`)")
+        label = "refer" if v.cls == "inject" and v.refer_reason == "stale-evidence" else v.cls
+        msgs.append(f"[{label}] {v.reason} (rule `{v.rule_id}`)")
     if worst is None:
         return 0, msgs
     if worst.cls == "deny":

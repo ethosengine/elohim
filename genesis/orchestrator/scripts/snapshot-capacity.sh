@@ -7,6 +7,10 @@
 # operator (or a future validator) reviews the diff before promoting
 # numbers from the snapshot into the ledger.
 #
+# The cluster-capacity half is superseded by `k8s-bridge observe` (Station 2/3b),
+# which promotes Prometheus allocatable values directly into the ledger. This
+# snapshot remains an operator-side audit tool for commitments and actuals.
+#
 # Usage:
 #   genesis/orchestrator/scripts/snapshot-capacity.sh [output.json]
 #

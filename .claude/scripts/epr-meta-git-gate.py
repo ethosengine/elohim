@@ -124,7 +124,9 @@ def main(argv: list[str]) -> int:
                                          f"authority: {native.get('evaluator')}"])
             except Exception:  # noqa: BLE001 — witnessing must never break the gate
                 pass
-        if rs_decision in _NATIVE_BLOCKS and not (rs_decision == "refer" and ack):
+        advisory_referral = (rs_decision == "refer" and native.get("winningClass") == "inject"
+                             and native.get("referReason") == "stale-evidence")
+        if rs_decision in _NATIVE_BLOCKS and not advisory_referral and not (rs_decision == "refer" and ack):
             native_worst = "refuse" if rs_decision == "refuse" else (native_worst or "refer")
             msgs.append(f"[{rs_decision}] (native) {native.get('reason')} "
                         f"(rule `{native.get('ruleId')}`, path {path})")

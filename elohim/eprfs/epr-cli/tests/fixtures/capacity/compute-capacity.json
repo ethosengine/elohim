@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "$schemaVersion": "1.0",
+  "snapshotTimestamp": "2026-09-05T18:54:00Z",
+  "snapshotMethod": "shared deterministic test fixture",
+  "cluster": {
+    "name": "fixture",
+    "kubernetesVersion": "fixture",
+    "ratifications": [
+      {
+        "policy": "test-bench-aggregate-capacity",
+        "dimension": "limits.cpu_m",
+        "overcommit_pct": 125,
+        "ratifiedBy": "operator",
+        "ratifiedOn": "2026-07-16",
+        "reason": "CPU limits are compressible; 125% of allocatable is the accepted ceiling."
+      }
+    ],
+    "totalAllocatable": {
+      "cpu_m": 1000,
+      "memory_Mi": 1000
+    },
+    "totalCommitted": {},
+    "totalHeadroom": {},
+    "nodeTypes": {
+      "fixture": {
+        "nodes": [
+          {
+            "name": "fixture",
+            "ready": true,
+            "allocatable": {
+              "cpu_m": 1000,
+              "memory_Mi": 1000
+            },
+            "limits": {}
+          }
+        ],
+        "totals": {}
+      }
+    }
+  },
+  "stewardCommitments": {},
+  "elohimHumans": {},
+  "storyGroups": [],
+  "settledState": {
+    "timestamp": "2026-09-05",
+    "activeGroups": [],
+    "suspendedGroups": [],
+    "reasoning": "fixture",
+    "aggregateCost": {},
+    "headroomRemaining": {},
+    "status": "SUSTAINABLE",
+    "action": "fixture"
+  },
+  "anomalies": []
+}

@@ -140,6 +140,9 @@ fn run_with_revisions(
                         GovernanceRuleClass::Deny => (FindingStatus::Warn, true),
                         GovernanceRuleClass::Ask => (FindingStatus::Refer, true),
                         GovernanceRuleClass::Inject
+                            if verdict.refer_reason.as_deref() == Some("stale-evidence") =>
+                            (FindingStatus::Refer, false),
+                        GovernanceRuleClass::Inject
                         | GovernanceRuleClass::Measure
                         | GovernanceRuleClass::Dispatch => (FindingStatus::Info, false),
                     };
