@@ -53,7 +53,8 @@ pub struct GovernanceVerdict {
     /// deterministic floor routed to judgment rather than deciding. One of
     /// `rule-fired`, `unresolvable-validator`, `policy-pin-mismatch`,
     /// `governance-manifest-malformed`, `escalation-requires-ratification`.
-    /// `None` for non-referral classes (deny/inject/measure/dispatch).
+    /// `stale-evidence` on an inject advisory refers for refresh without blocking reach.
+    /// Otherwise `None` for non-referral classes (deny/inject/measure/dispatch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refer_reason: Option<String>,
 }
@@ -106,7 +107,8 @@ fn class_str(class: &GovernanceRuleClass) -> &'static str {
 ///
 /// The semantics live here in the library (not the parity test) so every
 /// consumer — Rust runners, the parity corpus, future hosts — narrows the same
-/// way. `deny` → `refuse`, `ask` → `refer`, everything else → `permit`. Empty
+/// way. `deny` → `refuse`, `ask` → `refer`, stale-evidence inject → advisory `refer`,
+/// everything else → `permit`. Empty
 /// input is a clean allow (`permit`, no winner).
 pub fn resolve_decision(verdicts: &[GovernanceVerdict]) -> ResolvedDecision {
     let winner = verdicts
@@ -130,6 +132,11 @@ pub fn resolve_decision(verdicts: &[GovernanceVerdict]) -> ResolvedDecision {
             let decision = match verdict.class {
                 GovernanceRuleClass::Deny => "refuse",
                 GovernanceRuleClass::Ask => "refer",
+                GovernanceRuleClass::Inject
+                    if verdict.refer_reason.as_deref() == Some("stale-evidence") =>
+                {
+                    "refer"
+                }
                 GovernanceRuleClass::Inject
                 | GovernanceRuleClass::Measure
                 | GovernanceRuleClass::Dispatch => "permit",
@@ -204,6 +211,13 @@ pub enum ValidatorOutcome {
     Pass,
     Flag {
         reason: String,
+    },
+    /// A provider evaluated a typed finding, including evidence freshness or invalid input.
+    /// Reuses the governance class and referral vocabulary; adds no decision channel.
+    Finding {
+        class: GovernanceRuleClass,
+        reason: String,
+        refer_reason: Option<String>,
     },
     /// This host DECLARES the reference as belonging to another runtime.
     ///
@@ -697,6 +711,19 @@ fn evaluate_rule(
                 ValidatorOutcome::Pass => return None,
                 ValidatorOutcome::Flag { reason } => {
                     format!("validator `{reference}` flagged this write: {reason}. {why}")
+                }
+                ValidatorOutcome::Finding {
+                    class,
+                    reason,
+                    refer_reason,
+                } => {
+                    return Some(GovernanceVerdict {
+                        class,
+                        reason,
+                        rule_id: rule.id.clone(),
+                        policy_ref: None,
+                        refer_reason,
+                    });
                 }
                 // Unavailable-by-DECLARATION: the cascade (or the host's scope
                 // registry) says this reference belongs to another runtime. That

@@ -282,7 +282,7 @@ _live_manifests = sc.discover_manifest_paths(REPO)
 check("LIVE: discovery reads the TREE, never a scratch copy of it — zero manifests under "
       "`.claude/worktrees` (stale agent worktrees once supplied 80 of 125, every one of them "
       "reporting phantom stale pins against versions no resolver in this tree enforces)",
-      [p for p in _live_manifests if ".claude/worktrees" in str(p)] == [])
+      [p for p in _live_manifests if ".claude/worktrees" in p.relative_to(REPO).as_posix()] == [])
 check("LIVE: the REPO-ROOT CHARTER is under the stale-pin watch — `.epr-meta/manifest.md`, the "
       "directory form, is where the constitutional policies bind; an instrument blind to it "
       "while reading phantom bindings is not measuring the tree",

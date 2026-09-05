@@ -23,7 +23,8 @@ rules:
 intra-archetype drift (one human bumped, its class left behind) as an `ask`; realign the class by
 moving the archetype budget, or declare a justified `resourceOverride` on the exceptional human.
 
-The second binding composes upward: it replaces the ledger's prior human allocation with the
-prospective active deployment portfolio, then checks aggregate requests **and limits** against the
-operator-promoted allocatable envelope. The arithmetic is substrate evidence; the `ask` preserves
-the steward's agency to ratify an intentional exception at reach.
+The aggregate binding reads typed `cluster.ratifications` in `compute-capacity.json`: only CPU
+limits may exceed allocatable up to the ratified percentage; requests reserve and memory is
+incompressible. A ledger older than 30 days refers for refresh without an aggregate-capacity ask,
+retaining the underlying violations in the message. Run `k8s-bridge observe` to promote a fresh
+cluster observation; the command lands with Station 2/3b.

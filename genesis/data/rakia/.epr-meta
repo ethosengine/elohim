@@ -15,7 +15,8 @@ rules:
 
 # `genesis/data/rakia` — observed capacity governance
 
-`compute-capacity.json` is promoted by the cluster steward from a read-only observation snapshot.
-The EPR binding connects that operational projection to the same governance contract that evaluates
-`deployments.json`, so changing either side recomputes the relationship instead of trusting a stale
-derived total.
+The aggregate binding reads typed `cluster.ratifications` in `compute-capacity.json`: only CPU
+limits may exceed allocatable up to the ratified percentage; requests reserve and memory is
+incompressible. A ledger older than 30 days refers for refresh without an aggregate-capacity ask,
+retaining the underlying violations in the message. Run `k8s-bridge observe` to promote a fresh
+cluster observation; the command lands with Station 2/3b.

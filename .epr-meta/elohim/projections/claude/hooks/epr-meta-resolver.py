@@ -489,6 +489,8 @@ def main():
                  policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
                              if merged and result["rule_id"] else None),
                  refer=result["refer"], checks=[reason])
+        if cls == "inject" and (result.get("refer") or {}).get("reason") == "stale-evidence":
+            _emit_advise(" ".join([reason, *advisories]))
         _emit_ask(reason)
 
     # decision == "permit": inject (advisory) / dispatch / measure / clean-allow-with-advisories.

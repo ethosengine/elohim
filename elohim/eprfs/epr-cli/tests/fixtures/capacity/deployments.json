@@ -1,0 +1,12 @@
+{
+  "humans": [
+    {
+      "name": "fixture",
+      "pattern": "consolidated",
+      "edgenodeCpuRequest": "100m",
+      "edgenodeCpuLimit": "1200m",
+      "edgenodeMemoryRequest": "100Mi",
+      "edgenodeMemoryLimit": "100Mi"
+    }
+  ]
+}

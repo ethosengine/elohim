@@ -1,0 +1,308 @@
+[
+  {
+    "name": "ratified-within-125",
+    "patches": {},
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "permit",
+    "cls": null,
+    "contains": [],
+    "schemaValid": true
+  },
+  {
+    "name": "ratified-at-125",
+    "patches": {
+      "/cluster/nodeTypes/fixture/nodes/0/limits/cpu_m": 50
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "permit",
+    "cls": null,
+    "contains": [],
+    "schemaValid": true
+  },
+  {
+    "name": "ratified-above-125",
+    "patches": {
+      "/cluster/nodeTypes/fixture/nodes/0/limits/cpu_m": 51
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "limits.cpu_m=1251",
+      "1250",
+      "125%",
+      "operator",
+      "2026-07-16"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "unratified-cpu",
+    "patches": {
+      "/cluster/ratifications": []
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "limits.cpu_m=1200",
+      "1000"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "unratified-requests",
+    "patches": {
+      "/cluster/totalCommitted/cpu_m": 1000
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "requests.cpu_m=1100",
+      "1000"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "unratified-memory",
+    "patches": {
+      "/cluster/nodeTypes/fixture/nodes/0/limits/memory_Mi": 1000
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "limits.memory_Mi=1100",
+      "1000"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "refuse-requests.cpu_m",
+    "patches": {
+      "/cluster/ratifications/0/dimension": "requests.cpu_m"
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [
+      "requests reserve",
+      "memory is incompressible"
+    ],
+    "schemaValid": false
+  },
+  {
+    "name": "refuse-requests.memory_Mi",
+    "patches": {
+      "/cluster/ratifications/0/dimension": "requests.memory_Mi"
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [
+      "requests reserve",
+      "memory is incompressible"
+    ],
+    "schemaValid": false
+  },
+  {
+    "name": "refuse-limits.memory_Mi",
+    "patches": {
+      "/cluster/ratifications/0/dimension": "limits.memory_Mi"
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [
+      "requests reserve",
+      "memory is incompressible"
+    ],
+    "schemaValid": false
+  },
+  {
+    "name": "stale-31-days",
+    "patches": {
+      "/cluster/ratifications": []
+    },
+    "now": "2026-10-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "inject",
+    "contains": [
+      "31 days",
+      "k8s-bridge observe",
+      "limits.cpu_m=1200"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "fresh-30-days",
+    "patches": {
+      "/cluster/ratifications": []
+    },
+    "now": "2026-10-05T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "limits.cpu_m=1200"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "stale-30-days-plus-second",
+    "patches": {
+      "/cluster/ratifications": []
+    },
+    "now": "2026-10-05T18:54:01Z",
+    "decision": "refer",
+    "cls": "inject",
+    "contains": [
+      "30 days",
+      "k8s-bridge observe",
+      "limits.cpu_m=1200"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "stale-within-envelope",
+    "patches": {},
+    "now": "2026-10-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "inject",
+    "contains": [
+      "31 days",
+      "k8s-bridge observe",
+      "125%"
+    ],
+    "schemaValid": true
+  },
+  {
+    "name": "stale-invalid-still-refuses",
+    "patches": {
+      "/cluster/ratifications/0/dimension": "requests.cpu_m"
+    },
+    "now": "2026-10-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [
+      "requests reserve"
+    ],
+    "schemaValid": false
+  },
+  {
+    "name": "blank-reason",
+    "patches": {
+      "/cluster/ratifications/0/reason": " "
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "boolean-percentage",
+    "patches": {
+      "/cluster/ratifications/0/overcommit_pct": true
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "fractional-percentage",
+    "patches": {
+      "/cluster/ratifications/0/overcommit_pct": 125.5
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "wrong-policy",
+    "patches": {
+      "/cluster/ratifications/0/policy": "other"
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "invalid-date",
+    "patches": {
+      "/cluster/ratifications/0/ratifiedOn": "2026-02-30"
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "unknown-field",
+    "patches": {
+      "/cluster/ratifications/0/extra": true
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refuse",
+    "cls": "deny",
+    "contains": [],
+    "schemaValid": false
+  },
+  {
+    "name": "absent-key-fallback",
+    "patches": {
+      "/cluster/nodeTypes/fixture/nodes/0/limits/cpu_m": 100,
+      "/elohimHumans/observed": {
+        "deployments": {
+          "fixture": {
+            "pod": "p",
+            "node": "n",
+            "limits_sum": {
+              "cpu_m": 100
+            }
+          }
+        },
+        "humanLabel": "observed"
+      }
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "permit",
+    "cls": null,
+    "contains": [],
+    "schemaValid": true
+  },
+  {
+    "name": "empty-primary-no-fallback",
+    "patches": {
+      "/cluster/nodeTypes/fixture/nodes/0/limits/cpu_m": 100,
+      "/elohimHumans/observed": {
+        "deployments": {
+          "fixture": {
+            "pod": "p",
+            "node": "n",
+            "limits": {},
+            "limits_sum": {
+              "cpu_m": 100
+            }
+          }
+        },
+        "humanLabel": "observed"
+      }
+    },
+    "now": "2026-09-06T18:54:00Z",
+    "decision": "refer",
+    "cls": "ask",
+    "contains": [
+      "limits.cpu_m=1300",
+      "1250"
+    ],
+    "schemaValid": true
+  }
+]
