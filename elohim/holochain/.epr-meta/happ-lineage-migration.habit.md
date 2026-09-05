@@ -214,3 +214,26 @@ rows 1–4 of `genesis/data/timeline/backlog/arch-scale-risk-backlog.md` (tag `r
 here as `guard:` R1–R4 and as `inject` pointers at `elohim/holochain/dna/.epr-meta` and the elohim-storage
 manifest. None is measured by r15/r16 (node_registry, tens of records); the first live measure is a lamad-scale
 run, and the receipts need elapsed / catch-up minutes / RSS before that run means anything.
+
+DELTA 2026-09-05 (Station 5 GREEN on the household mesh — the held carry works, and the 2026-09-04
+"BLOCKED (zome)" DELTA above is SUPERSEDED; receipt
+`genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r20.{log,json}`, run stamp
+20260905025626, 1 scenario / 11 steps passed, 1m12s; the red it was driven from is `-r18`, same
+directory): jessica never adopted anything and never moved, and 16 of her 180 v1 node-registry
+records are readable in james's v2 side cell at her own v1 entry hashes, each witnessed by a link
+james authored (courier `uhCAkTlfAatal8yJHFgPfUTtAVZD68x8ORRHweLHuumG1QQ8RAwd3`) — and jessica's own
+v1 chain digest and count are unchanged across the sweep, which is what makes it a HELD carry and not
+a write into someone else's chain. What closed it since 2026-09-04: Task 12's `LineageBridge` ticker
+(one held page of 16 per neighbour per 30 s, armed the moment a window opens, idle otherwise) and
+Task 24/26's agent-scoped v1 export — the substrate the earlier DELTA correctly reported as absent.
+THREE MEASURED FACTS. (1) `RoleLineageView.sweep` is `skip_serializing_if = "Vec::is_empty"`, so the
+field is ABSENT from `/version` until the first tick has touched somebody — which is exactly the state
+the poll starts in; the step's non-optional index into it was Station 5's first red (`TypeError:
+Cannot read properties of undefined`). (2) The sweep budget cannot be a constant: it moves 16 records
+per neighbour per tick, so a chain of N takes ⌈N/16⌉ ticks, and this mesh's fixture chains are already
+180+ (eleven ticks) against a six-tick budget. Both Stations 5 and 6 now derive the bound from the
+neighbour's OWN record count, `(⌈N/16⌉ + 2) × 30 s`. (3) RISK ROW R1 HAS ITS FIRST LIVE NUMBERS, now
+appended per run to `.claude/data/lineage-carry-metrics.jsonl`: james's 186-record self-carry took 40 s
+end to end and the whole three-page v1 export walk 0.2 s, with `ExportPage.scanned` peaking at 634 —
+an UNPINNED page reports the whole chain's action count by construction (186 records ≈ 634 actions), so
+this is the linear-cost baseline the pinned-resume path has to beat, not a regression.

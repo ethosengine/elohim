@@ -121,7 +121,7 @@
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -377,17 +377,64 @@ const V1_EXPORT_PAGE_CAP = 32;
  * own override, and the budgets below stay generous either way.
  */
 const LINEAGE_SWEEP_SECS = 30;
+/** `services::lineage_bridge::HELD_PAGE_LIMIT` — the records ONE tick moves
+ * for ONE neighbour. The budgets below are stated in terms of it rather than
+ * as bare tick counts, so the reason for their size travels with them. */
+const HELD_PAGE_LIMIT = 16;
 /**
- * Station 5's budget: several ticks of room, because `HELD_PAGE_LIMIT` (16
- * records per tick, per that same module) may not cover jessica's whole v1
- * chain in one page once a mesh has accumulated fixture records across many
- * prior runs — Station 5 only needs ONE of her records witnessed, but even
- * that can legitimately take more than one tick.
+ * Stations 5/6's budget, derived from the neighbour's OWN chain length: the
+ * sweep moves at most `HELD_PAGE_LIMIT` records per neighbour per tick, so
+ * covering a chain of `records` takes `records / HELD_PAGE_LIMIT` ticks, plus
+ * two for the tick that is already in flight when the window opens and for
+ * scheduling margin. A FIXED six-tick budget (what this was) is a silent
+ * flake the moment a mesh accumulates fixture records across runs — jessica's
+ * chain is 170+ entries here, which is eleven ticks of sweeping, not six.
  */
-const BRIDGE_SWEEP_BUDGET_MS = LINEAGE_SWEEP_SECS * 1000 * 6;
-/** Station 6's tighter claim ("within one sweep interval") — one interval
- * plus a minute of scheduling margin, not six. */
-const ONE_SWEEP_INTERVAL_BUDGET_MS = (LINEAGE_SWEEP_SECS + 60) * 1000;
+function bridgeSweepBudgetMs(records: number): number {
+  return (Math.ceil(records / HELD_PAGE_LIMIT) + 2) * LINEAGE_SWEEP_SECS * 1000;
+}
+
+/**
+ * **Risk row R1's ledger.** The epic's R1 says carry cost must stay LINEAR in
+ * chain length; `ExportPage::scanned` (node_registry_coordinator) is the one
+ * number that says whether it does, and elapsed seconds against a record
+ * count is what says whether the linear constant is liveable.
+ *
+ * This is an OBSERVATION ledger, not a verification result: it records what a
+ * live run measured so a later run can be compared against it. It never
+ * decides anything, and nothing reads it to pass or fail a station — the
+ * cucumber receipt is the verdict, this is the cost beside it.
+ *
+ * Appended, never rewritten; a failure to write is reported and swallowed,
+ * because losing a metric must not turn a green station red.
+ */
+const CARRY_METRICS_PATH = path.resolve(A2O_ROOT, '../../.claude/data/lineage-carry-metrics.jsonl');
+function recordCarryMetric(fields: Record<string, unknown>): void {
+  try {
+    const line = JSON.stringify({
+      at: new Date().toISOString(),
+      run: RUN_STAMP,
+      concern: 'happ-lineage-migration',
+      ...fields,
+    });
+    mkdirSync(path.dirname(CARRY_METRICS_PATH), { recursive: true });
+    appendFileSync(CARRY_METRICS_PATH, `${line}\n`, 'utf8');
+  } catch (error) {
+    console.error(`[happ-lineage-migration] could not append a carry metric: ${String(error)}`);
+  }
+}
+/**
+ * Station 6's "within one sweep interval", measured honestly, uses the SAME
+ * bound.
+ *
+ * One interval is what the story means and what a CAUGHT-UP walk costs — but
+ * the walk itself is `⌈records / HELD_PAGE_LIMIT⌉` intervals long, and
+ * `next_sweep` rule 2 sends the cursor back to the beginning at the end of
+ * every local view, so a record written mid-cycle is reached when the walk
+ * next passes it, not on the following tick. The CLAIM Station 6's Then makes
+ * is unchanged (james's bridge, not jessica, moves it, and jessica's
+ * signature travels); only the waiting bound is chain-derived.
+ */
 
 // ---------------------------------------------------------------------------
 // Conductor rail — role/zome-parameterized, see module doc "Conductor rail"
@@ -2029,17 +2076,29 @@ async function openCanaryWindow(): Promise<void> {
   );
 }
 
+/** Fold one page's R1 `scanned` into the walk's worst so far. A coordinator
+ * that predates the field answers `undefined` and contributes nothing — never
+ * a 0, which would read as a page that scanned nothing. */
+function widerScan(worst: number | null, page: number | null | undefined): number | null {
+  if (typeof page !== 'number') return worst;
+  return worst === null ? page : Math.max(worst, page);
+}
+
 /** One peer's v1 node-registry chain, as v1's own `export_records` describes it. */
 async function readV1Export(
   peer: PeerName
 ): Promise<{ digest: string; total: number | null; entryHashes: string[] }> {
   const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  const startedAt = Date.now();
   try {
     const entryHashes: string[] = [];
     let digest = '';
     let total: number | null = null;
     let cursor: number | undefined;
     let exhausted = false;
+    // R1: the WORST page's position scan, not the sum — the risk row asks
+    // whether one page's cost grows with how far into the chain it sits.
+    let maxScanned: number | null = null;
     for (let page = 0; page < V1_EXPORT_PAGE_CAP; page += 1) {
       const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
         records: unknown[];
@@ -2047,7 +2106,9 @@ async function readV1Export(
         next_cursor?: number | null;
         digest: string;
         total?: number | null;
+        scanned?: number | null;
       };
+      maxScanned = widerScan(maxScanned, raw.scanned);
       digest = raw.digest;
       if (raw.total !== null && raw.total !== undefined) total = raw.total;
       for (const record of raw.records) {
@@ -2070,6 +2131,14 @@ async function readV1Export(
         `(${entryHashes.length} records read, total reported ${total}) — this baseline is a ` +
         `PREFIX of the chain, not the chain`
     );
+    recordCarryMetric({
+      measure: 'v1-export-walk',
+      peer,
+      records: entryHashes.length,
+      total,
+      maxPageScanned: maxScanned,
+      elapsedSecs: Number(((Date.now() - startedAt) / 1000).toFixed(1)),
+    });
     return { digest, total, entryHashes };
   } finally {
     await rail.close();
@@ -2154,6 +2223,7 @@ async function awaitCanaryApply(): Promise<void> {
   const c = lineage();
   const releaseCid = c.canaryReleaseCid;
   assert.ok(releaseCid, 'no canary release published');
+  const startedAt = Date.now();
   const { row } = await pollAdoption(
     'james',
     CANARY_APPLY_BUDGET_MS,
@@ -2168,6 +2238,14 @@ async function awaitCanaryApply(): Promise<void> {
   );
   c.carryReceipt = row.appliedRelease?.carry;
   c.lastRows.james = row;
+  recordCarryMetric({
+    measure: 'self-carry-apply',
+    station: 3,
+    peer: 'james',
+    carried: c.carryReceipt?.carried ?? null,
+    v1Count: c.carryReceipt?.v1Count ?? null,
+    elapsedSecs: Number(((Date.now() - startedAt) / 1000).toFixed(1)),
+  });
   console.error(
     `[happ-lineage-migration] Station 3: james applied ${releaseCid} via ${row.appliedRelease?.vehicle}; ` +
       `carry receipt: ${JSON.stringify(c.carryReceipt ?? null)}`
@@ -2541,7 +2619,11 @@ async function pollPassportSweep(
   while (Date.now() - start < timeoutMs) {
     const passport = await readPassport(peer);
     const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
-    const entry = role?.lineage?.sweep.find(s => s.agent === neighbourAgent);
+    // `RoleLineageView.sweep` is `skip_serializing_if = "Vec::is_empty"`
+    // (runtime_passport.rs) — ABSENT from the wire before the first tick has
+    // touched anyone, which is exactly the state this poll starts in. The
+    // optional index is load-bearing, not defensive.
+    const entry = role?.lineage?.sweep?.find(s => s.agent === neighbourAgent);
     if (entry) {
       last = entry;
       if (predicate(entry)) return entry;
@@ -2793,7 +2875,7 @@ Given(
 
 When(
   "james's bridge sweep runs",
-  { timeout: BRIDGE_SWEEP_BUDGET_MS + 30_000 },
+  { timeout: bridgeSweepBudgetMs(400) + 30_000 },
   async function (this: E2EWorld) {
     // The Given above is Station 4's OWN text ("james is dual-celled...")
     // reused verbatim by the feature, so james is already dual-celled and
@@ -2805,12 +2887,29 @@ When(
     // from the clock.
     const c = lineage();
     assert.ok(c.jessicaAgent, 'no jessica agent captured — run the previous Given first');
+    // The budget is jessica's OWN chain length divided by the page limit —
+    // see `bridgeSweepBudgetMs`. Read from the baseline the Given captured,
+    // never guessed, so a mesh that has accumulated fixture records across
+    // many runs widens the budget instead of flaking.
+    const budgetMs = bridgeSweepBudgetMs(c.jessicaV1Export?.total ?? 0);
+    const startedAt = Date.now();
     const sweep = await pollPassportSweep(
       'james',
       c.jessicaAgent,
-      BRIDGE_SWEEP_BUDGET_MS,
+      budgetMs,
       entry => entry.carried >= 1
     );
+    recordCarryMetric({
+      measure: 'held-carry-sweep',
+      station: 5,
+      courier: 'james',
+      neighbour: c.jessicaAgent,
+      carried: sweep.carried,
+      neighbourViewTotal: sweep.total ?? null,
+      observedHead: sweep.observedHead ?? null,
+      budgetSecs: budgetMs / 1000,
+      elapsedSecs: Number(((Date.now() - startedAt) / 1000).toFixed(1)),
+    });
     console.error(
       `[happ-lineage-migration] Station 5: james's bridge swept jessica — ${JSON.stringify(sweep)}`
     );
@@ -2924,24 +3023,38 @@ When(
 
 Then(
   "james's bridge sweep carries it into v2 within one sweep interval, held with jessica's signature",
-  { timeout: ONE_SWEEP_INTERVAL_BUDGET_MS + 30_000 },
+  { timeout: bridgeSweepBudgetMs(400) + 30_000 },
   async function (this: E2EWorld) {
     const c = lineage();
     const entryHash = c.jessicaFreshEntryHash;
     assert.ok(entryHash, 'no fresh jessica entry hash — run the When first');
     const sideAppId = await jamesLineageAppId();
     const start = Date.now();
+    // See bridgeSweepBudgetMs: the sweep's own walk is
+    // ⌈records / 16⌉ intervals long, so a record written mid-cycle is
+    // reached when the walk next passes it.
+    const budgetMs = bridgeSweepBudgetMs(c.jessicaV1Export?.total ?? 0);
     let links: Record<string, WitnessLinkView[]> = {};
-    while (Date.now() - start < ONE_SWEEP_INTERVAL_BUDGET_MS) {
+    while (Date.now() - start < budgetMs) {
       links = await witnessLinksFor('james', sideAppId, [entryHash]);
       if ((links[entryHash]?.length ?? 0) > 0) break;
       await new Promise<void>(resolve => setTimeout(resolve, 5_000));
     }
     const courierLinks = links[entryHash] ?? [];
+    recordCarryMetric({
+      measure: 'held-carry-fresh-record',
+      station: 6,
+      courier: 'james',
+      neighbour: c.jessicaAgent ?? null,
+      neighbourRecords: c.jessicaV1Export?.total ?? null,
+      witnessed: courierLinks.length > 0,
+      budgetSecs: budgetMs / 1000,
+      elapsedSecs: Number(((Date.now() - start) / 1000).toFixed(1)),
+    });
     assert.ok(
       courierLinks.length > 0,
       `jessica's fresh record ${entryHash} was not witnessed in v2 within ` +
-        `${Date.now() - start}ms (one sweep interval + margin, budget ${ONE_SWEEP_INTERVAL_BUDGET_MS}ms)`
+        `${Date.now() - start}ms (the sweep's own walk over her chain, budget ${budgetMs}ms)`
     );
     const jamesAgent = await baseAgentKey('james');
     assert.ok(
