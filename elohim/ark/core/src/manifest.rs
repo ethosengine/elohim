@@ -268,6 +268,14 @@ pub enum StdinSource {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Probe {
+    /// Verify the running native executable against this child's pinned artifact.
+    /// Place after service readiness: a wrapper that execs another image must not
+    /// certify the wrapper's digest as the running runtime. Unsupported drivers
+    /// and unreadable process images leave this rung unsatisfied.
+    ExecutableIdentity {
+        /// Maximum wait for this rung.
+        patience_ms: u64,
+    },
     /// Wait for a matching standard-output line.
     StdoutLine {
         /// Substring required in a line.

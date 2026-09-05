@@ -204,3 +204,77 @@ decisionPoints:
       - path: elohim/ark/core/src/verdict.rs
         testName: single_death_tally_restarts_immediately
         kind: unit
+
+  - name: readiness_failure_lifecycle
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lifecycle.rs
+      modulePath: ark_core::lifecycle::step
+    summary: A readiness-induced kill preserves its failed rung and enters the witnessed death and restart-policy
+      path. A stop request cannot erase an already observed readiness failure.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Pure local process lifecycle; no disclosure, custody, or head election.
+    - id: C1
+      status: n-a
+      justification: No candidate is elected or release authored.
+    - id: C2
+      status: n-a
+      justification: No assignment, release head, or authority transition occurs.
+    - id: C3
+      status: answered
+      justification: Readiness failure terminates the child and invokes the existing bounded restart governor.
+    - id: C4
+      status: answered
+      justification: An unready killed process is never represented as an intentional successful stop.
+    - id: C5
+      status: answered
+      justification: Transitions consume readiness and death observations; no authority is inferred from
+        them.
+    - id: C6a
+      status: answered
+      justification: Each pure step emits a finite action list; retries remain bounded by the existing governor.
+    - id: C6b
+      status: partial
+      justification: State transitions perform no I/O; crash recovery of in-flight supervisor state remains
+        outside this function.
+    - id: C7
+      status: answered
+      justification: Failed readiness cannot produce MarkReady or successful stop actions.
+    - id: C8
+      status: partial
+      justification: ReadinessFailed retains the rung; the supervisor includes it in the kill intent. No
+        labeled counter is added.
+    - id: C9
+      status: n-a
+      justification: No agent keys or source chains are accessed or changed.
+    - id: C10
+      status: answered
+      justification: ChildState is an internal non-serialized enum; no wire field is silently reinterpreted.
+    - id: C11
+      status: n-a
+      justification: This pure function has no queue or external calls.
+    - id: C12
+      status: n-a
+      justification: Observation grants no activation or arc-transition authority.
+    - id: C13
+      status: n-a
+      justification: The measurement has no social-tier gate.
+    - id: C14
+      status: partial
+      justification: Failure emits OpenIncident and WriteWitness before Decide; existing records carry process
+        and intent evidence. Unknown event combinations remain no-ops.
+    contractTests:
+    - path: elohim/ark/core/src/lifecycle.rs
+      testName: rung_timeout_records_kill_and_preserves_the_failed_rung
+      kind: unit
+    - path: elohim/ark/core/src/lifecycle.rs
+      testName: unready_or_live_death_opens_incident_writes_witness_then_decides
+      kind: unit
+    - path: elohim/ark/core/src/lifecycle.rs
+      testName: stop_request_does_not_erase_an_already_failed_readiness_rung
+      kind: unit
+    - path: elohim/ark/supervisor/tests/supervise_death.rs
+      testName: service_readiness_cannot_certify_a_different_executable
+      kind: integration

@@ -570,6 +570,18 @@ impl Worker {
                     since_epoch_ms: self.now_ms(),
                 }
             }
+            ChildState::ReadinessFailed {
+                pid,
+                rung,
+                since_epoch_ms: 0,
+            } => {
+                self.grace_expired = false;
+                ChildState::ReadinessFailed {
+                    pid,
+                    rung,
+                    since_epoch_ms: self.now_ms(),
+                }
+            }
             other => other,
         }
     }
@@ -587,6 +599,11 @@ impl Worker {
             ChildState::Dying {
                 pid,
                 since_epoch_ms,
+            }
+            | ChildState::ReadinessFailed {
+                pid,
+                since_epoch_ms,
+                ..
             } => self.poll_dying(pid, since_epoch_ms),
         }
     }
@@ -602,9 +619,9 @@ impl Worker {
         };
 
         let patience = Duration::from_millis(match &probe {
-            Probe::StdoutLine { patience_ms, .. } | Probe::TcpListen { patience_ms, .. } => {
-                *patience_ms
-            }
+            Probe::StdoutLine { patience_ms, .. }
+            | Probe::TcpListen { patience_ms, .. }
+            | Probe::ExecutableIdentity { patience_ms } => *patience_ms,
         });
         let deadline = deadline_after(patience);
 
@@ -745,6 +762,11 @@ impl Worker {
 
     fn probe_satisfied(&self, probe: &Probe) -> bool {
         match probe {
+            Probe::ExecutableIdentity { .. } => self.running.as_ref().is_some_and(|running| {
+                self.driver
+                    .running_artifact_sha256(running.pid)
+                    .is_some_and(|actual| actual == running.artifact_sha256)
+            }),
             Probe::StdoutLine { contains, .. } => self.running.as_ref().is_some_and(|running| {
                 running
                     .stdout
@@ -846,6 +868,8 @@ impl Worker {
             IntentAction::Kill => {
                 if self.grace_expired {
                     "grace period expired".to_string()
+                } else if let ChildState::ReadinessFailed { rung, .. } = self.state {
+                    format!("readiness rung {rung} patience exhausted")
                 } else {
                     "readiness patience exhausted".to_string()
                 }
@@ -880,7 +904,7 @@ impl Worker {
             .iter()
             .filter_map(|probe| match probe {
                 Probe::StdoutLine { contains, .. } => Some(contains.clone()),
-                Probe::TcpListen { .. } => None,
+                Probe::TcpListen { .. } | Probe::ExecutableIdentity { .. } => None,
             })
             .collect();
         let ring_lines = self.spec.listen.ring_lines;
@@ -1172,6 +1196,7 @@ impl Worker {
         let pid = match self.state {
             ChildState::Booting { pid, .. }
             | ChildState::Live { pid }
+            | ChildState::ReadinessFailed { pid, .. }
             | ChildState::Dying { pid, .. } => Some(pid),
             ChildState::Idle
             | ChildState::Spawning { .. }
@@ -1198,6 +1223,7 @@ fn child_state_name(state: &ChildState) -> &'static str {
         ChildState::Booting { .. } => "booting",
         ChildState::Live { .. } => "live",
         ChildState::Dying { .. } => "dying",
+        ChildState::ReadinessFailed { .. } => "readiness_failed",
         ChildState::Dead => "dead",
         ChildState::GaveUp => "give_up",
     }

@@ -179,6 +179,13 @@ impl Driver for NativeDriver {
     fn stats(&self, pid: u32) -> Option<ProcessSample> {
         proc_status_sample(pid)
     }
+
+    fn running_artifact_sha256(&self, pid: u32) -> Option<String> {
+        // Open the kernel's executable handle itself. Resolving its symlink and
+        // reopening the target pathname would measure a replacement file after
+        // an atomic artifact swap, while the process still runs the old inode.
+        sha256_file(Path::new(&format!("/proc/{pid}/exe"))).ok()
+    }
 }
 
 impl NativeDriver {

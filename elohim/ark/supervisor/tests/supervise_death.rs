@@ -712,3 +712,159 @@ fn a_berth_that_does_not_match_its_manifest_is_refused_before_anything_runs() {
     let scope = Supervisor::scope_for(&manifest, &placed).unwrap();
     assert_eq!(scope.scope.to_string(), placed.manifest);
 }
+
+#[test]
+fn executable_identity_rung_accepts_the_pinned_running_binary() {
+    let root = tempfile::tempdir().unwrap();
+    let executable = PathBuf::from(SHELL);
+    let expected = sha256_file(&executable).unwrap();
+    let manifest = RuntimeManifest {
+        processes: vec![ChildSpec {
+            name: "runtime".into(),
+            artifact: ArtifactRef::Pinned {
+                cid: None,
+                sha256: expected.clone(),
+                bytes: None,
+            },
+            argv: vec![
+                "{artifact}".into(),
+                "-c".into(),
+                "while :; do sleep 0.1; done".into(),
+            ],
+            readiness: vec![Probe::ExecutableIdentity { patience_ms: 1000 }],
+            policy: policy(0, 100),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let mut berth = berth_for(&manifest, root.path().into(), &["runtime"]);
+    berth.artifacts.insert("runtime".into(), executable);
+    let spool = reader(&berth, &manifest);
+    let supervisor = supervisor_for(&manifest, &berth);
+    let shutdown = supervisor.shutdown_flag();
+    let running = thread::spawn(move || supervisor.run());
+    let pid = wait_until("verified runtime identity", Duration::from_secs(5), || {
+        ready_pid(&spool, "runtime")
+    });
+    shutdown.store(true, Ordering::SeqCst);
+    let outcome = running.join().unwrap().unwrap();
+    assert_eq!(outcome.exit_code, 0);
+    assert_eq!(outcome.passport.processes[0].artifact_sha256, expected);
+    assert!(wait_nowait(pid).is_err());
+}
+
+#[test]
+fn service_readiness_cannot_certify_a_different_executable() {
+    identity_refusal(false);
+}
+
+#[test]
+fn missing_driver_identity_never_falls_back_to_the_spawn_digest() {
+    assert_eq!(
+        PanickingDriver {
+            inner: NativeDriver,
+            panic_on: "unused".into()
+        }
+        .running_artifact_sha256(std::process::id()),
+        None
+    );
+    identity_refusal(true);
+}
+
+fn identity_refusal(identity_unavailable: bool) {
+    let root = tempfile::tempdir().unwrap();
+    let mut policy = policy(0, 100);
+    policy.same_cause_limit = 1;
+    // The shell starts successfully and announces service readiness, but then
+    // replaces itself with sleep. A spawn hash or a stdout marker cannot prove
+    // the identity of the image now occupying the very same PID.
+    let manifest = RuntimeManifest {
+        processes: vec![child(
+            "runtime",
+            "echo booted; exec sleep 30",
+            vec![
+                Probe::StdoutLine {
+                    contains: "booted".into(),
+                    patience_ms: 1000,
+                },
+                Probe::ExecutableIdentity { patience_ms: 200 },
+            ],
+            policy,
+        )],
+        ..Default::default()
+    };
+    let berth = berth_for(&manifest, root.path().into(), &["runtime"]);
+    let spool = reader(&berth, &manifest);
+    let driver: Box<dyn Driver> = Box::new(ImageReplacingDriver {
+        identity_unavailable,
+    });
+    let outcome = supervisor_with_driver(&manifest, &berth, driver)
+        .run()
+        .unwrap();
+    assert_eq!(outcome.exit_code, 3);
+    assert!(!outcome.passport.processes[0].ready);
+    let witnesses = witnesses_of(&spool, "runtime");
+    assert_eq!(
+        witnesses.len(),
+        2,
+        "one write-ahead witness and one decided witness"
+    );
+    assert_eq!(witnesses[0].pid, witnesses[1].pid);
+    assert!(witnesses[0].verdict.is_none());
+    assert!(witnesses[1].verdict.is_some());
+    let witness = spool.read_witness(&witnesses[0].cid).unwrap();
+    assert_eq!(
+        witness.last_intent.unwrap().reason,
+        "readiness rung 1 patience exhausted"
+    );
+    assert_eq!(
+        witnesses[0].exit,
+        ExitClass::Signaled {
+            signal: 9,
+            core_dumped: false
+        }
+    );
+    assert!(wait_nowait(witnesses[0].pid).is_err());
+}
+
+struct ImageReplacingDriver {
+    identity_unavailable: bool,
+}
+
+impl Driver for ImageReplacingDriver {
+    fn fingerprint(&self) -> Fingerprint {
+        NativeDriver.fingerprint()
+    }
+    fn signal(&self, pid: u32, signal: i32) -> Result<(), DriverError> {
+        NativeDriver.signal(pid, signal)
+    }
+    fn stats(&self, pid: u32) -> Option<ProcessSample> {
+        NativeDriver.stats(pid)
+    }
+    fn running_artifact_sha256(&self, pid: u32) -> Option<String> {
+        if self.identity_unavailable {
+            None
+        } else {
+            NativeDriver.running_artifact_sha256(pid)
+        }
+    }
+    fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError> {
+        let started = NativeDriver.start(spec, berth)?;
+        // Synchronize with the fixture's exec instead of relying on scheduling
+        // between the stdout marker and the supervisor's identity observation.
+        for _ in 0..200 {
+            if NativeDriver
+                .running_artifact_sha256(started.pid)
+                .is_some_and(|actual| actual != started.artifact_sha256)
+            {
+                return Ok(started);
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        let _ = NativeDriver.signal(started.pid, 9);
+        let _ = ark_supervisor::reap_with_rusage(started.pid);
+        Err(DriverError::Spawn(
+            "fixture never replaced its image".into(),
+        ))
+    }
+}

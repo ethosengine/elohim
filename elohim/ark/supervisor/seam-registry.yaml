@@ -1,0 +1,76 @@
+seamRegistryVersion: 1
+crate: elohim-ark-supervisor
+crateRoot: elohim/ark/supervisor
+seamLocus: Local runtime observation; no release election, adoption grant, or DHT authority.
+decisionPoints:
+  - name: executable_identity_readiness
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/driver.rs
+      modulePath: ark_supervisor::driver::Driver::running_artifact_sha256
+    summary: >
+      A current executable digest is an observation; missing observation cannot satisfy
+      the executable-identity readiness rung. The native driver opens the kernel executable
+      handle rather than reopening a pathname that could have been replaced.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Local runtime observation, separate from head election, readability, and custody.
+      - id: C1
+        status: n-a
+        justification: No candidate is elected or release authored.
+      - id: C2
+        status: n-a
+        justification: No assignment, release head, or authority transition occurs.
+      - id: C3
+        status: answered
+        justification: Failed observation follows the existing readiness timeout and bounded restart machine.
+      - id: C4
+        status: partial
+        justification: Unavailable observations fail closed; Option does not distinguish unsupported from unreadable.
+      - id: C5
+        status: answered
+        justification: Native observation hashes the kernel's current executable, never the remembered spawn digest.
+      - id: C6a
+        status: partial
+        justification: Hashing uses fixed-size buffers and readiness has a deadline; a blocked filesystem read is not cancellable.
+      - id: C6b
+        status: answered
+        justification: Observations write nothing and create no shared records.
+      - id: C7
+        status: answered
+        justification: A configured identity rung cannot advertise ready without a matching observed executable.
+      - id: C8
+        status: partial
+        justification: Existing readiness-rung timeout and death witnesses remain; no identity-specific counter is added.
+      - id: C9
+        status: n-a
+        justification: No agent keys or source chains are accessed or changed.
+      - id: C10
+        status: answered
+        justification: The new probe is an explicit enum variant; old manifests retain their existing shape and CID.
+      - id: C11
+        status: partial
+        justification: Unreadable process images cannot become readiness evidence; filesystem latency remains a local risk.
+      - id: C12
+        status: n-a
+        justification: Observation grants no activation or arc-transition authority.
+      - id: C13
+        status: n-a
+        justification: The measurement has no social-tier gate.
+      - id: C14
+        status: partial
+        justification: Readiness failure uses existing death and incident records; the observed mismatch digest is not persisted.
+    contractTests:
+      - path: elohim/ark/supervisor/tests/native_reap.rs
+        testName: running_identity_reads_the_executed_inode_after_path_replacement
+        kind: integration
+      - path: elohim/ark/supervisor/tests/supervise_death.rs
+        testName: executable_identity_rung_accepts_the_pinned_running_binary
+        kind: integration
+      - path: elohim/ark/supervisor/tests/supervise_death.rs
+        testName: service_readiness_cannot_certify_a_different_executable
+        kind: integration
+      - path: elohim/ark/supervisor/tests/supervise_death.rs
+        testName: missing_driver_identity_never_falls_back_to_the_spawn_digest
+        kind: integration

@@ -80,6 +80,13 @@ pub trait Driver: Send + Sync {
 
     /// Samples a live child's resource use; `None` when the process is gone or unreadable.
     fn stats(&self, pid: u32) -> Option<ProcessSample>;
+
+    /// Hash the executable the kernel currently associates with this child.
+    /// Absence is unsupported or unreadable, never the pre-spawn artifact hash.
+    /// The caller must still own the unreaped child to prevent PID reuse.
+    fn running_artifact_sha256(&self, _pid: u32) -> Option<String> {
+        None
+    }
 }
 
 /// A refusal or failure on the path from declaration to running process.

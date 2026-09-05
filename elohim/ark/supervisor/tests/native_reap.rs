@@ -260,3 +260,39 @@ fn channel_artifact_is_refused_in_s0_by_name() {
         other => panic!("expected ChannelUnresolvedInS0, got {other:?}"),
     }
 }
+
+#[test]
+fn running_identity_reads_the_executed_inode_after_path_replacement() {
+    let dir = tempfile::tempdir().unwrap();
+    let artifact = dir.path().join("runtime");
+    std::fs::copy("/bin/sh", &artifact).unwrap();
+    let original = sha256_file(&artifact).unwrap();
+    let mut spec = spec(ArtifactRef::Pinned {
+        cid: None,
+        sha256: original.clone(),
+        bytes: None,
+    });
+    spec.argv = vec![
+        "{artifact}".into(),
+        "-c".into(),
+        "while :; do sleep 0.1; done".into(),
+    ];
+    let mut berth = berth(dir.path().into());
+    berth.artifacts.insert("child".into(), artifact.clone());
+    let started = NativeDriver.start(&spec, &berth).unwrap();
+
+    let replacement = dir.path().join("replacement");
+    std::fs::write(&replacement, b"replacement artifact, not the running image").unwrap();
+    std::fs::rename(&replacement, &artifact).unwrap();
+    let observed = NativeDriver.running_artifact_sha256(started.pid);
+    let on_disk = sha256_file(&artifact).unwrap();
+    NativeDriver.signal(started.pid, 9).unwrap();
+    await_exit(started.pid);
+
+    assert_ne!(
+        on_disk, original,
+        "the pathname must now name different bytes"
+    );
+    assert_eq!(observed.as_deref(), Some(original.as_str()));
+    assert_eq!(NativeDriver.running_artifact_sha256(started.pid), None);
+}

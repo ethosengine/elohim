@@ -25,6 +25,14 @@ pub enum ChildState {
     /// supervisor MUST stamp the real value on the returned state before any grace
     /// accounting.
     Dying { pid: u32, since_epoch_ms: u64 },
+    /// A failed readiness rung caused a kill. Its death must be witnessed and
+    /// judged by restart policy, never closed as an intentional successful stop.
+    /// The supervisor stamps `since_epoch_ms` just as it does for `Dying`.
+    ReadinessFailed {
+        pid: u32,
+        rung: usize,
+        since_epoch_ms: u64,
+    },
     /// A child died unexpectedly and awaits a restart verdict.
     Dead,
     /// Restart policy permanently stopped retrying the child.
@@ -121,14 +129,20 @@ pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>) {
                 )
             }
         }
-        (ChildState::Booting { pid, .. }, Event::RungTimedOut { rung: _ }) => (
-            ChildState::Dying {
+        (ChildState::Booting { pid, .. }, Event::RungTimedOut { rung }) => (
+            ChildState::ReadinessFailed {
                 pid,
+                rung,
                 since_epoch_ms: 0,
             },
             vec![Action::RecordIntent(IntentAction::Kill), Action::Kill],
         ),
-        (ChildState::Booting { .. } | ChildState::Live { .. }, Event::Died { class: _ }) => (
+        (
+            ChildState::Booting { .. }
+            | ChildState::Live { .. }
+            | ChildState::ReadinessFailed { .. },
+            Event::Died { class: _ },
+        ) => (
             ChildState::Dead,
             vec![Action::OpenIncident, Action::WriteWitness, Action::Decide],
         ),
@@ -192,6 +206,9 @@ pub fn step(state: ChildState, event: Event) -> (ChildState, Vec<Action>) {
             ],
         ),
         (state @ ChildState::Dying { .. }, Event::GraceExpired) => (state, vec![Action::Kill]),
+        (state @ ChildState::ReadinessFailed { .. }, Event::GraceExpired) => {
+            (state, vec![Action::Kill])
+        }
         (state, _) => (state, vec![]),
     }
 }
@@ -248,15 +265,16 @@ mod tests {
     }
 
     #[test]
-    fn rung_timeout_records_kill_and_enters_dying() {
+    fn rung_timeout_records_kill_and_preserves_the_failed_rung() {
         assert_eq!(
             step(
                 ChildState::Booting { pid: 42, rung: 1 },
                 Event::RungTimedOut { rung: 1 },
             ),
             (
-                ChildState::Dying {
+                ChildState::ReadinessFailed {
                     pid: 42,
+                    rung: 1,
                     since_epoch_ms: 0,
                 },
                 vec![Action::RecordIntent(IntentAction::Kill), Action::Kill,],
@@ -265,19 +283,53 @@ mod tests {
     }
 
     #[test]
-    fn booting_or_live_death_opens_incident_writes_witness_then_decides() {
+    fn unready_or_live_death_opens_incident_writes_witness_then_decides() {
         let event = Event::Died {
             class: ExitClass::Exited { code: 1 },
         };
         let expected_actions = vec![Action::OpenIncident, Action::WriteWitness, Action::Decide];
 
+        for state in [
+            ChildState::Booting { pid: 42, rung: 1 },
+            ChildState::Live { pid: 42 },
+            ChildState::ReadinessFailed {
+                pid: 42,
+                rung: 1,
+                since_epoch_ms: 10,
+            },
+        ] {
+            assert_eq!(
+                step(state, event.clone()),
+                (ChildState::Dead, expected_actions.clone())
+            );
+        }
+    }
+
+    #[test]
+    fn stop_request_does_not_erase_an_already_failed_readiness_rung() {
+        let state = ChildState::ReadinessFailed {
+            pid: 42,
+            rung: 2,
+            since_epoch_ms: 10,
+        };
         assert_eq!(
-            step(ChildState::Booting { pid: 42, rung: 1 }, event.clone()),
-            (ChildState::Dead, expected_actions.clone())
+            step(state.clone(), Event::StopRequested { signal: 15 }),
+            (state.clone(), vec![])
         );
         assert_eq!(
-            step(ChildState::Live { pid: 42 }, event),
-            (ChildState::Dead, expected_actions)
+            step(
+                state,
+                Event::Died {
+                    class: ExitClass::Signaled {
+                        signal: 9,
+                        core_dumped: false
+                    }
+                }
+            ),
+            (
+                ChildState::Dead,
+                vec![Action::OpenIncident, Action::WriteWitness, Action::Decide]
+            )
         );
     }
 
