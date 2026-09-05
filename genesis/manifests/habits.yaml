@@ -3041,6 +3041,32 @@ habits:
       cell on a crossed role, so `RootSource::Installed` is live and the check fires.
       And the release itself stays earned and admissible through both refusals — only the PATH was refused,
       which is the distinction the whole Station exists to hold.
+
+      DELTA 2026-09-05 (the TEN-STATION run, and Station 6's regression with its cause measured; receipt
+      `genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r30.{log,json}` — all ten
+      stations in ONE cucumber process, 10 scenarios / 129 steps, **9 passed / 1 failed**, 38m07s, on the
+      three-peer 0.7 household mesh with no conductor restarted): Stations 1, 2, 3, 4, 5, 7, 8, 9 and 10
+      pass together. **Station 6 is the one red, and it is a SUBSTRATE finding, not a step defect.**
+      MEASURED, three ways. The step's own diagnosis (`-r32`, 7m50s): "the courier's sweep is CAUGHT UP TO
+      A STALE HEAD: james's view of `uhCAkTMagp…` holds 212 records (observed head 732, carried 212) and
+      its walk has ENDED (cursor absent), while that neighbour's own chain holds 322." The bridge's own log
+      on james agrees and dates it: jessica's last carried page is `2026-09-05T04:53:11Z` with
+      `total_carried: 212, cursor: None, observed_head: Some(732)`, after which james keeps carrying
+      MATTHEW every 30 s and never reports another page for jessica — while jessica went on authoring past
+      322 records. And the numbers are identical across runs an hour apart (212/732 at 03:46 and at 04:53),
+      so james's agent-activity view of jessica's v1 chain has not advanced at all in that time.
+      The held carry itself is sound: `carry_from`'s held path carries the courier's OWN VIEW, and it
+      carried all 212 records of that view correctly, with jessica's signatures, exactly as Station 5
+      measures. What it cannot do is carry a record the courier's authority has never seen — so Station 6's
+      "jessica writes a NEW record and james carries it" passes only while her chain stays inside the view
+      james holds. It did at `-r22` (192 records, carried in 366 s, GREEN) and has not since (`-r29` 247,
+      `-r30` 292, `-r31` 316, `-r32` 322 — all red).
+      THE STEP NOW DIAGNOSES INSTEAD OF TIMING OUT: it reads james's sweep view each poll and fails
+      immediately, naming the stall, when the walk has ENDED on a view shorter than the neighbour's own
+      chain — 7m50s with an answer instead of 21m with a timeout. Closing the stall itself is substrate
+      work (agent-activity propagation between two household peers) and is BLOCKED for this seat under its
+      own stop conditions: it needs neither a step change nor a storage change, and a conductor restart —
+      the obvious next probe — is refused here by dispatch.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
       - "backlog home (the epic's backlog item): genesis/data/timeline/backlog/governance-native-dna-upgrade-path.md"

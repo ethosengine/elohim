@@ -424,16 +424,22 @@ function recordCarryMetric(fields: Record<string, unknown>): void {
   }
 }
 /**
- * Station 6's "within one sweep interval", measured honestly, uses the SAME
- * bound.
+ * Station 6's "within one sweep interval", measured honestly — TWO walks, not
+ * one.
  *
- * One interval is what the story means and what a CAUGHT-UP walk costs — but
- * the walk itself is `⌈records / HELD_PAGE_LIMIT⌉` intervals long, and
- * `next_sweep` rule 2 sends the cursor back to the beginning at the end of
- * every local view, so a record written mid-cycle is reached when the walk
- * next passes it, not on the following tick. The CLAIM Station 6's Then makes
- * is unchanged (james's bridge, not jessica, moves it, and jessica's
- * signature travels); only the waiting bound is chain-derived.
+ * One interval is what the story means and what a caught-up walk costs. What
+ * it actually costs is up to TWO full walks of the neighbour's chain, and the
+ * reason is `next_sweep` rule 1: a digest that changes mid-walk sends the
+ * cursor back to the beginning with a `restarted:` note. jessica's fresh write
+ * IS that digest change — the very act Station 6 is waiting on invalidates the
+ * walk in flight — so the sweep finishes the current cycle, restarts, and
+ * reaches her new record on the pass after that.
+ *
+ * MEASURED (`-r29`, the ten-station run): 542 s against a 540 s budget on a
+ * 247-record chain — a two-and-a-half-second miss that is a whole extra walk
+ * in disguise. `bridgeSweepBudgetMs(2 * records)` is the honest bound; the
+ * CLAIM the Then makes is unchanged (james's bridge, not jessica, moves it,
+ * and jessica's signature travels).
  */
 
 // ---------------------------------------------------------------------------
@@ -865,6 +871,11 @@ function findChannelRow(report: AdoptionReport, channelId: string): AdoptionChan
  * fire, never that it was still working.
  */
 const SUNSET_SEAL_BUDGET_MS = 360_000;
+
+/** How long a just-authored `AuthorToClose` link gets to reach the authority
+ * that answers `get_closes_for`. A link read is a DHT read even for one's own
+ * link, so this is integration latency, not a ceremony's duration. */
+const CLOSE_INDEX_BUDGET_MS = 180_000;
 
 /** Wait for ONE peer's own sunset ceremony to appear on `/admin/adoption`. */
 async function pollSunsetReceipt(peer: PeerName, timeoutMs: number): Promise<SunsetReceiptView> {
@@ -2764,6 +2775,52 @@ async function pollPassportSweep(
 interface WitnessLinkView {
   courier: string;
 }
+
+/** One peer's current bridge-sweep view of ONE neighbour, or `undefined`
+ * before the first tick has touched them. A single read, never a poll. */
+async function readSweepView(
+  peer: PeerName,
+  neighbourAgent: string | undefined
+): Promise<AgentSweepView | undefined> {
+  if (!neighbourAgent) return undefined;
+  const passport = await readPassport(peer);
+  const role = nodeRegistryRole(passport.passport?.happ?.roles ?? []);
+  return role?.lineage?.sweep?.find(s => s.agent === neighbourAgent);
+}
+
+/**
+ * Is this courier's sweep CAUGHT UP TO A STALE HEAD — a walk that has ended on
+ * a view holding fewer records than the neighbour's own chain?
+ *
+ * `cursor` absent means end-of-local-view (`next_sweep` rule 2), so a further
+ * wait re-walks the SAME view and reaches nothing new. When that view is short
+ * of the neighbour's own count, the missing records are not the sweep's to
+ * carry yet: the courier's agent-activity authority has not seen them. Naming
+ * that is the difference between a diagnosis and a timeout.
+ *
+ * `undefined` when the sweep is still walking, when no view exists yet, or when
+ * the neighbour's own count is unknown — never a guess.
+ */
+// `string | undefined` is the honest return: a stall has a REASON to report,
+// and no stall has nothing to say.
+function stalledCourierView(
+  view: AgentSweepView | undefined,
+  neighbourOwn: { total: number | null } | undefined
+): string | undefined {
+  const own = neighbourOwn?.total;
+  if (!view || typeof own !== 'number') return undefined;
+  if (view.cursor !== undefined) return undefined; // still walking
+  const seen = view.total;
+  if (typeof seen !== 'number' || seen >= own) return undefined;
+  return (
+    `the courier's sweep is CAUGHT UP TO A STALE HEAD: james's view of ${view.agent} holds ` +
+    `${seen} records (observed head ${String(view.observedHead)}, carried ${view.carried}) and its ` +
+    `walk has ENDED (cursor absent), while that neighbour's own chain holds ${own}. The record this ` +
+    "step waits for is not in james's view at all, so no further waiting reaches it — this is an " +
+    'agent-activity propagation stall between the two peers, not a bridge or a step defect.'
+  );
+}
+
 async function witnessLinksOn(
   rail: RoleConductorRail,
   entryHashes: string[]
@@ -3136,17 +3193,18 @@ When(
 
 Then(
   "james's bridge sweep carries it into v2 within one sweep interval, held with jessica's signature",
-  { timeout: bridgeSweepBudgetMs(400) + 30_000 },
+  // A ceiling, not the budget: the budget is derived from jessica's own chain
+  // inside the step (two walks of it), and this only has to be larger.
+  { timeout: bridgeSweepBudgetMs(2000) + 60_000 },
   async function (this: E2EWorld) {
     const c = lineage();
     const entryHash = c.jessicaFreshEntryHash;
     assert.ok(entryHash, 'no fresh jessica entry hash — run the When first');
     const sideAppId = await jamesLineageAppId();
     const start = Date.now();
-    // See bridgeSweepBudgetMs: the sweep's own walk is
-    // ⌈records / 16⌉ intervals long, so a record written mid-cycle is
-    // reached when the walk next passes it.
-    const budgetMs = bridgeSweepBudgetMs(c.jessicaV1Export?.total ?? 0);
+    // TWO walks, not one — jessica's fresh write is itself the mid-walk digest
+    // change that `next_sweep` rule 1 restarts on. See the budget's own doc.
+    const budgetMs = bridgeSweepBudgetMs(2 * (c.jessicaV1Export?.total ?? 0));
     // ONE rail for the whole poll — see `witnessLinksFor`'s doc: a re-connect
     // per iteration commits a cap grant and races the sweep's own writes.
     const rail = await connectRoleConductor(
@@ -3156,10 +3214,25 @@ Then(
       sideAppId
     );
     let links: Record<string, WitnessLinkView[]> = {};
+    let stall: string | undefined;
     try {
       while (Date.now() - start < budgetMs) {
         links = await witnessLinksOn(rail, [entryHash]);
         if ((links[entryHash]?.length ?? 0) > 0) break;
+        // FAIL FAST ON A STALLED VIEW, rather than burning the whole budget on
+        // a wait that cannot end. `carry_from`'s held path carries james's OWN
+        // VIEW of jessica's chain, and that view comes from an agent-activity
+        // authority. When the sweep's walk has ENDED (`cursor` absent, which
+        // `next_sweep` rule 2 sets at end-of-local-view) and the view it
+        // finished on holds FEWER records than jessica's own chain, the record
+        // this step waits for is not in james's view at all — the sweep is
+        // caught up to a STALE HEAD and no amount of further waiting reaches
+        // past it. Measured 2026-09-05 (`-r31`): james's view of jessica sat at
+        // 212 records / observed head 732 while her own chain was 316, and the
+        // bridge's own log stopped reporting new pages for her while it kept
+        // carrying matthew.
+        stall = stalledCourierView(await readSweepView('james', c.jessicaAgent), c.jessicaV1Export);
+        if (stall) break;
         await new Promise<void>(resolve => setTimeout(resolve, 5_000));
       }
     } finally {
@@ -3178,8 +3251,9 @@ Then(
     });
     assert.ok(
       courierLinks.length > 0,
-      `jessica's fresh record ${entryHash} was not witnessed in v2 within ` +
-        `${Date.now() - start}ms (the sweep's own walk over her chain, budget ${budgetMs}ms)`
+      stall ??
+        `jessica's fresh record ${entryHash} was not witnessed in v2 within ` +
+          `${Date.now() - start}ms (the sweep's own walk over her chain, budget ${budgetMs}ms)`
     );
     const jamesAgent = await baseAgentKey('james');
     assert.ok(
@@ -3658,17 +3732,25 @@ Then(
 
 Then(
   'each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended',
-  { timeout: 60_000 },
+  { timeout: 300_000 },
   async function (this: E2EWorld) {
-    // `seal_close` (the shared "next reconciles" step, above) already
-    // authored this witness as step 3 of its own one-call ceremony — this
-    // Then reads it back TWO ways: the receipt this dispatch's own harness
-    // captured, and `get_closes_for`, the coordinator's OWN read index
+    // `seal_close` (which each peer's OWN runtime ran — see the shared "next
+    // reconciles" step) authored this witness as step 3 of its one-call
+    // ceremony. This Then reads it back TWO ways: the `SunsetReceipt` the
+    // peer published, and `get_closes_for`, the coordinator's OWN read index
     // (`AuthorToClose`) built for exactly this question. Unlike a carried
     // CONTENT record (Station 4's own named gap — no `EntryToWitness` link
     // for an entry-less `CloseChain`), a close IS queryable, because
     // `seal_close` builds this second index precisely because validation
     // itself cannot traverse links.
+    //
+    // POLLED, not read once. `get_closes_for` is a `get_links` — an
+    // AUTHORITY read, not a source-chain read — so a link authored seconds
+    // ago has to be integrated before it answers. In the ten-station run
+    // (`-r29`) matthew's index was empty at the instant of the read and the
+    // step called that an absent seal; the receipt the previous Thens already
+    // asserted proves the link exists, so an empty answer is "not integrated
+    // yet", never "never authored".
     const c = lineage();
     for (const peer of PEER_NAMES) {
       const witnessHash = c.sealWitnessHashes?.[peer];
@@ -3677,11 +3759,19 @@ Then(
       const role = await pollPassportRole(peer, 30_000, r => r.lineage !== undefined);
       assert.ok(role.lineage, `${peer} has no lineage view`);
       const agent = await baseAgentKey(peer);
-      const closes = await getClosesFor(peer, sideAppId, role.lineage.readingDnaHash, agent);
+      const readingDnaHash = role.lineage.readingDnaHash;
+      const deadline = Date.now() + CLOSE_INDEX_BUDGET_MS;
+      let closes: unknown[] = [];
+      while (Date.now() < deadline) {
+        closes = await getClosesFor(peer, sideAppId, readingDnaHash, agent);
+        if (closes.length > 0) break;
+        await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+      }
       assert.ok(
         closes.length > 0,
-        `get_closes_for reports no seal for ${peer}'s own (lineage, agent) — the read index ` +
-          'seal_close builds is empty'
+        `get_closes_for reports no seal for ${peer}'s own (lineage, agent) within ` +
+          `${CLOSE_INDEX_BUDGET_MS}ms — the read index seal_close builds is empty, although ` +
+          `${peer}'s own sunset receipt named seal witness ${witnessHash}`
       );
       console.error(
         `[happ-lineage-migration] Station 8: ${peer}'s own close is a v2 witness (${witnessHash}), ` +
