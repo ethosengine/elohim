@@ -187,15 +187,20 @@ Given(
   }
 );
 
+interface AuthorizeOptions {
+  /** Send the world's bearer token — the authenticated branch answers 200 with the target in the body. */
+  withBearer: boolean;
+  prompt?: string;
+  responseType?: string;
+  requestState?: string;
+}
+
 async function authorize(
   world: E2EWorld,
   doorwayId: string,
   clientId: string,
   redirectUri: string,
-  withBearer: boolean,
-  prompt?: string,
-  responseType = 'code',
-  requestState?: string
+  { withBearer, prompt, responseType = 'code', requestState }: AuthorizeOptions
 ): Promise<void> {
   const s = oauth(world);
   const base = doorwayBase(world, doorwayId);
@@ -235,14 +240,14 @@ async function authorize(
 When(
   "Miriam's doorway is asked to authorize {string} with callback {string}",
   async function (this: E2EWorld, clientId: string, redirectUri: string) {
-    await authorize(this, 'alpha', clientId, redirectUri, true);
+    await authorize(this, 'alpha', clientId, redirectUri, { withBearer: true });
   }
 );
 
 When(
   'a signed-out browser asks doorway {string} to authorize {string} with callback {string}',
   async function (this: E2EWorld, doorwayId: string, clientId: string, redirectUri: string) {
-    await authorize(this, doorwayId, clientId, redirectUri, false);
+    await authorize(this, doorwayId, clientId, redirectUri, { withBearer: false });
   }
 );
 
@@ -257,16 +262,12 @@ When(
     requestState: string,
     prompt: string
   ) {
-    await authorize(
-      this,
-      doorwayId,
-      clientId,
-      redirectUri,
-      false,
+    await authorize(this, doorwayId, clientId, redirectUri, {
+      withBearer: false,
       prompt,
       responseType,
-      requestState
-    );
+      requestState,
+    });
   }
 );
 
