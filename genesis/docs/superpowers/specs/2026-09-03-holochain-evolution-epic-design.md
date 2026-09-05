@@ -479,6 +479,7 @@ runnable check and its DELTA lines; this table carries the epic-level picture th
 | 11–13 many versions (§5.1) | designed, not in the story yet | — |
 
 ### 11.3 Operator decisions
+- **OPEN (2026-09-05, from the arc/partition sidebar):** whether to start a fresh `elohim/holochain-0.7` fork from the stock 0.7.0 the mesh runs (the 0.6.3 fork's cures would be a re-port, not a rebase — tx5 is gone) carrying, in order: an admin `list_blocks` / `unblock` (the operator seat Task 30 reaches today by opening the database), the `sharding` feature enabled behind an arc-policy hook storage can drive from the trust gradient, and the household round-deadline defaults. This is the first conductor change the epic would carry as DESIGN rather than cure; the conductor image pipeline already builds and pins a fork. Until decided, the DNA seam (per-tier network seeds: commandments / deeds / paper) is the only floor lever, and Tasks 30–33 are the household's answer to blocks.
 
 - **2026-09-05 — WIP slot: HELD.** The habit `happ-lineage-migration` stays declared, red and `active: false`; the fence keeps dataplane-convergence and runtime-death-witnessed. Execution proceeds under the plan without a slot; the slot question returns when a station is ready to flip.
 - **2026-09-05 — §4 posture ACCEPTED; epic graduated Draft→Active.** The crossing is the elohim's notarized path, no per-node consent, the sunset irreversible and ours to enforce.
