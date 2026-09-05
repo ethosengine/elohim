@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:c9221eb64b4d30c5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:088e8b70e020a548 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -843,6 +843,17 @@ The rehearsal measures with these open and says so in every receipt. They are in
 - Test: sweettest — a page whose `type_names` is deliberately permuted is refused; the honest page still carries; default hash unchanged.
 
 - [ ] **Task 26 deliverable: a carry or re-adoption between lineage ends can never re-create a record as the wrong type; the type travels by name.**
+
+---
+
+### Task 27: G11 — a migration's successors are discoverable by every peer (mishpat coordinator + storage read)
+
+**Files:**
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs` (coordinator-only, hash-neutral): when `create_lineage_commitment` / `create_commitment` accepts a `sunsets-lineage` (or a `revokes-commitment` naming a lineage action), author a `MigrationToSuccessor` link from the MIGRATION commitment's anchor (its entry hash) to the new commitment, tag `sunset|<cid>` / `revoked|<cid>` — reuse an existing link type the integrity zome already declares (read `mishpat_integrity` for one with a free tag shape; if none fits, this half is hash-moving and joins Tasks 21–23 — say which); add `get_lineage_successors(migration_cid) -> Vec<Link>`.
+- Modify: `elohim/elohim-storage/src/services/release_adoption/path_evidence.rs` (`fetch_sunset_evidence_for` reads the successors through the peer's own conductor instead of the author-scoped query; unreadable → `Unreachable`).
+- Test: mishpat sweettest — bob's peer finds alice's sunset for alice's migration; storage unit test for the read.
+
+- [ ] **Task 27 deliverable: a non-authoring peer discovers the sunset that names its migration; the sunset arm is live on the canary; Station 8 can seal there.**
 
 ---
 
