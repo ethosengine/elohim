@@ -65,6 +65,7 @@ fn samples(
             .and_then(|v| v.parse::<f64>().ok())
             .unwrap_or(f64::NAN);
         let scaled = value * scale;
+        // The fractional check depends on cores * 1000 being an exact integer in f64.
         if !scaled.is_finite()
             || scaled < 0.0
             || scaled >= u64::MAX as f64

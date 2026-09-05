@@ -192,6 +192,10 @@ fn prometheus_error_status_refuses() {
 }
 #[test]
 fn key_order_and_untouched_fields_round_trip_identically() {
+    assert_eq!(
+        format!("{}\n", serde_json::to_string_pretty(&ledger()).unwrap()),
+        include_str!("../../../genesis/data/rakia/compute-capacity.json")
+    );
     let mut l = ledger();
     let before = serde_json::to_string_pretty(&l).unwrap();
     let changes = fold_observation(&mut l, &parse(&responses())).unwrap();
