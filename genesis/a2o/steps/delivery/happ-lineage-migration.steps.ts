@@ -133,17 +133,49 @@
  * `POST /admin/lineage/v1-binding {"role","v1AppId"}` declares it. Unbound —
  * which is where this fixture still is — every crossing resolves v1 to the base
  * app, so the chain Station 8 seals is the household's own node-registry v1 and
- * it is spent once. Making the crossing DISPOSABLE is this fixture's remaining
- * half: stage a run-scoped predecessor on each peer (the same DNA under a
- * per-run network seed, installed beside the base app under that peer's own
- * key), read its DNA hash back off `listApps`, bind it through that route
- * before the crossing, and point this file's v1 rails (`baseRoleCellId`,
- * `preAuthorizeBaseV1`, `probeChainClose`, `ensureNodeRegistryRecords`,
- * `walkV1Records` and Station 8's own write) at the bound app instead of
- * `APP_ID`. Each of those steps depends on facts only a live mesh supplies —
- * whether a seeded predecessor's DNA hash is one the packaged v2 can declare as
- * its lineage, and whether three fresh run-scoped cells converge in time for
- * Station 5's held-carry — so it belongs to a seat that can measure it.
+ * it is spent once.
+ *
+ * Making the crossing DISPOSABLE is this fixture's remaining half, and the
+ * ORDER below is part of the recipe, not a detail:
+ *
+ *   1. Let the `Before` hook run FIRST. `resetLineageBaselineOnAllPeers()`
+ *      posts `/admin/lineage/reset {"uninstall": true, "forceClosed": true}`,
+ *      and that reset CLEARS v1 bindings. **A bind placed before it is wiped.**
+ *      Storage now LATCHES a cleared binding and refuses to cross or to seal
+ *      that role until one is declared again, by name — so this mistake reds
+ *      instead of silently sealing the household's chain — but the latch is a
+ *      backstop, not the plan. A `clearedV1Bindings` entry naming the
+ *      run-scoped app in a reset response AFTER staging is the signal that the
+ *      order is wrong.
+ *   2. Stage a run-scoped predecessor on each peer: the same v1 DNA
+ *      (`packOneRoleHapp(NODE_REGISTRY_V1_DNA, …)`) installed through
+ *      `AdminWebsocket.installApp` with `network_seed: "a2o-lineage-<stamp>"`
+ *      — the SAME stamp on all three peers, or they land on three different
+ *      DHTs — `agent_key` = that peer's own base key, and `installed_app_id` =
+ *      `"elohim@a2o-v1-<stamp>"`. The `"<base>@"` prefix is what makes
+ *      `/admin/lineage/reset` sweep it and what makes `closed_role_app_ids`
+ *      protect it once sealed.
+ *   3. Read the installed DNA hash back off `listApps`. **A network seed is a
+ *      DNA modifier, so the run-scoped predecessor's hash NECESSARILY DIFFERS
+ *      from the household's** — and `seal_close` refuses outright when
+ *      `v1_cell.dna_hash() != properties.lineage[0]`. That read-back hash is
+ *      therefore the `v1DnaHash` the manifest must name in BOTH
+ *      `--migrate-from node_registry=<hash>` AND `--lineage <hash>`: the
+ *      packaged v2 has to be re-declared per run, or the crossing dies at the
+ *      seal with a lineage mismatch.
+ *   4. `POST /admin/lineage/v1-binding {"role","v1AppId"}` on each peer, and
+ *      only then run the crossing.
+ *   5. Point this file's v1 rails (`baseRoleCellId`, `preAuthorizeBaseV1`,
+ *      `probeChainClose`, `ensureNodeRegistryRecords`, `walkV1Records` and
+ *      Station 8's own write) at the bound app instead of `APP_ID`. Keep the
+ *      Background's already-closed pre-flight pointed at the household's base
+ *      chain as well: it guards a chain that must never be sealed, and it
+ *      costs one admin read.
+ *
+ * Steps 2-3 depend on facts only a live mesh supplies — whether the seeded
+ * predecessor's read-back hash is one the packaged v2 can be re-declared
+ * against, and whether three fresh run-scoped cells converge in time for
+ * Station 5's held-carry — so this belongs to a seat that can measure it.
  *
  * ## Run-scoped channel, one channel only (Part 1's scope)
  *
@@ -368,12 +400,52 @@ function hcMeshScriptPath(): string {
 function readPeerBlocks(peer: PeerName): { output: string; status: number | null } {
   const result = spawnSync(BASH_BIN, [hcMeshScriptPath(), 'blocks', peer], {
     encoding: 'utf8',
-    timeout: 120_000,
+    // MUST fit inside the caller's poll deadline. One sweep spawns both
+    // neighbours SERIALLY, so a per-call budget anywhere near the step's own
+    // timeout makes the legible refusal this design chose unreachable: a hung
+    // `hc-dbtool` would be killed by cucumber, not reported by us. 30 s x 2
+    // neighbours is one sweep well inside the 210 s deadline, and reading two
+    // small encrypted SQLite tables has never taken seconds.
+    timeout: 30_000,
   });
   return {
     output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
     status: result.status,
   };
+}
+
+/**
+ * The lines of the ONE `BlockSpan` row naming `target`, or `null`.
+ *
+ * `hc-mesh.sh blocks` prints the block rows AND THEN `rejected --dna` for every
+ * DNA those rows name, so two loose `includes()` over a peer's whole output can
+ * take the target from one row and the warrant text from an unrelated warrant
+ * in the same DNA's WARRANTS section. `hc-dbtool` already does the join —
+ * `BlockRow.render()` emits `  #<id>  <dna>:<agent>` and `explain_block` then
+ * indents `warrant:`, `blocked:`, `cause:` and `provoked by:` UNDER that row
+ * (crates/hc-dbtool/src/main.rs) — so the row is a legible unit and the
+ * assertion can be as tight as the Gherkin sentence it implements.
+ *
+ * A row runs from its `  #<id>  <target>` header to the next such header or the
+ * next section banner (`REJECTED OPS —`, `WARRANTS —`, `PEER `, or the `====`
+ * rule). Everything in between belongs to that block and to no other.
+ */
+function blockRowFor(output: string, target: string): string[] | null {
+  const lines = output.split('\n');
+  const header = /^\s{2}#\d+\s+(\S+)\s*$/;
+  const banner = /^(={10,}|PEER\s|REJECTED OPS —|WARRANTS —|BLOCKS —)/;
+  let row: string[] | null = null;
+  for (const line of lines) {
+    const match = header.exec(line);
+    if (match) {
+      if (row) return row;
+      row = match[1] === target ? [line] : null;
+      continue;
+    }
+    if (row && banner.test(line.trimStart())) return row;
+    if (row) row.push(line);
+  }
+  return row;
 }
 
 type PeerName = 'matthew' | 'jessica' | 'james';
@@ -4520,21 +4592,36 @@ Then(
 );
 
 /**
- * One pass over every neighbour's block table, looking for a row that names
- * `target` with `warrant` as its cause.
+ * One pass over every neighbour's block table, looking for the block ROW that
+ * names `target` and whose OWN cited warrant carries `warrant` as its cause.
+ *
+ * The join is the point. `hc-mesh.sh blocks` prints the rows and then every
+ * named DNA's whole WARRANTS/REJECTED OPS section, so two independent
+ * `includes()` over a peer's output could take the target from one row and the
+ * cause from an unrelated warrant. `hc-dbtool` indents `cause:` UNDER the row
+ * whose `warrant_op_hash` it followed, so `blockRowFor` + a `cause:` line
+ * inside that row is the same claim the Gherkin sentence makes: THIS cell is
+ * blocked FOR THIS reason.
  *
  * Split out of the Then so the retry loop is a `while` over one value rather
- * than two nested loops with three exits — and so the THREE outcomes stay
- * distinct: a blocker found, a peer that could not be ASKED (no `hc-dbtool`, no
- * databases), and a peer that answered with no such row. Collapsing the middle
- * one into the last is how a missing tool would read as a missing block.
+ * than nested loops with three exits — and so the FOUR outcomes stay distinct:
+ * a blocker found; a peer that could not be ASKED (no `hc-dbtool`, no
+ * databases); a peer holding the row but with no legible cause on it; and a
+ * peer that answered with no such row at all. Collapsing the second into the
+ * last is how a missing tool would read as a missing block.
  */
 function sweepNeighbourBlocks(
   neighbours: readonly PeerName[],
   target: string,
   warrant: string
-): { blocker: PeerName | null; unaskable: string[]; lastOutput: string } {
+): {
+  blocker: PeerName | null;
+  unaskable: string[];
+  rowsWithoutCause: string[];
+  lastOutput: string;
+} {
   const unaskable: string[] = [];
+  const rowsWithoutCause: string[] = [];
   let lastOutput = '';
   for (const neighbour of neighbours) {
     const { output } = readPeerBlocks(neighbour);
@@ -4544,13 +4631,24 @@ function sweepNeighbourBlocks(
         `${neighbour}: hc-dbtool is not built, so this peer's block table cannot be read. Build ` +
           "it with: cd crates/hc-dbtool && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev RUSTFLAGS='' cargo build"
       );
-    } else if (output.includes('no databases directory')) {
-      unaskable.push(`${neighbour}: no conductor databases directory (peer never started?)`);
-    } else if (output.includes(target) && output.includes(warrant)) {
-      return { blocker: neighbour, unaskable, lastOutput };
+      continue;
     }
+    if (output.includes('no databases directory')) {
+      unaskable.push(`${neighbour}: no conductor databases directory (peer never started?)`);
+      continue;
+    }
+    const row = blockRowFor(output, target);
+    if (!row) continue;
+    if (row.some(line => line.trimStart().startsWith('cause:') && line.includes(warrant))) {
+      return { blocker: neighbour, unaskable, rowsWithoutCause, lastOutput };
+    }
+    // The row is there and its warrant is not the one the story names — or the
+    // warrant it cites is not held in this peer's DHT database, which
+    // `explain_block` reports instead of a `cause:` line. Either way it is a
+    // DIFFERENT fact from "no block", and it is worth carrying verbatim.
+    rowsWithoutCause.push(`${neighbour}:\n${row.join('\n')}`);
   }
-  return { blocker: null, unaskable, lastOutput };
+  return { blocker: null, unaskable, rowsWithoutCause, lastOutput };
 }
 
 /**
@@ -4574,10 +4672,18 @@ function sweepNeighbourBlocks(
  * `POST /admin/lineage/v1-binding` for how a run declares a predecessor of its
  * own instead of the household's.
  *
- * Three failure modes are distinguished by name, because collapsing them is how
- * a missing tool would read as a missing block:
+ * The match is the row-to-warrant JOIN `hc-dbtool` already prints, not two
+ * loose substrings over a peer's whole output: `blockRowFor` isolates the
+ * `BlockSpan` row naming the cell, and the `cause:` line must be inside THAT
+ * row. Otherwise the target could come from one row and the cause from an
+ * unrelated warrant in the same DNA's WARRANTS section — a weaker claim than
+ * the Gherkin sentence it implements.
+ *
+ * Four outcomes are distinguished by name, because collapsing them is how a
+ * missing tool would read as a missing block:
  *   - `hc-dbtool` not built           → the question could not be ASKED (with the build line);
  *   - the peer's databases unreadable → the same, per peer;
+ *   - the row is there, its cause is not → a DIFFERENT fact, reported with the row verbatim;
  *   - read, and no such row           → the story's claim is FALSE, and says so with the output.
  */
 Then(
@@ -4619,6 +4725,14 @@ Then(
       "REFUSED to answer: no neighbour's block table could be read, so this Then cannot tell a " +
         'missing block from a missing tool — and answering "no block" from an unaskable question ' +
         `is the one direction of error that would hide the price of the sunset. ${sweep.unaskable.join('; ')}`
+    );
+    assert.equal(
+      sweep.rowsWithoutCause.length,
+      0,
+      `a neighbour DOES block james's v1 cell ${target}, but the warrant its block row cites does ` +
+        `not carry "${warrant}" — so the block is real and its cause is not the one this story ` +
+        "names, or the warrant it cites is not held in that peer's DHT database. The rows, " +
+        `verbatim:\n${sweep.rowsWithoutCause.join('\n\n')}`
     );
     assert.fail(
       `no neighbour's block list names james's v1 cell ${target} with the warrant "${warrant}" ` +
