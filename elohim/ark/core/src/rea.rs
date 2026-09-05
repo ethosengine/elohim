@@ -329,11 +329,13 @@ impl RuntimeManifest {
             parts.push(headroom as f64);
         }
         let limit = Composition::Sum.fold(&parts).ok()?;
-        let mut bound = Bound::new(limit, "bytes".into(), f64::from(threshold_pct)).ok()?;
-        bound.source = Some(LimitSource::Folded {
-            rule: Composition::Sum,
-        });
-        Some(bound)
+        Some(
+            Bound::new(limit, "bytes".into(), f64::from(threshold_pct))
+                .ok()?
+                .with_source(LimitSource::Folded {
+                    rule: Composition::Sum,
+                }),
+        )
     }
 }
 

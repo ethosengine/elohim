@@ -26,8 +26,8 @@ decisionPoints:
     justification: A refused declaration can be revised to fit its root; no runtime state machine is added.
   - id: C4
     status: partial
-    justification: Absent root and child quotas remain absent; the requested Option projection conflates invalid
-      thresholds with absence.
+    justification: Absent root memory or absent child quotas never refuse the sum; only declared allocations
+      contribute to validation.
   - id: C5
     status: answered
     justification: Validation re-derives integer sums; projection carries declarations and confers no enforcement
@@ -66,9 +66,12 @@ decisionPoints:
       later station.
   - id: C14
     status: partial
-    justification: Validator uses existing Invalid errors; Option projection has no witnessed residual reason for
-      invalid thresholds.
+    justification: Validation returns Invalid with exact overflowing totals or the offending process name;
+      residual reasons remain strings rather than typed or witnessed records.
   contractTests:
+  - path: elohim/ark/supervisor/src/native.rs
+    testName: the_fingerprint_reads_this_host
+    kind: unit
   - path: elohim/ark/core/src/manifest.rs
     testName: live_manifest_cid_is_unmoved_by_absent_envelope
     kind: unit
@@ -160,6 +163,9 @@ decisionPoints:
     justification: Validator uses existing Invalid errors; Option projection has no witnessed residual reason for
       invalid thresholds.
   contractTests:
+  - path: elohim/ark/supervisor/src/native.rs
+    testName: the_fingerprint_reads_this_host
+    kind: unit
   - path: elohim/ark/core/src/rea.rs
     testName: memory_bound_folds_bytes_and_agrees_with_declared_bands
     kind: unit
