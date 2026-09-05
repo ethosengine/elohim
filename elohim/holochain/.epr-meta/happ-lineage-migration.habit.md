@@ -11,7 +11,7 @@ invariant: >
 status: red
 active: false
 checks:
-  - "a2o @concern:happ-lineage-migration (genesis/a2o/features/delivery/happ-lineage-migration.feature — Stations 1-10, @wip; steps in genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts with the fixture helpers lineage-candidate.ts + lineage-commitments.ts; a live run needs A2O_RUN_WIP=1 or the @wip gate holds every scenario; rehearsal = node_registry v1 → v1+NotarizationWitness on the household mesh, 0.7)"
+  - "a2o @concern:happ-lineage-migration (genesis/a2o/features/delivery/happ-lineage-migration.feature — Stations 1-10, @wip; steps in genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts with the fixture helpers lineage-candidate.ts + lineage-commitments.ts; a live run needs A2O_RUN_WIP=1 AND ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml, or the @wip gate / a household-scope mismatch holds every scenario; rehearsal = node_registry v1 → v1+NotarizationWitness on the household mesh, 0.7)"
   - "spike verdict (§9 Lane B, conductor fork): must_get_record_from_lineage host fn measured in elohim/holochain-conductor before B2 is decided — recorded as a dated delta below"
 refs:
   - "spec: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"

@@ -526,43 +526,56 @@ async function connectRoleConductor(
     CONDUCTOR_CONNECT_TIMEOUT_MS,
     `admin connect ${peer}:${ports.admin}`
   );
-  const apps = await admin.listApps({});
-  const app =
-    appId === APP_ID
-      ? (apps.find(a => a.installed_app_id === APP_ID) ?? apps[0])
-      : apps.find(a => a.installed_app_id === appId);
-  if (!app) {
-    await admin.client.close();
-    throw new Error(
-      `${peer}: app '${appId}' is not installed on adminPort=${ports.admin} ` +
-        `(installed: ${apps.map(a => a.installed_app_id).join(', ')})`
+  // Every step after the admin connect can throw (a missing app/cell, a signing-credential or
+  // auth-token failure, a stalled app connect) — the try/catch is the ONLY thing that guarantees
+  // `admin`'s websocket (and `appWs`'s, once it exists) is closed on every one of those paths.
+  // Without it, a throw here leaves the socket — and the node process holding it — alive; a live
+  // seat measured cucumber still running 18 minutes after its own summary because of exactly this.
+  let appWs: AppWebsocket | undefined;
+  try {
+    const apps = await admin.listApps({});
+    const app =
+      appId === APP_ID
+        ? (apps.find(a => a.installed_app_id === APP_ID) ?? apps[0])
+        : apps.find(a => a.installed_app_id === appId);
+    if (!app) {
+      throw new Error(
+        `${peer}: app '${appId}' is not installed on adminPort=${ports.admin} ` +
+          `(installed: ${apps.map(a => a.installed_app_id).join(', ')})`
+      );
+    }
+    const cellId = findProvisionedCellId(app, role);
+    if (!cellId) {
+      throw new Error(`${peer}: no '${role}' cell provisioned on adminPort=${ports.admin}`);
+    }
+    await admin.authorizeSigningCredentials(cellId);
+    const authToken = await admin.issueAppAuthenticationToken({
+      installed_app_id: app.installed_app_id,
+    });
+    const ws = await withTimeout(
+      AppWebsocket.connect({
+        url: new URL(`ws://127.0.0.1:${ports.app}`),
+        token: authToken.token,
+        wsClientOptions: { origin: APP_ID },
+      }),
+      CONDUCTOR_CONNECT_TIMEOUT_MS,
+      `app connect ${peer}:${ports.app}`
     );
-  }
-  const cellId = findProvisionedCellId(app, role);
-  if (!cellId) {
+    appWs = ws; // tracked for the catch below; `ws` itself stays non-optional for the closures
+    const call = async (fnName: string, payload: unknown): Promise<unknown> =>
+      ws.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
+    const close = async (): Promise<void> => {
+      await ws.client.close();
+      await admin.client.close();
+    };
+    return { call, agent: encodeHashToBase64(cellId[1]), close };
+  } catch (e) {
+    if (appWs) {
+      await appWs.client.close();
+    }
     await admin.client.close();
-    throw new Error(`${peer}: no '${role}' cell provisioned on adminPort=${ports.admin}`);
+    throw e;
   }
-  await admin.authorizeSigningCredentials(cellId);
-  const authToken = await admin.issueAppAuthenticationToken({
-    installed_app_id: app.installed_app_id,
-  });
-  const appWs = await withTimeout(
-    AppWebsocket.connect({
-      url: new URL(`ws://127.0.0.1:${ports.app}`),
-      token: authToken.token,
-      wsClientOptions: { origin: APP_ID },
-    }),
-    CONDUCTOR_CONNECT_TIMEOUT_MS,
-    `app connect ${peer}:${ports.app}`
-  );
-  const call = async (fnName: string, payload: unknown): Promise<unknown> =>
-    appWs.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
-  const close = async (): Promise<void> => {
-    await appWs.client.close();
-    await admin.client.close();
-  };
-  return { call, agent: encodeHashToBase64(cellId[1]), close };
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,11 +1071,19 @@ async function ensureRunOwnedFollowSet(): Promise<void> {
 /**
  * Task 10 part 2 (Holochain Evolution Epic MVP) — the fixture's
  * baseline-convergence vehicle. POSTs `LINEAGE_RESET_PATH` with
- * `{"uninstall": true}` on every peer: `LineageRoles` resets to the v1
- * base for every tracked role and any lineage side app (`"<base
- * app id>@…"`) is disabled + uninstalled. A mesh run must start AND end at
- * the same baseline regardless of what a PRIOR run opened (rung 5's
+ * `{"uninstall": true, "forceClosed": true}` on every peer: `LineageRoles`
+ * resets to the v1 base for every tracked role and any lineage side app
+ * (`"<base app id>@…"`) is disabled + uninstalled. A mesh run must start AND
+ * end at the same baseline regardless of what a PRIOR run opened (rung 5's
  * lesson, 8181d60a8) — hence a call both in `Before` and in `AfterAll`.
+ *
+ * `forceClosed` is why this fixture can still converge after Station 8:
+ * a SUNSET role is otherwise skipped by the route and its side app held
+ * back, because on a real peer re-opening a sealed window (spec §4 step 5)
+ * or deleting the chain that carries the crossing's notarizations (§7 C14)
+ * is exactly what must never happen by accident. A REHEARSAL mesh is the
+ * one seat where converging past a seal is the intended act, and it says so
+ * explicitly rather than riding in on `uninstall`.
  *
  * Never throws: a failed reset on one peer is logged with the
  * `[happ-lineage-migration]` prefix and the other peers still get their
@@ -1074,6 +1095,7 @@ async function resetLineageBaselineOnAllPeers(): Promise<void> {
     try {
       const { status, text } = await postRaw(`${directPeerUrl(peer)}${LINEAGE_RESET_PATH}`, {
         uninstall: true,
+        forceClosed: true,
       });
       if (status < 200 || status >= 300) {
         console.error(
@@ -3192,7 +3214,7 @@ When(
 );
 
 Then(
-  "james's bridge sweep carries it into v2 within one sweep interval, held with jessica's signature",
+  "james's bridge sweep carries it into v2 within two walks of jessica's chain, held with jessica's signature",
   // A ceiling, not the budget: the budget is derived from jessica's own chain
   // inside the step (two walks of it), and this only has to be larger.
   { timeout: bridgeSweepBudgetMs(2000) + 60_000 },
@@ -3782,7 +3804,7 @@ Then(
 );
 
 Then(
-  "each peer's runtime has disabled its v1 cell, so nothing of its own is written there again",
+  "each peer's runtime routes the role's writes to v2 and marks v1 closed; the v1 cell stays enabled and readable, because the base app carries every other role",
   { timeout: 60_000 },
   async function (this: E2EWorld) {
     // CORRECTED 2026-09-05 — Task 14b wired the storage half: `perform_sunset`

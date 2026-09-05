@@ -141,7 +141,10 @@ Feature: The network changes the rules its peers hold each other to without losi
   and stays open until the sunset. A BRIDGE SWEEP is a dual-celled peer's
   runtime reading its reading cell for facts its authoring cell lacks and
   couriering them across; it runs on the runtime's ordinary reconciliation
-  interval — the SWEEP INTERVAL. BACKWARD CARRY is the same courier work in
+  interval — the SWEEP INTERVAL. A single sweep interval pages only part of a
+  long chain, so a WALK — one full pass of the sweep across the neighbour's
+  whole chain — can span several sweep intervals; a record written mid-walk
+  is not seen until the walk that follows it. BACKWARD CARRY is the same courier work in
   the other direction, v2 into v1, possible only when v1 has the witness
   type. RE-AUTHORING is different from either carry: it is an author
   committing the same content again, natively, on a cell they hold — the
@@ -235,7 +238,7 @@ Feature: The network changes the rules its peers hold each other to without losi
     Given james is dual-celled on the node-registry role, authoring on v2
     And the window is open and jessica keeps authoring on v1
     When jessica creates a new node-registry record on v1
-    Then james's bridge sweep carries it into v2 within one sweep interval, held with jessica's signature
+    Then james's bridge sweep carries it into v2 within two walks of jessica's chain, held with jessica's signature
     And james's passport reports backward carry as unavailable, because v1 does not carry the witness type
     And no peer reports jessica as stale — she is within the window
 
@@ -264,7 +267,7 @@ Feature: The network changes the rules its peers hold each other to without losi
     Then each peer's runtime seals the close on its v1 cell naming v2, then the open on its already-running v2 cell naming that close, in that order
     And each closed v1 chain is still readable by every peer
     And each peer carries its own close into v2 as a proof, so v2 knows where every old chain ended
-    And each peer's runtime has disabled its v1 cell, so nothing of its own is written there again
+    And each peer's runtime routes the role's writes to v2 and marks v1 closed; the v1 cell stays enabled and readable, because the base app carries every other role
     And each peer's passport shows the node-registry role with v2 authoring and v1 closed
     When the test harness, holding james's key, writes a fact on james's closed v1 cell and offers it to v2 as a carried proof
     Then the v1 conductor itself accepts that write — the substrate does not fence a closed chain, as the epic's kernel test measured
