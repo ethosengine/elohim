@@ -14,7 +14,7 @@ informed-by:
   - genesis/a2o/features/delivery/happ-lineage-migration.feature (the finish lines — Stations 1–10)
   - genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (rung 5: the channel, verify, vehicles and receipt chain every task rides)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:34b14055bad5132e | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:c9221eb64b4d30c5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/a2o/features/delivery/happ-lineage-migration.feature
   - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
   - elohim/holochain/tests/sweettest/src/tests/happ_lineage_migration.rs
@@ -833,6 +833,16 @@ The rehearsal measures with these open and says so in every receipt. They are in
 - Test: sweettest — validation cost per witness is constant after the seal (assert the walk length via a counter exposed in test builds).
 
 - [ ] **Task 25 deliverable: after-close validation is O(1) per witness once the close travels in the witness; hash-moving, lands with Tasks 21–23.**
+
+---
+
+### Task 26: G10 — entry types matched by NAME across lineage ends, never by index
+
+**Files:**
+- Modify: `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` (unconditional: `ExportPage` gains `type_names: Vec<String>` positional with `records` (`#[serde(default)]`); `carry_from` and `readopt_from` resolve the concrete `EntryTypes` variant by the carried NAME through this DNA's `zome_types.entries`, refusing a page whose name is unknown here with a named Guest error — the index is never trusted across DNAs).
+- Test: sweettest — a page whose `type_names` is deliberately permuted is refused; the honest page still carries; default hash unchanged.
+
+- [ ] **Task 26 deliverable: a carry or re-adoption between lineage ends can never re-create a record as the wrong type; the type travels by name.**
 
 ---
 
