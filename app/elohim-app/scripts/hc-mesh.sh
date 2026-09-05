@@ -1278,6 +1278,14 @@ k2gossip = advanced.get("k2Gossip") or {}
 k2gossip["initiateIntervalMs"] = 1000
 k2gossip["minInitiateIntervalMs"] = 1000
 k2gossip["initialInitiateIntervalMs"] = 1000
+# The round deadline is a whole-round wall clock (kitsune2 state.rs started_at is
+# never refreshed). At the 15 s default a space with ~10k ops cannot finish its
+# first Accept (512-sector minimal snapshot + new-op enumeration), every round
+# times out, no storage arc ever grows, and the space has NO authorities —
+# measured 2026-09-05 on node-registry (peer_timeouts 205, completed_rounds
+# null, storageArc null on every peer). Same values as the household edge profile.
+k2gossip.setdefault("roundTimeoutMs", 60000)
+k2gossip.setdefault("maxConcurrentAcceptedRounds", 4)
 advanced["k2Gossip"] = k2gossip
 
 network["advanced"] = advanced
