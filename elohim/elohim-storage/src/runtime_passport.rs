@@ -212,6 +212,20 @@ pub struct AgentSweepView {
     /// accumulated over ticks. A re-walk of an already-carried view adds
     /// nothing.
     pub carried: u32,
+    /// How many action rows the predecessor's POSITION scan read to find the
+    /// last page of this neighbour's walk — **risk row R1's metric**, per
+    /// neighbour.
+    ///
+    /// What to read it against: the neighbour's chain length. A page that
+    /// resumed a pinned walk reads only its own probe span, so `scanned` stays
+    /// small and, the property that actually matters, does not grow with how far
+    /// into the chain the page sits. An unpinned page reports the whole chain's
+    /// action count, because finding an arbitrary ordinal costs exactly that.
+    ///
+    /// Absent while the v2 cell's `carry_from` does not forward its export
+    /// page's `scanned` — "not reported", never a fabricated 0.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scanned: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_sweep: Option<String>,
     /// A page failure, or the `restarted:` note a mid-walk digest change
@@ -686,6 +700,7 @@ fn sweep_view_for(role: &str, sweep: &BTreeMap<SweepKey, AgentSweep>) -> Vec<Age
             total: state.total,
             digest: state.last_digest.clone(),
             carried: state.carried,
+            scanned: state.scanned,
             last_sweep: state.last_sweep.clone(),
             last_error: state.last_error.clone(),
         })
@@ -1040,6 +1055,8 @@ mod tests {
             AgentSweep {
                 cursor: Some(16),
                 last_digest: Some("digest-a".into()),
+                resume: None,
+                scanned: Some(8),
                 observed_head: Some(57),
                 total: Some(41),
                 carried: 16,
@@ -1072,6 +1089,11 @@ mod tests {
         assert_eq!(jessica.total, Some(41));
         assert_eq!(jessica.digest.as_deref(), Some("digest-a"));
         assert_eq!(jessica.carried, 16);
+        assert_eq!(
+            jessica.scanned,
+            Some(8),
+            "R1's metric is visible per neighbour, not only in a log line"
+        );
         assert!(jessica.last_error.is_none());
 
         // And it reaches the wire in camelCase, under the role's `lineage`.

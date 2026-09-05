@@ -77,7 +77,7 @@ use std::time::Duration;
 use crate::hc_client_registry::HcClientRegistry;
 use crate::lineage_roles::LineageRoles;
 use crate::services::release_adoption::carry::{
-    call_carry_from, CarryInput, CarryReceipt, CarrySource, CARRY_ZOME,
+    self, call_carry_from, CarryInput, CarryReceipt, CarrySource, ExportResume, CARRY_ZOME,
 };
 
 /// How often the bridge sweeps, in seconds. Overridable with
@@ -113,6 +113,27 @@ pub struct AgentSweep {
     /// The digest the last page reported. Compared against the next page's to
     /// notice the courier's view growing underneath an in-progress walk.
     pub last_digest: Option<String>,
+    /// The [`ExportResume`] the last page returned, handed back on the next
+    /// tick so the predecessor pins this walk instead of re-deriving its digest
+    /// and total per page (Task 24/28, G8).
+    ///
+    /// A pin is only ever as good as the walk it describes, so it is dropped
+    /// wherever the walk is: cleared by [`next_sweep`] on the restart a
+    /// mid-walk digest change forces, and cleared by the ticker when the export
+    /// refuses it by name ([`carry::CHAIN_MOVED`]). Losing it is never an
+    /// error — an unpinned page is exactly what this sweep sent before the
+    /// field existed.
+    pub resume: Option<ExportResume>,
+    /// How many action rows the predecessor's POSITION scan read on the last
+    /// page — **risk row R1's metric**, projected per neighbour so the cost of
+    /// finding a page is readable without a log dive.
+    ///
+    /// Last non-`None` wins, the same discipline `observed_head` keeps: a page
+    /// that cannot state it must not erase what an earlier page did. `None`
+    /// throughout while the v2 cell's `carry_from` does not forward its export
+    /// page's `scanned` — see [`carry::CarryReceipt::scanned`], where that
+    /// producer gap is named.
+    pub scanned: Option<u32>,
     /// The highest action sequence the predecessor observed for this chain,
     /// last non-`None` wins. Never fabricated as 0.
     pub observed_head: Option<u32>,
@@ -174,8 +195,14 @@ pub struct AgentSweep {
 ///    the neighbour is halted with a `halted:` reason and the forward progress
 ///    already made is kept.
 /// 4. **`carried` accumulates NEW carriage only.**
-/// 5. **`total` / `observed_head` keep the last non-`None`.** A momentarily
-///    blind authority must not erase what an earlier page established.
+/// 5. **`total` / `observed_head` / `scanned` keep the last non-`None`.** A
+///    momentarily blind authority must not erase what an earlier page
+///    established.
+/// 6. **The resume pin follows the page, and dies with the walk.** A forward
+///    page's pin is kept and handed back next tick; a restart clears it,
+///    because a pin describes the walk that is being abandoned. The pin is
+///    never a correctness input here — losing one costs the predecessor a
+///    re-derivation and nothing else.
 pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
     let mid_walk = state.cursor.is_some();
     let digest_changed = state
@@ -191,6 +218,11 @@ pub fn next_sweep(state: &AgentSweep, page: &CarryReceipt) -> AgentSweep {
     AgentSweep {
         cursor: if restarted { None } else { page.next_cursor },
         last_digest: Some(page.v1_digest.clone()),
+        // A pin describes ONE walk. The restart abandons that walk, so it
+        // abandons the pin with it — handing it back would earn the named
+        // `chain moved` refusal on the very next tick.
+        resume: if restarted { None } else { page.resume.clone() },
+        scanned: page.scanned.or(state.scanned),
         observed_head: page.v1_observed_head.or(state.observed_head),
         total: page.v1_total.or(state.total),
         carried: state.carried.saturating_add(page.newly_carried()),
@@ -489,11 +521,34 @@ impl LineageBridge {
             cursor: before.cursor,
             limit: HELD_PAGE_LIMIT,
             source: CarrySource::Held(agent),
+            // The pin the last page returned, so the predecessor walks this
+            // page's window rather than re-deriving the whole view's digest
+            // every tick (Task 24/28, G8).
+            resume: before.resume.clone(),
         };
         let outcome = call_carry_from(side, input).await;
 
         let mut after = match &outcome {
             Ok(page) => next_sweep(&before, page),
+            // **The pin was refused by name — drop it, keep the cursor.**
+            // Deliberately NOT a restart here, unlike the apply fold. A restart
+            // is a REWIND, and rule 3 above only permits one against a v2 that
+            // reports `already_carried` — which an error carries no receipt to
+            // tell us. Dropping the pin alone puts the next tick back on the
+            // un-pinned path this sweep used before the field existed: it is
+            // always correct, merely slower, and the page it returns states the
+            // changed digest so `next_sweep`'s landed restart-or-halt rules
+            // make that judgement with a receipt in hand.
+            Err(e) if carry::is_chain_moved(e) => AgentSweep {
+                resume: None,
+                last_error: Some(format!(
+                    "unpinned: the predecessor refused the resume token ({} …) — its view of this \
+                     chain moved, so the next page is walked without a pin and the digest it \
+                     reports decides whether the walk restarts",
+                    carry::CHAIN_MOVED
+                )),
+                ..before.clone()
+            },
             Err(e) => AgentSweep {
                 last_error: Some(e.clone()),
                 ..before.clone()
@@ -673,6 +728,16 @@ mod tests {
             self_carried: 0,
             v1_observed_head: head,
             already_carried: Some(already),
+            // The pin a Task-24 predecessor returns: named after the digest it
+            // belongs to, so a test can see WHICH walk a kept pin describes.
+            resume: Some(ExportResume {
+                head: format!("uhCkkHead-{digest}"),
+                digest: digest.to_string(),
+                total: total.unwrap_or(0),
+                observed_head: head,
+                cursor_seq: next_cursor.map(|c| (c, c * 6)),
+            }),
+            scanned: Some(8),
         }
     }
 
@@ -1037,5 +1102,123 @@ mod tests {
         // Whatever the environment says, the interval is captured at
         // construction and is a positive duration.
         assert!(bridge.interval() > Duration::ZERO);
+    }
+
+    /// **The pin round-trips through the sweep state.** A forward page's
+    /// [`ExportResume`] survives onto the state the next tick reads, verbatim —
+    /// that state IS the channel by which the pin reaches the zome, so a fold
+    /// that dropped it would leave every page paying the first-page cost with
+    /// nothing failing to say so.
+    #[test]
+    fn a_forward_page_keeps_its_resume_pin_for_the_next_tick() {
+        let after = next_sweep(
+            &AgentSweep::default(),
+            &page(16, 0, Some(16), "digest-a", Some(41), Some(57)),
+        );
+        let pin = after.resume.as_ref().expect("a forward page keeps its pin");
+        assert_eq!(pin.head, "uhCkkHead-digest-a");
+        assert_eq!(pin.digest, "digest-a");
+        assert_eq!(pin.total, 41);
+        assert_eq!(pin.observed_head, Some(57));
+        assert_eq!(
+            pin.cursor_seq,
+            Some((16, 96)),
+            "the field that makes the next page cost its own window survives too"
+        );
+
+        // …and the NEXT page's pin replaces it rather than accumulating.
+        let later = next_sweep(
+            &after,
+            &page(16, 0, Some(32), "digest-a", Some(41), Some(57)),
+        );
+        assert_eq!(
+            later.resume.as_ref().map(|r| r.cursor_seq),
+            Some(Some((32, 192)))
+        );
+    }
+
+    /// **A restart drops the pin.** The mid-walk digest change abandons the
+    /// walk; handing its pin back next tick would earn the predecessor's named
+    /// `chain moved` refusal on every subsequent tick, which is a sweep that
+    /// never moves again.
+    #[test]
+    fn a_restart_clears_the_resume_pin_with_the_cursor() {
+        let before = AgentSweep {
+            cursor: Some(16),
+            last_digest: Some("digest-a".into()),
+            resume: Some(ExportResume {
+                head: "uhCkkHead-digest-a".into(),
+                digest: "digest-a".into(),
+                total: 41,
+                observed_head: Some(57),
+                cursor_seq: Some((16, 96)),
+            }),
+            ..AgentSweep::default()
+        };
+        let after = next_sweep(&before, &page(4, 0, Some(32), "digest-b", None, None));
+        assert_eq!(after.cursor, None, "the landed restart still restarts");
+        assert_eq!(
+            after.resume, None,
+            "a pin describes ONE walk — the abandoned walk's pin is abandoned with it"
+        );
+        assert!(after
+            .last_error
+            .as_deref()
+            .is_some_and(|note| note.starts_with("restarted:")));
+    }
+
+    /// **R1's metric reaches the state.** `scanned` is what says the resumed
+    /// page cost its own window rather than the whole chain; it keeps the last
+    /// non-`None`, so a page that cannot state it does not erase what an earlier
+    /// page did.
+    #[test]
+    fn the_scanned_count_reaches_the_sweep_state_and_survives_a_silent_page() {
+        let after = next_sweep(
+            &AgentSweep::default(),
+            &page(16, 0, Some(16), "digest-a", Some(41), Some(57)),
+        );
+        assert_eq!(after.scanned, Some(8));
+
+        let silent = CarryReceipt {
+            scanned: None,
+            ..page(16, 0, Some(32), "digest-a", Some(41), Some(57))
+        };
+        assert_eq!(
+            next_sweep(&after, &silent).scanned,
+            Some(8),
+            "last non-`None` wins — a silent page reports nothing, it does not report zero"
+        );
+    }
+
+    /// A page from a v2 that predates the pin leaves the state unpinned, and
+    /// nothing about that is an error: it is the pre-Task-24 sweep, exactly.
+    #[test]
+    fn a_pre_pin_page_simply_leaves_the_sweep_unpinned() {
+        let unpinned = CarryReceipt {
+            resume: None,
+            scanned: None,
+            ..page(16, 0, Some(16), "digest-a", Some(41), Some(57))
+        };
+        let after = next_sweep(&AgentSweep::default(), &unpinned);
+        assert_eq!(after.resume, None);
+        assert_eq!(after.scanned, None);
+        assert_eq!(after.cursor, Some(16), "and the walk advances regardless");
+        assert!(after.last_error.is_none(), "an absent pin is not a fault");
+    }
+
+    /// The named refusal is matched as the zome writes it — including the
+    /// wrapping a `call_zome` error puts around a Guest message, which is why
+    /// this is a substring test and never an equality one.
+    #[test]
+    fn the_chain_moved_refusal_is_recognised_through_its_call_zome_wrapping() {
+        assert!(carry::is_chain_moved(&format!(
+            "zome call failed: Guest(\"{}: the resume token pins the chain head uhCkkOld, but \
+             this walk now sees uhCkkNew.\")",
+            carry::CHAIN_MOVED
+        )));
+        assert!(
+            !carry::is_chain_moved("Websocket closed: No connection"),
+            "a transport failure is NOT an instruction to drop the pin"
+        );
     }
 }

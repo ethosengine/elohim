@@ -915,7 +915,7 @@ impl ApplyVehicle for HappLineageVehicle {
         // (3) CARRY to the cursor's end.
         let client_ref = &client;
         let cell_ref = &v1_cell;
-        let carry = fold_carry(role, move |cursor| async move {
+        let carry = fold_carry(role, move |cursor, resume| async move {
             call_carry_from(
                 client_ref,
                 CarryInput {
@@ -927,6 +927,12 @@ impl ApplyVehicle for HappLineageVehicle {
                     // reach v2 through the trailing bridge sweep
                     // (`crate::services::lineage_bridge`), never here.
                     source: CarrySource::Own,
+                    // The previous page's pin, handed back verbatim so the
+                    // predecessor walks this page's window instead of its whole
+                    // chain (Task 24/28, G8). `None` on the first page, and
+                    // `None` again after a `chain moved` restart — the fold owns
+                    // both, this closure only carries what it is given.
+                    resume,
                 },
             )
             .await
@@ -1984,6 +1990,8 @@ mod tests {
                 self_carried: 32,
                 v1_observed_head: None,
                 already_carried: Some(0),
+                resume: None,
+                scanned: None,
             },
             CarryReceipt {
                 carried: 7,
@@ -1997,11 +2005,13 @@ mod tests {
                 self_carried: 7,
                 v1_observed_head: Some(33),
                 already_carried: Some(0),
+                resume: None,
+                scanned: None,
             },
         ]);
         let seen: std::sync::Mutex<Vec<Option<u32>>> = std::sync::Mutex::new(Vec::new());
 
-        let carry = fold_carry("node_registry", |cursor| {
+        let carry = fold_carry("node_registry", |cursor, _resume| {
             seen.lock().unwrap().push(cursor);
             let page = pages.lock().unwrap().remove(0);
             async move { Ok(page) }
@@ -2031,7 +2041,7 @@ mod tests {
     /// `carried` that is a multiple of the truth.
     #[tokio::test]
     async fn a_cursor_that_does_not_advance_is_refused_never_re_carried() {
-        let refusal = fold_carry("node_registry", |_cursor| async move {
+        let refusal = fold_carry("node_registry", |_cursor, _resume| async move {
             Ok(CarryReceipt {
                 carried: 1,
                 next_cursor: Some(1),
@@ -2041,6 +2051,8 @@ mod tests {
                 self_carried: 0,
                 v1_observed_head: None,
                 already_carried: Some(1),
+                resume: None,
+                scanned: None,
             })
         })
         .await
@@ -2056,7 +2068,7 @@ mod tests {
     /// position is not a diagnosis an operator can resume from.
     #[tokio::test]
     async fn a_failed_page_names_the_cursor_it_died_on() {
-        let refusal = fold_carry("node_registry", |_cursor| async move {
+        let refusal = fold_carry("node_registry", |_cursor, _resume| async move {
             Err("Websocket closed: No connection".to_string())
         })
         .await
@@ -2089,6 +2101,8 @@ mod tests {
             self_carried: 32,
             v1_observed_head: Some(41),
             already_carried: Some(0),
+            resume: None,
+            scanned: None,
         };
         let bytes = rmp_serde::to_vec_named(&page).unwrap();
         let back: CarryReceipt = rmp_serde::from_slice(&bytes).unwrap();
