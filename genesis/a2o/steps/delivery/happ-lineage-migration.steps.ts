@@ -1801,7 +1801,7 @@ Given(
 );
 
 Given(
-  'no peer's v1 node-registry chain is already closed',
+  "no peer's v1 node-registry chain is already closed",
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     // WHY THIS GIVEN EXISTS, AND WHY IT IS A REFUSAL RATHER THAN A REPAIR
