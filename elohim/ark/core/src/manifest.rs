@@ -36,6 +36,9 @@ pub struct RuntimeManifest {
     /// Six-field compute contract declaration; declaration is not enforcement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub envelope: Option<RuntimeEnvelope>,
+    /// Device archetype selecting the outward renderer's request floor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archetype: Option<String>,
 }
 
 impl Default for RuntimeManifest {
@@ -47,6 +50,7 @@ impl Default for RuntimeManifest {
             reach: default_reach(),
             processes: Vec::new(),
             envelope: None,
+            archetype: None,
         }
     }
 }
@@ -121,6 +125,10 @@ impl Default for ChildSpec {
 pub struct RuntimeEnvelope {
     /// Provider's envelope: resources consented to, not enforced here.
     pub bound: ResourceQuota,
+    /// Optional scheduler request override; absence uses the device archetype floor.
+    /// This is a declaration, not runtime enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requests: Option<ResourceQuota>,
     /// Provider's envelope: explicit memory reserved outside child quotas, not inferred.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub headroom_bytes: Option<u64>,

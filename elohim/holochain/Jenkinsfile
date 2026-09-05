@@ -945,6 +945,18 @@ def nonProdTrueGate(String env) {
 }
 
 
+// Pin provenance on the pod template; absent pins preserve the legacy render.
+def runtimeManifestSedExpr(Map humanConfig) {
+    def cid = humanConfig.runtimeManifest?.cid
+    if (cid == null) {
+        return '/RUNTIME_MANIFEST_CID_PLACEHOLDER/d'
+    }
+    if (!(cid instanceof String) || !(cid ==~ /bafyre[a-z2-7]+/)) {
+        error "Human ${humanConfig.name}: invalid runtime manifest CID"
+    }
+    return "s|RUNTIME_MANIFEST_CID_PLACEHOLDER|${cid}|"
+}
+
 /**
  * Per-human runtime-config body (rung 4 canary knob). `deployments.json`
  * `runtimeConfig` is a map KEY -> string rendered as TOML `KEY = "value"` lines
@@ -1076,6 +1088,7 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
         // Per-human runtime-config body (canary knob) — see runtimeConfigSedExpr.
         runtimeConfigSedExpr(humanConfig),
+        runtimeManifestSedExpr(humanConfig),
         // k2Gossip round-timeout / accepted-rounds (consolidated template only).
         // Defaults 60000/4 preserve the household slow-WAN profile baked into
         // the template for every human that doesn't override — an unset node

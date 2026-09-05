@@ -1,0 +1,171 @@
+seamRegistryVersion: 1
+crate: k8s-bridge
+crateRoot: bridges/k8s
+seamLocus: S3.6 orchestrator resource render outward; no enforcement, anchoring or observation.
+decisionPoints:
+- name: render_envelope
+  kind: verdict-fn
+  sourceLocation:
+    file: src/lib.rs
+    modulePath: k8s_bridge
+  summary: Project declared limits and request floor to Kubernetes quantities with exact conductor/storage shares.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: S3.6 outward bridge; pure resource projection of a local CID-pinned declaration, no network writes.
+  - id: C1
+    status: n-a
+    justification: The pure renderer takes one manifest and does not select the applicable head.
+  - id: C2
+    status: n-a
+    justification: No heads or shared state move; verify reads files and returns evidence.
+  - id: C3
+    status: answered
+    justification: Invalid declarations return errors; callers can revise the declaration and render again without
+      rollback.
+  - id: C4
+    status: answered
+    justification: absent_envelope_renders_empty_object_and_keeps_live_cid pins absence as empty output, never fabricated
+      zeros.
+  - id: C5
+    status: answered
+    justification: Golden tests compare the independent bash arithmetic; ark-core validates declarations and mints
+      identity.
+  - id: C6a
+    status: partial
+    justification: Fixed four-field comparison and finite manifest input; serialized file size and fleet count have
+      no admission ceiling.
+  - id: C6b
+    status: answered
+    justification: The golden tests exercise pure deterministic rendering without effects or records.
+  - id: C7
+    status: answered
+    justification: cli_observe_is_explicitly_unimplemented_and_render_reports_cid proves no advertised capacity
+      service; declaration is not enforcement.
+  - id: C8
+    status: answered
+    justification: cli_observe_is_explicitly_unimplemented_and_render_reports_cid pins the manifest CID on render
+      stderr.
+  - id: C9
+    status: n-a
+    justification: No agent keys, control binding, recovery, re-keying, or identity lineage is changed.
+  - id: C10
+    status: answered
+    justification: unknown_schema_or_archetype_and_invalid_requests_refuse rejects guessed versions; absent fields
+      preserve the live CID.
+  - id: C11
+    status: n-a
+    justification: No remote receiver, retries, timeout, or network backpressure exists.
+  - id: C12
+    status: n-a
+    justification: The pure renderer has no filesystem, cluster or network authority.
+  - id: C13
+    status: answered
+    justification: Rendering declares resources without quota enforcement; observe remains explicitly unimplemented.
+  - id: C14
+    status: partial
+    justification: Render errors retain textual schema/archetype/request reasons; no typed reason taxonomy or witness
+      is added.
+  contractTests:
+  - path: bridges/k8s/tests/contracts.rs
+    testName: golden_split_matches_bash_for_every_archetype_and_adam
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: split_floors_odd_values_and_passes_absent_limits_through
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: absent_envelope_renders_empty_object_and_keeps_live_cid
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: unknown_schema_or_archetype_and_invalid_requests_refuse
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: superseding_manifest_pins_request_override_and_archetype_lineage
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: cli_observe_is_explicitly_unimplemented_and_render_reports_cid
+    kind: integration
+- name: drift_verdict
+  kind: boundary-answer-type
+  sourceLocation:
+    file: src/lib.rs
+    modulePath: k8s_bridge
+  summary: Fresh, PinMismatch, RenderDrift or Unpinned evidence; never rewrite the declared head.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: S3.6 outward bridge; pure resource projection of a local CID-pinned declaration, no network writes.
+  - id: C1
+    status: answered
+    justification: The deployment CID declares the applicable head; supersedes is lineage, never recency selection.
+  - id: C2
+    status: n-a
+    justification: No heads or shared state move; verify reads files and returns evidence.
+  - id: C3
+    status: answered
+    justification: Refusals name a repairable pin or resource field; callers revise files explicitly, never via
+      automatic repair.
+  - id: C4
+    status: answered
+    justification: missing_pin_is_unpinned_and_suspended_humans_are_skipped distinguishes absence from drift.
+  - id: C5
+    status: answered
+    justification: changed_manifest_bytes_are_pin_mismatch re-derives identity with ark-core before comparing rendered
+      quantities; evidence never grants authority.
+  - id: C6a
+    status: partial
+    justification: Fixed four-field comparison and finite manifest input; serialized file size and fleet count have
+      no admission ceiling.
+  - id: C6b
+    status: answered
+    justification: pinned_fleet_is_fresh checks read-only reproducible verification; pure rendering neither writes
+      files nor mints heads.
+  - id: C7
+    status: answered
+    justification: cli_missing_pin_refuses pins the advertised refusal, not runtime quota enforcement.
+  - id: C8
+    status: answered
+    justification: Drift verdicts name human, field and both values, pinned by perturbation and CID mutation tests.
+  - id: C9
+    status: n-a
+    justification: No agent keys, control binding, recovery, re-keying, or identity lineage is changed.
+  - id: C10
+    status: answered
+    justification: quantity_equivalence_is_exact_and_malformed_quantities_refuse proves unit-equivalent comparison
+      without silently accepting malformed values.
+  - id: C11
+    status: n-a
+    justification: No remote receiver, retries, timeout, or network backpressure exists.
+  - id: C12
+    status: answered
+    justification: pin_path_cannot_escape_manifest_directory confines manifest reads; the bridge has no cluster
+      credentials or mutation capability.
+  - id: C13
+    status: answered
+    justification: '2026-09-05 all active humans pinned: Unpinned refuses at exit 65, pinned by cli_missing_pin_refuses.'
+  - id: C14
+    status: partial
+    justification: Typed drift residuals retain compared values; malformed input and IO errors still use textual
+      errors, with no witnessed residual ledger.
+  contractTests:
+  - path: bridges/k8s/tests/contracts.rs
+    testName: pinned_fleet_is_fresh
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: perturbed_field_is_render_drift
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: changed_manifest_bytes_are_pin_mismatch
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: missing_pin_is_unpinned_and_suspended_humans_are_skipped
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: quantity_equivalence_is_exact_and_malformed_quantities_refuse
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: pin_path_cannot_escape_manifest_directory
+    kind: integration
+  - path: bridges/k8s/tests/contracts.rs
+    testName: cli_missing_pin_refuses
+    kind: integration

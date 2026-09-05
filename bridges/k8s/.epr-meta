@@ -1,0 +1,21 @@
+---
+epr-meta-version: 1
+id: k8s-runtime-envelope-render
+purpose: >
+  Pure outward resource translation for the orchestrator; manifests declare, Kubernetes renders.
+rules:
+  - id: manifest-render-contract
+    class: inject
+    when: { write: "*.rs" }
+    dedupe-of: "bridges/k8s/tests/contracts.rs"
+    why: >
+      Reuse RuntimeManifest::cid for identity. Keep absent envelopes empty and split arithmetic
+      byte-equal to conductor-split-budget.sh. 2026-09-05: all seven active humans are pinned,
+      so Unpinned has graduated from refer to refuse (CLI exit 65). Rendering is not enforcement.
+---
+
+# Runtime envelope bridge
+
+The consumer is the orchestrator through the k8s-bridge CLI. No network, DHT anchoring,
+cgroup enforcement, capacity promotion, or volume-head semantics are implemented here.
+The dated Unpinned refusal is exercised by cli_missing_pin_refuses and the pre-push leg.

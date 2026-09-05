@@ -400,6 +400,23 @@ if echo "$CHANGED" | grep -qE "genesis/orchestrator/data/deployments\.json|genes
   echo "[pre-push] deployments resource-conformance ✓"
 fi
 
+# Runtime-manifest pin/render conformance. 2026-09-05: every active human is
+# pinned, so Unpinned is now REFUSE (exit 65), alongside CID/resource drift.
+# Use the same pool resolver as native gate.projects; no prebuilt binary needed.
+if echo "$CHANGED" | grep -qE "bridges/k8s/|elohim/ark/core/|genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/runtime/|genesis/data/devices/archetype-resource-budgets\.json|scripts/ci/conductor-split-budget\.sh"; then
+  echo "[pre-push] Verifying runtime manifest pins and rendered resources..."
+  (
+    k8s_repo_root="$(git rev-parse --show-toplevel)"
+    source "$k8s_repo_root/genesis/agentic/bin/pool-lib.sh"
+    k8s_pool_family="$(detect_family "$k8s_repo_root")"
+    export CARGO_TARGET_DIR="$(slot_path "$k8s_pool_family" k8s-bridge dev)"
+    export CARGO_BUILD_JOBS=2 RUSTFLAGS="" RUSTC_WRAPPER=""
+    cargo run -q --manifest-path bridges/k8s/Cargo.toml --bin k8s-bridge -- verify --deployments genesis/orchestrator/data/deployments.json --manifests-dir genesis/orchestrator/manifests/runtime
+  ) || exit 1
+  echo "[pre-push] runtime manifest pin/render conformance ✓"
+fi
+
+
 # ── Account Package Schema Validation ────────────────────────────
 #
 # When account packages or their source data change, validate the

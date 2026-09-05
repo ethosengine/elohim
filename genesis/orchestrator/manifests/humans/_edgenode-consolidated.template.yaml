@@ -159,6 +159,7 @@ spec:
   template:
     metadata:
       annotations:
+        elohim.protocol/runtime-manifest: RUNTIME_MANIFEST_CID_PLACEHOLDER
         # Continuous CPU profiling — Grafana Alloy discovers pods by these
         # annotations and scrapes the Go-compatible pprof endpoint elohim-storage
         # serves on the storage-http port (env-gated by ELOHIM_PPROF_ENABLED

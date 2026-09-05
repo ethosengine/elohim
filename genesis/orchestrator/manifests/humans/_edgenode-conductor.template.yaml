@@ -185,6 +185,7 @@ spec:
   template:
     metadata:
       annotations:
+        elohim.protocol/runtime-manifest: RUNTIME_MANIFEST_CID_PLACEHOLDER
         # Content digest of the hApp behind the floating happ-version tag,
         # resolved at render time (Jenkinsfile resolveHappDigest). The tag is
         # mutable — a DNA-pipeline rebuild moves dev-latest/latest to new hApp

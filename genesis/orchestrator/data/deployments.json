@@ -8,6 +8,7 @@
   "humans": [
     {
       "name": "adam",
+      "runtimeManifest": {"cid": "bafyreiapd5vu2vnk3tontaccwwvrtgziljpgfwmmudypi3pp2x76guzrta", "path": "genesis/orchestrator/manifests/runtime/adam.manifest.json"},
       "resourceOverride": {
         "cpuLimit": "8000m",
         "justification": "Genesis anchor + doorway-B backend + seed target; renders from adam-firstman.yaml so these edgenode* fields are render-inert mirrors. Conductor db read pool = max(2*cpus,8), so 8000m lifts max_readers to 16. See $resourceBudgetComment."
@@ -40,6 +41,7 @@
     },
     {
       "name": "matthew",
+      "runtimeManifest": {"cid": "bafyreiaaebz37gnblcarqiwmr7a7znlwom2cc24whm7z327ivx4ze7w7vu", "path": "genesis/orchestrator/manifests/runtime/family-node-base.manifest.json"},
       "role": "manager",
       "humanLabel": "matthew-manager",
       "humanId": "human-matthew-manager",
@@ -78,6 +80,7 @@
         "edgenodeCpuLimit": "1000m"
       },
       "name": "jessica",
+      "runtimeManifest": {"cid": "bafyreicpwvp3p3nab5n2eat555ewf4p44fr7uw5ycu34vyk2fczeidnrle", "path": "genesis/orchestrator/manifests/runtime/jessica.manifest.json"},
       "resourceOverride": {
         "memoryRequest": "1Gi",
         "memoryLimit": "4Gi",
@@ -117,6 +120,7 @@
         "edgenodeCpuLimit": "500m"
       },
       "name": "james",
+      "runtimeManifest": {"cid": "bafyreif6gike5vkii2dg3nttpu4fjkqrnpgb4dkdzlqnfl66tjxhys64ca", "path": "genesis/orchestrator/manifests/runtime/james.manifest.json"},
       "resourceOverride": {
         "cpuLimit": "2000m",
         "memoryLimit": "8Gi",
@@ -222,6 +226,7 @@
     {
       "$comment": "Introduced 2026-05-18 alongside shem-return reshuffle. Gertrude formalizes the 'grandma standard' archetype that has shaped the resilience epic \u2014 the non-technical user who must be served well (memory: project_recovery_grandma_standard, project_subsume_g_f_a_via_it_just_works). She is the reciprocal-recovery counterparty for the Dowell household: gertrude \u2194 matthew/jessica/james hold each other's Shamir-split shares for social-derived recovery (memory: project_socially_derived_security, project_graduated_recovery_authority). Dowell-side hub is matthew's device-family-node-base (on-prem family hub); gertrude is modeled here as her always-on hub-class device (device-home-nuc) \u2014 she also has a laptop in real life, but the per-human-multi-device topology isn't modeled in deployments yet; the hub holds the Shamir share so the backup relationship is exercisable from this one entry. We have not yet hit high-availability or fully-realized backup, but this single reciprocal relationship is enough to test the full recovery/sharding/login story surface. Structural schema for these stewardship agreements deferred \u2014 captured first in canonical stories under genesis/data/stories/ until the field shape crystallizes; humans.schema.json is protocol-law and any extension wants story-first justification.",
       "name": "gertrude",
+      "runtimeManifest": {"cid": "bafyreih6eqxw7nkehgj7mb6o5vxdx3brzttuvbcivm7z2e26rgawhlo3hq", "path": "genesis/orchestrator/manifests/runtime/gertrude.manifest.json"},
       "resourceOverride": {
         "cpuLimit": "3000m",
         "justification": "Situational co-location burn, not a class property: one of the 4 co-located shem conductors CFS-throttled 99.9% of periods AT the 2000m class canonical with usage pinned at the cap (n^2-gossip suspect), starving the 15s-budget batch head-resolve that drives content heal. Temporary until the steady-state burn is profiled — see $cpuThrottleBumpComment for evidence + restoration condition."
@@ -255,6 +260,7 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion; re-scoped same day from 'Dowell-household co-steward' to 'aunt to James / sister to Matthew, separate household-susan in the Seattle metro'. Canonical bio (genesis/data/humans/humans.json) describes Susan as Matthew's sister; collectives.json already had household-susan defined as its own compute shard, and humans.json now binds Susan there. Susan lives in Seattle, WA with her husband Caleb and three young children (not yet on the protocol) \u2014 see human-caleb-spouse deployment record. Susan-and-Caleb form the Pacific NW leg of a tri-region reciprocal backup chain: Dowell-household (matthew/jessica/james, San Antonio TX) \u2194 Susan's household (susan/caleb, Seattle WA) \u2194 Gertrude's household (gertrude, San Antonio TX), with Daniel's household (Jessica's brother, Tulsa OK) added as a fifth replicator giving the chain a third independent region. Multi-region geographic separation means no single natural disaster, ISP outage, or regional power failure can take down both halves of any reciprocal pair simultaneously \u2014 load-bearing for the 'high-availability' tier of the resilience epic (genesis/docs/content/elohim-protocol/resilience/README.md:146). Typical-steward floor mirrors jessica's $recycledLaptopFloor (device-recycled-laptop). Remote placement (remote/performance) lands Susan on shem when available so she is physically distant from the Dowell on-prem hub \u2014 geographic resilience reflected in K8s placement.",
       "name": "susan",
+      "runtimeManifest": {"cid": "bafyreieyjdxxe2okmoyawuybbi2hsdefcyoa42oykremnxxs4z34jwx5yy", "path": "genesis/orchestrator/manifests/runtime/susan.manifest.json"},
       "resourceOverride": {
         "cpuLimit": "3000m",
         "justification": "Situational co-location burn, not a class property: one of the 4 co-located shem conductors CFS-throttled 99.97% of periods AT the 2000m class canonical with usage pinned at the cap (n^2-gossip suspect); susan carries the fleet's highest actionable divergence (1052) with zero heal outcomes. Temporary until the steady-state burn is profiled — see $cpuThrottleBumpComment for evidence + restoration condition."
@@ -355,6 +361,7 @@
     {
       "$comment": "Introduced 2026-05-22 alongside the light-up-the-topology resiliency expansion. Eve formalizes a second household-pair counterparty option beyond gertrude\u2194dowell. The resilience README (genesis/docs/content/elohim-protocol/resilience/README.md:146) names 'fully-meshed quorum of five or seven share-holders' as the next bar above the single-pair recovery surface; adding eve gives the substrate a second always-on hub that can hold a Shamir share for a different counterparty, unlocking quorum-of-3+ recovery flows. Household-eve (Eden Valley neighborhood) is a separate community from household-matthew (Tech Valley), so the pair also exercises cross-neighborhood reach. Hub-class device-home-nuc mirrors gertrude's archetype \u2014 always-on, hub-shaped storage steward. Placement on shem (remote/performance) gives this hub geographic diversity from the on-prem Dowell hub, so a single-site failure cannot take down both halves of any reciprocal pair anchored on eve.",
       "name": "eve",
+      "runtimeManifest": {"cid": "bafyreih6eqxw7nkehgj7mb6o5vxdx3brzttuvbcivm7z2e26rgawhlo3hq", "path": "genesis/orchestrator/manifests/runtime/eve.manifest.json"},
       "resourceOverride": {
         "cpuLimit": "3000m",
         "justification": "Situational co-location burn, not a class property: one of the 4 co-located shem conductors CFS-throttled 99.97% of periods AT the 2000m class canonical with usage pinned at the cap (n^2-gossip suspect), starving the 15s-budget batch head-resolve that drives content heal. Temporary until the steady-state burn is profiled — see $cpuThrottleBumpComment for evidence + restoration condition."
