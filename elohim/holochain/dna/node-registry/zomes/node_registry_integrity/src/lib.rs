@@ -654,12 +654,14 @@ fn validate_notarization_witness(
 //     and it is non-evadable.
 //   * a carrier that carries the close and the post-close facts in ONE witness
 //     is refused by the intra-witness half of the same rule.
-//   * a COURIER that never sealed and never carried the close cannot be
-//     refused by any deterministic HDI rule, because "does a close exist for
+//   * GAP G6 — a COURIER that never sealed and never carried the close cannot
+//     be refused by any deterministic HDI rule, because "does a close exist for
 //     author A?" is an unbounded lookup and HDI has no unbounded lookup. That
 //     hole is named, not hidden: it is why the fence has leg (i) at all, and
 //     why Probe B2's warrant is read by the storage plane as evidence of a
-//     violated sunset.
+//     violated sunset. Greppable as `G6` so the whole-branch review, the epic
+//     ledger and this validator name one gap rather than three descriptions of
+//     it; it is a STANDING limit of HDI, not a task waiting to land.
 //
 // COST, declared: the walk makes the carrier's own chain a validation
 // dependency for every witness it authors. For the node_registry rehearsal

@@ -162,6 +162,15 @@ struct ExportPage {
     /// read. The metric risk row R1 watches — see the zome-side field doc.
     #[serde(default)]
     scanned: Option<u32>,
+    /// Task 29 (additive): WHICH read answered the page — `"authority"` when
+    /// the agent-activity authorities served it over the network,
+    /// `"local-only"` when they answered empty and the conductor fell back to
+    /// its own store, `None` on the own-chain path. Station 6's root cause was
+    /// that a partial-arc local read is indistinguishable from a short chain
+    /// unless the page says so. `#[serde(default)]` because a bundle packed
+    /// before Task 29 does not emit it.
+    #[serde(default)]
+    view: Option<String>,
 }
 
 /// Mirror of `node_registry_coordinator::ExportHeldInput` (Task 18, v1 held view).
@@ -239,6 +248,17 @@ struct CarryReceipt {
     /// re-creates nothing and authors no proof for these.
     #[serde(default)]
     already_carried: u32,
+    /// Task 29 (additive): the export page's `view`, threaded through verbatim
+    /// — which read answered the walk this page carried. A held receipt
+    /// reporting `local-only` is scoped to one peer's arc and must not be
+    /// recorded as the neighbour's chain.
+    #[serde(default)]
+    view: Option<String>,
+    /// Task 29 (additive): the export page's `scanned`, threaded through
+    /// verbatim — the producer half of the mirror storage landed at Task 28,
+    /// which decodes `None` as "not reported".
+    #[serde(default)]
+    scanned: Option<u32>,
 }
 
 /// Mirror of `node_registry_coordinator::ReadoptInput` (Task 13b, Station 7 —
@@ -1270,16 +1290,39 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
     println!(
-        "[export/held] total={:?} observed_head={:?} digest={} records={}",
+        "[export/held] total={:?} observed_head={:?} digest={} records={} view={:?} scanned={:?}",
         held.total,
         held.observed_head,
         held.digest,
-        held.records.len()
+        held.records.len(),
+        held.view,
+        held.scanned
     );
     assert_eq!(
         held.total,
         Some(5),
         "the held view of alice's own chain must see the same 5 app-entry records"
+    );
+    // Task 29: the page SAYS which store answered, and on a lone conductor the
+    // answer is the fallback. MEASURED (holochain 0.7.0, 2026-09-04): reading
+    // one's OWN key with `GetOptions::network()` returns an EMPTY activity list
+    // here — there is no second peer to be an authority — so the network-first
+    // read finds nothing, the local store holds all 5, and the page is honestly
+    // labelled `local-only`. That label is the whole point: the same five
+    // records served without it are indistinguishable from an authority answer,
+    // which is how Station 6's frozen partial-arc view read as a total.
+    assert_eq!(
+        held.view.as_deref(),
+        Some("local-only"),
+        "a lone conductor gets an empty network answer and falls back to its own \
+         store — the page must SAY so, got {:?}",
+        held.view
+    );
+    assert_eq!(
+        held.scanned,
+        Some(5),
+        "on the held path `scanned` is the size of the activity list the answering \
+         view returned — here the 5 app entries the local store holds"
     );
     assert_eq!(
         held.digest, p1.digest,
@@ -1868,6 +1911,33 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
          end-of-LOCAL-VIEW, not end-of-bob's-chain"
     );
     assert!(!receipt.witness_hash.is_empty(), "a non-empty page commits exactly one witness");
+
+    // Task 29: the receipt SAYS which read answered, and what it cost.
+    //
+    // Deliberately NOT pinned to one label here. Alice and bob are two peers on
+    // one DHT, so bob's agent-activity authority may be alice herself or the
+    // remote — and which one serves a given call is a network fact, not a
+    // property of the carry. What the receipt must never do is stay silent: a
+    // held page whose view is unknown is exactly the shape that let Station 6
+    // record a frozen partial-arc read as a completed crossing.
+    let view = receipt
+        .view
+        .as_deref()
+        .expect("a HELD receipt must name the view that answered — silence is the Station 6 bug");
+    assert!(
+        view == "authority" || view == "local-only",
+        "the view label is one of the two the zome defines, got {view:?}"
+    );
+    println!(
+        "[task18] receipt view = {view}, scanned = {:?}",
+        receipt.scanned
+    );
+    assert_eq!(
+        receipt.scanned,
+        Some(1),
+        "`scanned` threads through from the export page — on the held path it is the \
+         size of the activity list the answering view returned, and bob has one app entry"
+    );
 
     // --- 5. ONE witness, at bob's entry hash, carrying the BYTES ------------
     let links: Vec<Link> = ca.call(&za2, "get_witnesses_for", bob_eh.clone()).await;

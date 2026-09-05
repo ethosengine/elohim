@@ -704,8 +704,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // its own archive step. It is deliberately NOT stashed for the
                             // sweettest stage: the lineage probes need a v1 bundle too, and
                             // shipping v2 alone would turn their clean SKIP into a red.
+                            //
+                            // allowEmptyArchive: FALSE. The pack step above runs unconditionally,
+                            // so a missing node-registry-v2.dna here means the feature build or
+                            // the pack silently produced nothing — and under allowEmptyArchive
+                            // true that read as a green stage with no successor artifact, which
+                            // every downstream lineage consumer then treats as "no v2 to test".
+                            // Fail the build at the archive instead of shipping the absence.
                             dir("${env.WORKSPACE}/elohim/holochain/dna/node-registry") {
-                                archiveArtifacts artifacts: 'node-registry-v2.dna', allowEmptyArchive: true
+                                archiveArtifacts artifacts: 'node-registry-v2.dna', allowEmptyArchive: false
                             }
 
                             def props = loadBuildVars()

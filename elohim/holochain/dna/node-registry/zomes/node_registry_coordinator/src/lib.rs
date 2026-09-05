@@ -1527,7 +1527,50 @@ pub struct ExportPage {
     /// 0, which would read as a page that scanned nothing.
     #[serde(default)]
     pub scanned: Option<u32>,
+    /// **Additive (Task 29).** WHICH read answered this page —
+    /// [`HELD_VIEW_AUTHORITY`] or [`HELD_VIEW_LOCAL_ONLY`] — or `None` on the
+    /// own-chain path, where neither word applies because `export_records` is a
+    /// local `query()` of the caller's own chain and there is no other view to
+    /// choose between.
+    ///
+    /// **This is the field Station 6 was missing.** MEASURED on the household
+    /// mesh (2026-09-04): james's held view of jessica froze at 212 records
+    /// against an `observed_head` of 732 while her chain had passed 322, and it
+    /// read the SAME before and after a conductor respawn — because
+    /// `GetOptions::local()` on a PARTIAL-ARC peer only ever reports the slice
+    /// of her chain that hashes into james's arc, and no amount of waiting
+    /// fills the rest. A page that reads short is indistinguishable from a
+    /// chain that IS short unless the page says which store answered, so the
+    /// courier reported a truncated view as a complete one.
+    ///
+    /// [`HELD_VIEW_AUTHORITY`] means the agent-activity AUTHORITIES answered
+    /// over the network — the whole chain as the DHT holds it, independent of
+    /// this peer's arc. [`HELD_VIEW_LOCAL_ONLY`] means they answered with
+    /// nothing and this conductor fell back to its own store; the page is then
+    /// scoped to what THIS peer validated and integrated, and every
+    /// "courier's view" caveat on `total`, `digest` and `next_cursor` applies
+    /// at its strongest.
+    ///
+    /// A driver reads it as a CONFIDENCE label, never as a completeness proof:
+    /// `authority` does not promise the authorities were caught up either, it
+    /// promises the read was not silently answered by one partial-arc peer.
+    ///
+    /// `Option<String>` + `#[serde(default)]`: `None` from a bundle packed
+    /// before this field existed, which is honestly "not reported" rather than
+    /// a fabricated label.
+    #[serde(default)]
+    pub view: Option<String>,
 }
+
+/// [`ExportPage::view`] when the agent-activity AUTHORITIES answered over the
+/// network — the read every held page wants, because it is independent of this
+/// peer's arc.
+pub const HELD_VIEW_AUTHORITY: &str = "authority";
+
+/// [`ExportPage::view`] when the network answered with no valid activity and
+/// this conductor fell back to its OWN store. The page is then scoped to what
+/// this peer holds, which on a partial-arc peer is a slice of the chain.
+pub const HELD_VIEW_LOCAL_ONLY: &str = "local-only";
 
 const EXPORT_CAP: u32 = 64;
 
@@ -1973,6 +2016,11 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
             cursor_seq,
         }),
         scanned: Some(scanned),
+        // `None`, not a label. This is the OWN chain read with a local
+        // `query()`; there is no authority-vs-local choice to report, and
+        // stamping `local-only` here would read as the partial-arc shortfall
+        // Task 29 named on the held path, which this path cannot have.
+        view: None,
     })
 }
 
@@ -2097,14 +2145,23 @@ fn app_entry_types_in_scope() -> ExternResult<Vec<EntryType>> {
 /// the same [`chain_digest`], so a `v1_digest` comparison is like-for-like
 /// whichever export produced it.
 ///
-/// **What "whole" means here is the COURIER'S VIEW, not the neighbour's chain.**
-/// This reads THIS peer's own agent-activity store, so `total`, `digest` and
-/// `next_cursor` all describe a subset of `agent`'s real chain — possibly a
-/// gapped one, since gossip is asynchronous. A page from this extern is
-/// therefore never self-evidencing: `next_cursor: None` means end-of-local-view,
-/// and a receipt's `carried == total` says the courier carried everything it
-/// had. [`ExportPage::observed_head`] is the one field that reaches past that
-/// view and lets a driver notice it is behind.
+/// **WHICH VIEW answered is reported, not assumed (Task 29).** The read asks the
+/// agent-activity AUTHORITIES over the network first, and falls back to this
+/// conductor's own store only when they answer with no valid activity at all.
+/// [`ExportPage::view`] names which one served the page. That distinction is
+/// Station 6's root cause: a local-only read on a PARTIAL-ARC peer returns the
+/// slice of the neighbour's chain that hashes into this peer's arc and never
+/// fills, so a page taken from it reports a permanent truncation in exactly the
+/// shape of a complete short chain.
+///
+/// **Even on the authority view, "whole" is a claim about the read, not a
+/// proof.** `total`, `digest` and `next_cursor` describe the walk this page
+/// drew from; on [`HELD_VIEW_LOCAL_ONLY`] that walk is a subset of `agent`'s
+/// real chain, possibly gapped. A page from this extern is therefore never
+/// self-evidencing: `next_cursor: None` means end-of-THIS-VIEW, and a receipt's
+/// `carried == total` says the courier carried everything the view held.
+/// [`ExportPage::observed_head`] is the one field that reaches past the walk and
+/// lets a driver notice it is behind.
 ///
 /// A record the authority named but that cannot be fetched is a LOUD Guest
 /// error naming the action hash. Silently skipping it would produce a page that
@@ -2123,30 +2180,64 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         filter = filter.entry_type(entry_type);
     }
 
-    // `GetOptions::local()` — THIS conductor's own authority store, i.e. what
-    // this peer validated and integrated. Two reasons, one principled and one
-    // measured:
+    // THE AUTHORITIES FIRST, this conductor's own store only as a fallback
+    // (Task 29 — Station 6's root cause).
     //
-    //   * a courier should carry only what IT holds, never what a remote peer
-    //     told it it holds — the same verify-locally-then-serve invariant the
-    //     rest of the dataplane keeps;
-    //   * MEASURED (holochain 0.7.0, 2026-09-04): a lone conductor reading its
-    //     OWN key with `GetOptions::network()` returns an EMPTY activity list
-    //     (`total: Some(0)`, digest of the empty string) even 60 s after five
-    //     `register_node` calls, while the same read with `local()` returns all
-    //     five. `network()` is therefore not a superset of `local()` here, and
-    //     `export_held_records(self)` would silently report an empty chain.
+    // This read used to be `GetOptions::local()` alone, on a
+    // verify-locally-then-serve reading of the courier's role plus one measured
+    // fact: a LONE conductor reading its OWN key with `network()` returns an
+    // EMPTY activity list even 60 s after five `register_node` calls, while
+    // `local()` returns all five. That measurement stands — and it is a
+    // single-conductor artefact, which is why the fallback below keeps it
+    // working.
     //
-    // A peer that has not yet gossiped the neighbour's chain reports a SHORT
-    // view rather than a wrong one: `total` and `digest` cover exactly the
-    // records this page can also hand over, so a driver comparing them against
-    // the neighbour's own export sees the disagreement instead of inheriting it.
-    let activity = get_agent_activity(
+    // What it hid is the case that actually matters. MEASURED on the household
+    // mesh (2026-09-04, probe r36): james's held view of jessica froze at 212
+    // records against an `observed_head` of 732 while jessica's chain had
+    // passed 322, and it read IDENTICALLY before and after a conductor
+    // respawn. `local()` on a PARTIAL-ARC peer returns only the slice of a
+    // neighbour's chain that hashes into that peer's arc — it is not a view
+    // that is behind and catching up, it is a view that never fills. A courier
+    // reading it reported a permanent truncation as a complete crossing, and
+    // Station 6 could not reach the neighbour's real head at all.
+    //
+    // So: ask the agent-activity AUTHORITIES over the network, which answer for
+    // the whole chain regardless of this peer's arc. Fall back to the local
+    // store ONLY when the network answered with no valid activity at all AND
+    // the local store does hold records — the lone-conductor shape above, and
+    // the one case where `local()` is strictly more informative than the empty
+    // answer it would otherwise be believed over.
+    //
+    // The page then SAYS which store answered (`ExportPage::view`), because a
+    // short page from a partial-arc local read and a short page from a short
+    // chain are otherwise indistinguishable — which is exactly how the frozen
+    // 212 read as a total.
+    let authority_activity = get_agent_activity(
         input.agent.clone(),
-        filter,
+        filter.clone(),
         ActivityRequest::Full,
-        GetOptions::local(),
+        GetOptions::network(),
     )?;
+    let (activity, view) = if authority_activity.valid_activity.is_empty() {
+        let local_activity = get_agent_activity(
+            input.agent.clone(),
+            filter,
+            ActivityRequest::Full,
+            GetOptions::local(),
+        )?;
+        if local_activity.valid_activity.is_empty() {
+            // Both empty: the authorities answered, they answered nothing, and
+            // the local store agrees. That is an `authority` page reporting an
+            // empty chain, NOT a local-only fallback — labelling it `local-only`
+            // would tell a driver to distrust a read that was never made short
+            // by this peer's arc.
+            (authority_activity, HELD_VIEW_AUTHORITY)
+        } else {
+            (local_activity, HELD_VIEW_LOCAL_ONLY)
+        }
+    } else {
+        (authority_activity, HELD_VIEW_AUTHORITY)
+    };
 
     // MEASURED (holochain 0.7.0): `highest_observed` is computed by
     // `build_agent_activity_response` from the classified lists BEFORE
@@ -2281,6 +2372,7 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
             cursor_seq: None,
         }),
         scanned: Some(scanned),
+        view: Some(view.to_string()),
     })
 }
 
@@ -3036,6 +3128,49 @@ pub struct CarryReceipt {
     /// decodes, reading `None` for a page from a zome that predates the field.
     #[serde(default)]
     pub resume: Option<ExportResume>,
+    /// **Additive (Task 29).** WHICH read answered the export this page carried,
+    /// reported verbatim from [`ExportPage::view`]:
+    /// [`HELD_VIEW_AUTHORITY`], [`HELD_VIEW_LOCAL_ONLY`], or `None` on a
+    /// [`CarrySource::Own`] page, where the predecessor read its own chain
+    /// locally and neither word applies.
+    ///
+    /// **This is what makes a held receipt readable at all.** Station 6
+    /// measured a courier whose held view of a neighbour froze at 212 records
+    /// against an `observed_head` of 732 — a partial-arc local read that never
+    /// fills — and nothing in the receipt said so, so the sweep recorded a
+    /// permanent truncation as a crossing. A driver reads
+    /// [`HELD_VIEW_LOCAL_ONLY`] on a held receipt as "this number is scoped to
+    /// one peer's arc, do not record it as the neighbour's chain".
+    ///
+    /// It is a confidence label, never a completeness proof: `authority` says
+    /// the read reached the agent-activity authorities, not that they were
+    /// caught up. The completeness check stays the comparison of
+    /// [`Self::v1_observed_head`] across views.
+    ///
+    /// `#[serde(default)]` so a consumer built against the earlier receipt still
+    /// decodes, reading `None` — honestly "not reported" — for a page from a
+    /// zome that predates the field.
+    #[serde(default)]
+    pub view: Option<String>,
+    /// **Additive (Task 29).** How many action rows the predecessor's POSITION
+    /// scan read to find where this page starts, reported verbatim from
+    /// [`ExportPage::scanned`] — **the metric risk row R1 reads**.
+    ///
+    /// The producer half of a mirror the storage side landed ahead of it at
+    /// Task 28 (`release_adoption::carry::CarryReceipt::scanned`, which decodes
+    /// `None` as "not reported" rather than a fabricated 0). Carry cost stays
+    /// linear in chain length iff this stays bounded on RESUMED pages and,
+    /// the property that actually matters, independent of how far into the
+    /// chain the page sits.
+    ///
+    /// On the held path it is the size of the agent-activity list the answering
+    /// view returned — so it moves with [`Self::view`], and a `local-only` page
+    /// reporting a small `scanned` is reporting a small ARC, not a cheap walk.
+    ///
+    /// `#[serde(default)]`; `None` from a page that predates the field, never a
+    /// fabricated 0.
+    #[serde(default)]
+    pub scanned: Option<u32>,
 }
 
 /// Pull ONE bounded page from a predecessor cell and witness it here.
@@ -3381,6 +3516,12 @@ fn carry_page(
         v1_observed_head: page.observed_head,
         already_carried,
         resume: page.resume,
+        // Both reported VERBATIM from the page. This cell never mints or
+        // re-derives either: `view` is the predecessor's statement about which
+        // store answered its read, and `scanned` is what that read cost — two
+        // facts only the exporting cell can speak to.
+        view: page.view,
+        scanned: page.scanned,
     })
 }
 
