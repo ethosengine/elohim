@@ -478,10 +478,7 @@ describe('RegisterComponent', () => {
       component.form.location = 'San Francisco';
     });
 
-    it('registers over doorway HTTP even with no Holochain connection', async () => {
-      // Hosted registration is PasswordAuthProvider.register -> POST
-      // /auth/register. Gating it on a conductor WebSocket meant an anonymous
-      // visitor whose browser cannot open one could NEVER create an account.
+    it('should show error when not connected to network', async () => {
       Object.defineProperty(mockHolochainClient, 'isConnected', {
         value: signal(false),
         writable: true,
@@ -497,39 +494,8 @@ describe('RegisterComponent', () => {
 
       await newComponent.onRegister();
 
-      expect(newComponent.error()).toBeNull();
-      expect(mockIdentityService.registerHuman).toHaveBeenCalled();
-    });
-
-    it('leaves the session-migration path gated on the connection', async () => {
-      // The migration path DOES need the network, and SessionMigrationService
-      // .canMigrate already requires it — so an offline visitor WITH session
-      // progress falls through to standard registration rather than being
-      // refused outright, and migrate() is never attempted.
-      Object.defineProperty(mockHolochainClient, 'isConnected', {
-        value: signal(false),
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(mockSessionHumanService, 'hasSession', {
-        value: signal(true),
-        writable: true,
-        configurable: true,
-      });
-      // canMigrate stays signal(false) — that is what "not connected" means to
-      // SessionMigrationService.
-
-      const newFixture = TestBed.createComponent(RegisterComponent);
-      const newComponent = newFixture.componentInstance;
-      newComponent.form.displayName = 'John Doe';
-      newComponent.form.email = 'john@example.com';
-      newComponent.form.password = 'password123';
-      newComponent.form.confirmPassword = 'password123';
-
-      await newComponent.onRegister();
-
-      expect(mockMigrationService.migrate).not.toHaveBeenCalled();
-      expect(mockIdentityService.registerHuman).toHaveBeenCalled();
+      expect(newComponent.error()).toBe('Not connected to network. Please wait for connection.');
+      expect(mockIdentityService.registerHuman).not.toHaveBeenCalled();
     });
 
     it('should show error when displayName is empty', async () => {
