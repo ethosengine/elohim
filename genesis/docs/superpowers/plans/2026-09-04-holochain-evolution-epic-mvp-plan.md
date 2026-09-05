@@ -917,6 +917,8 @@ Why: the sunset ruling "routing, not a disable" (C14) is right for the app but t
 
 Why: Task 31 (252ead282) removed every fixture-authored write after a close, but Station 8's own measured post-close write is the story's assertion and a neighbour will always warrant it — so the chain it lands on must be disposable. Storage is the seat that binds v1.
 
+- Add to Station 8 on the disposable crossing the Then the story only narrates today: after the harness's post-close write, a neighbour's block list (`hc-mesh.sh blocks <neighbour>`) names the writer's cell with the warrant "No more actions are allowed after a chain close" — the permanent-block consequence measured, on a chain nobody needs again.
+
 - [ ] **Task 33 deliverable: a crossing can name its v1; Station 8 seals a run-scoped chain; two consecutive ten-station runs on a fresh household mesh leave every peer's block list empty.**
 
 ---
