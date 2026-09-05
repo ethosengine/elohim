@@ -13,20 +13,16 @@
       (resolve-error)="onResolveError($event)"
     >
       <span slot="help-text">
-        Enter your federated identifier — for example, matthew&#64;alpha.elohim.host.
+        Enter your federated identifier — for example, matthew&#64;alpha.elohim.host. We'll send you
+        to your own doorway to sign in.
       </span>
     </elohim-imagodei-federated-resolver>
   }
 
   @if (step === 'login') {
-    <elohim-imagodei-login-card
-      #loginCard
-      slot="primary"
-      [attr.remembered-identifier]="identifier"
-      allow-password
-      (password-submit)="onPasswordSubmit($event)"
-      (oauth-start)="onOAuthStart($event)"
-    ></elohim-imagodei-login-card>
+    <p slot="primary" class="handoff-note" role="status" data-testid="portal-handoff">
+      Taking you to your doorway to sign in…
+    </p>
   }
 
   @if (errorMessage) {

@@ -1,21 +1,21 @@
 /**
- * LoginComponent (Lit wrapper).
+ * LoginComponent (Lit wrapper) — the app's REDIRECTOR to its doorway's portal.
  *
- * The user-facing UI is rendered entirely by the Lit primitives in
- * elohim-imagodei. This component is a thin bridge that wires AuthService /
- * OAuthAuthProvider / DoorwayRegistryService into the Lit elements' callback
- * + event surfaces.
- *
- * The standalone EPR bundle (app/imagodei-portal/) renders the same UI with
- * the same UX — only the service wiring differs (plain fetch instead of
- * Angular DI).
- *
- * Per design spec §1.1, this is the cleanup that achieves "ZERO third portal"
- * — no parallel UI implementation in elohim-app.
+ * There are exactly two sign-in portals in the protocol: the doorway portal
+ * (`/threshold/*`, for hosted humans) and the p2p-native portal (for stewards
+ * whose own runtime holds their key). elohim-app is neither — it is a relying
+ * party. So this route (a) discovers which doorway to send the human to, and
+ * (b) redirects them there through OAuth. It renders NO password field and
+ * posts NO credential: the one place a hosted human's password is ever seen is
+ * the doorway's own origin.
  *
  * Steps:
  *   'resolve' — <elohim-imagodei-federated-resolver> collects user@host
- *   'login'   — <elohim-imagodei-login-card> handles password + OAuth entry
+ *   'login'   — the hand-off notice while the browser leaves for the portal
+ *
+ * When a doorway is ALREADY proven (a workspace origin, a configured
+ * environment, a registry entry that answered for itself), there is nothing to
+ * resolve and the redirect happens on init.
  */
 
 import { CommonModule } from '@angular/common';
@@ -31,16 +31,13 @@ import {
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
-import { type PasswordCredentials } from '../../models/auth.model';
 import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from '../../models/doorway.model';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { IdentityService } from '../../services/identity.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
-import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 
 // SIDE-EFFECT import: registers <elohim-imagodei-federated-resolver> and
-// <elohim-imagodei-login-card>. Without it this page renders the custom
+// <elohim-imagodei-portal-shell>. Without it this page renders the custom
 // elements' fallback text and NO identifier input, so login is impossible on a
 // direct navigation to /identity/login. The registration used to arrive only
 // via auth-callback.component.ts, which a first-time visitor never passes
@@ -62,9 +59,7 @@ type Step = 'resolve' | 'login';
 })
 export class LoginComponent implements OnInit, AfterViewInit {
   private readonly authService = inject(AuthService);
-  private readonly passwordProvider = inject(PasswordAuthProvider);
   private readonly oauthProvider = inject(OAuthAuthProvider);
-  private readonly identityService = inject(IdentityService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -84,14 +79,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
   private returnUrl = '/';
 
   @ViewChild('resolver') resolverRef?: ElementRef<HTMLElement>;
-  @ViewChild('loginCard') loginCardRef?: ElementRef<HTMLElement>;
 
   ngOnInit(): void {
-    // Register password provider with auth service if not already registered
-    if (!this.authService.hasProvider('password')) {
-      this.authService.registerProvider(this.passwordProvider);
-    }
-
     // Capture return URL from query params
     this.route.queryParams.subscribe(params => {
       this.returnUrl = (params['returnUrl'] as string) ?? '/';
@@ -110,6 +99,15 @@ export class LoginComponent implements OnInit, AfterViewInit {
       if (stored) this.identifier = stored;
     } catch {
       // localStorage unavailable — degrade silently
+    }
+
+    // A doorway that has already PROVED itself (workspace origin, configured
+    // environment, registry entry that answered for itself) leaves nothing to
+    // resolve — send the human straight to its portal.
+    const provenDoorwayUrl = this.doorwayRegistry.selectedUrl();
+    if (provenDoorwayUrl) {
+      this.redirectToPortal(provenDoorwayUrl, this.identifier);
+      return;
     }
 
     // Pre-fetch authority from doorway so the shell element receives it as a
@@ -213,23 +211,27 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.errorMessage = '';
 
     // Inform the doorway registry so the rest of the app knows which doorway
-    // was selected before we advance to the login card.
+    // was selected before we hand the human over to it.
     const parsed = parseFederatedIdentifier(detail.identifier);
-    if (parsed) {
-      // `resolveGatewayToDoorwayUrl` is a LOOKUP now and returns null for a host
-      // no doorway has declared — there is nothing to select in that case, and
-      // inventing one is the defect this whole path was fixed for.
-      const doorwayUrl = detail.doorwayUrl || resolveGatewayToDoorwayUrl(parsed.gatewayDomain);
-      if (doorwayUrl) {
-        // `selectProbedDoorwayUrl`, not `selectDoorwayByUrl`: the synchronous
-        // setter only accepts a doorway the app already trusts, so a host the
-        // resolver element legitimately probed would be refused by it. This
-        // path adopts a new doorway only after it answers for itself.
-        void this.doorwayRegistry.selectProbedDoorwayUrl(doorwayUrl, true);
-      }
+    // `resolveGatewayToDoorwayUrl` is a LOOKUP now and returns null for a host
+    // no doorway has declared — there is nothing to select in that case, and
+    // inventing one is the defect this whole path was fixed for.
+    const doorwayUrl = parsed
+      ? detail.doorwayUrl || resolveGatewayToDoorwayUrl(parsed.gatewayDomain)
+      : null;
+
+    if (!doorwayUrl) {
+      this.errorMessage = 'No doorway serves that identifier. Check the host after the @.';
+      return;
     }
 
-    this.step = 'login';
+    // `selectProbedDoorwayUrl`, not `selectDoorwayByUrl`: the synchronous
+    // setter only accepts a doorway the app already trusts, so a host the
+    // resolver element legitimately probed would be refused by it. This
+    // path adopts a new doorway only after it answers for itself.
+    void this.doorwayRegistry.selectProbedDoorwayUrl(doorwayUrl, true);
+
+    this.redirectToPortal(doorwayUrl, detail.identifier);
   }
 
   onResolveError(e: Event): void {
@@ -237,77 +239,46 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.errorMessage = `Could not resolve: ${detail.reason}`;
   }
 
-  async onPasswordSubmit(e: Event): Promise<void> {
-    const detail = (e as CustomEvent<{ identifier: string; password: string; remember: boolean }>)
-      .detail;
-    const identifier = (detail.identifier || this.identifier).trim();
-    this.errorMessage = '';
+  // ==========================================================================
+  // The hand-off
+  // ==========================================================================
 
-    const credentials: PasswordCredentials = {
-      type: 'password',
-      identifier,
-      password: detail.password,
-    };
-
-    try {
-      const result = await this.authService.login('password', credentials);
-
-      if (result.success) {
-        // Persist or clear remembered identifier
-        try {
-          if (detail.remember) {
-            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
-            localStorage.setItem(AUTH_IDENTIFIER_KEY, identifier);
-          } else {
-            // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside try/catch SSR fallback
-            localStorage.removeItem(AUTH_IDENTIFIER_KEY);
-          }
-        } catch {
-          // localStorage unavailable — degrade silently
-        }
-
-        // Wait for identity state before navigating so the UI reflects
-        // authenticated state immediately after redirect.
-        await this.identityService.waitForAuthenticatedState(3000);
-        void this.router.navigate([this.returnUrl]);
-      } else {
-        const msg = result.error ?? 'Sign-in failed';
-        this.errorMessage = msg;
-        this.forwardErrorToCard(msg);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Sign-in failed';
-      this.errorMessage = msg;
-      this.forwardErrorToCard(msg);
-    }
-  }
-
-  onOAuthStart(e: Event): void {
-    // The login-card emits the doorwayUrl it resolved during the resolve step.
-    // Fall back to the registry's current selection when not present.
-    const detail = (e as CustomEvent<{ providerId: string; doorwayUrl?: string }>).detail;
-    this.errorMessage = '';
+  /**
+   * Leave for the doorway's own portal through OAuth, carrying the identifier
+   * as `login_hint` so the human does not retype it.
+   *
+   * This is the ONLY way this route signs anyone in. There is no in-app
+   * credential path to fall back to.
+   */
+  redirectToPortal(doorwayUrl: string, identifier = ''): void {
+    const origin = this.browserOrigin();
+    if (!origin) return; // SSR / non-browser render — nowhere to send anyone
 
     try {
-      const doorwayUrl =
-        detail.doorwayUrl ?? this.doorwayRegistry.selectedUrl() ?? this.resolveCurrentDoorwayUrl();
-      if (!doorwayUrl) {
-        this.errorMessage = 'No doorway selected. Please resolve your identity first.';
-        return;
-      }
-
+      this.step = 'login';
       this.oauthProvider.storeReturnUrl(this.returnUrl);
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered (invoked only from a user click handler)
-      const callbackUrl = `${globalThis.location.origin}/auth/callback`;
-      this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl);
+      this.oauthProvider.initiateLogin(
+        doorwayUrl,
+        `${origin}/auth/callback`,
+        identifier.trim() || undefined
+      );
     } catch (err) {
-      this.errorMessage = err instanceof Error ? err.message : 'OAuth flow failed to start';
+      this.step = 'resolve';
+      this.errorMessage = err instanceof Error ? err.message : 'Sign-in could not be started';
     }
   }
 
   // ==========================================================================
   // Private helpers
   // ==========================================================================
+
+  /** The page origin, or null when there is no browser (SSR, prerender). */
+  private browserOrigin(): string | null {
+    if (typeof window === 'undefined') return null;
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded by the typeof check above
+    const origin = window.location?.origin;
+    return origin && origin !== 'null' ? origin : null;
+  }
 
   /**
    * Wire the Lit resolver element's `resolveIdentifier` imperative callback.
@@ -333,24 +304,5 @@ export class LoginComponent implements OnInit, AfterViewInit {
         return { ok: false, reason: err instanceof Error ? err.message : 'resolve-failed' };
       }
     };
-  }
-
-  /**
-   * Derive doorway URL from the current identifier as a last resort.
-   * Returns null when the identifier hasn't been resolved yet.
-   */
-  private resolveCurrentDoorwayUrl(): string | null {
-    if (!this.identifier) return null;
-    const parsed = parseFederatedIdentifier(this.identifier);
-    return parsed ? resolveGatewayToDoorwayUrl(parsed.gatewayDomain) : null;
-  }
-
-  /**
-   * Forward an error message to the login-card Lit element's `setError`
-   * imperative method, if the element exposes it.
-   */
-  private forwardErrorToCard(msg: string): void {
-    const card = this.loginCardRef?.nativeElement as unknown as { setError?: (m: string) => void };
-    card?.setError?.(msg);
   }
 }

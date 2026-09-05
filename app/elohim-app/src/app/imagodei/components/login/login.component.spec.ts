@@ -1,8 +1,10 @@
 /**
  * LoginComponent (Lit wrapper) — spec
  *
- * Tests cover the thin Angular bridge: event wiring, step transitions, and
- * service delegation. The Lit elements themselves are not rendered (JSDOM
+ * The route is a REDIRECTOR: it discovers which doorway owns the human and
+ * hands them to that doorway's portal through OAuth. There is no in-app
+ * credential path, so these tests assert the hand-off and its inputs, never a
+ * password submission. The Lit elements themselves are not rendered (JSDOM
  * treats custom elements as HTMLElement stubs), so assertions target
  * component state and service call expectations.
  */
@@ -14,12 +16,9 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { LoginComponent } from './login.component';
-import { AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { IdentityService } from '../../services/identity.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
-import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 
 describe('LoginComponent (Lit wrapper)', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -31,13 +30,11 @@ describe('LoginComponent (Lit wrapper)', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     login: ReturnType<typeof vi.fn>;
   };
-  let mockPasswordProvider: { login: ReturnType<typeof vi.fn> };
   let mockOAuthProvider: {
     initiateLogin: ReturnType<typeof vi.fn>;
     storeReturnUrl: ReturnType<typeof vi.fn>;
     isFlowInProgress: ReturnType<typeof signal<boolean>>;
   };
-  let mockIdentityService: { waitForAuthenticatedState: ReturnType<typeof vi.fn> };
   let mockDoorwayRegistry: {
     selectDoorwayByUrl: ReturnType<typeof vi.fn>;
     selectProbedDoorwayUrl: ReturnType<typeof vi.fn>;
@@ -56,16 +53,10 @@ describe('LoginComponent (Lit wrapper)', () => {
       login: vi.fn().mockResolvedValue({ success: true }),
     };
 
-    mockPasswordProvider = { login: vi.fn().mockResolvedValue({}) };
-
     mockOAuthProvider = {
       initiateLogin: vi.fn(),
       storeReturnUrl: vi.fn(),
       isFlowInProgress: signal(false),
-    };
-
-    mockIdentityService = {
-      waitForAuthenticatedState: vi.fn().mockResolvedValue(true),
     };
 
     mockDoorwayRegistry = {
@@ -83,9 +74,7 @@ describe('LoginComponent (Lit wrapper)', () => {
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: mockAuthService },
-        { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
-        { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
@@ -117,18 +106,19 @@ describe('LoginComponent (Lit wrapper)', () => {
     expect(component.errorMessage).toBe('');
   });
 
-  it('registers password provider with AuthService on init', () => {
-    expect(mockAuthService.registerProvider).toHaveBeenCalledWith(mockPasswordProvider);
+  it('registers NO credential provider — the app is a relying party, not a portal', () => {
+    // The one place a hosted human's password is seen is the doorway's own
+    // origin. This route must not stand up an in-app credential path at all.
+    expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
+    expect((component as unknown as Record<string, unknown>)['passwordProvider']).toBeUndefined();
+    expect((component as unknown as Record<string, unknown>)['onPasswordSubmit']).toBeUndefined();
   });
 
-  it('does not re-register if provider is already registered', async () => {
-    mockAuthService.hasProvider.mockReturnValue(true);
-    mockAuthService.registerProvider.mockClear();
-
-    const newFixture = TestBed.createComponent(LoginComponent);
-    newFixture.componentInstance.ngOnInit();
-
-    expect(mockAuthService.registerProvider).not.toHaveBeenCalled();
+  it('renders no login card and no password field', () => {
+    const html = fixture.nativeElement.innerHTML as string;
+    expect(html).not.toContain('elohim-imagodei-login-card');
+    expect(html).not.toContain('allow-password');
+    expect(fixture.nativeElement.querySelector('input[type="password"]')).toBeNull();
   });
 
   it('redirects immediately when already authenticated', () => {
@@ -153,7 +143,7 @@ describe('LoginComponent (Lit wrapper)', () => {
   // Step: resolve → login
   // ==========================================================================
 
-  it('advances to login step and stores identifier on resolved event', () => {
+  it('hands off to the doorway portal and stores the identifier on resolved', () => {
     component.onResolved(
       new CustomEvent('resolved', {
         detail: {
@@ -165,6 +155,25 @@ describe('LoginComponent (Lit wrapper)', () => {
 
     expect(component.step).toBe('login');
     expect(component.identifier).toBe('matthew@alpha.elohim.host');
+    // login_hint carries the identifier so the human does not retype it.
+    expect(mockOAuthProvider.initiateLogin).toHaveBeenCalledWith(
+      'https://alpha.elohim.host',
+      expect.stringContaining('/auth/callback'),
+      'matthew@alpha.elohim.host'
+    );
+  });
+
+  it('stores the return URL before leaving for the portal', () => {
+    component.onResolved(
+      new CustomEvent('resolved', {
+        detail: {
+          identifier: 'matthew@alpha.elohim.host',
+          doorwayUrl: 'https://alpha.elohim.host',
+        },
+      })
+    );
+
+    expect(mockOAuthProvider.storeReturnUrl).toHaveBeenCalled();
   });
 
   it('adopts the resolved doorway through the PROBED path, not the trusted-only setter', () => {
@@ -187,16 +196,20 @@ describe('LoginComponent (Lit wrapper)', () => {
     expect(mockDoorwayRegistry.selectDoorwayByUrl).not.toHaveBeenCalled();
   });
 
-  it('selects nothing when no doorway declares the typed gateway', () => {
+  it('selects nothing and redirects nowhere when no doorway declares the typed gateway', () => {
     component.onResolved(
       new CustomEvent('resolved', {
         detail: { identifier: 'someone@x.evil.tld', doorwayUrl: '' },
       })
     );
 
-    // The lookup returns null for an undeclared host, and null is the answer.
+    // The lookup returns null for an undeclared host, and null is the answer —
+    // an unknown host is never invented into a redirect target.
     expect(mockDoorwayRegistry.selectProbedDoorwayUrl).not.toHaveBeenCalled();
     expect(mockDoorwayRegistry.selectDoorwayByUrl).not.toHaveBeenCalled();
+    expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
+    expect(component.step).toBe('resolve');
+    expect(component.errorMessage).toBeTruthy();
   });
 
   it('clears errorMessage on a successful resolved event', () => {
@@ -233,132 +246,70 @@ describe('LoginComponent (Lit wrapper)', () => {
   });
 
   // ==========================================================================
-  // Password submit
+  // A doorway that already proved itself skips the resolver entirely
   // ==========================================================================
 
-  it('calls AuthService.login with password credentials on password-submit', async () => {
-    component.identifier = 'matthew@alpha.elohim.host';
+  it('redirects on init, with no resolver step, when a doorway is already proven', () => {
+    mockDoorwayRegistry.selectedUrl = signal('https://alpha.elohim.host') as ReturnType<
+      typeof signal<null>
+    >;
+    mockOAuthProvider.initiateLogin.mockClear();
 
-    await component.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'hunter2', remember: false },
-      })
-    );
-
-    expect(mockAuthService.login).toHaveBeenCalledWith('password', {
-      type: 'password',
-      identifier: 'matthew@alpha.elohim.host',
-      password: 'hunter2',
-    });
-  });
-
-  it('navigates to returnUrl after successful password submit', async () => {
-    mockActivatedRoute.queryParams = of({ returnUrl: '/dashboard' });
     const newFixture = TestBed.createComponent(LoginComponent);
     newFixture.componentInstance.ngOnInit();
-    await newFixture.whenStable();
 
-    await newFixture.componentInstance.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      })
+    expect(mockOAuthProvider.initiateLogin).toHaveBeenCalledWith(
+      'https://alpha.elohim.host',
+      expect.stringContaining('/auth/callback'),
+      undefined
     );
-
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+    expect(newFixture.componentInstance.step).toBe('login');
   });
 
-  it('persists identifier in localStorage when remember is true', async () => {
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-    component.identifier = 'matthew@alpha.elohim.host';
+  it('carries a remembered identifier as the login hint on the init redirect', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('matthew@alpha.elohim.host');
+    mockDoorwayRegistry.selectedUrl = signal('https://alpha.elohim.host') as ReturnType<
+      typeof signal<null>
+    >;
+    mockOAuthProvider.initiateLogin.mockClear();
 
-    await component.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: true },
-      })
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
+
+    expect(mockOAuthProvider.initiateLogin).toHaveBeenCalledWith(
+      'https://alpha.elohim.host',
+      expect.stringContaining('/auth/callback'),
+      'matthew@alpha.elohim.host'
     );
-
-    expect(setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'matthew@alpha.elohim.host');
   });
 
-  it('removes identifier from localStorage when remember is false', async () => {
-    const removeItem = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
-    component.identifier = 'matthew@alpha.elohim.host';
+  it('does not redirect an already-authenticated human — it navigates them home', () => {
+    mockAuthService.isAuthenticated.mockReturnValue(true);
+    mockDoorwayRegistry.selectedUrl = signal('https://alpha.elohim.host') as ReturnType<
+      typeof signal<null>
+    >;
+    mockOAuthProvider.initiateLogin.mockClear();
 
-    await component.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      })
-    );
+    const newFixture = TestBed.createComponent(LoginComponent);
+    newFixture.componentInstance.ngOnInit();
 
-    expect(removeItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY);
-  });
-
-  it('surfaces error to errorMessage on password failure (AuthResult failure)', async () => {
-    mockAuthService.login.mockResolvedValue({ success: false, error: 'bad credentials' });
-    component.identifier = 'matthew@alpha.elohim.host';
-
-    await component.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'wrong', remember: false },
-      })
-    );
-
-    expect(component.errorMessage).toContain('bad credentials');
-  });
-
-  it('surfaces error to errorMessage on thrown exception during password submit', async () => {
-    mockAuthService.login.mockRejectedValue(new Error('network error'));
-    component.identifier = 'matthew@alpha.elohim.host';
-
-    await component.onPasswordSubmit(
-      new CustomEvent('password-submit', {
-        detail: { identifier: 'matthew@alpha.elohim.host', password: 'pw', remember: false },
-      })
-    );
-
-    expect(component.errorMessage).toContain('network error');
-  });
-
-  // ==========================================================================
-  // OAuth start
-  // ==========================================================================
-
-  it('calls oauthProvider.initiateLogin on oauth-start event', async () => {
-    component.identifier = 'matthew@alpha.elohim.host';
-    // Provide doorwayUrl via the registry so the handler can resolve it
-    (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(
-      'https://alpha.elohim.host'
-    );
-
-    await component.onOAuthStart(
-      new CustomEvent('oauth-start', {
-        detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
-      })
-    );
-
-    expect(mockOAuthProvider.initiateLogin).toHaveBeenCalled();
-  });
-
-  it('calls oauthProvider.storeReturnUrl before initiating OAuth', async () => {
-    await component.onOAuthStart(
-      new CustomEvent('oauth-start', {
-        detail: { providerId: 'github', doorwayUrl: 'https://alpha.elohim.host' },
-      })
-    );
-
-    expect(mockOAuthProvider.storeReturnUrl).toHaveBeenCalled();
-  });
-
-  it('sets errorMessage when no doorway URL is available on oauth-start', async () => {
-    component.identifier = '';
-    (mockDoorwayRegistry.selectedUrl as ReturnType<typeof signal<string | null>>) = signal(null);
-
-    await component.onOAuthStart(
-      new CustomEvent('oauth-start', { detail: { providerId: 'github' } })
-    );
-
-    expect(component.errorMessage).toBeTruthy();
     expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
+  });
+
+  // ==========================================================================
+  // Hand-off failure
+  // ==========================================================================
+
+  it('surfaces an error and returns to resolve when the hand-off throws', () => {
+    mockOAuthProvider.initiateLogin.mockImplementation(() => {
+      throw new Error('sessionStorage unavailable');
+    });
+
+    component.redirectToPortal('https://alpha.elohim.host', 'matthew@alpha.elohim.host');
+
+    expect(component.step).toBe('resolve');
+    expect(component.errorMessage).toContain('sessionStorage unavailable');
   });
 
   // ==========================================================================

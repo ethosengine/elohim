@@ -10,3 +10,10 @@
   gap: 0.5rem;
   font-size: 0.875rem;
 }
+
+/* Hand-off notice while the browser leaves for the doorway's own portal */
+.handoff-note {
+  margin: 0;
+  font-size: 0.9375rem;
+  text-align: center;
+}
