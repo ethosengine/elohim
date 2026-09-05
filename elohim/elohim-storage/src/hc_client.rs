@@ -140,6 +140,55 @@ async fn authorize_signing_credentials_fenced(
     }
 }
 
+/// Substrings that mark a zome-call failure as "the conductor does not honour
+/// our capability grant", as opposed to any other failure.
+///
+/// Deliberately narrow. A false positive costs one extra `CapGrant` on an open
+/// chain (and only once per cell per process — the fence bounds it); a list
+/// wide enough to catch a transport error would spend that grant on every
+/// conductor hiccup. `signature` is NOT here for exactly that reason: it
+/// appears in transport and serialization failures too.
+const CAP_GRANT_REJECTION_MARKERS: &[&str] = &[
+    "unauthorized",
+    "capability",
+    "cap grant",
+    "capgrant",
+    "cap secret",
+    "capsecret",
+];
+
+/// Does this zome-call error say our persisted grant is no longer honoured?
+fn looks_like_a_rejected_cap_grant(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    CAP_GRANT_REJECTION_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+}
+
+/// A zome call was refused in a way that says our persisted `CapGrant` is gone.
+/// Ask the fence to discard it, ONCE, so the next connect mints a fresh one.
+///
+/// # Why the heal is driven from the error path and not from connect
+///
+/// A credential file can be perfectly well-formed while the grant it names has
+/// vanished from the chain — a conductor database restored from an older
+/// snapshot under the same `CellId`. Nothing at connect time can see that:
+/// the file parses, the key is valid, reuse is correct as far as the fence
+/// knows. The first zome call is the only place the truth appears.
+///
+/// The fence itself enforces the two bounds that make this safe — never on a
+/// closed cell, and at most once per cell per process — so this function stays
+/// a classifier and a call.
+fn heal_stale_signing_credentials(cell_id: &CellId, message: &str) {
+    if !looks_like_a_rejected_cap_grant(message) {
+        return;
+    }
+    let Some(fence) = crate::closed_chain_fence::fence() else {
+        return;
+    };
+    fence.discard_stale_credentials(cell_id, message);
+}
+
 /// Refuse a zome call that would author on a closed chain, before it reaches
 /// the admission gate or the websocket.
 ///
@@ -219,8 +268,16 @@ impl HcClient {
     /// admission shed that never left this process) lives in
     /// [`crate::conductor_bridge_health::classify_zome_error`], NOT here.
     fn zome_call_failed(&self, e: impl std::fmt::Display) -> StorageError {
+        self.zome_call_failed_on(&self.cell_id, e)
+    }
+
+    /// [`Self::zome_call_failed`] for a call that targeted a cell OTHER than the
+    /// configured role's (the mishpat and imagodei arms), so the credential heal
+    /// below blames the right chain.
+    fn zome_call_failed_on(&self, cell_id: &CellId, e: impl std::fmt::Display) -> StorageError {
         let msg = format!("Zome call failed: {}", e);
         observe_role_zome_error(self.role_key(), &msg);
+        heal_stale_signing_credentials(cell_id, &msg);
         StorageError::Conductor(msg)
     }
 
@@ -450,6 +507,9 @@ impl HcClient {
             "Making signed zome call (imagodei cell)"
         );
         refuse_write_on_closed_chain(&cell_id, zome_name, fn_name)?;
+        // The target is MOVED into `ZomeCallTarget` below; keep a copy so a
+        // rejected grant can be blamed on the right cell (Task 32 fix round 1).
+        let cell_for_heal = cell_id.clone();
         // Same gate, same pool: the imagodei cell is a different DNA but the same
         // conductor, so its calls compete for the same read permits.
         let _permit = crate::conductor_admission::admission()
@@ -464,7 +524,7 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(|e| self.zome_call_failed(e))?;
+            .map_err(|e| self.zome_call_failed_on(&cell_for_heal, e))?;
         record_role_success(self.role_key());
         Ok(result.into_vec())
     }
@@ -493,6 +553,9 @@ impl HcClient {
             "Making signed zome call (mishpat cell)"
         );
         refuse_write_on_closed_chain(&cell_id, zome_name, fn_name)?;
+        // The target is MOVED into `ZomeCallTarget` below; keep a copy so a
+        // rejected grant can be blamed on the right cell (Task 32 fix round 1).
+        let cell_for_heal = cell_id.clone();
         // Same gate, same pool — see `call_zome_imagodei`.
         let _permit = crate::conductor_admission::admission()
             .acquire(AdmissionClass::Interactive, zome_name)
@@ -506,7 +569,7 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(|e| self.zome_call_failed(e))?;
+            .map_err(|e| self.zome_call_failed_on(&cell_for_heal, e))?;
         record_role_success(self.role_key());
         Ok(result.into_vec())
     }

@@ -93,6 +93,10 @@ pub struct SpaceSample {
     pub peer_timeouts: u64,
     /// How many peers we hold metadata for.
     pub peers: usize,
+    /// The arc the FIRST local agent declares, when it declares one at all.
+    /// Carried through to [`SpacePartition::arc`] so that field reports what was
+    /// sampled rather than restating the classifier's own precondition.
+    pub arc: Option<[u32; 2]>,
 }
 
 impl SpaceSample {
@@ -100,6 +104,16 @@ impl SpaceSample {
     /// are the same fact — see the module docs.
     fn no_completed_rounds(&self) -> bool {
         self.completed_rounds.unwrap_or(0) == 0
+    }
+
+    /// Positive evidence that this space is REACHABLE again: somebody completed
+    /// a round with us, or we are declaring an arc. Either negates a condition
+    /// the classification rests on.
+    ///
+    /// A plateau in `peer_timeouts` is deliberately NOT here — see
+    /// [`LineagePartitionProbe::observe`].
+    fn cleared(&self) -> bool {
+        !self.no_completed_rounds() || (!self.arc_empty && self.local_agents > 0)
     }
 }
 
@@ -117,9 +131,13 @@ pub struct SpacePartition {
     /// Total `peer_timeouts` at the previous sample — the rise is the signal,
     /// so both ends of it are reported rather than the delta alone.
     pub peer_timeouts_prev: u64,
-    /// The declared storage arc. `null` is the partitioned shape and the only
-    /// value this field can currently hold; it is serialized rather than
-    /// skipped because an absent key would read as "not measured".
+    /// The declared storage arc AS SAMPLED, carried from
+    /// [`SpaceSample::arc`]. An empty arc is a precondition of the
+    /// classification, so today this is always `null` on a row that appears
+    /// here — but it is carried, not hardcoded, so a future classifier that
+    /// admits a narrow arc reports the truth without touching this field.
+    /// Serialized rather than skipped: an absent key would read as "not
+    /// measured".
     pub arc: Option<[u32; 2]>,
     /// The highest `completed_rounds` any peer reported, `null` when none did.
     pub completed_rounds: Option<u32>,
@@ -143,11 +161,16 @@ pub fn sample_from_metrics_json(metrics: &serde_json::Value) -> Option<SpaceSamp
         .cloned()
         .unwrap_or_default();
     let arc_empty = !local_agents.is_empty()
-        && local_agents.iter().all(|agent| {
-            agent
-                .as_object()
-                .and_then(|a| get_either(a, "storage_arc", "storageArc"))
-                .is_none_or(serde_json::Value::is_null)
+        && local_agents
+            .iter()
+            .all(|agent| agent_arc(agent).is_none_or(serde_json::Value::is_null));
+    let arc = local_agents
+        .first()
+        .and_then(agent_arc)
+        .and_then(|v| v.as_array())
+        .and_then(|bounds| match bounds.as_slice() {
+            [lo, hi] => Some([lo.as_u64()? as u32, hi.as_u64()? as u32]),
+            _ => None,
         });
 
     let gossip =
@@ -183,6 +206,7 @@ pub fn sample_from_metrics_json(metrics: &serde_json::Value) -> Option<SpaceSamp
         completed_rounds,
         peer_timeouts,
         peers: peer_meta.len(),
+        arc,
     })
 }
 
@@ -197,6 +221,13 @@ pub fn classify(prev: &SpaceSample, next: &SpaceSample) -> bool {
         && prev.no_completed_rounds()
         && next.no_completed_rounds()
         && next.peer_timeouts > prev.peer_timeouts
+}
+
+/// One local agent's declared storage arc, in either spelling.
+fn agent_arc(agent: &serde_json::Value) -> Option<&serde_json::Value> {
+    agent
+        .as_object()
+        .and_then(|a| get_either(a, "storage_arc", "storageArc"))
 }
 
 fn get_either<'a>(
@@ -272,6 +303,21 @@ impl LineagePartitionProbe {
     /// Split out from [`Self::tick`] so the two-sample rule is testable without
     /// a conductor: the FIRST call for a space can never classify (there is no
     /// `prev`), the second can.
+    ///
+    /// # A named partition is STICKY until it is positively cleared
+    ///
+    /// The returned bool is "did THIS pair of samples classify"; the passport
+    /// entry is not. Once named, a space stays named until a sample shows a
+    /// completed gossip round or a declared arc ([`SpaceSample::cleared`]).
+    ///
+    /// The reason is that condition 3 (rising timeouts) is a liveness signal,
+    /// and a partitioned peer can go quiet without recovering: neighbours give
+    /// up retrying, a backoff saturates, and the counter plateaus. Dropping the
+    /// entry there would clear the field while the partition holds — and the
+    /// a2o pre-flight reads it at ONE instant, so that false negative lands
+    /// exactly where it costs most. A stale-but-true entry is the safer error:
+    /// it carries `sampledAt` from its last CONFIRMING sample, so a reader can
+    /// always see how old the confirmation is.
     pub fn observe(&self, space: &str, sample: SpaceSample, sampled_at: String) -> bool {
         let prev = {
             let mut previous = self.previous.lock().unwrap_or_else(|e| e.into_inner());
@@ -291,12 +337,13 @@ impl LineagePartitionProbe {
                     sampled_at,
                     peer_timeouts: sample.peer_timeouts,
                     peer_timeouts_prev: prev.peer_timeouts,
-                    arc: None,
+                    arc: sample.arc,
                     completed_rounds: sample.completed_rounds,
                     peers: sample.peers,
                 },
             );
-        } else {
+        } else if sample.cleared() {
+            // Only a POSITIVE recovery un-names a space; see the doc above.
             partitions.remove(space);
         }
         partitioned
@@ -412,6 +459,7 @@ mod tests {
             completed_rounds: rounds,
             peer_timeouts: timeouts,
             peers,
+            arc: if arc_empty { None } else { Some([0, u32::MAX]) },
         }
     }
 
@@ -559,6 +607,50 @@ mod tests {
             probe.snapshot().is_empty(),
             "the passport must never keep naming a partition that has cleared"
         );
+    }
+
+    #[test]
+    fn a_plateaued_partition_stays_named() {
+        // M4. Rising timeouts are a LIVENESS signal, and a partitioned peer can
+        // go quiet without recovering — neighbours stop retrying, a backoff
+        // saturates. Dropping the entry there clears the field while the
+        // partition holds, and the pre-flight reads it at one instant.
+        let probe = probe_without_conductor();
+        probe.observe("space-a", sample(true, None, 10, 2), "t0".into());
+        assert!(probe.observe("space-a", sample(true, None, 11, 2), "t1".into()));
+
+        // Timeouts plateau: this pair does not classify …
+        assert!(!probe.observe("space-a", sample(true, None, 11, 2), "t2".into()));
+        // … but the space is still named, still carrying its last CONFIRMING
+        // timestamp so a reader can see how old the confirmation is.
+        let named = probe.snapshot();
+        assert_eq!(named.len(), 1);
+        assert_eq!(named[0].sampled_at, "t1");
+    }
+
+    #[test]
+    fn a_declared_arc_alone_clears_a_named_partition() {
+        let probe = probe_without_conductor();
+        probe.observe("space-a", sample(true, None, 10, 2), "t0".into());
+        probe.observe("space-a", sample(true, None, 11, 2), "t1".into());
+        assert_eq!(probe.snapshot().len(), 1);
+        // No completed round yet, but we are declaring an arc again.
+        probe.observe("space-a", sample(false, None, 11, 2), "t2".into());
+        assert!(probe.snapshot().is_empty());
+    }
+
+    #[test]
+    fn the_sampled_arc_is_carried_not_invented() {
+        // M6. `arc` reports what was sampled. It is null on every row that can
+        // appear today (an empty arc is a precondition), but it is carried, so
+        // it cannot silently become a lie if the classifier ever widens.
+        let mut v = partitioned_metrics_json();
+        let s = sample_from_metrics_json(&v).expect("object");
+        assert_eq!(s.arc, None);
+
+        v["local_agents"][0]["storage_arc"] = serde_json::json!([7u32, 9u32]);
+        let s = sample_from_metrics_json(&v).expect("object");
+        assert_eq!(s.arc, Some([7, 9]));
     }
 
     #[test]

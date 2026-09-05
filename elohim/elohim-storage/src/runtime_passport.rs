@@ -55,8 +55,10 @@ pub struct RuntimePassport {
 #[serde(rename_all = "camelCase")]
 pub struct LineagePassport {
     /// Spaces this node believes it is partitioned from, confirmed across two
-    /// probe samples ([`crate::lineage_partition`]). Never empty when present:
-    /// the whole section is omitted when there is nothing to name.
+    /// probe samples ([`crate::lineage_partition`]). Absent when empty — a node
+    /// with closed cells and no partition emits `closedCells` alone rather than
+    /// an empty `partition` array.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub partition: Vec<crate::lineage_partition::SpacePartition>,
     /// Cells whose chains this node has recorded CLOSED
     /// ([`crate::closed_chain_fence`]) — the durable ledger that survives a

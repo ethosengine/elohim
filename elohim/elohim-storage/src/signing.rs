@@ -244,6 +244,20 @@ impl ConductorSigningClient {
 
         debug!(agent_cid = %agent_cid, "ConductorSigningClient: calling sign_for_agent");
 
+        // Rail 3 (Task 32 fix round 1, review M1). This is the one raw
+        // `app_ws.call_zome` in the crate — every other path funnels through
+        // `HcClient`, which is fenced. No imagodei chain is closeable today, so
+        // there is no live exposure; the check is here because rail 3's whole
+        // point is that a write extern added tomorrow is refused BY DEFAULT,
+        // and a call site outside the fence is a hole waiting for that day.
+        if let Some(fence) = crate::closed_chain_fence::fence() {
+            if let Some(reason) =
+                fence.refuse_zome_call(&self.cell_id, "imagodei", "sign_for_agent")
+            {
+                return Err(SigningError::ZomeCall(reason));
+            }
+        }
+
         let result = self
             .app_ws
             .call_zome(

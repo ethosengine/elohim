@@ -60,6 +60,35 @@
 //! `CellId` because a `CellId` is what the conductor writes to and it survives
 //! a restart that loses the role map.
 //!
+//! # What this fence does NOT know
+//!
+//! The headline above is the GUARANTEE, not the coverage. Two limits, both
+//! real, and both the next seat's business:
+//!
+//! * **The ledger records only closes THIS peer performed.** It is written from
+//!   the `ChainSealer` impl, so a chain closed by an operator, by a neighbour,
+//!   or by an earlier a2o run leaves no entry here. Rail 1 covers most of that
+//!   in practice — credentials minted on an earlier boot are reused forever, so
+//!   a later close by anyone never provokes a mint — but a peer that meets an
+//!   **already-closed cell with a fresh data dir** has neither a ledger entry
+//!   nor a persisted credential, takes the `Mint` branch, and earns the block.
+//!   Closing that gap is a bounded follow-on: a boot-time `dump_full_state`
+//!   close-scan per supervised role, mirroring the a2o Background's
+//!   `closeChainSeqOf`.
+//! * **Durability here equals `storage_dir`'s durability.** Both rails live
+//!   under the storage data dir while the sealed chain lives in the conductor's.
+//!   A deployment that gives storage an EPHEMERAL data dir beside a persistent
+//!   conductor dir makes every restart a fresh-data-dir case, and this fence
+//!   silently degrades to nothing.
+//!
+//! A third consequence worth stating where an operator meets it: rail 2 is a
+//! read-disable as well as a write-fence. A closed cell with no pre-close
+//! credentials never connects, so it serves none of the
+//! [`CLOSED_CHAIN_READ_FNS`] either — a zome read needs a capability grant too.
+//! That is forced rather than chosen, and it is the one place the sunset
+//! ruling's "routing, not a disable" does not hold; the refusal message says so
+//! in as many words.
+//!
 //! # Storage layout
 //!
 //! ```text
@@ -91,12 +120,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// The first five mirror the a2o harness rail exactly (`seal_close` itself
 /// calls `my_chain_activity`, `get_record_at` and `get_signed_action` on the
-/// predecessor for precisely this reason). The last three are the additional
-/// write-free node-registry externs that STORAGE calls on a v1 cell:
-/// `known_agents` from the trailing lineage-bridge sweep
-/// ([`crate::services::lineage_bridge`]), and the two export walks the bridge
-/// and carry paths read pages through. Every one was checked write-free in the
-/// coordinator source before being listed.
+/// predecessor for precisely this reason).
+///
+/// The last three are additional node-registry externs, each verified
+/// write-free in the coordinator source and RESERVED for the v1 read paths —
+/// not a claim that storage calls all three today. Only `known_agents` is
+/// storage's own call on a v1 cell (`lineage_bridge.rs`'s neighbour sweep);
+/// `export_records` / `export_held_records` / `agent_activity_of` are read
+/// INSIDE `carry_from`, which runs on the v2 side app. They are listed because
+/// an over-broad READ allow-list costs nothing while a missing entry is a
+/// silent refusal on a path that was always legal.
 pub const CLOSED_CHAIN_READ_FNS: &[&str] = &[
     "export_records",
     "my_chain_activity",
@@ -221,6 +254,29 @@ pub struct ClosedChainFence {
     /// In-memory mirror of the credential files. Populated lazily on read and
     /// eagerly on mint, so the steady state costs no filesystem call.
     creds: RwLock<BTreeMap<String, StoredCredentials>>,
+    /// Cells whose credentials have already been healed once in this process
+    /// (see [`ClosedChainFence::discard_stale_credentials`]). Not persisted: the
+    /// bound is per-process on purpose, so a genuine repair survives a restart
+    /// while a rejection LOOP cannot.
+    healed: RwLock<std::collections::BTreeSet<String>>,
+}
+
+/// The one wording of the closed-cell refusal, so the two arms that produce it
+/// cannot drift into describing the same fact differently.
+///
+/// `detail` says WHY there is no way in; the rest is invariant.
+fn closed_refusal(record: &ClosedCellRecord, label: &str, detail: &str) -> String {
+    format!(
+        "refusing to authorize signing credentials on a CLOSED chain (cell {cell}, {why}) for \
+         '{label}': authorize_signing_credentials COMMITS a CapGrant, and a post-close action is \
+         warranted by every neighbour into a permanent cell block that holochain 0.7 cannot \
+         lift. {detail} This role therefore stays UNCONNECTED (503) — which, note, also means it \
+         serves none of the reads a closed chain would otherwise still answer, because a zome \
+         read needs a capability grant too. An unconnected role is recoverable; a blocked cell \
+         is not.",
+        cell = record.cell,
+        why = record.why,
+    )
 }
 
 impl ClosedChainFence {
@@ -240,6 +296,7 @@ impl ClosedChainFence {
                  credential vault will not persist across this restart"
             );
         }
+        harden_dir(&root);
         harden_dir(&root.join(CREDENTIALS_DIR));
 
         let ledger_path = root.join(LEDGER_FILE);
@@ -276,6 +333,7 @@ impl ClosedChainFence {
             root,
             closed: RwLock::new(closed),
             creds: RwLock::new(BTreeMap::new()),
+            healed: RwLock::new(std::collections::BTreeSet::new()),
         }
     }
 
@@ -287,6 +345,7 @@ impl ClosedChainFence {
             root: PathBuf::new(),
             closed: RwLock::new(BTreeMap::new()),
             creds: RwLock::new(BTreeMap::new()),
+            healed: RwLock::new(std::collections::BTreeSet::new()),
         }
     }
 
@@ -379,31 +438,163 @@ impl ClosedChainFence {
     ///
     /// Order is load-bearing:
     ///
-    /// 1. **Persisted credentials win, closed or open.** The grant they name is
-    ///    already on the chain; re-minting would author a second one for no
-    ///    gain. This is what makes a `storage-restart` write-free.
-    /// 2. **A closed cell with no persisted credentials is refused by name.**
+    /// 1. **USABLE persisted credentials win, closed or open.** The grant they
+    ///    name is already on the chain; re-minting would author a second one
+    ///    for no gain. This is what makes a `storage-restart` write-free.
+    /// 2. **An UNUSABLE persisted credential is discarded on an OPEN cell and
+    ///    re-minted; on a CLOSED cell it is refused.** See below — this
+    ///    asymmetry is the whole point of the branch.
+    /// 3. **A closed cell with no usable credentials is refused by name.**
     ///    Nothing reaches the conductor.
-    /// 3. **Otherwise mint once and persist immediately**, so the next restart
+    /// 4. **Otherwise mint once and persist immediately**, so the next restart
     ///    takes branch 1.
+    ///
+    /// # Why an unusable credential must not brick an OPEN cell
+    ///
+    /// Before this fence existed, storage re-minted on every connect, so a
+    /// truncated, hand-edited or half-written credential file simply could not
+    /// happen — and if the conductor's grant went missing, the next connect
+    /// replaced it. Rail 1 removes that per-connect write, which also removes
+    /// that self-healing. A `Reuse` returned for a file that cannot be turned
+    /// back into `SigningCredentials` would be retried forever by
+    /// [`crate::hc_client_registry::HcClientRegistry::connect_role_forever`],
+    /// which never gives up — the role would stay down until an operator
+    /// deleted the file by hand.
+    ///
+    /// So on an OPEN cell an unusable credential is DISCARDED (cache and file)
+    /// with a named WARN and the decision falls through to `Mint`: one extra
+    /// `CapGrant` on a chain that accepts them, which is exactly the
+    /// pre-Task-32 behaviour and exactly what the fence exists to allow on an
+    /// open chain.
+    ///
+    /// On a CLOSED cell it is NOT discarded and NOT minted. There, minting is
+    /// the thing that must never happen, and an unusable credential is simply
+    /// the "no way in" case — refused by name, with the file left in place for
+    /// an operator to inspect.
     pub fn decide(&self, cell: &CellId, label: &str) -> AuthorizeDecision {
         let key = cell_key(cell);
+        let closed = self.closed_record(cell);
+
         if let Some(stored) = self.load_credentials(&key) {
-            return AuthorizeDecision::Reuse(Box::new(stored));
+            match to_signing_credentials(&stored) {
+                // The steady state: a grant already on the chain, reused.
+                Ok(_) => return AuthorizeDecision::Reuse(Box::new(stored)),
+                Err(e) if closed.is_none() => {
+                    tracing::warn!(
+                        cell = %key,
+                        label,
+                        error = %e,
+                        "closed-chain fence: persisted signing credentials are UNUSABLE on an \
+                         OPEN cell — discarding them and minting once. A CapGrant on an open \
+                         chain is safe and this is the pre-fence self-healing behaviour; the \
+                         same fault on a CLOSED cell is refused instead."
+                    );
+                    self.discard_credentials(&key);
+                }
+                Err(e) => {
+                    // Closed: say so precisely rather than reporting "no
+                    // credentials", which would send an operator looking for a
+                    // file that is right there and broken.
+                    return AuthorizeDecision::Refuse(closed_refusal(
+                        closed.as_ref().expect("closed arm"),
+                        label,
+                        &format!(
+                            "The credentials persisted for this cell are UNUSABLE ({e}) and are \
+                             left in place for inspection; they are NOT re-minted, because \
+                             minting is the one thing a sealed chain must never receive."
+                        ),
+                    ));
+                }
+            }
         }
-        if let Some(record) = self.closed_record(cell) {
-            return AuthorizeDecision::Refuse(format!(
-                "refusing to authorize signing credentials on a CLOSED chain (cell {cell}, \
-                 {why}) for '{label}': authorize_signing_credentials COMMITS a CapGrant, and a \
-                 post-close action is warranted by every neighbour into a permanent cell block \
-                 that holochain 0.7 cannot lift. No pre-close credentials are persisted for this \
-                 cell, so there is no write-free way to reach it — this role stays unconnected \
-                 (503) rather than partitioning the mesh.",
-                cell = record.cell,
-                why = record.why,
+
+        if let Some(record) = closed {
+            return AuthorizeDecision::Refuse(closed_refusal(
+                &record,
+                label,
+                "No pre-close credentials are persisted for this cell, so there is no \
+                 write-free way to reach it.",
             ));
         }
         AuthorizeDecision::Mint
+    }
+
+    /// Forget the persisted credentials for `key`, in memory and on disk.
+    ///
+    /// Reached from two places, both of which have established that the cell is
+    /// OPEN: [`Self::decide`] on an unusable file, and
+    /// [`Self::discard_stale_credentials`] on a runtime authorization failure.
+    /// Nothing calls it for a closed cell.
+    fn discard_credentials(&self, key: &str) {
+        self.creds
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(key);
+        if self.root.as_os_str().is_empty() {
+            return;
+        }
+        let path = self.credentials_path(key);
+        if let Err(e) = std::fs::remove_file(&path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "closed-chain fence: could not remove the unusable credential file — the \
+                     next connect will read it again and discard it again"
+                );
+            }
+        }
+    }
+
+    /// A zome call on `cell` failed in a way that says the conductor no longer
+    /// honours our persisted grant. Discard it so the NEXT connect mints a
+    /// fresh one.
+    ///
+    /// # The shape this exists for
+    ///
+    /// The credential file can be perfectly well-formed while the `CapGrant` it
+    /// names is gone from the chain — a conductor database restored from an
+    /// older snapshot, with the same `CellId`. `decide` cannot see that: the
+    /// file parses, the key is valid, `Reuse` is correct as far as it can tell.
+    /// The only place the truth appears is the first zome call, which comes
+    /// back unauthorized.
+    ///
+    /// Returns `true` when something was discarded.
+    ///
+    /// # Two bounds, both deliberate
+    ///
+    /// * **Never on a closed cell.** Discarding there would invite the next
+    ///   connect to mint on a sealed chain — the exact action this module
+    ///   exists to prevent. A closed cell whose grant has vanished is simply
+    ///   unreachable, and that is the correct answer.
+    /// * **Once per cell per process.** The heal is a repair, not a retry loop:
+    ///   after one discard the next connect mints, and if THAT grant is also
+    ///   rejected the fault is not a stale file. Bounding it here means the
+    ///   worst case is one extra `CapGrant` per cell per process — strictly
+    ///   fewer than the pre-Task-32 one-per-connect.
+    pub fn discard_stale_credentials(&self, cell: &CellId, reason: &str) -> bool {
+        if self.closed_record(cell).is_some() {
+            return false;
+        }
+        let key = cell_key(cell);
+        {
+            let mut healed = self.healed.write().unwrap_or_else(|e| e.into_inner());
+            if !healed.insert(key.clone()) {
+                return false;
+            }
+        }
+        if self.load_credentials(&key).is_none() {
+            return false;
+        }
+        self.discard_credentials(&key);
+        tracing::warn!(
+            cell = %key,
+            reason,
+            "closed-chain fence: the conductor rejected our persisted signing credentials on an \
+             OPEN cell — discarded ONCE so the next connect mints a fresh grant. A second \
+             rejection on this cell will not be healed again; the fault would not be a stale file."
+        );
+        true
     }
 
     /// The ONE gate every `authorize_signing_credentials` call site goes
@@ -576,8 +767,25 @@ fn unix_now() -> i64 {
 }
 
 /// Write `body` to `path` with owner-only permissions.
+///
+/// The file is CREATED at 0600 rather than created-then-chmodded: a plain
+/// `fs::write` followed by `set_permissions` leaves a credential readable at
+/// `0666 & ~umask` for the window between the two syscalls. The chmod stays as
+/// belt-and-braces for a file that already existed at a looser mode.
 fn write_private(path: &Path, body: &str) {
-    if let Err(e) = std::fs::write(path, body) {
+    use std::io::Write;
+
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let written = options
+        .open(path)
+        .and_then(|mut file| file.write_all(body.as_bytes()));
+    if let Err(e) = written {
         tracing::warn!(path = %path.display(), error = %e, "closed-chain fence: write failed");
         return;
     }
@@ -701,6 +909,21 @@ mod tests {
                 "{shared} is in the a2o rail and must stay in this allowlist"
             );
         }
+        // And the whole list is pinned, so storage's own three cannot vanish
+        // under a rename without a failing test naming them.
+        assert_eq!(
+            CLOSED_CHAIN_READ_FNS,
+            &[
+                "export_records",
+                "my_chain_activity",
+                "get_record_at",
+                "get_signed_action",
+                "get_closes_for",
+                "known_agents",
+                "export_held_records",
+                "agent_activity_of",
+            ]
+        );
     }
 
     #[test]
@@ -882,6 +1105,142 @@ mod tests {
             AuthorizeDecision::Reuse(_)
         ));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A credential file that parses as JSON but cannot become
+    /// `SigningCredentials` — the shape a truncated write or a hand-edit
+    /// leaves behind.
+    fn write_unusable_credentials(fence: &ClosedChainFence, key: &str) {
+        fence
+            .creds
+            .write()
+            .unwrap()
+            .insert(key.to_string(), unusable_stored());
+        if !fence.root.as_os_str().is_empty() {
+            write_private(
+                &fence.credentials_path(key),
+                &serde_json::to_string(&unusable_stored()).unwrap(),
+            );
+        }
+    }
+
+    fn unusable_stored() -> StoredCredentials {
+        StoredCredentials {
+            signing_agent_key: hex::encode([1u8; 39]),
+            keypair: hex::encode([2u8; 8]), // wrong length — cannot be a SigningKey
+            cap_secret: hex::encode([3u8; 64]),
+            minted_at: 0,
+        }
+    }
+
+    #[test]
+    fn an_unusable_credential_on_an_open_cell_is_discarded_and_re_minted_once() {
+        // I1. Before the fence, a per-connect re-mint healed this shape; rail 1
+        // removed that, so the heal has to be explicit or an OPEN role stays
+        // down forever behind `connect_role_forever`'s infinite retry.
+        let dir = tmp_dir("stale-open");
+        let fence = ClosedChainFence::open(&dir);
+        let cell = test_cell(30, 31);
+        let key = cell_key(&cell);
+        write_unusable_credentials(&fence, &key);
+
+        assert_eq!(
+            fence.decide(&cell, "node_registry"),
+            AuthorizeDecision::Mint,
+            "an open cell must heal, not brick"
+        );
+        assert!(
+            fence.load_credentials(&key).is_none(),
+            "the unusable file is discarded from cache AND disk, so the mint is not undone \
+             by the next read"
+        );
+        assert!(!fence.credentials_path(&key).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_unusable_credential_on_a_closed_cell_is_refused_and_never_minted() {
+        // The asymmetry is the point: on a sealed chain a mint is the one thing
+        // that must never happen, so the broken file is left in place and named.
+        let dir = tmp_dir("stale-closed");
+        let fence = ClosedChainFence::open(&dir);
+        let cell = test_cell(32, 33);
+        let key = cell_key(&cell);
+        write_unusable_credentials(&fence, &key);
+        fence.record_closed(&cell, Some("node_registry"), None, "sealed", 1);
+
+        match fence.decide(&cell, "node_registry") {
+            AuthorizeDecision::Refuse(reason) => {
+                assert!(reason.contains("UNUSABLE"), "{reason}");
+                assert!(reason.contains("NOT re-minted"), "{reason}");
+                assert!(reason.contains("CLOSED chain"), "{reason}");
+            }
+            other => panic!("a closed cell must never mint: {other:?}"),
+        }
+        assert!(
+            fence.credentials_path(&key).exists(),
+            "the file stays for an operator to inspect"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_rejected_grant_heals_exactly_once_on_an_open_cell() {
+        // The stale-grant shape: the file is perfectly good, but the CapGrant
+        // it names is gone from a restored conductor database. Only the first
+        // zome call can see it, so the heal is driven from there.
+        let dir = tmp_dir("stale-grant");
+        let fence = ClosedChainFence::open(&dir);
+        let cell = test_cell(34, 35);
+        let key = cell_key(&cell);
+        fence.store_credentials(&key, &good_credentials());
+
+        assert!(
+            fence.discard_stale_credentials(&cell, "unauthorized"),
+            "the first rejection heals"
+        );
+        assert!(fence.load_credentials(&key).is_none());
+        assert_eq!(
+            fence.decide(&cell, "node_registry"),
+            AuthorizeDecision::Mint
+        );
+
+        // Bounded: a second rejection is not a stale file, and a heal loop
+        // would author a CapGrant per failed call.
+        fence.store_credentials(&key, &good_credentials());
+        assert!(
+            !fence.discard_stale_credentials(&cell, "unauthorized"),
+            "the heal is once per cell per process"
+        );
+        assert!(fence.load_credentials(&key).is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_rejected_grant_never_heals_on_a_closed_cell() {
+        // Discarding here would invite the next connect to mint on a sealed
+        // chain — the exact action this module exists to prevent.
+        let dir = tmp_dir("stale-grant-closed");
+        let fence = ClosedChainFence::open(&dir);
+        let cell = test_cell(36, 37);
+        let key = cell_key(&cell);
+        fence.store_credentials(&key, &good_credentials());
+        fence.record_closed(&cell, Some("node_registry"), None, "sealed", 1);
+
+        assert!(!fence.discard_stale_credentials(&cell, "unauthorized"));
+        assert!(
+            fence.load_credentials(&key).is_some(),
+            "an unreachable closed cell is the correct answer, not a fresh grant"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn good_credentials() -> holochain_client::SigningCredentials {
+        holochain_client::SigningCredentials {
+            signing_agent_key: AgentPubKey::from_raw_32(vec![38; 32]),
+            keypair: ed25519_dalek::SigningKey::from_bytes(&[39u8; 32]),
+            cap_secret: holochain_types::prelude::CapSecret::from([40u8; 64]),
+        }
     }
 
     #[test]
