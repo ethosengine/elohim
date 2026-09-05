@@ -115,7 +115,17 @@
  *   3. The Background pre-flight (`probeChainClose`, admin-only and therefore
  *      write-free) refuses the whole run BY NAME when a peer's v1 chain was
  *      already sealed by an EARLIER run, so a spent mesh reds in the
- *      Background instead of five Stations later.
+ *      Background instead of five Stations later. It FAILS CLOSED: an
+ *      unreachable peer, or a chain whose records this file cannot read in
+ *      either action shape, is refused rather than answered "open" — the
+ *      asymmetry is that a false refusal costs one mesh rebuild and a false
+ *      pass costs the mesh.
+ *
+ * Rails 1 and 2 are armed for a peer the moment its OWN seal receipt lands
+ * (`markCellClosed(await baseRoleCellId(peer), …, true)` in the Station 8 branch
+ * of "each peer's runtime next reconciles"), never by re-probing the chain — the
+ * receipt is the proof, and a probe miss there would silently disarm the fence
+ * for the rest of the run.
  *
  * What none of this can do is make the crossing run on a disposable cell: the
  * storage vehicle resolves v1 as the BASE app's role cell
@@ -699,7 +709,12 @@ async function connectRoleConductor(
             'run holds no signing credentials minted before the close. Authorizing now would ' +
             'commit a CapGrant on a closed chain — the exact action that earned matthew and ' +
             'jessica permanent cell blocks from every neighbour on 2026-09-05T03:32:39Z. A ' +
-            'closed chain is never authored on again, by anyone.'
+            'closed chain is never authored on again, by anyone. NOTE: this branch ignores ' +
+            "`intent` on purpose — even Station 8's declared 'deliberate-post-close-write' rides " +
+            'on credentials the Background minted BEFORE the close, and a run that reached the ' +
+            'sunset without them has lost the fixture invariant, not found a loophole. If you ' +
+            'are here debugging that Station, the bug is the missing pre-flight mint, not this ' +
+            'refusal.'
         );
       }
       await admin.authorizeSigningCredentials(cellId);
@@ -764,8 +779,18 @@ interface ChainCloseFact {
   actionHash: string | null;
 }
 
+/** The two shapes a dumped action is read in — see `actionVariantOf`. */
+interface DumpedAction {
+  type?: string;
+  action_seq?: number;
+  header?: { action_seq?: number };
+  data?: { type?: string };
+}
+
 /**
- * The `CloseChain` on a source-chain dump record, if that record is one.
+ * The action-variant tag of a source-chain dump record, or `undefined` when the
+ * record's action is in NEITHER shape this file knows — which is a legibility
+ * failure, never a "not a close".
  *
  * Shape-tolerant ON PURPOSE. 0.7 splits an action into a common `header` and a
  * per-variant `data` half (measured, and documented on
@@ -775,19 +800,30 @@ interface ChainCloseFact {
  * only one of the two would make an already-closed chain look open — which is
  * precisely the blindness this pre-flight exists to end — so both are read and
  * neither is trusted to be the only one.
+ *
+ * Separating LEGIBILITY from "is it a `CloseChain`" is the whole point: a probe
+ * that answers "no close" for a dump it could not read would let the caller mint
+ * a `CapGrant` on a chain nobody actually checked. `probeChainClose` refuses
+ * instead.
  */
-function closeChainSeqOf(action: unknown): number | null | undefined {
-  const a = action as
-    | {
-        type?: string;
-        action_seq?: number;
-        header?: { action_seq?: number };
-        data?: { type?: string };
-      }
-    | undefined;
+function actionVariantOf(action: unknown): string | undefined {
+  const a = action as DumpedAction | undefined;
   const variant = a?.data?.type ?? a?.type;
-  if (variant !== 'CloseChain') return undefined;
+  return typeof variant === 'string' ? variant : undefined;
+}
+
+/** The `action_seq` of a dump record already known to be a `CloseChain`. */
+function closeChainSeqOf(action: unknown): number | null {
+  const a = action as DumpedAction | undefined;
   return a?.header?.action_seq ?? a?.action_seq ?? null;
+}
+
+/** The top-level keys of an illegible action, so a refusal can NAME the shape it
+ * did not recognise instead of saying only that it failed. */
+function describeActionShape(action: unknown): string {
+  if (action === null || typeof action !== 'object') return typeof action;
+  const keys = Object.keys(action).slice(0, 8);
+  return `{${keys.join(',')}}`;
 }
 
 /**
@@ -798,10 +834,16 @@ function closeChainSeqOf(action: unknown): number | null | undefined {
  * through `connectRoleConductor`) is exactly the action a closed chain must
  * never take. See `closedCells`.
  *
- * Returns `null` when the chain carries no close, and throws only when the
- * conductor itself could not be asked — an unreachable peer is never read as
- * "not closed" (`unreachable ≠ absent`, the same discipline `pollAdoption`
- * documents).
+ * Returns `null` ONLY when the chain was read and provably carries no close.
+ * Every other outcome THROWS, because this is a poison check and the two
+ * mistakes are not symmetric: a false refusal costs one
+ * `hc-mesh.sh stop && start` — which the refusal itself prescribes — while a
+ * false pass lets the caller mint a `CapGrant` on a sealed chain and costs the
+ * mesh permanently. So an unreachable peer is never read as "not closed"
+ * (`unreachable ≠ absent`, the same discipline `pollAdoption` documents), and
+ * neither is a dump whose records this file cannot read: a chain with records
+ * of which NONE yielded a legible action variant is refused by name, carrying
+ * the unrecognised shape, rather than answered "open".
  */
 async function probeChainClose(
   peer: PeerName,
@@ -824,16 +866,70 @@ async function probeChainClose(
     const cellId = findProvisionedCellId(app, role);
     if (!cellId) return null;
     const dump = await admin.dumpFullState({ cell_id: cellId });
-    for (const record of dump.source_chain_dump?.records ?? []) {
-      const seq = closeChainSeqOf(record.action);
-      if (seq === undefined) continue;
+    const records = dump.source_chain_dump?.records ?? [];
+    let legible = 0;
+    const unreadShapes = new Set<string>();
+    for (const record of records) {
+      const variant = actionVariantOf(record.action);
+      if (variant === undefined) {
+        unreadShapes.add(describeActionShape(record.action));
+        continue;
+      }
+      legible += 1;
+      if (variant !== 'CloseChain') continue;
       return {
         cellId,
-        actionSeq: seq,
+        actionSeq: closeChainSeqOf(record.action),
         actionHash: record.action_address ? encodeHashToBase64(record.action_address) : null,
       };
     }
+    if (records.length > 0 && legible === 0) {
+      throw new Error(
+        `${peer}'s '${role}' v1 chain state is UNREADABLE — refusing rather than assuming it is ` +
+          `open. ${records.length} source-chain record(s) came back from dumpFullState and not ` +
+          'one carried an action variant in either shape this file reads ' +
+          `(neither \`action.data.type\` nor \`action.type\`); the shapes seen were ` +
+          `${[...unreadShapes].join(' ')}. Teach \`actionVariantOf\` the new shape — an ` +
+          'un-inspectable chain must never be answered "no close", because the caller then mints ' +
+          'a CapGrant on it and, if it WAS sealed, blocks the peer permanently.'
+      );
+    }
     return null;
+  } finally {
+    await closeTransport(admin.client);
+  }
+}
+
+/**
+ * One peer's provisioned cell id for `role` on `appId`, read over the admin
+ * seam alone (`listApps`) — no dump, no zome call, nothing written.
+ *
+ * This exists so the after-close fence can be armed from a fact the caller
+ * ALREADY holds (a `SealReceipt`'s close hash) rather than from a second
+ * inspection of the chain: a probe that missed would silently disarm the fence
+ * for the rest of the run, and the receipt is the authoritative signal.
+ */
+async function baseRoleCellId(
+  peer: PeerName,
+  role: string = NODE_REGISTRY_ROLE,
+  appId: string = APP_ID
+): Promise<CellId> {
+  const ports = PEER_CONDUCTOR_PORTS[peer];
+  const admin = await withTimeout(
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${ports.admin}`),
+      wsClientOptions: { origin: APP_ID },
+    }),
+    CONDUCTOR_CONNECT_TIMEOUT_MS,
+    `admin connect ${peer}:${ports.admin}`
+  );
+  try {
+    const apps = await admin.listApps({});
+    const app = apps.find(a => a.installed_app_id === appId);
+    assert.ok(app, `${peer}: app '${appId}' is not installed`);
+    const cellId = findProvisionedCellId(app, role);
+    assert.ok(cellId, `${peer}: no '${role}' cell provisioned on app '${appId}'`);
+    return cellId;
   } finally {
     await closeTransport(admin.client);
   }
@@ -925,22 +1021,23 @@ async function seedNodeRegistryRecord(peer: PeerName): Promise<void> {
 }
 
 /**
- * Best-effort: authors one fresh v1 node-registry record per peer (idempotent enough — each
- * run's `node_id` is unique by `RUN_STAMP`, so re-running never collides with a prior run's
- * fixture). No query extern exists to check "does a record already exist" (`get_my_nodes` is
- * retired and always returns `[]`; no HTTP route projects node-registry records yet — see
- * `elohim/elohim-storage/src/node_registry_api.rs`, which wires shard assignment only), so this
- * always authors rather than first checking. On any failure (conductor unreachable, port not
- * where expected, …) this logs loudly and returns `'pending'` rather than silently treating "at
- * least one record" as already true — the Background skips the whole scenario, which is the
- * loud, honest failure mode for a fixture precondition that could not be established.
+ * How many records this peer's v1 node-registry chain already holds. A READ
+ * (`export_records`), legal on a closed chain and covered by the credentials
+ * the pre-flight minted.
+ *
+ * This is the query an earlier note in this file said did not exist — the
+ * Background used to author unconditionally because it believed there was no
+ * way to ask (`get_my_nodes` is retired and always returns `[]`, and no HTTP
+ * route projects node-registry records; see
+ * `elohim/elohim-storage/src/node_registry_api.rs`, which wires shard
+ * assignment only). `export_records` IS that query, on the agent's own chain.
+ *
+ * Throws when the conductor cannot be asked; `ensureNodeRegistryRecords`
+ * catches that and reports `'pending'`, so an unaskable peer is never read as
+ * "already holds records" — the same `unreachable ≠ absent` discipline the rest
+ * of this file keeps.
  */
-/**
- * How many records this peer's v1 node-registry chain already holds, or `null`
- * when it could not be asked. A READ (`export_records`), legal on a closed
- * chain and covered by the credentials the pre-flight minted.
- */
-async function countV1Records(peer: PeerName): Promise<number | null> {
+async function countV1Records(peer: PeerName): Promise<number> {
   const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
   try {
     const page = (await rail.call('export_records', { cursor: null, limit: 1 })) as {
@@ -964,8 +1061,7 @@ async function countV1Records(peer: PeerName): Promise<number | null> {
 async function ensureNodeRegistryRecords(): Promise<'ok' | 'pending'> {
   for (const peer of PEER_NAMES) {
     try {
-      const held = await countV1Records(peer);
-      if (held !== null && held > 0) continue;
+      if ((await countV1Records(peer)) > 0) continue;
       await seedNodeRegistryRecord(peer);
     } catch (error) {
       console.error(
@@ -2386,15 +2482,21 @@ When("each peer's runtime next reconciles", { timeout: 400_000 }, async function
       // of committing the `CapGrant` that blocked the household on 2026-09-05.
       // The credentials the Background minted (before any close) are what the
       // remaining v1 reads in this Station ride on.
-      const close = await probeChainClose(peer);
-      if (close) {
-        markCellClosed(
-          close.cellId,
-          `sealed by ${peer}'s own runtime in THIS run — CloseChain ${receipt.closeHash} at ` +
-            `action_seq ${String(close.actionSeq)}`,
-          true
-        );
-      }
+      //
+      // ARMED FROM THE RECEIPT, NOT FROM A SECOND LOOK. `receipt.closeHash` IS
+      // the proof that this chain is closed — the peer's own runtime authored
+      // it and published it. Re-deriving the same fact by re-reading the chain
+      // would put the fence behind a probe that can come back empty (an
+      // integration lag, an action shape this file cannot read), and a probe
+      // miss HERE silently disarms the two rails above for the rest of the run.
+      // `baseRoleCellId` resolves the cell over `listApps` alone, so arming
+      // costs one admin read and cannot fail open.
+      markCellClosed(
+        await baseRoleCellId(peer),
+        `sealed by ${peer}'s own runtime in THIS run — CloseChain ${receipt.closeHash}, open ` +
+          `${receipt.openHash}`,
+        true
+      );
       console.error(
         `[happ-lineage-migration] Station 8: ${peer}'s OWN runtime sealed — close ` +
           `${receipt.closeHash}, open ${receipt.openHash}, seal witness ${receipt.witnessHash}, ` +
