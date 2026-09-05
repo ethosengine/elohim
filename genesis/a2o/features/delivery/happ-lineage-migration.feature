@@ -176,9 +176,11 @@ Feature: The network changes the rules its peers hold each other to without losi
   validation confirms the warrant (no quorum, no vote, no appeal): that peer
   refuses to gossip with the accused CELL — that one chain on that peer, not
   the person's other cells — again, permanently, and nothing in the
-  substrate lifts it. A write after a close earns both from every neighbour
-  that sees it; that is the price of the sunset, and the reason a closed
-  chain is never written on again. (Measured on the household 2026-09-05,
+  substrate lifts it. Each peer keeps its blocks in a BLOCK LIST, which the
+  household can read from that peer's own databases (each entry names the
+  blocked cell and the warrant it cites). A write after a close earns both
+  from every neighbour that sees it; that is the price of the sunset, and
+  the reason a closed chain is never written on again. (Measured on the household 2026-09-05,
   read from the conductors' own databases with crates/hc-dbtool.)
 
   The TEST HARNESS is the rehearsal's own hand: the a2o runner that drives
@@ -295,7 +297,7 @@ Feature: The network changes the rules its peers hold each other to without losi
   # its DHT — does not fence a closed chain), v2's validation refuses it where the close is known,
   # and james's neighbours warrant it (publish a record accusing the write) and block his v1 cell
   # (refuse to gossip with that chain again, permanently; his v2 cell is untouched). That last
-  # consequence is ASSERTED here, read from a neighbour's own block table — which is exactly why the
+  # consequence is ASSERTED here, read from a neighbour's own block list — which is exactly why the
   # chain this Station spends should be one nobody needs afterwards.
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
     Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
@@ -317,7 +319,7 @@ Feature: The network changes the rules its peers hold each other to without losi
     # plainly as a limitation still being closed, never as the network's intended shape — the fence
     # this Station rehearses grows to cover every courier, not fewer peers on purpose.
     And a courier who never saw the close is not yet fenced — a limitation still being closed, not the network's intended shape
-    # The neighbour's own refusal, read out of its conductor's block table rather than inferred from
+    # The neighbour's own refusal, read out of its conductor's block list rather than inferred from
     # silence. This is the price of the sunset named in the vocabulary above, and the reason the
     # chain this Station spends should be a chain made for the purpose.
     And a neighbour's own block list names james's v1 cell, with the warrant "No more actions are allowed after a chain close"
