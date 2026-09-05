@@ -204,7 +204,7 @@ export async function connectConductor(
  * the closer is duck-typed and never throws — a transport that cannot be closed
  * is a cleanup nuisance, never a reason to fail a scenario that already passed.
  */
-async function closeTransport(transport: unknown): Promise<void> {
+export async function closeTransport(transport: unknown): Promise<void> {
   const closer = (transport as { close?: () => unknown }).close;
   if (typeof closer !== 'function') return;
   try {

@@ -138,6 +138,7 @@ import {
 } from '@holochain/client';
 import { request } from 'undici';
 
+import { closeTransport } from '../../src/framework/dataplane/carried-election.js';
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
 
 import {
@@ -565,15 +566,15 @@ async function connectRoleConductor(
     const call = async (fnName: string, payload: unknown): Promise<unknown> =>
       ws.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
     const close = async (): Promise<void> => {
-      await ws.client.close();
-      await admin.client.close();
+      await closeTransport(ws.client);
+      await closeTransport(admin.client);
     };
     return { call, agent: encodeHashToBase64(cellId[1]), close };
   } catch (e) {
     if (appWs) {
-      await appWs.client.close();
+      await closeTransport(appWs.client);
     }
-    await admin.client.close();
+    await closeTransport(admin.client);
     throw e;
   }
 }
