@@ -1370,6 +1370,23 @@ pub struct ExportInput {
 pub struct ExportPage {
     pub records: Vec<SignedActionHashed>,
     pub entries: Vec<Option<Entry>>,
+    /// **Additive (Task 26, G10).** The entry-def NAME the EXPORTING DNA
+    /// publishes for each record, paired POSITIONALLY with `records` — `""` for
+    /// a record that carries no app entry. Declared here rather than appended
+    /// with the other additive fields because that pairing is the fact a reader
+    /// needs: `records`, `entries` and `type_names` are the page's three
+    /// positional vectors, and each is length-checked against the first.
+    ///
+    /// Why a NAME when the action already carries an entry-def index: the index
+    /// is scoped to the DNA that authored it, and the two ends of a lineage are
+    /// two DNAs whose entry-type order differs by construction (v2 appends
+    /// `NotarizationWitness`). See the "ENTRY TYPES TRAVEL BY NAME" section.
+    ///
+    /// `#[serde(default)]`, and EMPTY from a coordinator that predates Task 26
+    /// — which the receiving end falls back to the carried index for, with a
+    /// logged warning rather than a refusal (§7 C10: old peers keep working).
+    #[serde(default)]
+    pub type_names: Vec<String>,
     /// Where to resume, or `None` when THIS WALK is exhausted.
     ///
     /// On the own-chain path (`export_records`) that is end-of-chain. On the
@@ -1469,6 +1486,202 @@ where
         hasher.update(h.get_raw_39());
     }
     hex::encode(hasher.finalize())
+}
+
+// ============================================================================
+// ENTRY TYPES TRAVEL BY NAME (Holochain Evolution Epic Task 26, G10; §7 C10)
+//
+// An `AppEntryDef` on a carried action is a pair of INDEXES — a zome index and
+// an entry-def index — and both are scoped to the DNA that authored it. Two
+// lineage ends are two DNAs. The moment a successor adds, removes or reorders
+// an entry type (v2 does exactly this: it appends `NotarizationWitness`), the
+// same index pair names a DIFFERENT type on the two ends. A carry or a
+// re-adoption that trusted the carried index would then re-create a record AS
+// THE WRONG TYPE — silently, under a fresh entry hash wearing an old fact's
+// name. That is the one failure the whole crossing exists to prevent, and an
+// index is the one thing on the wire that cannot be checked across the boundary
+// it crossed.
+//
+// So the type travels by NAME. Every export page carries `type_names`
+// positionally beside `records`, resolved from the EXPORTING DNA's own
+// `zome_types.entries`; every receiving end resolves that name through ITS OWN
+// scope and never reads the carried index. A name this end does not host is
+// `foreign` on the re-adoption path (v2's witness read by v1 — a count, never
+// an error) and a NAMED refusal on the self-carry path (a fact this end cannot
+// host must not be re-created as whatever the carried index happens to name).
+//
+// §7 C10 (contract evolution) requires old peers keep working: a page from a
+// coordinator that predates this task carries NO names, and is walked by the
+// carried index with a logged warning rather than refused. That fallback is the
+// pre-Task-26 behaviour exactly, and it is the ONLY path on which an index is
+// ever trusted across a DNA boundary.
+//
+// Unconditional and coordinator-only: the DNA hash covers integrity zomes and
+// modifiers, so the default `node-registry.dna` hash is unmoved by every line
+// of this section.
+// ============================================================================
+
+/// One app entry type as THIS DNA hosts it: the scoped `(zome_index,
+/// entry_index)` an action on this chain carries for it, the NAME the DNA
+/// publishes for it, and this zome's own `EntryTypes` unit — the three facts a
+/// translation between lineage ends needs, in one row.
+#[derive(Debug, Clone)]
+struct LocalEntryType {
+    scoped: ScopedEntryDefIndex,
+    name: String,
+    unit: UnitEntryTypes,
+}
+
+/// This DNA's app entry types, read from `zome_info()` ONCE per page.
+///
+/// The name is the entry-def id the integrity zome registers (`EntryDef::from`
+/// a unit variant), which is the snake_case of the `EntryTypes` variant — the
+/// same string on both lineage ends for any type both ends host, and so the
+/// whole basis of the translation. Derived at runtime, so the `lineage-witness`
+/// build's extra entry type is covered without this function naming it — the
+/// same discipline [`app_entry_types_in_scope`] keeps.
+///
+/// Hoisted out of every caller's loop on purpose: `zome_info()` is a host call,
+/// and resolving per record would pay one per record.
+fn local_entry_types() -> ExternResult<Vec<LocalEntryType>> {
+    let entries = zome_info()?.zome_types.entries;
+    let mut table = Vec::new();
+    for unit in UnitEntryTypes::iter() {
+        if let Some(scoped) = entries.get(unit) {
+            table.push(LocalEntryType {
+                scoped,
+                name: entry_def_name(unit),
+                unit,
+            });
+        }
+    }
+    Ok(table)
+}
+
+/// The entry-def name a unit variant registers.
+///
+/// The two capability ids are rendered rather than unwrapped so this stays
+/// total; neither is an app entry type, so neither can reach an export page.
+fn entry_def_name(unit: UnitEntryTypes) -> String {
+    match EntryDef::from(unit).id {
+        EntryDefId::App(name) => name.0.into_owned(),
+        EntryDefId::CapClaim => "cap_claim".to_string(),
+        EntryDefId::CapGrant => "cap_grant".to_string(),
+    }
+}
+
+/// The name THIS DNA publishes for the app entry type an action carries.
+///
+/// `""` for a record that carries no app entry — which is the ONE meaning of
+/// the empty string on the wire, and what a receiving end reads it as. An
+/// export walks only its own scope, so an app entry it cannot name is
+/// unreachable; it renders as `""` too rather than panicking, and the receiving
+/// end then treats it as a type it cannot host.
+fn exported_type_name(table: &[LocalEntryType], action: &Action) -> String {
+    match action.entry_type() {
+        Some(EntryType::App(def)) => {
+            let scoped = ScopedEntryDefIndex {
+                zome_index: def.zome_index(),
+                zome_type: def.entry_index(),
+            };
+            table
+                .iter()
+                .find(|t| t.scoped == scoped)
+                .map(|t| t.name.clone())
+                .unwrap_or_default()
+        }
+        _ => String::new(),
+    }
+}
+
+/// How a page's carried entry types are being read on THIS end.
+enum CarriedTypes {
+    /// The page named its types. Positional with `records`, and the only path
+    /// on which a type crossing a DNA boundary is checked.
+    ByName(Vec<String>),
+    /// The page named none — the far end predates Task 26. The carried
+    /// entry-def INDEX is used, which is sound only while both lineage ends
+    /// happen to agree on their entry-type order. §7 C10: old peers keep
+    /// working, loudly.
+    ByCarriedIndex,
+}
+
+/// What a carried record's app entry type resolves to on THIS DNA.
+enum LocalTypeMatch {
+    /// This DNA hosts the type. The unit is ITS OWN — resolved here, never
+    /// taken from the carried index.
+    Known(UnitEntryTypes),
+    /// This DNA does not host it (v2's `NotarizationWitness` read by v1, above
+    /// all). The `String` renders what the page claimed, for the message the
+    /// caller writes: a count on the re-adoption path, a refusal on the carry.
+    Foreign(String),
+}
+
+impl CarriedTypes {
+    /// Read a page's `type_names`.
+    ///
+    /// A page whose names and records disagree in length is refused BY NAME:
+    /// the two are paired POSITIONALLY, so a length mismatch means index `i`
+    /// names a different record in each and nothing on the page can be paired
+    /// at all — the same reason `records`/`entries` are length-checked.
+    fn read(page: &ExportPage, whose: &str) -> ExternResult<Self> {
+        if page.type_names.is_empty() {
+            if !page.records.is_empty() {
+                warn!(
+                    "{whose}: this page carries no `type_names` — the far end predates the \
+                     name-carrying export. Falling back to the carried entry-def INDEX for {} \
+                     record(s); an index is only meaningful inside the DNA that authored it, so \
+                     this is sound only while both lineage ends agree on their entry-type order.",
+                    page.records.len()
+                );
+            }
+            return Ok(Self::ByCarriedIndex);
+        }
+        if page.type_names.len() != page.records.len() {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{whose}: the page carries {} type names for {} records — `type_names` is paired \
+                 POSITIONALLY with `records`, so a length mismatch cannot be paired at all. \
+                 Refusing rather than re-creating records under names that are not theirs.",
+                page.type_names.len(),
+                page.records.len()
+            ))));
+        }
+        Ok(Self::ByName(page.type_names.clone()))
+    }
+
+    /// Resolve record `i`'s app entry type to the unit variant THIS DNA hosts
+    /// for it.
+    ///
+    /// `def` is read ONLY on the legacy arm. On the named arm the carried index
+    /// is ignored entirely — that is the whole point of G10.
+    fn resolve(&self, table: &[LocalEntryType], i: usize, def: &AppEntryDef) -> LocalTypeMatch {
+        match self {
+            Self::ByName(names) => {
+                // `read` established `names.len() == records.len()`, so this
+                // cannot miss for an `i` that indexes `records`; the default
+                // keeps it total, and `""` is a name no entry def registers.
+                let name = names.get(i).map(String::as_str).unwrap_or_default();
+                match table.iter().find(|t| t.name == name) {
+                    Some(t) => LocalTypeMatch::Known(t.unit),
+                    None => LocalTypeMatch::Foreign(format!("entry type `{name}`")),
+                }
+            }
+            Self::ByCarriedIndex => {
+                let scoped = ScopedEntryDefIndex {
+                    zome_index: def.zome_index(),
+                    zome_type: def.entry_index(),
+                };
+                match table.iter().find(|t| t.scoped == scoped) {
+                    Some(t) => LocalTypeMatch::Known(t.unit),
+                    None => LocalTypeMatch::Foreign(format!(
+                        "the unnamed entry-def index {}/{} it carried",
+                        def.zome_index().0,
+                        def.entry_index().0
+                    )),
+                }
+            }
+        }
+    }
 }
 
 /// v1 bounded export (Holochain Evolution Epic Task 1). Exports THIS agent's
@@ -1573,6 +1786,10 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
     //     asked for.
     let mut records = Vec::with_capacity(window.len());
     let mut entries = Vec::with_capacity(window.len());
+    // The page names its own types (Task 26). One `zome_info()` for the page,
+    // not one per record.
+    let type_table = local_entry_types()?;
+    let mut type_names = Vec::with_capacity(window.len());
     if let (Some((first_seq, _)), Some((last_seq, _))) = (window.first(), window.last()) {
         let loaded = query(
             ChainQueryFilter::new()
@@ -1595,6 +1812,7 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
                      disagrees with its own cursor"
                 )))
             })?;
+            type_names.push(exported_type_name(&type_table, record.action()));
             entries.push(record.entry().as_option().cloned());
             records.push(record.signed_action);
         }
@@ -1603,6 +1821,7 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
     Ok(ExportPage {
         records,
         entries,
+        type_names,
         next_cursor,
         digest: digest.clone(),
         total: Some(total),
@@ -1807,6 +2026,12 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
 
     let mut records = Vec::with_capacity(window.len());
     let mut entries = Vec::with_capacity(window.len());
+    // As on the own path (Task 26): the page names its own types, from THIS
+    // DNA's scope. A courier and the neighbour it reads run the same DNA, so
+    // the name it publishes for a held record is the neighbour's own name for
+    // it — which is what makes a held page carryable by the same rule.
+    let type_table = local_entry_types()?;
+    let mut type_names = Vec::with_capacity(window.len());
     for action_hash in window {
         let record = get(action_hash.clone(), GetOptions::network())?.ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(format!(
@@ -1816,6 +2041,7 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
                 input.agent
             )))
         })?;
+        type_names.push(exported_type_name(&type_table, record.action()));
         entries.push(record.entry().as_option().cloned());
         records.push(record.signed_action);
     }
@@ -1823,6 +2049,7 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
     Ok(ExportPage {
         records,
         entries,
+        type_names,
         next_cursor,
         digest: digest.clone(),
         total,
@@ -2101,11 +2328,12 @@ pub fn get_record_at(input: (ActionHash, bool)) -> ExternResult<Option<Record>> 
 //     exactly what the v2 action committed to; schema drift between the
 //     lineage ends is refused rather than silently minting a new entry hash
 //     under an old fact's name.
-//   * **A v2-only entry type is not an error.** v2's `NotarizationWitness`
-//     sits at an `EntryDefIndex` v1 does not know. It is counted `foreign` and
-//     skipped: witnesses are v2's own bookkeeping about the crossing, never a
-//     fact of v1's, and refusing the page over one would make revert
-//     impossible for exactly the chains that took the crossing.
+//   * **A v2-only entry type is not an error.** v2's `NotarizationWitness` is
+//     an entry-type NAME v1 does not host (Task 26 — the successor's entry-def
+//     index is never read here). It is counted `foreign` and skipped:
+//     witnesses are v2's own bookkeeping about the crossing, never a fact of
+//     v1's, and refusing the page over one would make revert impossible for
+//     exactly the chains that took the crossing.
 //
 // Coordinator-only, and UNCONDITIONAL: it must exist on the PRISTINE v1
 // artifact, which is built without `lineage-witness`. That is safe because the
@@ -2238,29 +2466,37 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
         ))));
     }
 
-    // (2) which app entry types THIS DNA knows. A successor's entry-def index
-    //     that this zome's scope does not resolve is `foreign` — asked here,
-    //     BEFORE `deserialize_from_type`, because that helper RETURNS AN ERROR
-    //     for an out-of-range index within a dependency zome, and an error is
-    //     exactly what §4 step 4 forbids for a v2-only type.
-    let known_entries = zome_info()?.zome_types.entries;
-    let knows = |def: &AppEntryDef| -> bool {
-        known_entries
-            .find_key(ScopedEntryDefIndex {
-                zome_index: def.zome_index(),
-                zome_type: def.entry_index(),
-            })
-            .is_some()
-    };
+    // (2) which app entry types THIS DNA hosts, and how the successor NAMES
+    //     the ones on its page (Task 26, G10). A name this end does not host is
+    //     `foreign` — asked here, BEFORE any deserialization, because §4 step 4
+    //     requires a v2-only type to be a COUNT and never an error.
+    //
+    //     The successor's entry-def INDEX is never trusted: v2 appends
+    //     `NotarizationWitness` to the same enum v1 defines, so the two ends
+    //     agree on today's indexes only by accident of ordering, and a
+    //     successor that reordered or removed a type would make an index-keyed
+    //     re-adoption re-author records as the wrong type. The one exception is
+    //     a successor that predates the named export, which `CarriedTypes` logs
+    //     and falls back for (§7 C10).
+    let table = local_entry_types()?;
+    let carried_types = CarriedTypes::read(&page, "readopt_from")?;
 
     // (3) what this chain already holds, in ONE query over the page's
     //     candidate entry hashes rather than one query per record.
     let candidates: HashSet<EntryHash> = page
         .records
         .iter()
-        .filter(|signed| signed.action().author() == &me)
-        .filter_map(|signed| match signed.action().entry_type() {
-            Some(EntryType::App(def)) if knows(def) => signed.action().entry_hash().cloned(),
+        .enumerate()
+        .filter(|(_, signed)| signed.action().author() == &me)
+        .filter_map(|(i, signed)| match signed.action().entry_type() {
+            Some(EntryType::App(def))
+                if matches!(
+                    carried_types.resolve(&table, i, def),
+                    LocalTypeMatch::Known(_)
+                ) =>
+            {
+                signed.action().entry_hash().cloned()
+            }
             _ => None,
         })
         .collect();
@@ -2280,6 +2516,11 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
     let mut readopted: u32 = 0;
     let mut already_present: u32 = 0;
     let mut foreign: u32 = 0;
+    // What the successor CALLED the types this end could not host, deduplicated
+    // and logged once for the whole page. `foreign` is the number the receipt
+    // reports; this is the diagnosis a driver needs when that number surprises
+    // it — "which type did v1 refuse to hold?" — without a host call per record.
+    let mut foreign_named: Vec<String> = Vec::new();
 
     for (i, signed) in page.records.iter().enumerate() {
         let action = signed.action();
@@ -2299,12 +2540,19 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
             continue;
         };
 
-        // A v2-only entry type (its `NotarizationWitness`). Skipped, counted,
-        // never an error.
-        if !knows(def) {
-            foreign = foreign.saturating_add(1);
-            continue;
-        }
+        // A v2-only entry type (its `NotarizationWitness`), recognised BY THE
+        // NAME the successor published for it. Skipped, counted, never an
+        // error.
+        let unit = match carried_types.resolve(&table, i, def) {
+            LocalTypeMatch::Known(unit) => unit,
+            LocalTypeMatch::Foreign(claimed) => {
+                foreign = foreign.saturating_add(1);
+                if !foreign_named.contains(&claimed) {
+                    foreign_named.push(claimed);
+                }
+                continue;
+            }
+        };
 
         let entry_hash = action.entry_hash().ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(format!(
@@ -2327,19 +2575,18 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
             ))));
         };
 
-        let raw = EntryTypes::deserialize_from_type(def.zome_index(), def.entry_index(), &entry);
-        let typed = raw.map_err(|e| {
+        // Deserialized as the type THIS DNA hosts under the name the successor
+        // published — never as whatever the carried index names here. A failure
+        // is real drift between the ends (a shared name over changed bytes) and
+        // is refused, unlike an unhosted name, which was counted `foreign`
+        // above.
+        let typed = EntryTypes::try_from((unit, &entry)).map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "readopt_from: record {i}: could not deserialize the exported entry into a known \
-                 entry type: {e:?}"
+                "readopt_from: record {i}: could not deserialize the exported entry as `{}`, the \
+                 entry type the successor named for it: {e:?}",
+                entry_def_name(unit)
             )))
         })?;
-        let Some(typed) = typed else {
-            // The index resolved to no unit in this zome's scope — a type from
-            // a zome this DNA does not depend on. Same class as `!knows`.
-            foreign = foreign.saturating_add(1);
-            continue;
-        };
 
         // CID continuity is the whole promise: the re-authored entry must hash
         // to exactly what the v2 action committed to. If the two lineage ends
@@ -2360,6 +2607,15 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
         // would mint two actions over it.
         on_chain.insert(recreated_hash);
         readopted = readopted.saturating_add(1);
+    }
+
+    if !foreign_named.is_empty() {
+        debug!(
+            "readopt_from: skipped {foreign} record(s) this DNA hosts no entry type for: {}. \
+             Expected for the successor's own crossing bookkeeping; anything else means the two \
+             lineage ends disagree about which facts v1 can hold.",
+            foreign_named.join(", ")
+        );
     }
 
     Ok(ReadoptReceipt {
@@ -2580,18 +2836,7 @@ pub struct CarryReceipt {
 #[hdk_extern]
 pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
     // (1) the declared predecessor, from this DNA's identity-bearing properties.
-    let properties: LineageProperties =
-        dna_info()?.modifiers.properties.try_into().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "carry_from: could not deserialize DNA properties: {e:?}"
-            )))
-        })?;
-    let lineage_dna_hash = properties.lineage.first().cloned().ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "carry_from: this DNA declares no lineage — there is no predecessor to carry from"
-                .to_string(),
-        ))
-    })?;
+    let lineage_dna_hash = declared_predecessor()?;
     if input.v1_cell.dna_hash() != &lineage_dna_hash {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "carry_from: v1_cell names DNA {}, but this DNA declares {} as its predecessor",
@@ -2669,6 +2914,48 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         }
     };
 
+    carry_page(page, held, lineage_dna_hash, me)
+}
+
+/// This DNA's declared predecessor, read from its identity-bearing properties.
+///
+/// Factored out of [`carry_from`] so [`carry_page_for_test`] reaches the same
+/// lineage through the same read — a test entry point that trusted a different
+/// predecessor would not be exercising the crossing.
+#[cfg(feature = "lineage-witness")]
+fn declared_predecessor() -> ExternResult<DnaHash> {
+    let properties: LineageProperties =
+        dna_info()?.modifiers.properties.try_into().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "carry_from: could not deserialize DNA properties: {e:?}"
+            )))
+        })?;
+    properties.lineage.first().cloned().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "carry_from: this DNA declares no lineage — there is no predecessor to carry from"
+                .to_string(),
+        ))
+    })
+}
+
+/// Carry ONE already-fetched [`ExportPage`] onto this chain.
+///
+/// Split out of [`carry_from`] at Task 26 and otherwise unchanged: `carry_from`
+/// is now (verify the lineage · fetch the page · carry it), and this is the
+/// third step. The split is what lets [`carry_page_for_test`] drive a page the
+/// zome did not fetch through exactly this code, rather than a paraphrase of it
+/// — a refusal proven by a second implementation proves nothing about the
+/// first.
+///
+/// `held` is the caller's statement about WHOSE chain the page came from, and
+/// it gates native re-creation: a courier carries, it does not author.
+#[cfg(feature = "lineage-witness")]
+fn carry_page(
+    page: ExportPage,
+    held: bool,
+    lineage_dna_hash: DnaHash,
+    me: AgentPubKey,
+) -> ExternResult<CarryReceipt> {
     // `records` and `entries` are paired POSITIONALLY, so a page whose two
     // vectors disagree in length cannot be paired at all — index i would mean a
     // different record in each. Refuse the page rather than silently carrying
@@ -2694,6 +2981,14 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
     // whole page's entry hashes, not one query per record — a page's records
     // are a page-bounded batch and the check should cost one round trip, not
     // `page.records.len()` of them.
+    //
+    // The types a self-carry re-creates are resolved by NAME (Task 26, G10):
+    // the predecessor's entry-def index means nothing on this DNA, which
+    // appends `NotarizationWitness` to the same enum. Read once per page, and
+    // read even on a held page so the length check on `type_names` fires there
+    // too — a malformed page is malformed whoever authored its records.
+    let type_table = local_entry_types()?;
+    let carried_types = CarriedTypes::read(&page, "carry_from")?;
     let self_carry_candidates: HashSet<EntryHash> = if held {
         HashSet::new()
     } else {
@@ -2775,44 +3070,59 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
             if let (Some(EntryType::App(def)), Some(entry)) =
                 (action.entry_type(), carried_entry.as_ref())
             {
-                let typed = EntryTypes::deserialize_from_type(
-                    def.zome_index,
-                    def.entry_index,
-                    entry,
-                )
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "carry_from: proof {i}: could not deserialize the carried entry into a \
-                         known entry type: {e:?}"
-                    )))
-                })?;
-                if let Some(typed) = typed {
-                    // The whole promise of self-carry is CID continuity: the
-                    // re-created entry must hash to exactly what the carried
-                    // action commits to. If the two lineage ends disagree about
-                    // the struct's shape, the round-trip silently produces
-                    // DIFFERENT bytes — a new entry hash under an old action's
-                    // proof. Refuse the page; never fall through to
-                    // `entry: None`, which would drop the only copy of the
-                    // bytes the witness needed.
-                    let recreated_hash = hash_entry(&typed)?;
-                    let committed = action.entry_hash().ok_or_else(|| {
-                        wasm_error!(WasmErrorInner::Guest(format!(
-                            "carry_from: proof {i}: an app entry was carried but the action \
-                             references no entry hash"
-                        )))
-                    })?;
-                    if &recreated_hash != committed {
+                // The type comes from the NAME the predecessor published, never
+                // from the index it carried (Task 26, G10). A name this DNA
+                // does not host is a REFUSAL on this arm, not a `foreign`
+                // count: the re-adoption path may skip a fact it cannot hold,
+                // but a successor that cannot host its own predecessor's type
+                // has no honest way to re-create the record, and falling
+                // through would carry it as bytes while reporting a self-carry.
+                let unit = match carried_types.resolve(&type_table, i, def) {
+                    LocalTypeMatch::Known(unit) => unit,
+                    LocalTypeMatch::Foreign(claimed) => {
                         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                            "carry_from: proof {i}: re-created entry hash differs from the \
-                             carried action's — schema drift between lineage ends (re-created \
-                             {recreated_hash}, carried action commits to {committed})"
+                            "carry_from: proof {i}: the predecessor named {claimed} for a record \
+                             THIS AGENT authored, and this DNA hosts no such entry type. Entry \
+                             types travel by NAME across lineage ends — refusing rather than \
+                             re-creating the record as whatever type the carried entry-def index \
+                             happens to name here."
                         ))));
                     }
-                    create_entry(typed)?;
-                    recreated = true;
-                    self_carried = self_carried.saturating_add(1);
+                };
+                let typed = EntryTypes::try_from((unit, entry)).map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "carry_from: proof {i}: could not deserialize the carried entry as `{}`, \
+                         the entry type the predecessor named for it: {e:?}",
+                        entry_def_name(unit)
+                    )))
+                })?;
+                // The whole promise of self-carry is CID continuity: the
+                // re-created entry must hash to exactly what the carried
+                // action commits to. If the two lineage ends disagree about
+                // the struct's shape — or the page named a type that is not
+                // this record's — the round-trip silently produces DIFFERENT
+                // bytes, a new entry hash under an old action's proof. Refuse
+                // the page; never fall through to `entry: None`, which would
+                // drop the only copy of the bytes the witness needed.
+                let recreated_hash = hash_entry(&typed)?;
+                let committed = action.entry_hash().ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "carry_from: proof {i}: an app entry was carried but the action \
+                         references no entry hash"
+                    )))
+                })?;
+                if &recreated_hash != committed {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "carry_from: proof {i}: re-created entry hash differs from the carried \
+                         action's — schema drift between lineage ends, or a page that named the \
+                         wrong type for this record (re-created as `{}` to {recreated_hash}, \
+                         carried action commits to {committed})",
+                        entry_def_name(unit)
+                    ))));
                 }
+                create_entry(typed)?;
+                recreated = true;
+                self_carried = self_carried.saturating_add(1);
             }
         }
 
@@ -2851,6 +3161,32 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         already_carried,
         resume: page.resume,
     })
+}
+
+/// Carry ONE hand-built [`ExportPage`] through exactly the carry [`carry_from`]
+/// runs on a page it fetched (Holochain Evolution Epic Task 26, G10).
+///
+/// **This exists because the refusal it proves cannot be reached any other
+/// way.** `carry_from` fetches its page from a predecessor CELL, so a test can
+/// only ever hand it an HONEST page — one whose `type_names` a real export
+/// produced. The whole point of G10 is what happens when those names are wrong:
+/// a predecessor whose entry-type order differs from this DNA's, or one that
+/// simply lies. There is no injection point on the honest path, and a refusal
+/// nothing can exercise is a claim rather than a check.
+///
+/// It authors nothing a `carry_from` page would not: the same declared
+/// predecessor, the same [`carry_page`], the same witness. `held` is `false`
+/// because the refusal being exercised is the SELF-CARRY one — a held page
+/// re-creates nothing and so resolves no types at all.
+///
+/// Gated with the rest of the crossing, so the default `node-registry.dna`
+/// does not carry it and its hash is unmoved.
+#[cfg(feature = "lineage-witness")]
+#[hdk_extern]
+pub fn carry_page_for_test(page: ExportPage) -> ExternResult<CarryReceipt> {
+    let lineage_dna_hash = declared_predecessor()?;
+    let me = agent_info()?.agent_initial_pubkey;
+    carry_page(page, false, lineage_dna_hash, me)
 }
 
 // ============================================================================

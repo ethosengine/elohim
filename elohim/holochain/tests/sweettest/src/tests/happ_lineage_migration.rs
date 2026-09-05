@@ -119,6 +119,13 @@ struct ExportInputResumed {
 struct ExportPage {
     records: Vec<SignedActionHashed>,
     entries: Vec<Option<Entry>>,
+    /// Task 26 (additive): the entry-def NAME the exporting DNA publishes for
+    /// each record, paired POSITIONALLY with `records`. `#[serde(default)]`
+    /// because a bundle packed before Task 26 does not emit it — and because
+    /// this mirror is also SERIALIZED, into `carry_page_for_test`, where an
+    /// empty vector is exactly how a pre-Task-26 predecessor's page looks.
+    #[serde(default)]
+    type_names: Vec<String>,
     next_cursor: Option<u32>,
     digest: String,
     /// Task 9 (additive): the app-record count the export walks — the WHOLE
@@ -2729,6 +2736,263 @@ async fn station_7_readopt_from_re_authors_window_time_v2_records_on_v1() -> Res
         Some(2),
         "a retried re-adoption must not mint a second action over an entry hash this chain \
          already holds"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// TASK 26 (G10) — ENTRY TYPES TRAVEL BY NAME ACROSS LINEAGE ENDS
+//
+// An `AppEntryDef` on a carried action is a pair of INDEXES scoped to the DNA
+// that authored it, and the two ends of a lineage are two DNAs whose entry-type
+// order differs by construction — v2 appends `NotarizationWitness` to the same
+// enum v1 defines. Trusting the carried index across that boundary is how a
+// crossing re-creates a record AS THE WRONG TYPE: silently, under a fresh entry
+// hash wearing an old fact's name.
+//
+// So the type travels by NAME. What this probe pins:
+//
+//   1. every export page NAMES its records' types, positionally with `records`,
+//      using the entry-def id the integrity zome registers;
+//   2. a page naming a type this DNA does not host is refused BY NAME on the
+//      self-carry arm — not carried as bytes, not re-created as whatever the
+//      carried index happens to point at here;
+//   3. a PERMUTED page — every name real, none of them this record's — is
+//      refused too, and authors nothing;
+//   4. a page whose names and records disagree in length is refused by name;
+//   5. the honest page still carries, through the real `carry_from` driver, and
+//      v2's own export names both its re-creations and its witness;
+//   6. §7 C10 — a page carrying NO names (a coordinator predating this task)
+//      still carries, by the carried index, with a logged warning;
+//   7. re-adoption reads the successor's names the same way: v2's
+//      `notarization_witness` is `foreign` because v1 hosts no such NAME.
+//
+// `carry_page_for_test` is the gated test entry point points 2–4 and 6 need:
+// `carry_from` fetches its page from a predecessor CELL, so a test can only
+// ever hand it an honest page, and a refusal nothing can exercise is a claim
+// rather than a check. It runs exactly the carry `carry_from` runs — same
+// declared predecessor, same `carry_page`, same witness.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn task_26_entry_types_travel_by_name_across_lineage_ends() -> Result<()> {
+    let Some(_v2) = v2_bundle_or_skip() else {
+        return Ok(());
+    };
+    let Crossing {
+        conductor,
+        alice,
+        v1_hash: _,
+        v2_hash: _,
+        z1,
+        z2,
+    } = install_crossing().await?;
+
+    // --- 1. two v1 facts, and the page that NAMES their types ---------------
+    for id in ["g10-a", "g10-b"] {
+        let _ = author_and_read_back(&conductor, &z1, id, &alice).await;
+    }
+    let page: ExportPage = conductor
+        .call(
+            &z1,
+            "export_records",
+            ExportInput {
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!("[G10] v1 page type_names = {:?}", page.type_names);
+    assert_eq!(page.records.len(), 2, "one app entry per register_node");
+    assert_eq!(
+        page.type_names.len(),
+        page.records.len(),
+        "`type_names` is paired POSITIONALLY with `records` — the export must name every record \
+         or the pairing means nothing"
+    );
+    assert_eq!(
+        page.type_names,
+        vec!["node_registration".to_string(); 2],
+        "the name is the entry-def id the integrity zome REGISTERS (snake_case), not the Rust \
+         variant ident — that id is what both lineage ends publish for the same type"
+    );
+
+    // --- 2. a name this DNA does not host is a NAMED refusal ----------------
+    let mut unknown = page.clone();
+    unknown.type_names = vec![
+        "not_a_type_on_this_dna".to_string(),
+        "node_registration".to_string(),
+    ];
+    let err = conductor
+        .call_fallible::<_, CarryReceipt>(&z2, "carry_page_for_test", unknown)
+        .await
+        .expect_err(
+            "a page naming a type this DNA cannot host must be refused on the self-carry arm — \
+             there is no honest way to re-create the record",
+        );
+    let msg = format!("{err:?}");
+    println!("[G10] unknown-name refusal:\n{msg}");
+    assert!(
+        msg.contains("not_a_type_on_this_dna") && msg.contains("travel by NAME"),
+        "the refusal must NAME the type the predecessor claimed — a driver reads it to tell \
+         schema drift from a lying page, got: {msg}"
+    );
+
+    // --- 3. a PERMUTED page: every name real, none of them this record's ----
+    let mut permuted = page.clone();
+    permuted.type_names = vec!["string_anchor".to_string(); 2];
+    let err = conductor
+        .call_fallible::<_, CarryReceipt>(&z2, "carry_page_for_test", permuted)
+        .await
+        .expect_err(
+            "a page that names the WRONG hosted type for a record must be refused — this is the \
+             exact shape of an entry-def index reused across two DNAs",
+        );
+    let msg = format!("{err:?}");
+    println!("[G10] permuted-name refusal:\n{msg}");
+    assert!(
+        msg.contains("string_anchor"),
+        "the refusal must name the type the page claimed, got: {msg}"
+    );
+
+    // --- 4. names and records of different lengths cannot be paired ---------
+    let mut short = page.clone();
+    short.type_names = vec!["node_registration".to_string()];
+    let err = conductor
+        .call_fallible::<_, CarryReceipt>(&z2, "carry_page_for_test", short)
+        .await
+        .expect_err("a page whose names and records disagree in length must be refused");
+    let msg = format!("{err:?}");
+    println!("[G10] length-mismatch refusal:\n{msg}");
+    assert!(
+        msg.contains("1 type names for 2 records") && msg.contains("POSITIONALLY"),
+        "expected the NAMED positional-pairing refusal, got: {msg}"
+    );
+
+    // Every refusal above authored NOTHING: a zome call that returns an error
+    // discards its whole source-chain workspace, which is what makes refusing
+    // the safe answer rather than a partial carry.
+    let v2_after_refusals: ExportPage = conductor
+        .call(
+            &z2,
+            "export_records",
+            ExportInput {
+                cursor: None,
+                limit: 64,
+            },
+        )
+        .await;
+    assert_eq!(
+        v2_after_refusals.total,
+        Some(0),
+        "three refused pages must leave v2's chain empty — a refusal that half-carried would be \
+         worse than the mis-typing it prevented"
+    );
+
+    // --- 5. the HONEST page still carries, through the real driver ----------
+    let carry: CarryReceipt = conductor
+        .call(
+            &z2,
+            "carry_from",
+            CarryInput {
+                v1_cell: z1.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!("[G10] honest carry receipt = {carry:?}");
+    assert_eq!(carry.carried, 2, "both v1 facts crossed");
+    assert_eq!(
+        carry.self_carried, 2,
+        "both were re-created NATIVELY on v2 — resolved through the name v1 published"
+    );
+
+    let v2_page: ExportPage = conductor
+        .call(
+            &z2,
+            "export_records",
+            ExportInput {
+                cursor: None,
+                limit: 64,
+            },
+        )
+        .await;
+    println!("[G10] v2 page type_names = {:?}", v2_page.type_names);
+    assert_eq!(
+        v2_page
+            .type_names
+            .iter()
+            .filter(|n| *n == "node_registration")
+            .count(),
+        2,
+        "the re-creations carry v1's type under the SAME name on v2 — which is what makes the \
+         name a translation rather than a coincidence of ordering"
+    );
+    assert_eq!(
+        v2_page
+            .type_names
+            .iter()
+            .filter(|n| *n == "notarization_witness")
+            .count(),
+        1,
+        "the successor names its OWN extra type too — the one v1 will report `foreign` BY NAME"
+    );
+
+    // --- 6. §7 C10 — an UNNAMED page still carries, by the carried index ----
+    let _ = author_and_read_back(&conductor, &z1, "g10-c", &alice).await;
+    let mut legacy: ExportPage = conductor
+        .call(
+            &z1,
+            "export_records",
+            ExportInput {
+                cursor: Some(2),
+                limit: 16,
+            },
+        )
+        .await;
+    assert_eq!(legacy.records.len(), 1, "the third v1 fact, on its own page");
+    // Exactly what a predecessor coordinator predating Task 26 puts on the
+    // wire: no names at all.
+    legacy.type_names = Vec::new();
+    let old: CarryReceipt = conductor
+        .call(&z2, "carry_page_for_test", legacy)
+        .await;
+    println!("[G10] unnamed-page carry receipt = {old:?}");
+    assert_eq!(
+        old.self_carried, 1,
+        "a page with NO `type_names` falls back to the carried entry-def index and still carries \
+         — §7 C10: old peers keep working, loudly, rather than being refused"
+    );
+
+    // --- 7. re-adoption reads the successor's names the same way ------------
+    let readopt: ReadoptReceipt = conductor
+        .call(
+            &z1,
+            "readopt_from",
+            ReadoptInput {
+                v2_cell: z2.cell_id().clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!("[G10] readopt receipt = {readopt:?}");
+    assert_eq!(
+        readopt.foreign, 2,
+        "both of v2's witnesses are the NAME `notarization_witness`, which v1 hosts no entry type \
+         for — counted, never an error, and recognised by name rather than by an index that means \
+         something else here"
+    );
+    assert_eq!(
+        readopt.readopted, 0,
+        "nothing was authored only on v2 — every fact came from v1 in the first place"
+    );
+    assert_eq!(
+        readopt.already_present, 3,
+        "all three re-creations hash to entries v1 already holds — CID continuity across the \
+         crossing, established through the name and not the index"
     );
 
     Ok(())
