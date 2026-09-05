@@ -1138,7 +1138,38 @@ impl super::sunset::ChainSealer for HappLineageVehicle {
             .connect_app(side_app_id, role)
             .await
             .map_err(|e| format!("could not connect to side app '{side_app_id}' ({e})"))?;
-        super::sunset::call_seal_close(&client, &v1_cell).await
+        let receipt = super::sunset::call_seal_close(&client, &v1_cell).await?;
+
+        // **Task 32 — the close is recorded DURABLY, here, because this is the
+        // only place that holds the sealed `CellId`.**
+        //
+        // `LineageRoles::sunset` (which `perform_sunset` calls next) sets a flag
+        // in process memory, and every boot rebuilds that map at base. So on
+        // the one code path that matters — the restart — the in-memory answer to
+        // "is this role's reading cell closed?" is `false`, `connect_role`
+        // dials the base app, and `authorize_signing_credentials` authors a
+        // `CapGrant` on a sealed chain. That is the exact action Task 30 found
+        // blocking three household conductors permanently.
+        //
+        // The fence's ledger is the durable projection of that flag, keyed by
+        // the cell rather than the role because a `CellId` is what the conductor
+        // writes to and it outlives the role map. Recorded on `already_sealed`
+        // and `resumed` too: those mean the chain IS closed, which is the fact
+        // the fence needs, regardless of who closed it.
+        if let Some(fence) = crate::closed_chain_fence::fence() {
+            fence.record_closed(
+                &v1_cell,
+                Some(role),
+                Some(&self.base_app_id),
+                &format!(
+                    "sealed by seal_close toward '{side_app_id}' (close {}, open {})",
+                    receipt.close_hash, receipt.open_hash
+                ),
+                super::state::now_unix(),
+            );
+        }
+
+        Ok(receipt)
     }
 }
 

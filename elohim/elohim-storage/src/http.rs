@@ -407,6 +407,10 @@ pub struct HttpServer {
     /// clears it. `None` on a fixture that never wired one → an empty sweep,
     /// which serializes identically to the pre-Task-12 shape.
     lineage_bridge: Option<Arc<crate::services::lineage_bridge::LineageBridge>>,
+    /// **Task 32.** The per-space partition probe, when one is armed. `/version`
+    /// projects its snapshot under `passport.lineage.partition`; the handler
+    /// never holds anything but the snapshot.
+    lineage_partition: Option<Arc<crate::lineage_partition::LineagePartitionProbe>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
@@ -1008,6 +1012,7 @@ impl HttpServer {
             happ_app_id: None,
             lineage_roles: None,
             lineage_bridge: None,
+            lineage_partition: None,
             fan_out_ctx: None,
             network_stakes_resolver: None,
             #[cfg(feature = "ssr")]
@@ -1170,6 +1175,16 @@ impl HttpServer {
         lineage_bridge: Arc<crate::services::lineage_bridge::LineageBridge>,
     ) -> Self {
         self.lineage_bridge = Some(lineage_bridge);
+        self
+    }
+
+    /// Wire the per-space partition probe (Task 32) so `/version` can name a
+    /// partitioned space instead of leaving a driver to infer it from silence.
+    pub fn with_lineage_partition(
+        mut self,
+        probe: Arc<crate::lineage_partition::LineagePartitionProbe>,
+    ) -> Self {
+        self.lineage_partition = Some(probe);
         self
     }
 
@@ -1657,6 +1672,19 @@ impl HttpServer {
                             .lineage_bridge
                             .as_ref()
                             .map(|bridge| bridge.snapshot())
+                            .unwrap_or_default(),
+                        // Task 32. Both are point-in-time snapshots taken here,
+                        // never handles held by the passport. The closed-cell
+                        // ledger is read straight off the process-wide fence
+                        // because it has exactly one home per process and
+                        // threading a second handle would let the two disagree.
+                        partition: self
+                            .lineage_partition
+                            .as_ref()
+                            .map(|probe| probe.snapshot())
+                            .unwrap_or_default(),
+                        closed_cells: crate::closed_chain_fence::fence()
+                            .map(|fence| fence.closed_cells())
                             .unwrap_or_default(),
                     },
                 )

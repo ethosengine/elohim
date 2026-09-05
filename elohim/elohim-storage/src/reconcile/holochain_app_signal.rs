@@ -595,15 +595,26 @@ impl HolochainAppSignalStream {
                 AppSignalStreamError::NotFound(format!("role '{role}' not found in app '{app_id}'"))
             })?;
 
-        // Authorize signing credentials.
+        // Signing credentials.
+        //
+        // **A chain write, not a handshake** (Task 32) — see
+        // `crate::closed_chain_fence`. The signal stream reconnects on every
+        // conductor restart, which makes it exactly as dangerous a re-minter as
+        // the bridge, so it takes the same fence.
         let signer = ClientAgentSigner::default();
-        let credentials = admin_ws
-            .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                cell_id: cell_id.clone(),
-                functions: None,
-            })
-            .await
-            .map_err(|e| AppSignalStreamError::Credentials(e.to_string()))?;
+        let credentials = match crate::closed_chain_fence::fence() {
+            Some(fence) => fence
+                .authorize(&admin_ws, &cell_id, role)
+                .await
+                .map_err(|e| AppSignalStreamError::Credentials(e.to_string()))?,
+            None => admin_ws
+                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                    cell_id: cell_id.clone(),
+                    functions: None,
+                })
+                .await
+                .map_err(|e| AppSignalStreamError::Credentials(e.to_string()))?,
+        };
         signer.add_credentials(cell_id.clone(), credentials);
         let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
 

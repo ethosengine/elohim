@@ -832,6 +832,21 @@ async fn async_main(
     // Ensure storage directory exists
     tokio::fs::create_dir_all(&config.storage_dir).await?;
 
+    // ── The post-close write fence (Task 32) ─────────────────────────────────
+    //
+    // Armed HERE, before anything dials a conductor, because the first thing a
+    // conductor connect does is `authorize_signing_credentials` — which commits
+    // a `CapGrant` on the cell's source chain. On a chain the network has seen
+    // closed, that one action is warranted by every neighbour into a permanent
+    // cell block holochain 0.7 cannot lift; it is how the household mesh
+    // partitioned itself on 2026-09-05 (Task 30, `6968baf1e`).
+    //
+    // The fence persists credentials per cell (so a restart re-mints nothing)
+    // and carries the durable closed-cell ledger (so a restart still knows what
+    // the in-memory `LineageRoles` map forgot). A fence armed after the first
+    // connect would be a fence that misses the write it exists to stop.
+    elohim_storage::closed_chain_fence::init(&config.storage_dir);
+
     // Provide-loop / re-anchor observability holder. Created here in the
     // composition root so the boot path (self_cid derive + loop spawn) and the
     // re-anchor backfill can write it, and `/p2p/status` can read it via a clone
@@ -4052,6 +4067,26 @@ async fn async_main(
         // and the reset route clears the one being written.
         http_server = http_server.with_lineage_bridge(Arc::clone(bridge));
     }
+    // Task 32: the per-space partition probe. CONSTRUCTED here for the same
+    // reason as the bridge above — `http_server` is still owned, so `/version`
+    // can snapshot the SAME Arc the ticker writes; the ticker is SPAWNED beside
+    // the bridge's, further down. Resolved the way every other admin-plane leg
+    // resolves its connection: the embedded conductor's handle, else any live
+    // external-conductor bridge (the local mesh's only route).
+    let partition_probe = agent_info_admin_ws
+        .as_deref()
+        .cloned()
+        .or_else(|| {
+            hc_registry_for_http
+                .as_ref()
+                .and_then(|r| r.any_admin_websocket())
+        })
+        .map(|admin| {
+            Arc::new(elohim_storage::lineage_partition::LineagePartitionProbe::new(admin))
+        });
+    if let Some(ref probe) = partition_probe {
+        http_server = http_server.with_lineage_partition(Arc::clone(probe));
+    }
 
     // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
     // When the iroh node started successfully, thread its blob store so that
@@ -5906,6 +5941,18 @@ async fn async_main(
     // a tick reads is the in-process `LineageRoles` snapshot.
     if let Some(bridge) = lineage_bridge {
         bridge.spawn(shutdown_tx.subscribe());
+    }
+
+    // ── Task 32: the per-space partition probe ───────────────────────────────
+    //
+    // Spawned beside the bridge sweep and for the same reason: a partition is
+    // not scoped to an open window, and a probe that only ran where a
+    // controller happened to be armed is a probe that goes quiet exactly when
+    // it is needed. It classifies nothing for the first `boot_grace`, needs two
+    // samples to say anything, and writes to `/version` under
+    // `passport.lineage.partition`.
+    if let Some(probe) = partition_probe {
+        Arc::clone(&probe).spawn(shutdown_tx.subscribe());
     }
 
     info!("Press Ctrl+C to stop.");

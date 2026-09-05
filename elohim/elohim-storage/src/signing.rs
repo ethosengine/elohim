@@ -173,15 +173,27 @@ impl ConductorSigningClient {
                 SigningError::NotFound(format!("role '{role}' not found in app '{app_id}'"))
             })?;
 
-        // Authorize signing credentials for this cell.
+        // Signing credentials for this cell.
+        //
+        // **A chain write, not a handshake** (Task 32): `authorize_signing_credentials`
+        // commits a `CapGrant`, and on a closed chain that single action earns
+        // a permanent cell block from every neighbour. Routed through the
+        // post-close fence, which reuses persisted credentials wherever they
+        // exist and refuses a mint on a closed cell by name.
         let signer = ClientAgentSigner::default();
-        let credentials = admin_ws
-            .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                cell_id: cell_id.clone(),
-                functions: None,
-            })
-            .await
-            .map_err(|e| SigningError::Credentials(e.to_string()))?;
+        let credentials = match crate::closed_chain_fence::fence() {
+            Some(fence) => fence
+                .authorize(&admin_ws, &cell_id, role)
+                .await
+                .map_err(|e| SigningError::Credentials(e.to_string()))?,
+            None => admin_ws
+                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                    cell_id: cell_id.clone(),
+                    functions: None,
+                })
+                .await
+                .map_err(|e| SigningError::Credentials(e.to_string()))?,
+        };
         signer.add_credentials(cell_id.clone(), credentials);
         let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
 

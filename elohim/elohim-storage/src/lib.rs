@@ -55,6 +55,7 @@ pub mod api;
 pub mod app_deliverability; // Pure deliverability verdict over a bundle's extracted entries
 pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
+pub mod closed_chain_fence; // Task 32 (Holochain Evolution Epic MVP): the post-close write fence
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
 pub mod conductor_admission; // Capacity contract over the conductor's DB read pool
 pub mod conductor_bridge_health; // Observed liveness of the zome path (is the bridge actually alive?)
@@ -113,6 +114,7 @@ pub mod hc_client_registry;
 pub mod http;
 pub mod identity_handshake_service;
 pub mod import_handler;
+pub mod lineage_partition; // Task 32 (Holochain Evolution Epic MVP): per-space partition probe
 pub mod lineage_roles; // Task 6 (Holochain Evolution Epic MVP): per-role authoring app id resolver
 pub mod metadata;
 pub mod metrics; // Durable Prometheus app-metrics surface (/metrics) — design-decision toolkit P0

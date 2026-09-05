@@ -36,6 +36,34 @@ pub struct RuntimePassport {
     pub happ: HappPassport,
     pub host: HostPassport,
     pub flags: BootFlagsPassport,
+    /// **Task 32.** Node-wide lineage observations that are not scoped to one
+    /// role. Absent — and byte-identical to the pre-Task-32 response — on a
+    /// node with nothing to report.
+    ///
+    /// It is a TOP-LEVEL section rather than a field on [`RoleLineageView`] on
+    /// purpose: the driver that
+    /// reads it (the a2o `@concern:happ-lineage-migration` pre-flight) runs
+    /// BEFORE any window is opened, when every role's `lineage` object is
+    /// absent by construction. A partition hidden behind an open window is a
+    /// partition nobody can pre-flight for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lineage: Option<LineagePassport>,
+}
+
+/// Node-wide lineage observations.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LineagePassport {
+    /// Spaces this node believes it is partitioned from, confirmed across two
+    /// probe samples ([`crate::lineage_partition`]). Never empty when present:
+    /// the whole section is omitted when there is nothing to name.
+    pub partition: Vec<crate::lineage_partition::SpacePartition>,
+    /// Cells whose chains this node has recorded CLOSED
+    /// ([`crate::closed_chain_fence`]) — the durable ledger that survives a
+    /// restart and keeps a capability grant off a sealed chain. Absent when
+    /// empty, which is every node that has never sunset a window.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closed_cells: Vec<crate::closed_chain_fence::ClosedCellRecord>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -297,6 +325,15 @@ pub struct StoragePassportContext {
     /// pre-Task-12 response, because a role with no lineage window emits no
     /// `lineage` object to hang a `sweep` off at all.
     pub sweep: BTreeMap<SweepKey, AgentSweep>,
+    /// **Task 32.** Point-in-time copy of the partition probe's verdict
+    /// (`LineagePartitionProbe::snapshot()`). Same discipline as `lineage` and
+    /// `sweep` above: the passport holds the SNAPSHOT, never the probe. Empty
+    /// on a healthy node and on a build with no probe wired.
+    pub partition: Vec<crate::lineage_partition::SpacePartition>,
+    /// **Task 32.** Point-in-time copy of the closed-cell ledger
+    /// (`ClosedChainFence::closed_cells()`). Empty on every node that has never
+    /// sunset a lineage window.
+    pub closed_cells: Vec<crate::closed_chain_fence::ClosedCellRecord>,
 }
 
 /// Assemble a fresh storage runtime passport.
@@ -368,8 +405,25 @@ pub async fn assemble_storage_passport(ctx: StoragePassportContext) -> RuntimeVe
                 transport_backend,
                 adaptive_transport_selection: adaptive_transport_selection_enabled(),
             },
+            lineage: lineage_passport(ctx.partition, ctx.closed_cells),
         },
     }
+}
+
+/// The node-wide lineage section, or `None` when there is nothing to say —
+/// which keeps `/version` byte-identical to its pre-Task-32 shape on a healthy
+/// node that has never crossed a lineage.
+fn lineage_passport(
+    partition: Vec<crate::lineage_partition::SpacePartition>,
+    closed_cells: Vec<crate::closed_chain_fence::ClosedCellRecord>,
+) -> Option<LineagePassport> {
+    if partition.is_empty() && closed_cells.is_empty() {
+        return None;
+    }
+    Some(LineagePassport {
+        partition,
+        closed_cells,
+    })
 }
 
 fn active_transports(libp2p_active: bool, iroh_active: bool) -> Vec<String> {
@@ -787,6 +841,8 @@ mod tests {
             iroh_active: false,
             lineage: BTreeMap::new(),
             sweep: BTreeMap::new(),
+            partition: Vec::new(),
+            closed_cells: Vec::new(),
         })
         .await;
         let actual = serde_json::to_value(response).unwrap();
@@ -816,6 +872,8 @@ mod tests {
             iroh_active: true,
             lineage: BTreeMap::new(),
             sweep: BTreeMap::new(),
+            partition: Vec::new(),
+            closed_cells: Vec::new(),
         })
         .await;
         let json = serde_json::to_value(response).unwrap();

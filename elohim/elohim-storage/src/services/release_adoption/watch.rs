@@ -491,6 +491,12 @@ impl InstalledRealitySource for PassportInstalledReality {
                 // observations, that is a bridge handle threaded to here, not
                 // a value invented at this call site.
                 sweep: std::collections::BTreeMap::new(),
+                // **Task 32's fields, same rule again.** This leg reads
+                // `passport.happ` and nothing else, so a partition verdict and
+                // a closed-cell ledger it does not hold would be invented, not
+                // observed. The wired `/version` path supplies both.
+                partition: Vec::new(),
+                closed_cells: Vec::new(),
             },
         )
         .await;

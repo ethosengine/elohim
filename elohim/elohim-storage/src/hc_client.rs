@@ -26,8 +26,8 @@ use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
 use holochain_client::{
-    AdminWebsocket, AllowedOrigins, AppWebsocket, AuthorizeSigningCredentialsPayload, CellId,
-    ClientAgentSigner, ExternIO, ZomeCallTarget,
+    AdminWebsocket, AllowedOrigins, AppWebsocket, CellId, ClientAgentSigner, ExternIO,
+    ZomeCallTarget,
 };
 
 use crate::conductor_admission::AdmissionClass;
@@ -88,6 +88,79 @@ pub struct HcClientConfig {
     pub app_id: String,
     /// Role to use for the cell (e.g., "lamad")
     pub role: Option<String>,
+}
+
+/// Mint (or reuse) signing credentials for `cell` through the post-close write
+/// fence.
+///
+/// # Why every authorize in this crate goes through one function
+///
+/// `AdminWebsocket::authorize_signing_credentials` generates a keypair and then
+/// calls `grant_zome_call_capability`, which **commits a `CapGrant` entry on the
+/// cell's source chain**. On a chain the network has seen closed, that one
+/// action is warranted by every neighbour and turned into a `Timestamp::max()`
+/// cell block that holochain 0.7 cannot lift — the household mesh partitioned
+/// itself exactly this way on 2026-09-05 (Task 30, `6968baf1e`).
+///
+/// The fence gives three outcomes:
+///
+/// * credentials already persisted for this cell → **reused, nothing authored**
+///   (this is what makes a `storage-restart` write-free);
+/// * cell recorded closed and no persisted credentials → **refused by name**,
+///   nothing reaches the conductor and this role stays unconnected (503),
+///   which is recoverable where a block is not;
+/// * otherwise → minted once and persisted, so the next restart takes the
+///   first branch.
+///
+/// On a build that never armed a fence ([`crate::closed_chain_fence::fence`]
+/// returns `None` — library consumers, unit tests) this is byte-for-byte the
+/// pre-Task-32 call.
+async fn authorize_signing_credentials_fenced(
+    admin_ws: &AdminWebsocket,
+    cell_id: &CellId,
+    label: Option<&str>,
+) -> Result<holochain_client::SigningCredentials, StorageError> {
+    let label = label.unwrap_or("default");
+    match crate::closed_chain_fence::fence() {
+        Some(fence) => fence
+            .authorize(admin_ws, cell_id, label)
+            .await
+            .map_err(|e| StorageError::Connection(e.to_string())),
+        None => admin_ws
+            .authorize_signing_credentials(holochain_client::AuthorizeSigningCredentialsPayload {
+                cell_id: cell_id.clone(),
+                functions: None,
+            })
+            .await
+            .map_err(|e| {
+                StorageError::Connection(format!(
+                    "authorize_signing_credentials ({label}) failed: {e}"
+                ))
+            }),
+    }
+}
+
+/// Refuse a zome call that would author on a closed chain, before it reaches
+/// the admission gate or the websocket.
+///
+/// `Ok(())` means "not refused" — the cell is open, no fence is armed, or the
+/// function is one of [`crate::closed_chain_fence::CLOSED_CHAIN_READ_FNS`],
+/// which a closed chain still serves.
+fn refuse_write_on_closed_chain(
+    cell_id: &CellId,
+    zome_name: &str,
+    fn_name: &str,
+) -> Result<(), StorageError> {
+    let Some(fence) = crate::closed_chain_fence::fence() else {
+        return Ok(());
+    };
+    match fence.refuse_zome_call(cell_id, zome_name, fn_name) {
+        Some(reason) => {
+            warn!(zome = %zome_name, fn_name = %fn_name, "{reason}");
+            Err(StorageError::Conductor(reason))
+        }
+        None => Ok(()),
+    }
 }
 
 /// Holochain client with proper signing support
@@ -288,16 +361,18 @@ impl HcClient {
         // Create signing credentials
         let signer = ClientAgentSigner::default();
 
-        // Authorize signing credentials for this cell
-        let credentials = admin_ws
-            .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                cell_id: cell_id.clone(),
-                functions: None, // All functions
-            })
-            .await
-            .map_err(|e| {
-                StorageError::Connection(format!("authorize_signing_credentials failed: {}", e))
-            })?;
+        // Signing credentials for this cell.
+        //
+        // **This is a CHAIN WRITE, not a handshake** — `authorize_signing_credentials`
+        // commits a `CapGrant` on the cell's source chain. Task 30 measured what
+        // that costs on a chain the network has seen closed: every neighbour
+        // warrants the author and turns the warrant into a permanent cell block
+        // holochain 0.7 cannot lift. So it goes through the post-close fence
+        // (Task 32), which reuses persisted credentials wherever they exist and
+        // refuses a mint on a closed cell BY NAME rather than authoring it.
+        let credentials =
+            authorize_signing_credentials_fenced(&admin_ws, &cell_id, config.role.as_deref())
+                .await?;
 
         // Add credentials to signer
         signer.add_credentials(cell_id.clone(), credentials);
@@ -305,36 +380,16 @@ impl HcClient {
         // Authorize the mishpat cell too — the signer is per-cell, so without
         // this a role-targeted mishpat call fails at signing, not at dispatch.
         if let Some(mc) = &mishpat_cell_id {
-            let mishpat_credentials = admin_ws
-                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                    cell_id: mc.clone(),
-                    functions: None,
-                })
-                .await
-                .map_err(|e| {
-                    StorageError::Connection(format!(
-                        "authorize_signing_credentials (mishpat) failed: {}",
-                        e
-                    ))
-                })?;
+            let mishpat_credentials =
+                authorize_signing_credentials_fenced(&admin_ws, mc, Some("mishpat")).await?;
             signer.add_credentials(mc.clone(), mishpat_credentials);
         }
 
         // Same for imagodei — without per-cell credentials a role-targeted
         // imagodei call fails at signing rather than at dispatch.
         if let Some(ic) = &imagodei_cell_id {
-            let imagodei_credentials = admin_ws
-                .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                    cell_id: ic.clone(),
-                    functions: None,
-                })
-                .await
-                .map_err(|e| {
-                    StorageError::Connection(format!(
-                        "authorize_signing_credentials (imagodei) failed: {}",
-                        e
-                    ))
-                })?;
+            let imagodei_credentials =
+                authorize_signing_credentials_fenced(&admin_ws, ic, Some("imagodei")).await?;
             signer.add_credentials(ic.clone(), imagodei_credentials);
         }
         info!("Signing credentials authorized");
@@ -394,6 +449,7 @@ impl HcClient {
             payload_len = payload.len(),
             "Making signed zome call (imagodei cell)"
         );
+        refuse_write_on_closed_chain(&cell_id, zome_name, fn_name)?;
         // Same gate, same pool: the imagodei cell is a different DNA but the same
         // conductor, so its calls compete for the same read permits.
         let _permit = crate::conductor_admission::admission()
@@ -436,6 +492,7 @@ impl HcClient {
             payload_len = payload.len(),
             "Making signed zome call (mishpat cell)"
         );
+        refuse_write_on_closed_chain(&cell_id, zome_name, fn_name)?;
         // Same gate, same pool — see `call_zome_imagodei`.
         let _permit = crate::conductor_admission::admission()
             .acquire(AdmissionClass::Interactive, zome_name)
@@ -492,6 +549,11 @@ impl HcClient {
             class = class.label(),
             "Making signed zome call"
         );
+
+        // A close is a sealing act: refuse anything that would author on a
+        // sealed chain BEFORE the admission gate, so a refused write costs the
+        // conductor nothing and can never reach the websocket.
+        refuse_write_on_closed_chain(&self.cell_id, zome_name, fn_name)?;
 
         // ADMISSION BEFORE DISPATCH. The bound below is on acquiring LOCAL
         // capacity — nothing has crossed the websocket yet, so a shed costs the
