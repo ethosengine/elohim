@@ -1334,8 +1334,62 @@ pub struct ExportResume {
     /// momentarily blind authority does not erase what an earlier page
     /// established — the same last-non-`None` discipline
     /// [`CarryReceipt::v1_observed_head`] documents.
+    ///
+    /// On the OWN path this is the source-chain HEAD sequence, and it is the
+    /// second half of the pin: a chain whose head hash is unchanged but whose
+    /// head sequence moved is a contradiction, and a chain that grew moves both.
     #[serde(default)]
     pub observed_head: Option<u32>,
+    /// **Additive (Task 24 fix round 1).** Where the page cursor SITS on the
+    /// chain: `(app-entry ordinal, action_seq)`.
+    ///
+    /// This is the field that makes a resumed page cost its own window rather
+    /// than the whole chain. The cursor is an ordinal into the app-entry
+    /// SUBSEQUENCE, and nothing in an ordinal says which `action_seq` it lands
+    /// on — the first implementation therefore rebuilt the whole ordinal index
+    /// with a chain-wide header query on every page, so the pin skipped only
+    /// the sha256 and the walk stayed linear-per-page (chain-length work, N/CAP
+    /// times). Naming the sequence lets the next page start its scan where the
+    /// last one stopped.
+    ///
+    /// Used ONLY when the caller's `cursor` equals the ordinal here. Any other
+    /// cursor — a driver that jumped, restarted at a different offset, or is
+    /// re-reading an earlier page — falls back to the full ordinal walk, which
+    /// is always correct and never wrong, just slower.
+    ///
+    /// `None` from a page that could not name the next position (the scan
+    /// reached the chain head without a further record) or from a coordinator
+    /// that predates this field; either way the next page walks in full.
+    #[serde(default)]
+    pub cursor_seq: Option<(u32, u32)>,
+}
+
+/// How far past a page's start the bounded forward scan reads on its first
+/// probe, as a multiple of the page limit — then doubling until it has the page
+/// plus one, or reaches the chain head.
+///
+/// MEASURED on this DNA: `register_node` commits SIX actions per app entry (one
+/// Create plus five CreateLinks), and the chain also carries three genesis
+/// actions and an `InitZomesComplete`. A factor of 8 therefore clears a full
+/// page in ONE probe here with slack for a chain whose link density is higher,
+/// and the doubling covers anything denser without a second guess. It is a
+/// probe size, never a correctness bound: a scan that comes up short simply
+/// probes again.
+const SCAN_SPAN_FACTOR: u32 = 8;
+
+/// What one bounded forward scan found — named rather than returned as a
+/// three-tuple so each number keeps its meaning at the call site.
+struct ScannedWindow {
+    /// The page's app-entry `(action_seq, ActionHash)` pairs, in chain order.
+    window: Vec<(u32, ActionHash)>,
+    /// The sequence of the app entry ONE PAST the page, when the scan reached
+    /// it — this is what the next page's [`ExportResume::cursor_seq`] carries.
+    /// `None` when the scan hit the chain head first, which costs the next page
+    /// a full ordinal walk and is never wrong.
+    next_start_seq: Option<u32>,
+    /// Action rows read. Reported rather than swallowed because it is the
+    /// number risk row R1 watches — see [`ExportPage::scanned`].
+    scanned: u32,
 }
 
 /// Input to [`export_records`]: an opaque page cursor (`None` starts at the
@@ -1452,6 +1506,27 @@ pub struct ExportPage {
     /// costs exactly what this export cost before the field existed.
     #[serde(default)]
     pub resume: Option<ExportResume>,
+    /// **Additive (Task 24 fix round 1).** How many action rows this page's
+    /// POSITION scan read — the cost of finding where the page starts.
+    ///
+    /// **This is the metric risk row R1 reads.** Carry cost stays linear in
+    /// chain length iff this stays bounded: assert `scanned` on resumed pages
+    /// ≪ chain length, and — the property that actually matters — INDEPENDENT
+    /// of how far into the chain the page sits. An unpinned page reports the
+    /// whole chain's action count, because finding an arbitrary ordinal costs
+    /// exactly that; a pinned page reports only its own probe span.
+    ///
+    /// Scope is deliberately the position scan ALONE. The windowed entry read
+    /// that follows it is bounded by `limit` by construction and was never the
+    /// quadratic term, so folding it in here would blunt the one number that
+    /// tells you whether the walk regressed. On the held path this is the size
+    /// of the agent-activity list the authority returned — the same "rows read
+    /// to find the position" quantity, from the courier's side.
+    ///
+    /// `None` from a coordinator that predates the field — never a fabricated
+    /// 0, which would read as a page that scanned nothing.
+    #[serde(default)]
+    pub scanned: Option<u32>,
 }
 
 const EXPORT_CAP: u32 = 64;
@@ -1695,87 +1770,151 @@ impl CarriedTypes {
 /// Local-only by construction (`query`), so it is deterministic and never
 /// waits on the network — the same property `get_signed_action` relies on.
 ///
-/// # The walk is linear (Task 24, G8)
+/// # The walk is linear (Task 24, G8; corrected in fix round 1)
 ///
-/// Two separable costs used to be one. The page's ENTRIES and the walk's
-/// page-independent `digest`/`total` were both taken from a single
-/// `query(include_entries(true))` over the WHOLE chain, so every page loaded
-/// every entry: carrying N records cost `N * N/EXPORT_CAP` entry loads. They
-/// are now split, and neither is quadratic:
+/// Three costs used to be one `query(include_entries(true))` over the whole
+/// chain, run on every page: finding where the page starts, hashing the walk,
+/// and loading the page's entries. Carrying N records therefore cost
+/// `N * N/EXPORT_CAP` entry loads. They are now three separate reads, and the
+/// two that scale with the chain are paid ONCE per walk rather than per page:
 ///
-///   * **The ordinal index is HEADERS ONLY.** One `query(include_entries(false))`
-///     per page establishes which actions are app entries and at which sequence
-///     — a header scan, no entry blobs. This is what maps the page cursor (an
-///     ordinal into the app-entry list) onto source-chain sequences, which is
-///     why it cannot be skipped even on a resumed page.
-///   * **Entries are loaded for THIS WINDOW only**, with a second query bounded
-///     by `ChainQueryFilterRange::ActionSeqRange` over the window's first and
-///     last sequence. Total entry loads across a whole walk: N, once.
+///   * **Entries are loaded for THIS WINDOW only** — a query bounded by
+///     `ChainQueryFilterRange::ActionSeqRange` over the window's first and last
+///     sequence. Unconditional: the landed storage driver gets it without
+///     changing a byte it sends. Total entry loads across a walk: N, once.
+///   * **The digest is computed once**, on the first (unpinned) page, and
+///     reported verbatim by every page that hands the pin back.
+///   * **The POSITION scan is bounded on a pinned page.** The page cursor is an
+///     ordinal into the app-entry SUBSEQUENCE, so nothing in it says which
+///     `action_seq` it lands on. An unpinned page has no choice but to rebuild
+///     that index with one chain-wide HEADERS-ONLY query — which is what the
+///     first cut of this task did on EVERY page, so the pin skipped only the
+///     sha256 and this doc's claim to "pay that walk once" was false. A pinned
+///     page whose cursor matches [`ExportResume::cursor_seq`] instead scans
+///     FORWARD from the sequence the previous page named, in doubling probes
+///     from `limit * SCAN_SPAN_FACTOR`, and stops as soon as it has the page
+///     plus one. [`ExportPage::scanned`] reports what it read, and is the
+///     number risk row R1 watches.
 ///
-/// That split alone makes the walk linear in record loads and is unconditional
-/// — the landed storage driver gets it without changing a byte it sends. The
-/// [`ExportResume`] token on top of it removes the remaining per-page work (the
-/// whole-chain digest) and, more importantly, PINS the walk: see
+/// The pin itself costs NO queries at all: `agent_info()` reports the
+/// source-chain head hash and sequence directly, and on an append-only chain an
+/// unchanged head hash IS the proof that the chain below it is unchanged — the
+/// head action commits to its predecessor, transitively to genesis. See
 /// [`ExportPage::resume`].
 #[hdk_extern]
 pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
     let limit = input.limit.clamp(1, EXPORT_CAP) as usize;
+    let start = input.cursor.unwrap_or(0) as usize;
 
-    // (1) The pin, O(1). `agent_info()` reports the source-chain head as of the
-    //     start of this call, and this extern writes nothing, so it is stable
-    //     for the duration of the page.
-    let head = agent_info()?.chain_head.0.to_string();
+    // (1) The pin, at ZERO queries. `agent_info()` reports this agent's
+    //     source-chain head — hash AND sequence — as of the start of the call,
+    //     and this extern writes nothing, so it is stable for the page.
+    let (head_hash, head_seq, _) = agent_info()?.chain_head;
+    let head = head_hash.to_string();
 
-    // (2) The ordinal index: HEADERS ONLY. `include_entries(false)` is the
-    //     whole point — the action rows carry the entry TYPE, the sequence and
-    //     the action hash, which is everything the cursor arithmetic and the
-    //     digest need. The entry blobs, which are the expensive part, are left
-    //     on disk until step (4) knows which handful of them this page wants.
-    //
-    //     Read the chain head sequence BEFORE the app-entry filter:
-    //     `observed_head` is a sequence over every action, so that the held
-    //     path (which reads it from the authority's pre-filter
-    //     `highest_observed`) means the same thing.
-    let headers = query(ChainQueryFilter::new().include_entries(false))?;
-    let observed_head = headers
-        .iter()
-        .map(|r| r.action().action_seq())
-        .max()
-        .or_else(|| input.resume.as_ref().and_then(|r| r.observed_head));
-    let mut app: Vec<(u32, ActionHash)> = headers
-        .into_iter()
-        .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
-        .map(|r| (r.action().action_seq(), r.action_address().clone()))
-        .collect();
-    app.sort_by_key(|(seq, _)| *seq);
-    let total = app.len() as u32;
-
-    // (3) The digest: computed ONCE per walk. A resumed page verifies the pin
-    //     and reuses what the first page established; an unpinned page hashes
-    //     the (already loaded) header hashes, exactly as before.
-    let digest = match input.resume.as_ref() {
+    // (2) Verify the pin BEFORE reading anything. A source chain is append-only
+    //     and every action commits to its predecessor, so an unchanged head
+    //     hash is a complete proof that the chain below it is byte-identical to
+    //     the one the first page walked — which is what licenses reusing that
+    //     page's `digest` and `total` without re-deriving them. The sequence
+    //     check beside it is free from the same call and catches the one shape
+    //     the hash alone could not explain (a head that is somehow the same
+    //     action at a different position).
+    let pinned = match input.resume.as_ref() {
+        None => None,
         Some(resume) => {
             if resume.head != head {
                 return Err(chain_moved("chain head", &resume.head, &head));
             }
-            if resume.total != total {
-                return Err(chain_moved(
-                    "an app-record count of",
-                    &resume.total.to_string(),
-                    &total.to_string(),
-                ));
+            if let Some(pinned_seq) = resume.observed_head {
+                if pinned_seq != head_seq {
+                    return Err(chain_moved(
+                        "a chain-head sequence of",
+                        &pinned_seq.to_string(),
+                        &head_seq.to_string(),
+                    ));
+                }
             }
-            resume.digest.clone()
+            Some(resume)
         }
-        None => chain_digest(app.iter().map(|(_, hash)| hash)),
+    };
+    let observed_head = Some(head_seq);
+
+    // (3) Position. The FAST path applies only when the pin names where THIS
+    //     cursor sits; anything else rebuilds the ordinal index in full, which
+    //     is always correct and is what an unpinned first page does anyway.
+    let fast_from = pinned.and_then(|resume| match resume.cursor_seq {
+        Some((ordinal, seq)) if ordinal as usize == start => Some(seq),
+        _ => None,
+    });
+
+    let (window, next_start_seq, total, digest, scanned) = match (fast_from, pinned) {
+        (Some(from_seq), Some(resume)) => {
+            // Bounded: probes forward from where the last page stopped. `total`
+            // and `digest` come from the pin — verified above, so this page
+            // never has to see the whole chain to report them.
+            let scan = scan_forward(from_seq, head_seq, limit)?;
+            (
+                scan.window,
+                scan.next_start_seq,
+                resume.total,
+                resume.digest.clone(),
+                scan.scanned,
+            )
+        }
+        _ => {
+            // The ordinal index, HEADERS ONLY. `include_entries(false)` is the
+            // whole point — the action rows carry the entry TYPE, the sequence
+            // and the action hash, which is everything the cursor arithmetic
+            // and the digest need. The entry blobs, which are the expensive
+            // part, stay on disk until step (4) knows which handful this page
+            // wants.
+            let headers = query(ChainQueryFilter::new().include_entries(false))?;
+            let scanned = headers.len() as u32;
+            let mut app: Vec<(u32, ActionHash)> = headers
+                .into_iter()
+                .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
+                .map(|r| (r.action().action_seq(), r.action_address().clone()))
+                .collect();
+            app.sort_by_key(|(seq, _)| *seq);
+            let total = app.len() as u32;
+            // Only assertable when we actually walked. It cannot fail after the
+            // head check above — it is kept as the loud contradiction it would
+            // be if it ever did.
+            if let Some(resume) = pinned {
+                if resume.total != total {
+                    return Err(chain_moved(
+                        "an app-record count of",
+                        &resume.total.to_string(),
+                        &total.to_string(),
+                    ));
+                }
+            }
+            let digest = match pinned {
+                Some(resume) => resume.digest.clone(),
+                None => chain_digest(app.iter().map(|(_, hash)| hash)),
+            };
+            let window: Vec<(u32, ActionHash)> =
+                app.iter().skip(start).take(limit).cloned().collect();
+            let next_start_seq = app.get(start + limit).map(|(seq, _)| *seq);
+            (window, next_start_seq, total, digest, scanned)
+        }
     };
 
-    let start = input.cursor.unwrap_or(0) as usize;
-    let window: Vec<(u32, ActionHash)> = app.into_iter().skip(start).take(limit).collect();
+    // A FULL page always offers a cursor, even when the chain happens to end
+    // exactly on the page boundary — the landed `fold_carry` terminates on
+    // `next_cursor: None` and expects the trailing empty page. Unchanged.
     let next_cursor = if window.len() == limit {
         Some((start + limit) as u32)
     } else {
         None
+    };
+    // The next page can skip its ordinal walk only if we can name where it
+    // starts. `None` (the scan reached the head with nothing beyond the page)
+    // costs that page one full walk and is never wrong.
+    let cursor_seq = match (next_cursor, next_start_seq) {
+        (Some(cursor), Some(seq)) => Some((cursor, seq)),
+        _ => None,
     };
 
     // (4) Entries for the window, and only the window. The sequence range spans
@@ -1831,7 +1970,63 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
             digest,
             total,
             observed_head,
+            cursor_seq,
         }),
+        scanned: Some(scanned),
+    })
+}
+
+/// Collect the app-entry `(action_seq, ActionHash)` pairs for one page WITHOUT
+/// reading the whole chain — the bounded half of Task 24's fix round 1.
+///
+/// Starts at `from_seq` (the sequence the previous page named in
+/// [`ExportResume::cursor_seq`]) and probes forward in header-only windows,
+/// doubling the span until it holds `limit + 1` app entries or reaches
+/// `head_seq`. The extra one is what lets the caller name the NEXT page's
+/// starting sequence; without it every page would hand back a `cursor_seq` of
+/// `None` and the walk would fall back to a full scan on each step.
+///
+/// Correctness does not depend on the probe size: coming up short simply probes
+/// again with twice the span, and reaching the head ends the scan. The span
+/// only decides how many round trips a page costs.
+fn scan_forward(from_seq: u32, head_seq: u32, limit: usize) -> ExternResult<ScannedWindow> {
+    let want = limit.saturating_add(1);
+    let mut collected: Vec<(u32, ActionHash)> = Vec::with_capacity(want);
+    let mut scanned: u32 = 0;
+    let mut cursor = from_seq;
+    let mut span = (limit as u32)
+        .saturating_mul(SCAN_SPAN_FACTOR)
+        .max(SCAN_SPAN_FACTOR);
+
+    while cursor <= head_seq && collected.len() < want {
+        let end = cursor.saturating_add(span.saturating_sub(1)).min(head_seq);
+        let rows = query(
+            ChainQueryFilter::new()
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(cursor, end))
+                .include_entries(false),
+        )?;
+        scanned = scanned.saturating_add(rows.len() as u32);
+        let mut probed: Vec<(u32, ActionHash)> = rows
+            .into_iter()
+            .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
+            .map(|r| (r.action().action_seq(), r.action_address().clone()))
+            .collect();
+        probed.sort_by_key(|(seq, _)| *seq);
+        collected.extend(probed);
+        if end >= head_seq {
+            break;
+        }
+        cursor = end.saturating_add(1);
+        span = span.saturating_mul(2);
+    }
+
+    collected.truncate(want);
+    let next_start_seq = collected.get(limit).map(|(seq, _)| *seq);
+    collected.truncate(limit);
+    Ok(ScannedWindow {
+        window: collected,
+        next_start_seq,
+        scanned,
     })
 }
 
@@ -1973,7 +2168,20 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
     let head = match &activity.status {
         ChainStatus::Empty => "empty".to_string(),
         ChainStatus::Valid(head) => head.hash.to_string(),
-        ChainStatus::Forked(fork) => format!("forked@{}", fork.fork_seq),
+        // BOTH conflicting hashes, SORTED. `ChainFork` documents the ordering
+        // of `first_action`/`second_action` as undefined and peer-dependent, and
+        // the fork sequence alone cannot tell two different forks at the same
+        // position apart — so rendering either of those alone would make the
+        // pin disagree with itself across peers, or silently accept a walk that
+        // resumed onto a different branch.
+        ChainStatus::Forked(fork) => {
+            let mut pair = [
+                fork.first_action.to_string(),
+                fork.second_action.to_string(),
+            ];
+            pair.sort();
+            format!("forked@{}:{}:{}", fork.fork_seq, pair[0], pair[1])
+        }
         ChainStatus::Invalid(head) => format!("invalid@{}", head.hash),
         // A SEALED predecessor (Station 8's `CloseChain`) is a distinct state
         // from a live one, and it is exactly the transition a crossing walks
@@ -1993,6 +2201,12 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         .collect();
 
     let count = hashes.len() as u32;
+    // The held path's POSITION scan IS the activity list: the authority hands
+    // back the whole filtered set of `(seq, hash)` pairs in one round trip, and
+    // there is no cheaper index into it. So `scanned` is that list's size, and
+    // — unlike the own path — a pin cannot shrink it. What the pin removes here
+    // is the per-page digest; see `ExportPage::scanned`.
+    let scanned = count;
     // Digest once per walk, as on the own path. The COUNT check beside the head
     // check is what makes the pin sound here specifically: gossip adds records
     // to the courier's view, and a back-fill below the head would change the
@@ -2059,7 +2273,14 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
             digest,
             total: count,
             observed_head,
+            // Deliberately NOT named on the held path. `cursor_seq` exists to
+            // let the next page skip rebuilding an ordinal index; here the
+            // index arrives whole with the activity response, so naming a
+            // sequence would buy nothing and would imply a positional stability
+            // a growing courier view does not have.
+            cursor_seq: None,
         }),
+        scanned: Some(scanned),
     })
 }
 
@@ -2919,7 +3140,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
 
 /// This DNA's declared predecessor, read from its identity-bearing properties.
 ///
-/// Factored out of [`carry_from`] so [`carry_page_for_test`] reaches the same
+/// Factored out of [`carry_from`] so `carry_page_for_test` reaches the same
 /// lineage through the same read — a test entry point that trusted a different
 /// predecessor would not be exercising the crossing.
 #[cfg(feature = "lineage-witness")]
@@ -2942,7 +3163,7 @@ fn declared_predecessor() -> ExternResult<DnaHash> {
 ///
 /// Split out of [`carry_from`] at Task 26 and otherwise unchanged: `carry_from`
 /// is now (verify the lineage · fetch the page · carry it), and this is the
-/// third step. The split is what lets [`carry_page_for_test`] drive a page the
+/// third step. The split is what lets `carry_page_for_test` drive a page the
 /// zome did not fetch through exactly this code, rather than a paraphrase of it
 /// — a refusal proven by a second implementation proves nothing about the
 /// first.
@@ -3179,9 +3400,21 @@ fn carry_page(
 /// because the refusal being exercised is the SELF-CARRY one — a held page
 /// re-creates nothing and so resolves no types at all.
 ///
-/// Gated with the rest of the crossing, so the default `node-registry.dna`
-/// does not carry it and its hash is unmoved.
-#[cfg(feature = "lineage-witness")]
+/// # It does not ship (Task 26 review, addressed in Task 24 fix round 1)
+///
+/// `lineage-witness` alone is the DEPLOYABLE successor, and this extern must not
+/// be in it: it is an unauthenticated injection point for hand-built pages, and
+/// a zome call is a zome call — "for_test" in the name is a comment, not a
+/// fence. It is therefore gated on `lineage-witness` AND a second feature,
+/// `lineage-test`, which only the sweettest-facing build passes
+/// (`just build-witness-test`). `just build-witness` — the bundle a conductor
+/// installs — omits it.
+///
+/// The two bundles are DNA-hash-IDENTICAL, because the difference is
+/// coordinator-only. That is not a loophole, it is the point: the sweettest
+/// exercises the same DNA the fleet runs, and only the test bundle can be
+/// talked to through this door.
+#[cfg(all(feature = "lineage-witness", feature = "lineage-test"))]
 #[hdk_extern]
 pub fn carry_page_for_test(page: ExportPage) -> ExternResult<CarryReceipt> {
     let lineage_dna_hash = declared_predecessor()?;

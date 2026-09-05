@@ -11,6 +11,15 @@ crate-type = ["cdylib", "rlib"]
 # NotarizationWitness/EntryToWitness types are gated the same way here.
 lineage-witness = ["node_registry_integrity/lineage-witness"]
 
+# TEST-ONLY externs, on top of `lineage-witness`. Off by default and NOT passed
+# by `just build-witness`, so the deployable successor bundle does not carry
+# them. `carry_page_for_test` is the one member: it accepts a hand-built
+# `ExportPage`, which is exactly the injection point the G10 refusal has to be
+# proven against and exactly what must not be reachable on a running conductor.
+# `just build-witness-test` passes both features; the resulting DNA hash is
+# IDENTICAL to the deployable one, because the difference is coordinator-only.
+lineage-test = []
+
 [dependencies]
 hdk = "=0.7.0"
 serde = "1"

@@ -33,13 +33,20 @@
 //!
 //! ```sh
 //! just build && hc dna pack . -o node-registry-v1.dna       # v1 (pristine, default)
-//! just build-witness                                        # v2 (node-registry-v2.dna)
+//! just build-witness                                        # v2 DEPLOYABLE (node-registry-v2.dna)
+//! just build-witness-test                                   # v2 TEST (node-registry-v2-test.dna)
 //! ```
+//!
+//! The two v2 bundles are DNA-hash-IDENTICAL — the difference is coordinator
+//! wasm only. `build-witness-test` additionally passes `lineage-test`, which
+//! fences `carry_page_for_test`: a hand-built-page injection point the G10
+//! refusals need and a running conductor must never answer. THIS FILE reads the
+//! test bundle by default, because those refusals cannot be reached otherwise.
 //!
 //! v1 is the pristine artifact (predecessor); v2 is the `lineage-witness`
 //! artifact (successor). Their paths come from `NODE_REGISTRY_V1_DNA` /
 //! `NODE_REGISTRY_V2_DNA` when set, else the in-repo defaults below
-//! (`node-registry-v1.dna` / `node-registry-v2.dna`). The test is
+//! (`node-registry-v1.dna` / `node-registry-v2-test.dna`). The test is
 //! `#[ignore]`d only in the sense of skipping cleanly when v1 is absent —
 //! CI runs sweettests with `--run-ignored all`, so no `#[ignore]` is used.
 
@@ -98,6 +105,11 @@ struct ExportResume {
     total: u32,
     #[serde(default)]
     observed_head: Option<u32>,
+    /// Task 24 fix round 1 (additive): `(app-entry ordinal, action_seq)` — what
+    /// lets a resumed page scan forward from where the last one stopped instead
+    /// of rebuilding the ordinal index over the whole chain.
+    #[serde(default)]
+    cursor_seq: Option<(u32, u32)>,
 }
 
 /// Mirror of `ExportInput` WITH the Task 24 `resume` field.
@@ -146,6 +158,10 @@ struct ExportPage {
     /// packed before Task 24 does not emit it.
     #[serde(default)]
     resume: Option<ExportResume>,
+    /// Task 24 fix round 1 (additive): action rows the page's POSITION scan
+    /// read. The metric risk row R1 watches — see the zome-side field doc.
+    #[serde(default)]
+    scanned: Option<u32>,
 }
 
 /// Mirror of `node_registry_coordinator::ExportHeldInput` (Task 18, v1 held view).
@@ -289,10 +305,10 @@ fn v1_path() -> PathBuf {
 fn v2_path() -> PathBuf {
     std::env::var("NODE_REGISTRY_V2_DNA")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| dna_dir().join("node-registry-v2.dna"))
+        .unwrap_or_else(|_| dna_dir().join("node-registry-v2-test.dna"))
 }
 
-/// The v2 bundle is a FEATURE build (`just build-witness`) that CI's DNA pipeline does not
+/// The v2 bundle is a FEATURE build (`just build-witness-test`) that CI's DNA pipeline does not
 /// produce yet. Until it does, a missing bundle is a loud SKIP, never a silent pass and never
 /// a red for a bundle nobody built: the probe's evidence is its own log line.
 fn v2_bundle_or_skip() -> Option<PathBuf> {
@@ -302,7 +318,7 @@ fn v2_bundle_or_skip() -> Option<PathBuf> {
     } else {
         eprintln!(
             "SKIPPED @concern:happ-lineage-migration — v2 bundle absent at {} \
-             (build it: cd elohim/holochain/dna/node-registry && just build-witness)",
+             (build it: cd elohim/holochain/dna/node-registry && just build-witness-test)",
             p.display()
         );
         None
@@ -1406,12 +1422,39 @@ async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
         pin.observed_head, p1.observed_head,
         "the pin carries the head sequence forward for a later blind page"
     );
+    let (pin_ordinal, _pin_seq) = pin
+        .cursor_seq
+        .expect("a full page names where the NEXT page starts — that is the whole fix");
+    assert_eq!(
+        pin_ordinal,
+        p1.next_cursor.unwrap(),
+        "the pin's ordinal IS the cursor it is paired with; a mismatch is what makes a resumed \
+         page fall back to the full walk"
+    );
 
-    // --- pages 2..N: pinned. The digest is not recomputed, and every page
-    //     hands back a pin identical to the one it was given.
+    // MEASURED (holochain 0.7.0): 3 genesis + InitZomesComplete + 200 x 6
+    // register_node actions = 1204. An UNPINNED page has no choice but to read
+    // all of them: the cursor is an ordinal into the app-entry subsequence and
+    // nothing in it says where that lands.
+    let first_scanned = p1
+        .scanned
+        .expect("every page reports what its position scan read");
+    assert_eq!(
+        first_scanned, 1204,
+        "an unpinned page rebuilds the whole ordinal index — 3 genesis + InitZomesComplete + \
+         200x6 register_node actions"
+    );
+
+    // --- pages 2..N: pinned. The digest is not recomputed; the WALK-IDENTITY
+    //     half of the pin (head, digest, total, observed_head) never moves, and
+    //     only `cursor_seq` advances — which is the whole mechanism: each page
+    //     tells the next one where to start so it never rebuilds the index.
+    let first_pin = pin.clone();
+    let mut pin = pin;
     let mut cursor = p1.next_cursor;
     let mut walked = p1.records.len();
     let mut pages = 1;
+    let mut resumed_scans: Vec<u32> = Vec::new();
     while let Some(next) = cursor {
         let page: ExportPage = conductor
             .call(
@@ -1427,23 +1470,80 @@ async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
         pages += 1;
         assert_eq!(
             page.digest, p1.digest,
-            "the digest is a property of the WALK, computed once — a resumed page reports the              pinned value, never a fresh one"
+            "the digest is a property of the WALK, computed once — a resumed page reports the \
+             pinned value, never a fresh one"
         );
         assert_eq!(page.total, Some(N), "so is the total");
-        assert_eq!(
-            page.resume.as_ref(),
-            Some(&pin),
-            "a resumed page returns the pin it was handed, unchanged — the walk did not move"
-        );
         assert_eq!(page.entries.len(), page.records.len());
+
+        let returned = page
+            .resume
+            .clone()
+            .expect("every page returns a resume token");
+        assert_eq!(
+            (
+                &returned.head,
+                &returned.digest,
+                returned.total,
+                returned.observed_head
+            ),
+            (&pin.head, &pin.digest, pin.total, pin.observed_head),
+            "the walk-identity half of the pin is what says THIS IS THE SAME WALK — it must come \
+             back untouched, or the refusal it licenses means nothing"
+        );
+        if let Some(next_cursor) = page.next_cursor {
+            let (ordinal, _seq) = returned
+                .cursor_seq
+                .expect("a full page names where the NEXT page starts");
+            assert_eq!(
+                ordinal, next_cursor,
+                "the pin's ordinal must equal the cursor it accompanies, or the next page \
+                 silently falls back to the full ordinal walk"
+            );
+        }
+
+        // THE PROPERTY (risk row R1). A resumed page reads only its own probe
+        // span, so its scan cost is bounded by `limit * SCAN_SPAN_FACTOR` and
+        // — the part that actually matters — does NOT grow with how far into
+        // the chain the page sits. Before fix round 1 every one of these read
+        // all 1204 rows and the pin bought only the sha256.
+        let scanned = page
+            .scanned
+            .expect("every page reports what its position scan read");
+        resumed_scans.push(scanned);
+        assert!(
+            scanned <= 64 * 8,
+            "a resumed page must stay inside its probe span (limit 64 x SCAN_SPAN_FACTOR 8), \
+             got {scanned}"
+        );
+        assert!(
+            scanned < first_scanned,
+            "a resumed page must read strictly less than the whole-chain walk it replaces \
+             ({scanned} vs {first_scanned})"
+        );
+
         walked += page.records.len();
         cursor = page.next_cursor;
+        pin = returned;
     }
     assert_eq!(
         walked as u32, N,
         "the pinned walk reaches every app record exactly once"
     );
     assert_eq!(pages, 4, "200 records at EXPORT_CAP 64 is 4 pages");
+    println!("[G8] scanned: first(unpinned)={first_scanned}, resumed={resumed_scans:?}");
+    // Flat, not merely bounded: the LAST resumed page is no more expensive than
+    // the first. That is the difference between "linear walk" and "quadratic
+    // walk with a smaller constant".
+    assert!(
+        resumed_scans.last().unwrap() <= resumed_scans.first().unwrap(),
+        "scan cost must not grow with chain position — got {resumed_scans:?}"
+    );
+    assert!(
+        resumed_scans.iter().sum::<u32>() < first_scanned,
+        "EVERY resumed page together must read less than ONE unpinned walk — got \
+         {resumed_scans:?} against {first_scanned}"
+    );
 
     // --- the pin has teeth: a mid-walk write refuses the next resumed page --
     let _mid: ActionHash = conductor
@@ -1461,7 +1561,7 @@ async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
             ExportInputResumed {
                 cursor: Some(64),
                 limit: 64,
-                resume: Some(pin.clone()),
+                resume: Some(first_pin.clone()),
             },
         )
         .await
@@ -1495,7 +1595,7 @@ async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
     );
     let fresh_pin = fresh.resume.expect("the restarted walk mints its own pin");
     assert_ne!(
-        fresh_pin.head, pin.head,
+        fresh_pin.head, first_pin.head,
         "the new pin names the NEW chain head"
     );
 
@@ -1515,6 +1615,12 @@ async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
     assert_eq!(
         unpinned.digest, fresh.digest,
         "an unpinned page recomputes against the chain as it is now — today's behaviour, unchanged"
+    );
+    assert_eq!(
+        unpinned.scanned,
+        Some(1210),
+        "and it pays the full walk for it: 1204 + one more register_node's six actions. The \
+         pin is what buys the bounded scan; without one, nothing changed"
     );
 
     Ok(())
