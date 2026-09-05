@@ -3,7 +3,7 @@ title: "Nachalah — the Allotment Epic: every record on the DHT is held by the 
 id: nachalah-allotment-epic
 brand: Nachalah
 name: Allotment
-status: Draft
+status: Active
 class: protocol-canonical
 context-tier: disclosed
 steward: rust-architect
@@ -11,7 +11,7 @@ serves:
   - happ-lineage-migration
   - runtime-upgrade-propagation
   - dataplane-convergence
-graduation-trigger: Draft→Active when the operator accepts §2's tier policy (gold / deeds / paper) and §3's allotment posture (arcs are earned, evidence-backed commitments, never geometry accidents); Active→Canonical when (a) the household mesh runs three DNA seams with three different floors and a `@concern:nachalah-allotment` receipt shows a paper-tier record never leaving its household while a gold-tier record reaches every hub, (b) our 0.7 conductor line runs with sharding on and an arc policy hook driven by the valueflow trust gradient, measured on the mesh, and (c) a conductor binary propagates to alpha through rung 5 with no Jenkins act after the build
+graduation-trigger: graduated Draft→Active 2026-09-05 on the operator's acceptance of §2's tier policy (gold / deeds / paper, relative per level), §2b's fractal, §2c's floor/ceiling/trust sizing and §3's allotment posture (arcs are earned, evidence-backed commitments dynamically negotiated by the elohim; recorded in §7.1). Graduates Active→Canonical when (a) the household mesh runs three DNA seams with three different floors and a `@concern:nachalah-allotment` receipt shows a paper-tier record never leaving its household while a gold-tier record reaches every hub, (b) our 0.7 conductor line runs with sharding on and an arc policy hook driven by the valueflow trust gradient, measured on the mesh, and (c) a conductor binary propagates to alpha through rung 5 with no Jenkins act after the build
 created: 2026-09-05
 domain: D2
 topic: [dht, storage-arc, sharding, allotment, trust-gradient, tiering, reach, dna-seam, block-governance, conductor-fork, conductor-artifact, rung-5, ci-hygiene]
@@ -345,7 +345,7 @@ Gaps:
 
 ## 6. Sequence
 
-1. Operator accepts §2's tiers and §3's posture (Draft → Active).
+1. ~~Operator accepts §2's tiers and §3's posture (Draft → Active).~~ Done 2026-09-05.
 2. Slice 1 plan: tier policy + first seam split + the allotment habit (household mesh, three
    seeds). Cheapest; no fork.
 3. Slice 2 plan: the fork with blocks first (it retires Task 30's database surgery), then
@@ -357,6 +357,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — **graduated Draft → Active** on the operator's acceptance ("ok accepted.. let's graduate that"): §2 tiers, §2b fractal, §2c floor/ceiling/trust, §3 posture, §3b ontology all accepted. Next artifact: the Slice 1 plan (tier policy + first seam split + the allotment habit on the household mesh, per §6 step 2).
 - 2026-09-05 — steering (operator): §2c is where the maximal diversity the physics allows lives (the ceiling, only there); §3b gains the EPR coupling — the minimal atom that keeps the whole network honest, what wisdom deliberates over to scale trust in balance with the whole (G3b.4).
 - 2026-09-05 — operator: satisfied with the allotment design ("you've got the right idea now"); arcs are dynamically negotiated by the elohim, every allotment decision aware of its limits, externalities and context (§3 posture amended).
 - 2026-09-05 — steering (operator): deterministic floor, elohim ceiling — the ceiling (planetary carrying capacity, the limitarian cap) is reached only at the full-arc global tier; the everyday goal is the most performant representation that TRUST allows; a trust-full architecture is more viable; full-arc-everywhere is the trustless crypto anti-pattern in a Holochain costume (§2c corrected, G2c.3 rewritten).
