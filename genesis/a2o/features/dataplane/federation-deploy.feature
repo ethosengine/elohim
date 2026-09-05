@@ -28,6 +28,13 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   a reader who meets those internal labels elsewhere recognizes the same two peers. Uniform deploy
   means a visitor cannot tell which one they reached.
 
+
+  One piece of test vocabulary, because this file's tag line uses it: an ACT names the substrate a
+  scenario is measured on. Act I runs against a household mesh the test run OWNS and may write to;
+  Act II runs against the deployed fleet, which it may only read. A feature file carries exactly one
+  act tag, and the runner uses it to decide whether a lane executes the file at all — which is why a
+  scenario that needs a different substrate from its neighbours has to live in a different file.
+
   Resolution has a PRECONDITION the first two scenarios do not cover: the deploy pipeline must be
   permitted to place bytes on a doorway it did not author from at all. Scenario 3 covers that link
   in the same chain — it is not a separate concern that happens to share a file.

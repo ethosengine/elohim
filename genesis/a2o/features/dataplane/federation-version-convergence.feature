@@ -42,15 +42,24 @@ Feature: Federation version convergence — two doorways that disagree serve the
   are only ever believed after the receiving peer's own conductor re-derives the claim from them
   and gets the same answer.
 
+
+  One piece of test vocabulary, because this file's tag line uses it: an ACT names the substrate a
+  scenario is measured on. Act I runs against a household mesh the test run OWNS and may write to;
+  Act II runs against the deployed fleet, which it may only read. A feature file carries exactly one
+  act tag, and the runner uses it to decide whether a lane executes the file at all — which is why a
+  scenario that needs a different substrate from its neighbours has to live in a different file.
+
   The two peers: alpha-A is the author peer (the one the deploy pipeline authors from). Peer
   "elohim.host" is a second federation doorway serving the same content from a different premises.
   On the household lane both are peers of a mesh this run owns.
 
   WHY THE DIVERGENCE PERSISTED, which is what the cure had to address: each doorway's head only
   ever moved when a deploy or seed wrote to that host DIRECTLY, while the declarations that should
-  settle the election live on the conductor DHT and were not traveling (storage arcs reset to
-  Empty on every restart, so election links never gossiped in; one peer's sweep measured 2,619
-  divergent rows and refused 2,603 per sweep — correctly, having no election to obey). A cure that
+  settle the election live on the conductor DHT — the distributed hash table every peer shares —
+  and were not traveling. A peer's STORAGE ARC is the slice of that shared space it volunteers to
+  hold and pass on; an arc of Empty means it holds and passes on nothing. Arcs reset to Empty on
+  every restart, so election links never gossiped in — one peer's sweep measured 2,619 divergent
+  rows and refused 2,603 of them per sweep, correctly, having no election to obey. A cure that
   fixed this by re-uploading to each host would be the disease.
 
   A GREEN SCENARIO HERE IS NOT YET A HEALED VISITOR, and the difference is not a technicality. The
@@ -82,28 +91,38 @@ Feature: Federation version convergence — two doorways that disagree serve the
   # peer" — true of every scenario in the file.
   @requires:owned-substrate
   Scenario: two doorways that disagree about a page converge on the elected version without anyone re-uploading it
-    # THE CURE UNDER TEST — carry the election: a peer that HOLDS the winning declaration
-    # serves the declaration link's own signed record alongside its head; the disagreeing
-    # peer's OWN conductor re-derives it in wasm — the link's bytes hash to the address they
-    # claim, the author's signature verifies, the link binds to this EPR's anchor, the tier
-    # parses — and merges it with every declaration it can already see under the shared
-    # election rule. Only a verified win moves the row, under the same never-move-backwards
-    # guard as every other head move. No doorway credential, no seed, no deploy is involved
-    # anywhere in this chain — that is the assertion, not an implementation detail.
+    # THE CURE UNDER TEST — the disagreeing peer OBEYS AN ELECTION rather than copying a peer.
+    # It merges every declaration it can see under the shared rule and moves its row only to a
+    # winner it has itself verified, under the same never-move-backwards guard as any other head
+    # move. Where its own conductor cannot see the election at all, a peer that HOLDS the winning
+    # declaration can hand over that declaration link's own signed record, and the disagreeing
+    # peer's conductor re-derives it in wasm — the bytes hash to the address they claim, the
+    # author's signature verifies, the link binds to this EPR's anchor, the tier parses. Which of
+    # those two routes carries a given move depends on what the peer can see, and this scenario
+    # does not prescribe one; what it asserts is that no doorway credential, no seed and no deploy
+    # is involved anywhere in the chain, and that the peer can verify a carried record and refuses
+    # a forged one.
     #
     # Ships DORMANT: the capability is enabled per-fleet by the operator flag
     # ELOHIM_OBEY_CARRIED_ELECTION. Scenario green means the capability works where enabled;
     # visitors experience convergence only once the operator turns it on.
+    #
     # THE VEHICLE IS A PAGE THIS RUN AUTHORS, and that is a protocol fact, not a test shortcut.
     # An EARNED canonical declaration is restricted to a page's root author, a device it
     # delegated, or the bootstrap steward — measured 2026-09-05, the conductor refuses anyone
     # else in wasm. So no test can ever manufacture this disagreement on a page it does not
-    # own; it stages on its own page, and reads the REAL landing page in the last two Thens.
+    # own; it stages on its own page, and reads the REAL landing page in the two Thens that name it.
+    #
+    # WHO HOLDS WHICH HEAD, because the assertions below turn on it: the first peer plants the
+    # page's one root and authors the revision it will declare EARNED. The second peer then
+    # authors its OWN, LATER revision of that same page, which its conductor declares as its head
+    # at the STAGING tier. So the peer that must move is holding the NEWER head, and the head it
+    # must move TO is older.
     Given peer "alpha-A" and peer "elohim.host" both declare a head for a page this run authored
     And their declared heads DISAGREE
-    And an EARNED canonical declaration exists for the newer head on its declaring peer
+    And an EARNED canonical declaration exists on the page's root author for the head it authored
     And carried elections are enabled on the fleet via the operator flag ELOHIM_OBEY_CARRIED_ELECTION
-    When the reconcile sweep runs on the peer holding the older head
+    When the reconcile sweep runs on the disagreeing peer
     # OUTCOME — the visitor-facing promise this scenario exists to prove:
     Then the peer's served head moves to the earned-tier elected head
     And both doorways serve the SAME head for that page
@@ -113,6 +132,10 @@ Feature: Federation version convergence — two doorways that disagree serve the
     # separately and can drift behind it — heads equal, pages different, which is the same harm
     # wearing a different costume. These two lines close that gap by comparing, on each doorway,
     # what the running process has MATERIALIZED against what its own storage row DECLARES.
+    # SCOPE CHANGES HERE, and the next line is what entitles it to. Everything above concerns the
+    # page this run authored. The two checks after it read a REAL, seeded page instead — so the
+    # first thing asserted about that page is that this run never wrote to it.
+    And EPR "elohim-host-landing" was never staged by this run
     And the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
     And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
     # MECHANISM — how that outcome is trustworthy, not a trust-the-peer copy. The peer that moved
@@ -125,6 +148,6 @@ Feature: Federation version convergence — two doorways that disagree serve the
     # the line claims only what it proves: the winner carries the earned declaration, and the
     # notarized timestamp the tiebreak would read is present on it. Staging a real two-earned tie
     # is worth its own scenario; asserting it from here would be an overclaim.
-    And the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp
+    And the elected head carries the EARNED canonical declaration, and that declaration carries a notarized timestamp
     # ANTI-REGRESSION: the move must be an ELECTION OBEYED, never a trust-the-peer copy.
     And a carried declaration link whose signature or binding fails wasm verification moves nothing

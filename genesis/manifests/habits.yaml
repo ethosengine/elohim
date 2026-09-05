@@ -599,6 +599,15 @@ habits:
         discriminator above; which arm ran is recorded verbatim in every receipt as observation.
         Status stays RED: this is one of six checks, and the fleet-side peer_carried observation the 2026-08-31 entry is
         waiting on is still unobserved.
+      - 2026-09-05 06:08Z — RE-MEASURED GREEN after both blind readers' findings were folded into the story: 15/15 steps,
+        exit 0, 1m18s, converged in 30s (receipt
+        `genesis/a2o/reports/dataplane/2026-09-05/carried-election-organic-receipt-2026-09-05T06-06-22-481Z.json`;
+        ledger 5/5, declarationCallsDuringCure 0). The extra step is a reader finding turned into an ASSERTION rather than a
+        comment: the scenario stages on a page this run authored and then reads the REAL landing page, and that scope change
+        is now guarded by `EPR "elohim-host-landing" was never staged by this run`, which fails if any staging-ledger entry
+        names it — so a future edit cannot quietly start staging divergence on the page visitors are reading. Both feature
+        files came back READY; the parent's remaining MAJOR (scenario 2's negative assertion lives in a comment) is minted as
+        plan Task 3. Status unchanged.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

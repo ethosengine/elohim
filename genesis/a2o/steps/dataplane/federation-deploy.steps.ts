@@ -625,11 +625,15 @@ Given('their declared heads DISAGREE', function (this: E2EWorld) {
  * rule prefers over a deploy/seed STAGING declaration. This is the same call
  * the 2026-08-31 proof made, on the same peer role.
  *
+ * Only the page's ROOT AUTHOR may do this — the zome refuses anyone else in wasm — which is why
+ * the staging plants the root on this peer. Its head is the OLDER of the two; the earned tier is
+ * what elects it, not recency.
+ *
  * Example:
- *   And an EARNED canonical declaration exists for the newer head on its declaring peer
+ *   And an EARNED canonical declaration exists on the page's root author for the head it authored
  */
 Given(
-  'an EARNED canonical declaration exists for the newer head on its declaring peer',
+  "an EARNED canonical declaration exists on the page's root author for the head it authored",
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const s = state(this);
@@ -674,7 +678,12 @@ Given(
 // ---------------------------------------------------------------------------
 
 /**
- * Wait for the peer holding the older head to move it ON ITS OWN.
+ * Wait for the disagreeing peer to move its head ON ITS OWN.
+ *
+ * "Disagreeing", not "holding the older head": under this fixture's staging that peer holds the
+ * NEWER head — it authored its competing revision second — and the head it must move TO is the
+ * older, earned one. Naming it by age would contradict the very ordering the mechanism step
+ * asserts.
  *
  * This step makes NO mutating call. It snapshots the staging write ledger and
  * the obey-path counter, then polls one read surface — `GET
@@ -684,10 +693,10 @@ Given(
  * outcome the story names rather than as an opaque timeout here.
  *
  * Example:
- *   When the reconcile sweep runs on the peer holding the older head
+ *   When the reconcile sweep runs on the disagreeing peer
  */
 When(
-  'the reconcile sweep runs on the peer holding the older head',
+  'the reconcile sweep runs on the disagreeing peer',
   { timeout: SWEEP_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const s = state(this);
@@ -841,6 +850,35 @@ Then(
   }
 );
 
+/**
+ * The SCOPE TRANSITION, made executable instead of narrated.
+ *
+ * Everything above this line concerns the page this run authored. The two steps below it read a
+ * REAL, seeded page — a different page, named in the Gherkin — to check that each doorway serves
+ * what it declares. Two blind readers independently flagged that the jump between the two was
+ * invisible in the Gherkin and recoverable only from a comment.
+ *
+ * So the transition is now an assertion, and a load-bearing one: the staging ledger must contain
+ * no mutating call whose target names this EPR. That is what entitles the next two steps to read
+ * the live landing page at all — they are observing a page this run never touched, not inspecting
+ * its own handiwork. It also permanently forecloses the worst version of this fixture, in which a
+ * future edit quietly stages divergence on the page visitors are reading.
+ *
+ * Example:
+ *   And EPR "elohim-host-landing" was never staged by this run
+ */
+Then('EPR {string} was never staged by this run', function (this: E2EWorld, eprId: string) {
+  const touched = stagingWrites().filter(write => write.target.includes(eprId));
+  assert.deepStrictEqual(
+    touched,
+    [],
+    `this run made ${touched.length} mutating call(s) against "${eprId}", the live seeded page: ` +
+      `${JSON.stringify(touched)}. The served-versus-declared checks that follow are only ` +
+      `meaningful on a page the fixture did not author, and no fixture may stage divergence on a ` +
+      `page visitors are reading.`
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Then — the mechanism, so the outcome is not a trust-the-peer copy
 // ---------------------------------------------------------------------------
@@ -925,10 +963,10 @@ Then(
  * step adds nothing to it.
  *
  * Example:
- *   And the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp
+ *   And the elected head carries the EARNED canonical declaration, and that declaration carries a notarized timestamp
  */
 Then(
-  'the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp',
+  'the elected head carries the EARNED canonical declaration, and that declaration carries a notarized timestamp',
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const s = state(this);
