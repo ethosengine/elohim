@@ -96,6 +96,35 @@
  *   `root_mismatch`) the actual roster/root checks rather than the earlier
  *   "roster … is not an address" terminal refusal a slug always produced.
  *
+ * ## The closed-chain fence (Task 31) — READ BEFORE ADDING ANY v1 CALL
+ *
+ * A close is a sealing act: after Station 8 has sealed a peer's v1 cell, NO
+ * action may be authored on it again — not a record, and not a `CapGrant`.
+ * `AdminWebsocket.authorizeSigningCredentials` commits a `CapGrant`, so a
+ * connect that re-authorizes is itself a post-close write; on 2026-09-05 the
+ * ten-station run's own post-seal reads did exactly that and left every
+ * household peer permanently blocking its neighbours (Task 30's report holds
+ * the per-peer database evidence). Three rails now hold this file to the rule:
+ *
+ *   1. `connectRoleConductor` mints signing credentials ONCE per cell per run
+ *      (the client's signing store is process-global) and refuses outright to
+ *      mint them on a cell in `closedCells`.
+ *   2. The rail's `call` refuses any function outside `CLOSED_CHAIN_READ_FNS`
+ *      on a closed cell — Station 8's deliberate post-close write is the one
+ *      declared exception, spelled at its own call site.
+ *   3. The Background pre-flight (`probeChainClose`, admin-only and therefore
+ *      write-free) refuses the whole run BY NAME when a peer's v1 chain was
+ *      already sealed by an EARLIER run, so a spent mesh reds in the
+ *      Background instead of five Stations later.
+ *
+ * What none of this can do is make the crossing run on a disposable cell: the
+ * storage vehicle resolves v1 as the BASE app's role cell
+ * (`HappLineageVehicle::seal_close` → `Self::role_cell(&base, role)`, with
+ * `install_lineage` inheriting `base_role_seed`), so the household's own
+ * node-registry v1 chain is what the sunset seals, and it is spent once. That
+ * is a storage seam, named in the Task 31 report, not something this fixture
+ * can route around.
+ *
  * ## Run-scoped channel, one channel only (Part 1's scope)
  *
  * `channelId()` mints fresh per run from a run stamp, exactly like the rung-5
@@ -138,6 +167,7 @@ import {
   fakeEntryHash,
   fakeDnaHash,
   decodeHashFromBase64,
+  getSigningCredentials,
 } from '@holochain/client';
 import { request } from 'undici';
 
@@ -510,17 +540,125 @@ function findProvisionedCellId(app: AppInfo, role: string): CellId | undefined {
   return undefined;
 }
 
+// ---------------------------------------------------------------------------
+// The closed-chain fence — a CapGrant is a chain write (MEASURED 2026-09-05)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cells this run knows to be CLOSED, keyed exactly the way `@holochain/client`'s
+ * own signing store keys them (`b64(dnaHash) + b64(agentPubKey)`), so a lookup
+ * here and a `getSigningCredentials` lookup can never disagree about which cell
+ * they are talking about.
+ *
+ * ## Why this set exists (the measured failure this fence is built from)
+ *
+ * `AdminWebsocket.authorizeSigningCredentials` is not a handshake — it calls
+ * `grantZomeCallCapability`, which COMMITS a `CapGrant` entry on the cell's own
+ * source chain. On a chain that has been CLOSED, that commit is an action after
+ * the close, and 0.7's remote validation refuses it with "No more actions are
+ * allowed after a chain close", warrants its author, and every neighbour turns
+ * the accepted warrant into a PERMANENT cell block (`end_us = Timestamp::max`).
+ *
+ * That is not a hypothesis. On the household mesh at 2026-09-05T03:32:39Z the
+ * ten-station run's own post-seal reads did exactly this: matthew took a
+ * rejected `Create(CapGrant)` at seq 1052 and jessica one at seq 732, inside a
+ * 30 ms window, and james then blocked BOTH neighbours while jessica blocked
+ * matthew — three conductors each executing a permanent, correct-by-their-own-
+ * rules refusal, with zero completed gossip rounds afterwards. Task 30's report
+ * carries the per-peer database evidence.
+ *
+ * So the rule this file now holds itself to, and the dispatch ruling it comes
+ * from: **a close is a sealing act — a closed chain is never authored on again,
+ * by anyone, including conductor-side CapGrants.** Credentials for a cell are
+ * minted ONCE per run (before anything closes) and reused from the client's own
+ * process-global signing store thereafter; a connect that would have to mint
+ * fresh credentials on a cell in this set refuses BY NAME instead.
+ */
+interface ClosedCellFact {
+  /** The human-readable reason a refusal quotes back. */
+  why: string;
+  /**
+   * `true` when THIS run's Station 8 sealed it. The distinction is the whole
+   * difference between "the story just did its one irreversible act, and the
+   * Stations after it may still READ v1" and "a previous run spent this mesh,
+   * and this run must not start" — see the Background pre-flight.
+   */
+  sealedByThisRun: boolean;
+}
+
+const closedCells = new Map<string, ClosedCellFact>();
+
+/** The signing store's own cell key — `b64(dnaHash) + b64(agentPubKey)`. */
+function cellKey(cellId: CellId): string {
+  return encodeHashToBase64(cellId[0]).concat(encodeHashToBase64(cellId[1]));
+}
+
+/**
+ * Record that `cellId` is closed. Idempotent on the reason (the FIRST
+ * observation is the one nearest the close), but `sealedByThisRun` LATCHES
+ * true: a cell the pre-flight saw as closed and this run then sealed again is
+ * not a thing, and a cell this run sealed must never be re-read as an earlier
+ * run's leftover.
+ */
+function markCellClosed(cellId: CellId, why: string, sealedByThisRun = false): void {
+  const key = cellKey(cellId);
+  const prior = closedCells.get(key);
+  closedCells.set(key, {
+    why: prior?.why ?? why,
+    sealedByThisRun: (prior?.sealedByThisRun ?? false) || sealedByThisRun,
+  });
+}
+
+/**
+ * Zome functions that only READ, and are therefore still legal on a closed
+ * chain — the story's own "each closed v1 chain is still readable by every
+ * peer" rides on exactly these. Anything NOT named here is treated as an
+ * author on a closed chain and refused, because the cost of guessing wrong in
+ * that direction is a permanent block on every neighbour rather than a failing
+ * step. The v1 coordinator exports all five (`seal_close` itself calls
+ * `my_chain_activity`, `get_record_at` and `get_signed_action` on the
+ * predecessor for precisely this reason).
+ */
+const CLOSED_CHAIN_READ_FNS = new Set([
+  'export_records',
+  'my_chain_activity',
+  'get_record_at',
+  'get_signed_action',
+  'get_closes_for',
+]);
+
+/**
+ * What a rail intends to do on a cell that is (or becomes) closed.
+ *
+ * `deliberate-post-close-write` is not a loophole — it is Station 8's own
+ * measurement ("the test harness … writes a fact on james's closed v1 cell"),
+ * the ill-behaved-peer act the story grants the harness in as many words. It
+ * has to be spelled at the call site so that every OTHER write on a closed
+ * chain stays impossible by default.
+ */
+type ClosedChainIntent = 'reads-only' | 'deliberate-post-close-write';
+
 /**
  * Copies `release-ceremony.ts`'s own `conductor()` connect shape (admin connect → resolve
  * provisioned cell → authorize signing credentials → app connect → bound `call`), generalized by
  * role/zome instead of that script's hardcoded `lamad`/`content_store`. See module doc
  * "Conductor rail" for why this is not a shared import.
+ *
+ * ## One CapGrant per cell per run, never one per connect
+ *
+ * The signing store `@holochain/client` keeps is process-global and cell-keyed,
+ * so credentials minted by the FIRST connect to a cell serve every later
+ * connect in the same cucumber process — including the ones that happen after
+ * that cell has been closed. Re-authorizing on every connect (what this
+ * function used to do) is what wrote the post-close `CapGrant`s that blocked
+ * the household; see `closedCells` above for the measurement.
  */
 async function connectRoleConductor(
   peer: PeerName,
   role: string,
   zomeName: string,
-  appId: string = APP_ID
+  appId: string = APP_ID,
+  intent: ClosedChainIntent = 'reads-only'
 ): Promise<RoleConductorRail> {
   const ports = PEER_CONDUCTOR_PORTS[peer];
   const admin = await withTimeout(
@@ -553,7 +691,19 @@ async function connectRoleConductor(
     if (!cellId) {
       throw new Error(`${peer}: no '${role}' cell provisioned on adminPort=${ports.admin}`);
     }
-    await admin.authorizeSigningCredentials(cellId);
+    const closed = closedCells.get(cellKey(cellId));
+    if (!getSigningCredentials(cellId)) {
+      if (closed) {
+        throw new Error(
+          `REFUSED: ${peer}'s '${role}' cell on app '${appId}' is CLOSED (${closed.why}) and this ` +
+            'run holds no signing credentials minted before the close. Authorizing now would ' +
+            'commit a CapGrant on a closed chain — the exact action that earned matthew and ' +
+            'jessica permanent cell blocks from every neighbour on 2026-09-05T03:32:39Z. A ' +
+            'closed chain is never authored on again, by anyone.'
+        );
+      }
+      await admin.authorizeSigningCredentials(cellId);
+    }
     const authToken = await admin.issueAppAuthenticationToken({
       installed_app_id: app.installed_app_id,
     });
@@ -567,8 +717,28 @@ async function connectRoleConductor(
       `app connect ${peer}:${ports.app}`
     );
     appWs = ws; // tracked for the catch below; `ws` itself stays non-optional for the closures
-    const call = async (fnName: string, payload: unknown): Promise<unknown> =>
-      ws.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
+    const call = async (fnName: string, payload: unknown): Promise<unknown> => {
+      // Re-read the set on every call, not once at connect: a rail opened
+      // before the sunset is still open after it, and the fence has to bite on
+      // the call rather than on the handle. Reads stay legal — the story's
+      // "each closed v1 chain is still readable by every peer" depends on it.
+      const nowClosed = closedCells.get(cellKey(cellId));
+      if (
+        nowClosed &&
+        intent !== 'deliberate-post-close-write' &&
+        !CLOSED_CHAIN_READ_FNS.has(fnName)
+      ) {
+        throw new Error(
+          `REFUSED: '${fnName}' on ${peer}'s '${role}' cell (app '${appId}') would author on a ` +
+            `CLOSED chain (${nowClosed.why}). A close is a sealing act: every neighbour refuses ` +
+            'the next action, warrants its author and blocks the cell permanently (measured ' +
+            '2026-09-05T03:32:39Z). Only the reads ' +
+            `${[...CLOSED_CHAIN_READ_FNS].join(', ')} are still legal here; a step that means to ` +
+            "write anyway must say so with the 'deliberate-post-close-write' intent."
+        );
+      }
+      return ws.callZome({ cell_id: cellId, zome_name: zomeName, fn_name: fnName, payload });
+    };
     const close = async (): Promise<void> => {
       await closeTransport(ws.client);
       await closeTransport(admin.client);
@@ -581,6 +751,104 @@ async function connectRoleConductor(
     await closeTransport(admin.client);
     throw e;
   }
+}
+
+// ---------------------------------------------------------------------------
+// The pre-flight: is this peer's base v1 chain ALREADY closed?
+// ---------------------------------------------------------------------------
+
+/** What a `CloseChain` on a peer's own base v1 chain looks like once found. */
+interface ChainCloseFact {
+  cellId: CellId;
+  actionSeq: number | null;
+  actionHash: string | null;
+}
+
+/**
+ * The `CloseChain` on a source-chain dump record, if that record is one.
+ *
+ * Shape-tolerant ON PURPOSE. 0.7 splits an action into a common `header` and a
+ * per-variant `data` half (measured, and documented on
+ * `entryHashOfSignedAction` for the zome-call path), but the admin
+ * `DumpFullState` response is produced by a different serializer than a zome
+ * call's msgpack and has carried the FLAT shape in earlier conductors. Reading
+ * only one of the two would make an already-closed chain look open — which is
+ * precisely the blindness this pre-flight exists to end — so both are read and
+ * neither is trusted to be the only one.
+ */
+function closeChainSeqOf(action: unknown): number | null | undefined {
+  const a = action as
+    | {
+        type?: string;
+        action_seq?: number;
+        header?: { action_seq?: number };
+        data?: { type?: string };
+      }
+    | undefined;
+  const variant = a?.data?.type ?? a?.type;
+  if (variant !== 'CloseChain') return undefined;
+  return a?.header?.action_seq ?? a?.action_seq ?? null;
+}
+
+/**
+ * Read one peer's own source chain for `role` on `appId` and report its
+ * `CloseChain`, if it has one. **Write-free by construction**: `listApps` and
+ * `dumpFullState` are ADMIN reads, so nothing here mints a capability grant —
+ * which is the whole point, because the one read that would (a zome call
+ * through `connectRoleConductor`) is exactly the action a closed chain must
+ * never take. See `closedCells`.
+ *
+ * Returns `null` when the chain carries no close, and throws only when the
+ * conductor itself could not be asked — an unreachable peer is never read as
+ * "not closed" (`unreachable ≠ absent`, the same discipline `pollAdoption`
+ * documents).
+ */
+async function probeChainClose(
+  peer: PeerName,
+  role: string = NODE_REGISTRY_ROLE,
+  appId: string = APP_ID
+): Promise<ChainCloseFact | null> {
+  const ports = PEER_CONDUCTOR_PORTS[peer];
+  const admin = await withTimeout(
+    AdminWebsocket.connect({
+      url: new URL(`ws://127.0.0.1:${ports.admin}`),
+      wsClientOptions: { origin: APP_ID },
+    }),
+    CONDUCTOR_CONNECT_TIMEOUT_MS,
+    `admin connect ${peer}:${ports.admin}`
+  );
+  try {
+    const apps = await admin.listApps({});
+    const app = apps.find(a => a.installed_app_id === appId);
+    if (!app) return null; // an app that is not installed has no chain to close
+    const cellId = findProvisionedCellId(app, role);
+    if (!cellId) return null;
+    const dump = await admin.dumpFullState({ cell_id: cellId });
+    for (const record of dump.source_chain_dump?.records ?? []) {
+      const seq = closeChainSeqOf(record.action);
+      if (seq === undefined) continue;
+      return {
+        cellId,
+        actionSeq: seq,
+        actionHash: record.action_address ? encodeHashToBase64(record.action_address) : null,
+      };
+    }
+    return null;
+  } finally {
+    await closeTransport(admin.client);
+  }
+}
+
+/**
+ * Mint this run's signing credentials for a peer's base v1 cell NOW, while the
+ * chain is provably open, so every later read of that chain — including the
+ * ones the story takes AFTER the sunset seals it — reuses them instead of
+ * committing a fresh `CapGrant` on a closed chain. One grant, per cell, per
+ * run, at the earliest honest moment.
+ */
+async function preAuthorizeBaseV1(peer: PeerName): Promise<void> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  await rail.close();
 }
 
 // ---------------------------------------------------------------------------
@@ -667,9 +935,37 @@ async function seedNodeRegistryRecord(peer: PeerName): Promise<void> {
  * least one record" as already true — the Background skips the whole scenario, which is the
  * loud, honest failure mode for a fixture precondition that could not be established.
  */
+/**
+ * How many records this peer's v1 node-registry chain already holds, or `null`
+ * when it could not be asked. A READ (`export_records`), legal on a closed
+ * chain and covered by the credentials the pre-flight minted.
+ */
+async function countV1Records(peer: PeerName): Promise<number | null> {
+  const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+  try {
+    const page = (await rail.call('export_records', { cursor: null, limit: 1 })) as {
+      records: unknown[];
+      total?: number | null;
+    };
+    if (typeof page.total === 'number') return page.total;
+    return page.records.length;
+  } finally {
+    await rail.close();
+  }
+}
+
+/**
+ * The Background's own words are "each HOLD node-registry records they authored
+ * on v1" — an ENSURE, not an append. It used to author one record per peer on
+ * every scenario, which is why a ten-Station run pushed the household's v1
+ * chains past a thousand actions, and why a Station running after the sunset
+ * authored on a sealed chain. A peer that already holds records is left alone.
+ */
 async function ensureNodeRegistryRecords(): Promise<'ok' | 'pending'> {
   for (const peer of PEER_NAMES) {
     try {
+      const held = await countV1Records(peer);
+      if (held !== null && held > 0) continue;
       await seedNodeRegistryRecord(peer);
     } catch (error) {
       console.error(
@@ -1409,6 +1705,75 @@ Given(
 );
 
 Given(
+  'no peer has already closed its v1 node-registry chain in an earlier run',
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    // WHY THIS GIVEN EXISTS, AND WHY IT IS A REFUSAL RATHER THAN A REPAIR
+    //
+    // The sunset (Station 8) is the story's one irreversible act: it seals the
+    // household's node-registry v1 chain on every peer. A sealed chain is never
+    // authored on again — and this feature's own Background authors on it
+    // (`ensureNodeRegistryRecords`), as does every rail that reads it. On a mesh
+    // where a previous run already sealed, the FIRST write of this run is an
+    // action after a close: every neighbour refuses it, warrants its author, and
+    // turns the accepted warrant into a permanent cell block. That is not a
+    // failing test, it is a poisoned mesh — three conductors each executing a
+    // correct-by-their-own-rules refusal, with no gossip between them ever
+    // again (measured 2026-09-05T03:32:39Z; Task 30's report carries the
+    // per-peer database evidence).
+    //
+    // So this run refuses to start, BY NAME, on the peer that is already sealed,
+    // rather than discovering it five Stations later as an unexplained red. The
+    // read is admin-only (`listApps` + `dumpFullState`) and therefore writes
+    // nothing — a pre-flight that had to mint a capability grant to ask the
+    // question would itself be the poison it is checking for.
+    const foreign: string[] = [];
+    const open: PeerName[] = [];
+    for (const peer of PEER_NAMES) {
+      const close = await probeChainClose(peer);
+      if (!close) {
+        open.push(peer);
+        continue;
+      }
+      const key = cellKey(close.cellId);
+      const alreadyOurs = closedCells.get(key)?.sealedByThisRun === true;
+      markCellClosed(
+        close.cellId,
+        `CloseChain at action_seq ${String(close.actionSeq)} (${String(close.actionHash)})`,
+        alreadyOurs
+      );
+      // A close THIS run's Station 8 authored is the story's own irreversible
+      // act, and the Stations after it legitimately keep READING v1 (the
+      // closed-chain fence above is what keeps them from writing). Only a close
+      // this run did not make means the mesh was spent before we arrived.
+      if (alreadyOurs) continue;
+      foreign.push(
+        `${peer}: CloseChain at action_seq ${String(close.actionSeq)}, action ${String(
+          close.actionHash
+        )}`
+      );
+    }
+    assert.equal(
+      foreign.length,
+      0,
+      `REFUSED before any write: ${foreign.length} peer(s) already carry a v1 node-registry chain ` +
+        `closed by an earlier run — ${foreign.join('; ')}. The close is a sealing act; this ` +
+        "story's own Background would author on a sealed chain and earn every one of those peers " +
+        'a permanent block from its neighbours (measured 2026-09-05T03:32:39Z). Rebuild the ' +
+        'household mesh (hc-mesh.sh stop, then start) before re-running this feature — a sealed ' +
+        'base chain is spent, not repairable.'
+    );
+    // Every chain still open, so mint this run's signing credentials for each
+    // peer's v1 cell NOW — while minting one is still a legal action on that
+    // chain. Every later read of v1, including the post-sunset ones, rides on
+    // these rather than on a fresh CapGrant.
+    for (const peer of open) {
+      await preAuthorizeBaseV1(peer);
+    }
+  }
+);
+
+Given(
   "each peer's runtime follows release channel {string}",
   { timeout: 60_000 },
   async function (this: E2EWorld, channelName: string) {
@@ -2015,6 +2380,21 @@ When("each peer's runtime next reconciles", { timeout: 400_000 }, async function
       c.closeActionHashes[peer] = receipt.closeHash;
       c.openActionHashes[peer] = receipt.openHash;
       c.sealWitnessHashes[peer] = receipt.witnessHash;
+      // The instant this peer's own runtime has sealed, its v1 cell joins the
+      // closed set: from here on, nothing in this run may mint a capability
+      // grant on it, and a connect that would have to refuses by name instead
+      // of committing the `CapGrant` that blocked the household on 2026-09-05.
+      // The credentials the Background minted (before any close) are what the
+      // remaining v1 reads in this Station ride on.
+      const close = await probeChainClose(peer);
+      if (close) {
+        markCellClosed(
+          close.cellId,
+          `sealed by ${peer}'s own runtime in THIS run — CloseChain ${receipt.closeHash} at ` +
+            `action_seq ${String(close.actionSeq)}`,
+          true
+        );
+      }
       console.error(
         `[happ-lineage-migration] Station 8: ${peer}'s OWN runtime sealed — close ` +
           `${receipt.closeHash}, open ${receipt.openHash}, seal witness ${receipt.witnessHash}, ` +
@@ -3908,7 +4288,21 @@ When(
   async function (this: E2EWorld) {
     const c = lineage();
     assert.ok(c.closeActionHashes?.james, "james's v1 cell has not been closed");
-    const rail = await connectRoleConductor('james', NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME);
+    // The ONE write this file makes on a closed chain, and it is the story's own
+    // measurement: the harness standing in for a careless or hostile node, to
+    // prove the substrate does not fence a closed chain. Declared at the call
+    // site (`deliberate-post-close-write`) so that every other write on a closed
+    // chain stays impossible by default — see `ClosedChainIntent`. It is not
+    // free: james's neighbours will warrant this action and block his v1 cell.
+    // That space is sealed by now and carries nothing further, but it is why the
+    // household's base chain is spent once this Station has run.
+    const rail = await connectRoleConductor(
+      'james',
+      NODE_REGISTRY_ROLE,
+      NODE_REGISTRY_ZOME,
+      APP_ID,
+      'deliberate-post-close-write'
+    );
     let writeError: unknown;
     let writeSucceeded = false;
     try {

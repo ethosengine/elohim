@@ -184,6 +184,11 @@ Feature: The network changes the rules its peers hold each other to without losi
   Background:
     Given the household mesh is running three peers, each on its own conductor, all built from the same conductor software
     And the household's node-registry role runs rule version v1
+    # The sunset below is this story's one irreversible act, and it spends the chain it seals: a
+    # closed chain is never authored on again, so a run that begins on an already-sealed mesh would
+    # earn every peer a permanent block from its neighbours on its very first write. This precondition
+    # refuses that run by name, before it writes anything, instead of failing five Stations later.
+    And no peer has already closed its v1 node-registry chain in an earlier run
     And each peer's runtime follows release channel "runtime:lineage:node_registry:commons"
     And matthew, james and jessica each hold node-registry records they authored on v1
     And no peer has been restarted or re-keyed at any point in this story
@@ -257,6 +262,13 @@ Feature: The network changes the rules its peers hold each other to without losi
     And jessica's runtime never noticed anything but a head that moved and moved back
 
   # ── Station 8: the sunset is a separate notarized act, and it is the only irreversible one ──
+  # Irreversible in the fixture as well as in the story. Once this Station has run, the household's
+  # node-registry v1 chains are sealed for good: the Stations that follow may still READ them, but
+  # nothing may write on them again — not a record, not a capability grant — and the next run of
+  # this feature is refused at the Background above until the mesh is rebuilt. The harness's own
+  # post-close write below is the single deliberate exception, and it is the story's measurement:
+  # james's neighbours will warrant it, which is what "the substrate does not fence a closed chain"
+  # costs on a real mesh.
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
     Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
     But no sunset commitment exists
