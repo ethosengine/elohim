@@ -71,9 +71,10 @@ floor lever that ships; arcs are the lever it left unfinished; block governance 
 
 ## 1. Charter
 
-**Every record on the DHT is held by the peers its tier deserves. Arcs are earned allotments read
-from the trust gradient, changed under running peers without a big-bang roll. The conductor that
-enforces this is our own artifact, built by CI and delivered over p2p like every other artifact.**
+**Every record on the DHT is held by the peers its tier deserves. Arcs are earned allotments — REA
+commitments read from the trust gradient, regulated by VSM loops so the mesh reacts like a living
+ecology — changed under running peers without a big-bang roll. The conductor that enforces this is
+our own artifact, built by CI and delivered over p2p like every other artifact.**
 
 Three slices, in the order they can be measured:
 
@@ -144,6 +145,52 @@ Gaps:
   no completed round + timeouts rising) reds by name in the passport (companion Task 32 mints the
   probe; this epic binds it to the allotment habit).
 
+## 3b. The ontology — allotment as a living ecology (REA + VSM), not a faster deterministic network
+
+Allotment alone is the performance slice. The operator's steering (2026-09-05): the REA and VSM
+primitives are what let Holochain evolve from a deterministic network into a system that reacts
+like a living ecology. So the allotment is not a tuning knob on kitsune2; it is an economic and
+cybernetic object, minted in the ontology the substrate already carries (`elohim-epr`, `epr-rea`,
+`elohim-compute` — inherit, never duplicate).
+
+**REA reading.** The *resource* is holding capacity: a slice of address space × the validation,
+storage and serving compute to keep it. The *agents* are peers (and the households and collectives
+they belong to). The *events* are holding, validating, serving, healing — each a witnessed
+economic event with a cost the peer bears and a value the commons receives. The *commitment* is
+the allotment itself: a Mishpat-bounded promise by a peer to hold a portion at a floor for a
+window, claimable, fulfillable, revocable, priced by the trust gradient the peer has earned. An
+arc is therefore an REA commitment with a provenance chain, not a self-declared number, and the
+critical floor for a tier is a *recipe* (this many hubs, this diverse, this reliable) that the
+valueflow projects and measures — the same machinery that projects a developer's commitments from
+the repo projects a household's holding commitments from the DHT.
+
+**VSM reading.** The ecology has the five systems Beer names, and each already has a seat here:
+
+| VSM system | What it is in the allotment | Where it lives today |
+|---|---|---|
+| S1 operations | holding, validating, serving a portion | the conductor's cells and arcs |
+| S2 coordination | gossip and reconciliation between overlapping portions | kitsune2 rounds; storage's reconcile controller |
+| S3 control | the arc policy: what each peer is asked to hold now | the hook storage drives (§3 G2.2) |
+| S3* audit | the partition probe, the block ledger, the passport | companion Task 32; Task 30's tool |
+| S4 intelligence | the trust gradient and the environment: who has earned what, what the world is doing to the mesh | valueflow evidence, saga survival, recovery drills |
+| S5 policy | the tiers and the refusals; Mishpat rulings on blocks | §2, §5; the Mishpat DNA |
+
+Ashby's law is the design rule: the variety of the environment (peers joining, leaving, failing,
+misbehaving; records of every weight) must be met by variety in the regulator. A single full arc
+and a single permanent block are the regulator with no variety; the allotment, graded by tier and
+earned by evidence, is the regulator with enough. That is the difference between a network that
+is merely deterministic and one that reacts.
+
+Gaps added by this reading:
+
+- G3b.1 The allotment as an REA commitment type, inherited from `epr-rea`, with the recipe for a
+  tier's floor projected and measured by `epr flow` (no new ledger, no parallel schema).
+- G3b.2 Holding events as witnessed economic events (attention/compute-denominated), so a peer's
+  holding history IS its trust evidence — the S4 signal that S3 reads, closing the loop without a
+  human in it as terminal authority.
+- G3b.3 The five VSM seats named on the seam atlas so a future concern (a new probe, a new policy)
+  self-locates: is it S3* (audit) or S5 (policy)?
+
 ## 4. Slice 3 — The conductor as an artifact: the sixth rung-5 class
 
 Rung 5 already moves coordinator bundles, hApp bundles, config EPRs, the storage binary and
@@ -190,6 +237,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — steering (operator): allotment is the performance slice; the REA + VSM primitives are what make the DHT a living ecology — §3b added (allotment = REA commitment; five VSM seats; Ashby as the design rule; gaps G3b.1–3).
 - 2026-09-05 — epic planted from the operator's sidebar after the sunset partition finding
   (companion §11.4). Brand *Nachalah*, name *Allotment*. Boundary with the companion recorded in
   frontmatter `boundary:`. Status Draft; nothing decomposed yet — the first plan waits on §6 step 1.
