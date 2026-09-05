@@ -31,3 +31,10 @@ implementation of the plan.. I want you to save your tokens at the decision maki
 coherence, judgement, delegation, vision-alignment and orchestration." So: implementation
 tasks from a plan go to Opus agents and `codex exec` (full-auto in a worktree when it must
 write), not to me. I read their evidence and decide. See [[orchestrate]] skill tier ladder.
+
+**2026-09-05 (integration session):** the local `codex` CLI (0.153.x) now runs **GPT-6 "astra"** — the
+operator rates it as technically proficient as the top model, so it can take real implementation and
+verification legwork (it ran the epr-rea/eprfs gates and audited task-report test claims cleanly), but
+"I wouldn't necessarily trust it if it needs to make a moral judgement" — keep governance/ethics/
+framing calls with the top model. Practical: `--sandbox danger-full-access` is needed when the task
+runs cargo (the target pool lives outside the workspace); keep the prompt in the scratchpad.
