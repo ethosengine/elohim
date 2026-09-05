@@ -22,6 +22,10 @@ accuse an op of being invalid; the **warrantee** is the agent the warrant accuse
 A block cites the warrant, and the party it lands on is the warrantee when the
 warrant itself validated (details under "What hash a block actually cites").
 
+"The household mesh" below is this repository's local three-conductor development
+network (`app/elohim-app/scripts/hc-mesh.sh`); the tool itself works on any 0.7
+conductor's data directory.
+
 The sections "Verbs" and "Building" are how to use the tool. Everything after
 them is how it works inside, for when the output needs interpreting.
 
@@ -59,7 +63,7 @@ The one write verb refuses while any live process holds `conductor.db` open, and
 refuses without `--yes`:
 
 ```bash
-./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it
+./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it (james = your peer's mesh name)
 ./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors. hc-dbtool itself needs only the
                                                     #    blocked peer's own conductor.db closed; hc-mesh.sh is
                                                     #    the household mesh's lifecycle script and stops all
@@ -81,10 +85,22 @@ holochain --piped --config-path <conductor-config.yaml> <<< '<lair passphrase>' 
 hc-dbtool --databases $DB --passphrase '<lair passphrase>' blocks   # 5. no rows
 ```
 
-Then confirm the peer rejoined the space: the admin interface's `dump_network_metrics`
-(any Holochain admin client; `include_dht_summary: false`) shows, per DNA, the local
-agent's `storage_arc` (null while blocked-out, a full range once a gossip round has
-completed) and `peer_meta[*].completed_rounds` climbing.
+Then confirm the peer rejoined the space through the admin interface's
+`dump_network_metrics` — per DNA it shows the local agent's `storage_arc` (null while
+blocked-out, a full range once a gossip round has completed) and
+`peer_meta[*].completed_rounds` climbing. One literal call, using the client this
+repository already carries (`ADMIN` = the peer's admin websocket port, `DNA` = the
+hash from `apps`):
+
+```bash
+cd genesis/a2o && ADMIN=4464 DNA=uhC0k… npx tsx -e '
+import { AdminWebsocket, decodeHashFromBase64 } from "@holochain/client";
+const a = await AdminWebsocket.connect({ url: new URL(`ws://127.0.0.1:${process.env.ADMIN}`), wsClientOptions: { origin: "elohim" } });
+const m = await a.dumpNetworkMetrics({ dna_hash: decodeHashFromBase64(process.env.DNA), include_dht_summary: false });
+const s = (typeof m === "string" ? JSON.parse(m) : m)[process.env.DNA];
+console.log("storage_arc", s.local_agents[0].storage_arc, "completed_rounds", Object.values(s.gossip_state_summary.peer_meta).map(p => p.completed_rounds));
+process.exit(0);'
+```
 
 Lifting is not a cure by itself: whatever wrote the rejected op (in the first
 observed case, a `CapGrant` written after a chain close) re-earns the block on its
