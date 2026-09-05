@@ -4,7 +4,6 @@
   "description": "Operator-authored ledger of cluster compute commitments. Genesis devops artifact (Category C). Derived from compute-capacity-snapshot.json (live kubectl snapshot).",
   "snapshotTimestamp": "2026-09-05T18:54:00Z",
   "snapshotMethod": "Allocatable + readiness re-observed 2026-09-05 from Prometheus kube-state-metrics (kube_node_status_allocatable, kube_node_status_condition) via the observability MCP: 7/7 nodes Ready, shem back in the fleet (24 cores / 128751 Mi), cluster allocatable 70000m / 246980 Mi. Promoted by the integrator session at the operator's direction during the 2026-09-05 integration push, because the 2026-05-04 envelope (46000m, shem cordoned) made every deployments.json write fail test-bench-aggregate-capacity on a portfolio the live cluster schedules with headroom. Per-node commitments (requests/limits), actuals and ephemeral storage are still the 2026-05-04 live-kubectl snapshot hand-curated by the operator (audit trail: genesis/data/rakia/snapshots/2026-05-04/snapshot.json, narrative in .../REVIEW.md); a full re-promotion runs genesis/orchestrator/scripts/snapshot-capacity.sh.",
-
   "cluster": {
     "ratifications": [
       {
@@ -35,13 +34,48 @@
       "memory_Mi": 223838
     },
     "actuals": {
-      "ethosengine": { "cpu_m": 3477, "cpu_pct": 14, "mem_Mi": 24747, "mem_pct": 38 },
-      "intel-nuc":   { "cpu_m": 2749, "cpu_pct": 34, "mem_Mi": 7103,  "mem_pct": 45 },
-      "hp-micro10":  { "cpu_m": 315,  "cpu_pct": 15, "mem_Mi": 3925,  "mem_pct": 25 },
-      "thinkc-p0h":  { "cpu_m": 3780, "cpu_pct": 94, "mem_Mi": 4082,  "mem_pct": 52, "note": "transient Jenkins build storm" },
-      "thinkc-p0t":  { "cpu_m": 3197, "cpu_pct": 79, "mem_Mi": 4898,  "mem_pct": 63, "note": "transient Jenkins build storm" },
-      "thinkc-p1s":  { "cpu_m": 3060, "cpu_pct": 76, "mem_Mi": 4117,  "mem_pct": 53, "note": "transient Jenkins build storm" },
-      "shem":        { "status": "Ready again (observed 2026-09-05 via Prometheus); utilization not re-sampled in this promotion" }
+      "ethosengine": {
+        "cpu_m": 3477,
+        "cpu_pct": 14,
+        "mem_Mi": 24747,
+        "mem_pct": 38
+      },
+      "intel-nuc": {
+        "cpu_m": 2749,
+        "cpu_pct": 34,
+        "mem_Mi": 7103,
+        "mem_pct": 45
+      },
+      "hp-micro10": {
+        "cpu_m": 315,
+        "cpu_pct": 15,
+        "mem_Mi": 3925,
+        "mem_pct": 25
+      },
+      "thinkc-p0h": {
+        "cpu_m": 3780,
+        "cpu_pct": 94,
+        "mem_Mi": 4082,
+        "mem_pct": 52,
+        "note": "transient Jenkins build storm"
+      },
+      "thinkc-p0t": {
+        "cpu_m": 3197,
+        "cpu_pct": 79,
+        "mem_Mi": 4898,
+        "mem_pct": 63,
+        "note": "transient Jenkins build storm"
+      },
+      "thinkc-p1s": {
+        "cpu_m": 3060,
+        "cpu_pct": 76,
+        "mem_Mi": 4117,
+        "mem_pct": 53,
+        "note": "transient Jenkins build storm"
+      },
+      "shem": {
+        "status": "Ready again (observed 2026-09-05 via Prometheus); utilization not re-sampled in this promotion"
+      }
     },
     "nodeTypes": {
       "performance": {
@@ -50,15 +84,38 @@
             "name": "ethosengine",
             "ready": true,
             "role": "control-plane",
-            "allocatable": { "cpu_m": 24000, "memory_Mi": 64126, "ephemeralStorage_Gi": 909 },
-            "committed": { "cpu_m": 4030, "memory_Mi": 9350 },
-            "limits": { "cpu_m": 13400, "memory_Mi": 33886 },
-            "headroom": { "cpu_m": 19970, "memory_Mi": 54776 },
-            "utilizationPctRequests": { "cpu": 17, "memory": 15 },
-            "utilizationPctLimits": { "cpu": 56, "memory": 53 }
+            "allocatable": {
+              "cpu_m": 24000,
+              "memory_Mi": 64126,
+              "ephemeralStorage_Gi": 909
+            },
+            "committed": {
+              "cpu_m": 4030,
+              "memory_Mi": 9350
+            },
+            "limits": {
+              "cpu_m": 13400,
+              "memory_Mi": 33886
+            },
+            "headroom": {
+              "cpu_m": 19970,
+              "memory_Mi": 54776
+            },
+            "utilizationPctRequests": {
+              "cpu": 17,
+              "memory": 15
+            },
+            "utilizationPctLimits": {
+              "cpu": 56,
+              "memory": 53
+            }
           }
         ],
-        "totals": { "cpu_m": 24000, "memory_Mi": 64126, "ephemeralStorage_Gi": 909 }
+        "totals": {
+          "cpu_m": 24000,
+          "memory_Mi": 64126,
+          "ephemeralStorage_Gi": 909
+        }
       },
       "operations": {
         "nodes": [
@@ -66,16 +123,39 @@
             "name": "intel-nuc",
             "ready": true,
             "role": "control-plane",
-            "allocatable": { "cpu_m": 8000, "memory_Mi": 15598, "ephemeralStorage_Gi": 465 },
-            "committed": { "cpu_m": 3050, "memory_Mi": 7340 },
-            "limits": { "cpu_m": 10850, "memory_Mi": 17548 },
-            "headroom": { "cpu_m": 4950, "memory_Mi": 8258 },
-            "utilizationPctRequests": { "cpu": 38, "memory": 47 },
-            "utilizationPctLimits": { "cpu": 135, "memory": 112 },
+            "allocatable": {
+              "cpu_m": 8000,
+              "memory_Mi": 15598,
+              "ephemeralStorage_Gi": 465
+            },
+            "committed": {
+              "cpu_m": 3050,
+              "memory_Mi": 7340
+            },
+            "limits": {
+              "cpu_m": 10850,
+              "memory_Mi": 17548
+            },
+            "headroom": {
+              "cpu_m": 4950,
+              "memory_Mi": 8258
+            },
+            "utilizationPctRequests": {
+              "cpu": 38,
+              "memory": 47
+            },
+            "utilizationPctLimits": {
+              "cpu": 135,
+              "memory": 112
+            },
             "warning": "limits overcommitted on both CPU and memory"
           }
         ],
-        "totals": { "cpu_m": 8000, "memory_Mi": 15598, "ephemeralStorage_Gi": 465 }
+        "totals": {
+          "cpu_m": 8000,
+          "memory_Mi": 15598,
+          "ephemeralStorage_Gi": 465
+        }
       },
       "edge": {
         "nodes": [
@@ -83,38 +163,99 @@
             "name": "thinkc-p0h",
             "ready": true,
             "role": "control-plane",
-            "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 466 },
-            "committed": { "cpu_m": 1250, "memory_Mi": 2192 },
-            "limits": { "cpu_m": 2400, "memory_Mi": 6555 },
-            "headroom": { "cpu_m": 2750, "memory_Mi": 5539 },
-            "utilizationPctRequests": { "cpu": 31, "memory": 28 },
-            "utilizationPctLimits": { "cpu": 60, "memory": 84 }
+            "allocatable": {
+              "cpu_m": 4000,
+              "memory_Mi": 7731,
+              "ephemeralStorage_Gi": 466
+            },
+            "committed": {
+              "cpu_m": 1250,
+              "memory_Mi": 2192
+            },
+            "limits": {
+              "cpu_m": 2400,
+              "memory_Mi": 6555
+            },
+            "headroom": {
+              "cpu_m": 2750,
+              "memory_Mi": 5539
+            },
+            "utilizationPctRequests": {
+              "cpu": 31,
+              "memory": 28
+            },
+            "utilizationPctLimits": {
+              "cpu": 60,
+              "memory": 84
+            }
           },
           {
             "name": "thinkc-p0t",
             "ready": true,
             "role": "control-plane",
-            "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 457 },
-            "committed": { "cpu_m": 1000, "memory_Mi": 612 },
-            "limits": { "cpu_m": 4000, "memory_Mi": 6144 },
-            "headroom": { "cpu_m": 3000, "memory_Mi": 7119 },
-            "utilizationPctRequests": { "cpu": 25, "memory": 7 },
-            "utilizationPctLimits": { "cpu": 100, "memory": 79 }
+            "allocatable": {
+              "cpu_m": 4000,
+              "memory_Mi": 7731,
+              "ephemeralStorage_Gi": 457
+            },
+            "committed": {
+              "cpu_m": 1000,
+              "memory_Mi": 612
+            },
+            "limits": {
+              "cpu_m": 4000,
+              "memory_Mi": 6144
+            },
+            "headroom": {
+              "cpu_m": 3000,
+              "memory_Mi": 7119
+            },
+            "utilizationPctRequests": {
+              "cpu": 25,
+              "memory": 7
+            },
+            "utilizationPctLimits": {
+              "cpu": 100,
+              "memory": 79
+            }
           },
           {
             "name": "thinkc-p1s",
             "ready": true,
             "role": "control-plane",
-            "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 457 },
-            "committed": { "cpu_m": 1000, "memory_Mi": 1472 },
-            "limits": { "cpu_m": 1500, "memory_Mi": 9472 },
-            "headroom": { "cpu_m": 3000, "memory_Mi": 6259 },
-            "utilizationPctRequests": { "cpu": 25, "memory": 19 },
-            "utilizationPctLimits": { "cpu": 37, "memory": 122 },
+            "allocatable": {
+              "cpu_m": 4000,
+              "memory_Mi": 7731,
+              "ephemeralStorage_Gi": 457
+            },
+            "committed": {
+              "cpu_m": 1000,
+              "memory_Mi": 1472
+            },
+            "limits": {
+              "cpu_m": 1500,
+              "memory_Mi": 9472
+            },
+            "headroom": {
+              "cpu_m": 3000,
+              "memory_Mi": 6259
+            },
+            "utilizationPctRequests": {
+              "cpu": 25,
+              "memory": 19
+            },
+            "utilizationPctLimits": {
+              "cpu": 37,
+              "memory": 122
+            },
             "warning": "memory limits overcommitted"
           }
         ],
-        "totals": { "cpu_m": 12000, "memory_Mi": 23193, "ephemeralStorage_Gi": 1380 }
+        "totals": {
+          "cpu_m": 12000,
+          "memory_Mi": 23193,
+          "ephemeralStorage_Gi": 1380
+        }
       },
       "storage": {
         "nodes": [
@@ -122,16 +263,39 @@
             "name": "hp-micro10",
             "ready": true,
             "role": "worker",
-            "allocatable": { "cpu_m": 2000, "memory_Mi": 15347, "ephemeralStorage_Gi": 3666 },
-            "committed": { "cpu_m": 850, "memory_Mi": 2176 },
-            "limits": { "cpu_m": 3000, "memory_Mi": 5120 },
-            "headroom": { "cpu_m": 1150, "memory_Mi": 13171 },
-            "utilizationPctRequests": { "cpu": 42, "memory": 14 },
-            "utilizationPctLimits": { "cpu": 150, "memory": 33 },
+            "allocatable": {
+              "cpu_m": 2000,
+              "memory_Mi": 15347,
+              "ephemeralStorage_Gi": 3666
+            },
+            "committed": {
+              "cpu_m": 850,
+              "memory_Mi": 2176
+            },
+            "limits": {
+              "cpu_m": 3000,
+              "memory_Mi": 5120
+            },
+            "headroom": {
+              "cpu_m": 1150,
+              "memory_Mi": 13171
+            },
+            "utilizationPctRequests": {
+              "cpu": 42,
+              "memory": 14
+            },
+            "utilizationPctLimits": {
+              "cpu": 150,
+              "memory": 33
+            },
             "warning": "CPU limits overcommitted 1.5x; only 2 cores available"
           }
         ],
-        "totals": { "cpu_m": 2000, "memory_Mi": 15347, "ephemeralStorage_Gi": 3666 }
+        "totals": {
+          "cpu_m": 2000,
+          "memory_Mi": 15347,
+          "ephemeralStorage_Gi": 3666
+        }
       },
       "remote": {
         "nodes": [
@@ -139,9 +303,19 @@
             "name": "shem",
             "ready": true,
             "role": "worker",
-            "allocatable": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 },
-            "committed": { "cpu_m": 0, "memory_Mi": 0 },
-            "headroom": { "cpu_m": 24000, "memory_Mi": 128751 },
+            "allocatable": {
+              "cpu_m": 24000,
+              "memory_Mi": 128751,
+              "ephemeralStorage_Gi": 294
+            },
+            "committed": {
+              "cpu_m": 0,
+              "memory_Mi": 0
+            },
+            "headroom": {
+              "cpu_m": 24000,
+              "memory_Mi": 128751
+            },
             "lastSeenReady": "2026-09-05T18:54:00Z (Prometheus kube_node_status_condition Ready=true)",
             "outageTaintAge": "none",
             "warning": "Returned to the fleet after the 2026-05-04 PSU failure — the operator resolved it by keeping the PSU fan running (thermal, not a dead supply); shem-only humans were re-enrolled by the 2026-06-03 scope-reconcile. Committed figures below are still the 2026-05-04 snapshot (0 — nothing was scheduled there); re-run snapshot-capacity.sh to refresh them. The openebs-hostpath PVCs lost in the outage were not recovered; the orphanedPods list is historical.",
@@ -153,23 +327,44 @@
             ]
           }
         ],
-        "totals": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 }
+        "totals": {
+          "cpu_m": 24000,
+          "memory_Mi": 128751,
+          "ephemeralStorage_Gi": 294
+        }
       }
     }
   },
-
   "stewardCommitments": {
     "jenkins": {
       "namespace": "jenkins",
       "stewardWorkload": "ee-jenkins (StatefulSet, replicas=1)",
       "node": "ethosengine",
-      "requests": { "cpu_m": 50, "memory_Mi": 256 },
-      "limits": { "cpu_m": 2000, "memory_Mi": 4096 },
+      "requests": {
+        "cpu_m": 50,
+        "memory_Mi": 256
+      },
+      "limits": {
+        "cpu_m": 2000,
+        "memory_Mi": 4096
+      },
       "actual": null,
       "pvcs": [
-        { "name": "ee-jenkins", "size_Gi": 8, "sc": "microk8s-hostpath" },
-        { "name": "nix-cache-holochain", "size_Gi": 50, "sc": "openebs-jiva-csi-default" },
-        { "name": "cargo-cache-holochain", "size_Gi": 20, "sc": "openebs-jiva-csi-default" }
+        {
+          "name": "ee-jenkins",
+          "size_Gi": 8,
+          "sc": "microk8s-hostpath"
+        },
+        {
+          "name": "nix-cache-holochain",
+          "size_Gi": 50,
+          "sc": "openebs-jiva-csi-default"
+        },
+        {
+          "name": "cargo-cache-holochain",
+          "size_Gi": 20,
+          "sc": "openebs-jiva-csi-default"
+        }
       ],
       "totalPvc_Gi": 78,
       "note": "jenkins ns also hosts ephemeral build agents (holochain-dev, orchestrator-dev) which can spike to 4c/8Gi each; not in steady-state requests"
@@ -177,16 +372,48 @@
     "harbor": {
       "namespace": "harbor",
       "stewardWorkload": "8 workloads (5 Deployments, 3 StatefulSets)",
-      "nodes": ["ethosengine", "thinkc-p1s", "hp-micro10"],
-      "requests": { "cpu_m": 200, "memory_Mi": 512, "note": "ONLY trivy has requests; 7 of 9 containers unset" },
-      "limits": { "cpu_m": 1000, "memory_Mi": 1024, "note": "ONLY trivy has limits; 7 of 9 containers unset" },
+      "nodes": [
+        "ethosengine",
+        "thinkc-p1s",
+        "hp-micro10"
+      ],
+      "requests": {
+        "cpu_m": 200,
+        "memory_Mi": 512,
+        "note": "ONLY trivy has requests; 7 of 9 containers unset"
+      },
+      "limits": {
+        "cpu_m": 1000,
+        "memory_Mi": 1024,
+        "note": "ONLY trivy has limits; 7 of 9 containers unset"
+      },
       "actual": null,
       "pvcs": [
-        { "name": "data-ee-harbor-redis-0", "size_Gi": 1, "sc": "microk8s-hostpath" },
-        { "name": "data-ee-harbor-trivy-0", "size_Gi": 5, "sc": "microk8s-hostpath" },
-        { "name": "database-data-ee-harbor-database-0", "size_Gi": 1, "sc": "microk8s-hostpath" },
-        { "name": "ee-harbor-jobservice", "size_Gi": 1, "sc": "openebs-rwx" },
-        { "name": "ee-harbor-registry", "size_Gi": 100, "sc": "openebs-jiva-csi-default" }
+        {
+          "name": "data-ee-harbor-redis-0",
+          "size_Gi": 1,
+          "sc": "microk8s-hostpath"
+        },
+        {
+          "name": "data-ee-harbor-trivy-0",
+          "size_Gi": 5,
+          "sc": "microk8s-hostpath"
+        },
+        {
+          "name": "database-data-ee-harbor-database-0",
+          "size_Gi": 1,
+          "sc": "microk8s-hostpath"
+        },
+        {
+          "name": "ee-harbor-jobservice",
+          "size_Gi": 1,
+          "sc": "openebs-rwx"
+        },
+        {
+          "name": "ee-harbor-registry",
+          "size_Gi": 100,
+          "sc": "openebs-jiva-csi-default"
+        }
       ],
       "totalPvc_Gi": 108,
       "warning": "core/database/portal/redis/registry/jobservice/exporter — uncapped CPU/memory; can starve neighbors during build storms"
@@ -195,11 +422,21 @@
       "namespace": "nexus",
       "stewardWorkload": "nexus-nexus3 (StatefulSet, replicas=1)",
       "node": "hp-micro10",
-      "requests": { "cpu_m": 500, "memory_Mi": 2048 },
-      "limits": { "cpu_m": 2000, "memory_Mi": 4096 },
+      "requests": {
+        "cpu_m": 500,
+        "memory_Mi": 2048
+      },
+      "limits": {
+        "cpu_m": 2000,
+        "memory_Mi": 4096
+      },
       "actual": null,
       "pvcs": [
-        { "name": "data-nexus-nexus3-0", "size_Gi": 100, "sc": "openebs-jiva-csi-default" }
+        {
+          "name": "data-nexus-nexus3-0",
+          "size_Gi": 100,
+          "sc": "openebs-jiva-csi-default"
+        }
       ],
       "totalPvc_Gi": 100,
       "warning": "nexus alone limits up to 100% of hp-micro10's 2 cores"
@@ -207,15 +444,24 @@
     "eclipse-che": {
       "namespace": "eclipse-che",
       "stewardWorkload": "4 Deployments (che, che-dashboard, che-gateway[4 containers], che-operator)",
-      "nodes": ["thinkc-p1s", "thinkc-p0h"],
-      "requests": { "cpu_m": 650, "memory_Mi": 992 },
-      "limits": { "cpu_m": 500, "memory_Mi": 9472, "note": "most containers have memory limits but no CPU limit" },
+      "nodes": [
+        "thinkc-p1s",
+        "thinkc-p0h"
+      ],
+      "requests": {
+        "cpu_m": 650,
+        "memory_Mi": 992
+      },
+      "limits": {
+        "cpu_m": 500,
+        "memory_Mi": 9472,
+        "note": "most containers have memory limits but no CPU limit"
+      },
       "actual": null,
       "totalPvc_Gi": 0,
       "note": "che workspaces themselves live in per-user namespaces and consume openebs-jiva-csi-default PVCs separately"
     }
   },
-
   "elohimHumans": {
     "matthew": {
       "humanLabel": "matthew-manager",
@@ -225,8 +471,14 @@
         "alpha": {
           "pod": "elohim-matthew-alpha-0",
           "node": "ethosengine",
-          "requests": { "cpu_m": 1000, "memory_Mi": 2048 },
-          "limits": { "cpu_m": 3000, "memory_Mi": 8192 },
+          "requests": {
+            "cpu_m": 1000,
+            "memory_Mi": 2048
+          },
+          "limits": {
+            "cpu_m": 3000,
+            "memory_Mi": 8192
+          },
           "pvc_Gi": 40,
           "note": "TEMP BUMP per deployments.json $comment — was 4Gi/2000m, OOMed under seeder load. Currently 3c/8Gi limit."
         }
@@ -240,8 +492,14 @@
         "alpha": {
           "pod": "elohim-jessica-alpha-0",
           "node": "intel-nuc",
-          "requests": { "cpu_m": 250, "memory_Mi": 512 },
-          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "requests": {
+            "cpu_m": 250,
+            "memory_Mi": 512
+          },
+          "limits": {
+            "cpu_m": 1000,
+            "memory_Mi": 1536
+          },
           "pvc_Gi": 40
         }
       }
@@ -254,15 +512,27 @@
         "alpha": {
           "pod": "elohim-terrance-alpha-0",
           "node": "thinkc-p0h",
-          "requests": { "cpu_m": 250, "memory_Mi": 1024 },
-          "limits": { "cpu_m": 1000, "memory_Mi": 3072 },
+          "requests": {
+            "cpu_m": 250,
+            "memory_Mi": 1024
+          },
+          "limits": {
+            "cpu_m": 1000,
+            "memory_Mi": 3072
+          },
           "pvc_Gi": 40
         },
         "staging": {
           "pod": "elohim-terrance-staging-0",
           "node": "intel-nuc",
-          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
-          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "requests_sum": {
+            "cpu_m": 330,
+            "memory_Mi": 616
+          },
+          "limits_sum": {
+            "cpu_m": 1400,
+            "memory_Mi": 1952
+          },
           "pvc_Gi": 15
         }
       }
@@ -275,8 +545,14 @@
         "alpha": {
           "pod": "elohim-adam-alpha-0",
           "node": "shem",
-          "requests": { "cpu_m": 500, "memory_Mi": 2048 },
-          "limits": { "cpu_m": 2000, "memory_Mi": 6144 },
+          "requests": {
+            "cpu_m": 500,
+            "memory_Mi": 2048
+          },
+          "limits": {
+            "cpu_m": 2000,
+            "memory_Mi": 6144
+          },
           "pvc_Gi": 40,
           "warning": "STRANDED on decommissioned shem; openebs-hostpath PVC tied to dead node; agent key likely lost"
         }
@@ -290,16 +566,28 @@
         "alpha": {
           "pod": "elohim-frank-alpha-0",
           "node": "shem",
-          "requests": { "cpu_m": 250, "memory_Mi": 512 },
-          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "requests": {
+            "cpu_m": 250,
+            "memory_Mi": 512
+          },
+          "limits": {
+            "cpu_m": 1000,
+            "memory_Mi": 1536
+          },
           "pvc_Gi": 40,
           "warning": "STRANDED on decommissioned shem"
         },
         "prod": {
           "pod": "elohim-frank-prod-0",
           "node": "intel-nuc",
-          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
-          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "requests_sum": {
+            "cpu_m": 330,
+            "memory_Mi": 616
+          },
+          "limits_sum": {
+            "cpu_m": 1400,
+            "memory_Mi": 1952
+          },
           "pvc_Gi": 15,
           "note": "healthy on intel-nuc but gated by human-level suspension; restoration requires un-suspending in deployments.json"
         }
@@ -313,40 +601,101 @@
         "alpha": {
           "pod": "elohim-pete-alpha-0",
           "node": "shem",
-          "requests": { "cpu_m": 250, "memory_Mi": 512 },
-          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "requests": {
+            "cpu_m": 250,
+            "memory_Mi": 512
+          },
+          "limits": {
+            "cpu_m": 1000,
+            "memory_Mi": 1536
+          },
           "pvc_Gi": 40,
           "warning": "STRANDED on decommissioned shem"
         },
         "staging": {
           "pod": "elohim-pete-staging-0",
           "node": "intel-nuc",
-          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
-          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "requests_sum": {
+            "cpu_m": 330,
+            "memory_Mi": 616
+          },
+          "limits_sum": {
+            "cpu_m": 1400,
+            "memory_Mi": 1952
+          },
           "pvc_Gi": 15,
           "note": "healthy on intel-nuc but gated by human-level suspension"
         }
       }
     }
   },
-
   "elohimSharedInfra": {
     "alpha": [
-      { "workload": "elohim-doorway-alpha", "node": "intel-nuc", "requests": { "cpu_m": 110, "memory_Mi": 160 }, "limits": { "cpu_m": 500, "memory_Mi": 640 } },
-      { "workload": "elohim-site-alpha", "node": "intel-nuc", "requests": { "cpu_m": 100, "memory_Mi": 128 }, "limits": { "cpu_m": 200, "memory_Mi": 256 } },
-      { "workload": "mongodb-alpha", "node": "intel-nuc", "requests": { "cpu_m": 100, "memory_Mi": 256 }, "limits": { "cpu_m": 500, "memory_Mi": 512 } },
-      { "workload": "nats-alpha", "node": "intel-nuc", "requests": { "cpu_m": 50, "memory_Mi": 64 }, "limits": { "cpu_m": 250, "memory_Mi": 256 } }
+      {
+        "workload": "elohim-doorway-alpha",
+        "node": "intel-nuc",
+        "requests": {
+          "cpu_m": 110,
+          "memory_Mi": 160
+        },
+        "limits": {
+          "cpu_m": 500,
+          "memory_Mi": 640
+        }
+      },
+      {
+        "workload": "elohim-site-alpha",
+        "node": "intel-nuc",
+        "requests": {
+          "cpu_m": 100,
+          "memory_Mi": 128
+        },
+        "limits": {
+          "cpu_m": 200,
+          "memory_Mi": 256
+        }
+      },
+      {
+        "workload": "mongodb-alpha",
+        "node": "intel-nuc",
+        "requests": {
+          "cpu_m": 100,
+          "memory_Mi": 256
+        },
+        "limits": {
+          "cpu_m": 500,
+          "memory_Mi": 512
+        }
+      },
+      {
+        "workload": "nats-alpha",
+        "node": "intel-nuc",
+        "requests": {
+          "cpu_m": 50,
+          "memory_Mi": 64
+        },
+        "limits": {
+          "cpu_m": 250,
+          "memory_Mi": 256
+        }
+      }
     ]
   },
-
   "storyGroups": [
     {
       "name": "ethosengine-perf",
       "description": "Performance backbone — matthew-alpha + CI/CD + sonarqube. Loss of ethosengine breaks the build pipeline AND matthew's conductor simultaneously.",
       "priority": 0,
       "fateSharingNode": "ethosengine",
-      "humans": ["matthew"],
-      "stewardWorkloads": ["jenkins", "harbor (most pods)", "che workspaces", "sonarqube"],
+      "humans": [
+        "matthew"
+      ],
+      "stewardWorkloads": [
+        "jenkins",
+        "harbor (most pods)",
+        "che workspaces",
+        "sonarqube"
+      ],
       "addedAt": "2026-01-15",
       "active": true,
       "costSummary": {
@@ -361,8 +710,15 @@
       "description": "Operations SPOF — jessica-alpha + shared elohim infra (mongodb, nats, doorway, site). Loss of intel-nuc breaks all elohim environments simultaneously.",
       "priority": 1,
       "fateSharingNode": "intel-nuc",
-      "humans": ["jessica"],
-      "stewardWorkloads": ["mongodb-alpha", "nats-alpha", "elohim-doorway-alpha", "elohim-site-alpha"],
+      "humans": [
+        "jessica"
+      ],
+      "stewardWorkloads": [
+        "mongodb-alpha",
+        "nats-alpha",
+        "elohim-doorway-alpha",
+        "elohim-site-alpha"
+      ],
       "addedAt": "2026-01-15",
       "active": true,
       "costSummary": {
@@ -377,8 +733,14 @@
       "description": "Edge pool — terrance-alpha + eclipse-che gateway/operator + Jenkins build agents. Spans 3 thinkc nodes; throttling delays merges but doesn't strand data.",
       "priority": 2,
       "fateSharingNode": "edge-pool",
-      "humans": ["terrance"],
-      "stewardWorkloads": ["eclipse-che gateway", "eclipse-che operator", "jenkins build agents"],
+      "humans": [
+        "terrance"
+      ],
+      "stewardWorkloads": [
+        "eclipse-che gateway",
+        "eclipse-che operator",
+        "jenkins build agents"
+      ],
       "addedAt": "2026-01-15",
       "active": true,
       "costSummary": {
@@ -394,7 +756,10 @@
       "priority": 3,
       "fateSharingNode": "hp-micro10",
       "humans": [],
-      "stewardWorkloads": ["nexus", "harbor-registry"],
+      "stewardWorkloads": [
+        "nexus",
+        "harbor-registry"
+      ],
       "addedAt": "2026-01-15",
       "active": true,
       "costSummary": {
@@ -408,7 +773,11 @@
       "description": "Remote-pool — adam, pete-alpha, frank-alpha. REALIZED FAILURE 2026-05-04: shem decommissioned, all three pods stranded, openebs-hostpath PVCs (40Gi each) unrecoverable.",
       "priority": 1,
       "fateSharingNode": "shem",
-      "humans": ["adam", "pete", "frank"],
+      "humans": [
+        "adam",
+        "pete",
+        "frank"
+      ],
       "stewardWorkloads": [],
       "addedAt": "2026-01-15",
       "active": false,
@@ -420,11 +789,17 @@
       "notes": "First realized fate-sharing failure. The shem outage is the canonical proof case for this story-group abstraction."
     }
   ],
-
   "settledState": {
     "timestamp": "2026-05-04",
-    "activeGroups": ["ethosengine-perf", "intel-nuc-ops", "edge-builders", "hp-micro10-storage"],
-    "suspendedGroups": ["shem-remote"],
+    "activeGroups": [
+      "ethosengine-perf",
+      "intel-nuc-ops",
+      "edge-builders",
+      "hp-micro10-storage"
+    ],
+    "suspendedGroups": [
+      "shem-remote"
+    ],
     "reasoning": "shem decommissioned 2026-05-04 (PSU failure). adam, pete-alpha, frank-alpha PVCs lost. Remaining groups operate with substantial cluster headroom (34.8c, 110GiB available). The cluster is far from capacity-starved; the outage is fundamentally a data-loss / fate-sharing event. Next exposure is intel-nuc SPOF (135%/112% limits overcommit, 4 elohim humans + mongodb + nats + doorway co-located).",
     "aggregateCost": {
       "cpu_m": 1500,
@@ -438,7 +813,6 @@
     "status": "SUSTAINABLE",
     "action": "De-SPOF intel-nuc before next shem-class incident: distribute mongodb / nats / elohim humans across more nodes. See anomaly intel-nuc-spof. Separate plan."
   },
-
   "anomalies": [
     {
       "id": "shem-decommissioned",

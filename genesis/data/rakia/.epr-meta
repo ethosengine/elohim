@@ -18,5 +18,7 @@ rules:
 The aggregate binding reads typed `cluster.ratifications` in `compute-capacity.json`: only CPU
 limits may exceed allocatable up to the ratified percentage; requests reserve and memory is
 incompressible. A ledger older than 30 days refers for refresh without an aggregate-capacity ask,
-retaining the underlying violations in the message. Run `k8s-bridge observe` to promote a fresh
-cluster observation; the command lands with Station 2/3b.
+retaining the underlying violations in the message. Run `k8s-bridge observe --ledger genesis/data/rakia/compute-capacity.json` with
+`PROMETHEUS_URL` set (or `--prometheus-url`) to promote a fresh cluster observation.
+Use `--dry-run` to review field changes first. Commitments, utilization actuals and ephemeral
+storage remain operator-curated; missing or invalid node evidence refuses promotion.

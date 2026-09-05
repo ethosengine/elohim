@@ -16,6 +16,7 @@ rules:
 
 # Runtime envelope bridge
 
-The consumer is the orchestrator through the k8s-bridge CLI. No network, DHT anchoring,
-cgroup enforcement, capacity promotion, or volume-head semantics are implemented here.
+The consumer is the orchestrator through the k8s-bridge CLI. The observe command reads an operator-selected Prometheus endpoint and promotes
+validated capacity evidence into the ledger. No DHT anchoring, cgroup enforcement,
+or volume-head semantics are implemented here.
 The dated Unpinned refusal is exercised by cli_missing_pin_refuses and the pre-push leg.
