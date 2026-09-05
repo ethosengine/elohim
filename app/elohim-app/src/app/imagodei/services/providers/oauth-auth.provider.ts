@@ -6,8 +6,10 @@
  *
  * Flow:
  * 1. User clicks doorway in DoorwayPickerComponent
- * 2. initiateLogin() redirects browser to doorway's /auth/authorize
- * 3. User authenticates on doorway's /threshold/login page
+ * 2. initiateLogin() (or initiateRegistration(), which adds prompt=create)
+ *    redirects the browser to the doorway's /auth/authorize
+ * 3. User authenticates — or creates an account — on the doorway's own
+ *    /threshold/login or /threshold/register page
  * 4. Doorway redirects back with authorization code
  * 5. handleCallback() exchanges code for JWT token
  *
@@ -115,8 +117,38 @@ export class OAuthAuthProvider implements AuthProvider {
    *
    * @param doorwayUrl - URL of the doorway to authenticate with
    * @param returnUrl - URL to redirect back to after auth (default: current page)
+   * @param loginHint - identifier the human already gave, so they need not retype it
    */
   initiateLogin(doorwayUrl: string, returnUrl?: string, loginHint?: string): void {
+    this.beginAuthorizeFlow(doorwayUrl, returnUrl, loginHint);
+  }
+
+  /**
+   * Initiate account CREATION at the doorway's own portal.
+   *
+   * Identical to {@link initiateLogin} except for `prompt=create`, which the
+   * doorway's authorize endpoint reads to send an unauthenticated human to
+   * `/threshold/register` instead of `/threshold/login`, request intact. The app
+   * never posts a registration itself — registration happens at the portal, and
+   * the human returns here through the same OAuth callback, signed in.
+   *
+   * @param doorwayUrl - URL of the doorway to register with
+   * @param returnUrl - URL to redirect back to after auth (default: current page)
+   * @param loginHint - identifier the human already gave, so they need not retype it
+   */
+  initiateRegistration(doorwayUrl: string, returnUrl?: string, loginHint?: string): void {
+    this.beginAuthorizeFlow(doorwayUrl, returnUrl, loginHint, 'create');
+  }
+
+  /**
+   * Mint CSRF state, remember it, and leave for the doorway's authorize endpoint.
+   */
+  private beginAuthorizeFlow(
+    doorwayUrl: string,
+    returnUrl?: string,
+    loginHint?: string,
+    prompt?: 'create'
+  ): void {
     const state = this.generateState();
     // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered
     const redirectUri = returnUrl ?? `${globalThis.location.origin}/auth/callback`;
@@ -141,6 +173,10 @@ export class OAuthAuthProvider implements AuthProvider {
 
     if (loginHint) {
       params.set('login_hint', loginHint);
+    }
+
+    if (prompt) {
+      params.set('prompt', prompt);
     }
 
     const authorizeUrl = `${doorwayUrl}/auth/authorize?${params.toString()}`;

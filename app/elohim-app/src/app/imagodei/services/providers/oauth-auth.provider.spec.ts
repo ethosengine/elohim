@@ -124,6 +124,75 @@ describe('OAuthAuthProvider', () => {
   });
 
   // ==========================================================================
+  // Initiate Registration — prompt=create is what makes the app a relying
+  // party instead of a portal: the human creates their account AT the doorway.
+  // ==========================================================================
+
+  describe('initiateRegistration', () => {
+    let originalLocation: Location;
+
+    const authorizeUrl = (): string => globalThis.location.href;
+
+    beforeEach(() => {
+      originalLocation = globalThis.location;
+      Object.defineProperty(globalThis, 'location', {
+        value: { href: '', origin: 'http://localhost:4200' },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(globalThis, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('asks the doorway for the registration entry with prompt=create', () => {
+      provider.initiateRegistration('https://doorway.example.com');
+
+      expect(authorizeUrl()).toContain('https://doorway.example.com/auth/authorize');
+      expect(authorizeUrl()).toContain('prompt=create');
+      expect(authorizeUrl()).toContain('client_id=elohim-app');
+      expect(authorizeUrl()).toContain('response_type=code');
+    });
+
+    it('carries the callback and the identifier hint through registration', () => {
+      provider.initiateRegistration(
+        'https://doorway.example.com',
+        'http://localhost:4200/auth/callback',
+        'ruth@doorway.example.com'
+      );
+
+      expect(authorizeUrl()).toContain(
+        `redirect_uri=${encodeURIComponent('http://localhost:4200/auth/callback')}`
+      );
+      expect(authorizeUrl()).toContain(
+        `login_hint=${encodeURIComponent('ruth@doorway.example.com')}`
+      );
+    });
+
+    it('remembers the same CSRF state a login would, so the callback verifies', () => {
+      provider.initiateRegistration('https://doorway.example.com');
+
+      const stored = sessionStorage.getItem(OAUTH_STATE_KEY);
+      expect(stored).toBeTruthy();
+      const state = JSON.parse(stored!);
+      expect(state.doorwayUrl).toBe('https://doorway.example.com');
+      expect(authorizeUrl()).toContain(`state=${state.state}`);
+      expect(provider.isFlowInProgress()).toBe(true);
+    });
+
+    it('leaves prompt off a plain login, so nobody lands on registration by accident', () => {
+      provider.initiateLogin('https://doorway.example.com');
+
+      expect(authorizeUrl()).not.toContain('prompt=');
+    });
+  });
+
+  // ==========================================================================
   // Handle Callback
   // ==========================================================================
 
