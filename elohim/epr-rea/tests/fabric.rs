@@ -1,6 +1,9 @@
 //! Slice-1 fabric tests: DB-free folds over hand-built events (the rea-facing
 //! test-first shape), the dev-pipeline mini-chain walk, and the sidecar floor.
 
+#[path = "support/concurrent_sidecars.rs"]
+mod concurrent_sidecars;
+
 use cid::Cid;
 use elohim_epr_rea::{
     atom_cid, fulfillment, resource_state, AgentRef, AlgedonicEvidence, Bound, Commitment,

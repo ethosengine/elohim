@@ -61,6 +61,8 @@ pub mod error;
 pub mod fold;
 pub mod model;
 pub mod scope;
+#[cfg(feature = "sidecar")]
+mod sidecar;
 pub mod stock;
 pub mod store;
 pub mod walk;

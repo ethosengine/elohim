@@ -4,10 +4,6 @@
 
 use std::collections::HashSet;
 #[cfg(feature = "sidecar")]
-use std::fs;
-#[cfg(feature = "sidecar")]
-use std::io::Write as _;
-#[cfg(feature = "sidecar")]
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
@@ -213,18 +209,29 @@ pub struct SidecarFlowStore {
 impl SidecarFlowStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
     pub fn open(root: &Path) -> Result<Self> {
-        let dir = root.join(".eprfs").join("status");
-        fs::create_dir_all(&dir)?;
-        let log_path = dir.join("flows.jsonl");
-        if !log_path.exists() {
-            fs::File::create(&log_path)?;
-        }
+        let log_path = crate::sidecar::open_log(root, "flows.jsonl")?;
         Ok(Self { log_path })
     }
 
     pub fn log_path(&self) -> &Path {
         &self.log_path
     }
+
+    /// Serialize read/check/append against other cooperating processes. Use the returned
+    /// store for every read and append in this operation; reopening this log would deadlock.
+    /// The lock lasts until this handle drops. Appends are individually synced, not rolled
+    /// back if a subsequent append or check fails. No recovery rewrites damaged bytes.
+    pub fn transaction(&self) -> Result<SidecarFlowTransaction> {
+        Ok(SidecarFlowTransaction {
+            log: crate::sidecar::LockedLog::exclusive(&self.log_path)?,
+        })
+    }
+}
+
+/// A process-exclusive view of the existing flow store, implementing the same store seam.
+#[cfg(feature = "sidecar")]
+pub struct SidecarFlowTransaction {
+    log: crate::sidecar::LockedLog,
 }
 
 #[cfg(feature = "sidecar")]
@@ -237,22 +244,37 @@ struct SidecarLine {
 #[cfg(feature = "sidecar")]
 impl FlowStore for SidecarFlowStore {
     fn append(&mut self, record: FlowRecord) -> Result<Cid> {
+        self.transaction()?.append(record)
+    }
+
+    fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
+        SidecarFlowTransaction {
+            log: crate::sidecar::LockedLog::shared(&self.log_path)?,
+        }
+        .records()
+    }
+}
+
+#[cfg(feature = "sidecar")]
+impl FlowStore for SidecarFlowTransaction {
+    fn append(&mut self, record: FlowRecord) -> Result<Cid> {
+        // Refuse to append behind broken evidence, including a valid JSON tail lacking its
+        // record terminator. Verification is under the same lock as the append.
+        if !self.log.validated() {
+            self.records()?;
+        }
         let cid = record.cid()?;
         let line = serde_json::to_string(&SidecarLine {
             cid: cid.to_string(),
             record,
         })
         .map_err(|e| FabricError::Encode(e.to_string()))?;
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.log_path)?;
-        writeln!(file, "{line}")?;
+        self.log.append(line)?;
         Ok(cid)
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
-        let contents = fs::read_to_string(&self.log_path)?;
+        let contents = self.log.contents()?;
         let mut records = Vec::new();
         for line in contents.lines().filter(|l| !l.trim().is_empty()) {
             let parsed: SidecarLine =
@@ -266,6 +288,7 @@ impl FlowStore for SidecarFlowStore {
             }
             records.push((computed, parsed.record));
         }
+        self.log.mark_validated();
         Ok(records)
     }
 }

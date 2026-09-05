@@ -27,10 +27,6 @@
 //! tree is the caller's refusal to make.
 
 #[cfg(feature = "sidecar")]
-use std::fs;
-#[cfg(feature = "sidecar")]
-use std::io::Write as _;
-#[cfg(feature = "sidecar")]
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
@@ -318,18 +314,28 @@ pub struct SidecarActorStore {
 impl SidecarActorStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
     pub fn open(root: &Path) -> Result<Self> {
-        let dir = root.join(".eprfs").join("status");
-        fs::create_dir_all(&dir)?;
-        let log_path = dir.join("actors.jsonl");
-        if !log_path.exists() {
-            fs::File::create(&log_path)?;
-        }
+        let log_path = crate::sidecar::open_log(root, "actors.jsonl")?;
         Ok(Self { log_path })
     }
 
     pub fn log_path(&self) -> &Path {
         &self.log_path
     }
+
+    /// Serialize current-claim/check/append using this returned handle only. The OS lock
+    /// releases when it drops, including process death. Each append is synced; a transaction
+    /// is not a rollback boundary. Never independently reopen the log inside this scope.
+    pub fn transaction(&self) -> Result<SidecarActorTransaction> {
+        Ok(SidecarActorTransaction {
+            log: crate::sidecar::LockedLog::exclusive(&self.log_path)?,
+        })
+    }
+}
+
+/// A process-exclusive view of the existing actor store, implementing the same store seam.
+#[cfg(feature = "sidecar")]
+pub struct SidecarActorTransaction {
+    log: crate::sidecar::LockedLog,
 }
 
 #[cfg(feature = "sidecar")]
@@ -342,22 +348,37 @@ struct SidecarLine {
 #[cfg(feature = "sidecar")]
 impl ActorStore for SidecarActorStore {
     fn append(&mut self, record: ActorRecord) -> Result<Cid> {
+        self.transaction()?.append(record)
+    }
+
+    fn records(&self) -> Result<Vec<(Cid, ActorRecord)>> {
+        SidecarActorTransaction {
+            // Attribution cannot stall a governance decision behind a suspended writer.
+            // Busy is an I/O error, never a coherent-looking empty actor history.
+            log: crate::sidecar::LockedLog::try_shared(&self.log_path)?,
+        }
+        .records()
+    }
+}
+
+#[cfg(feature = "sidecar")]
+impl ActorStore for SidecarActorTransaction {
+    fn append(&mut self, record: ActorRecord) -> Result<Cid> {
+        if !self.log.validated() {
+            self.records()?;
+        }
         let cid = record.cid()?;
         let line = serde_json::to_string(&SidecarLine {
             cid: cid.to_string(),
             record,
         })
         .map_err(|e| FabricError::Encode(e.to_string()))?;
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.log_path)?;
-        writeln!(file, "{line}")?;
+        self.log.append(line)?;
         Ok(cid)
     }
 
     fn records(&self) -> Result<Vec<(Cid, ActorRecord)>> {
-        let contents = fs::read_to_string(&self.log_path)?;
+        let contents = self.log.contents()?;
         let mut records = Vec::new();
         for line in contents.lines().filter(|l| !l.trim().is_empty()) {
             let parsed: SidecarLine =
@@ -371,6 +392,7 @@ impl ActorStore for SidecarActorStore {
             }
             records.push((computed, parsed.record));
         }
+        self.log.mark_validated();
         Ok(records)
     }
 }
@@ -378,6 +400,8 @@ impl ActorStore for SidecarActorStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "sidecar")]
+    use std::fs;
 
     const AT: &str = "2026-08-15T00:00:00Z";
     /// A well-formed definition address: 64 lowercase hex characters.

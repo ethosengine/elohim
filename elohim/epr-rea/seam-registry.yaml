@@ -29,6 +29,58 @@ seamLocus: >
   plant, both in this crate.
 
 decisionPoints:
+  - name: SidecarFlowTransaction::append / SidecarActorTransaction::append
+    kind: state-transition
+    sourceLocation:
+      file: src/store.rs
+      modulePath: elohim_epr_rea::store
+    summary: >
+      Cooperating native processes preserve whole, CID-verified records under a log-inode
+      lock. Transaction-local validation avoids repeated scans of their own successful
+      appends; every accepted append is synced. Interrupted bytes are preserved and refused.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          Atomic create-new never truncates an incumbent log. A killed writer releases its
+          OS lock but cannot turn its partial bytes into accepted evidence or erase them.
+      - id: C6a
+        status: partial
+        justification: >
+          Full reads remain linear in log size; representative_log_read_check_and_batch_cost
+          measures 1000 records. No persistent index or bounded scan window is claimed.
+      - id: C6b
+        status: answered
+        justification: >
+          Exclusive transactions keep the existing read/check/append semantics coherent
+          across OS processes. Plain append still records repeated atoms intentionally;
+          idempotence belongs to the caller's claim/projection semantics.
+      - id: C11
+        status: partial
+        justification: >
+          Lock and sync errors propagate. Actor reads try-lock to preserve decision liveness;
+          flow reads/writes can wait for a live lock holder. Advisory locks require cooperating
+          access; raw Python readers and labels.json are outside this transaction contract.
+    contractTests:
+      - path: elohim/epr-rea/src/sidecar.rs
+        testName: dropping_transaction_unlocks_even_if_an_inherited_handle_remains_open
+        kind: unit
+      - path: elohim/epr-rea/tests/support/concurrent_sidecars.rs
+        testName: independent_processes_first_open_and_append_preserve_every_record
+        kind: integration
+      - path: elohim/epr-rea/tests/support/concurrent_sidecars.rs
+        testName: flow_reader_observes_a_complete_transaction
+        kind: integration
+      - path: elohim/epr-rea/tests/support/concurrent_sidecars.rs
+        testName: killed_writer_releases_lock_but_preserves_and_refuses_partial_evidence
+        kind: integration
+      - path: elohim/epr-rea/tests/support/concurrent_sidecars.rs
+        testName: complete_json_without_terminator_is_not_accepted_as_a_record
+        kind: integration
+      - path: elohim/epr-rea/tests/support/concurrent_sidecars.rs
+        testName: representative_log_read_check_and_batch_cost
+        kind: integration
+
   - name: Bound::breached_by / Bound::approached_by
     kind: pure-decision-predicate
     sourceLocation:
