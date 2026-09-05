@@ -1,9 +1,12 @@
 ---
 name: project_storage_build_under_ram_guard_debuginfo_off
-title: Storage builds under the RAM guard
-description: elohim-storage cannot `cargo build`/`test` while the local mesh is up (rustc peak ~6.4 GB vs ~5.5 GB under the 80% RAM guard; conductors grow to ~4.3 GB each) — `--config "profile.dev.package.elohim-storage.debug=0"` + CARGO_BUILD_JOBS=1 builds in ~3 min; bites every mesh-first storage shift
-metadata:
+description: "elohim-storage cargo test/build gets shed by the 80% RAM guard while the mesh is up; cure in-tree since 2026-09-05 — line-tables-only debuginfo + cargo-jobs-flag -j1; just gate picks it up"
+metadata: 
+  node_type: memory
+  title: Storage builds under the RAM guard
   type: project
+  originSessionId: f84d8f67-f26c-4b08-8a6f-6cfd7e6cf12d
+  modified: 2026-09-05T20:07:31.913Z
 ---
 
 **Trap (2026-09-04 overnight):** with the 3-peer 0.7 mesh running, every plain `cargo build --features "p2p p2p-iroh"`
@@ -19,6 +22,12 @@ CARGO_TARGET_DIR=<pool slot> CARGO_BUILD_JOBS=1 cargo build --features "p2p p2p-
 ```
 Only the top crate recompiles without debuginfo (deps stay cached); the binary is ~90 MB smaller and runs the mesh fine
 (`storage-restart` onto it 08:19Z). The same flag should let the `--lib` test target fit.
+
+**2026-09-05 (integration push #4):** line-tables-only debuginfo alone was NOT enough — `cargo test` compiles the lib
+and the test harness as TWO ~5.5 GB rustc processes and the guard shed it at 80.5% (13 GB). Durable cure now in-tree:
+`elohim/elohim-storage/.cargo/config.toml` (line-tables-only for the top crate) + the storage justfile's `jobs_flag`,
+computed by `genesis/agentic/bin/cargo-jobs-flag` (`-j1` whenever `ram-guard status` shows < 14 GB headroom; CI has
+no guard → cargo's default). `just gate elohim-storage` picks both up; nothing to type.
 
 **Why:** debuginfo generation is the marginal memory of the top-crate codegen; the guard's ceiling is a policy
 (memory.high is 88%), not a kernel limit, but building past it risks an OOM of a 4 GB conductor (oom.group=0 kills the
