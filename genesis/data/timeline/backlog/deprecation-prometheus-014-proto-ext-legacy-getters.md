@@ -133,6 +133,20 @@ the whole verification. Then delete this entry and the three ledger fingerprints
 red** rather than noise. That change and this fix should land together, or this
 fix should land first.
 
+**Correction at integration (2026-09-05).** The three call sites had already been
+moved to `.name()` / `.value()` in commit `49972934b` on 2026-09-04 ("fix(storage):
+metrics tests use prometheus 0.14 name()/value()", `elohim/elohim-storage/src/metrics.rs`,
+5 lines) — that commit names fingerprints `fe49ee2127a3 19709474b9b5 cd1e5e2f933b`
+and reports the accessors as *failing* the crate gate, so the "nothing is red"
+reasoning above was already stale when this entry was written from an older
+worktree. What is still outstanding is only the proof: no verified
+`cargo clippy -- -D warnings` plus `cargo test` run on `elohim-storage` has been
+recorded since, so this entry stays open on the verification leg rather than the
+edit leg. A duplicate entry with slug `deprecation-prometheus-014-proto-getname-getvalue`
+(same three fingerprints) covered the identical concern and was retired unmerged
+in favour of this one; the three ledger rows still point at that retired slug and
+should be repointed here when the ledger is next writable.
+
 ## Verification
 
 N/A — not fixed. Closure evidence will be: the three substitutions applied, the
