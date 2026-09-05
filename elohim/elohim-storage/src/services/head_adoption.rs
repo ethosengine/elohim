@@ -1622,49 +1622,99 @@ pub async fn try_adopt_canonical_head(
 ///
 /// ## Why this is not authority laundering
 ///
-/// Three conditions, all mandatory, and each one closes a specific way this
-/// could have become a head move wearing a pointer's clothes:
+/// FOUR conditions, all mandatory, and each one closes a specific way this
+/// could have become a head move wearing a pointer's clothes — or a pointer
+/// paired with the wrong length:
 ///
 /// 1. **`conductor_verified`** — the answer is `canonical == true` from THIS
 ///    node's own conductor ([`LocalResolve`], never a peer hint, never a
 ///    fetched record). A peer's bytes reach the projection through the declare
 ///    path or not at all.
-/// 2. **EXACT head equality** — `row_declared_head == head_action_hash`, trimmed
-///    on both sides exactly as [`declaration_would_move`] trims. Not "newer",
-///    not "supersedes", not "the conductor is canonical so it wins": the row
-///    must ALREADY be obeying this head. A different head is the head-move
-///    question, and it stays entirely with `canonical_move_verdict` and the
-///    canonical channels. This is the condition that makes the write
-///    head-neutral by construction rather than by care.
+/// 2. **EXACT head equality, on the SAME comparison the stamp makes** —
+///    `row_declared_head == head_action_hash`, **untrimmed**. Not "newer", not
+///    "supersedes", not "the conductor is canonical so it wins": the row must
+///    ALREADY be obeying this head. A different head is the head-move question,
+///    and it stays entirely with `canonical_move_verdict` and the canonical
+///    channels.
+///
+///    Untrimmed **on purpose**, and this is the subtle part. Condition 2 is not
+///    a claim about the hashes — it is a claim about WHAT THE STAMP WILL DO, so
+///    it has to be the stamp's own test. `stamp_declared_head_mode` computes
+///    `same_declared_head` / `moving_declared_row` on the raw column values
+///    (`content_diesel.rs`), so a padded stored head that this predicate trimmed
+///    into a match would enter the stamp as a head MOVE: it would run
+///    `canonical_move_verdict` and either drop the patch or normalize the stored
+///    head's bytes. Neither is a real head change, and both break the "head-
+///    neutral by CONSTRUCTION" claim this whole predicate rests on.
+///
+///    [`declaration_would_move`] trims because it answers a DIFFERENT question —
+///    "is a zome declare worth spending?" — where over-trimming costs at most a
+///    skipped no-op. Here over-trimming costs the invariant, so a padded row is
+///    refused and its pointer simply stays drifted. Conservative, and visible:
+///    the caller logs nothing, and the next sweep asks again.
 /// 3. **A real, different pointer** — the record names a non-empty `blob_cid`
 ///    that differs from the row's. Empty never wins (the same rule the amber
 ///    heal holds), and an identical value writes nothing, so a converged corpus
 ///    heals ZERO pointers per sweep.
+/// 4. **The record states its own blob's SIZE** — see below. Absent size, no
+///    heal.
 ///
 /// `dht_anchor_hash` is untouched in VALUE for the same reason: the stamp writes
 /// it from `head_action_hash`, which condition 2 proved is what the row already
 /// holds.
 ///
-/// Returns the pointer to write, or `None` to leave the row alone.
+/// ## Why the SIZE is a condition and not a best-effort ride-along
+///
+/// [`content_diesel::ContentProjectionPatch`]'s contract is "`None` preserves
+/// the existing column". So a patch that refreshed `blob_cid` while leaving
+/// `content_size_bytes` at `None` would leave the OTHER blob's length attached
+/// to the new pointer — the precise inconsistency this heal exists to avoid
+/// creating, silently, on the row it just "cured".
+///
+/// That is not cosmetic. `p2p::inventory_broadcaster::gather_hints` JOINS the
+/// content projection on `blob_hash` and emits `BlobHint { address, size_bytes }`
+/// from the row — so a refreshed pointer beside a stale length is broadcast over
+/// the gossip plane as a wrong (address, size) pair, from which the replication
+/// prioritizer sizes fetch budgets on every peer that receives it. A heal that
+/// cures one node's serving path by lying to the whole pool is not a cure.
+///
+/// The patch type cannot express "clear this column" (`Option<i32>`, where
+/// `None` already means preserve), and a fabricated `0` would be a different
+/// lie — `gather_hints` would publish `size_bytes: Some(0)`. So the honest
+/// remaining option is to REFUSE: a record that cannot state its blob's length
+/// does not get to move the pointer. This is the same shape as condition 3's
+/// empty-never-wins and as the caller's "a pointer we cannot read is a pointer
+/// we do not heal".
+///
+/// The downcast **saturates** (`unwrap_or(i32::MAX)`), matching every sibling
+/// projection write in the crate ([`try_obey_visible_election`],
+/// `rea_projection`'s `ContentCommitted` arm, `http.rs`'s eager stamp). A
+/// `.ok()` here would have turned a >2 GiB record into the very absent-size case
+/// above rather than into a clamped one.
+///
+/// Returns `(pointer, size_bytes)` to write — both, or neither.
 ///
 /// **Contract tests:** [`tests::pointer_heals_when_the_record_names_the_row_s_own_head`],
 /// [`tests::a_different_head_never_heals_the_pointer`],
-/// [`tests::an_unverified_record_never_heals_the_pointer`].
+/// [`tests::an_unverified_record_never_heals_the_pointer`],
+/// [`tests::the_pointer_and_its_length_move_together_or_not_at_all`].
 pub fn pointer_heal_patch(
     conductor_verified: bool,
     row_declared_head: Option<&str>,
     head_action_hash: &str,
     row_blob_hash: Option<&str>,
     record_blob_cid: Option<&str>,
-) -> Option<String> {
+    record_size_bytes: Option<u64>,
+) -> Option<(String, i32)> {
     if !conductor_verified {
         return None;
     }
-    // (2) EXACT equality. `None` (undeclared) is NOT a match: an undeclared row
-    // is the FILL case, which the stamp itself handles as a head move — letting
-    // it through here would heal a pointer for a head the row does not yet obey.
+    // (2) EXACT equality, byte-for-byte, as the stamp compares. `None`
+    // (undeclared) is NOT a match: an undeclared row is the FILL case, which the
+    // stamp itself handles as a head move — letting it through here would heal a
+    // pointer for a head the row does not yet obey.
     let declared = row_declared_head?;
-    if declared.trim() != head_action_hash.trim() {
+    if declared != head_action_hash {
         return None;
     }
     // (3) Empty never wins; identical writes nothing.
@@ -1672,7 +1722,10 @@ pub fn pointer_heal_patch(
     if row_blob_hash.map(str::trim) == Some(incoming) {
         return None;
     }
-    Some(incoming.to_string())
+    // (4) The pointer and its length are one fact from one record, so they move
+    // together or not at all. Saturating, never dropping — see above.
+    let size = record_size_bytes.map(|n| i32::try_from(n).unwrap_or(i32::MAX))?;
+    Some((incoming.to_string(), size))
 }
 
 /// Stamp a canonical head this node's OWN conductor resolved.
@@ -1699,7 +1752,10 @@ pub fn pointer_heal_patch(
 ///
 /// `content_size_bytes` travels with the pointer, never alone: the two are one
 /// fact from one entry, and a refreshed pointer carrying the OTHER blob's length
-/// is a new inconsistency in place of the one being cured.
+/// is a new inconsistency in place of the one being cured — one that
+/// `inventory_broadcaster::gather_hints` would then broadcast to the pool.
+/// [`pointer_heal_patch`] returns BOTH or NEITHER, so that promise is kept by
+/// the return type rather than by remembering to set a second field.
 fn adopt_local(
     pool: &DbPool,
     ctx: &AppContext,
@@ -1717,8 +1773,14 @@ fn adopt_local(
 
     // T7. Read the row's pointer ONLY when the head matches — on a converged
     // corpus every other candidate skips the query entirely.
+    //
+    // The gate is byte-for-byte, NOT trimmed, and must stay that way: it is the
+    // same comparison `stamp_declared_head_mode` makes below, so a row this gate
+    // admits is a row the stamp will treat as `Refreshed` rather than as a move.
+    // See condition 2 on `pointer_heal_patch`, which repeats the test for the
+    // same reason.
     let mut pointer_patch: Option<content_diesel::ContentProjectionPatch> = None;
-    if local_declared.is_some_and(|d| d.trim() == head.head_action_hash.as_str().trim()) {
+    if local_declared == Some(head.head_action_hash.as_str()) {
         let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
             Ok(v) => v,
             Err(e) => {
@@ -1731,12 +1793,13 @@ fn adopt_local(
                 None
             }
         };
-        if let Some(healed) = pointer_heal_patch(
+        if let Some((healed, size_bytes)) = pointer_heal_patch(
             head.canonical,
             local_declared,
             head.head_action_hash.as_str(),
             row_blob_hash.as_deref(),
             head.content.blob_cid.as_deref(),
+            head.content.content_size_bytes,
         ) {
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
@@ -1744,16 +1807,14 @@ fn adopt_local(
                 head = %head.head_action_hash,
                 from = ?row_blob_hash,
                 to = %healed,
+                size_bytes = size_bytes,
                 "pointer-heal (T7): the own conductor's record for the head this row \
-                 ALREADY declares names a different blob — refreshing the pointer; \
-                 the declared head and dht_anchor_hash do not move"
+                 ALREADY declares names a different blob — refreshing the pointer and \
+                 its length together; the declared head and dht_anchor_hash do not move"
             );
             pointer_patch = Some(content_diesel::ContentProjectionPatch {
                 blob_cid: Some(healed),
-                content_size_bytes: head
-                    .content
-                    .content_size_bytes
-                    .and_then(|v| i32::try_from(v).ok()),
+                content_size_bytes: Some(size_bytes),
                 ..Default::default()
             });
         }
@@ -3661,21 +3722,22 @@ mod tests {
                 HEAD_A,
                 Some("sha256-stale"),
                 Some("sha256-fresh"),
+                Some(4096),
             ),
-            Some("sha256-fresh".to_string())
+            Some(("sha256-fresh".to_string(), 4096))
         );
-        // Whitespace on either side is padding, not a difference — the same
-        // trim `declaration_would_move` applies, so a stray-padding round trip
-        // cannot read as a mismatch and skip the heal.
+        // The POINTER is trimmed — padding around a blob address is noise. The
+        // HEAD is not; see `the_head_test_is_untrimmed_so_the_two_layers_cannot_disagree`.
         assert_eq!(
             pointer_heal_patch(
                 true,
-                Some(&format!(" {HEAD_A} ")),
+                Some(HEAD_A),
                 HEAD_A,
                 Some("sha256-stale"),
                 Some(" sha256-fresh "),
+                Some(1),
             ),
-            Some("sha256-fresh".to_string())
+            Some(("sha256-fresh".to_string(), 1))
         );
         // A row already naming the value writes NOTHING — a converged corpus
         // heals zero pointers per sweep.
@@ -3685,7 +3747,8 @@ mod tests {
                 Some(HEAD_A),
                 HEAD_A,
                 Some("sha256-x"),
-                Some("sha256-x")
+                Some("sha256-x"),
+                Some(9),
             ),
             None
         );
@@ -3693,8 +3756,113 @@ mod tests {
         // with no pointer must not blank a row that has one.
         for empty in [None, Some(""), Some("   ")] {
             assert_eq!(
-                pointer_heal_patch(true, Some(HEAD_A), HEAD_A, Some("sha256-x"), empty),
+                pointer_heal_patch(true, Some(HEAD_A), HEAD_A, Some("sha256-x"), empty, Some(9)),
                 None
+            );
+        }
+    }
+
+    /// **The pointer and its length move together, or neither moves.**
+    ///
+    /// `ContentProjectionPatch`'s `None` means PRESERVE, so a patch that
+    /// refreshed `blob_cid` while leaving `content_size_bytes` unset would
+    /// attach the OLD blob's length to the NEW pointer — and
+    /// `p2p::inventory_broadcaster::gather_hints` JOINs the content projection
+    /// on `blob_hash` and broadcasts `BlobHint { address, size_bytes }` from
+    /// that row, so the lie would leave this node and size fetch budgets across
+    /// the pool. Hence: a record that cannot state its blob's length does not
+    /// get to move the pointer.
+    ///
+    /// The overflow branch SATURATES rather than dropping, matching every
+    /// sibling projection write in the crate. `.ok()` would have turned an
+    /// over-2-GiB record into the absent-size case above — i.e. into exactly
+    /// the stale-length write this test forbids.
+    #[test]
+    fn the_pointer_and_its_length_move_together_or_not_at_all() {
+        // Absent size → no heal at all, rather than a fresh pointer beside a
+        // stale length. `content_size_bytes` is `Option` + `serde(default)`
+        // alongside `blob_cid`, so this is a modelled decode, not a malformed one.
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+                None,
+            ),
+            None
+        );
+        // Oversize saturates and STILL heals: a clamped length is a bounded
+        // inaccuracy about the NEW blob; a preserved one is a precise statement
+        // about the WRONG blob.
+        for huge in [u64::MAX, i32::MAX as u64 + 1] {
+            assert_eq!(
+                pointer_heal_patch(
+                    true,
+                    Some(HEAD_A),
+                    HEAD_A,
+                    Some("sha256-stale"),
+                    Some("sha256-fresh"),
+                    Some(huge),
+                ),
+                Some(("sha256-fresh".to_string(), i32::MAX))
+            );
+        }
+        // The i32 boundary itself is exact, not clamped.
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+                Some(i32::MAX as u64),
+            ),
+            Some(("sha256-fresh".to_string(), i32::MAX))
+        );
+        // A zero-byte blob is a real size, not an absence.
+        assert_eq!(
+            pointer_heal_patch(
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-stale"),
+                Some("sha256-fresh"),
+                Some(0),
+            ),
+            Some(("sha256-fresh".to_string(), 0))
+        );
+    }
+
+    /// **The head comparison is the STAMP's comparison, byte-for-byte.**
+    ///
+    /// `content_diesel::stamp_declared_head_mode` computes `same_declared_head`
+    /// on the raw column value. A padded stored head that this predicate trimmed
+    /// into a match would enter the stamp as a head MOVE — running
+    /// `canonical_move_verdict` and either dropping the patch or normalizing the
+    /// stored head's bytes. Neither is a real head change, and both break the
+    /// "head-neutral by CONSTRUCTION" claim the whole predicate rests on. So a
+    /// padded row is REFUSED and its pointer stays drifted: conservative, and
+    /// the next sweep asks again.
+    #[test]
+    fn the_head_test_is_untrimmed_so_the_two_layers_cannot_disagree() {
+        for padded in [
+            format!(" {HEAD_A}"),
+            format!("{HEAD_A} "),
+            format!("\t{HEAD_A}\n"),
+        ] {
+            assert_eq!(
+                pointer_heal_patch(
+                    true,
+                    Some(&padded),
+                    HEAD_A,
+                    Some("sha256-stale"),
+                    Some("sha256-fresh"),
+                    Some(4096),
+                ),
+                None,
+                "a padded stored head must not be trimmed into a match the stamp will not make"
             );
         }
     }
@@ -3717,6 +3885,7 @@ mod tests {
                 HEAD_B,
                 Some("sha256-stale"),
                 Some("sha256-fresh"),
+                Some(4096),
             ),
             None
         );
@@ -3726,7 +3895,8 @@ mod tests {
                 None,
                 HEAD_A,
                 Some("sha256-stale"),
-                Some("sha256-fresh")
+                Some("sha256-fresh"),
+                Some(4096),
             ),
             None
         );
@@ -3749,6 +3919,7 @@ mod tests {
                 HEAD_A,
                 Some("sha256-stale"),
                 Some("sha256-fresh"),
+                Some(4096),
             ),
             None
         );
