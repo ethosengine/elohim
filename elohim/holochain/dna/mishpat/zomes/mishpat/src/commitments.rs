@@ -437,6 +437,41 @@ pub struct CommitmentStateLinkOutput {
 ///
 /// The link is immutable (links never update). Called by the elohim-storage
 /// graduation projection right after `graduate_to_active` flips the SQL cache.
+///
+/// # GAP G7 — this extern records a lifecycle, it does not authorise one
+///
+/// Named here, at the entry point, because this is where a reader arrives:
+/// **the link says a transition happened; nothing here says it was allowed to.**
+///
+/// Three facts compose into that gap:
+///
+///   1. This is a PUBLIC extern. Any agent on the Mishpat DHT may call it for
+///      any `commitment_cid` — the coordinator checks only that the two hashes
+///      parse and that the two tag segments are non-empty.
+///   2. The integrity validator (`mishpat_integrity::validate_create_link`)
+///      is TAG-SHAPE-ONLY on `CommitmentByState`: it admits any `<a>|<b>` with
+///      both segments non-empty. It binds the link author to nothing — not to
+///      the commitment provider, not to the recipient, not to the event the
+///      target names.
+///   3. So `active|<t>` and `revoked|<t>` are both FORGEABLE. A peer can hang
+///      an `active` on a commitment that never graduated, or a `revoked` on one
+///      that stands, and every reading peer sees a well-formed link.
+///
+/// What that means for a reader, stated plainly: this link makes a lifecycle
+/// fact DISCOVERABLE everywhere, never VERIFIED. The reading side must keep
+/// re-confirming the target event against the commitment it claims to move —
+/// which is why `get_commitment_state_links` hands back the event
+/// `ActionHash` rather than a verdict, and why the storage-side projections
+/// replay it. `author_successor_link` above inherits exactly this limit for
+/// its `sunset|<cid>` genus and says so.
+///
+/// **The fix is integrity-side, not here** (epic Tasks 21–23): the validator
+/// must resolve the base commitment and bind the link author to a role on it,
+/// and it must resolve the target event and check it justifies the state named
+/// in the tag. Both are `must_get_*`-expressible (the base and target are exact
+/// hashes), so the rule is reachable under HDI — it simply has not landed. A
+/// coordinator-side check would not close it, because a forger calls the DHT,
+/// not this function.
 #[hdk_extern]
 pub fn create_commitment_state_link(
     input: CreateCommitmentStateLinkInput,
