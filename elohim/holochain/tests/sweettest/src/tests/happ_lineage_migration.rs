@@ -164,11 +164,14 @@ struct ExportPage {
     scanned: Option<u32>,
     /// Task 29 (additive): WHICH read answered the page — `"authority"` when
     /// the agent-activity authorities served it over the network,
-    /// `"local-only"` when they answered empty and the conductor fell back to
-    /// its own store, `None` on the own-chain path. Station 6's root cause was
-    /// that a partial-arc local read is indistinguishable from a short chain
-    /// unless the page says so. `#[serde(default)]` because a bundle packed
-    /// before Task 29 does not emit it.
+    /// `"local-only"` when the network handed over nothing and the conductor
+    /// fell back to its own store, `"unreachable"` when nobody answered at all
+    /// and the local store held nothing either, `None` on the own-chain path.
+    /// Station 6's root cause was that a partial-arc local read is
+    /// indistinguishable from a short chain unless the page says so; the third
+    /// label exists because `NoPeersForLocation` reaches a zome as a well-formed
+    /// EMPTY response rather than an error. `#[serde(default)]` because a bundle
+    /// packed before Task 29 does not emit it.
     #[serde(default)]
     view: Option<String>,
 }
@@ -1378,6 +1381,56 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
         "known_agents must list the author of the NodeRegistration entries this cell can read"
     );
 
+    // --- Task 29 fix round 1: NOBODY ANSWERED is its own label --------------
+    //
+    // An unreachable authority does NOT arrive at the zome as an error. Traced
+    // through the pinned conductor fork: `NoPeersForLocation` becomes `vec![]`
+    // in `Cascade::fetch_agent_activity`, and merging an empty result set
+    // yields `ChainStatus::Empty` / `highest_observed: None` / no activity — a
+    // well-formed EMPTY response. Labelling that `authority` would serve an
+    // unanswered question as a settled fact, under the one label that tells a
+    // driver to trust it. It is the live shape on the household mesh, where
+    // every node_registry peer advertises a null storage arc and no peer is an
+    // authority for any location.
+    //
+    // Asked for a fabricated key nothing has ever authored, this conductor gets
+    // exactly that response and holds nothing locally either, so the page must
+    // say `unreachable` — an absence of evidence, never evidence of an empty
+    // chain, even though `total` reads `Some(0)` in both cases.
+    let nobody = holo_hash::AgentPubKey::from_raw_36(vec![0x29u8; 36]);
+    let unanswered: ExportPage = conductor
+        .call(
+            &zome,
+            "export_held_records",
+            ExportHeldInput {
+                agent: nobody.clone(),
+                cursor: None,
+                limit: 16,
+            },
+        )
+        .await;
+    println!(
+        "[export/held] unanswered: total={:?} observed_head={:?} view={:?} scanned={:?}",
+        unanswered.total, unanswered.observed_head, unanswered.view, unanswered.scanned
+    );
+    assert_eq!(
+        unanswered.view.as_deref(),
+        Some("unreachable"),
+        "a network read that nobody answered, with nothing in the local store either, \
+         must NOT be labelled `authority` — got {:?}",
+        unanswered.view
+    );
+    assert_eq!(
+        unanswered.total,
+        Some(0),
+        "the page still reports its walk honestly; it is `view` that says the zero was \
+         never confirmed by anyone"
+    );
+    assert!(
+        unanswered.records.is_empty() && unanswered.next_cursor.is_none(),
+        "an unanswered page carries no records and offers no cursor"
+    );
+
     Ok(())
 }
 
@@ -1926,7 +1979,9 @@ async fn held_carry_pulls_a_neighbours_v1_record_into_v2() -> Result<()> {
         .expect("a HELD receipt must name the view that answered — silence is the Station 6 bug");
     assert!(
         view == "authority" || view == "local-only",
-        "the view label is one of the two the zome defines, got {view:?}"
+        "a page that CARRIED bob's record was answered by someone, so the label is one of \
+         the two answering states — `unreachable` here would mean the zome credited a page \
+         with records to a read nobody made. Got {view:?}"
     );
     println!(
         "[task18] receipt view = {view}, scanned = {:?}",

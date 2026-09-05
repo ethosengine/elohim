@@ -1528,10 +1528,10 @@ pub struct ExportPage {
     #[serde(default)]
     pub scanned: Option<u32>,
     /// **Additive (Task 29).** WHICH read answered this page —
-    /// [`HELD_VIEW_AUTHORITY`] or [`HELD_VIEW_LOCAL_ONLY`] — or `None` on the
-    /// own-chain path, where neither word applies because `export_records` is a
-    /// local `query()` of the caller's own chain and there is no other view to
-    /// choose between.
+    /// [`HELD_VIEW_AUTHORITY`], [`HELD_VIEW_LOCAL_ONLY`] or
+    /// [`HELD_VIEW_UNREACHABLE`] — or `None` on the own-chain path, where none
+    /// of the three applies because `export_records` is a local `query()` of the
+    /// caller's own chain and there is no other view to choose between.
     ///
     /// **This is the field Station 6 was missing.** MEASURED on the household
     /// mesh (2026-09-04): james's held view of jessica froze at 212 records
@@ -1545,15 +1545,26 @@ pub struct ExportPage {
     ///
     /// [`HELD_VIEW_AUTHORITY`] means the agent-activity AUTHORITIES answered
     /// over the network — the whole chain as the DHT holds it, independent of
-    /// this peer's arc. [`HELD_VIEW_LOCAL_ONLY`] means they answered with
-    /// nothing and this conductor fell back to its own store; the page is then
-    /// scoped to what THIS peer validated and integrated, and every
-    /// "courier's view" caveat on `total`, `digest` and `next_cursor` applies
-    /// at its strongest.
+    /// this peer's arc. [`HELD_VIEW_LOCAL_ONLY`] means the network handed over
+    /// nothing and this conductor fell back to its own store, which did hold
+    /// records; the page is then scoped to what THIS peer validated and
+    /// integrated, and every "courier's view" caveat on `total`, `digest` and
+    /// `next_cursor` applies at its strongest. [`HELD_VIEW_UNREACHABLE`] means
+    /// nobody answered at all and this peer holds nothing either — an absence of
+    /// evidence, never evidence of an empty chain.
     ///
     /// A driver reads it as a CONFIDENCE label, never as a completeness proof:
     /// `authority` does not promise the authorities were caught up either, it
-    /// promises the read was not silently answered by one partial-arc peer.
+    /// promises the read reached one and was not silently answered by this
+    /// peer's arc — or by nothing at all.
+    ///
+    /// **Why a `String` and not a closed enum**, given three labels: a v2 cell
+    /// DECODES this field off a predecessor's page in `carry_from`, so a closed
+    /// enum would turn a fourth label from some future coordinator into a
+    /// whole-page decode failure on an older peer. That is precisely the refusal
+    /// epic §7 C10 forbids (old peers keep working, loudly). The three
+    /// `HELD_VIEW_*` consts above are the labels' single home; the wire stays
+    /// forward-tolerant.
     ///
     /// `Option<String>` + `#[serde(default)]`: `None` from a bundle packed
     /// before this field existed, which is honestly "not reported" rather than
@@ -1567,10 +1578,35 @@ pub struct ExportPage {
 /// peer's arc.
 pub const HELD_VIEW_AUTHORITY: &str = "authority";
 
-/// [`ExportPage::view`] when the network answered with no valid activity and
-/// this conductor fell back to its OWN store. The page is then scoped to what
-/// this peer holds, which on a partial-arc peer is a slice of the chain.
+/// [`ExportPage::view`] when the network handed over no valid activity and this
+/// conductor fell back to its OWN store, which did hold records. The page is
+/// then scoped to what this peer holds, which on a partial-arc peer is a slice
+/// of the chain.
+///
+/// Deliberately NOT split by why the network came up short. Whether the
+/// authorities answered empty or were never reached, a page served from the
+/// local store is arc-scoped either way, and that is the whole content of the
+/// label.
 pub const HELD_VIEW_LOCAL_ONLY: &str = "local-only";
+
+/// [`ExportPage::view`] when NOBODY ANSWERED: the network read came back in the
+/// synthesised zero-response shape (no valid activity, no `highest_observed`,
+/// `ChainStatus::Empty`) and the local store held nothing either, so the page
+/// reports an empty walk that nothing in the network ever confirmed.
+///
+/// This is the label that keeps an unreachable authority from wearing
+/// [`HELD_VIEW_AUTHORITY`]. `NoPeersForLocation` reaches a zome as a well-formed
+/// empty response rather than an error (see `export_held_records`), so without
+/// this third state an unanswered question is served as a settled fact — the
+/// Station 6 failure shape, under the one label that tells a driver to trust it.
+///
+/// A driver reads it as "re-ask, do not record": an `unreachable` page's
+/// `total: Some(0)` is an absence of evidence, never evidence of an empty chain.
+/// MEASURED cause on the household mesh (2026-09-04): every peer in the
+/// node_registry space advertises a null storage arc, so no peer is an
+/// agent-activity authority for any location and every network read there
+/// returns this shape.
+pub const HELD_VIEW_UNREACHABLE: &str = "unreachable";
 
 const EXPORT_CAP: u32 = 64;
 
@@ -2147,12 +2183,19 @@ fn app_entry_types_in_scope() -> ExternResult<Vec<EntryType>> {
 ///
 /// **WHICH VIEW answered is reported, not assumed (Task 29).** The read asks the
 /// agent-activity AUTHORITIES over the network first, and falls back to this
-/// conductor's own store only when they answer with no valid activity at all.
-/// [`ExportPage::view`] names which one served the page. That distinction is
-/// Station 6's root cause: a local-only read on a PARTIAL-ARC peer returns the
-/// slice of the neighbour's chain that hashes into this peer's arc and never
-/// fills, so a page taken from it reports a permanent truncation in exactly the
-/// shape of a complete short chain.
+/// conductor's own store only when the network hands over no valid activity.
+/// [`ExportPage::view`] names which of the three states served the page —
+/// [`HELD_VIEW_AUTHORITY`], [`HELD_VIEW_LOCAL_ONLY`] or
+/// [`HELD_VIEW_UNREACHABLE`]. That distinction is Station 6's root cause: a
+/// local-only read on a PARTIAL-ARC peer returns the slice of the neighbour's
+/// chain that hashes into this peer's arc and never fills, so a page taken from
+/// it reports a permanent truncation in exactly the shape of a complete short
+/// chain.
+///
+/// The third state exists because an unreachable network is not an error here:
+/// `NoPeersForLocation` arrives as a well-formed EMPTY response, so `authority`
+/// is gated on evidence that an authority actually spoke — see the comment on
+/// the read itself.
 ///
 /// **Even on the authority view, "whole" is a claim about the read, not a
 /// proof.** `total`, `digest` and `next_cursor` describe the walk this page
@@ -2218,25 +2261,64 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         ActivityRequest::Full,
         GetOptions::network(),
     )?;
-    let (activity, view) = if authority_activity.valid_activity.is_empty() {
+
+    // AN EMPTY NETWORK ANSWER IS NOT PROOF THAT AN AUTHORITY ANSWERED (fix
+    // round 1). The absence of a reachable authority arrives here as a
+    // well-formed EMPTY response, not as an error, so it is indistinguishable
+    // from "the authorities answered and the chain holds nothing" unless this
+    // read looks for evidence of an answer. Traced through the pinned conductor
+    // fork (holochain 0.7.0):
+    //
+    //   * `HolochainP2pActor::get_agent_activity` raises `NoPeersForLocation`
+    //     when no peer advertises a storage arc covering the agent's location;
+    //   * `Cascade::fetch_agent_activity` converts that error into `vec![]`;
+    //   * `agent_activity::merge_activities` over an EMPTY result set yields
+    //     `ChainStatus::Empty`, empty `valid_activity`, `highest_observed: None`.
+    //
+    // Transport errors and timeouts still propagate and are refused by the `?`
+    // above; the hole is `NoPeersForLocation` alone — and it is LIVE, not
+    // hypothetical: MEASURED on the household mesh (2026-09-04), every peer in
+    // the node_registry space advertises a null storage arc and no gossip round
+    // has ever completed there, so there are no agent-activity authorities at
+    // all and every network read returns exactly this shape.
+    //
+    // The discriminator is in the response and costs nothing to read: a real
+    // authority speaking for a live agent reports `highest_observed: Some(_)`
+    // and a non-`Empty` `ChainStatus`, because genesis actions exist even when
+    // the FILTERED set is empty. The synthesised zero-response reports neither.
+    let authority_answered = !authority_activity.valid_activity.is_empty()
+        || authority_activity.highest_observed.is_some()
+        || !matches!(authority_activity.status, ChainStatus::Empty);
+
+    let (activity, view) = if !authority_activity.valid_activity.is_empty() {
+        // Records came back over the network. A zero-response cannot produce
+        // records, so this branch is self-evidencing.
+        (authority_activity, HELD_VIEW_AUTHORITY)
+    } else {
         let local_activity = get_agent_activity(
             input.agent.clone(),
             filter,
             ActivityRequest::Full,
             GetOptions::local(),
         )?;
-        if local_activity.valid_activity.is_empty() {
-            // Both empty: the authorities answered, they answered nothing, and
-            // the local store agrees. That is an `authority` page reporting an
-            // empty chain, NOT a local-only fallback — labelling it `local-only`
-            // would tell a driver to distrust a read that was never made short
-            // by this peer's arc.
+        if !local_activity.valid_activity.is_empty() {
+            // The local store holds records the network did not hand over. The
+            // page is served from it and SAYS so — whether the network was
+            // merely empty or was never reached, `local-only` is the honest
+            // label, because either way this page is scoped to one peer's arc.
+            (local_activity, HELD_VIEW_LOCAL_ONLY)
+        } else if authority_answered {
+            // Both empty, and the network answer carries evidence that an
+            // authority produced it. THAT is an `authority` page reporting a
+            // chain with no matching entries.
             (authority_activity, HELD_VIEW_AUTHORITY)
         } else {
-            (local_activity, HELD_VIEW_LOCAL_ONLY)
+            // Both empty and NOBODY ANSWERED. Reporting `authority` here would
+            // be the Station 6 failure in a better costume: an unanswered
+            // question served as a settled fact, under the one label that tells
+            // a driver to trust it. The page says `unreachable` instead.
+            (authority_activity, HELD_VIEW_UNREACHABLE)
         }
-    } else {
-        (authority_activity, HELD_VIEW_AUTHORITY)
     };
 
     // MEASURED (holochain 0.7.0): `highest_observed` is computed by
@@ -3129,10 +3211,10 @@ pub struct CarryReceipt {
     #[serde(default)]
     pub resume: Option<ExportResume>,
     /// **Additive (Task 29).** WHICH read answered the export this page carried,
-    /// reported verbatim from [`ExportPage::view`]:
-    /// [`HELD_VIEW_AUTHORITY`], [`HELD_VIEW_LOCAL_ONLY`], or `None` on a
+    /// reported verbatim from [`ExportPage::view`]: [`HELD_VIEW_AUTHORITY`],
+    /// [`HELD_VIEW_LOCAL_ONLY`], [`HELD_VIEW_UNREACHABLE`], or `None` on a
     /// [`CarrySource::Own`] page, where the predecessor read its own chain
-    /// locally and neither word applies.
+    /// locally and none of the three applies.
     ///
     /// **This is what makes a held receipt readable at all.** Station 6
     /// measured a courier whose held view of a neighbour froze at 212 records
@@ -3144,8 +3226,10 @@ pub struct CarryReceipt {
     ///
     /// It is a confidence label, never a completeness proof: `authority` says
     /// the read reached the agent-activity authorities, not that they were
-    /// caught up. The completeness check stays the comparison of
-    /// [`Self::v1_observed_head`] across views.
+    /// caught up. [`HELD_VIEW_UNREACHABLE`] is the sharpest of the three — a
+    /// receipt carrying it recorded nothing anyone confirmed, and the sweep
+    /// should re-ask rather than bank it. The completeness check stays the
+    /// comparison of [`Self::v1_observed_head`] across views.
     ///
     /// `#[serde(default)]` so a consumer built against the earlier receipt still
     /// decodes, reading `None` — honestly "not reported" — for a page from a
