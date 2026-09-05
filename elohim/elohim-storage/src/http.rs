@@ -685,6 +685,18 @@ struct LineageResetOptions {
     force_closed: bool,
 }
 
+/// The body `POST /admin/lineage/v1-binding` reads (Task 33 — the disposable
+/// crossing). `v1AppId` absent or `null` CLEARS the binding, returning the role
+/// to the household's own app; that is the shape a baseline converges to, so
+/// the destructive-sounding word is the one that restores the default.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LineageV1BindingBody {
+    role: String,
+    #[serde(default, alias = "v1_app_id")]
+    v1_app_id: Option<String>,
+}
+
 /// Pure parse of the `POST /admin/lineage/reset` body. Default (missing
 /// fields, empty body, malformed JSON) is all-`false`: disable only, never
 /// uninstall, never touch a closed role — the safer reading wins rather than
@@ -1975,6 +1987,22 @@ impl HttpServer {
             // Node-local: deliberately NOT in build_manifest() — never
             // doorway-proxied.
             (Method::POST, "/admin/lineage/reset") => self.handle_lineage_reset(req).await,
+
+            // Task 33 (Holochain Evolution Epic MVP) — the DISPOSABLE
+            // CROSSING's one lever. Declares which installed app holds the
+            // PREDECESSOR cell for a role: what a crossing carries out of and
+            // what a sunset SEALS. Body: `{"role":"node_registry",
+            // "v1AppId":"<installed app id>"}`; a null/absent `v1AppId`
+            // clears the binding back to the base app, which is where every
+            // real peer stays. A close is irreversible and a write after one
+            // earns a permanent block from every neighbour, so a rehearsal of
+            // the sunset needs a chain nobody needs afterwards — that is what
+            // this route makes possible, and the ONLY thing it does.
+            // Node-local: deliberately NOT in build_manifest() — never
+            // doorway-proxied.
+            (Method::POST, "/admin/lineage/v1-binding") => {
+                self.handle_lineage_v1_binding(req).await
+            }
 
             // Rung 4 of the same upgrade-velocity snowball: config as a RUNTIME
             // surface. GET reports the watcher (active/path/poll) plus every
@@ -5334,6 +5362,127 @@ impl HttpServer {
         }
     }
 
+    /// `POST /admin/lineage/v1-binding` (Task 33, Holochain Evolution Epic
+    /// MVP) — the seat that binds v1.
+    ///
+    /// # Why this route exists
+    ///
+    /// The lineage vehicle used to resolve the predecessor STRUCTURALLY —
+    /// `HappLineageVehicle::seal_close` took the base app's role cell, with
+    /// the base app id fixed at boot — so a sunset could only ever close the
+    /// household's OWN node-registry chain. That is irreversible, and a write
+    /// on a closed chain earns a permanent block from every neighbour that
+    /// sees it, so the a2o rehearsal of the sunset spent the household's real
+    /// chain every time it ran (Task 30's measurement).
+    ///
+    /// Binding v1 makes a crossing DISPOSABLE: a fixture stages a run-scoped
+    /// predecessor (a per-run network seed on the same DNA, installed beside
+    /// the base app under the same key), names it here, and the whole
+    /// ceremony happens on a chain nobody needs afterwards. The household's
+    /// base cell is only ever read.
+    ///
+    /// Body: `{"role": "<role>", "v1AppId": "<installed app id>"}`. A missing
+    /// or `null` `v1AppId` — and naming the base app explicitly — CLEARS the
+    /// binding, which is the state every real peer is in and the state
+    /// `/admin/lineage/reset` converges to.
+    ///
+    /// Two refusals, both by name and both BEFORE anything changes:
+    ///
+    /// 1. **400** when the named app is not installed on this conductor
+    ///    ([`crate::lineage_roles::resolve_v1_binding`]) — a binding aimed at
+    ///    an app that is not there would surface much later as "no cell for
+    ///    this role", about the wrong app, after the ceremony had started.
+    /// 2. **409** when the role's window is already open or closed
+    ///    ([`crate::lineage_roles::LineageRoles::bind_v1`]) — the binding
+    ///    decides which chain the carry reads AND which the sunset seals, so
+    ///    re-aiming it mid-crossing would close a chain nothing was carried
+    ///    out of.
+    ///
+    /// Response 200: `{"role", "v1AppId", "previousV1AppId", "baseAppId"}`,
+    /// where `v1AppId` is the RESOLVED predecessor (never null — a cleared
+    /// binding reports the base app id, because that is the chain the role now
+    /// crosses from). Node-local: deliberately NOT in build_manifest().
+    async fn handle_lineage_v1_binding(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body_bytes = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        let body: LineageV1BindingBody = match serde_json::from_slice(&body_bytes) {
+            Ok(body) => body,
+            Err(e) => {
+                return Ok(response::bad_request(&format!(
+                    "expected {{\"role\":\"<role>\",\"v1AppId\":\"<installed app id>\"|null}}: {e}"
+                )))
+            }
+        };
+        let role = body.role.trim().to_string();
+        if role.is_empty() {
+            return Ok(response::bad_request("role must not be empty"));
+        }
+
+        let Some(lineage_roles) = self.lineage_roles.as_ref() else {
+            return Ok(response::service_unavailable("lineage_roles_unavailable"));
+        };
+        let base_app_id = lineage_roles.base_app_id().to_string();
+
+        // The conductor is consulted ONLY to answer "is this app installed?",
+        // and only when a binding is actually being declared. Clearing a
+        // binding must work on a node whose conductor is momentarily
+        // unreachable — that direction is always the safe one.
+        let requested = body.v1_app_id.as_deref();
+        let resolved = if requested
+            .map(str::trim)
+            .filter(|r| !r.is_empty() && *r != base_app_id)
+            .is_none()
+        {
+            None
+        } else {
+            let Some(admin_ws) = self.admin_websocket.as_deref().cloned().or_else(|| {
+                self.hc_registry
+                    .as_ref()
+                    .and_then(|r| r.any_admin_websocket())
+            }) else {
+                return Ok(response::service_unavailable("conductor_unavailable"));
+            };
+            let apps = admin_ws
+                .list_apps(None)
+                .await
+                .map_err(|e| StorageError::Internal(format!("list_apps: {e}")))?;
+            let app_ids: Vec<String> = apps.into_iter().map(|a| a.installed_app_id).collect();
+            match crate::lineage_roles::resolve_v1_binding(&base_app_id, &role, requested, &app_ids)
+            {
+                Ok(resolved) => resolved,
+                Err(refusal) => return Ok(response::bad_request(&refusal)),
+            }
+        };
+
+        let previous = match lineage_roles.bind_v1(&role, resolved.as_deref()) {
+            Ok(previous) => previous,
+            Err(refusal) => {
+                return Ok(response::conflict(&refusal));
+            }
+        };
+
+        let effective = resolved.clone().unwrap_or_else(|| base_app_id.clone());
+        tracing::info!(
+            role = role.as_str(),
+            v1_app_id = effective.as_str(),
+            previous = ?previous,
+            "POST /admin/lineage/v1-binding — the crossing's predecessor is declared"
+        );
+
+        Ok(response::ok(&serde_json::json!({
+            "role": role,
+            "v1AppId": effective,
+            "previousV1AppId": previous.unwrap_or_else(|| base_app_id.clone()),
+            "baseAppId": base_app_id,
+        })))
+    }
+
     /// `POST /admin/lineage/reset` (Task 10 part 2, Holochain Evolution Epic
     /// MVP) — the fixture's baseline-convergence vehicle. A mesh run must
     /// start AND end at the v1 baseline regardless of what a prior run
@@ -5415,19 +5564,25 @@ impl HttpServer {
         // The pre-reset snapshot is read ONCE, before the reset, because it
         // is also where the closed roles' side app ids come from — after
         // `reset_all` those roles no longer say which app was theirs.
-        let (reset, skipped_closed, protected_closed) = match self.lineage_roles.as_ref() {
-            Some(lineage_roles) => {
-                let snapshot = lineage_roles.snapshot();
-                let protected = if force_closed {
-                    Vec::new()
-                } else {
-                    closed_role_app_ids(&snapshot, &base_app_id)
-                };
-                let report = lineage_roles.reset_all(force_closed);
-                (report.reset, report.skipped_closed, protected)
-            }
-            None => (Vec::new(), Vec::new(), Vec::new()),
-        };
+        let (reset, skipped_closed, protected_closed, cleared_v1_bindings) =
+            match self.lineage_roles.as_ref() {
+                Some(lineage_roles) => {
+                    let snapshot = lineage_roles.snapshot();
+                    let protected = if force_closed {
+                        Vec::new()
+                    } else {
+                        closed_role_app_ids(&snapshot, &base_app_id)
+                    };
+                    let report = lineage_roles.reset_all(force_closed);
+                    (
+                        report.reset,
+                        report.skipped_closed,
+                        protected,
+                        report.cleared_v1_bindings,
+                    )
+                }
+                None => (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            };
         // Task 12: the bridge's cursors are ordinals into a view of a side app
         // this route is about to disable (and maybe uninstall). Leaving them
         // behind would resume a sweep at a position with nothing behind it, so
@@ -5504,6 +5659,14 @@ impl HttpServer {
             "disabled": disabled,
             "uninstalled": uninstalled,
             "protectedClosed": protected_closed,
+            // Task 33: a run-scoped predecessor belongs to the run that staged
+            // it, so a baseline reset drops the binding — and says which one,
+            // because a silent return to the household's own chain is the one
+            // step back toward spending it.
+            "clearedV1Bindings": cleared_v1_bindings
+                .iter()
+                .map(|(role, app_id)| serde_json::json!({"role": role, "v1AppId": app_id}))
+                .collect::<Vec<_>>(),
         })))
     }
 

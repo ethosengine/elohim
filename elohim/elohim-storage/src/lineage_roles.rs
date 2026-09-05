@@ -59,6 +59,33 @@ pub struct RoleLineage {
     pub reading_app_id: String,
     pub authoring_app_id: String,
     pub closed: bool,
+    /// **Task 33 — the V1 BINDING.** Which installed app holds the
+    /// PREDECESSOR cell this role's crossing reads from, carries out of, and
+    /// ultimately SEALS. `None` means the base app, which is the only shape
+    /// a household peer ever has.
+    ///
+    /// # Why this is a declaration and not a derivation
+    ///
+    /// Before this field the vehicle resolved v1 STRUCTURALLY —
+    /// `HappLineageVehicle::seal_close` took `role_cell(&base_app_info, role)`
+    /// with `base_app_id` fixed at boot — so a sunset could only ever close
+    /// the household's OWN node-registry chain. A close is irreversible and a
+    /// post-close write earns a permanent block from every neighbour, so the
+    /// a2o rehearsal of the sunset spent the household's real chain every time
+    /// it ran (Task 30's measurement: matthew seq 1052, jessica seq 732, both
+    /// warranted "No more actions are allowed after a chain close").
+    ///
+    /// Binding v1 makes the crossing DISPOSABLE: a fixture installs a
+    /// run-scoped predecessor (a per-run network seed on the same DNA,
+    /// installed beside the base app under the same key), binds it here, and
+    /// the whole ceremony — install, carry, window, seal — happens on a chain
+    /// nobody needs afterwards. The household's base cell is only ever READ.
+    ///
+    /// `None` rather than a copy of `base_app_id`: the default has to be
+    /// indistinguishable from the pre-Task-33 state on every surface that
+    /// projects this struct, and an `Option` that is absent cannot drift from
+    /// a base app id that moves.
+    pub v1_app_id: Option<String>,
     /// **Task 13a.** What opened this window, or `None` for a role that was
     /// never crossed (and for a window opened without an origin — see
     /// [`WindowOrigin`]). Carried THROUGH a revert and a sunset rather than
@@ -77,15 +104,30 @@ pub struct ResetReport {
     /// Roles left EXACTLY as they were because their lineage window is
     /// closed (sunset). Empty whenever `force_closed` was passed.
     pub skipped_closed: Vec<String>,
+    /// **Task 33.** Roles whose V1 BINDING this call dropped, paired with the
+    /// app id they were bound to. Reported rather than silent because a
+    /// binding is a run-scoped fixture declaration: a baseline reset that
+    /// quietly returned a role to the household's own chain — the chain the
+    /// binding exists to keep out of the ceremony — would be the one silent
+    /// step back toward spending it.
+    pub cleared_v1_bindings: Vec<(String, String)>,
 }
 
 impl RoleLineage {
+    /// This role's PREDECESSOR app id: the binding when one is declared, the
+    /// base app otherwise. The one place the default is applied, so no caller
+    /// can spell it differently.
+    pub fn v1_app_id_or<'a>(&'a self, base_app_id: &'a str) -> &'a str {
+        self.v1_app_id.as_deref().unwrap_or(base_app_id)
+    }
+
     fn at_base(base_app_id: &str) -> Self {
         Self {
             reading_app_id: base_app_id.to_string(),
             authoring_app_id: base_app_id.to_string(),
             closed: false,
             origin: None,
+            v1_app_id: None,
         }
     }
 }
@@ -131,10 +173,82 @@ impl LineageRoles {
             .unwrap_or_else(|| self.base_app_id.clone())
     }
 
-    /// Open a lineage window on `role`: reads stay pinned to the base app
-    /// id, authoring (writes) move to `lineage_app_id`. Un-closes the role
-    /// if a prior `sunset` had closed it — opening a fresh window
-    /// supersedes a closed one.
+    /// The app id this resolver falls back to for every role — the boot-time
+    /// `HOLOCHAIN_APP_ID`.
+    pub fn base_app_id(&self) -> &str {
+        &self.base_app_id
+    }
+
+    /// **Task 33.** The PREDECESSOR app id for `role` — the app whose
+    /// provisioned cell for this role is the v1 of a crossing: what the carry
+    /// reads FROM, what the window's `reading_app_id` points at, and what a
+    /// sunset SEALS.
+    ///
+    /// An unbound role (every role on every household peer) answers the base
+    /// app id, so every caller that used `base_app_id` directly before this
+    /// existed is byte-for-byte unchanged.
+    pub fn v1_app_id_for(&self, role: &str) -> String {
+        self.inner
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(role)
+            .and_then(|lineage| lineage.v1_app_id.clone())
+            .unwrap_or_else(|| self.base_app_id.clone())
+    }
+
+    /// **Task 33.** Declare (or clear, with `None`) the v1 binding for `role`.
+    /// Returns the binding that was in force before this call.
+    ///
+    /// # Why a bound role must be at BASE
+    ///
+    /// The binding decides which chain the ceremony reads, carries and
+    /// finally CLOSES. Re-aiming it while a window is open would leave the
+    /// carry having read one chain and the seal closing another — and the
+    /// seal is the irreversible act. So this refuses BY NAME unless the role
+    /// is in the untouched state (`authoring == reading == v1`, not closed),
+    /// which is exactly the state `reset_all` converges to and the state a
+    /// fixture is in when it stages a run-scoped predecessor.
+    ///
+    /// Refusing is a `String` and not a panic or a silent no-op because the
+    /// caller is an HTTP route whose whole job is to say why.
+    pub fn bind_v1(&self, role: &str, v1_app_id: Option<&str>) -> Result<Option<String>, String> {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        let entry = inner
+            .entry(role.to_string())
+            .or_insert_with(|| RoleLineage::at_base(&self.base_app_id));
+        let current_v1 = entry.v1_app_id_or(&self.base_app_id).to_string();
+        if entry.closed {
+            return Err(format!(
+                "role '{role}' has a CLOSED lineage window (v1 '{current_v1}' is sealed) — the \
+                 predecessor a sunset already closed cannot be re-aimed, and a closed chain is \
+                 never crossed a second time"
+            ));
+        }
+        if entry.authoring_app_id != current_v1 || entry.reading_app_id != current_v1 {
+            return Err(format!(
+                "role '{role}' has an OPEN lineage window (reading '{}', authoring '{}') — the \
+                 v1 binding decides which chain the carry reads and the sunset SEALS, so \
+                 re-aiming it mid-crossing would close a chain nothing was carried out of. \
+                 Reset the role to base first.",
+                entry.reading_app_id, entry.authoring_app_id
+            ));
+        }
+        let previous = entry.v1_app_id.clone();
+        entry.v1_app_id = v1_app_id.map(str::to_string);
+        // The untouched state is defined against the PREDECESSOR, so moving
+        // the binding moves both ids with it. Without this a bound role would
+        // read as an open window (`reading != authoring` is not the test, but
+        // `open_windows`' `reading == v1` is) the moment it was bound.
+        let bound = entry.v1_app_id_or(&self.base_app_id).to_string();
+        entry.reading_app_id = bound.clone();
+        entry.authoring_app_id = bound;
+        Ok(previous)
+    }
+
+    /// Open a lineage window on `role`: reads stay pinned to the role's V1
+    /// app id (its binding, or the base app), authoring (writes) move to
+    /// `lineage_app_id`. Un-closes the role if a prior `sunset` had closed
+    /// it — opening a fresh window supersedes a closed one.
     ///
     /// `origin` records what authorised the crossing (Task 13a). It is
     /// `Option` rather than required because a fixture may open a window
@@ -146,7 +260,7 @@ impl LineageRoles {
         let entry = inner
             .entry(role.to_string())
             .or_insert_with(|| RoleLineage::at_base(&self.base_app_id));
-        entry.reading_app_id = self.base_app_id.clone();
+        entry.reading_app_id = entry.v1_app_id_or(&self.base_app_id).to_string();
         entry.authoring_app_id = lineage_app_id.to_string();
         entry.closed = false;
         entry.origin = origin;
@@ -155,7 +269,8 @@ impl LineageRoles {
     /// Every role whose window is currently OPEN, paired with its state.
     ///
     /// **The ONE definition of "open".** The predicate is
-    /// `!closed && reading == base && authoring != base` — exactly the shape
+    /// `!closed && reading == v1 && authoring != v1`, where `v1` is the role's
+    /// binding or the base app (Task 33) — exactly the shape
     /// [`Self::open_window`] builds, and all three clauses are load-bearing.
     /// The tempting shorthand `authoring != reading && !closed` is WRONG:
     /// [`Self::revert`] leaves the two ids still different but INVERTED (the
@@ -175,15 +290,15 @@ impl LineageRoles {
             .unwrap_or_else(|e| e.into_inner())
             .iter()
             .filter(|(_, lineage)| {
-                !lineage.closed
-                    && lineage.reading_app_id == self.base_app_id
-                    && lineage.authoring_app_id != self.base_app_id
+                let v1 = lineage.v1_app_id_or(&self.base_app_id);
+                !lineage.closed && lineage.reading_app_id == v1 && lineage.authoring_app_id != v1
             })
             .map(|(role, lineage)| (role.clone(), lineage.clone()))
             .collect()
     }
 
-    /// Roll AUTHORING back to the base app id. The CURRENT authoring app id
+    /// Roll AUTHORING back to the role's V1 app id — its binding, or the base
+    /// app (Task 33; unbound roles are byte-for-byte unchanged). The CURRENT authoring app id
     /// (the lineage app, while a window is open) moves into `reading_app_id`
     /// first — a disabled cell: a historical read pointer at the lineage
     /// app, kept for reference, no longer live for writes.
@@ -212,7 +327,7 @@ impl LineageRoles {
             .entry(role.to_string())
             .or_insert_with(|| RoleLineage::at_base(&self.base_app_id));
         entry.reading_app_id = entry.authoring_app_id.clone();
-        entry.authoring_app_id = self.base_app_id.clone();
+        entry.authoring_app_id = entry.v1_app_id_or(&self.base_app_id).to_string();
     }
 
     /// Terminally close the lineage window on `role`. Unlike `revert`,
@@ -234,7 +349,9 @@ impl LineageRoles {
     ///
     /// # A CLOSED role is skipped, and that is the point
     ///
-    /// `RoleLineage::at_base` clears `closed`. Applied blindly, this call
+    /// `RoleLineage::at_base` clears `closed` AND the v1 binding (Task 33 —
+    /// a run-scoped predecessor belongs to the run that staged it, and a
+    /// baseline is the household's own chain). Applied blindly, this call
     /// would therefore route a SUNSET role back to authoring on a chain that
     /// is permanently sealed — writes a remote authority refuses and
     /// warrants (Probe B2) — which is exactly what spec §4 step 5's *"at no
@@ -262,6 +379,9 @@ impl LineageRoles {
                 report.skipped_closed.push(role.clone());
                 continue;
             }
+            if let Some(bound) = lineage.v1_app_id.clone() {
+                report.cleared_v1_bindings.push((role.clone(), bound));
+            }
             *lineage = RoleLineage::at_base(&self.base_app_id);
             report.reset.push(role.clone());
         }
@@ -273,6 +393,45 @@ impl LineageRoles {
     pub fn snapshot(&self) -> BTreeMap<String, RoleLineage> {
         self.inner.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
+}
+
+/// **Task 33 — the pure half of `POST /admin/lineage/v1-binding`.**
+///
+/// Decide which app id a requested v1 binding resolves to, given what this
+/// conductor actually has installed. Pure, so all three answers the route can
+/// give are testable with no conductor: the default, the named side app, and
+/// the refusal.
+///
+/// - `None` (or the base app id itself) → `Ok(None)`: the DEFAULT. Naming the
+///   base explicitly stores `None` rather than a copy, so the resolver's
+///   fallback stays the single definition of "the household's own chain" and
+///   `/version` cannot start reporting a binding where there is none.
+/// - a named app this conductor has installed → `Ok(Some(id))`.
+/// - a named app it does NOT have → `Err`, naming the app AND listing what is
+///   installed. A binding aimed at an app that is not there would resolve at
+///   apply time into "base app has no cell for this role" — a message about
+///   the wrong app, arriving at the wrong moment, after the ceremony has
+///   started. Refusing here, by name, is the difference between a typo and a
+///   crossing that reads one chain and seals another.
+pub fn resolve_v1_binding(
+    base_app_id: &str,
+    role: &str,
+    requested: Option<&str>,
+    installed_app_ids: &[String],
+) -> Result<Option<String>, String> {
+    let Some(requested) = requested.map(str::trim).filter(|r| !r.is_empty()) else {
+        return Ok(None);
+    };
+    if requested == base_app_id {
+        return Ok(None);
+    }
+    if !installed_app_ids.iter().any(|id| id == requested) {
+        return Err(format!(
+            "role '{role}': app '{requested}' is not installed on this conductor, so it holds \
+             no v1 cell to cross from, carry out of or seal. Installed: {installed_app_ids:?}"
+        ));
+    }
+    Ok(Some(requested.to_string()))
 }
 
 #[cfg(test)]
@@ -456,5 +615,189 @@ mod tests {
         l.open_window("node_registry", "elohim@CCC", None);
         assert_eq!(l.app_id_for("node_registry"), "elohim@CCC");
         assert_eq!(l.snapshot().len(), 1);
+    }
+    // -----------------------------------------------------------------
+    // Task 33 — the v1 binding (the disposable crossing)
+    // -----------------------------------------------------------------
+
+    fn installed() -> Vec<String> {
+        vec![
+            "elohim".to_string(),
+            "elohim@a2o-v1-20260905".to_string(),
+            "elohim@EKiIscIk5BDd".to_string(),
+        ]
+    }
+
+    /// **The DEFAULT is the base app**, and it is the same answer whether the
+    /// caller says nothing or says "elohim" out loud — both store `None`, so
+    /// nothing on the wire can tell a defaulted role from a never-bound one.
+    #[test]
+    fn an_unbound_role_resolves_v1_to_the_base_app() {
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        assert_eq!(l.v1_app_id_for("node_registry"), "elohim");
+        assert_eq!(l.v1_app_id_for("never-registered"), "elohim");
+
+        assert_eq!(
+            resolve_v1_binding("elohim", "node_registry", None, &installed()),
+            Ok(None)
+        );
+        assert_eq!(
+            resolve_v1_binding("elohim", "node_registry", Some("elohim"), &installed()),
+            Ok(None),
+            "naming the base app IS the default, stored as None"
+        );
+        assert_eq!(
+            resolve_v1_binding("elohim", "node_registry", Some("   "), &installed()),
+            Ok(None)
+        );
+    }
+
+    /// **An EXPLICIT binding resolves to the named side app** and, once set,
+    /// is what `v1_app_id_for` answers.
+    #[test]
+    fn an_explicit_binding_names_the_side_app() {
+        assert_eq!(
+            resolve_v1_binding(
+                "elohim",
+                "node_registry",
+                Some("elohim@a2o-v1-20260905"),
+                &installed()
+            ),
+            Ok(Some("elohim@a2o-v1-20260905".to_string()))
+        );
+
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        assert_eq!(
+            l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905")),
+            Ok(None),
+            "the previous binding was the default"
+        );
+        assert_eq!(l.v1_app_id_for("node_registry"), "elohim@a2o-v1-20260905");
+        // The untouched state moves WITH the binding: both ids are the
+        // predecessor, so the role still reads as never-crossed.
+        let snap = l.snapshot();
+        assert_eq!(
+            snap["node_registry"].reading_app_id,
+            "elohim@a2o-v1-20260905"
+        );
+        assert_eq!(
+            snap["node_registry"].authoring_app_id,
+            "elohim@a2o-v1-20260905"
+        );
+        assert!(
+            l.open_windows().is_empty(),
+            "binding v1 is not opening a window"
+        );
+        // `app_id_for` (authoring) follows, so a fixture seeding v1 records
+        // through the resolver lands them on the disposable chain.
+        assert_eq!(l.app_id_for("node_registry"), "elohim@a2o-v1-20260905");
+    }
+
+    /// **An UNKNOWN app is refused BY NAME**, and the refusal says what is
+    /// installed — the whole point of resolving the binding against the
+    /// conductor rather than trusting the body.
+    #[test]
+    fn an_uninstalled_v1_app_is_refused_by_name() {
+        let err = resolve_v1_binding("elohim", "node_registry", Some("elohim@typo"), &installed())
+            .expect_err("an app this conductor does not have is not a v1");
+        assert!(
+            err.contains("elohim@typo"),
+            "the refusal names the app: {err}"
+        );
+        assert!(
+            err.contains("node_registry"),
+            "the refusal names the role: {err}"
+        );
+        assert!(
+            err.contains("elohim@a2o-v1-20260905"),
+            "the refusal lists what IS installed: {err}"
+        );
+    }
+
+    /// The whole crossing rides the binding: the window's READING side is the
+    /// run-scoped predecessor (never the household's own app), the window is
+    /// still recognised as open, and a revert returns authoring to the
+    /// PREDECESSOR rather than to the base app.
+    #[test]
+    fn a_bound_crossing_reads_reverts_and_sunsets_on_the_run_scoped_v1() {
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905"))
+            .expect("binding an installed app is allowed at base");
+
+        l.open_window("node_registry", "elohim@EKiIscIk5BDd", None);
+        let snap = l.snapshot();
+        assert_eq!(
+            snap["node_registry"].reading_app_id, "elohim@a2o-v1-20260905",
+            "the PREDECESSOR is the run-scoped app, never the household's own"
+        );
+        assert_eq!(
+            l.open_windows()
+                .into_iter()
+                .map(|(role, _)| role)
+                .collect::<Vec<_>>(),
+            vec!["node_registry".to_string()],
+            "a bound window is still an OPEN window"
+        );
+
+        l.revert("node_registry");
+        assert_eq!(
+            l.app_id_for("node_registry"),
+            "elohim@a2o-v1-20260905",
+            "a revert returns authoring to the PREDECESSOR, not to the household's base app"
+        );
+        assert!(l.open_windows().is_empty(), "a reverted window is not open");
+    }
+
+    /// Re-aiming a binding mid-crossing is refused by name — the carry read
+    /// one chain and the seal would close another, and the seal is the
+    /// irreversible act.
+    #[test]
+    fn a_binding_cannot_be_re_aimed_under_an_open_or_closed_window() {
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905"))
+            .expect("at base");
+        l.open_window("node_registry", "elohim@EKiIscIk5BDd", None);
+
+        let err = l
+            .bind_v1("node_registry", Some("elohim"))
+            .expect_err("an open window may not be re-aimed");
+        assert!(err.contains("OPEN lineage window"), "{err}");
+        assert_eq!(
+            l.v1_app_id_for("node_registry"),
+            "elohim@a2o-v1-20260905",
+            "a refused re-aim changes nothing"
+        );
+
+        l.sunset("node_registry");
+        let err = l
+            .bind_v1("node_registry", Some("elohim"))
+            .expect_err("a sealed predecessor may not be re-aimed");
+        assert!(err.contains("CLOSED lineage window"), "{err}");
+        assert!(
+            err.contains("elohim@a2o-v1-20260905"),
+            "names the sealed v1: {err}"
+        );
+    }
+
+    /// A baseline reset drops the binding and SAYS SO — the run-scoped
+    /// predecessor belongs to the run that staged it, and a silent return to
+    /// the household's own chain is the one step back toward spending it.
+    #[test]
+    fn reset_all_clears_a_v1_binding_and_names_it() {
+        let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
+        l.bind_v1("node_registry", Some("elohim@a2o-v1-20260905"))
+            .expect("at base");
+
+        let report = l.reset_all(false);
+
+        assert_eq!(
+            report.cleared_v1_bindings,
+            vec![(
+                "node_registry".to_string(),
+                "elohim@a2o-v1-20260905".to_string()
+            )]
+        );
+        assert_eq!(l.v1_app_id_for("node_registry"), "elohim");
+        assert_eq!(l.v1_app_id_for("lamad"), "elohim");
     }
 }

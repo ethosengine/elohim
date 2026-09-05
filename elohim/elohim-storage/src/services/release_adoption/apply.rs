@@ -785,9 +785,27 @@ impl HappLineageVehicle {
             .collect()
     }
 
-    /// This conductor's record of the BASE app — the agent key the side app
-    /// inherits and the v1 cells the carry reads from.
-    async fn base_app_info(&self) -> Result<holochain_client::AppInfo, AdoptionRefusal> {
+    /// **Task 33.** The app this role's crossing treats as its PREDECESSOR —
+    /// the role's v1 binding, or the base app when it has none (which is every
+    /// household peer).
+    fn v1_app_id(&self, role: &str) -> String {
+        self.lineage.v1_app_id_for(role)
+    }
+
+    /// This conductor's record of the role's V1 app — the agent key the side
+    /// app inherits, the network seed it joins on, and the cell the carry
+    /// reads from.
+    ///
+    /// The agent key comes from the PREDECESSOR rather than from the base app
+    /// on purpose: `carry_from` is a SELF-carry, so v2 must be authored by the
+    /// same agent that authored v1. On an unbound role the two apps are the
+    /// same app and the key is identical; on a bound one the fixture installs
+    /// the run-scoped predecessor under the peer's own key, so it still is.
+    /// Reading it here means the two can never disagree.
+    async fn v1_app_info(
+        &self,
+        v1_app_id: &str,
+    ) -> Result<holochain_client::AppInfo, AdoptionRefusal> {
         let apps = self.admin.list_apps(None).await.map_err(|e| {
             AdoptionRefusal::new(
                 RefusalReason::ApplyFailed,
@@ -795,32 +813,34 @@ impl HappLineageVehicle {
             )
         })?;
         apps.into_iter()
-            .find(|a| a.installed_app_id == self.base_app_id)
+            .find(|a| a.installed_app_id == v1_app_id)
             .ok_or_else(|| {
                 AdoptionRefusal::new(
                     RefusalReason::BootstrapOutOfBand,
                     format!(
-                        "app '{}' is not installed on this conductor — there is no v1 to install \
-                         beside and no key to inherit; a fresh joiner's first bundle is seeded out \
-                         of band",
-                        self.base_app_id
+                        "app '{v1_app_id}' is not installed on this conductor — there is no v1 \
+                         to install beside and no key to inherit; a fresh joiner's first bundle \
+                         is seeded out of band, and a run-scoped predecessor is staged by \
+                         whoever bound it"
                     ),
                 )
             })
     }
 
-    /// The base app's provisioned cell for `role` — the carry's v1 source.
+    /// The PREDECESSOR app's provisioned cell for `role` — the carry's v1
+    /// source. `v1_app` is whatever [`Self::v1_app_info`] resolved: the base
+    /// app on every real peer, a run-scoped side app on a bound crossing.
     fn v1_cell(
-        base: &holochain_client::AppInfo,
+        v1_app: &holochain_client::AppInfo,
         role: &str,
     ) -> Result<holochain_client::CellId, AdoptionRefusal> {
-        Self::role_cell(base, role).ok_or_else(|| {
+        Self::role_cell(v1_app, role).ok_or_else(|| {
             AdoptionRefusal::new(
                 RefusalReason::ApplyFailed,
                 format!(
-                    "base app '{}' has no provisioned cell for role '{role}' — nothing to \
+                    "v1 app '{}' has no provisioned cell for role '{role}' — nothing to \
                      carry FROM",
-                    base.installed_app_id
+                    v1_app.installed_app_id
                 ),
             )
         })
@@ -860,13 +880,23 @@ impl ApplyVehicle for HappLineageVehicle {
         // Both crossing refusals land HERE — before `list_apps`, before any
         // install, before anything on this conductor changes.
         let (role, binding) = Self::sole_crossing(&verified.manifest)?;
-        let base = self.base_app_info().await?;
-        let agent_key = base.agent_pub_key.clone();
+        // **Task 33.** The PREDECESSOR is declared, not derived: an unbound
+        // role answers the base app (every household peer), a bound one
+        // answers the run-scoped side app a fixture staged, and everything
+        // downstream — key, seed, carry source, and eventually the seal —
+        // follows this ONE resolution.
+        let v1_app_id = self.v1_app_id(role);
+        let v1_app = self.v1_app_info(&v1_app_id).await?;
+        let agent_key = v1_app.agent_pub_key.clone();
 
+        // The side app id stays derived from the BASE app id, not from the
+        // predecessor: `install_lineage`'s `"<base>@…"` convention is what
+        // `/admin/lineage/reset` and the passport's `lineageApps` scan for, and
+        // a run-scoped crossing's side app must be swept by the same broom.
         let lineage_app_id =
             crate::happ_manager::lineage_app_id(&self.base_app_id, &binding.dna_hash);
         let lineage = Self::lineage_hashes(role, binding)?;
-        let v1_cell = Self::v1_cell(&base, role)?;
+        let v1_cell = Self::v1_cell(&v1_app, role)?;
 
         // (1) INSTALL BESIDE — same key, inherited network seed, idempotent on
         // an app id that is already there (so a retried sweep resumes, and the
@@ -879,6 +909,13 @@ impl ApplyVehicle for HappLineageVehicle {
             agent_key,
             &lineage,
             role,
+            // **Task 33.** The network seed is inherited from the
+            // PREDECESSOR, not from the base app. On an unbound role those are
+            // the same app and nothing moves; on a bound one it is what makes
+            // the successor run-scoped too — both peers of a disposable
+            // crossing land on the run's own network rather than half of it
+            // joining the household's.
+            &v1_app_id,
             // **Task 17b.** The constitution this crossing is notarized under,
             // written into the v2 cell's own modifiers so the cell this apply
             // MINTS declares the root its successor will be checked against.
@@ -1034,13 +1071,14 @@ impl super::revert::LineageReverter for HappLineageVehicle {
 /// BOTH cells of the crossing (v1 to run on, v2 to read from), and the only
 /// object that knows which app ids those are is the one that installed them.
 ///
-/// # Why the client is the BASE app's
+/// # Why the client is the PREDECESSOR's
 ///
 /// `readopt_from` is a V1 extern. It runs on the predecessor chain — that is
 /// what makes the re-authored records land there, under the same key, with the
 /// same entry hashes — and reaches ACROSS to `v2_cell` for one bounded page of
-/// the successor's own export. So this connects to `base_app_id`, which by the
-/// time `perform_revert` calls us is once again the role's authoring app.
+/// the successor's own export. So this connects to the role's v1 app (Task 33:
+/// its binding, or the base app), which by the time `perform_revert` calls us
+/// is once again the role's authoring app.
 ///
 /// Every failure here is a [`super::revert::ReadoptStatus`], never a `Result`:
 /// the revert has already succeeded by the time this runs, and a readopt that
@@ -1067,23 +1105,24 @@ impl super::revert::Readopter for HappLineageVehicle {
                 "side app '{side_app_id}' has no provisioned cell for this role"
             ));
         };
-        let base = match self.app_info(&self.base_app_id).await {
+        // **Task 33.** `readopt_from` re-authors on the PREDECESSOR — the cell
+        // `perform_revert` has just returned authoring to — which is the
+        // role's v1 binding, or the base app when it has none.
+        let v1_app_id = self.v1_app_id(role);
+        let v1_app = match self.app_info(&v1_app_id).await {
             Ok(app) => app,
             Err(e) => return not_attempted(e),
         };
-        if Self::role_cell(&base, role).is_none() {
+        if Self::role_cell(&v1_app, role).is_none() {
             return not_attempted(format!(
-                "base app '{}' has no provisioned cell for this role — nothing to re-author ONTO",
-                self.base_app_id
+                "v1 app '{v1_app_id}' has no provisioned cell for this role — nothing to \
+                 re-author ONTO"
             ));
         }
-        let client = match self.registry.connect_app(&self.base_app_id, role).await {
+        let client = match self.registry.connect_app(&v1_app_id, role).await {
             Ok(client) => client,
             Err(e) => {
-                return not_attempted(format!(
-                    "could not connect to base app '{}' ({e})",
-                    self.base_app_id
-                ))
+                return not_attempted(format!("could not connect to v1 app '{v1_app_id}' ({e})"))
             }
         };
 
@@ -1125,12 +1164,20 @@ impl super::sunset::ChainSealer for HappLineageVehicle {
         role: &str,
         side_app_id: &str,
     ) -> Result<super::sunset::SealReceipt, String> {
-        let base = self.app_info(&self.base_app_id).await?;
-        let v1_cell = Self::role_cell(&base, role).ok_or_else(|| {
+        // **Task 33 — the seal aims at the role's DECLARED predecessor.**
+        //
+        // This was `role_cell(&base_app_info, role)`, so a sunset could only
+        // ever close the household's OWN chain — and a close is irreversible
+        // and earns its author a permanent block from every neighbour that
+        // sees a write after it. Resolving v1 through the binding is what lets
+        // a rehearsal seal a chain made for the purpose. An unbound role
+        // answers the base app, so a real peer's sunset is unchanged.
+        let v1_app_id = self.v1_app_id(role);
+        let v1_app = self.app_info(&v1_app_id).await?;
+        let v1_cell = Self::role_cell(&v1_app, role).ok_or_else(|| {
             format!(
-                "base app '{}' has no provisioned cell for role '{role}' — there is no chain to \
-                 close",
-                self.base_app_id
+                "v1 app '{v1_app_id}' has no provisioned cell for role '{role}' — there is no \
+                 chain to close"
             )
         })?;
         let client = self
@@ -1160,7 +1207,7 @@ impl super::sunset::ChainSealer for HappLineageVehicle {
             fence.record_closed(
                 &v1_cell,
                 Some(role),
-                Some(&self.base_app_id),
+                Some(&v1_app_id),
                 &format!(
                     "sealed by seal_close toward '{side_app_id}' (close {}, open {})",
                     receipt.close_hash, receipt.open_hash

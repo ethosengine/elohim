@@ -32,12 +32,28 @@
 //!    at zero — the predicate takes `None` and `Some(0)` as the same fact,
 //!    because a peer stuck at zero is exactly as partitioned as one that never
 //!    reported).
-//! 3. **`peer_timeouts` is RISING between the two samples.** This is what
-//!    separates a partition from a quiet, healthy, idle node: an idle node's
-//!    counters do not move. A node whose neighbours are refusing it keeps
+//! 3. **Liveness, in ONE of two shapes.** Either
+//!    `peer_timeouts` is RISING between the two samples (`shape: "timeouts"`),
+//!    or this space's `peer_meta` has been EMPTY across both samples while
+//!    another space on the same conductor holds peers (`shape: "isolated"`).
+//!
+//!    The first separates a partition from a quiet, healthy, idle node: an idle
+//!    node's counters do not move; a node whose neighbours are refusing it keeps
 //!    trying and keeps timing out.
 //!
-//! All three, on two consecutive samples, or nothing is claimed. The probe is
+//!    The second was MEASURED (2026-09-05, the poisoned household). matthew and
+//!    jessica — the two peers that were blocked — named the node-registry space
+//!    four minutes after restart on the rising-timeouts shape (377 → 378, arc
+//!    null, no completed rounds). **james, the peer that BLOCKED both of them,
+//!    was never named**: he knows no peers in that space at all, so nothing
+//!    initiates, nothing times out, and the counter never rises. The blocker
+//!    was the one peer the probe could not see. Emptiness is only evidence when
+//!    the conductor is otherwise fine, which is why the other-spaces clause is
+//!    load-bearing rather than decorative — a conductor with no peers anywhere
+//!    is offline, not partitioned, and that is a different fault.
+//!
+//! Conditions 1, 2 and one arm of 3, on two consecutive samples, or nothing is
+//! claimed. The probe is
 //! deliberately conservative — a false "you are partitioned" would send an
 //! operator hunting a fault that is not there, and the honest cost of missing
 //! one cycle is a single extra probe interval.
@@ -117,6 +133,31 @@ impl SpaceSample {
     }
 }
 
+/// WHICH of the two liveness shapes named this space. Rendered on the passport
+/// entry, because the two are read differently by whoever is holding the
+/// evidence: `timeouts` is a peer that keeps reaching and keeps being refused;
+/// `isolated` is a peer that has nobody left to reach — the BLOCKER's own view
+/// of the same event, and the one the first classifier could not see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PartitionShape {
+    /// `peer_timeouts` rose between the two samples.
+    Timeouts,
+    /// This space held NO peer metadata across both samples, while another
+    /// space on the same conductor held some.
+    Isolated,
+}
+
+impl PartitionShape {
+    /// The name as it appears on the passport and in the WARN's `shape` field.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Timeouts => "timeouts",
+            Self::Isolated => "isolated",
+        }
+    }
+}
+
 /// A space this node believes it is partitioned from, as rendered on the
 /// passport under `passport.lineage.partition`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -141,8 +182,11 @@ pub struct SpacePartition {
     pub arc: Option<[u32; 2]>,
     /// The highest `completed_rounds` any peer reported, `null` when none did.
     pub completed_rounds: Option<u32>,
-    /// How many peers we hold gossip metadata for.
+    /// How many peers we hold gossip metadata for. Zero on the `isolated`
+    /// shape — that emptiness IS the signal there.
     pub peers: usize,
+    /// Which liveness arm named this space. See [`PartitionShape`].
+    pub shape: PartitionShape,
 }
 
 /// Extract one space's sample from the JSON projection of that space's
@@ -210,17 +254,36 @@ pub fn sample_from_metrics_json(metrics: &serde_json::Value) -> Option<SpaceSamp
     })
 }
 
-/// Is this space partitioned, given two consecutive samples?
+/// Is this space partitioned, given two consecutive samples — and if so, in
+/// which shape?
 ///
-/// `prev` is the earlier one. All three conditions must hold; see the module
-/// docs for why each is load-bearing.
-pub fn classify(prev: &SpaceSample, next: &SpaceSample) -> bool {
-    next.peers > 0
-        && prev.arc_empty
+/// `prev` is the earlier one. `peers_elsewhere` is whether ANOTHER space on
+/// this conductor holds peer metadata; it gates the `isolated` arm alone, so
+/// that a conductor which knows nobody anywhere reads as offline (a different
+/// fault) rather than as partitioned everywhere.
+///
+/// The two preconditions — empty arc, no completed round — are shared. The two
+/// liveness arms are mutually exclusive by construction (`peers > 0` versus
+/// `peers == 0`), so there is never a shape to choose between.
+pub fn classify(
+    prev: &SpaceSample,
+    next: &SpaceSample,
+    peers_elsewhere: bool,
+) -> Option<PartitionShape> {
+    let preconditions = prev.arc_empty
         && next.arc_empty
         && prev.no_completed_rounds()
-        && next.no_completed_rounds()
-        && next.peer_timeouts > prev.peer_timeouts
+        && next.no_completed_rounds();
+    if !preconditions {
+        return None;
+    }
+    if next.peers > 0 && next.peer_timeouts > prev.peer_timeouts {
+        return Some(PartitionShape::Timeouts);
+    }
+    if peers_elsewhere && prev.peers == 0 && next.peers == 0 {
+        return Some(PartitionShape::Isolated);
+    }
+    None
 }
 
 /// One local agent's declared storage arc, in either spelling.
@@ -319,17 +382,28 @@ impl LineagePartitionProbe {
     /// it carries `sampledAt` from its last CONFIRMING sample, so a reader can
     /// always see how old the confirmation is.
     pub fn observe(&self, space: &str, sample: SpaceSample, sampled_at: String) -> bool {
-        let prev = {
+        // The `isolated` arm needs one fact from OUTSIDE this space: does the
+        // conductor hold peers anywhere else? It is read from the probe's own
+        // sample map rather than plumbed through `tick`, because the map
+        // already IS "the most recent sample of every space" — and a second
+        // path to the same fact is how the two would come to disagree.
+        //
+        // Taken BEFORE this space's sample is inserted, and excluding this
+        // space either way, so a space can never vouch for its own emptiness.
+        let (prev, peers_elsewhere) = {
             let mut previous = self.previous.lock().unwrap_or_else(|e| e.into_inner());
-            previous.insert(space.to_string(), sample)
+            let peers_elsewhere = previous
+                .iter()
+                .any(|(other, s)| other != space && s.peers > 0);
+            (previous.insert(space.to_string(), sample), peers_elsewhere)
         };
         let Some(prev) = prev else {
             return false;
         };
-        let partitioned = classify(&prev, &sample);
+        let shape = classify(&prev, &sample, peers_elsewhere);
 
         let mut partitions = self.partitions.write().unwrap_or_else(|e| e.into_inner());
-        if partitioned {
+        if let Some(shape) = shape {
             partitions.insert(
                 space.to_string(),
                 SpacePartition {
@@ -340,13 +414,14 @@ impl LineagePartitionProbe {
                     arc: sample.arc,
                     completed_rounds: sample.completed_rounds,
                     peers: sample.peers,
+                    shape,
                 },
             );
         } else if sample.cleared() {
             // Only a POSITIVE recovery un-names a space; see the doc above.
             partitions.remove(space);
         }
-        partitioned
+        shape.is_some()
     }
 
     /// One WARN per space per [`PARTITION_WARN_EVERY_SECS`].
@@ -365,6 +440,7 @@ impl LineagePartitionProbe {
             peer_timeouts = partition.peer_timeouts,
             peer_timeouts_prev = partition.peer_timeouts_prev,
             peers = partition.peers,
+            shape = partition.shape.as_str(),
             "SPACE PARTITIONED — this node declares an empty storage arc, no peer has completed a \
              gossip round with it, and peer timeouts are still rising. The known cause of this \
              shape is a permanent cell block earned by an action authored after a chain close \
@@ -535,8 +611,13 @@ mod tests {
         assert!(!s.arc_empty, "nothing claimed means no arc claim either");
         assert_eq!(s.peers, 0);
         assert!(
-            !classify(&s, &s),
+            classify(&s, &s, false).is_none(),
             "an unknown shape can never be classified"
+        );
+        assert!(
+            classify(&s, &s, true).is_none(),
+            "and not even when the conductor has peers elsewhere: an unknown shape's arc is not \
+             empty, so the preconditions never hold"
         );
         assert!(sample_from_metrics_json(&serde_json::json!("nope")).is_none());
     }
@@ -544,36 +625,104 @@ mod tests {
     #[test]
     fn all_three_conditions_are_required() {
         let prev = sample(true, None, 10, 2);
-        assert!(
-            classify(&prev, &sample(true, None, 11, 2)),
+        assert_eq!(
+            classify(&prev, &sample(true, None, 11, 2), false),
+            Some(PartitionShape::Timeouts),
             "empty arc + no rounds + rising timeouts"
         );
         assert!(
-            !classify(&prev, &sample(false, None, 11, 2)),
+            classify(&prev, &sample(false, None, 11, 2), false).is_none(),
             "a declared arc is not a partition"
         );
         assert!(
-            !classify(&prev, &sample(true, Some(3), 11, 2)),
+            classify(&prev, &sample(true, Some(3), 11, 2), false).is_none(),
             "a completed round proves the space is reachable"
         );
         assert!(
-            !classify(&prev, &sample(true, None, 10, 2)),
+            classify(&prev, &sample(true, None, 10, 2), false).is_none(),
             "flat timeouts are an idle node, not a partitioned one"
         );
         assert!(
-            !classify(&prev, &sample(true, None, 9, 2)),
+            classify(&prev, &sample(true, None, 9, 2), false).is_none(),
             "falling timeouts are not rising"
         );
         assert!(
-            !classify(&prev, &sample(true, None, 11, 0)),
-            "no peers at all is not evidence of refusal"
+            classify(&prev, &sample(true, None, 11, 0), false).is_none(),
+            "no peers at all is not evidence of refusal — unless the conductor has peers \
+             ELSEWHERE, which is the isolated shape and needs BOTH samples empty"
         );
     }
 
     #[test]
     fn zero_completed_rounds_reads_the_same_as_none() {
         let prev = sample(true, Some(0), 10, 2);
-        assert!(classify(&prev, &sample(true, Some(0), 11, 2)));
+        assert_eq!(
+            classify(&prev, &sample(true, Some(0), 11, 2), false),
+            Some(PartitionShape::Timeouts)
+        );
+    }
+
+    /// **MEASURED 2026-09-05 — the BLOCKER's own view.** matthew and jessica,
+    /// the two blocked peers, named the space on rising timeouts. james, the
+    /// peer that blocked them both, knows nobody in that space at all: nothing
+    /// initiates, nothing times out, and the rising-timeouts arm can never
+    /// fire. Emptiness across two samples, while the conductor holds peers in
+    /// another space, IS the signal — and the other-spaces clause is what keeps
+    /// an offline conductor (no peers anywhere) from reading as partitioned
+    /// everywhere.
+    #[test]
+    fn the_isolated_shape_names_the_peer_that_knows_nobody() {
+        // Both samples empty, and the conductor has peers elsewhere.
+        let prev = sample(true, None, 0, 0);
+        assert_eq!(
+            classify(&prev, &sample(true, None, 0, 0), true),
+            Some(PartitionShape::Isolated),
+            "no peers, twice, while other spaces have some"
+        );
+        // The same pair on a conductor that knows nobody ANYWHERE is offline,
+        // not partitioned — a different fault, and not this probe's to claim.
+        assert!(
+            classify(&prev, &sample(true, None, 0, 0), false).is_none(),
+            "a conductor with no peers in any space is offline, not partitioned"
+        );
+        // One empty sample is not two: a space that has just lost its peers
+        // waits a full interval like every other classification here.
+        assert!(
+            classify(&sample(true, None, 3, 1), &sample(true, None, 3, 0), true).is_none(),
+            "the space held a peer one sample ago"
+        );
+        // The shared preconditions still gate it.
+        assert!(
+            classify(&prev, &sample(false, None, 0, 0), true).is_none(),
+            "a declared arc is not a partition, in either shape"
+        );
+        assert!(
+            classify(&prev, &sample(true, Some(2), 0, 0), true).is_none(),
+            "a completed round proves the space is reachable, in either shape"
+        );
+
+        // End to end through `observe`, where `peers_elsewhere` is read off the
+        // probe's own sample map: the healthy space is sampled FIRST so the
+        // isolated one has something to be measured against.
+        let probe = probe_without_conductor();
+        assert!(!probe.observe("space-healthy", sample(false, Some(4), 0, 3), "t0".into()));
+        assert!(!probe.observe("space-blocked", sample(true, None, 0, 0), "t0".into()));
+        assert!(!probe.observe("space-healthy", sample(false, Some(5), 0, 3), "t1".into()));
+        assert!(
+            probe.observe("space-blocked", sample(true, None, 0, 0), "t1".into()),
+            "the blocker's own space is named on the second empty sample"
+        );
+
+        let named = probe.snapshot();
+        assert_eq!(named.len(), 1, "only the blocked space is named");
+        assert_eq!(named[0].space, "space-blocked");
+        assert_eq!(named[0].shape, PartitionShape::Isolated);
+        assert_eq!(named[0].peers, 0, "the emptiness IS the signal here");
+        assert_eq!(
+            serde_json::to_value(&named[0]).expect("serializable")["shape"],
+            serde_json::json!("isolated"),
+            "the passport entry carries the shape name"
+        );
     }
 
     #[test]
@@ -675,6 +824,7 @@ mod tests {
             arc: None,
             completed_rounds: None,
             peers: 2,
+            shape: PartitionShape::Timeouts,
         };
         let json = serde_json::to_value(&view).expect("serialize");
         assert!(
@@ -684,6 +834,7 @@ mod tests {
         assert!(json["arc"].is_null());
         assert_eq!(json["sampledAt"], "2026-09-05T00:00:00Z");
         assert_eq!(json["peerTimeouts"], 11);
+        assert_eq!(json["shape"], "timeouts");
     }
 
     /// A probe with no conductor behind it: every test above drives

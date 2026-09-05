@@ -300,21 +300,20 @@ impl crate::services::release_adoption::revert::RoleSweepState for LineageBridge
 pub struct LineageBridge {
     lineage: Arc<LineageRoles>,
     registry: Arc<HcClientRegistry>,
-    base_app_id: String,
     interval: Duration,
     state: RwLock<BTreeMap<SweepKey, AgentSweep>>,
 }
 
 impl LineageBridge {
-    pub fn new(
-        lineage: Arc<LineageRoles>,
-        registry: Arc<HcClientRegistry>,
-        base_app_id: impl Into<String>,
-    ) -> Self {
+    /// **Task 33.** No `base_app_id`: the sweep names its v1 cell from the
+    /// window's own `reading_app_id` — the app it CONNECTS to — so the two can
+    /// never describe different chains, and a run-scoped predecessor is swept
+    /// exactly like the household's own. The base app id remains available on
+    /// [`LineageRoles::base_app_id`] for anything that genuinely needs it.
+    pub fn new(lineage: Arc<LineageRoles>, registry: Arc<HcClientRegistry>) -> Self {
         Self {
             lineage,
             registry,
-            base_app_id: base_app_id.into(),
             interval: sweep_interval(),
             state: RwLock::new(BTreeMap::new()),
         }
@@ -435,7 +434,7 @@ impl LineageBridge {
             );
             return;
         };
-        let v1_cell = match self.v1_cell(&admin, role).await {
+        let v1_cell = match self.v1_cell(&admin, role, &window.reading_app_id).await {
             Ok(cell) => cell,
             Err(e) => {
                 tracing::warn!(role, error = %e, "lineage bridge: no v1 cell to carry FROM");
@@ -632,21 +631,29 @@ impl LineageBridge {
         }
     }
 
-    /// The base app's provisioned cell for `role` — the held carry's v1 source.
+    /// The PREDECESSOR app's provisioned cell for `role` — the held carry's v1
+    /// source.
+    ///
+    /// **Task 33.** `reading_app_id` comes off the window the sweep is already
+    /// holding, not from `base_app_id`: the sweep CONNECTS to that app (see the
+    /// hazard named at the call site), so naming the cell from anywhere else is
+    /// how the two would come to describe different chains. On an unbound
+    /// crossing the window's reading id IS the base app id, so nothing moves.
     async fn v1_cell(
         &self,
         admin: &holochain_client::AdminWebsocket,
         role: &str,
+        reading_app_id: &str,
     ) -> Result<holochain_client::CellId, String> {
         let apps = admin
             .list_apps(None)
             .await
             .map_err(|e| format!("list_apps: {e}"))?;
-        let base = apps
+        let v1 = apps
             .into_iter()
-            .find(|a| a.installed_app_id == self.base_app_id)
-            .ok_or_else(|| format!("base app '{}' is not installed", self.base_app_id))?;
-        base.cell_info
+            .find(|a| a.installed_app_id == reading_app_id)
+            .ok_or_else(|| format!("v1 app '{reading_app_id}' is not installed"))?;
+        v1.cell_info
             .get(role)
             .and_then(|cells| {
                 cells.iter().find_map(|c| match c {
@@ -655,10 +662,7 @@ impl LineageBridge {
                 })
             })
             .ok_or_else(|| {
-                format!(
-                    "base app '{}' has no provisioned cell for role '{role}'",
-                    self.base_app_id
-                )
+                format!("v1 app '{reading_app_id}' has no provisioned cell for role '{role}'")
             })
     }
 
@@ -907,11 +911,7 @@ mod tests {
     #[test]
     fn only_an_open_window_is_swept() {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry", "lamad"]));
-        let bridge = LineageBridge::new(
-            Arc::clone(&lineage),
-            Arc::new(HcClientRegistry::empty()),
-            "elohim",
-        );
+        let bridge = LineageBridge::new(Arc::clone(&lineage), Arc::new(HcClientRegistry::empty()));
         assert!(
             bridge.open_windows().is_empty(),
             "a node with no window open sweeps nothing"
@@ -948,7 +948,6 @@ mod tests {
             // fails closed, and `any_admin_websocket` is `None`. Reaching
             // either would be observable; the tick returns before both.
             Arc::new(HcClientRegistry::empty()),
-            "elohim",
         );
         bridge.tick().await;
         assert!(bridge.snapshot().is_empty());
@@ -963,7 +962,6 @@ mod tests {
         let bridge = LineageBridge::new(
             Arc::new(LineageRoles::new("elohim", &["node_registry"])),
             Arc::new(HcClientRegistry::empty()),
-            "elohim",
         );
         bridge.state.write().unwrap().insert(
             ("node_registry".into(), "uhCAkJessica".into()),
@@ -985,7 +983,6 @@ mod tests {
         let bridge = LineageBridge::new(
             Arc::new(LineageRoles::new("elohim", &["node_registry", "lamad"])),
             Arc::new(HcClientRegistry::empty()),
-            "elohim",
         );
         {
             let mut state = bridge.state.write().unwrap();
@@ -1028,11 +1025,7 @@ mod tests {
     fn an_open_windows_two_app_ids_are_never_the_same_cell() {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
         lineage.open_window("node_registry", "elohim@EKiIscIk5BDd", None);
-        let bridge = LineageBridge::new(
-            Arc::clone(&lineage),
-            Arc::new(HcClientRegistry::empty()),
-            "elohim",
-        );
+        let bridge = LineageBridge::new(Arc::clone(&lineage), Arc::new(HcClientRegistry::empty()));
         let [window] = bridge.open_windows().try_into().expect("one open window");
         assert_ne!(window.reading_app_id, window.authoring_app_id);
         assert_eq!(window.reading_app_id, "elohim", "the PREDECESSOR is asked");
@@ -1128,7 +1121,6 @@ mod tests {
         let bridge = LineageBridge::new(
             Arc::new(LineageRoles::new("elohim", &[])),
             Arc::new(HcClientRegistry::empty()),
-            "elohim",
         );
         // Whatever the environment says, the interval is captured at
         // construction and is a positive duration.

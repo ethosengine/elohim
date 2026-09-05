@@ -4058,7 +4058,6 @@ async fn async_main(
             elohim_storage::services::lineage_bridge::LineageBridge::new(
                 Arc::clone(&lineage_roles),
                 Arc::clone(registry),
-                args.app_id.clone(),
             ),
         )
     });

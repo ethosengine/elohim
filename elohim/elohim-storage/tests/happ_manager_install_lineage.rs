@@ -81,6 +81,11 @@ async fn install_lineage_installs_beside_under_same_key() {
         key.clone(),
         std::slice::from_ref(&v1_hash),
         "node_registry",
+        // Task 33: the crossing's PREDECESSOR — the app whose `node_registry`
+        // network seed the new cell inherits. The base app here, which is what
+        // every real peer's crossing resolves to; a run-scoped predecessor is a
+        // fixture's declaration (`POST /admin/lineage/v1-binding`).
+        elohim_storage::happ_manager::APP_ID,
         // Task 17b: the constitution this crossing is notarized under, written
         // into the side app's own DNA modifiers so the cell this install MINTS
         // declares the root its successor will be checked against.
@@ -96,6 +101,7 @@ async fn install_lineage_installs_beside_under_same_key() {
         key.clone(),
         std::slice::from_ref(&v1_hash),
         "node_registry",
+        elohim_storage::happ_manager::APP_ID,
         Some(CONSTITUTION_ROOT),
     )
     .await

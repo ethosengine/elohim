@@ -563,6 +563,26 @@ async fn inspect_installed_happ(
         // wasm hashes. All three come from the SAME provisioned cell, in one
         // pass, so they cannot describe different cells — which is exactly the
         // failure mode a second lookup would introduce.
+        // **Task 33.** The READING cell is the crossing's predecessor, which is
+        // the base app's cell only when the role has no v1 binding. On a bound
+        // crossing `dna_hash` above describes the household's own cell, which
+        // is not the chain this window reads from — and `backward_carry`
+        // compares the two hashes, so reporting the wrong one is not cosmetic.
+        // A failed lookup keeps the base hash rather than inventing "unknown":
+        // an unbound role must be byte-identical here.
+        let reading_dna_hash = if needs_lineage_view {
+            match resolve_role_cell(&apps, &lineage[role].reading_app_id, role) {
+                Ok(provisioned) => provisioned.cell_id.dna_hash().to_string(),
+                Err(lookup_error) => {
+                    if role_error.is_none() {
+                        role_error = Some(lookup_error);
+                    }
+                    dna_hash.clone()
+                }
+            }
+        } else {
+            dna_hash.clone()
+        };
         let (authoring_dna_hash, authoring_cell) = if needs_lineage_view {
             let authoring_app_id = &lineage[role].authoring_app_id;
             match resolve_role_cell(&apps, authoring_app_id, role) {
@@ -604,7 +624,7 @@ async fn inspect_installed_happ(
         };
         let lineage_view = lineage_view_for(
             role,
-            &dna_hash,
+            &reading_dna_hash,
             lineage,
             authoring_dna_hash,
             authoring_constitution_root,
@@ -1073,6 +1093,7 @@ mod tests {
                 authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
                 closed: false,
                 origin: None,
+                v1_app_id: None,
             },
         );
         let view = lineage_view_for(
@@ -1127,6 +1148,7 @@ mod tests {
                 authoring_app_id: "elohim@EKiIscIk5BDd".to_string(),
                 closed: false,
                 origin: None,
+                v1_app_id: None,
             },
         );
         let mut sweep = BTreeMap::new();
@@ -1204,6 +1226,7 @@ mod tests {
                 authoring_app_id: "elohim".to_string(),
                 closed: true,
                 origin: None,
+                v1_app_id: None,
             },
         );
         let view = lineage_view_for(
@@ -1237,6 +1260,7 @@ mod tests {
                 authoring_app_id: "elohim".to_string(),
                 closed: false,
                 origin: None,
+                v1_app_id: None,
             },
         );
         assert!(lineage_view_for(

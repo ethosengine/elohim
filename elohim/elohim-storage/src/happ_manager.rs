@@ -880,7 +880,10 @@ pub(crate) fn lineage_install_needs_enable(status: &holochain_types::prelude::Ap
 
 /// Install a second app alongside the base app ([`APP_ID`]), under the SAME
 /// agent key — never a new one — so both apps' source chains are authored by
-/// the one identity. Used to bring a lineage DNA (a coordinator- or
+/// the one identity. `v1_app_id` names the crossing's PREDECESSOR, whose
+/// network seed for `role` the new cell inherits (Task 33: the base app for
+/// every real peer, a run-scoped side app for a disposable rehearsal
+/// crossing). Used to bring a lineage DNA (a coordinator- or
 /// integrity-zome evolution of an already-installed role) onto the conductor
 /// for evaluation without touching the base app's chains: no uninstall, no
 /// re-key, no data loss — see the module doc for why a reinstall is never the
@@ -938,6 +941,12 @@ fn lineage_properties_json(
     props
 }
 
+// Eight parameters, and each one is a distinct fact about the install that has
+// no other home: the two app ids (the successor being minted, the predecessor
+// whose seed it joins on), the bundle, the key, the role, the declared lineage
+// and the constitution root. Same posture as `runtime_passport::lineage_view_for`
+// — a params struct here would be a struct with one construction site.
+#[allow(clippy::too_many_arguments)]
 pub async fn install_lineage(
     admin_ws: &AdminWebsocket,
     happ_path: &Path,
@@ -945,6 +954,7 @@ pub async fn install_lineage(
     agent_key: AgentPubKey,
     lineage: &[DnaHash],
     role: &str,
+    v1_app_id: &str,
     constitution_root: Option<&str>,
 ) -> anyhow::Result<()> {
     let apps = admin_ws
@@ -974,7 +984,12 @@ pub async fn install_lineage(
         return Ok(());
     }
 
-    let network_seed = base_role_seed(admin_ws, APP_ID, role).await?;
+    // **Task 33.** The seed comes from the crossing's declared PREDECESSOR,
+    // not from the boot-time base app id. Unbound (every household peer) the
+    // two are the same string; bound, this is what puts the successor on the
+    // same run-scoped network its predecessor is on instead of half a crossing
+    // on each side.
+    let network_seed = base_role_seed(admin_ws, v1_app_id, role).await?;
 
     // YamlProperties wraps a private `yaml_serde::Value`; the crate is not a
     // direct dependency here, so we go through its generic Deserialize impl
