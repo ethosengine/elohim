@@ -662,20 +662,60 @@ fn lineage_side_app_ids(base_app_id: &str, installed_app_ids: &[String]) -> Vec<
         .collect()
 }
 
-/// Pure parse of the `POST /admin/lineage/reset` body — `{"uninstall": true}`
-/// opts every lineage side app into `uninstall_app`, on top of the
-/// unconditional `disable_app`. Default (missing field, empty body,
-/// malformed JSON) is `false`: disable only, never uninstall — the safer
-/// reading wins rather than refusing the request.
-fn parse_lineage_reset_uninstall(body: &[u8]) -> bool {
-    #[derive(Debug, Default, serde::Deserialize)]
-    struct LineageResetBody {
-        #[serde(default)]
-        uninstall: bool,
-    }
-    serde_json::from_slice::<LineageResetBody>(body)
-        .map(|b| b.uninstall)
-        .unwrap_or(false)
+/// The two opt-ins `POST /admin/lineage/reset` reads off its body. Both
+/// default to `false`, and both defaults are the SAFE reading: a malformed or
+/// empty body converges what it can and destroys nothing.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LineageResetOptions {
+    /// `{"uninstall": true}` opts every lineage side app into
+    /// `uninstall_app`, on top of the unconditional `disable_app`.
+    #[serde(default)]
+    uninstall: bool,
+    /// `{"forceClosed": true}` (alias `force_closed`) additionally reaches
+    /// roles whose lineage window is CLOSED — see
+    /// [`crate::lineage_roles::LineageRoles::reset_all`] and the route's own
+    /// doc for why that is a separate, explicit act rather than part of
+    /// `uninstall`.
+    #[serde(default, alias = "force_closed")]
+    force_closed: bool,
+}
+
+/// Pure parse of the `POST /admin/lineage/reset` body. Default (missing
+/// fields, empty body, malformed JSON) is all-`false`: disable only, never
+/// uninstall, never touch a closed role — the safer reading wins rather than
+/// refusing the request.
+fn parse_lineage_reset_options(body: &[u8]) -> LineageResetOptions {
+    serde_json::from_slice::<LineageResetOptions>(body).unwrap_or_default()
+}
+
+/// Pure filter behind `POST /admin/lineage/reset`: every installed app id
+/// that is the side app of a role whose lineage window is CLOSED (sunset).
+///
+/// After a sunset the role's `authoring_app_id` IS the side app — the only
+/// home of every `NotarizationWitness` the crossing produced. Spec §7 C14
+/// keeps that chain ("kept, never deleted"), so these ids are held back from
+/// the disable AND uninstall arms unless the caller explicitly passes
+/// `forceClosed`. `reading_app_id` is included for the reverted-then-sunset
+/// shape, where the historical read pointer is the side app instead.
+fn closed_role_app_ids(
+    snapshot: &std::collections::BTreeMap<String, crate::lineage_roles::RoleLineage>,
+    base_app_id: &str,
+) -> Vec<String> {
+    let mut ids: Vec<String> = snapshot
+        .values()
+        .filter(|lineage| lineage.closed)
+        .flat_map(|lineage| {
+            [
+                lineage.authoring_app_id.clone(),
+                lineage.reading_app_id.clone(),
+            ]
+        })
+        .filter(|id| id != base_app_id)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 /// Outcome of [`HttpServer::get_blob_or_heal`]: the shared local-read +
@@ -5251,20 +5291,44 @@ impl HttpServer {
     /// MVP) — the fixture's baseline-convergence vehicle. A mesh run must
     /// start AND end at the v1 baseline regardless of what a prior run
     /// opened (rung 5's lesson, 8181d60a8): this route rolls `LineageRoles`
-    /// back to base for every tracked role via [`LineageRoles::reset_all`]
-    /// and disables — with `{"uninstall": true}`, also uninstalls — every
-    /// lineage side app the vehicle may have installed alongside the base
-    /// hApp (any installed app id starting with `"<base app id>@"`, the
-    /// `install_lineage` naming convention).
+    /// back to base for every tracked OPEN role via
+    /// [`LineageRoles::reset_all`] and disables — with `{"uninstall": true}`,
+    /// also uninstalls — every lineage side app the vehicle may have
+    /// installed alongside the base hApp (any installed app id starting with
+    /// `"<base app id>@"`, the `install_lineage` naming convention).
     ///
-    /// Body (optional): `{"uninstall": bool}`, default `false` — disable
-    /// only, never uninstall, unless the caller explicitly opts in.
+    /// # What this route may NOT undo: a sunset (spec §4 step 5, §7 C14)
     ///
-    /// Response 200: `{ "reset": [<role names from the pre-reset snapshot>],
-    /// "disabled": [<app ids>], "uninstalled": [<app ids>] }`. A per-app
-    /// `disable_app`/`uninstall_app` failure is logged and simply excluded
-    /// from its list — one stuck side app never blocks the reset of the
-    /// others or of `LineageRoles`.
+    /// A SUNSET role's window is closed permanently. Two things follow, and
+    /// both are enforced here rather than left to the caller's care:
+    ///
+    /// 1. Resetting the role's ROUTING back to base would route authorship
+    ///    onto a chain that is sealed — writes a remote authority refuses and
+    ///    warrants (Probe B2), which is what §4 step 5's *"at no point
+    ///    after"* forbids. `reset_all` skips it and names it.
+    /// 2. Disabling — let alone uninstalling — a closed role's side app
+    ///    reaches the ONLY home of every `NotarizationWitness` the crossing
+    ///    produced. §7 C14 is *"kept, never deleted"*, so that app id is held
+    ///    back from both arms.
+    ///
+    /// `{"forceClosed": true}` is the explicit, separate opt-in that lifts
+    /// both — the fixture/operator seat, because the a2o story's
+    /// `Before`/`AfterAll` legitimately has to converge a REHEARSAL mesh to
+    /// the v1 baseline after Station 8 has sealed. It is deliberately not
+    /// implied by `uninstall`: the destructive reach is the thing being
+    /// gated, and one flag that means two different destructive things is
+    /// how a real peer loses its residual by accident.
+    ///
+    /// Body (optional): `{"uninstall": bool, "forceClosed": bool}`, both
+    /// default `false` — disable only, never uninstall, never touch a closed
+    /// role, unless the caller explicitly opts in.
+    ///
+    /// Response 200: `{ "reset": [<roles actually rolled back>],
+    /// "skippedClosed": [<roles left sealed>], "disabled": [<app ids>],
+    /// "uninstalled": [<app ids>], "protectedClosed": [<side app ids held
+    /// back>] }`. A per-app `disable_app`/`uninstall_app` failure is logged
+    /// and simply excluded from its list — one stuck side app never blocks
+    /// the reset of the others or of `LineageRoles`.
     ///
     /// `lineage_roles` being `None` (a fixture that never wired it) still
     /// runs the app-convergence half; `reset` comes back empty. Admin
@@ -5283,7 +5347,15 @@ impl HttpServer {
             .await
             .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
             .to_bytes();
-        let uninstall = parse_lineage_reset_uninstall(&body_bytes);
+        let LineageResetOptions {
+            uninstall,
+            force_closed,
+        } = parse_lineage_reset_options(&body_bytes);
+
+        let base_app_id = self
+            .happ_app_id
+            .clone()
+            .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
 
         // `LineageRoles::reset_all` happens FIRST and unconditionally — a
         // pure in-memory op that needs no conductor, independent of
@@ -5292,13 +5364,22 @@ impl HttpServer {
         // WINDOW (no `install_lineage` side app) still needs this to
         // converge, and a momentarily-unreachable conductor must never
         // leave a role's routing stuck open.
-        let reset: Vec<String> = match self.lineage_roles.as_ref() {
+        //
+        // The pre-reset snapshot is read ONCE, before the reset, because it
+        // is also where the closed roles' side app ids come from — after
+        // `reset_all` those roles no longer say which app was theirs.
+        let (reset, skipped_closed, protected_closed) = match self.lineage_roles.as_ref() {
             Some(lineage_roles) => {
-                let roles: Vec<String> = lineage_roles.snapshot().into_keys().collect();
-                lineage_roles.reset_all();
-                roles
+                let snapshot = lineage_roles.snapshot();
+                let protected = if force_closed {
+                    Vec::new()
+                } else {
+                    closed_role_app_ids(&snapshot, &base_app_id)
+                };
+                let report = lineage_roles.reset_all(force_closed);
+                (report.reset, report.skipped_closed, protected)
             }
-            None => Vec::new(),
+            None => (Vec::new(), Vec::new(), Vec::new()),
         };
         // Task 12: the bridge's cursors are ordinals into a view of a side app
         // this route is about to disable (and maybe uninstall). Leaving them
@@ -5318,17 +5399,20 @@ impl HttpServer {
             return Ok(response::service_unavailable("conductor_unavailable"));
         };
 
-        let base_app_id = self
-            .happ_app_id
-            .clone()
-            .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
-
         let apps = admin_ws
             .list_apps(None)
             .await
             .map_err(|e| StorageError::Internal(format!("list_apps: {e}")))?;
         let app_ids: Vec<String> = apps.into_iter().map(|a| a.installed_app_id).collect();
-        let side_app_ids = lineage_side_app_ids(&base_app_id, &app_ids);
+        // §7 C14: a closed role's side app carries the crossing's witnessed
+        // residual. It is held back from BOTH arms below — disabling it would
+        // strand a sealed role's authoring just as surely as un-sunsetting it
+        // would re-open one — unless the caller passed `forceClosed`, in
+        // which case `protected_closed` is empty by construction above.
+        let side_app_ids: Vec<String> = lineage_side_app_ids(&base_app_id, &app_ids)
+            .into_iter()
+            .filter(|id| !protected_closed.contains(id))
+            .collect();
 
         let mut disabled = Vec::new();
         for app_id in &side_app_ids {
@@ -5358,16 +5442,21 @@ impl HttpServer {
 
         tracing::info!(
             reset = reset.len(),
+            skipped_closed = skipped_closed.len(),
+            protected_closed = protected_closed.len(),
             disabled = disabled.len(),
             uninstalled = uninstalled.len(),
             uninstall_requested = uninstall,
+            force_closed_requested = force_closed,
             "POST /admin/lineage/reset — baseline convergence complete"
         );
 
         Ok(response::ok(&serde_json::json!({
             "reset": reset,
+            "skippedClosed": skipped_closed,
             "disabled": disabled,
             "uninstalled": uninstalled,
+            "protectedClosed": protected_closed,
         })))
     }
 
@@ -19432,13 +19521,13 @@ mod lineage_reset_tests {
     /// `uninstall_app`.
     #[test]
     fn parses_uninstall_true_from_body() {
-        assert!(parse_lineage_reset_uninstall(br#"{"uninstall":true}"#));
+        assert!(parse_lineage_reset_options(br#"{"uninstall":true}"#).uninstall);
     }
 
     /// `{"uninstall": false}` is explicit-false, same as the default.
     #[test]
     fn parses_uninstall_false_from_body() {
-        assert!(!parse_lineage_reset_uninstall(br#"{"uninstall":false}"#));
+        assert!(!parse_lineage_reset_options(br#"{"uninstall":false}"#).uninstall);
     }
 
     /// The safer default: an empty body, a body with no `uninstall` key, and
@@ -19446,8 +19535,72 @@ mod lineage_reset_tests {
     /// request, and never silently default to the destructive reading.
     #[test]
     fn defaults_to_false_never_uninstall_on_empty_missing_or_malformed_body() {
-        assert!(!parse_lineage_reset_uninstall(b""));
-        assert!(!parse_lineage_reset_uninstall(b"{}"));
-        assert!(!parse_lineage_reset_uninstall(b"not json"));
+        for body in [b"".as_slice(), b"{}".as_slice(), b"not json".as_slice()] {
+            let opts = parse_lineage_reset_options(body);
+            assert!(!opts.uninstall);
+            assert!(!opts.force_closed);
+        }
+    }
+
+    /// **Whole-branch I1.** `forceClosed` is its own opt-in and is NOT
+    /// implied by `uninstall` — the one body shape that lets the route reach
+    /// a sealed role at all. Both spellings parse, so a hand-rolled operator
+    /// curl in snake_case is not silently read as "no".
+    #[test]
+    fn force_closed_is_a_separate_opt_in_never_implied_by_uninstall() {
+        assert!(!parse_lineage_reset_options(br#"{"uninstall":true}"#).force_closed);
+        assert!(parse_lineage_reset_options(br#"{"forceClosed":true}"#).force_closed);
+        assert!(parse_lineage_reset_options(br#"{"force_closed":true}"#).force_closed);
+
+        let both = parse_lineage_reset_options(br#"{"uninstall":true,"forceClosed":true}"#);
+        assert!(both.uninstall);
+        assert!(both.force_closed);
+    }
+
+    /// **Whole-branch I1 / spec §7 C14.** The side app of a CLOSED role is
+    /// the only home of the crossing's carried notarizations, so its id is
+    /// what the route holds back from disable AND uninstall. An OPEN
+    /// window's side app is not protected — that is the convergence the
+    /// route exists for.
+    #[test]
+    fn closed_roles_side_apps_are_named_for_protection() {
+        use crate::lineage_roles::{LineageRoles, RoleLineage};
+        use std::collections::BTreeMap;
+
+        let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
+        l.open_window("node_registry", "elohim@open", None);
+        l.open_window("lamad", "elohim@sealed", None);
+        l.sunset("lamad");
+
+        let snapshot: BTreeMap<String, RoleLineage> = l.snapshot();
+        assert_eq!(
+            closed_role_app_ids(&snapshot, "elohim"),
+            vec!["elohim@sealed".to_string()],
+            "only the sealed role's side app is held back; the base id is never listed"
+        );
+
+        // Held-back ids are removed from what the arms act on.
+        let installed = vec![
+            "elohim".to_string(),
+            "elohim@open".to_string(),
+            "elohim@sealed".to_string(),
+        ];
+        let protected = closed_role_app_ids(&snapshot, "elohim");
+        let actionable: Vec<String> = lineage_side_app_ids("elohim", &installed)
+            .into_iter()
+            .filter(|id| !protected.contains(id))
+            .collect();
+        assert_eq!(actionable, vec!["elohim@open".to_string()]);
+    }
+
+    /// A mesh with nothing sealed protects nothing — the pre-I1 behaviour is
+    /// byte-for-byte intact on every peer that never crossed.
+    #[test]
+    fn nothing_is_protected_when_no_role_is_closed() {
+        use crate::lineage_roles::LineageRoles;
+
+        let l = LineageRoles::new("elohim", &["node_registry"]);
+        l.open_window("node_registry", "elohim@open", None);
+        assert!(closed_role_app_ids(&l.snapshot(), "elohim").is_empty());
     }
 }

@@ -2846,19 +2846,27 @@ mesh_coordswap() {
 
 # Task 10 part 2 (Holochain Evolution Epic MVP) — the a2o fixture's
 # baseline-convergence vehicle, callable directly for an operator/manual
-# reset. POSTs {"uninstall":true} to /admin/lineage/reset on every storage
-# peer: LineageRoles resets to the v1 base for every role AND any lineage
-# side app ("<base app id>@…") is disabled + uninstalled, so the mesh starts
-# and ends at the same baseline regardless of what a prior run opened (rung
-# 5's lesson, 8181d60a8). Non-2xx is a loud line, never a fatal exit — one
-# stuck peer must not block the others' convergence.
+# reset. POSTs {"uninstall":true,"forceClosed":true} to /admin/lineage/reset
+# on every storage peer: LineageRoles resets to the v1 base for every role
+# AND any lineage side app ("<base app id>@…") is disabled + uninstalled, so
+# the mesh starts and ends at the same baseline regardless of what a prior
+# run opened (rung 5's lesson, 8181d60a8). Non-2xx is a loud line, never a
+# fatal exit — one stuck peer must not block the others' convergence.
+#
+# forceClosed is deliberate and REHEARSAL-ONLY. Without it the route skips a
+# SUNSET role and holds its side app back from both the disable and the
+# uninstall arm — because on a real peer re-opening a sealed window (spec §4
+# step 5) or deleting the chain that carries the crossing's notarizations
+# (§7 C14) is exactly what must never happen by accident. This mesh is the
+# one seat where converging past a seal is the intended act, and it asks for
+# it by name instead of inheriting it from "uninstall".
 lineage_reset_all() {
   local j=0 name port resp code body
   for name in "${PEERS[@]}"; do
     port="$(http_port $j)"
     resp="$(curl -s -m 15 -w '\n%{http_code}' -X POST \
       -H 'Content-Type: application/json' \
-      -d '{"uninstall":true}' \
+      -d '{"uninstall":true,"forceClosed":true}' \
       "http://127.0.0.1:$port/admin/lineage/reset" 2>/dev/null)"
     code="${resp##*$'\n'}"
     body="${resp%$'\n'*}"

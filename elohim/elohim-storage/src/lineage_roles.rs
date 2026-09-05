@@ -67,6 +67,18 @@ pub struct RoleLineage {
     pub origin: Option<WindowOrigin>,
 }
 
+/// What one [`LineageRoles::reset_all`] call actually did — the two lists
+/// `/admin/lineage/reset` renders back to its caller, so a reset that left a
+/// sunset role alone says so instead of reporting a silent success.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ResetReport {
+    /// Roles rolled back to the base app id by this call.
+    pub reset: Vec<String>,
+    /// Roles left EXACTLY as they were because their lineage window is
+    /// closed (sunset). Empty whenever `force_closed` was passed.
+    pub skipped_closed: Vec<String>,
+}
+
 impl RoleLineage {
     fn at_base(base_app_id: &str) -> Self {
         Self {
@@ -215,15 +227,45 @@ impl LineageRoles {
         entry.closed = true;
     }
 
-    /// Reset every currently-tracked role back to the base app id
+    /// Reset currently-tracked roles back to the base app id
     /// (`reading_app_id == authoring_app_id == base_app_id`,
     /// `closed == false`) in one call. Backs the operator-facing
     /// `/admin/lineage/reset` route (Task 10 part 2).
-    pub fn reset_all(&self) {
+    ///
+    /// # A CLOSED role is skipped, and that is the point
+    ///
+    /// `RoleLineage::at_base` clears `closed`. Applied blindly, this call
+    /// would therefore route a SUNSET role back to authoring on a chain that
+    /// is permanently sealed — writes a remote authority refuses and
+    /// warrants (Probe B2) — which is exactly what spec §4 step 5's *"at no
+    /// point after"* forbids. So `force_closed == false` (the default, and
+    /// the only shape an operator should reach for) leaves every role with
+    /// `closed == true` untouched and NAMES it in
+    /// [`ResetReport::skipped_closed`]; only the roles that were still open
+    /// come back to base.
+    ///
+    /// `force_closed == true` is the fixture/operator seat: the a2o story's
+    /// `Before`/`AfterAll` legitimately has to converge a rehearsal mesh to
+    /// the v1 baseline after Station 8 has sealed a window, and that is a
+    /// deliberate act on a rehearsal peer, never a reset an operator reaches
+    /// for by accident. Note what it does NOT license: §7 C14's *"kept,
+    /// never deleted"* is about the witnessed residual — the carried
+    /// notarizations on the side app's chain. Re-opening a role's ROUTING is
+    /// reversible; deleting that chain is not, which is why the uninstall
+    /// arm of `/admin/lineage/reset` reads the same flag before it touches a
+    /// closed role's side app.
+    pub fn reset_all(&self, force_closed: bool) -> ResetReport {
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
-        for lineage in inner.values_mut() {
+        let mut report = ResetReport::default();
+        for (role, lineage) in inner.iter_mut() {
+            if lineage.closed && !force_closed {
+                report.skipped_closed.push(role.clone());
+                continue;
+            }
             *lineage = RoleLineage::at_base(&self.base_app_id);
+            report.reset.push(role.clone());
         }
+        report
     }
 
     /// A point-in-time copy of every tracked role's lineage state, for the
@@ -275,18 +317,69 @@ mod tests {
     }
 
     #[test]
-    fn reset_all_returns_every_tracked_role_to_base() {
+    fn reset_all_returns_every_open_role_to_base() {
         let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
         l.open_window("node_registry", "elohim@AAA", None);
         l.open_window("lamad", "elohim@BBB", None);
-        l.sunset("lamad");
-        l.reset_all();
+        let report = l.reset_all(false);
+        assert_eq!(
+            report.reset,
+            vec!["lamad".to_string(), "node_registry".to_string()]
+        );
+        assert!(report.skipped_closed.is_empty());
         for role in ["node_registry", "lamad"] {
             assert_eq!(l.app_id_for(role), "elohim");
             let snap = l.snapshot();
             assert_eq!(snap[role].reading_app_id, "elohim");
             assert!(!snap[role].closed);
         }
+    }
+
+    /// **Whole-branch I1 / spec §4 step 5.** A SUNSET role is not something a
+    /// baseline reset may quietly re-open: routing it back to base would put
+    /// authorship on a chain that is permanently sealed. The still-open role
+    /// beside it converges exactly as before, so one closed role never blocks
+    /// the rest of the reset.
+    #[test]
+    fn reset_all_skips_a_closed_role_and_names_it() {
+        let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
+        l.open_window("node_registry", "elohim@AAA", None);
+        l.open_window("lamad", "elohim@BBB", None);
+        l.sunset("lamad");
+
+        let report = l.reset_all(false);
+
+        assert_eq!(report.reset, vec!["node_registry".to_string()]);
+        assert_eq!(report.skipped_closed, vec!["lamad".to_string()]);
+
+        let snap = l.snapshot();
+        // The open role converged.
+        assert_eq!(l.app_id_for("node_registry"), "elohim");
+        assert!(!snap["node_registry"].closed);
+        // The sunset role is byte-for-byte where the sunset left it: still
+        // closed, still authoring on the lineage app.
+        assert!(snap["lamad"].closed);
+        assert_eq!(snap["lamad"].authoring_app_id, "elohim@BBB");
+        assert_eq!(l.app_id_for("lamad"), "elohim@BBB");
+    }
+
+    /// The fixture/operator seat: `force_closed` DOES reset a closed role,
+    /// because a rehearsal mesh has to converge to the v1 baseline after
+    /// Station 8 has sealed a window. Nothing is skipped, so the report's
+    /// skip list is empty.
+    #[test]
+    fn reset_all_with_force_closed_resets_a_closed_role() {
+        let l = LineageRoles::new("elohim", &["node_registry", "lamad"]);
+        l.open_window("lamad", "elohim@BBB", None);
+        l.sunset("lamad");
+
+        let report = l.reset_all(true);
+
+        assert!(report.skipped_closed.is_empty());
+        assert!(report.reset.contains(&"lamad".to_string()));
+        let snap = l.snapshot();
+        assert!(!snap["lamad"].closed);
+        assert_eq!(l.app_id_for("lamad"), "elohim");
     }
 
     fn origin() -> WindowOrigin {
