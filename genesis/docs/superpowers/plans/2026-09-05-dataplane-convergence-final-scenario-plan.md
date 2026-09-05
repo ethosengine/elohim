@@ -86,6 +86,28 @@ catch — the receipt must assert served-versus-declared per doorway too.
 
 - [ ] **Task 2 deliverable: two peers holding the same notarized head with drifted blob pointers converge on one pointer after a sweep, with no head move and no per-host write; the final scenario's served-versus-declared assertion holds on both doorways.**
 
+### Task 3: scenario 2's negative assertion becomes a Then
+
+**Files:**
+- Modify: `genesis/a2o/features/dataplane/federation-deploy.feature` (scenario 2), and whichever
+  step file the new assertion needs.
+
+Two independent blind readers of this feature (2026-09-05, Task 1's review loop) named the same
+finding: scenario 2's defining claim — that peer `elohim.host` resolves the landing EPR *because
+the metadata propagated*, not because the deploy uploaded to it — is carried ENTIRELY by a comment
+saying that the absence of a `Given ... was uploaded to peer ...` step IS the assertion. The
+executable Gherkin proves only "elohim.host resolves the landing EPR", which a per-host upload
+would also satisfy. That makes the feature's central promise invisible to the runner and fragile to
+maintenance: a future author who adds the missing Given "for completeness" silently destroys the
+test's meaning, and nothing goes red. The repair is to make the negative a positive assertion the
+suite actually executes — a Then that reads the receiving peer's own record of how it obtained the
+EPR and refuses a direct-upload provenance — so the propagation claim is measured rather than
+narrated. Deferred out of Task 1 because scenario 2 is currently passing and is not the scenario
+that task was dispatched to bind.
+
+- [ ] **Task 3 deliverable: scenario 2 asserts propagation-not-upload as an executable step, and
+  the assertion fails if the landing EPR reached `elohim.host` by a direct per-host upload.**
+
 ---
 
 ## Self-review (2026-09-05)

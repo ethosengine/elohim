@@ -196,15 +196,23 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   # election live on the conductor DHT and were not traveling (storage arcs reset to Empty on
   # every restart, so election links never gossiped in; adam's sweep measured 2,619 divergent
   # rows and refused 2,603 per sweep — correctly, having no election to obey).
-  # BOUND 2026-09-05 (steps/dataplane/federation-deploy.steps.ts). Runs on the HOUSEHOLD MESH, not
-  # a fleet lane: the mechanism lines below reach two peers' conductors directly, which the local
-  # mesh exposes (app/elohim-app/scripts/hc-mesh.sh) and a fleet doorway does not.
+  # BOUND 2026-09-05 (steps/dataplane/federation-deploy.steps.ts).
   #
-  # The two tags are different questions, not a contradiction. The feature's @requires:multi-node
-  # says "this story needs more than one peer" — true of every scenario here. This scenario's
-  # @requires:household-nodes narrows further: it needs peers whose conductors this run OWNS, so a
-  # fleet lane skips it rather than red-ing on a rail it was never given.
-  @requires:household-nodes
+  # @requires:owned-substrate IS LOAD-BEARING, and it is the ONLY tag here that gates anything.
+  # This scenario WRITES: it stages a real disagreement on a real page by authoring a revision on
+  # each of two peers, and it flips an operator flag in a peer's runtime config. That is only ever
+  # acceptable on a substrate THIS RUN OWNS. `owned-substrate` is the one capability that says so —
+  # available: false in genesis/manifests/cluster-state.yaml (the shared fleet), available: true
+  # only under cluster-state.act1-household.yaml. So the fleet's Dataplane Validation lane, which
+  # selects `@dataplane and not @wip`, skips this scenario instead of staging divergence on the
+  # live landing page that visitors are reading.
+  #
+  # @requires:household-nodes would NOT have gated it: that capability is available: true in BOTH
+  # cluster-state files, because a household mesh is normally up. "Peers exist" and "this run may
+  # write to them" are different questions, and only the second one is the permission this scenario
+  # needs. The feature's own @requires:multi-node is the third, weakest question — "more than one
+  # peer" — true of every scenario in the file.
+  @requires:owned-substrate
   Scenario: two doorways that disagree about a page converge on the elected version without anyone re-uploading it
     # THE CURE UNDER TEST — carry the election: a peer that HOLDS the winning declaration
     # serves the declaration link's own signed record alongside its head; the disagreeing
@@ -236,6 +244,12 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
     # MECHANISM — how that outcome is trustworthy, not a trust-the-peer copy:
     And that peer's conductor verified the carried declaration link in wasm before moving it
-    And the election obeyed earned-beats-staging, with ties broken on the notarized declaration timestamp
+    # Earned-beats-staging is the rule this line exercises: one EARNED declaration against the
+    # other peer's staging-tier one. The timestamp tiebreak is the election's SECOND rule and is
+    # only reached when two EARNED declarations compete — a shape this scenario does not stage, so
+    # the line claims only what it proves: the winner carries the earned declaration, and the
+    # notarized timestamp the tiebreak would read is present on it. Staging a real two-earned tie
+    # is worth its own scenario; asserting it from here would be an overclaim.
+    And the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp
     # ANTI-REGRESSION: the move must be an ELECTION OBEYED, never a trust-the-peer copy.
     And a carried declaration link whose signature or binding fails wasm verification moves nothing

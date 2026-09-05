@@ -53,10 +53,14 @@
  *
  * ## Where this runs
  *
- * The household mesh only (`@requires:household-nodes`): the mechanism
- * assertions call `content_store` coordinator externs on two conductors'
- * admin/app websockets, which exist on the local mesh
- * (`app/elohim-app/scripts/hc-mesh.sh`) and not on a fleet doorway. Run it with
+ * A substrate this run OWNS only (`@requires:owned-substrate` — available:false
+ * on the shared fleet, available:true only under
+ * `genesis/manifests/cluster-state.act1-household.yaml`). This fixture WRITES:
+ * it authors a revision on each of two peers and flips an operator flag in a
+ * peer's runtime config. `@requires:household-nodes` would not have gated that,
+ * being available:true in both cluster-state files — "peers exist" is not "this
+ * run may write to them", and the fleet's Dataplane Validation lane selects
+ * `@dataplane and not @wip`. Run it with
  * `just test mesh genesis/a2o/features/dataplane/federation-deploy.feature`.
  */
 
@@ -68,7 +72,7 @@
  * same constant and the same reason. */
 
 import { strict as assert } from 'node:assert';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { Given, When, Then, AfterAll } from '@cucumber/cucumber';
@@ -77,6 +81,7 @@ import {
   authorDeclare,
   canonicalElectionEvidence,
   connectConductor,
+  declareEarnedCanonicalHead,
   meshConductorPorts,
   resetStagingWrites,
   servedHead,
@@ -339,7 +344,12 @@ AfterAll({ timeout: 120_000 }, async function () {
     if (!original) continue;
     try {
       if (original.bytes === null) {
-        writeFileSync(original.file, '', 'utf8');
+        // There was NO file before this run. Restoring means removing it, never
+        // leaving an empty one: an empty runtime-config.toml is a different state
+        // from no runtime-config.toml for anything that branches on file presence
+        // (the watcher reports `filePresent`), and a fixture must hand the mesh
+        // back exactly what it borrowed.
+        rmSync(original.file, { force: true });
       } else {
         writeFileSync(original.file, original.bytes);
       }
@@ -526,13 +536,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const s = state(this);
-    const earned = (await s.winnerRail.call('declare_earned_canonical_head', {
-      id: s.eprId,
-      head_action_hash: s.winnerHead,
-      carried_record: null,
-      adopt_before_author: false,
-      delegation: null,
-    })) as { canonical?: boolean } | null;
+    const earned = await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
     assert.ok(
       earned,
       `${s.winner.alias}: declare_earned_canonical_head answered nothing for "${s.eprId}"`
@@ -780,20 +784,30 @@ Then(
 );
 
 /**
- * Re-derive the election on the laggard's OWN conductor and read the two rules
- * back out of the wasm answer: the winner it names, and that the winning
- * declaration is the EARNED one (`canonical_earned`), carrying the notarized
- * `canonical_declared_at` timestamp the tiebreak reads.
+ * Re-derive the election on the laggard's OWN conductor and read the answer back
+ * out of wasm: the winner it names, that the winning declaration is the EARNED
+ * one (`canonical_earned`), and that it carries the notarized
+ * `canonical_declared_at`.
+ *
+ * WHAT THIS DOES NOT ASSERT, deliberately. The election has two rules:
+ * earned-beats-staging, then newest notarized timestamp. Only the FIRST is
+ * exercised here, because the staging shape is one earned declaration against
+ * one staging-tier one — the timestamp rule is reached only when two EARNED
+ * declarations compete. This step therefore checks that the tiebreak's INPUT
+ * exists (the timestamp is present on the winner) and stops there. Staging a
+ * real two-earned tie needs a second `declare_earned_canonical_head` on the
+ * laggard and a deliberate timestamp ordering; that is its own scenario, and
+ * claiming it from here would be an overclaim the Gherkin used to carry.
  *
  * This is a READ — `verify_carried_election` proves bytes, it does not author.
  * The staging ledger is asserted unchanged by the outcome step above, and this
  * step adds nothing to it.
  *
  * Example:
- *   And the election obeyed earned-beats-staging, with ties broken on the notarized declaration timestamp
+ *   And the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp
  */
 Then(
-  'the election obeyed earned-beats-staging, with ties broken on the notarized declaration timestamp',
+  'the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp',
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const s = state(this);

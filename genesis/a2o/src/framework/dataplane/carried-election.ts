@@ -274,8 +274,28 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
 
   const existing = await fetch(`${storageUrl}/db/content/${id}`);
   const existingRow = existing.ok
-    ? ((await existing.json().catch(() => null)) as { reach?: string } | null)
+    ? ((await existing.json().catch(() => null)) as {
+        reach?: string;
+        dhtAnchorHash?: string | null;
+      } | null)
     : null;
+
+  // THE GUARD THAT MAKES THE NON-DESTRUCTIVE CLAIM TRUE (see this function's doc).
+  // `ContentService::update_via_conductor` branches on `dht_anchor_hash.is_none()`
+  // (elohim-storage/src/services/content_service.rs ~:384). Only the ELSE arm is the
+  // bytes-preserving update this fixture relies on; the `is_none()` arm BOOTSTRAPS —
+  // it publishes `content: view.content_body`, i.e. this fixture's staging text would
+  // become the page's actual body. On the landing EPR that is a defacement, not a test.
+  // So an existing row with no live anchor is refused by name rather than staged.
+  if (existingRow && !existingRow.dhtAnchorHash) {
+    throw new Error(
+      `refusing to stage on "${id}" at ${storageUrl}: the row exists but its dhtAnchorHash is ` +
+        `${JSON.stringify(existingRow.dhtAnchorHash)}. An unanchored row takes elohim-storage's ` +
+        `BOOTSTRAP arm, which publishes the fixture's contentBody as the page's real body. ` +
+        `Wait for the row to anchor (or stage on an id this run owns) — never let a fixture ` +
+        `overwrite a served page.`
+    );
+  }
 
   if (!existingRow) {
     recordStagingWrite('POST', `${storageUrl}/db/content/bulk`);
@@ -314,6 +334,14 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
   if (!anchor) {
     throw new Error(
       `no dhtAnchorHash after PATCH on ${storageUrl}: ${JSON.stringify(patched).slice(0, 200)}`
+    );
+  }
+  // A revision that did not move the anchor is not a revision — the divergence this
+  // fixture exists to stage would be imaginary, and every assertion downstream vacuous.
+  if (existingRow?.dhtAnchorHash && anchor === existingRow.dhtAnchorHash) {
+    throw new Error(
+      `PATCH on ${storageUrl} left "${id}" at the same anchor ${anchor} — no new action was ` +
+        `notarized, so there is no revision to declare and no divergence to heal`
     );
   }
 
@@ -363,6 +391,30 @@ export interface VerifiedCarriedElection {
   canonical_earned?: boolean;
   canonical_declared_at?: unknown;
   [key: string]: unknown;
+}
+
+/**
+ * Declare an EARNED canonical head on this peer's own conductor.
+ *
+ * This AUTHORS — `declare_earned_canonical_head` writes a declaration link to the
+ * peer's chain — so it belongs in the write ledger exactly as much as the HTTP
+ * staging calls do. It is recorded with `method: 'zome'` and the
+ * `<zome>.<fn>` target, which is what makes the ledger's "covers every mutating
+ * call the fixture can make" claim true rather than approximately true.
+ */
+export async function declareEarnedCanonicalHead(
+  rail: CarriedElectionRail,
+  id: string,
+  headActionHash: string
+): Promise<{ canonical?: boolean } | null> {
+  recordStagingWrite('zome', `${CONTENT_STORE_ZOME}.declare_earned_canonical_head`);
+  return (await rail.call('declare_earned_canonical_head', {
+    id,
+    head_action_hash: headActionHash,
+    carried_record: null,
+    adopt_before_author: false,
+    delegation: null,
+  })) as { canonical?: boolean } | null;
 }
 
 /**
