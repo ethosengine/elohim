@@ -37,9 +37,22 @@ Doorway is the **porch** — a gateway (bootstrap + signal + conductor proxy/cac
 
 ### 2a. Deps — `doorway/doorway-service/Cargo.toml`
 ```toml
-prometheus = "0.13"   # same as storage; do NOT pull 0.14+
+prometheus = "0.14"   # same as storage; keep all four workspaces on 0.14
 lazy_static = "1"     # doorway has NEITHER today — add both
 ```
+
+> **Superseded pin (corrected 2026-09-04).** This block originally read
+> `prometheus = "0.13"   # same as storage; do NOT pull 0.14+`. The
+> "do NOT pull 0.14+" rule was a *consistency* convention from this handoff's
+> 2026-06-17 metrics work — never a resolution constraint (these are four
+> independent lockfiles with no version unification). It has since inverted:
+> `prometheus` 0.13 pins `protobuf ^2.0`, which resolves the unmaintained
+> `protobuf 2.28.0` (RUSTSEC-2024-0437); 0.14 requires `protobuf ^3.7.2`, the
+> advisory fix line. All four Rust workspaces — `doorway/doorway-service`,
+> `elohim/elohim-bitswap`, `elohim/elohim-storage`, `steward/node` — now resolve
+> `prometheus 0.14.0` / `protobuf 3.7.2` only. The idiom this handoff describes
+> (`lazy_static!` statics + one `Registry` + `TextEncoder`) is unchanged across
+> the major, so everything else below still holds verbatim.
 
 ### 2b. New module `src/metrics.rs` (mirror storage's idiom)
 ```rust
