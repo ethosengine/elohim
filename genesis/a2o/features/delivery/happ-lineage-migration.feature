@@ -163,11 +163,20 @@ Feature: The network changes the rules its peers hold each other to without losi
   writing after its own close — measured — so the household enforces the
   close where it already checks everything: v2 carries each close as a
   proof and refuses any carried fact that came after it, and each runtime
-  disables its own closed cell. OPENING is the matching
+  routes the role's writes to v2 while the closed cell stays enabled and
+  readable. OPENING is the matching
   action on the continuing cell, naming the close it continues from. Both
   cells exist and have been written to long before either happens: the
   close and open are the seal on a crossing already made, not the making of
   it, and they happen only at the sunset.
+
+  A WARRANT is the record a peer publishes when a fact it received fails
+  validation — an accusation naming the fact and its author. A BLOCK is what
+  the substrate does with an accepted warrant: the accusing peer refuses to
+  gossip with the accused cell again, permanently, and nothing in the
+  substrate lifts it. A write after a close earns both from every neighbour
+  that sees it; that is the price of the sunset, and the reason a closed
+  chain is never written on again.
 
   The TEST HARNESS is the rehearsal's own hand: the a2o runner that drives
   the household mesh. It holds the fixture humans' keys and the bootstrap
@@ -185,13 +194,13 @@ Feature: The network changes the rules its peers hold each other to without losi
     Given the household mesh is running three peers, each on its own conductor, all built from the same conductor software
     And the household's node-registry role runs rule version v1
     # The sunset below is this story's one irreversible act, and it spends the chain it seals. A
-    # closed chain must not be authored on again. Station 8 measures the first half of why: the
-    # author's own conductor still accepts a write after the close. The second half — every
-    # neighbour rejects that write and BLOCKS the writer (refuses to gossip with that cell again,
-    # permanently) — is measured on a chain nobody needs afterwards, in the sibling story of the
-    # disposable crossing (epic Task 33), because measuring it here would spend this household's
-    # real chain. A story that began on an already-sealed household would poison it with its first
-    # write, so this precondition refuses such a household by name before anything is written.
+    # closed chain must not be authored on again, and Station 8 measures two of the three things
+    # that happen when one is: the author's own conductor accepts the write, and v2's validation
+    # refuses it wherever the close is known. The third — the neighbours WARRANT the write and BLOCK
+    # the writer (see the vocabulary) — is measured on a chain nobody needs afterwards, in the sibling
+    # story of the disposable crossing (epic Task 33), because measuring it here would spend this
+    # household's real chain. A story that began on an already-sealed household would poison it with
+    # its first write, so this precondition refuses such a household by name before anything is written.
     And no peer's v1 node-registry chain is already closed
     And each peer's runtime follows release channel "runtime:lineage:node_registry:commons"
     And matthew, james and jessica each hold node-registry records they authored on v1
