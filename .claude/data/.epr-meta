@@ -73,3 +73,19 @@ memory-dump drift wearing a data-directory costume, and every one that lands
 here bypasses the reconciliation rails (decompose, cites, timeline status).
 The background librarian review classifies them while the context still exists,
 without stopping the active development pass.
+
+## Declared ledgers (mode · reader · forgetting rule)
+
+- `lineage-carry-metrics.jsonl` — **APPEND-ONLY** (every row is a historical
+  measurement of one live run; draining it would destroy the growth-rate
+  comparison it exists to compute). Written by
+  `genesis/a2o/steps/delivery/happ-lineage-migration.steps.ts`
+  (`recordCarryMetric`) during a `@concern:happ-lineage-migration` mesh run.
+  **Reader, by path:** the `guard:` R1–R3 rows of
+  `elohim/holochain/.epr-meta/happ-lineage-migration.habit.md` and risk rows 1–3
+  of `genesis/data/timeline/backlog/arch-scale-risk-backlog.md` — a lamad-scale
+  crossing is not schedulable until its rows are compared against the
+  node_registry rehearsal's. **Forgetting rule:** none yet, by decision — the
+  file holds a handful of rows per run and the whole point of R1 is the trend
+  across runs; it is PINNED until the habit's `retire-when` fires (three alpha
+  crossings), which is the decision that releases it.
