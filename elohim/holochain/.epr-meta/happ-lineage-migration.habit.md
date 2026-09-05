@@ -323,3 +323,26 @@ the fix round `27532918a` earning itself on a live mesh. (3) "Disabled" in this 
 storage-side `closed` flag, NOT `disable_app`: the admin seam disables a whole app and the base app
 carries lamad, imagodei and infrastructure too, so the sunset disables nothing and uninstalls
 nothing — what stops a peer writing to v1 again is that routing no longer points there.
+
+DELTA 2026-09-05 (Station 10 GREEN on the household mesh — the roster and the root are REAL checks
+now, and the 2026-09-04 "BLOCKED (no roster, no installed root)" DELTA above is SUPERSEDED; receipt
+`genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r28.{log,json}`, run stamp
+20260905033528, 1 scenario / 14 steps passed, 2m46s; the red it was driven from is 2026-09-04's
+`-r14`, 9 passed / 1 failed): both negative arms are refused by all three peers, each on its own
+channel, each asserting the exact refusal DETAIL and not merely the reason code.
+ARM 1 — a `migrates-lineage` notarized through JESSICA's own mishpat cell (a household peer, off the
+declared roster; `create_lineage_commitment` signs with the CALLING agent's key and takes no other,
+which is the only honest way to express "signed by a key that is not on the roster") is refused
+`quorum_unmet` on matthew, jessica and james. On 2026-09-04 this same act was accepted by every peer
+with `{"state":"ok"}` because THERE WAS NO ROSTER CHECK ANYWHERE; Task 16's `read_roster` closed it,
+reading membership off the real `author-lens` commitment the run mints (roster
+`uhCEk…`, one member: matthew's own agent key) rather than off a slug that always
+terminated at "roster is not an address".
+ARM 2 — the same crossing signed by the steward but under
+`a2o-fixture-constitution-root-THE-V2-DNA-DOES-NOT-DECLARE` is refused `root_mismatch` on all three.
+On 2026-09-04 this arm was unreachable in principle: `InstalledReality::from_happ_passport` set
+`constitution_root: None` for every role, with its own comment saying the passport did not expose
+one. Task 17 put the root on the passport and Task 14b made installed reality read the AUTHORING
+cell on a crossed role, so `RootSource::Installed` is live and the check fires.
+And the release itself stays earned and admissible through both refusals — only the PATH was refused,
+which is the distinction the whole Station exists to hold.
