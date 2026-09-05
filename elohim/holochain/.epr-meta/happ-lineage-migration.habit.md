@@ -261,3 +261,32 @@ head has moved since the bundle began`, Station 6's first red, on the READ path.
 now opens ONE rail and re-calls `get_witnesses_for` on it.
 R1 ledger this run: james's 196-record self-carry 50 s; the v1 export walk 0.3 s at
 `ExportPage.scanned` = 676.
+
+DELTA 2026-09-05 (Station 7 GREEN on the household mesh — the revert is free, and it is REAL, not a
+routing flip; receipt `genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r25.{log,json}`,
+run stamp 20260905032540, 1 scenario / 16 steps passed, 2m27s; the reds it was driven from are `-r23`
+and `-r24`): matthew notarized a `revokes-commitment` against the migration inside its revert horizon,
+and every one of the story's seven Thens held. jessica — who never applied, so her sweep never takes
+`watch.rs`'s C6b idempotence exit — read `path_revoked` off her own conductor within one sweep
+("path uhCEk7QNP… revoked at 2026-09-05T03:27:16Z"), which is Task 19's DHT-first evidence seam doing
+exactly what the 2026-09-04 fix round said it would: an elohim's revocation is no longer invisible to
+the peers it is meant to stop. james and matthew both flipped v1 back to AUTHORING with the side app
+kept as the READING pointer, disabled and still installed. THE MEASURED CENTRE OF THIS STATION:
+james's readopt receipt on `/admin/adoption` — **status `readopted`, readopted 1, alreadyPresent 206,
+foreign 20, v2Total 227, pages 15** — 1+206+20 = 227, the successor's own count, so every record his
+v2 cell held is ACCOUNTED FOR and the one he authored natively during the window is back on v1 at the
+same entry hash. That arithmetic IS the story's "pending, never lost": the 20 foreign are v2's own
+witnesses, which v1 declares no entry type for, and a walk that died partway would report its partial
+under `status: failed` rather than reading as nothing.
+THREE MEASURED FACTS, all of them corrections to what the steps said before this run. (1) The landed
+revert semantics are v1-AUTHORS / v2-READS, not "authoring == reading == base" — the passport's
+lineage view is still PRESENT after a revert with the two ids swapped, and the earlier ruling's
+wording is withdrawn in code as well as in the ledger. (2) A single `export_records{cursor: null,
+limit: 64}` reads the FIRST PAGE ONLY; on a v2 cell that has just carried a 200-record v1 chain a
+freshly authored record is at the END, so the one-page read found nothing and reported "produced no
+readable entry hash" — a page boundary wearing an authorship failure's costume (`-r23`). Every
+"is this record on this chain" question now walks. (3) The v2 cell CANNOT be read after a revert: it
+is disabled, and a disabled cell refuses even the capability grant a read needs
+(`internal_error: … CellDisabled(CellId(…))`, `-r24`). A step that reached in there was asking the
+wrong surface — the story says "reported by its author's PASSPORT", and Task 13c's
+`RevertReceipt.readopt` is that report, with numbers.

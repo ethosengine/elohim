@@ -714,9 +714,44 @@ interface AppliedCarryReceipt {
   witnessHashes: string[];
 }
 
+/**
+ * **Task 13c.** What a revert did with the window-time v2 records, as
+ * `release_adoption::revert::ReadoptStatus` renders it — internally tagged on
+ * `status`, so the summary's own fields sit beside the tag.
+ *
+ * The COUNTS are the story's "pending, never lost": a walk that died partway
+ * still reports what the pages before it brought home, and `v2Total` is the
+ * successor's OWN record count, never derived from `readopted` — which is what
+ * makes an unaccounted remainder detectable at all.
+ */
+interface ReadoptStatusView {
+  status: 'notAttempted' | 'readopted' | 'failed';
+  reason?: string;
+  readopted?: number;
+  alreadyPresent?: number;
+  foreign?: number;
+  pages?: number;
+  v2Digest?: string;
+  v2Total?: number;
+}
+
+/** **Task 13a/13c.** One reverted window, on `/admin/adoption`. */
+interface RevertReceiptView {
+  role: string;
+  lineageAppId: string;
+  reason: string;
+  pathCommitmentCid?: string;
+  at: number;
+  disabled: boolean;
+  disableError?: string;
+  readopt?: ReadoptStatusView;
+}
+
 interface AdoptionReport {
   controller: { running: boolean };
   channels: AdoptionChannelRow[];
+  /** **Task 13a.** Absent on a build with no revert arm, empty until one fires. */
+  reverts?: RevertReceiptView[];
 }
 
 /**
@@ -2076,6 +2111,45 @@ async function openCanaryWindow(): Promise<void> {
   );
 }
 
+/**
+ * Every entry hash on the cell a rail is already connected to, walked page by
+ * page.
+ *
+ * MEASURED (Station 7's first red, 2026-09-05): a single
+ * `export_records{cursor: null, limit: 64}` reads the FIRST page only. On a
+ * v2 side cell that has just carried a 200-record v1 chain, a freshly
+ * authored record is at the END, so a one-page read finds nothing and the
+ * step reports "produced no readable entry hash" — a page boundary wearing
+ * an authorship failure's costume. Every "is this record on this chain"
+ * question walks.
+ */
+async function exportEntryHashesOn(rail: RoleConductorRail, label: string): Promise<string[]> {
+  const hashes: string[] = [];
+  let cursor: number | undefined;
+  let exhausted = false;
+  for (let page = 0; page < V1_EXPORT_PAGE_CAP; page += 1) {
+    const raw = (await rail.call('export_records', { cursor: cursor ?? null, limit: 64 })) as {
+      records: unknown[];
+      next_cursor?: number | null;
+    };
+    for (const record of raw.records) {
+      const hash = entryHashOfSignedAction(record);
+      if (hash) hashes.push(hash);
+    }
+    if (raw.next_cursor === null || raw.next_cursor === undefined) {
+      exhausted = true;
+      break;
+    }
+    cursor = raw.next_cursor;
+  }
+  assert.ok(
+    exhausted,
+    `${label}: the export did not reach a null cursor within ${V1_EXPORT_PAGE_CAP} pages — this ` +
+      'is a PREFIX of the chain, not the chain'
+  );
+  return hashes;
+}
+
 /** Fold one page's R1 `scanned` into the walk's worst so far. A coordinator
  * that predates the field answers `undefined` and contributes nothing — never
  * a 0, which would read as a page that scanned nothing. */
@@ -3162,21 +3236,13 @@ Given(
       sideAppId
     );
     try {
-      const before = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
-        records: unknown[];
-      };
-      const beforeHashes = new Set(
-        before.records
-          .map(r => entryHashOfSignedAction(r))
-          .filter((h): h is string => h !== undefined)
-      );
+      // WALKED, not first-paged: james's v2 cell has just carried his whole
+      // v1 chain, so a freshly authored record is past page 1 — see
+      // `exportEntryHashesOn`.
+      const beforeHashes = new Set(await exportEntryHashesOn(rail, "james's v2 (before)"));
       await rail.call('register_node', fixtureNodeRegistration('james', rail.agent));
-      const after = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
-        records: unknown[];
-      };
-      const freshHash = after.records
-        .map(r => entryHashOfSignedAction(r))
-        .find((h): h is string => h !== undefined && !beforeHashes.has(h));
+      const afterHashes = await exportEntryHashesOn(rail, "james's v2 (after)");
+      const freshHash = afterHashes.find(h => !beforeHashes.has(h));
       assert.ok(freshHash, "james's new v2-native record produced no readable entry hash");
       c.jamesV2AuthoredEntryHash = freshHash;
     } finally {
@@ -3251,16 +3317,20 @@ Then(
   "the release is no longer held, and the channel's earned head returns to the prior release by re-election",
   { timeout: RECONCILE_POLL_TIMEOUT_MS + 30_000 },
   async function (this: E2EWorld) {
-    // READ FROM THE CODE (2026-09-04, no live run this dispatch): an
-    // ALREADY-APPLIED release is never re-verified. `watch.rs`'s own C6b
-    // idempotence exit ("re-sweep on a current head is already_current, ZERO
-    // conductor calls beyond the resolve") returns `Verdict::Applied` for
-    // james and matthew on every subsequent sweep without calling
-    // `verify_path` again, and no production code calls `LineageRoles::revert`
-    // outside its own unit tests (grepped `elohim-storage/src` — the only
-    // call site is `open_window`). "The release is no longer held" is
-    // therefore not yet observable off JAMES's or MATTHEW's own state on this
-    // substrate.
+    // CORRECTED 2026-09-05 (Task 13a landed; the 2026-09-04 reading below was
+    // written against a tree where it had not): the reconcile loop DOES react
+    // to a revoked path. `watch.rs`'s revert arm re-reads each open window's
+    // path evidence, asks `revert::revert_decision`, and calls
+    // `reverter.revert_window(...)` — so james's and matthew's own state moves
+    // too, and this Then is no longer jessica-only by necessity.
+    //
+    // It is still jessica-FIRST by construction, and that is why she is the
+    // one this Then reads: an ALREADY-APPLIED release takes `watch.rs`'s C6b
+    // idempotence exit, so `Verdict::Applied` is what james and matthew's
+    // channel row keeps reporting; the revert shows on their PASSPORT (the
+    // next Then) rather than as a refusal on their adoption row. jessica never
+    // applied, so her sweep freshly re-runs `verify_path` every time and her
+    // row is where a refusal reason can appear at all.
     //
     // It IS observable off JESSICA's: she never applied, so her sweep takes
     // no idempotence exit and freshly re-runs `verify_path` on the SAME
@@ -3290,16 +3360,17 @@ Then(
   'james and matthew mark v1 authoring and v2 reading, disable their v2 cells, and uninstall nothing',
   { timeout: 180_000 },
   async function (this: E2EWorld) {
-    // NAMED GAP, not papered over: `LineageRoles::revert`
-    // (`elohim-storage/src/lineage_roles.rs`) does exactly this — flips
-    // `authoring_app_id` back to the base app while leaving `reading_app_id`
-    // on the side app as a historical pointer — but nothing in production
-    // calls it (grepped 2026-09-04; its only call sites are that module's
-    // own unit tests). Until reconcile reacts to a revoked path (the
-    // remaining half of Task 13/14 — Task 19 landed only the VISIBILITY
-    // half), this Then polls the real contract and will legitimately time
-    // out on today's mesh; that is this dispatch's finding, not a step
-    // defect.
+    // CORRECTED 2026-09-05 — Task 13a landed and this is now wired end to
+    // end: `watch.rs`'s revert arm calls `revert_window`, whose vehicle calls
+    // `LineageRoles::revert` (`elohim-storage/src/lineage_roles.rs`). The
+    // landed semantics are the ones asserted below and NOT the "authoring ==
+    // reading == base" that an earlier ruling guessed: v1 (the base app)
+    // AUTHORS again and the side app stays as the READING pointer — disabled
+    // but intact — so the passport's lineage view is still PRESENT after a
+    // revert, with the two ids swapped rather than collapsed. `disable_app`
+    // is whole-app, and the base app carries every other role, so the side
+    // app is disabled and never uninstalled: "uninstall nothing" is
+    // structural here, not a policy this step trusts.
     const c = lineage();
     for (const peer of ['james', 'matthew'] as const) {
       const sideAppId = peer === 'james' ? await jamesLineageAppId() : c.matthewLineageAppId;
@@ -3354,13 +3425,15 @@ Then(
   "james's record authored on v2 during the window is re-authored by james on v1 with the same entry hash, its v2 proof kept in the disabled cell as evidence",
   { timeout: 60_000 },
   async function (this: E2EWorld) {
-    // NAMED GAP: RE-AUTHORING (the story's own term) is an author committing
-    // the same content again, natively, on v1 — no code anywhere calls
-    // `register_node` (or any coordinator function) in automatic reaction to
-    // a revert; the crossing's own vehicle (`apply.rs`) only ever writes
-    // forward, into v2. This Then checks the real, falsifiable claim (the
-    // SAME entry hash landing on v1) and will legitimately read absent until
-    // that re-authoring act is wired.
+    // CORRECTED 2026-09-05 — Tasks 13b/13c landed the re-authoring act: v1's
+    // `readopt_from(v2_cell, cursor, limit)` re-authors the agent's OWN
+    // window-time v2 facts on v1 at the SAME entry hash under a new action,
+    // and the revert ceremony calls it BEFORE disabling the side app (a
+    // disabled app answers no cross-cell call). So this Then's claim — the
+    // same entry hash landing on v1 — is the real contract and is now
+    // reachable. Records authored by anyone else are ignored by construction:
+    // v1 declares no witness entry type, so a revert is a re-authoring and
+    // never a carry.
     const c = lineage();
     const entryHash = c.jamesV2AuthoredEntryHash;
     assert.ok(entryHash, 'no v2-authored entry hash captured for james');
@@ -3376,36 +3449,55 @@ Then(
   "any v2-authored record not yet re-authored on v1 is reported by its author's passport as pending, never as lost",
   { timeout: 60_000 },
   async function (this: E2EWorld) {
-    // NAMED GAP: there is no storage projection of node-registry records at
-    // all (Station 4's own finding stands) — no field anywhere reports a
-    // record as "pending" versus "lost". What IS checkable is the literal
-    // floor under that word: the record itself. james's own v2 side app is
-    // never uninstalled by a revert (the previous Then's own claim), so the
-    // record is still there, on his own chain, exactly as native content
-    // always is.
-    const c = lineage();
-    const entryHash = c.jamesV2AuthoredEntryHash;
-    assert.ok(entryHash, 'no v2-authored entry hash captured for james');
-    const sideAppId = await jamesLineageAppId();
-    const rail = await connectRoleConductor(
-      'james',
-      NODE_REGISTRY_ROLE,
-      NODE_REGISTRY_ZOME,
-      sideAppId
+    // MEASURED 2026-09-05: this Then CANNOT be answered by reading the v2
+    // cell. The revert disables the side app (that is the previous Then's own
+    // claim), and a disabled cell refuses even the capability grant a read
+    // needs — `internal_error: … CellDisabled(CellId(…))`, this Then's first
+    // red. A step that reached in there was asking the wrong surface anyway:
+    // the story says "reported by its author's passport", and Task 13c's
+    // `RevertReceipt.readopt` on `GET /admin/adoption` IS that report.
+    //
+    // It carries NUMBERS, which is what makes "pending, never lost" a claim
+    // and not a comfort: `readopted` + `alreadyPresent` + `foreign` against
+    // the successor's OWN `v2Total`, and a walk that died partway reports its
+    // `partial` under `status: "failed"` rather than reading as nothing. The
+    // side app is disabled and never uninstalled, so whatever is not yet
+    // re-authored is intact behind that flag — the arithmetic below is what
+    // says how much that is.
+    const { report } = await getAdoptionReport('james');
+    const revert = report.reverts?.find(r => r.role === NODE_REGISTRY_ROLE);
+    assert.ok(
+      revert,
+      "james's /admin/adoption records no revert for the node_registry role — the readopt has no " +
+        'report at all, which is exactly the silence the story refuses'
     );
-    try {
-      const page = (await rail.call('export_records', { cursor: null, limit: 64 })) as {
-        records: unknown[];
-      };
-      const stillThere = page.records.some(r => entryHashOfSignedAction(r) === entryHash);
-      assert.ok(
-        stillThere,
-        `james's v2-authored record ${entryHash} is no longer on his own v2 chain — it is LOST, ` +
-          'not pending'
-      );
-    } finally {
-      await rail.close();
-    }
+    assert.notEqual(
+      revert.readopt?.status,
+      'notAttempted',
+      `james's revert reports readopt notAttempted: ${String(revert.readopt?.reason)}`
+    );
+    const readopted = revert.readopt?.readopted ?? 0;
+    const alreadyPresent = revert.readopt?.alreadyPresent ?? 0;
+    const foreign = revert.readopt?.foreign ?? 0;
+    const v2Total = revert.readopt?.v2Total;
+    const accounted = readopted + alreadyPresent + foreign;
+    assert.ok(
+      typeof v2Total === 'number',
+      `james's readopt reports no v2Total — the successor never said how many records it held, so ` +
+        '"nothing was lost" would be unfalsifiable'
+    );
+    assert.equal(
+      accounted,
+      v2Total,
+      `james's readopt accounts for ${accounted} of the ${v2Total} records his v2 cell held ` +
+        `(readopted ${readopted}, alreadyPresent ${alreadyPresent}, foreign ${foreign}) — the ` +
+        'remainder is unreported, which is the "lost" the story refuses'
+    );
+    console.error(
+      `[happ-lineage-migration] Station 7: james's readopt — status ${String(revert.readopt?.status)}, ` +
+        `readopted ${readopted}, alreadyPresent ${alreadyPresent}, foreign ${foreign}, ` +
+        `v2Total ${v2Total}, pages ${String(revert.readopt?.pages)}`
+    );
   }
 );
 
