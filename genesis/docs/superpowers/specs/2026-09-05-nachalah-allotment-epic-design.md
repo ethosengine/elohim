@@ -125,9 +125,20 @@ names — device → household → neighbourhood → collective → commons → 
 holon has a gevul and, inside it, a nachalah. **What is gold at one level is paper at the level
 above.** A household's records are gold to the household (every device holds and validates them)
 and paper to the planet (never gossiped past the household). A collective's deeds are gold to the
-collective and paper to the commons. Only the values agreement — the covenant that centres human
-flourishing — is gold at every level, and that is precisely the set small enough for seven
-billion peers to hold at full arc.
+collective and paper to the commons.
+
+**Values are the same system held at different arcs (operator correction, 2026-09-05).** The
+elohim's global values agreement — the covenant that centres human flourishing — is core at
+every level. But the scope of what is *agreed* at each level is constructed by the consensus
+underneath it: global values, local cultural values, individual values are all value agreements on
+the same system, each held at the arc of the holon that agreed it. Immutability is not a flag on
+a record; it is an **emergent property of arc width**. A value held by every peer on the planet
+is practically immutable because the physics, the compute and the deliberation required to
+change it are planetary. A household's value is flexible because three devices can deliberate
+by supper. The gradient from flexible to practically immutable IS the gradient from a narrow
+arc to a wide one, and the balance between global, local and individual values is not a
+policy someone writes — it is where each agreement sits on that gradient, decided by the
+consensus that formed it.
 
 A record's reach is therefore a **path up the holarchy** with a floor at each level it crosses:
 three devices at the household, seven diverse hubs at the commons, every peer at the orchestra.
@@ -153,6 +164,36 @@ Gaps added by this reading:
 - G2b.4 Fractal measurement: the allotment habit runs at two levels on the household mesh (device
   and household) before any collective level exists, so the relative-tier rule is measured, not
   asserted.
+
+## 2c. The Republic ceiling — carrying capacity is the protocol limit, and we are the IPv4 generation
+
+Holochain will not survive seven billion peers on one DHT, whatever the arcs say. The honest
+question is: **what is the maximalist "republic" the physics of one Holochain space can
+reasonably support** — the peer count × corpus × validation load at which gossip, arcs and
+deliberation still converge — and at the global scale, **how much diversity can be held under
+that limit?** Carrying capacity, not membership, is the constraint the top of the fractal is
+built against.
+
+This is a network-maturity concern of the kind the IPv4 designers met: an address space that
+looked infinite until it was not, and a protocol limit whose real meaning only appeared at
+scale. We are that generation for this substrate. The fractal is our answer in advance: the
+orchestra level is not one republic of every peer but a **republic of republics** — the
+commons-level holons hold the covenant at full arc among themselves, and each commons is itself
+a republic of collectives, down to the household. The ceiling bounds the width of any one level;
+the depth of the fractal is what carries the diversity.
+
+Gaps:
+
+- G2c.1 Measure the ceiling: on the household mesh and then alpha, the peers × corpus curve at
+  which gossip rounds stop converging, validation backlog grows without bound, or a new joiner's
+  initial sync exceeds the deliberation window — a measured constant with error bars, re-measured
+  per conductor line, recorded here.
+- G2c.2 Design the top level against the ceiling: the orchestra as a republic of republics, with
+  delegation (stewards, elohim) as the crossing between levels — the sociocratic double-link, not
+  a flat membership.
+- G2c.3 Diversity under the limit: the floor recipe at each level names *diversity* (regions,
+  households, stewards) as well as count, so the capacity we do have carries the widest
+  representation the physics allows.
 
 ## 3. Slice 2 — Earned arcs: sharding on, arcs from the trust gradient, blocks under Mishpat
 
@@ -278,6 +319,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — steering (operator): (a) values are the same system held at different arcs — immutability is an emergent property of arc width, local/individual values are constructed by the consensus underneath the global covenant (§2b corrected); (b) the Republic ceiling — one space's carrying capacity is the real protocol limit, we are the IPv4 generation, the orchestra is a republic of republics (§2c, gaps G2c.1–3).
 - 2026-09-05 — steering (operator): the construction is fractal — every holon has a gevul (boundary) and a nachalah inside it; gold at one level is paper at the level above; only the covenant is gold everywhere; a record's reach is a path up the holarchy with a floor at each level — §2b added (gaps G2b.1–4).
 - 2026-09-05 — steering (operator): allotment is the performance slice; the REA + VSM primitives are what make the DHT a living ecology — §3b added (allotment = REA commitment; five VSM seats; Ashby as the design rule; gaps G3b.1–3).
 - 2026-09-05 — epic planted from the operator's sidebar after the sunset partition finding
