@@ -317,10 +317,40 @@ fn dna_dir() -> PathBuf {
 }
 
 /// The predecessor artifact: node_registry packed BEFORE the integrity change.
+///
+/// Resolution order: the `NODE_REGISTRY_V1_DNA` env; the local `node-registry-v1.dna`
+/// (`just build && hc dna pack . -o node-registry-v1.dna`, per the module doc); else
+/// `node-registry.dna` — the DNA pipeline's own pack name for the SAME pristine default
+/// build (`elohim/holochain/dna/Jenkinsfile`: `hc dna pack . -o node-registry.dna`). The
+/// two export tests below loaded the local name unguarded and failed in CI with
+/// "No such file or directory" (elohim-holochain #1428, 2026-09-05) for a bundle that was
+/// present under its CI name the whole time.
 fn v1_path() -> PathBuf {
-    std::env::var("NODE_REGISTRY_V1_DNA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| dna_dir().join("node-registry-v1.dna"))
+    if let Ok(p) = std::env::var("NODE_REGISTRY_V1_DNA") {
+        return PathBuf::from(p);
+    }
+    let local = dna_dir().join("node-registry-v1.dna");
+    if local.exists() {
+        return local;
+    }
+    dna_dir().join("node-registry.dna")
+}
+
+/// Like [`v2_bundle_or_skip`] for the v1 bundle: absent is a loud SKIP with the build
+/// command in the log line, never a red for a bundle nobody packed and never a silent pass.
+fn v1_bundle_or_skip() -> Option<PathBuf> {
+    let p = v1_path();
+    if p.exists() {
+        Some(p)
+    } else {
+        eprintln!(
+            "SKIPPED @concern:happ-lineage-migration — v1 bundle absent at {} \
+             (build it: cd elohim/holochain/dna/node-registry && just build && \
+             hc dna pack . -o node-registry-v1.dna; CI packs it as node-registry.dna)",
+            p.display()
+        );
+        None
+    }
 }
 
 /// The successor artifact: the in-tree bundle packed WITH the `lineage-witness`
@@ -1219,9 +1249,10 @@ async fn probe_b2_remote_authority_after_close() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn export_records_is_bounded_and_resumable() -> Result<()> {
+    let Some(v1_bundle) = v1_bundle_or_skip() else { return Ok(()); };
     let (mut conductor, alice) = single_agent_conductor().await?;
     let seed = network_seed(DNA);
-    let v1 = load_dna_from_path(&v1_path(), &seed, None).await?;
+    let v1 = load_dna_from_path(&v1_bundle, &seed, None).await?;
     let app = conductor
         .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1])
         .await?;
@@ -1460,9 +1491,10 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
+    let Some(v1_bundle) = v1_bundle_or_skip() else { return Ok(()); };
     let (mut conductor, alice) = single_agent_conductor().await?;
     let seed = network_seed(DNA);
-    let v1 = load_dna_from_path(&v1_path(), &seed, None).await?;
+    let v1 = load_dna_from_path(&v1_bundle, &seed, None).await?;
     let app = conductor
         .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1])
         .await?;
