@@ -130,6 +130,9 @@ pub mod artifact_pull;
 /// the trailing bridge sweep (Task 12).
 pub mod carry;
 pub mod path_evidence;
+/// The `readopt_from` wire mirror + cursor fold — the storage side of Station
+/// 7's "the window-time v2 facts come home" (Task 13c).
+pub mod readopt;
 pub mod revert;
 pub mod state;
 pub mod verify;

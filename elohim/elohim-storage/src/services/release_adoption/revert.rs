@@ -122,38 +122,58 @@ pub fn revert_decision(
     None
 }
 
-/// What became of the window-time v2 records — the half of Station 7 that is
-/// **13b**, named rather than silently skipped.
+/// What became of the window-time v2 records — the other half of Station 7.
 ///
 /// The story asks for james's v2-authored record to be *re-authored* on v1
 /// with the same entry hash, and for anything not yet re-authored to be
-/// reported as `pending`, never as lost. That is a v1 COORDINATOR act
-/// (`readopt_from(v2_cell, cursor, limit) -> ReadoptReceipt`: `export_records`
-/// cross-cell from v2, `create_entry` natively on v1, idempotent by entry
-/// hash) and it does not exist on this build. Rather than have the revert
-/// quietly say nothing about the records, it says exactly this — and 13b adds
-/// variants beside [`Self::Unimplemented`] without reshaping anything that
-/// already reads a receipt.
+/// reported as `pending`, **never as lost**. Task 13b put the act on the v1
+/// coordinator (`readopt_from(v2_cell, cursor, limit) -> ReadoptReceipt`:
+/// `export_records` cross-cell from v2, `create_entry` natively on v1,
+/// idempotent by entry hash); Task 13c drives it from here.
+///
+/// Three answers, and the difference between the last two is the whole point:
+/// a walk that FAILED still says what the pages before it brought home, so a
+/// half-finished readopt reads as partial rather than as nothing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
 pub enum ReadoptStatus {
-    /// The v1 coordinator extern this needs is not on this build. Typed, with
-    /// the reason on the wire.
-    Unimplemented { reason: String },
+    /// No readopt was attempted, and why. A node with no client registry (and
+    /// so no way to dial its own base app) is the only production shape that
+    /// reaches this; the reason says so rather than leaving a silent zero.
+    NotAttempted { reason: String },
+    /// The walk ran to the end of the successor's export.
+    Readopted(super::readopt::ReadoptSummary),
+    /// The walk died partway. `partial` is what the pages before it DID
+    /// re-author — the story's "pending, never lost", with numbers.
+    Failed {
+        reason: String,
+        partial: super::readopt::ReadoptSummary,
+    },
 }
 
-/// The 13b seam. Returns the typed refusal today; 13b replaces the body with
-/// the `readopt_from` walk and returns a counted receipt. Every caller already
-/// puts the answer on the revert receipt, so the plug-in is one function body.
-pub fn readopt_pending(role: &str) -> ReadoptStatus {
-    ReadoptStatus::Unimplemented {
+/// The answer when no [`Readopter`] is wired at all.
+pub fn readopt_not_attempted(role: &str) -> ReadoptStatus {
+    ReadoptStatus::NotAttempted {
         reason: format!(
-            "role '{role}': re-authoring the window-time v2 records on v1 needs the v1 \
-             coordinator's `readopt_from` extern, which this build does not carry (epic Task 13b). \
-             The v2 cell is DISABLED, never uninstalled, so every window-time record is intact and \
-             readable in it — pending re-authoring, never lost."
+            "role '{role}': no readopt seam is wired on this node, so the window-time v2 records \
+             were not re-authored on v1 by this revert. The v2 cell is DISABLED, never \
+             uninstalled, so every one of them is intact and readable in it — pending \
+             re-authoring, never lost."
         ),
     }
+}
+
+/// The 13c seam: re-author this agent's window-time v2 facts back onto v1.
+///
+/// Implemented by [`super::apply::HappLineageVehicle`] — the same object that
+/// opened the window — so the v1 cell the readopt runs on and the v2 cell it
+/// reads from are derived once, from the app ids the crossing itself installed.
+#[async_trait::async_trait]
+pub trait Readopter: Send + Sync {
+    /// `side_app_id` is passed rather than looked up because by the time this
+    /// runs the revert has already moved that id out of `authoring_app_id`;
+    /// re-deriving it here is how the two halves would come to disagree.
+    async fn readopt(&self, role: &str, side_app_id: &str) -> ReadoptStatus;
 }
 
 /// What one reverted window did. Recorded on the adoption report so
@@ -254,15 +274,20 @@ fn not_an_open_window(role: &str, detail: &str) -> AdoptionRefusal {
 ///    and it is why it happens BEFORE the conductor is touched. A revert that
 ///    disabled the cell first would leave a window in which the role is still
 ///    routed to a cell that no longer answers.
-/// 2. **Then disable, and NEVER uninstall.** [`SideAppAdmin`] has one method,
+/// 2. **Then bring the window-time records home** ([`Readopter`], Task 13c) —
+///    and this step is HERE, before the disable, for a reason that is easy to
+///    get wrong: `readopt_from` runs on v1 and reaches ACROSS to the v2 cell
+///    for its export. A disabled app's cells answer no cross-cell call, so a
+///    readopt placed after the disable would fail on every revert while
+///    looking like an ordering detail. Its failure is reported on the receipt,
+///    never fatal — the revert itself has already succeeded by this line.
+/// 3. **Then disable, and NEVER uninstall.** [`SideAppAdmin`] has one method,
 ///    so this is structural rather than remembered. A failure here does NOT
 ///    fail the revert: authoring is already home, and a side app left enabled
 ///    but unrouted is inert. It is recorded on the receipt instead — the same
 ///    discipline `POST /admin/lineage/reset` follows.
-/// 3. **Then drop the trailing sweep's cursors for this role.** They are
+/// 4. **Then drop the trailing sweep's cursors for this role.** They are
 ///    ordinals into a view of the cell just disabled.
-/// 4. **Then say what became of the window-time records** ([`readopt_pending`],
-///    the 13b seam).
 ///
 /// # Idempotence
 ///
@@ -277,6 +302,7 @@ pub async fn perform_revert(
     lineage: &crate::lineage_roles::LineageRoles,
     side_admin: &dyn SideAppAdmin,
     bridge: Option<&dyn RoleSweepState>,
+    readopter: Option<&dyn Readopter>,
     role: &str,
     trigger: RevertTrigger,
     now: i64,
@@ -303,7 +329,23 @@ pub async fn perform_revert(
     // (1) ROUTING FIRST. No further write can reach v2 after this line.
     lineage.revert(role);
 
-    // (2) DISABLE, never uninstall. Non-fatal by design.
+    // (2) THE WINDOW-TIME RECORDS, while the v2 cell can still answer. See the
+    // ordering note above: this cannot move below the disable.
+    let readopt = match readopter {
+        Some(readopter) => readopter.readopt(role, &lineage_app_id).await,
+        None => readopt_not_attempted(role),
+    };
+    if let ReadoptStatus::Failed { reason, .. } = &readopt {
+        tracing::warn!(
+            role,
+            lineage_app_id = %lineage_app_id,
+            error = %reason,
+            "release-adoption: revert stands, but the window-time v2 records were only partly \
+             re-authored on v1 — they remain intact in the disabled side app, never lost"
+        );
+    }
+
+    // (3) DISABLE, never uninstall. Non-fatal by design.
     let (disabled, disable_error) = match side_admin.disable_app(&lineage_app_id).await {
         Ok(()) => (true, None),
         Err(e) => {
@@ -318,13 +360,10 @@ pub async fn perform_revert(
         }
     };
 
-    // (3) The trailing sweep's cursors point into a view of the cell above.
+    // (4) The trailing sweep's cursors point into a view of the cell above.
     if let Some(bridge) = bridge {
         bridge.clear_role(role);
     }
-
-    // (4) The window-time v2 records (13b).
-    let readopt = readopt_pending(role);
 
     tracing::info!(
         role,
@@ -425,12 +464,14 @@ mod tests {
         );
     }
 
-    /// The 13b seam says WHY, and says the records are intact — the one thing
-    /// the story forbids reporting as lost.
+    /// With no seam wired the revert still SAYS what became of the records,
+    /// and says they are intact — the one thing the story forbids reporting as
+    /// lost.
     #[test]
-    fn the_readopt_seam_is_typed_and_names_its_reason() {
-        let ReadoptStatus::Unimplemented { reason } = readopt_pending("node_registry");
-        assert!(reason.contains("readopt_from"), "{reason}");
+    fn the_unwired_readopt_answer_is_typed_and_names_its_reason() {
+        let ReadoptStatus::NotAttempted { reason } = readopt_not_attempted("node_registry") else {
+            panic!("an unwired seam must report NotAttempted");
+        };
         assert!(reason.contains("node_registry"), "{reason}");
         assert!(reason.contains("never lost"), "{reason}");
     }
@@ -496,6 +537,50 @@ mod tests {
         }
     }
 
+    /// A fake readopt seam. Records what it was asked to readopt AND whether
+    /// the side app had already been disabled at that moment — which is how
+    /// the "readopt BEFORE the disable" ordering is asserted rather than
+    /// commented. `readopt_from` reaches into the v2 cell, and a disabled app
+    /// answers nothing.
+    struct FakeReadopter {
+        admin: Arc<FakeAdmin>,
+        calls: Mutex<Vec<(String, String, bool)>>,
+        summary: super::super::readopt::ReadoptSummary,
+    }
+
+    impl FakeReadopter {
+        fn new(admin: Arc<FakeAdmin>) -> Self {
+            Self {
+                admin,
+                calls: Mutex::new(Vec::new()),
+                summary: super::super::readopt::ReadoptSummary {
+                    readopted: 1,
+                    already_present: 4,
+                    foreign: 1,
+                    pages: 1,
+                    v2_digest: "v2digest".to_string(),
+                    v2_total: Some(6),
+                },
+            }
+        }
+        /// `(role, side app id, whether disable_app had already run)`.
+        fn calls(&self) -> Vec<(String, String, bool)> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Readopter for FakeReadopter {
+        async fn readopt(&self, role: &str, side_app_id: &str) -> ReadoptStatus {
+            self.calls.lock().unwrap().push((
+                role.to_string(),
+                side_app_id.to_string(),
+                !self.admin.calls().is_empty(),
+            ));
+            ReadoptStatus::Readopted(self.summary.clone())
+        }
+    }
+
     fn open_window() -> Arc<LineageRoles> {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
         lineage.open_window(
@@ -516,13 +601,14 @@ mod tests {
     #[tokio::test]
     async fn a_revert_marks_v1_authoring_disables_the_side_app_and_reports_the_records() {
         let lineage = open_window();
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
         let sweep = FakeSweep::default();
 
         let receipt = perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
             Some(&sweep),
+            None,
             "node_registry",
             RevertTrigger::PathRevoked,
             1_700_000_000,
@@ -536,10 +622,10 @@ mod tests {
         assert_eq!(receipt.path_commitment_cid.as_deref(), Some("uhCEkPATH"));
         assert!(receipt.disabled);
         assert!(receipt.disable_error.is_none());
-        assert!(matches!(
-            receipt.readopt,
-            ReadoptStatus::Unimplemented { .. }
-        ));
+        assert!(
+            matches!(receipt.readopt, ReadoptStatus::NotAttempted { .. }),
+            "with no readopt seam wired the revert still SAYS so — never a silent zero"
+        );
 
         let snap = lineage.snapshot();
         let role = &snap["node_registry"];
@@ -559,11 +645,12 @@ mod tests {
     async fn routing_returns_to_base_before_the_cell_is_disabled() {
         let lineage = open_window();
         assert_eq!(lineage.app_id_for("node_registry"), "elohim@SIDE");
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
 
         perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
+            None,
             None,
             "node_registry",
             RevertTrigger::PriorHeadReelected,
@@ -586,11 +673,12 @@ mod tests {
     #[tokio::test]
     async fn a_failed_disable_is_reported_not_fatal() {
         let lineage = open_window();
-        let admin = FakeAdmin::failing(Arc::clone(&lineage), "websocket closed");
+        let admin = Arc::new(FakeAdmin::failing(Arc::clone(&lineage), "websocket closed"));
 
         let receipt = perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
+            None,
             None,
             "node_registry",
             RevertTrigger::PathRevoked,
@@ -611,13 +699,14 @@ mod tests {
     #[tokio::test]
     async fn a_second_revert_does_nothing_and_costs_no_conductor_call() {
         let lineage = open_window();
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
         let sweep = FakeSweep::default();
 
         perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
             Some(&sweep),
+            None,
             "node_registry",
             RevertTrigger::PathRevoked,
             1_700_000_000,
@@ -632,8 +721,9 @@ mod tests {
 
         let again = perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
             Some(&sweep),
+            None,
             "node_registry",
             RevertTrigger::PathRevoked,
             1_700_000_001,
@@ -659,11 +749,12 @@ mod tests {
     async fn a_sunset_window_is_never_reverted() {
         let lineage = open_window();
         lineage.sunset("node_registry");
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
 
         let refused = perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
+            None,
             None,
             "node_registry",
             RevertTrigger::PathRevoked,
@@ -688,10 +779,11 @@ mod tests {
     #[tokio::test]
     async fn a_role_with_no_window_refuses() {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
         assert!(perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
+            None,
             None,
             "node_registry",
             RevertTrigger::PathRevoked,
@@ -709,11 +801,12 @@ mod tests {
     async fn a_window_without_an_origin_reverts_and_names_no_path() {
         let lineage = Arc::new(LineageRoles::new("elohim", &["node_registry"]));
         lineage.open_window("node_registry", "elohim@SIDE", None);
-        let admin = FakeAdmin::new(Arc::clone(&lineage));
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
 
         let receipt = perform_revert(
             lineage.as_ref(),
-            &admin,
+            admin.as_ref(),
+            None,
             None,
             "node_registry",
             RevertTrigger::PriorHeadReelected,
@@ -722,6 +815,104 @@ mod tests {
         .await
         .expect("the window was open");
         assert!(receipt.path_commitment_cid.is_none());
+    }
+
+    /// **Task 13c, and the ordering that makes it possible.** The readopt runs
+    /// BEFORE `disable_app`, because `readopt_from` reaches into the v2 cell
+    /// and a disabled app answers nothing. The fake records whether the disable
+    /// had already happened, so a reordered implementation fails here rather
+    /// than at 3am on a live revert.
+    #[tokio::test]
+    async fn the_readopt_runs_while_the_side_app_can_still_answer() {
+        let lineage = open_window();
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
+        let readopter = FakeReadopter::new(Arc::clone(&admin));
+
+        let receipt = perform_revert(
+            lineage.as_ref(),
+            admin.as_ref(),
+            None,
+            Some(&readopter),
+            "node_registry",
+            RevertTrigger::PathRevoked,
+            1_700_000_000,
+        )
+        .await
+        .expect("the window was open");
+
+        assert_eq!(
+            readopter.calls(),
+            vec![(
+                "node_registry".to_string(),
+                "elohim@SIDE".to_string(),
+                false
+            )],
+            "the readopt named the SIDE app and ran while it was still enabled"
+        );
+        let ReadoptStatus::Readopted(summary) = &receipt.readopt else {
+            panic!("expected a counted readopt, got {:?}", receipt.readopt);
+        };
+        assert_eq!(summary.readopted, 1);
+        assert_eq!(summary.already_present, 4);
+        assert_eq!(summary.foreign, 1);
+        assert_eq!(summary.complete(), Some(true));
+        // …and the disable still happened, after.
+        assert_eq!(admin.calls().len(), 1);
+        assert!(receipt.disabled);
+    }
+
+    /// A readopt that DIED still reports what it moved, and never fails the
+    /// revert: authoring is already home, and the records are intact in the
+    /// disabled cell. "Pending, never lost", with numbers.
+    #[tokio::test]
+    async fn a_failed_readopt_is_reported_partial_never_fatal() {
+        struct DyingReadopter;
+        #[async_trait::async_trait]
+        impl Readopter for DyingReadopter {
+            async fn readopt(&self, _role: &str, _side_app_id: &str) -> ReadoptStatus {
+                ReadoptStatus::Failed {
+                    reason: "readopt_from(role='node_registry', cursor=Some(16)) failed on page 1"
+                        .to_string(),
+                    partial: super::super::readopt::ReadoptSummary {
+                        readopted: 2,
+                        pages: 1,
+                        v2_digest: "v2digest".to_string(),
+                        ..Default::default()
+                    },
+                }
+            }
+        }
+
+        let lineage = open_window();
+        let admin = Arc::new(FakeAdmin::new(Arc::clone(&lineage)));
+
+        let receipt = perform_revert(
+            lineage.as_ref(),
+            admin.as_ref(),
+            None,
+            Some(&DyingReadopter),
+            "node_registry",
+            RevertTrigger::PathRevoked,
+            1_700_000_000,
+        )
+        .await
+        .expect("a failed readopt never fails the revert");
+
+        let ReadoptStatus::Failed { reason, partial } = &receipt.readopt else {
+            panic!("expected a partial readopt, got {:?}", receipt.readopt);
+        };
+        assert!(reason.contains("page 1"), "{reason}");
+        assert_eq!(partial.readopted, 2, "what landed is still reported");
+        assert_eq!(
+            partial.complete(),
+            None,
+            "an unknown total is never rendered as completeness"
+        );
+        assert_eq!(
+            lineage.app_id_for("node_registry"),
+            "elohim",
+            "v1 authoring"
+        );
     }
 
     #[test]

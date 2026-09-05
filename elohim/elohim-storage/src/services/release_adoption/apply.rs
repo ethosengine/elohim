@@ -814,24 +814,42 @@ impl HappLineageVehicle {
         base: &holochain_client::AppInfo,
         role: &str,
     ) -> Result<holochain_client::CellId, AdoptionRefusal> {
-        base.cell_info
-            .get(role)
-            .and_then(|cells| {
-                cells.iter().find_map(|c| match c {
-                    holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
-                    _ => None,
-                })
+        Self::role_cell(base, role).ok_or_else(|| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!(
+                    "base app '{}' has no provisioned cell for role '{role}' — nothing to \
+                     carry FROM",
+                    base.installed_app_id
+                ),
+            )
+        })
+    }
+
+    /// Any app's provisioned cell for `role`. Shared by the carry's v1 source
+    /// and by the two lineage ceremonies that have to name a cell on the OTHER
+    /// side (Task 13c's readopt, which names the v2 cell to a v1 call, and
+    /// Task 14b's seal, which names the v1 cell to a v2 call) — one derivation,
+    /// so the three can never disagree about which cell a role lives in.
+    fn role_cell(app: &holochain_client::AppInfo, role: &str) -> Option<holochain_client::CellId> {
+        app.cell_info.get(role).and_then(|cells| {
+            cells.iter().find_map(|c| match c {
+                holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
+                _ => None,
             })
-            .ok_or_else(|| {
-                AdoptionRefusal::new(
-                    RefusalReason::ApplyFailed,
-                    format!(
-                        "base app '{}' has no provisioned cell for role '{role}' — nothing to \
-                         carry FROM",
-                        base.installed_app_id
-                    ),
-                )
-            })
+        })
+    }
+
+    /// This conductor's record of an app by id.
+    async fn app_info(&self, app_id: &str) -> Result<holochain_client::AppInfo, String> {
+        let apps = self
+            .admin
+            .list_apps(None)
+            .await
+            .map_err(|e| format!("could not read this conductor's installed apps ({e})"))?;
+        apps.into_iter()
+            .find(|a| a.installed_app_id == app_id)
+            .ok_or_else(|| format!("app '{app_id}' is not installed on this conductor"))
     }
 }
 
@@ -995,11 +1013,92 @@ impl super::revert::LineageReverter for HappLineageVehicle {
             self.lineage.as_ref(),
             self.side_admin.as_ref(),
             self.bridge.as_deref(),
+            Some(self),
             role,
             trigger,
             super::state::now_unix(),
         )
         .await
+    }
+}
+
+/// **Task 13c — the window-time v2 facts come home.**
+///
+/// On the vehicle for the same reason the revert is: the readopt has to name
+/// BOTH cells of the crossing (v1 to run on, v2 to read from), and the only
+/// object that knows which app ids those are is the one that installed them.
+///
+/// # Why the client is the BASE app's
+///
+/// `readopt_from` is a V1 extern. It runs on the predecessor chain — that is
+/// what makes the re-authored records land there, under the same key, with the
+/// same entry hashes — and reaches ACROSS to `v2_cell` for one bounded page of
+/// the successor's own export. So this connects to `base_app_id`, which by the
+/// time `perform_revert` calls us is once again the role's authoring app.
+///
+/// Every failure here is a [`super::revert::ReadoptStatus`], never a `Result`:
+/// the revert has already succeeded by the time this runs, and a readopt that
+/// could not connect must be REPORTED, not allowed to fail a remedy.
+#[async_trait::async_trait]
+impl super::revert::Readopter for HappLineageVehicle {
+    async fn readopt(&self, role: &str, side_app_id: &str) -> super::revert::ReadoptStatus {
+        use super::readopt::{call_readopt_from, fold_readopt, ReadoptInput, READOPT_PAGE_LIMIT};
+
+        let not_attempted = |reason: String| super::revert::ReadoptStatus::NotAttempted {
+            reason: format!(
+                "role '{role}': {reason} — the window-time v2 records were NOT re-authored on v1 \
+                 by this revert. They are intact and readable in the side app, which stays \
+                 installed; pending re-authoring, never lost."
+            ),
+        };
+
+        let side = match self.app_info(side_app_id).await {
+            Ok(app) => app,
+            Err(e) => return not_attempted(e),
+        };
+        let Some(v2_cell) = Self::role_cell(&side, role) else {
+            return not_attempted(format!(
+                "side app '{side_app_id}' has no provisioned cell for this role"
+            ));
+        };
+        let base = match self.app_info(&self.base_app_id).await {
+            Ok(app) => app,
+            Err(e) => return not_attempted(e),
+        };
+        if Self::role_cell(&base, role).is_none() {
+            return not_attempted(format!(
+                "base app '{}' has no provisioned cell for this role — nothing to re-author ONTO",
+                self.base_app_id
+            ));
+        }
+        let client = match self.registry.connect_app(&self.base_app_id, role).await {
+            Ok(client) => client,
+            Err(e) => {
+                return not_attempted(format!(
+                    "could not connect to base app '{}' ({e})",
+                    self.base_app_id
+                ))
+            }
+        };
+
+        let client_ref = &client;
+        let cell_ref = &v2_cell;
+        match fold_readopt(role, move |cursor| async move {
+            call_readopt_from(
+                client_ref,
+                ReadoptInput {
+                    v2_cell: cell_ref.clone(),
+                    cursor,
+                    limit: READOPT_PAGE_LIMIT,
+                },
+            )
+            .await
+        })
+        .await
+        {
+            Ok(summary) => super::revert::ReadoptStatus::Readopted(summary),
+            Err((reason, partial)) => super::revert::ReadoptStatus::Failed { reason, partial },
+        }
     }
 }
 

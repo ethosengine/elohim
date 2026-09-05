@@ -1028,25 +1028,38 @@ impl AdoptionController {
             };
 
             let evidence = read_path(origin.path_commitment_cid.clone()).await;
-            let elected_away = self.elected_away_from(origin).await;
 
-            let Some(trigger) = super::revert::revert_decision(&evidence, elected_away) else {
-                continue;
+            // **13a review Minor — the head read is skipped when it cannot
+            // matter.** `revert_decision` ranks `PathRevoked` strictly above
+            // `PriorHeadReelected`, so once the path itself reads revoked the
+            // channel-head resolve the re-election arm needs is a conductor
+            // round trip whose answer cannot change the outcome. Ask the pure
+            // decision first with `elected_away = false`; spend the read only
+            // when it declines.
+            let trigger = match super::revert::revert_decision(&evidence, false) {
+                already @ Some(_) => already,
+                None => {
+                    let elected_away = self.elected_away_from(origin).await;
+                    super::revert::revert_decision(&evidence, elected_away)
+                }
             };
 
-            match reverter.revert_window(&role, trigger).await {
-                Ok(receipt) => state::record_revert(receipt),
-                // A refusal here is a race the sweep lost (a reset, or a
-                // concurrent revert, between the snapshot and the call), not a
-                // claim about the path — so it is logged and the next sweep
-                // asks again, exactly like every other transient refusal.
-                Err(refusal) => tracing::warn!(
-                    role = role.as_str(),
-                    reason = trigger.label(),
-                    refusal = %refusal.reason,
-                    "release-adoption: revert refused — the window is unchanged and the next \
-                     sweep asks again"
-                ),
+            if let Some(trigger) = trigger {
+                match reverter.revert_window(&role, trigger).await {
+                    Ok(receipt) => state::record_revert(receipt),
+                    // A refusal here is a race the sweep lost (a reset, or a
+                    // concurrent revert, between the snapshot and the call),
+                    // not a claim about the path — so it is logged and the next
+                    // sweep asks again, exactly like every other transient
+                    // refusal.
+                    Err(refusal) => tracing::warn!(
+                        role = role.as_str(),
+                        reason = trigger.label(),
+                        refusal = %refusal.reason,
+                        "release-adoption: revert refused — the window is unchanged and the next \
+                         sweep asks again"
+                    ),
+                }
             }
         }
     }
@@ -2987,7 +3000,7 @@ mod tests {
                 at: 1_700_000_000,
                 disabled: true,
                 disable_error: None,
-                readopt: adoption_revert::readopt_pending(role),
+                readopt: adoption_revert::readopt_not_attempted(role),
             })
         }
     }
