@@ -46,6 +46,12 @@ interface OAuthState {
   status: number;
   /** Location header, present only on the unauthenticated 302 branch. */
   location: string | null;
+  /** Parameters sent by the most recent authorize request. */
+  authorizeRequest: {
+    clientId: string;
+    redirectUri: string;
+    responseType: string;
+  } | null;
   /** Code parsed out of the issued redirect_uri, when one was issued. */
   code: string | null;
   /** Raw body of the last /auth/token answer. */
@@ -173,6 +179,7 @@ Given(
       body: '',
       status: 0,
       location: null,
+      authorizeRequest: null,
       code: null,
       tokenBody: '',
       tokenStatus: 0,
@@ -185,14 +192,20 @@ async function authorize(
   doorwayId: string,
   clientId: string,
   redirectUri: string,
-  withBearer: boolean
+  withBearer: boolean,
+  prompt?: string,
+  responseType = 'code',
+  requestState?: string
 ): Promise<void> {
   const s = oauth(world);
   const base = doorwayBase(world, doorwayId);
-  const url =
+  if (requestState) s.state = requestState;
+  let url =
     `${base}/auth/authorize?client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&response_type=code&state=${encodeURIComponent(s.state)}&scope=openid`;
+    `&response_type=${responseType}&state=${encodeURIComponent(s.state)}&scope=openid`;
+  if (prompt) url += `&prompt=${encodeURIComponent(prompt)}`;
+  s.authorizeRequest = { clientId, redirectUri, responseType };
 
   // undici's `request` does not follow redirects unless asked, and the 302 branch
   // IS the assertion here — following it would silently test the login page.
@@ -230,6 +243,30 @@ When(
   'a signed-out browser asks doorway {string} to authorize {string} with callback {string}',
   async function (this: E2EWorld, doorwayId: string, clientId: string, redirectUri: string) {
     await authorize(this, doorwayId, clientId, redirectUri, false);
+  }
+);
+
+When(
+  'a signed-out browser asks doorway {string} to authorize {string} with callback {string}, response type {string}, state {string} and prompt {string}',
+  async function (
+    this: E2EWorld,
+    doorwayId: string,
+    clientId: string,
+    redirectUri: string,
+    responseType: string,
+    requestState: string,
+    prompt: string
+  ) {
+    await authorize(
+      this,
+      doorwayId,
+      clientId,
+      redirectUri,
+      false,
+      prompt,
+      responseType,
+      requestState
+    );
   }
 );
 
@@ -285,6 +322,23 @@ Then('the authorization response redirects to the login surface', function (this
   );
 });
 
+Then('the authorization response redirects to the registration surface', function (this: E2EWorld) {
+  const s = oauth(this);
+  assert.equal(
+    s.status,
+    302,
+    `expected an unauthenticated create-account request to 302 to registration, ` +
+      `got ${s.status}: ${s.body}`
+  );
+  assert.ok(s.location, 'the 302 carried no Location header');
+  const location = new URL(s.location, 'https://doorway.invalid');
+  assert.equal(
+    location.pathname,
+    '/threshold/register',
+    `expected the doorway registration surface, got: ${s.location}`
+  );
+});
+
 Then(
   'the login redirect preserves the client_id, redirect_uri, response_type and state',
   function (this: E2EWorld) {
@@ -301,6 +355,20 @@ Then(
       s.location.includes(encodeURIComponent(s.state)) || s.location.includes(s.state),
       `the login redirect dropped the state VALUE: ${s.location}`
     );
+  }
+);
+
+Then(
+  'the registration redirect preserves the client_id, redirect_uri, response_type and state',
+  function (this: E2EWorld) {
+    const s = oauth(this);
+    assert.ok(s.location, 'no Location header to inspect');
+    assert.ok(s.authorizeRequest, 'no authorize request was recorded');
+    const location = new URL(s.location, 'https://doorway.invalid');
+    assert.equal(location.searchParams.get('client_id'), s.authorizeRequest.clientId);
+    assert.equal(location.searchParams.get('redirect_uri'), s.authorizeRequest.redirectUri);
+    assert.equal(location.searchParams.get('response_type'), s.authorizeRequest.responseType);
+    assert.equal(location.searchParams.get('state'), s.state);
   }
 );
 

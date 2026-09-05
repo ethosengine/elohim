@@ -8,11 +8,11 @@
  * should surface "Your conductor — alpha.elohim.host is helping with ingress"
  * instead of the hosted-flywheel phrasing.
  *
- * Reuses the visitor + selector patterns from `hosted-login.steps.ts` (F1) —
- * the `_portal-visitor` anonymous Human, the LOGIN tag constants, the
- * `When('matthew opens {string}', ...)` navigation step are all shared via
- * cucumber-js's global step registry; this module only defines the steps
- * unique to Mode B.
+ * The `_portal-visitor` anonymous Human and the `When matthew opens "{url}"`
+ * navigation step live here. They were shared from the Mode A step file until
+ * that story was retired — the hosted human's sign-in is now told against the
+ * doorway's own portal in `features/auth/hosted-human/`, and Mode B is the only
+ * remaining consumer of this shape.
  *
  * Tauri scenarios (sign-in via local conductor with no doorway) are tagged
  * `@manual @tauri-only @skip` in the .feature file; the step bodies here
@@ -31,6 +31,8 @@ import { Given, Then, When } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { Human } from '../../src/framework/human.js';
+import { LOGIN } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -38,9 +40,10 @@ import { E2EWorld } from '../../src/framework/world.js';
 // ---------------------------------------------------------------------------
 
 const TRUST_INDICATOR = 'elohim-imagodei-trust-indicator';
+const PORTAL_SHELL = LOGIN.PORTAL_SHELL;
 
 // ---------------------------------------------------------------------------
-// Browser session — anonymous portal visitor (shared shape with F1)
+// Browser session — anonymous portal visitor
 // ---------------------------------------------------------------------------
 
 const VISITOR_NAME = '_portal-visitor';
@@ -80,22 +83,49 @@ function getPeerSessionState(world: E2EWorld): PeerSessionState {
 }
 
 /**
- * Resolve the visitor's Playwright page. The visitor is set up by F1's
- * `When matthew opens "{url}"` step (reused via cucumber-js's global step
- * registry); this helper just resolves the device + page from the world.
+ * Create (once per scenario) the anonymous visitor's browser, pointed at the
+ * alpha doorway. Registered as a Human so world cleanup closes it.
+ */
+async function ensureVisitor(world: E2EWorld): Promise<PlaywrightDevice> {
+  let human: Human;
+  try {
+    human = world.getHuman(VISITOR_NAME);
+  } catch {
+    human = new Human(VISITOR_NAME, { identifier: '', password: '', displayName: VISITOR_NAME });
+    world.addHuman(VISITOR_NAME, human);
+  }
+
+  const existing = human.devices.find(d => d.type === 'playwright');
+  if (existing) return existing as PlaywrightDevice;
+
+  const doorwayUrl = resolveAlphaDoorwayUrl(world);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const browser = await world.getBrowser();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const device = new PlaywrightDevice(`${VISITOR_NAME}-pw`, doorwayUrl, doorwayUrl, browser);
+  await device.init();
+  human.addDevice(device);
+  world.onCleanup(async () => device.close());
+  return device;
+}
+
+/**
+ * Resolve the visitor's Playwright page. The visitor is set up by the
+ * `When matthew opens "{url}"` step below; this helper just resolves the
+ * device + page from the world.
  */
 function getVisitorPage(world: E2EWorld) {
   const human = world.getHuman(VISITOR_NAME);
   const device = human.devices.find(d => d.type === 'playwright') as PlaywrightDevice | undefined;
   assert.ok(
     device,
-    'Visitor Playwright device is missing — the F1 "matthew opens" step should set it up'
+    'Visitor Playwright device is missing — the "matthew opens" step should set it up'
   );
   return device.page;
 }
 
 /**
- * Resolve the configured alpha doorway URL (mirrors F1's helper).
+ * Resolve the configured alpha doorway URL.
  *
  * Prefers a registered doorway (Background step), falls back to env. Strips
  * a single trailing slash so we can join paths cleanly.
@@ -145,11 +175,18 @@ Given(
 );
 
 // ---------------------------------------------------------------------------
-// When — visitor actions unique to Mode B
-//
-// NOTE: `When matthew opens "..."` is defined in hosted-login.steps.ts (F1)
-// and reused here via cucumber-js's global step registry.
+// When — visitor actions
 // ---------------------------------------------------------------------------
+
+/**
+ * Open a URL as the anonymous portal visitor, creating the browser on first
+ * use, and wait for the portal shell to render.
+ */
+When('matthew opens {string}', async function (this: E2EWorld, url: string) {
+  const device = await ensureVisitor(this);
+  await device.page.goto(url);
+  await device.page.locator(PORTAL_SHELL).waitFor({ state: 'visible' });
+});
 
 /**
  * Query `/auth/me` against the alpha doorway and capture the response body.

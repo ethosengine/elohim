@@ -27,6 +27,24 @@ names the driver; `elohim-render::Renderer` is the trait a runtime drives).
    - `lint-ssr-entry.mjs` — the SSR-entry contract (below), checked at authoring time.
    - `lint-workspace-imports.mjs` — the cross-workspace import ratchet (below).
 
+## Apps sign humans in through a portal — they are never one
+
+There are two sign-in portals in the protocol and an app is neither. The **doorway portal**
+(`doorway-app`, served by a doorway under `/threshold/*`) is the identity provider for hosted
+humans, whose doorway keeps their credential and runs their cell. The **p2p-native portal**
+(`imagodei-portal/` over a peer runtime's `/auth/me` and `/session` routes) is the identity
+provider for stewards whose own runtime holds their key; today it is reached by hand-off from
+the doorway portal. Every app — `elohim-app`, `lamad`, doorway-app's dashboard, any future EPR
+app — is an OAuth relying party of those two: it discovers where to send a human from the
+doorway's `/.well-known/elohim-auth` document, redirects to the doorway's `authorize` endpoint
+(with `prompt=create` when the human has no account yet), and consumes the code on
+`/auth/callback`. An app renders no password field and posts no registration; the only
+sign-in surface it keeps is the "which doorway" resolver step. Profile fields (bio, interests,
+location, reach) are set on the profile surface after sign-in, never at registration. Native
+in-app authentication for layered contexts (a collective's inner membrane, a lock on a
+sensitive set of files) is a future second factor layered on a session a portal minted, not a
+third portal. Decision: `genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md`.
+
 ## Bundle seams are not domain seams
 
 Splitting an app out of `app/elohim-app/` into its own workspace buys ONE thing: an

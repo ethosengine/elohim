@@ -1,0 +1,31 @@
+---
+epr-meta-version: 1
+id: a2o-auth-hosted-human-series
+covers: subtree
+purpose: >
+  The hosted-human series — the common, familiar stories of a person whose doorway keeps
+  their identity for them: arriving as a visitor, creating an account at the portal, signing
+  in, reaching the app, living in the account, being hosted, meeting the operator, and
+  leaving with nothing left behind. Ordered as a life, not as a feature list; the README is
+  the series index and maps every station to the story that carries it, whether it lives in
+  this directory (born here, numbered) or elsewhere under features/ (born earlier, listed by
+  path). Governed as a whole; the parent a2o CLAUDE.md and .epr-meta carry the authoring
+  conventions and the blind-reader obligation — no additional edit-time gate is needed here.
+cites:
+  - genesis/docs/superpowers/plans/2026-09-04-hosted-human-lifecycle-e2e-plan.md
+  - genesis/a2o/features/auth/agency-pipeline-coherence.feature
+  - genesis/a2o/features/browser/doorway-portal-login.feature
+---
+# hosted-human/ — the series
+
+Numbered `.feature` files, one per station of the hosted stage, in the order a person meets them.
+Every story here carries `@hosted-human` and one `@concern:<slug>` tag; stations whose story was
+born elsewhere are listed in `README.md` by path and are NOT moved (habit checks and pipelines
+cite them where they are). New glue lives in `steps/ui/hosted-human.steps.ts`; reuse the portal
+primitives in `steps/ui/doorway-portal-login.steps.ts` before defining anything new.
+
+**Considered, no enforcing rule beyond the parent's.** This manifest satisfies the parent
+`genesis/a2o/.epr-meta` no-orphan-subtree rule and claims coverage so the walk terminates here.
+The series discipline — one life, ordered stations, a story creates and removes its own human
+so it runs on any doorway and leaves it clean — is prose in `README.md`, not a mechanizable
+predicate.

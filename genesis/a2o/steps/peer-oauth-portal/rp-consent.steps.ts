@@ -34,6 +34,7 @@ import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
+import { ThresholdLoginPage } from '../../src/framework/pages/threshold-login.page.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,7 @@ const CONSENT_CARD = 'elohim-imagodei-consent-card';
 const CLAIM_ROW_PART = '[part="claim-row"]';
 const APPROVE_PART = '[part="approve"]';
 const DECLINE_PART = '[part="decline"]';
+const AUTH_TOKEN_KEY = 'doorway_auth_token';
 
 // ---------------------------------------------------------------------------
 // Browser session — anonymous portal visitor (shared shape with F1/F2)
@@ -131,6 +133,21 @@ function getVisitorPage(world: E2EWorld) {
   return device.page;
 }
 
+async function signInThroughDoorwayPortal(
+  device: PlaywrightDevice,
+  baseUrl: string,
+  returnTo: string
+): Promise<void> {
+  await device.page.goto(`${baseUrl}/threshold/login?returnUrl=${encodeURIComponent(returnTo)}`);
+  const loginPage = new ThresholdLoginPage(device.page);
+  await loginPage.login('matthew@alpha.elohim.host', 'shibboleth');
+  await device.page.waitForFunction(
+    (key: string) => globalThis.localStorage.getItem(key) !== null,
+    AUTH_TOKEN_KEY,
+    { timeout: 15_000 }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Given — Mode A signed-in precondition + OAuth client registration
 // ---------------------------------------------------------------------------
@@ -144,34 +161,16 @@ interface OAuthClientRow {
 /**
  * Sign matthew in as a Mode A (hosted) visitor before the OAuth redirect.
  *
- * Drives the federated-resolver -> login-card flow on alpha.elohim.host so
- * the visitor's browser context carries the `elohim_session` cookie before
- * the consent redirect. The seed is expected to have provisioned matthew
- * with password "shibboleth" (same fixture as F1).
+ * Drives the doorway's `/threshold/login` portal so the browser carries the
+ * hosted-human session before the consent redirect. The seed is expected to
+ * have provisioned matthew with password "shibboleth" (same fixture as F1).
  */
 Given(
   String.raw`matthew is signed in to alpha.elohim.host \(Mode A)`,
   async function (this: E2EWorld) {
     const device = await ensureVisitor(this);
     const baseUrl = resolveAlphaDoorwayUrl(this);
-    await device.page.goto(`${baseUrl}/auth/portal`);
-
-    const resolver = device.page.locator('elohim-imagodei-federated-resolver');
-    await resolver.waitFor({ state: 'visible' });
-    await resolver.locator('input').fill('matthew@alpha.elohim.host');
-    await resolver.locator('button[type="submit"]').click();
-
-    const card = device.page.locator('elohim-imagodei-login-card');
-    await card.waitFor({ state: 'visible' });
-    await card.locator('input[type="password"]').fill('shibboleth');
-    await card.locator('button[type="submit"]').click();
-
-    // Wait for the elohim_session cookie to land (set by /auth/login).
-    await device.page.waitForFunction(
-      () => typeof document !== 'undefined' && document.cookie.includes('elohim_session'),
-      undefined,
-      { timeout: 15_000 }
-    );
+    await signInThroughDoorwayPortal(device, baseUrl, '/auth/portal');
 
     const state = getConsentSessionState(this);
     state.matthewSignedIn = true;
@@ -263,35 +262,19 @@ When('matthew clicks Decline', async function (this: E2EWorld) {
 /**
  * Composite precondition for the Decline scenario: sign matthew in (Mode A)
  * and navigate to the consent-card with the graphos-designer params already
- * applied. Mirrors F1's `matthew is on the login-card step` shape.
+ * applied. The hosted human signs in at the doorway portal before returning
+ * to the p2p-native consent surface.
  */
 Given('matthew is on the consent-card for graphos-designer', async function (this: E2EWorld) {
   const device = await ensureVisitor(this);
   const baseUrl = resolveAlphaDoorwayUrl(this);
 
-  // Sign in first (reuses the same federated-resolver -> login-card flow).
-  await device.page.goto(`${baseUrl}/auth/portal`);
-  const resolver = device.page.locator('elohim-imagodei-federated-resolver');
-  await resolver.waitFor({ state: 'visible' });
-  await resolver.locator('input').fill('matthew@alpha.elohim.host');
-  await resolver.locator('button[type="submit"]').click();
-  const loginCard = device.page.locator('elohim-imagodei-login-card');
-  await loginCard.waitFor({ state: 'visible' });
-  await loginCard.locator('input[type="password"]').fill('shibboleth');
-  await loginCard.locator('button[type="submit"]').click();
-  await device.page.waitForFunction(
-    () => typeof document !== 'undefined' && document.cookie.includes('elohim_session'),
-    undefined,
-    { timeout: 15_000 }
-  );
-
-  // Then issue the OAuth redirect carrying graphos-designer's params.
   const consentUrl =
     `${baseUrl}/auth/portal?client_id=graphos-designer` +
     `&claims=imagodei.displayName` +
     `&redirect_uri=https://graphos-designer.elohim.host/callback` +
     `&state=abc`;
-  await device.page.goto(consentUrl);
+  await signInThroughDoorwayPortal(device, baseUrl, consentUrl);
   await device.page.locator(CONSENT_CARD).waitFor({ state: 'visible' });
 });
 

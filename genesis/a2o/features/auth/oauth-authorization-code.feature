@@ -21,6 +21,10 @@ Feature: OAuth authorization-code flow — the doorway delegates, and bounds wha
   than one forged by someone else. Every refusal below must preserve it too — an error that
   drops `state` strands the application with a failure it cannot attribute.
 
+  A signed-out application may add `prompt=create` when the human asked to make an account.
+  That changes only which doorway portal receives them; the application, callback, response
+  type, and state still describe the same authorization request and must travel with them.
+
   The redirect_uri is the whole security boundary here. A code is a bearer credential for
   the human's identity and redirect_uri decides who receives it, so a registered
   application's bound must hold the SCHEME, HOST and PORT — not merely the shape of the
@@ -54,6 +58,12 @@ Feature: OAuth authorization-code flow — the doorway delegates, and bounds wha
     When a signed-out browser asks doorway "alpha" to authorize "elohim-app" with callback "https://elohim.host/cb"
     Then the authorization response redirects to the login surface
     And the login redirect preserves the client_id, redirect_uri, response_type and state
+
+  @act:i
+  Scenario: A signed-out human asking to create an account is sent to registration without losing the request
+    When a signed-out browser asks doorway "alpha" to authorize "elohim-app" with callback "https://elohim.host/cb", response type "code", state "create-account-request" and prompt "create"
+    Then the authorization response redirects to the registration surface
+    And the registration redirect preserves the client_id, redirect_uri, response_type and state
 
   @act:i
   Scenario Outline: A hostile callback is refused even for a registered application

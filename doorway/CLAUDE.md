@@ -114,6 +114,17 @@ Anti-pattern smells in plans and PRs:
 - "Federation peer A asks doorway B for canonical content B authored" → doorways never author canonical content
 - Per-DNA proxy files → forbidden (we deleted 13 of these)
 
+**The doorway portal is one of exactly two sign-in portals, and apps are relying parties of it.**
+`doorway-app` under `/threshold/*` is the identity provider for hosted humans; the p2p-native portal
+(`app/imagodei-portal/` over a peer runtime) is the identity provider for stewards, reached today by
+the steward hand-off from `/auth/login`. Apps never own a password field or a registration form:
+they discover the portal from `/.well-known/elohim-auth`, redirect to `/auth/authorize`
+(`prompt=create` sends a new human to `/threshold/register` with the same request), and consume the
+code at their callback. Every app is a registered OAuth client with an allowed callback; the session
+moves between apps on one doorway through the single-use session-transfer pair. The doorway is the
+only surface that ever sees a hosted human's password. Decision:
+`genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md`.
+
 ## Two Scaling Axes
 
 Doorway has two fundamentally different scaling concerns:
