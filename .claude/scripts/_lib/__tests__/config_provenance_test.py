@@ -398,9 +398,16 @@ with tempfile.TemporaryDirectory() as td:
     write(tmp, "node_modules/pkg/index.js", "const a = process.env.ELOHIM_TEST_SHOULD_BE_PRUNED;\n")
     write(tmp, "target/debug/build/out.rs", 'let a = std::env::var("ELOHIM_TEST_ALSO_PRUNED");\n')
     write(tmp, "src/keep.rs", 'let a = std::env::var("ELOHIM_TEST_NOT_PRUNED");\n')
+    # .claude/worktrees/ holds sibling git worktrees — duplicate checkouts of this same
+    # repo. Unpruned, every site in the main tree is reported N+1 times (once per live
+    # worktree), which reads as "N deployment surfaces set this" for a single manifest.
+    write(tmp, ".claude/worktrees/agent-deadbeef/src/keep.rs",
+          'let a = std::env::var("ELOHIM_TEST_WORKTREE_DUPE");\n')
     reads = cp.scan_reads(tmp)
     check("node_modules/ is pruned from the walk", "ELOHIM_TEST_SHOULD_BE_PRUNED" not in reads)
     check("target/ is pruned from the walk", "ELOHIM_TEST_ALSO_PRUNED" not in reads)
+    check(".claude/worktrees/ (sibling checkouts) is pruned from the walk",
+          "ELOHIM_TEST_WORKTREE_DUPE" not in reads)
     check("a real source file outside vendor dirs is scanned", "ELOHIM_TEST_NOT_PRUNED" in reads)
 
 
@@ -474,6 +481,13 @@ with tempfile.TemporaryDirectory() as td:
 # shipped `dual` fleet-wide while the iroh relay knob it depends on, ELOHIM_IROH_RELAY_URL,
 # was read by elohim-storage's p2p_iroh config and set by nothing. Skips cleanly (does not
 # fail) if this checkout's layout has moved the file.
+#
+# LIVE TRUTH MOVED 2026-08-30, and this expectation moved with it: commit 7234b6ff0
+# ("manifests(alpha): storage-side iroh relay env + manifest board on doorway-alpha")
+# wired the knob at genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml
+# (a k8s-env write), so the verdict is now `set` — read by p2p_iroh/config.rs, written by
+# the edgenode template. The instrument stays pointed at live truth: it asserts the gap is
+# CLOSED and by which surface, so a regression that drops the env re-reds this check.
 
 _iroh_config_rs = REPO_ROOT / "elohim" / "elohim-storage" / "src" / "p2p_iroh" / "config.rs"
 if _iroh_config_rs.is_file():
@@ -486,10 +500,26 @@ if _iroh_config_rs.is_file():
             any(r.path.endswith("elohim/elohim-storage/src/p2p_iroh/config.rs") for r in kp.reads),
             str(kp.reads),
         )
-        check("LIVE: no deployment surface sets it anywhere in the repo", kp.writes == [], str(kp.writes))
         check(
-            "LIVE: verdict is 'unset' (the read is `if let Ok(v) = env::var(...)`, no default chain)",
-            kp.verdict == "unset",
+            "LIVE: the edgenode manifest template is the deployment surface that sets it",
+            any(
+                w.path.endswith(
+                    "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml"
+                )
+                and w.kind == "k8s-env"
+                for w in kp.writes
+            ),
+            str(kp.writes),
+        )
+        check(
+            "LIVE: exactly one surface sets it (a second write site means a duplicate "
+            "checkout leaked into the walk, or two manifests disagree)",
+            len(kp.writes) == 1,
+            str(kp.writes),
+        )
+        check(
+            "LIVE: verdict is 'set' (read by p2p_iroh config, written by the edgenode template)",
+            kp.verdict == "set",
             kp.verdict,
         )
 else:

@@ -127,7 +127,10 @@ _SKIP_DIR_NAMES = {
 # repo-relative path instead. genesis/research/repos/ holds full third-party research
 # checkouts (freenet-git, p2panda, ...) whose OWN env::var reads are not this repo's
 # config surface; scanning them produces false "unset" findings for someone else's code.
-_SKIP_REL_PATHS = {"genesis/research/repos"}
+# .claude/worktrees/ holds sibling git worktrees — duplicate checkouts of THIS repo, so
+# every read and write site in them is a phantom copy of one already counted in the main
+# tree (it reported ELOHIM_IROH_RELAY_URL set at six sites when one manifest sets it).
+_SKIP_REL_PATHS = {"genesis/research/repos", ".claude/worktrees"}
 
 _JS_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 _SHELL_EXTS = {".sh", ".bash"}
