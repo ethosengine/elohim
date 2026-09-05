@@ -33,11 +33,22 @@ pub struct BlockRow {
     /// `dna:agent` in holo_hash b64 form for a cell block, or the IP for an IP
     /// block.
     pub target: String,
-    /// Rendered reason, e.g. `InvalidOp(uhCkk…)`.
+    /// Rendered reason, e.g. `InvalidOp(uhCQk…)`.
     pub reason: String,
-    /// The op hash the block cites, when the reason carries one. This is the row
-    /// to look for in `rejected`.
-    pub invalid_op: Option<String>,
+    /// The op hash `CellBlockReason::InvalidOp` carries — the **warrant op's**
+    /// hash, not the hash of the rejected chain op that provoked it.
+    ///
+    /// `integrate_dht_ops_workflow` builds the block from a warrant op's summary
+    /// (`holochain-0.7.0/src/core/workflow/integrate_dht_ops_workflow.rs:46-65`):
+    /// it pushes `(target, s.op_hash)` where `s` is the *warrant* op, then wraps
+    /// that same hash in `CellBlockReason::InvalidOp`. Which party is blocked
+    /// depends on the warrant's own validation status — an ACCEPTED warrant
+    /// blocks the warrantee, a REJECTED one blocks the warrant's author.
+    ///
+    /// So this hash is found under `WARRANTS` in `rejected --dna` output, never
+    /// under `REJECTED OPS`. Looking for it there is a dead end, which is why it
+    /// is not named `invalid_op`.
+    pub warrant_op_hash: Option<String>,
     pub start_us: i64,
     pub end_us: i64,
     /// Raw bytes of `target_id`, kept so a caller can group rows without
@@ -81,9 +92,9 @@ fn decode_reason(bytes: &[u8]) -> Result<(String, Option<String>)> {
     let reason: BlockTargetReason = holochain_serialized_bytes::decode(bytes)
         .context("decoding BlockSpan.target_reason as BlockTargetReason")?;
     Ok(match reason {
-        BlockTargetReason::Cell(CellBlockReason::InvalidOp(op_hash)) => {
-            let h = fmt::hash_b64(op_hash.get_raw_39());
-            (format!("InvalidOp({h})"), Some(h))
+        BlockTargetReason::Cell(CellBlockReason::InvalidOp(warrant_op_hash)) => {
+            let h = fmt::hash_b64(warrant_op_hash.get_raw_39());
+            (format!("InvalidOp(warrant op {h})"), Some(h))
         }
         BlockTargetReason::Cell(CellBlockReason::BadCrypto) => ("BadCrypto".to_string(), None),
         BlockTargetReason::Ip(r) => (format!("{r:?}"), None),
@@ -111,12 +122,12 @@ pub fn list(conn: &Connection) -> Result<Vec<BlockRow>> {
     for row in rows {
         let (id, target_id_bytes, reason_bytes, start_us, end_us) = row?;
         let target = decode_target(&target_id_bytes)?;
-        let (reason, invalid_op) = decode_reason(&reason_bytes)?;
+        let (reason, warrant_op_hash) = decode_reason(&reason_bytes)?;
         out.push(BlockRow {
             id,
             target,
             reason,
-            invalid_op,
+            warrant_op_hash,
             start_us,
             end_us,
             target_id_bytes,
@@ -141,6 +152,15 @@ impl CellSelector {
         })?;
         if dna.is_empty() || agent.is_empty() {
             anyhow::bail!("--cell must be <dna>:<agent> or <dna>:* (got {s:?})");
+        }
+        // `BlockTargetId::Ip` renders as `ip:<addr>`, so a bare `ip:*` would
+        // otherwise address every IP block through the DNA field. This verb is
+        // for cell blocks; refuse the collision rather than quietly widening.
+        if dna == "ip" {
+            anyhow::bail!(
+                "--cell addresses CELL blocks (<dna>:<agent>); `ip:` targets IP blocks \
+                 and are not liftable through this verb"
+            );
         }
         Ok(Self {
             dna: dna.to_string(),
@@ -189,6 +209,10 @@ pub fn delete_matching(conn: &Connection, selector: &CellSelector) -> Result<Vec
 ///
 /// Fixture support: the tool builds its own test databases so the read and lift
 /// paths are exercised against the real schema and the real msgpack encoding.
+/// `cfg(test)` so the crate's invariant — the only *reachable* writer is
+/// `delete_matching`, and it only ever deletes — holds by construction rather
+/// than by documentation.
+#[cfg(test)]
 pub fn create_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS BlockSpan (
@@ -208,7 +232,9 @@ pub fn create_schema(conn: &Connection) -> Result<()> {
 
 /// Insert a block the way `holochain_data::conductor::block` does.
 ///
-/// Fixture support only — writing a block is not an operator verb.
+/// Fixture support only — writing a block is not an operator verb, so this is
+/// `cfg(test)` and unreachable from the CLI.
+#[cfg(test)]
 pub fn insert(
     conn: &Connection,
     target_id: &BlockTargetId,
@@ -286,10 +312,18 @@ mod tests {
         );
         assert_eq!(
             first.reason,
-            format!("InvalidOp({})", fmt::hash_b64(op(100).get_raw_39()))
+            format!(
+                "InvalidOp(warrant op {})",
+                fmt::hash_b64(op(100).get_raw_39())
+            )
         );
         let cited = fmt::hash_b64(op(100).get_raw_39());
-        assert_eq!(first.invalid_op.as_deref(), Some(cited.as_str()));
+        assert_eq!(first.warrant_op_hash.as_deref(), Some(cited.as_str()));
+        assert!(
+            first.reason.contains("warrant op"),
+            "the cited hash must be labelled as the warrant op's: {}",
+            first.reason
+        );
         assert!(
             first.is_permanent(),
             "integrate_dht_ops_workflow writes Timestamp::max as end_us"
@@ -350,6 +384,10 @@ mod tests {
         assert!(CellSelector::parse("no-colon").is_err());
         assert!(CellSelector::parse(":agent").is_err());
         assert!(CellSelector::parse("dna:").is_err());
+        assert!(
+            CellSelector::parse("ip:*").is_err(),
+            "the ip: target class must not be addressable through --cell"
+        );
         assert_eq!(
             CellSelector::parse("dna:*").unwrap(),
             CellSelector {

@@ -1,6 +1,6 @@
 # hc-dbtool
 
-See a Holochain 0.7 cell block, read the rejected op that caused it, and lift it.
+See a Holochain 0.7 cell block, read the warrant and the rejected op behind it, and lift it.
 
 ## Why this exists
 
@@ -29,8 +29,9 @@ hc-dbtool --databases $DB apps
 #   this conductor's own agent key per installed app, and each role's DNA
 
 hc-dbtool --databases $DB blocks
-#   every BlockSpan row, decoded to dna:agent + reason + interval,
-#   with the `rejected` command that explains each one
+#   every BlockSpan row, decoded to dna:agent + reason + interval, each joined
+#   through the DNA's DHT database to the WARRANT it cites and to the rejected
+#   ops the warrantee authored
 
 hc-dbtool --databases $DB rejected --dna uhC0k…
 #   rejected ops in that DNA (ChainOp + LimboChainOp), joined to their
@@ -83,6 +84,21 @@ for forty lines of libsodium. The port is pinned from both sides: a
 generate-then-load round trip in `key.rs`, and the live conductor databases that
 wrote the real files.
 
+## What hash a block actually cites
+
+`CellBlockReason::InvalidOp` carries the **warrant op's** hash, not the hash of
+the rejected chain op that provoked it.
+`integrate_dht_ops_workflow.rs:46-65` builds the block from a warrant op's
+summary — it pushes `(target, s.op_hash)` where `s` is the *warrant* op, and
+which party gets blocked depends on the warrant's own validation status: an
+accepted warrant blocks the **warrantee**, a rejected one blocks the **warrant's
+author**.
+
+So the cited hash is found under `WARRANTS`, never under `REJECTED OPS`. `blocks`
+does that hop for you — it opens the DNA's DHT database, resolves the warrant,
+and prints the warrantee, the cause, and the rejected ops that warrantee
+authored, so one screen answers "who is refused, by whom, and for what".
+
 ## Hash rendering
 
 The DHT tables store the **36-byte core** of a hash (32-byte digest + 4-byte DHT
@@ -90,4 +106,4 @@ location) without its 3-byte type prefix — the prefix is implied by the column
 `BlockSpan` payload, by contrast, decodes to a typed `HoloHash` carrying all 39
 bytes. `fmt::hash_b64_kind` re-attaches the column's prefix so both render as the
 same `uhCAk…` / `uhCQk…` string the conductor logs use; without it a block cannot
-be grepped back to the op it cites.
+be grepped back to the warrant it cites.

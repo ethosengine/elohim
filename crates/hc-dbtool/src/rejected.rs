@@ -229,6 +229,28 @@ pub fn warrants(conn: &Connection) -> Result<Vec<WarrantRow>> {
     Ok(out)
 }
 
+/// The warrant a block cites, looked up by the op hash in
+/// `CellBlockReason::InvalidOp`.
+///
+/// The block lives in `conductor.db` and the warrant in `dht-<dna>.db`, so this
+/// is the one join no single connection can make; the caller opens both.
+pub fn warrant_by_hash(conn: &Connection, op_hash: &str) -> Result<Option<WarrantRow>> {
+    Ok(warrants(conn)?.into_iter().find(|w| w.hash == op_hash))
+}
+
+/// Every rejected op in this DNA authored by one agent.
+///
+/// Given a warrant's `warrantee`, this is "what did the blocked peer write that
+/// got them warranted" — the evidence a household reads before it decides to
+/// lift. Filtered in Rust over the rendered author so the base64 <-> 36-byte-core
+/// conversion stays in exactly one place (`fmt::hash_b64_kind`).
+pub fn rejected_authored_by(conn: &Connection, author: &str) -> Result<Vec<RejectedOp>> {
+    Ok(list(conn)?
+        .into_iter()
+        .filter(|o| o.author == author)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,6 +366,35 @@ mod tests {
         assert_eq!(rows[0].reason.as_deref(), Some("invalid op"));
         assert_eq!(rows[0].validation_status, Some(1));
         assert!(rows[0].render().contains("warrantee:"));
+    }
+
+    #[test]
+    fn a_block_joins_to_its_warrant_and_the_warrantees_rejected_ops() {
+        let conn = fixture();
+        let warrant_hash = fmt::hash_b64_kind(&[7u8; 36], HashKind::DhtOp);
+        let author = fmt::hash_b64_kind(&[2u8; 36], HashKind::Agent);
+
+        // The hash a block cites resolves to a WARRANT, never to a rejected op.
+        let found = warrant_by_hash(&conn, &warrant_hash).unwrap().unwrap();
+        assert_eq!(found.hash, warrant_hash);
+        assert!(
+            !list(&conn)
+                .unwrap()
+                .iter()
+                .any(|o| o.op_hash == warrant_hash),
+            "a warrant op hash must not appear among the rejected ops"
+        );
+
+        // …and the warrantee's own rejected ops are reachable from it.
+        assert_eq!(rejected_authored_by(&conn, &author).unwrap().len(), 2);
+        assert!(rejected_authored_by(&conn, "uhCAkNOBODY")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn an_unknown_warrant_hash_resolves_to_nothing() {
+        assert!(warrant_by_hash(&fixture(), "uhCQkNOPE").unwrap().is_none());
     }
 
     #[test]

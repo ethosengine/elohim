@@ -19,7 +19,7 @@ pub fn hash_b64(bytes: &[u8]) -> String {
 /// carries all 39 bytes. Rendering a 36-byte column with [`hash_b64`] alone
 /// produces a string that does NOT match the same hash anywhere else
 /// (`u-5aEHTDZ…` instead of `uhCQk-5aEHTDZ…`), which silently breaks the join
-/// between a block and the op it cites. Hence this typed form.
+/// between a block and the warrant op it cites. Hence this typed form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashKind {
     Agent,
