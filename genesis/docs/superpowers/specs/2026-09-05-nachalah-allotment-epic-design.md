@@ -172,7 +172,21 @@ question is: **what is the maximalist "republic" the physics of one Holochain sp
 reasonably support** — the peer count × corpus × validation load at which gossip, arcs and
 deliberation still converge — and at the global scale, **how much diversity can be held under
 that limit?** Carrying capacity, not membership, is the constraint the top of the fractal is
-built against.
+built against — but it is the CEILING, not the goal.
+
+**Deterministic floor, elohim ceiling (operator correction, 2026-09-05).** The floor of every
+allotment is deterministic: the minimum holding and verification the physics guarantees, the
+same floor the pre-push gate dogfoods as a reach-earned attestation. The ceiling is the
+ecology's carrying capacity — the limitarian cap, Robeyns' upper limit, the top of the donut —
+and it is reached only at the full-arc global tier. Neither is the everyday. **The everyday goal
+is the most performant representation that TRUST allows.** Trust is the resource that lets a
+record be held by fewer, validated by fewer, and still be viable: seven hubs that have earned
+each other's trust through witnessed contribution carry what a trustless design would need
+seven thousand strangers to carry. A trust-full architecture is MORE viable, not less — the
+trustless "everyone verifies everything, nobody is trusted" pattern is the crypto anti-pattern
+this protocol rejects, and full-arc-everywhere is that anti-pattern wearing a Holochain costume.
+So the allotment at each level is: never below the deterministic floor, never above the elohim
+ceiling, and sized in between by the trust the peers have actually earned.
 
 This is a network-maturity concern of the kind the IPv4 designers met: an address space that
 looked infinite until it was not, and a protocol limit whose real meaning only appeared at
@@ -191,9 +205,11 @@ Gaps:
 - G2c.2 Design the top level against the ceiling: the orchestra as a republic of republics, with
   delegation (stewards, elohim) as the crossing between levels — the sociocratic double-link, not
   a flat membership.
-- G2c.3 Diversity under the limit: the floor recipe at each level names *diversity* (regions,
-  households, stewards) as well as count, so the capacity we do have carries the widest
-  representation the physics allows.
+- G2c.3 Trust-sized allotments between floor and ceiling: each level's recipe names the
+  deterministic floor (count and diversity the physics requires), the elohim ceiling (the
+  ecology's carrying capacity, reached only at the global tier), and the trust evidence that
+  sizes the everyday allotment between them — so the mesh runs at the most performant
+  representation trust allows, and grows toward the ceiling only as deliberation demands it.
 
 ## 3. Slice 2 — Earned arcs: sharding on, arcs from the trust gradient, blocks under Mishpat
 
@@ -319,6 +335,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — steering (operator): deterministic floor, elohim ceiling — the ceiling (planetary carrying capacity, the limitarian cap) is reached only at the full-arc global tier; the everyday goal is the most performant representation that TRUST allows; a trust-full architecture is more viable; full-arc-everywhere is the trustless crypto anti-pattern in a Holochain costume (§2c corrected, G2c.3 rewritten).
 - 2026-09-05 — steering (operator): (a) values are the same system held at different arcs — immutability is an emergent property of arc width, local/individual values are constructed by the consensus underneath the global covenant (§2b corrected); (b) the Republic ceiling — one space's carrying capacity is the real protocol limit, we are the IPv4 generation, the orchestra is a republic of republics (§2c, gaps G2c.1–3).
 - 2026-09-05 — steering (operator): the construction is fractal — every holon has a gevul (boundary) and a nachalah inside it; gold at one level is paper at the level above; only the covenant is gold everywhere; a record's reach is a path up the holarchy with a floor at each level — §2b added (gaps G2b.1–4).
 - 2026-09-05 — steering (operator): allotment is the performance slice; the REA + VSM primitives are what make the DHT a living ecology — §3b added (allotment = REA commitment; five VSM seats; Ashby as the design rule; gaps G3b.1–3).
