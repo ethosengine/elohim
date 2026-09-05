@@ -1,7 +1,9 @@
 # Asserts uniform all-peer EPR resolution to kill the per-host stageSpaBlob crutch. Authored
 # RED-FIRST (2026-06-29): scenario 2 failed until blobHash-pointer propagation landed. Re-probed
 # 2026-09-02: propagation landed — scenario 2 now passes live on both doorways. The remaining red
-# is a second, parallel failure mode (version divergence, scenario 4, @wip).
+# is a second, parallel failure mode (version divergence, scenario 4). Its steps were bound
+# 2026-09-05 and it now runs on the household mesh (@requires:household-nodes) instead of being
+# skipped — so whatever it reports from here on is a measurement, not the absence of one.
 @e2e @dataplane @concern:federation-deploy @requires:multi-node @act:ii
 Feature: Federation deploy uniformity — landing EPR resolves on all federation doorways
   A person who types elohim.host into a browser should arrive at the Elohim landing page. Today
@@ -36,6 +38,15 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   winners on every peer. The RECONCILE SWEEP is the periodic background process on each peer that
   measures disagreements and heals the ones it can prove.
 
+  Two more terms the final scenario's mechanism lines rest on. A CONDUCTOR is the peer-to-peer
+  runtime each peer runs behind its doorway: the doorway is the web front door, the conductor is
+  what actually holds the signed records and the rules for reading them. VERIFIED IN WASM means the
+  check ran inside the conductor's own sandboxed protocol code — the same code, byte for byte, on
+  every peer — rather than in the doorway or in this test. That distinction is the whole difference
+  between a peer PROVING a version won and a peer being TAKEN AT ITS WORD: bytes carried from
+  another peer are only ever believed after the receiving peer's own conductor re-derives the claim
+  from them and gets the same answer.
+
   Resolution has a PRECONDITION the first two scenarios do not cover: the deploy pipeline must be
   permitted to place bytes on a doorway it did not author from at all. Scenario 3 covers that link
   in the same chain — it is not a separate concern that happens to share a file.
@@ -54,6 +65,13 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   doorways that each hold the page but serve different VERSIONS of it because the version
   election never reached them (the final scenario — its own vocabulary block sits above it, and
   it is the fleet's live red today).
+
+  A GREEN FINAL SCENARIO IS NOT YET A HEALED VISITOR, and the difference is not a technicality.
+  The convergence capability ships DORMANT: it does nothing until an operator turns it on per
+  fleet. The final scenario turns it on for the length of its own run and turns it back off after,
+  so what it proves is "the cure works where it is enabled" — not "visitors are experiencing the
+  cure". Visitors stop seeing two versions of this page only when the operator enables it on the
+  fleet. Read a green there as a capability receipt, never as a closed harm.
 
   This feature is the acceptance gate that makes the per-host Jenkinsfile stageSpaBlob stage
   un-shippable: a uniform deploy MUST mean every doorway can independently resolve the landing
@@ -178,7 +196,15 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   # election live on the conductor DHT and were not traveling (storage arcs reset to Empty on
   # every restart, so election links never gossiped in; adam's sweep measured 2,619 divergent
   # rows and refused 2,603 per sweep — correctly, having no election to obey).
-  @wip
+  # BOUND 2026-09-05 (steps/dataplane/federation-deploy.steps.ts). Runs on the HOUSEHOLD MESH, not
+  # a fleet lane: the mechanism lines below reach two peers' conductors directly, which the local
+  # mesh exposes (app/elohim-app/scripts/hc-mesh.sh) and a fleet doorway does not.
+  #
+  # The two tags are different questions, not a contradiction. The feature's @requires:multi-node
+  # says "this story needs more than one peer" — true of every scenario here. This scenario's
+  # @requires:household-nodes narrows further: it needs peers whose conductors this run OWNS, so a
+  # fleet lane skips it rather than red-ing on a rail it was never given.
+  @requires:household-nodes
   Scenario: two doorways that disagree about a page converge on the elected version without anyone re-uploading it
     # THE CURE UNDER TEST — carry the election: a peer that HOLDS the winning declaration
     # serves the declaration link's own signed record alongside its head; the disagreeing
@@ -200,6 +226,14 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # OUTCOME — the visitor-facing promise this scenario exists to prove:
     Then the peer's served head moves to the earned-tier elected head
     And both doorways serve the SAME head for EPR "elohim-host-landing"
+    # AGREEING ON THE VERSION IS NOT YET SERVING IT. The two lines above compare what each doorway
+    # DECLARES. A doorway can declare the elected head and still hand a visitor the bytes of an
+    # older one, because the pointer from the head record to the served bundle is projected
+    # separately and can drift behind it — heads equal, pages different, which is the same harm
+    # wearing a different costume. These two lines close that gap by comparing, on each doorway,
+    # what the running process has MATERIALIZED against what its own storage row DECLARES.
+    And the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
+    And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
     # MECHANISM — how that outcome is trustworthy, not a trust-the-peer copy:
     And that peer's conductor verified the carried declaration link in wasm before moving it
     And the election obeyed earned-beats-staging, with ties broken on the notarized declaration timestamp

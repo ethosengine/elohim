@@ -134,7 +134,19 @@ export default tseslint.config(
       'import/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: ['**/*.spec.ts', '**/*.test.ts', '**/*.steps.ts'],
+          devDependencies: [
+            '**/*.spec.ts',
+            '**/*.test.ts',
+            '**/*.steps.ts',
+            // The conductor-rail module the mesh-proof script and the
+            // federation-deploy steps SHARE. The `scripts/**` block below
+            // already anticipates it ("Typing the rail once as a shared module
+            // is backlog work"); now that the module exists it needs the same
+            // devDependency allowance those two call sites have, because
+            // @holochain/client is a harness dependency and this package ships
+            // nothing.
+            'src/framework/dataplane/carried-election.ts',
+          ],
           peerDependencies: true,
         },
       ],
