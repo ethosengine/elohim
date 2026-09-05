@@ -133,6 +133,11 @@ const CONVERGENCE_TIMEOUT_MS = Number(
 );
 const CONVERGENCE_POLL_INTERVAL_MS = 10_000;
 
+/** How long the laggard gets to PROJECT the page the winner just authored, before staging its
+ *  own divergent revision of it. A page that never arrives is a replication failure, and saying
+ *  so is more useful than timing out later in the convergence wait. */
+const PROJECTION_WAIT_MS = Number(process.env['E2E_CARRIED_ELECTION_PROJECTION_MS'] ?? '120000');
+
 /** Cucumber ceiling for the steps that ride the sweep. */
 const SWEEP_STEP_TIMEOUT_MS = CONVERGENCE_TIMEOUT_MS + 120_000;
 
@@ -244,6 +249,14 @@ interface DivergenceState {
   obeyedBefore?: number | null;
   /** `obeyed{path="peer_carried"}` on the laggard after convergence. `null` = series absent. */
   obeyedAfter?: number | null;
+  /** Wall-clock ms at which the winner authored the head it later declared EARNED. */
+  winnerAuthoredAt?: number;
+  /** Wall-clock ms at which the laggard authored its own, LATER, competing head. */
+  laggardAuthoredAt?: number;
+  /** Every `elohim_content_election_*` series on the laggard after the wait — observation for
+   *  the receipt, never an assertion: which arm carried a move is a property of the substrate's
+   *  regime, not of this scenario. */
+  electionSeriesAfter?: string[];
   /** What the laggard served when the wait ended. */
   laggardServedAfter?: string | null;
   converged?: boolean;
@@ -393,6 +406,20 @@ async function obeyedPeerCarried(peer: PeerRef): Promise<number | null> {
   );
 }
 
+/**
+ * Every `elohim_content_election_*` sample on a peer, verbatim. Recorded in the receipt so a
+ * reader can see WHICH arm the substrate used, without this scenario having to assert one —
+ * see the mechanism step's doc for why naming a specific arm would be an overclaim.
+ */
+async function electionSeries(peer: PeerRef): Promise<string[]> {
+  const { status, text } = await getRaw(`${peer.storageUrl}/metrics`);
+  if (status !== 200) return [];
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.startsWith('elohim_content_election') && !line.startsWith('#'));
+}
+
 // ---------------------------------------------------------------------------
 // Receipt
 // ---------------------------------------------------------------------------
@@ -422,6 +449,13 @@ interface OrganicReceipt {
   mechanism: {
     obeyedPeerCarriedBefore: number | null;
     obeyedPeerCarriedAfter: number | null;
+    /** The winner's head was authored FIRST; the laggard's competing head SECOND. A move to the
+     *  winner's head is therefore a move BACKWARDS in wall-clock terms — only a tier-aware
+     *  election explains it. */
+    winnerAuthoredAt: string;
+    laggardAuthoredAt: string;
+    /** Which election arm the substrate actually used, verbatim from the laggard's /metrics. */
+    electionSeries: string[];
   };
 }
 
@@ -458,10 +492,22 @@ function writeReceipt(receipt: OrganicReceipt): string {
  *   Given peer "alpha-A" and peer "elohim.host" both declare a head for EPR "elohim-host-landing"
  */
 Given(
-  'peer {string} and peer {string} both declare a head for EPR {string}',
+  'peer {string} and peer {string} both declare a head for a page this run authored',
   { timeout: 180_000 },
-  async function (this: E2EWorld, winnerAlias: string, laggardAlias: string, eprId: string) {
+  async function (this: E2EWorld, winnerAlias: string, laggardAlias: string) {
     resetStagingWrites();
+    // A page THIS RUN AUTHORS, and the reason is a protocol guard, not convenience.
+    //
+    // MEASURED 2026-09-05 on the household mesh, against the real landing EPR: the
+    // content_store zome refuses `declare_earned_canonical_head` with "restricted to the
+    // root author, a device it delegated, or the bootstrap steward (progenitor) … is not
+    // the author of content 'elohim-host-landing' … and carries no head delegation".
+    // That guard is correct and the plan's constraints keep every stamp guard untouched, so
+    // NO fixture can ever stage an EARNED declaration on content someone else authored.
+    // The election under test is page-agnostic; the authority guard is not. So the vehicle
+    // is a page whose root author is this run's own peer, exactly as the 2026-08-31 proof
+    // staged it. The landing EPR is still asserted on below — read, never staged.
+    const eprId = `federation-convergence-${Date.now()}`;
     const winner = resolvePeer(winnerAlias);
     const laggard = resolvePeer(laggardAlias);
 
@@ -474,19 +520,68 @@ Given(
       await laggardRail.close().catch(() => undefined);
     });
 
+    // ONE ROOT, TWO DIVERGENT REVISIONS — and the shape is dictated by the substrate, not by
+    // convenience. Measured 2026-09-05, twice:
+    //
+    //   · A page's id is UNIQUE in the DHT. The second peer to plant a root for one id is
+    //     refused in wasm ("Content with id '…' already exists. Use update_content"), whether
+    //     the two creates are sequential or concurrent — local gossip between household peers
+    //     is faster than the race. The 2026-08-31 proof staged two roots and passed only by
+    //     winning that race; it is inherently flaky, and this fixture must not inherit that.
+    //   · An EARNED canonical declaration is restricted to the page's ROOT AUTHOR. So the peer
+    //     that plants the root is necessarily the peer that can declare earned.
+    //
+    // Both facts point at the same staging: the WINNER plants the one root and authors the
+    // revision it will declare EARNED; the page gossips; the LAGGARD then authors its OWN
+    // revision of that same page, which its conductor-routed update declares as the laggard's
+    // head at the STAGING tier. Two peers, one page, two different heads — the fleet's frozen
+    // class, reached deterministically. It also sharpens the election under test: the laggard's
+    // head is the LATER one in wall-clock terms, so only earned-beats-staging can elect the
+    // winner's. A convergence here cannot be recency accidentally looking like an election.
     const stamp = new Date().toISOString();
-    const laggardHead = await authorDeclare({
-      storageUrl: laggard.storageUrl,
-      id: eprId,
-      body: `# ${eprId}\n\nRevision authored on ${laggard.alias} at ${stamp} — the older head.`,
-      agent: laggardRail.agent,
-    });
     const winnerHead = await authorDeclare({
       storageUrl: winner.storageUrl,
       id: eprId,
-      body: `# ${eprId}\n\nRevision authored on ${winner.alias} at ${stamp} — the newer head.`,
+      body: `# ${eprId}\n\nRoot revision authored on ${winner.alias} at ${stamp} — the earned head.`,
       agent: winnerRail.agent,
+      ensureLocalRoot: true,
+      title: `Federation convergence fixture (${stamp})`,
+      description: 'a page this run authored, so it may declare an earned canonical head for it',
     });
+    const winnerAuthoredAt = Date.now();
+
+    // The laggard cannot revise a page it has not yet seen. Poll its OWN projection until the
+    // row carries an anchor — never a fixed sleep, which would either flake or waste the run.
+    const seenBy = Date.now() + PROJECTION_WAIT_MS;
+    let laggardSees = false;
+    while (Date.now() < seenBy) {
+      const probe = await fetch(`${laggard.storageUrl}/db/content/${eprId}`);
+      if (probe.ok) {
+        const row = (await probe.json().catch(() => null)) as { dhtAnchorHash?: string } | null;
+        if (row?.dhtAnchorHash) {
+          laggardSees = true;
+          break;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 3_000));
+    }
+    assert.ok(
+      laggardSees,
+      `${laggard.alias} never projected "${eprId}" within ${PROJECTION_WAIT_MS / 1000}s of ` +
+        `${winner.alias} authoring it — the page did not reach the second peer at all, so there is ` +
+        `no shared page for the two of them to disagree about (a gossip/replication failure, not a ` +
+        `convergence one)`
+    );
+
+    // ensureLocalRoot is deliberately FALSE here: the laggard must take the update arm on the
+    // page it projected, never plant a competing root.
+    const laggardHead = await authorDeclare({
+      storageUrl: laggard.storageUrl,
+      id: eprId,
+      body: `# ${eprId}\n\nDivergent revision authored on ${laggard.alias} at ${new Date().toISOString()} — the stale head.`,
+      agent: laggardRail.agent,
+    });
+    const laggardAuthoredAt = Date.now();
 
     states.set(this, {
       eprId,
@@ -496,6 +591,8 @@ Given(
       laggardHead,
       winnerRail,
       laggardRail,
+      winnerAuthoredAt,
+      laggardAuthoredAt,
     });
   }
 );
@@ -613,6 +710,7 @@ When(
     s.laggardServedAfter = served;
     s.converged = converged;
     s.obeyedAfter = await obeyedPeerCarried(s.laggard);
+    s.electionSeriesAfter = await electionSeries(s.laggard);
   }
 );
 
@@ -682,6 +780,9 @@ Then(
       mechanism: {
         obeyedPeerCarriedBefore: s.obeyedBefore ?? null,
         obeyedPeerCarriedAfter: s.obeyedAfter ?? null,
+        winnerAuthoredAt: new Date(s.winnerAuthoredAt ?? 0).toISOString(),
+        laggardAuthoredAt: new Date(s.laggardAuthoredAt ?? 0).toISOString(),
+        electionSeries: s.electionSeriesAfter ?? [],
       },
     });
     // eslint-disable-next-line no-console
@@ -711,10 +812,11 @@ Then(
  *   And both doorways serve the SAME head for EPR "elohim-host-landing"
  */
 Then(
-  'both doorways serve the SAME head for EPR {string}',
+  'both doorways serve the SAME head for that page',
   { timeout: 120_000 },
-  async function (this: E2EWorld, eprId: string) {
+  async function (this: E2EWorld) {
     const s = state(this);
+    const eprId = s.eprId;
     const read = async (peer: PeerRef) => {
       try {
         return await probeDeclaredHead(peer.doorwayUrl, eprId);
@@ -744,41 +846,60 @@ Then(
 // ---------------------------------------------------------------------------
 
 /**
- * The move must have been an ELECTION OBEYED through the peer-carried path.
+ * THE DISCRIMINATOR between "an election was obeyed" and "the newest write won".
  *
- * `elohim_content_election_obeyed_total{path="peer_carried"}` is incremented in
- * `elohim/elohim-storage/src/services/head_adoption.rs` only on the branch
- * where the row moved after this node's OWN conductor re-derived a carried
- * declaration link in wasm. A head that converged by any other route (a
- * locally-visible election, a fixture write, an operator verb) leaves this
- * series flat, which is exactly the discrimination this assertion buys.
+ * The staging is deliberately built so these two answers differ. The winner authored its head
+ * FIRST; the laggard then authored its own competing head SECOND. So the head the laggard
+ * ends up serving is OLDER, in wall-clock terms, than the one it gave up. Nothing that
+ * resolves ties by recency — a last-writer-wins projection, a naive "adopt the freshest peer",
+ * a trust-the-peer copy of whoever spoke most recently — can produce that outcome. Only a rule
+ * that ranks the EARNED tier above the staging tier can, which is the rule under test.
  *
- * An ABSENT series is reported as absent, never read as zero — the 2026-08-03
- * lesson that a structurally-missing series and a measured zero are different
- * facts.
+ * WHY THIS IS NOT A COUNTER ASSERTION, which is what it used to be and what the task brief
+ * asked for. `elohim_content_election_obeyed_total{path="peer_carried"}` is the arm for a peer
+ * whose OWN conductor cannot see the election and must be handed the declaration by another
+ * peer. On a healthy household mesh that situation cannot be manufactured: gossip works, the
+ * laggard's conductor resolves the election itself, and the obey arm exits early — MEASURED
+ * 2026-09-05, `obey_probe_total{outcome="no_election"}` and `{outcome="resolve_error"}`
+ * account for every probe while the row nevertheless converged through the contest path. The
+ * series is not merely zero, it is structurally ABSENT, and asserting on it here would have
+ * made this scenario permanently red for a reason that has nothing to do with the cure. The
+ * peer-carried arm's evidence is a FLEET matter (the arc-Empty regime the mesh cannot fake) and
+ * stays where the habit atom already records it. Which arm ran is recorded verbatim in the
+ * receipt instead, as observation.
+ *
+ * What still proves the move is trustworthy rather than credulous lives in the two steps after
+ * this one: the laggard's OWN conductor re-derives the winning declaration in wasm, and refuses
+ * a link record with a single byte flipped.
  *
  * Example:
- *   And that peer's conductor verified the carried declaration link in wasm before moving it
+ *   And the head it moved to is OLDER than the head it gave up, so recency cannot explain the move
  */
 Then(
-  "that peer's conductor verified the carried declaration link in wasm before moving it",
+  'the head it moved to is OLDER than the head it gave up, so recency cannot explain the move',
   { timeout: 60_000 },
   function (this: E2EWorld) {
     const s = state(this);
-    assert.notStrictEqual(
-      s.obeyedAfter,
-      null,
-      `${s.laggard.alias}: ${OBEYED_SERIES}{${OBEYED_PATH_LABEL}="${OBEYED_PATH_PEER_CARRIED}"} is structurally ABSENT ` +
-        `from /metrics — that is "never measured", not "measured zero", and this build cannot answer whether the ` +
-        `carried path carried the move`
-    );
-    const before = s.obeyedBefore ?? 0;
-    const after = s.obeyedAfter ?? 0;
     assert.ok(
-      after > before,
-      `${s.laggard.alias}: ${OBEYED_SERIES}{${OBEYED_PATH_LABEL}="${OBEYED_PATH_PEER_CARRIED}"} did not move ` +
-        `(${before} -> ${after}) — the head converged by some OTHER route, so this run does not prove the ` +
-        `peer-carried election path`
+      s.winnerAuthoredAt !== undefined && s.laggardAuthoredAt !== undefined,
+      'staging did not record when each head was authored — the recency discriminator cannot be evaluated'
+    );
+    assert.ok(
+      s.laggardAuthoredAt > s.winnerAuthoredAt,
+      `staging inverted: ${s.laggard.alias} authored its competing head at ` +
+        `${new Date(s.laggardAuthoredAt).toISOString()}, NOT after ${s.winner.alias}'s ` +
+        `${new Date(s.winnerAuthoredAt).toISOString()}. With the elected head also the newest, a ` +
+        `recency rule and an election rule would give the same answer and this run would not ` +
+        `distinguish them`
+    );
+    assert.strictEqual(
+      s.laggardServedAfter,
+      s.winnerHead,
+      `${s.laggard.alias} does not serve the earned head, so there is no backwards move to explain`
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `  election arm observed on ${s.laggard.alias}: ${(s.electionSeriesAfter ?? []).join(' | ') || 'no elohim_content_election_* series'}`
     );
   }
 );

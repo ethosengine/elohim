@@ -231,6 +231,20 @@ export interface AuthorDeclareOptions {
   title?: string;
   /** Description for the created row. */
   description?: string;
+  /**
+   * Does this call OWN the page — may it plant this peer's own root for it?
+   *
+   * `true` (the divergence vehicle, and the 2026-08-31 proof's shape): always bulk-create,
+   * because each peer must hold its OWN chain entry for the id before it can author a
+   * revision of it. MEASURED 2026-09-05: skipping the create when a row is merely PRESENT
+   * is wrong — once the first peer's create gossips, the second peer PROJECTS a row it has
+   * no local entry for, and the zome refuses the update with "Content with id '…'".
+   * Presence of a row is not possession of a root.
+   *
+   * `false` (default): never create, and refuse outright if the row is unanchored. This is
+   * the safety posture for content the run does NOT own — see the guard below.
+   */
+  ensureLocalRoot?: boolean;
 }
 
 /**
@@ -241,7 +255,10 @@ export interface AuthorDeclareOptions {
  *      already hold it (see the note below).
  *   2. `PATCH /db/content/{id}` — author the revision; the answer's
  *      `dhtAnchorHash` is the new notarized action this peer's chain now holds.
- *   3. `POST /db/content/{id}/head` — declare that action as this peer's head.
+ *   3. `POST /db/content/{id}/head` — declare that action as this peer's head, but ONLY for a
+ *      row this call created. On a pre-existing row the conductor-routed PATCH has already
+ *      declared, and the notary would (correctly) refuse this fixture as a non-author; see the
+ *      branch's own comment.
  *
  * ### Why the create is conditional, and why staging is non-destructive
  *
@@ -280,6 +297,8 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
       } | null)
     : null;
 
+  const ensureLocalRoot = opts.ensureLocalRoot === true;
+
   // THE GUARD THAT MAKES THE NON-DESTRUCTIVE CLAIM TRUE (see this function's doc).
   // `ContentService::update_via_conductor` branches on `dht_anchor_hash.is_none()`
   // (elohim-storage/src/services/content_service.rs ~:384). Only the ELSE arm is the
@@ -287,7 +306,7 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
   // it publishes `content: view.content_body`, i.e. this fixture's staging text would
   // become the page's actual body. On the landing EPR that is a defacement, not a test.
   // So an existing row with no live anchor is refused by name rather than staged.
-  if (existingRow && !existingRow.dhtAnchorHash) {
+  if (!ensureLocalRoot && existingRow && !existingRow.dhtAnchorHash) {
     throw new Error(
       `refusing to stage on "${id}" at ${storageUrl}: the row exists but its dhtAnchorHash is ` +
         `${JSON.stringify(existingRow.dhtAnchorHash)}. An unanchored row takes elohim-storage's ` +
@@ -297,7 +316,7 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
     );
   }
 
-  if (!existingRow) {
+  if (ensureLocalRoot || !existingRow) {
     recordStagingWrite('POST', `${storageUrl}/db/content/bulk`);
     const bulk = await fetch(`${storageUrl}/db/content/bulk`, {
       method: 'POST',
@@ -329,32 +348,80 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ contentBody: body, reach }),
   });
-  const patched = (await patch.json().catch(() => ({}))) as { dhtAnchorHash?: string };
-  const anchor = patched.dhtAnchorHash;
-  if (!anchor) {
-    throw new Error(
-      `no dhtAnchorHash after PATCH on ${storageUrl}: ${JSON.stringify(patched).slice(0, 200)}`
-    );
-  }
+  const anchor = anchorFromPatch(await patch.text(), storageUrl, id);
   // A revision that did not move the anchor is not a revision — the divergence this
   // fixture exists to stage would be imaginary, and every assertion downstream vacuous.
-  if (existingRow?.dhtAnchorHash && anchor === existingRow.dhtAnchorHash) {
+  if (!ensureLocalRoot && existingRow?.dhtAnchorHash && anchor === existingRow.dhtAnchorHash) {
     throw new Error(
       `PATCH on ${storageUrl} left "${id}" at the same anchor ${anchor} — no new action was ` +
         `notarized, so there is no revision to declare and no divergence to heal`
     );
   }
 
-  recordStagingWrite('POST', `${storageUrl}/db/content/${id}/head`);
-  const head = await fetch(`${storageUrl}/db/content/${id}/head`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'X-Agent-Cid': agent },
-    body: JSON.stringify({ headActionHash: anchor }),
-  });
-  if (!head.ok) {
-    throw new Error(`declare on ${storageUrl}: ${head.status} ${await head.text()}`);
+  // WHO DECLARES, AND WHY THIS BRANCHES (measured 2026-09-05 on the household mesh).
+  //
+  // For a row this call CREATED, the explicit declaration POST is what declares: the
+  // bootstrap write leaves no prior canonical head, and the authoring agent is the author,
+  // so the notary accepts. That is the 2026-08-31 proof's path and it is unchanged.
+  //
+  // For a row that ALREADY EXISTED, the POST is both unnecessary and wrong to attempt.
+  // Unnecessary: the PATCH above routes through the conductor and
+  // `upsert_with_anchor(.., HeadElection::Declare)` already sets `declared_head_action_hash`
+  // to the new action (the PATCH handler passes `Declare`), so the head has moved by the
+  // time we get here. Wrong to attempt: `POST /db/content/{id}/head` gates on the CANONICAL
+  // head's author, which for seeded content is whoever seeded it — not this peer's conductor
+  // agent — so the notary correctly answers 403 "caller is not the author of this content".
+  // A fixture must not need to impersonate an author to stage; it reads back instead.
+  if (ensureLocalRoot || !existingRow) {
+    recordStagingWrite('POST', `${storageUrl}/db/content/${id}/head`);
+    const head = await fetch(`${storageUrl}/db/content/${id}/head`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Agent-Cid': agent },
+      body: JSON.stringify({ headActionHash: anchor }),
+    });
+    if (!head.ok) {
+      throw new Error(`declare on ${storageUrl}: ${head.status} ${await head.text()}`);
+    }
+    return anchor;
+  }
+
+  const declared = await servedHead(storageUrl, id);
+  if (declared !== anchor) {
+    throw new Error(
+      `${storageUrl} did not declare the new revision of "${id}": the PATCH minted ${anchor} but ` +
+        `GET /db/content/${id}/head still answers ${declared ?? 'nothing'}. The conductor-routed ` +
+        `update is supposed to declare as it anchors; without that this peer has no head to disagree with.`
+    );
   }
   return anchor;
+}
+
+/**
+ * The new notarized action hash out of a PATCH answer, or a legible throw.
+ *
+ * Split out of {@link authorDeclare} only to keep that function under the cognitive-complexity
+ * bound; it is one concern — "did this peer plant a revision, and if not, why not".
+ */
+function anchorFromPatch(patchText: string, storageUrl: string, id: string): string {
+  let patched: { dhtAnchorHash?: string } = {};
+  try {
+    patched = JSON.parse(patchText) as { dhtAnchorHash?: string };
+  } catch {
+    /* fall through to the no-anchor error, which prints the raw body */
+  }
+  if (patched.dhtAnchorHash) return patched.dhtAnchorHash;
+  // The one failure worth naming, because it reads as a bug and is not one: the DHT has
+  // already learned this id from the OTHER peer, so this peer's conductor refuses to plant
+  // a second root for it. That is the gossip race the divergence is born of — lost, not broken.
+  if (patchText.includes('already exists')) {
+    throw new Error(
+      `${storageUrl} lost the root-planting race for "${id}": its conductor refuses a second ` +
+        `root because the id had already gossiped in ("already exists. Use update_content"). ` +
+        `Two independently-rooted entries for one id can only be staged while neither create ` +
+        `has reached the other peer — stage both peers CONCURRENTLY, or use a fresh id.`
+    );
+  }
+  throw new Error(`no dhtAnchorHash after PATCH on ${storageUrl}: ${patchText.slice(0, 400)}`);
 }
 
 /**

@@ -1,9 +1,9 @@
 # Asserts uniform all-peer EPR resolution to kill the per-host stageSpaBlob crutch. Authored
 # RED-FIRST (2026-06-29): scenario 2 failed until blobHash-pointer propagation landed. Re-probed
 # 2026-09-02: propagation landed — scenario 2 now passes live on both doorways. The remaining red
-# is a second, parallel failure mode (version divergence, scenario 4). Its steps were bound
-# 2026-09-05 and it now runs on the household mesh (@requires:household-nodes) instead of being
-# skipped — so whatever it reports from here on is a measurement, not the absence of one.
+# is a second, parallel failure mode (version divergence), which moved 2026-09-05 into its own
+# @act:i sibling, features/dataplane/federation-version-convergence.feature — it is proven on a
+# household mesh, and an @act:ii file cannot carry an Act I scenario without holding it.
 @e2e @dataplane @concern:federation-deploy @requires:multi-node @act:ii
 Feature: Federation deploy uniformity — landing EPR resolves on all federation doorways
   A person who types elohim.host into a browser should arrive at the Elohim landing page. Today
@@ -28,25 +28,6 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   a reader who meets those internal labels elsewhere recognizes the same two peers. Uniform deploy
   means a visitor cannot tell which one they reached.
 
-  A second vocabulary pair, needed only by the final scenario: a HEAD is the specific version of an
-  EPR a doorway serves — a pointer to one authored revision, distinct from blobHash (which points at
-  bytes; the head names WHICH bytes). A DECLARATION is a signed link that names one head as the
-  canonical version of an EPR, carrying a tier: EARNED (authored through the protocol's authority
-  path) or STAGING (placed by a deploy/seed scaffold). The ELECTION is the rule every peer shares for
-  picking one winner from all declarations it can see: earned beats staging, then the newest
-  notarized declaration timestamp, with a deterministic tiebreak — so identical inputs give identical
-  winners on every peer. The RECONCILE SWEEP is the periodic background process on each peer that
-  measures disagreements and heals the ones it can prove.
-
-  Two more terms the final scenario's mechanism lines rest on. A CONDUCTOR is the peer-to-peer
-  runtime each peer runs behind its doorway: the doorway is the web front door, the conductor is
-  what actually holds the signed records and the rules for reading them. VERIFIED IN WASM means the
-  check ran inside the conductor's own sandboxed protocol code — the same code, byte for byte, on
-  every peer — rather than in the doorway or in this test. That distinction is the whole difference
-  between a peer PROVING a version won and a peer being TAKEN AT ITS WORD: bytes carried from
-  another peer are only ever believed after the receiving peer's own conductor re-derives the claim
-  from them and gets the same answer.
-
   Resolution has a PRECONDITION the first two scenarios do not cover: the deploy pipeline must be
   permitted to place bytes on a doorway it did not author from at all. Scenario 3 covers that link
   in the same chain — it is not a separate concern that happens to share a file.
@@ -59,27 +40,23 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   shows is the second failure mode below: the doorways now each resolve the page, but serve two
   different versions of it.
 
-  Uniformity has TWO failure modes, and this feature carries both: bytes/metadata that never
-  ARRIVE on a doorway (the first three scenarios — closed for the landing EPR as of 2026-09-02,
-  though scenario 3's staging-authority precondition remains @wip pending its own deploy), and
-  doorways that each hold the page but serve different VERSIONS of it because the version
-  election never reached them (the final scenario — its own vocabulary block sits above it, and
-  it is the fleet's live red today).
-
-  A GREEN FINAL SCENARIO IS NOT YET A HEALED VISITOR, and the difference is not a technicality.
-  The convergence capability ships DORMANT: it does nothing until an operator turns it on per
-  fleet. The final scenario turns it on for the length of its own run and turns it back off after,
-  so what it proves is "the cure works where it is enabled" — not "visitors are experiencing the
-  cure". Visitors stop seeing two versions of this page only when the operator enables it on the
-  fleet. Read a green there as a capability receipt, never as a closed harm.
+  Uniformity has TWO failure modes. THIS feature carries the first: bytes/metadata that never
+  ARRIVE on a doorway, so it answers "App not found" — closed for the landing EPR as of 2026-09-02,
+  though scenario 3's staging-authority precondition remains @wip pending its own deploy. The
+  second — doorways that each hold the page but serve different VERSIONS of it because the version
+  election never reached them — lives in the sibling feature
+  features/dataplane/federation-version-convergence.feature. The two are parallel, not sequential:
+  a page can arrive correctly and still be the wrong version. They are separate files because they
+  are proven on separate substrates (this one against the fleet, @act:ii; the other on a household
+  mesh the run owns, @act:i), and a file carries exactly one act.
 
   This feature is the acceptance gate that makes the per-host Jenkinsfile stageSpaBlob stage
   un-shippable: a uniform deploy MUST mean every doorway can independently resolve the landing
   EPR, not just the peer that ran the CI blob-upload step. blobHash metadata propagation from the
   author peer to all federation peers has now landed (backlog: dataplane-peer-fallback-and-
   blob-replication, item D5) — the crutch itself is not yet retired, since retiring it needs the
-  staging-authority precondition (scenario 3) and the version-divergence cure (scenario 4) settled
-  first.
+  staging-authority precondition (scenario 3) and the version-divergence cure (the sibling
+  feature) settled first.
 
   Evidence log (dated probes against the live fleet — history, not the specification above):
 
@@ -181,75 +158,3 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # A credential-free remote caller stays refused; a green here with this line failing means
     # the fix was a bypass, not an authority.
     And staging a blob on peer "elohim.host" with NO credential is refused
-
-  # ── Second failure mode: VERSION DIVERGENCE (parallel to the deploy gap, not downstream of it) ──
-  #
-  # Everything above is about bytes and metadata ARRIVING. This scenario is about something that
-  # can go wrong even when they have: the two doorways each HOLD the page but serve two different
-  # VERSIONS of it. (HEAD / DECLARATION / ELECTION / RECONCILE SWEEP are defined in the feature
-  # description above, alongside the first vocabulary block.)
-  #
-  # This failure mode EXISTS TODAY, alongside (not after) the null-blobHash gap: measured live
-  # 2026-08-31, both alpha doorways held the SAME bytes for the manifesto but served two
-  # DIFFERENT declared heads, for days — because each doorway's head only ever moved when a
-  # deploy or seed wrote to that host directly, while the declarations that should settle the
-  # election live on the conductor DHT and were not traveling (storage arcs reset to Empty on
-  # every restart, so election links never gossiped in; adam's sweep measured 2,619 divergent
-  # rows and refused 2,603 per sweep — correctly, having no election to obey).
-  # BOUND 2026-09-05 (steps/dataplane/federation-deploy.steps.ts).
-  #
-  # @requires:owned-substrate IS LOAD-BEARING, and it is the ONLY tag here that gates anything.
-  # This scenario WRITES: it stages a real disagreement on a real page by authoring a revision on
-  # each of two peers, and it flips an operator flag in a peer's runtime config. That is only ever
-  # acceptable on a substrate THIS RUN OWNS. `owned-substrate` is the one capability that says so —
-  # available: false in genesis/manifests/cluster-state.yaml (the shared fleet), available: true
-  # only under cluster-state.act1-household.yaml. So the fleet's Dataplane Validation lane, which
-  # selects `@dataplane and not @wip`, skips this scenario instead of staging divergence on the
-  # live landing page that visitors are reading.
-  #
-  # @requires:household-nodes would NOT have gated it: that capability is available: true in BOTH
-  # cluster-state files, because a household mesh is normally up. "Peers exist" and "this run may
-  # write to them" are different questions, and only the second one is the permission this scenario
-  # needs. The feature's own @requires:multi-node is the third, weakest question — "more than one
-  # peer" — true of every scenario in the file.
-  @requires:owned-substrate
-  Scenario: two doorways that disagree about a page converge on the elected version without anyone re-uploading it
-    # THE CURE UNDER TEST — carry the election: a peer that HOLDS the winning declaration
-    # serves the declaration link's own signed record alongside its head; the disagreeing
-    # peer's OWN conductor re-derives it in wasm — the link's bytes hash to the address they
-    # claim, the author's signature verifies, the link binds to this EPR's anchor, the tier
-    # parses — and merges it with every declaration it can already see under the shared
-    # election rule. Only a verified win moves the row, under the same never-move-backwards
-    # guard as every other head move. No doorway credential, no seed, no deploy is involved
-    # anywhere in this chain — that is the assertion, not an implementation detail.
-    #
-    # Ships DORMANT: the capability is enabled per-fleet by the operator flag
-    # ELOHIM_OBEY_CARRIED_ELECTION. Scenario green means the capability works where enabled;
-    # visitors experience convergence only once the operator turns it on.
-    Given peer "alpha-A" and peer "elohim.host" both declare a head for EPR "elohim-host-landing"
-    And their declared heads DISAGREE
-    And an EARNED canonical declaration exists for the newer head on its declaring peer
-    And carried elections are enabled on the fleet via the operator flag ELOHIM_OBEY_CARRIED_ELECTION
-    When the reconcile sweep runs on the peer holding the older head
-    # OUTCOME — the visitor-facing promise this scenario exists to prove:
-    Then the peer's served head moves to the earned-tier elected head
-    And both doorways serve the SAME head for EPR "elohim-host-landing"
-    # AGREEING ON THE VERSION IS NOT YET SERVING IT. The two lines above compare what each doorway
-    # DECLARES. A doorway can declare the elected head and still hand a visitor the bytes of an
-    # older one, because the pointer from the head record to the served bundle is projected
-    # separately and can drift behind it — heads equal, pages different, which is the same harm
-    # wearing a different costume. These two lines close that gap by comparing, on each doorway,
-    # what the running process has MATERIALIZED against what its own storage row DECLARES.
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
-    # MECHANISM — how that outcome is trustworthy, not a trust-the-peer copy:
-    And that peer's conductor verified the carried declaration link in wasm before moving it
-    # Earned-beats-staging is the rule this line exercises: one EARNED declaration against the
-    # other peer's staging-tier one. The timestamp tiebreak is the election's SECOND rule and is
-    # only reached when two EARNED declarations compete — a shape this scenario does not stage, so
-    # the line claims only what it proves: the winner carries the earned declaration, and the
-    # notarized timestamp the tiebreak would read is present on it. Staging a real two-earned tie
-    # is worth its own scenario; asserting it from here would be an overclaim.
-    And the elected head carries the EARNED canonical declaration, stamped with the notarized declaration timestamp
-    # ANTI-REGRESSION: the move must be an ELECTION OBEYED, never a trust-the-peer copy.
-    And a carried declaration link whose signature or binding fails wasm verification moves nothing

@@ -7,7 +7,7 @@ invariant: >
 status: red
 active: true
 checks:
-  - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature)"
+  - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature — deploy uniformity, Act II; and genesis/a2o/features/dataplane/federation-version-convergence.feature — version convergence, Act I, runnable on the household mesh)"
   - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
   - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
   - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
@@ -527,3 +527,40 @@ conductor StatefulSets rolled by edge #1428 onto wiped volumes; both doorways `c
 conductor peer stores 35 agents / 5 spaces homed across BOTH relays (`relay.alpha.elohim.host` + `relay.elohim.host`).
 Status unchanged (this habit's check is federation-deploy, Act II; the fleet has no content yet — re-seed follows). The
 line change itself was a wipe, not propagation: see runtime-upgrade-propagation's 2026-09-03 scope DELTA.
+
+- 2026-09-05 06:00Z — VERSION-CONVERGENCE SCENARIO MEASURED GREEN on the household mesh, first time: 14/14 steps,
+  `cucumber-js` exit 0, 1m21s (receipt `genesis/a2o/reports/dataplane/2026-09-05/carried-election-organic-receipt-2026-09-05T05-58-30-956Z.json`,
+  run report `federation-deploy-final-055657Z.json`). Two peers holding divergent declared heads for one page CONVERGED
+  organically in 40s with the operator flag on: `ledgerAtWhen == ledgerAtThen == 5` and `declarationCallsDuringCure: 0`
+  — the fixture's five staging writes all land BEFORE the wait and it makes none during it, so the cure is the peer's
+  own sweep, not the test. Both doorways then served the same head, and each doorway's served head matched its own
+  declared head for the REAL landing EPR (the pain-points T7 assertion, exercised green). The move is discriminated from
+  recency by construction: the laggard gave up a head it authored at 05:57:50 for one authored at 05:57:13 — 37s
+  BACKWARDS, which only earned-beats-staging explains.
+  FIVE measured reds got there, each a substrate fact the plan had not anticipated, and each is now written into the
+  fixture rather than worked around:
+    (1) `@requires:household-nodes` GATES NOTHING (`available: true` in both cluster-state files) while
+        run-dataplane-validation.sh selects `@dataplane and not @wip` — un-@wip'ing had admitted a WRITING scenario to
+        the live fleet lane. Now `@requires:owned-substrate`.
+    (2) The feature's `@act:ii` held every scenario in it on the household lane (`acts[0]` takes the FEATURE tag and a
+        second act tag is an authoring error), so the Act I scenario was SPLIT into
+        `features/dataplane/federation-version-convergence.feature` (@act:i). A file carries exactly one act.
+    (3) `POST /db/content/{id}/head` gates on the CANONICAL head's author: 403 on seeded content. Unnecessary anyway —
+        the conductor-routed PATCH already declares via `upsert_with_anchor(.., Declare)`.
+    (4) `declare_earned_canonical_head` is restricted IN WASM to the root author / its delegated device / the progenitor
+        steward. NO fixture can ever stage an earned declaration on a page it did not author, so the vehicle is a page
+        the run authors; the landing EPR is read, never staged. (Its body was verified byte-intact on both peers after
+        every run.)
+    (5) A page id is UNIQUE in the DHT — the second peer to plant a root is refused ("already exists. Use
+        update_content"), sequentially AND concurrently, because local household gossip beats the race. The 2026-08-31
+        proof staged two roots and passed only by winning that race; staging is now ONE root plus two divergent
+        revisions, which is deterministic.
+  NOT PROVEN HERE, and it cannot be: `elohim_content_election_obeyed_total{path="peer_carried"}` stayed structurally
+  ABSENT while the row converged — `obey_probe_total` accounted for all 3 probes as `no_election` (2) / `resolve_error`
+  (1). On a healthy mesh the laggard's own conductor resolves the election, so the peer-carried supply arm is never
+  needed and cannot be exercised; the move came through the contest path. This confirms rather than contradicts the
+  2026-08-31 note — the mesh cannot fake the fleet's arc-Empty regime, and peer_carried evidence stays a FLEET matter.
+  The task brief's "the obeyed{path=peer_carried} counter moved" assertion was therefore replaced by the recency
+  discriminator above; which arm ran is recorded verbatim in every receipt as observation.
+  Status stays RED: this is one of six checks, and the fleet-side peer_carried observation the 2026-08-31 entry is
+  waiting on is still unobserved.

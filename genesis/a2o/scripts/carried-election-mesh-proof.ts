@@ -56,6 +56,7 @@ async function main() {
     id: ID,
     body: `# Version A (matthew)\n\nThe elected version.`,
     agent: matthew.agent,
+    ensureLocalRoot: true,
     title: `Carried election proof (${M})`,
     description: 'mesh proof fixture',
   });
@@ -65,6 +66,7 @@ async function main() {
     id: ID,
     body: `# Version B (jessica)\n\nThe stale version.`,
     agent: jessica.agent,
+    ensureLocalRoot: true,
     title: `Carried election proof (${J})`,
     description: 'mesh proof fixture',
   });
