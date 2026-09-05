@@ -237,3 +237,27 @@ appended per run to `.claude/data/lineage-carry-metrics.jsonl`: james's 186-reco
 end to end and the whole three-page v1 export walk 0.2 s, with `ExportPage.scanned` peaking at 634 —
 an UNPINNED page reports the whole chain's action count by construction (186 records ≈ 634 actions), so
 this is the linear-cost baseline the pinned-resume path has to beat, not a regression.
+
+DELTA 2026-09-05 (Station 6 GREEN on the household mesh; receipt
+`genesis/a2o/reports/release-ceremony/2026-09-05/cucumber-stations-mvp-r22.{log,json}`, run stamp
+20260905031014, 1 scenario / 11 steps passed, 7m07s; the red it was driven from is `-r21`):
+the window keeps both sides talking. jessica, who never crossed, authored a fresh v1 record
+(`uhCEksNdZC-tU9iT1wM3-nxTRm2LCySbXvG-Ccm7-ArbIhG3cWJ83`) and james's bridge carried it into v2 with
+her signature intact, courier james, in **366 s**; james's passport reports `backwardCarry:
+unavailable` — a fact about v1 (its integrity zome declares no witness type, so a v2-authored record
+has nowhere to land there), reported rather than inferred from silence; and the word "stale" appears
+on no peer's `/version` or `/admin/adoption`, which is right, because the story defines stale as
+"still on v1 AFTER the sunset" and no sunset exists in this world.
+TWO MEASURED FACTS. (1) THE STORY'S "within one sweep interval" IS NOT THE MEASURE, and the run says
+so in one number: 366 s ≈ 12 ticks, against jessica's 192-record chain. `next_sweep` rule 2 sends the
+cursor back to the beginning at the end of every local view, so a record written mid-cycle is reached
+when the walk NEXT PASSES IT — ⌈N/16⌉ ticks, not one. One interval is what a caught-up walk costs;
+the Then's claim (james's bridge, not jessica, moves it, and her signature travels) is unchanged and
+its bound is now chain-derived. The story line should be re-spelled when it is next touched.
+(2) DEFECT in the harness, fixed: `connectRoleConductor` calls `authorizeSigningCredentials`, which
+COMMITS a cap grant to the cell's own source chain. Re-connecting on every poll iteration against a
+v2 cell the bridge is writing to every 30 s loses that race — `internal_error: … the source chain
+head has moved since the bundle began`, Station 6's first red, on the READ path. A polling caller
+now opens ONE rail and re-calls `get_witnesses_for` on it.
+R1 ledger this run: james's 196-record self-carry 50 s; the v1 export walk 0.3 s at
+`ExportPage.scanned` = 676.

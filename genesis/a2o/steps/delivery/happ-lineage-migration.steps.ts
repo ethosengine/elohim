@@ -2648,6 +2648,30 @@ async function pollPassportSweep(
 interface WitnessLinkView {
   courier: string;
 }
+async function witnessLinksOn(
+  rail: RoleConductorRail,
+  entryHashes: string[]
+): Promise<Record<string, WitnessLinkView[]>> {
+  const out: Record<string, WitnessLinkView[]> = {};
+  for (const hash of entryHashes) {
+    const links = (await rail.call('get_witnesses_for', decodeHashFromBase64(hash))) as {
+      author: Uint8Array;
+    }[];
+    out[hash] = links.map(link => ({ courier: encodeHashToBase64(link.author) }));
+  }
+  return out;
+}
+/**
+ * `witnessLinksOn` over a rail of its own.
+ *
+ * MEASURED (Station 6's first red, 2026-09-05): `connectRoleConductor` calls
+ * `authorizeSigningCredentials`, which COMMITS a cap grant to the cell's own
+ * source chain. Doing that inside a poll loop, against a v2 cell the bridge
+ * sweep is writing to every 30 s, loses the race —
+ * `internal_error: … the source chain head has moved since the bundle began`.
+ * A polling caller must open ONE rail and call `witnessLinksOn` on it; this
+ * wrapper is for the one-shot readers.
+ */
 async function witnessLinksFor(
   peer: PeerName,
   sideAppId: string,
@@ -2655,14 +2679,7 @@ async function witnessLinksFor(
 ): Promise<Record<string, WitnessLinkView[]>> {
   const rail = await connectRoleConductor(peer, NODE_REGISTRY_ROLE, NODE_REGISTRY_ZOME, sideAppId);
   try {
-    const out: Record<string, WitnessLinkView[]> = {};
-    for (const hash of entryHashes) {
-      const links = (await rail.call('get_witnesses_for', decodeHashFromBase64(hash))) as {
-        author: Uint8Array;
-      }[];
-      out[hash] = links.map(link => ({ courier: encodeHashToBase64(link.author) }));
-    }
-    return out;
+    return await witnessLinksOn(rail, entryHashes);
   } finally {
     await rail.close();
   }
@@ -3034,11 +3051,23 @@ Then(
     // ⌈records / 16⌉ intervals long, so a record written mid-cycle is
     // reached when the walk next passes it.
     const budgetMs = bridgeSweepBudgetMs(c.jessicaV1Export?.total ?? 0);
+    // ONE rail for the whole poll — see `witnessLinksFor`'s doc: a re-connect
+    // per iteration commits a cap grant and races the sweep's own writes.
+    const rail = await connectRoleConductor(
+      'james',
+      NODE_REGISTRY_ROLE,
+      NODE_REGISTRY_ZOME,
+      sideAppId
+    );
     let links: Record<string, WitnessLinkView[]> = {};
-    while (Date.now() - start < budgetMs) {
-      links = await witnessLinksFor('james', sideAppId, [entryHash]);
-      if ((links[entryHash]?.length ?? 0) > 0) break;
-      await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+    try {
+      while (Date.now() - start < budgetMs) {
+        links = await witnessLinksOn(rail, [entryHash]);
+        if ((links[entryHash]?.length ?? 0) > 0) break;
+        await new Promise<void>(resolve => setTimeout(resolve, 5_000));
+      }
+    } finally {
+      await rail.close();
     }
     const courierLinks = links[entryHash] ?? [];
     recordCarryMetric({
