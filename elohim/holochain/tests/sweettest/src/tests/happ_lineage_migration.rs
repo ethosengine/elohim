@@ -88,6 +88,32 @@ struct ExportInput {
     limit: u32,
 }
 
+/// Mirror of `node_registry_coordinator::ExportResume` (Task 24, G8) — the pin
+/// a multi-page walk hands back so the predecessor stops re-walking its whole
+/// chain per page.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct ExportResume {
+    head: String,
+    digest: String,
+    total: u32,
+    #[serde(default)]
+    observed_head: Option<u32>,
+}
+
+/// Mirror of `ExportInput` WITH the Task 24 `resume` field.
+///
+/// Kept separate from [`ExportInput`] on purpose: every other test in this file
+/// keeps sending the two-field shape, which is exactly the byte shape the
+/// LANDED storage driver sends. Those call sites are therefore a standing
+/// old-caller compatibility assertion — if `resume` ever stopped being
+/// `#[serde(default)]` on the zome side, they would all fail to decode.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ExportInputResumed {
+    cursor: Option<u32>,
+    limit: u32,
+    resume: Option<ExportResume>,
+}
+
 /// Mirror of `node_registry_coordinator::ExportPage`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ExportPage {
@@ -109,6 +135,10 @@ struct ExportPage {
     /// not a count, so `observed_head >= total - 1` always.
     #[serde(default)]
     observed_head: Option<u32>,
+    /// Task 24 (additive): the walk pin. `#[serde(default)]` because a bundle
+    /// packed before Task 24 does not emit it.
+    #[serde(default)]
+    resume: Option<ExportResume>,
 }
 
 /// Mirror of `node_registry_coordinator::ExportHeldInput` (Task 18, v1 held view).
@@ -1280,6 +1310,204 @@ async fn export_records_is_bounded_and_resumable() -> Result<()> {
     assert!(
         agents.contains(&alice),
         "known_agents must list the author of the NodeRegistration entries this cell can read"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// Task 24 (G8) — THE EXPORT WALK IS LINEAR, THE DIGEST COMPUTED ONCE
+//
+// Before Task 24 every page of `export_records` re-walked and re-hashed the
+// WHOLE chain to report its page-independent `digest`/`total`, so carrying N
+// records cost N/EXPORT_CAP whole-chain walks with every entry blob loaded on
+// each — quadratic on the one path a migration must run to completion.
+//
+// Two things fix it, and this test holds both honest:
+//
+//   1. The walk itself is now HEADERS for the ordinal index plus a
+//      sequence-bounded query for the page's entries. That is unconditional —
+//      no caller change — so it cannot be asserted from the wire. What CAN be
+//      asserted is that the pages it produces are unchanged: same records, same
+//      order, same page-independent digest, same total.
+//   2. The `resume` pin removes the remaining per-page digest walk, and — the
+//      part with teeth — REFUSES a page whose chain moved underneath it. That
+//      refusal is the reason the shortcut is safe: a resumed page can never be
+//      served against a digest it no longer describes.
+//
+// 200 records on purpose: four pages at the 64-record EXPORT_CAP, so the pin is
+// exercised across three resumed pages rather than one.
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_walk_pins_the_head_and_digests_once() -> Result<()> {
+    let (mut conductor, alice) = single_agent_conductor().await?;
+    let seed = network_seed(DNA);
+    let v1 = load_dna_from_path(&v1_path(), &seed, None).await?;
+    let app = conductor
+        .setup_app_for_agent("node-registry-v1", alice.clone(), &[v1])
+        .await?;
+    let cell = app.cells().first().unwrap().clone();
+    let zome = cell.zome(ZOME);
+
+    const N: u32 = 200;
+    for i in 0..N {
+        let _ah: ActionHash = conductor
+            .call(
+                &zome,
+                "register_node",
+                node_registration(&format!("g8-{i}"), &alice),
+            )
+            .await;
+    }
+
+    // --- page 1: unpinned, establishes the walk ----------------------------
+    let p1: ExportPage = conductor
+        .call(
+            &zome,
+            "export_records",
+            ExportInput {
+                cursor: None,
+                limit: 64,
+            },
+        )
+        .await;
+    assert_eq!(p1.records.len(), 64, "page 1 is bounded by EXPORT_CAP");
+    assert_eq!(p1.entries.len(), p1.records.len());
+    assert_eq!(
+        p1.total,
+        Some(N),
+        "one app entry per register_node — see the measured note in          export_records_is_bounded_and_resumable"
+    );
+
+    // Every page mints a pin, including the first — that is what makes the
+    // walk resumable without the caller having to know how it was computed.
+    let pin = p1
+        .resume
+        .clone()
+        .expect("every page returns a resume token");
+    assert_eq!(
+        pin.digest, p1.digest,
+        "the pin carries the SAME digest the page reports — it is a pin, not a second opinion"
+    );
+    assert_eq!(pin.total, N);
+    assert!(
+        !pin.head.is_empty(),
+        "the pin names the chain head it is pinned to"
+    );
+    assert_eq!(
+        pin.observed_head, p1.observed_head,
+        "the pin carries the head sequence forward for a later blind page"
+    );
+
+    // --- pages 2..N: pinned. The digest is not recomputed, and every page
+    //     hands back a pin identical to the one it was given.
+    let mut cursor = p1.next_cursor;
+    let mut walked = p1.records.len();
+    let mut pages = 1;
+    while let Some(next) = cursor {
+        let page: ExportPage = conductor
+            .call(
+                &zome,
+                "export_records",
+                ExportInputResumed {
+                    cursor: Some(next),
+                    limit: 64,
+                    resume: Some(pin.clone()),
+                },
+            )
+            .await;
+        pages += 1;
+        assert_eq!(
+            page.digest, p1.digest,
+            "the digest is a property of the WALK, computed once — a resumed page reports the              pinned value, never a fresh one"
+        );
+        assert_eq!(page.total, Some(N), "so is the total");
+        assert_eq!(
+            page.resume.as_ref(),
+            Some(&pin),
+            "a resumed page returns the pin it was handed, unchanged — the walk did not move"
+        );
+        assert_eq!(page.entries.len(), page.records.len());
+        walked += page.records.len();
+        cursor = page.next_cursor;
+    }
+    assert_eq!(
+        walked as u32, N,
+        "the pinned walk reaches every app record exactly once"
+    );
+    assert_eq!(pages, 4, "200 records at EXPORT_CAP 64 is 4 pages");
+
+    // --- the pin has teeth: a mid-walk write refuses the next resumed page --
+    let _mid: ActionHash = conductor
+        .call(
+            &zome,
+            "register_node",
+            node_registration("g8-mid-walk", &alice),
+        )
+        .await;
+
+    let err = conductor
+        .call_fallible::<_, ExportPage>(
+            &zome,
+            "export_records",
+            ExportInputResumed {
+                cursor: Some(64),
+                limit: 64,
+                resume: Some(pin.clone()),
+            },
+        )
+        .await
+        .expect_err("a resumed page against a moved chain MUST be refused, not served");
+    let msg = format!("{err:?}");
+    println!("[G8] mid-walk refusal:\n{msg}");
+    assert!(
+        msg.contains("chain moved") && msg.contains("restart at 0"),
+        "expected the NAMED chain-moved refusal (a driver matches on it to restart), got: {msg}"
+    );
+
+    // --- and the named remedy actually works -------------------------------
+    let fresh: ExportPage = conductor
+        .call(
+            &zome,
+            "export_records",
+            ExportInput {
+                cursor: None,
+                limit: 64,
+            },
+        )
+        .await;
+    assert_eq!(
+        fresh.total,
+        Some(N + 1),
+        "restarting at 0 sees the record the mid-walk write added"
+    );
+    assert_ne!(
+        fresh.digest, p1.digest,
+        "a chain that grew has a different digest — which is the fact the refusal was protecting"
+    );
+    let fresh_pin = fresh.resume.expect("the restarted walk mints its own pin");
+    assert_ne!(
+        fresh_pin.head, pin.head,
+        "the new pin names the NEW chain head"
+    );
+
+    // An UNPINNED page against the same moved chain is never refused — the pin
+    // is opt-in, and the landed storage driver (which sends none) keeps working
+    // exactly as it did.
+    let unpinned: ExportPage = conductor
+        .call(
+            &zome,
+            "export_records",
+            ExportInput {
+                cursor: Some(64),
+                limit: 64,
+            },
+        )
+        .await;
+    assert_eq!(
+        unpinned.digest, fresh.digest,
+        "an unpinned page recomputes against the chain as it is now — today's behaviour, unchanged"
     );
 
     Ok(())

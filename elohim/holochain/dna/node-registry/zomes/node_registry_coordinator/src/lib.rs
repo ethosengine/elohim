@@ -1280,6 +1280,64 @@ pub fn get_signed_action(action_hash: ActionHash) -> ExternResult<Option<SignedA
         .map(|r| r.signed_action))
 }
 
+/// What a multi-page walk learned on its FIRST page and need not learn again:
+/// the head the walk is pinned to, the digest and total it established over the
+/// whole chain, and the highest sequence it observed.
+///
+/// Why this exists (Holochain Evolution Epic Task 24, G8). Before it, every
+/// page of `export_records` re-walked the WHOLE chain and re-hashed it to
+/// report the same page-independent `digest`/`total`, so carrying N records
+/// cost N/`EXPORT_CAP` whole-chain walks — quadratic in the corpus, on the one
+/// path a migration has to run to completion. A caller that hands back the
+/// `resume` its previous page returned pays that walk ONCE.
+///
+/// **It is a pin, not a cache.** Handing back a `resume` is a claim that the
+/// walk is the same walk, and the export CHECKS it: a page whose chain head or
+/// record count no longer matches is refused outright (`chain moved — restart
+/// at 0`) rather than served against a stale digest. Refusing is what makes the
+/// shortcut safe — a resumed page can never report a digest that disagrees with
+/// the records it returns.
+///
+/// **Entirely optional.** A caller that never sends one (the landed storage
+/// driver does not) gets exactly today's behaviour: every page recomputes.
+/// `#[serde(default)]` on both the inputs and [`ExportPage::resume`] keeps that
+/// byte-compatible in both directions.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ExportResume {
+    /// The chain head this walk is pinned to, rendered with `HoloHash`'s
+    /// `Display` (base64) rather than sent as a native hash — the same
+    /// string-not-byte-array discipline `CarryReceipt`'s hashes keep, so a
+    /// consumer decoding into a `String` field cannot hit the msgpack
+    /// byte-array class.
+    ///
+    /// On the OWN path (`export_records`) it is this agent's source-chain head
+    /// from `agent_info()`, which is O(1) to read. On the HELD path
+    /// (`export_held_records`) it is the neighbour's chain head as the
+    /// agent-activity authority reports it (`ChainStatus`), which is the same
+    /// fact from the courier's side.
+    ///
+    /// Note what this pins on the own path: the CHAIN head, not the last app
+    /// entry. A write that commits only links still moves it, so a resumed page
+    /// after such a write is refused even though the app-entry walk is
+    /// unchanged. Conservative on purpose — a spurious restart costs one walk,
+    /// a missed one serves a stale digest.
+    pub head: String,
+    /// The whole-walk digest established on the first page — the same value
+    /// every page of the walk reports, per [`ExportPage::digest`].
+    pub digest: String,
+    /// The app-record count of the whole walk, per [`ExportPage::total`].
+    /// Checked on every resumed page: a walk whose count changed is refused,
+    /// which is what catches a courier's view growing underneath a held ordinal
+    /// even when the neighbour's head has not moved.
+    pub total: u32,
+    /// The highest observed sequence, carried forward so a page answered by a
+    /// momentarily blind authority does not erase what an earlier page
+    /// established — the same last-non-`None` discipline
+    /// [`CarryReceipt::v1_observed_head`] documents.
+    #[serde(default)]
+    pub observed_head: Option<u32>,
+}
+
 /// Input to [`export_records`]: an opaque page cursor (`None` starts at the
 /// beginning of the app-entry portion of the chain) and a page size, capped
 /// at [`EXPORT_CAP`].
@@ -1287,6 +1345,11 @@ pub fn get_signed_action(action_hash: ActionHash) -> ExternResult<Option<SignedA
 pub struct ExportInput {
     pub cursor: Option<u32>,
     pub limit: u32,
+    /// **Additive.** The [`ExportResume`] the previous page returned, or `None`
+    /// to start (or restart) a walk. `#[serde(default)]` keeps a caller that
+    /// omits the key — every landed one does — byte-compatible.
+    #[serde(default)]
+    pub resume: Option<ExportResume>,
 }
 
 /// One bounded, cursor-resumable page of app-entry records, plus a chain digest
@@ -1366,9 +1429,27 @@ pub struct ExportPage {
     /// all — never a fabricated 0, which would read as "chain head at genesis".
     #[serde(default)]
     pub observed_head: Option<u32>,
+    /// **Additive.** Hand this back on the next [`ExportInput`]/
+    /// [`ExportHeldInput`] and the walk is pinned rather than re-derived — see
+    /// [`ExportResume`]. Every page returns one; ignoring it is always safe and
+    /// costs exactly what this export cost before the field existed.
+    #[serde(default)]
+    pub resume: Option<ExportResume>,
 }
 
 const EXPORT_CAP: u32 = 64;
+
+/// The named refusal a resumed page gets when the walk it claims to continue is
+/// no longer the walk it started. Named ON PURPOSE and identically on both
+/// export paths: a driver matches on it to decide "restart at 0", and a message
+/// that varied by path would make that decision path-dependent.
+fn chain_moved(what: &str, was: &str, now: &str) -> WasmError {
+    wasm_error!(WasmErrorInner::Guest(format!(
+        "chain moved — restart at 0: the resume token pins {what} {was}, but this walk now sees \
+         {now}. Re-issue this export with `resume: None` and `cursor: None`; a resumed page is \
+         refused rather than served against a digest it no longer describes."
+    )))
+}
 
 /// The chain digest every export reports: a hex sha256 over the concatenated
 /// raw action hashes, in chain order.
@@ -1400,39 +1481,138 @@ where
 ///
 /// Local-only by construction (`query`), so it is deterministic and never
 /// waits on the network — the same property `get_signed_action` relies on.
+///
+/// # The walk is linear (Task 24, G8)
+///
+/// Two separable costs used to be one. The page's ENTRIES and the walk's
+/// page-independent `digest`/`total` were both taken from a single
+/// `query(include_entries(true))` over the WHOLE chain, so every page loaded
+/// every entry: carrying N records cost `N * N/EXPORT_CAP` entry loads. They
+/// are now split, and neither is quadratic:
+///
+///   * **The ordinal index is HEADERS ONLY.** One `query(include_entries(false))`
+///     per page establishes which actions are app entries and at which sequence
+///     — a header scan, no entry blobs. This is what maps the page cursor (an
+///     ordinal into the app-entry list) onto source-chain sequences, which is
+///     why it cannot be skipped even on a resumed page.
+///   * **Entries are loaded for THIS WINDOW only**, with a second query bounded
+///     by `ChainQueryFilterRange::ActionSeqRange` over the window's first and
+///     last sequence. Total entry loads across a whole walk: N, once.
+///
+/// That split alone makes the walk linear in record loads and is unconditional
+/// — the landed storage driver gets it without changing a byte it sends. The
+/// [`ExportResume`] token on top of it removes the remaining per-page work (the
+/// whole-chain digest) and, more importantly, PINS the walk: see
+/// [`ExportPage::resume`].
 #[hdk_extern]
 pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
     let limit = input.limit.clamp(1, EXPORT_CAP) as usize;
-    let all = query(ChainQueryFilter::new().include_entries(true))?;
-    // Read the chain head BEFORE the app-entry filter: `observed_head` is a
-    // sequence over every action, so that the held path (which reads it from
-    // the authority's pre-filter `highest_observed`) means the same thing.
-    let observed_head = all.iter().map(|r| r.action().action_seq()).max();
-    let mut app: Vec<Record> = all
+
+    // (1) The pin, O(1). `agent_info()` reports the source-chain head as of the
+    //     start of this call, and this extern writes nothing, so it is stable
+    //     for the duration of the page.
+    let head = agent_info()?.chain_head.0.to_string();
+
+    // (2) The ordinal index: HEADERS ONLY. `include_entries(false)` is the
+    //     whole point — the action rows carry the entry TYPE, the sequence and
+    //     the action hash, which is everything the cursor arithmetic and the
+    //     digest need. The entry blobs, which are the expensive part, are left
+    //     on disk until step (4) knows which handful of them this page wants.
+    //
+    //     Read the chain head sequence BEFORE the app-entry filter:
+    //     `observed_head` is a sequence over every action, so that the held
+    //     path (which reads it from the authority's pre-filter
+    //     `highest_observed`) means the same thing.
+    let headers = query(ChainQueryFilter::new().include_entries(false))?;
+    let observed_head = headers
+        .iter()
+        .map(|r| r.action().action_seq())
+        .max()
+        .or_else(|| input.resume.as_ref().and_then(|r| r.observed_head));
+    let mut app: Vec<(u32, ActionHash)> = headers
         .into_iter()
         .filter(|r| matches!(r.action().entry_type(), Some(EntryType::App(_))))
+        .map(|r| (r.action().action_seq(), r.action_address().clone()))
         .collect();
-    app.sort_by_key(|r| r.action().action_seq());
+    app.sort_by_key(|(seq, _)| *seq);
+    let total = app.len() as u32;
 
-    let digest = chain_digest(app.iter().map(|r| r.action_address()));
-    // Cheap: the walk above already read the whole chain.
-    let total = Some(app.len() as u32);
+    // (3) The digest: computed ONCE per walk. A resumed page verifies the pin
+    //     and reuses what the first page established; an unpinned page hashes
+    //     the (already loaded) header hashes, exactly as before.
+    let digest = match input.resume.as_ref() {
+        Some(resume) => {
+            if resume.head != head {
+                return Err(chain_moved("chain head", &resume.head, &head));
+            }
+            if resume.total != total {
+                return Err(chain_moved(
+                    "an app-record count of",
+                    &resume.total.to_string(),
+                    &total.to_string(),
+                ));
+            }
+            resume.digest.clone()
+        }
+        None => chain_digest(app.iter().map(|(_, hash)| hash)),
+    };
 
     let start = input.cursor.unwrap_or(0) as usize;
-    let page: Vec<Record> = app.into_iter().skip(start).take(limit).collect();
-    let next_cursor = if page.len() == limit {
+    let window: Vec<(u32, ActionHash)> = app.into_iter().skip(start).take(limit).collect();
+    let next_cursor = if window.len() == limit {
         Some((start + limit) as u32)
     } else {
         None
     };
 
+    // (4) Entries for the window, and only the window. The sequence range spans
+    //     any non-app actions that happen to sit between the first and last
+    //     record of the page — those carry no entry, so they cost nothing — and
+    //     the records are re-ordered by the window's own order rather than the
+    //     query's, so the page can never disagree with the ordinals it was
+    //     asked for.
+    let mut records = Vec::with_capacity(window.len());
+    let mut entries = Vec::with_capacity(window.len());
+    if let (Some((first_seq, _)), Some((last_seq, _))) = (window.first(), window.last()) {
+        let loaded = query(
+            ChainQueryFilter::new()
+                .sequence_range(ChainQueryFilterRange::ActionSeqRange(*first_seq, *last_seq))
+                .include_entries(true),
+        )?;
+        let mut by_hash: std::collections::HashMap<ActionHash, Record> = loaded
+            .into_iter()
+            .map(|r| (r.action_address().clone(), r))
+            .collect();
+        for (_, action_hash) in &window {
+            // The header scan named this action a moment ago in the same call,
+            // so a miss is not a stale-view problem — it is this export
+            // disagreeing with itself. Refuse loudly rather than return a page
+            // shorter than the cursor it advances.
+            let record = by_hash.remove(action_hash).ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "export_records: action {action_hash} was named by the chain header scan but \
+                     not returned by the windowed entry query — refusing to return a page that \
+                     disagrees with its own cursor"
+                )))
+            })?;
+            entries.push(record.entry().as_option().cloned());
+            records.push(record.signed_action);
+        }
+    }
+
     Ok(ExportPage {
-        entries: page.iter().map(|r| r.entry().as_option().cloned()).collect(),
-        records: page.into_iter().map(|r| r.signed_action).collect(),
+        records,
+        entries,
         next_cursor,
-        digest,
-        total,
+        digest: digest.clone(),
+        total: Some(total),
         observed_head,
+        resume: Some(ExportResume {
+            head,
+            digest,
+            total,
+            observed_head,
+        }),
     })
 }
 
@@ -1445,6 +1625,13 @@ pub struct ExportHeldInput {
     pub agent: AgentPubKey,
     pub cursor: Option<u32>,
     pub limit: u32,
+    /// **Additive.** The [`ExportResume`] the previous page returned. On this
+    /// path the pin is doubly load-bearing: a courier's view of a neighbour can
+    /// GROW mid-walk as gossip arrives, which silently shifts the ordinals a
+    /// cursor indexes into. An unpinned walk only notices via the digest, after
+    /// the fact; a pinned one is refused at the door.
+    #[serde(default)]
+    pub resume: Option<ExportResume>,
 }
 
 /// The app entry types in scope for THIS zome, rendered as an exact
@@ -1553,7 +1740,29 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
     // has seen — genesis, links and all — not just the app entries this walk
     // returns. That is what makes it a truncation check the page cannot fake:
     // it reaches past the filtered view the rest of this response describes.
-    let observed_head = activity.highest_observed.map(|h| h.action_seq);
+    let observed_head = activity
+        .highest_observed
+        .map(|h| h.action_seq)
+        .or_else(|| input.resume.as_ref().and_then(|r| r.observed_head));
+
+    // The pin for the HELD path (Task 24, G8). `ChainStatus` is the authority's
+    // statement about the neighbour's chain head IRRESPECTIVE of the filters —
+    // the same fact `agent_info().chain_head` is on the own path, read from the
+    // courier's side. The non-`Valid` states get stable renderings rather than
+    // being collapsed into one string: a chain that goes Empty → Valid HAS
+    // moved, and a resumed walk across that transition must be refused.
+    let head = match &activity.status {
+        ChainStatus::Empty => "empty".to_string(),
+        ChainStatus::Valid(head) => head.hash.to_string(),
+        ChainStatus::Forked(fork) => format!("forked@{}", fork.fork_seq),
+        ChainStatus::Invalid(head) => format!("invalid@{}", head.hash),
+        // A SEALED predecessor (Station 8's `CloseChain`) is a distinct state
+        // from a live one, and it is exactly the transition a crossing walks
+        // through. Rendering it separately means a walk that began before the
+        // seal and resumed after it is refused rather than continued against a
+        // digest taken from the open chain.
+        ChainStatus::Closed(head) => format!("closed@{}", head.hash),
+    };
 
     // `valid_activity` arrives ascending by sequence (the authority sorts before
     // filtering), which is the order `export_records` establishes with its
@@ -1564,8 +1773,29 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         .map(|(_seq, hash)| hash)
         .collect();
 
-    let digest = chain_digest(hashes.iter());
-    let total = Some(hashes.len() as u32);
+    let count = hashes.len() as u32;
+    // Digest once per walk, as on the own path. The COUNT check beside the head
+    // check is what makes the pin sound here specifically: gossip adds records
+    // to the courier's view, and a back-fill below the head would change the
+    // digest without moving the head at all. A view that grew is a different
+    // walk, and is refused rather than served against the old digest.
+    let digest = match input.resume.as_ref() {
+        Some(resume) => {
+            if resume.head != head {
+                return Err(chain_moved("chain head", &resume.head, &head));
+            }
+            if resume.total != count {
+                return Err(chain_moved(
+                    "an app-record count of",
+                    &resume.total.to_string(),
+                    &count.to_string(),
+                ));
+            }
+            resume.digest.clone()
+        }
+        None => chain_digest(hashes.iter()),
+    };
+    let total = Some(count);
 
     let start = input.cursor.unwrap_or(0) as usize;
     let window: Vec<ActionHash> = hashes.into_iter().skip(start).take(limit).collect();
@@ -1594,9 +1824,15 @@ pub fn export_held_records(input: ExportHeldInput) -> ExternResult<ExportPage> {
         records,
         entries,
         next_cursor,
-        digest,
+        digest: digest.clone(),
         total,
         observed_head,
+        resume: Some(ExportResume {
+            head,
+            digest,
+            total: count,
+            observed_head,
+        }),
     })
 }
 
@@ -1724,28 +1960,56 @@ pub fn get_witnesses_for(entry_hash: EntryHash) -> ExternResult<Vec<Link>> {
 /// Reads each candidate witness locally (`GetOptions::local()`) — this chain
 /// is checking its OWN prior commits, the same verify-locally-then-serve
 /// discipline `export_held_records` documents above.
+///
+/// # Batched per page (Task 24, G8)
+///
+/// `seen` memoizes "which lineage does the witness at this action hash carry"
+/// for the WHOLE page, and the caller owns it. One witness carries up to
+/// [`WITNESS_BATCH`] proofs and therefore has an `EntryToWitness` link from
+/// each of those entry hashes, so the un-memoized version re-fetched and
+/// re-decoded the SAME witness record once per record of the page — a page of
+/// 32 previously-carried records cost 32 `get`s of one entry. It now costs one.
+///
+/// The `get_links` per distinct entry hash stays: the link base IS the entry
+/// hash, so there is no index that answers the whole page in one read. What is
+/// removed is the redundant record fetch behind those links.
+///
+/// A witness that cannot be fetched or that decodes to no
+/// [`NotarizationWitness`] memoizes as `None` — "known not to be a witness of
+/// any lineage" — so a broken link is also read only once per page.
 #[cfg(feature = "lineage-witness")]
 fn entry_already_witnessed(
     entry_hash: &EntryHash,
     lineage_dna_hash: &DnaHash,
+    seen: &mut std::collections::HashMap<ActionHash, Option<DnaHash>>,
 ) -> ExternResult<bool> {
     for link in witnesses_for(entry_hash.clone())? {
         let Some(action_hash) = link.target.into_action_hash() else {
             continue;
         };
-        let Some(record) = get(action_hash, GetOptions::local())? else {
-            continue;
-        };
-        let witness = record.entry().to_app_option::<NotarizationWitness>().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "entry_already_witnessed: could not decode NotarizationWitness at {}: {e:?}",
-                record.action_address()
-            )))
-        })?;
-        if let Some(witness) = witness {
-            if &witness.lineage_dna_hash == lineage_dna_hash {
-                return Ok(true);
+        let lineage = match seen.get(&action_hash) {
+            Some(cached) => cached.clone(),
+            None => {
+                let resolved = match get(action_hash.clone(), GetOptions::local())? {
+                    None => None,
+                    Some(record) => record
+                        .entry()
+                        .to_app_option::<NotarizationWitness>()
+                        .map_err(|e| {
+                            wasm_error!(WasmErrorInner::Guest(format!(
+                                "entry_already_witnessed: could not decode NotarizationWitness \
+                                 at {}: {e:?}",
+                                record.action_address()
+                            )))
+                        })?
+                        .map(|witness| witness.lineage_dna_hash),
+                };
+                seen.insert(action_hash, resolved.clone());
+                resolved
             }
+        };
+        if lineage.as_ref() == Some(lineage_dna_hash) {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -1940,6 +2204,12 @@ pub fn readopt_from(input: ReadoptInput) -> ExternResult<ReadoptReceipt> {
         ExportInput {
             cursor: input.cursor,
             limit,
+            // Unpinned: re-adoption pages are bounded by READOPT_CAP over a
+            // short window-time tail, and `ReadoptInput`/`ReadoptReceipt` carry
+            // no resume field to thread one through. The successor's export is
+            // linear per page regardless (Task 24), so this pays only the
+            // whole-chain digest per page.
+            resume: None,
         },
     )?;
     let page: ExportPage = match response {
@@ -2159,6 +2429,17 @@ pub struct CarryInput {
     /// behaviour that driver already relies on.
     #[serde(default)]
     pub source: CarrySource,
+    /// **Additive.** The [`ExportResume`] the previous page's
+    /// [`CarryReceipt::resume`] carried, passed through verbatim to whichever
+    /// export this page calls. `#[serde(default)]` keeps the landed storage
+    /// driver — which sends no such key — byte-compatible, and a sweep that
+    /// omits it simply pays the first-page cost on every page.
+    ///
+    /// Pass-through by design: this cell never mints or edits a resume, because
+    /// the token describes the PREDECESSOR's chain and only the predecessor can
+    /// speak to it. Carrying someone else's pin unchanged is the whole contract.
+    #[serde(default)]
+    pub resume: Option<ExportResume>,
 }
 
 /// What one page of carriage produced.
@@ -2269,6 +2550,15 @@ pub struct CarryReceipt {
     /// the field.
     #[serde(default)]
     pub already_carried: u32,
+    /// **Additive.** The predecessor's [`ExportResume`] for this walk, reported
+    /// verbatim from [`ExportPage::resume`]. Hand it back on the next
+    /// [`CarryInput`] and the predecessor stops re-walking its whole chain per
+    /// page (Task 24, G8); ignore it and nothing changes.
+    ///
+    /// `#[serde(default)]` so a consumer built against the earlier receipt still
+    /// decodes, reading `None` for a page from a zome that predates the field.
+    #[serde(default)]
+    pub resume: Option<ExportResume>,
 }
 
 /// Pull ONE bounded page from a predecessor cell and witness it here.
@@ -2337,6 +2627,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
             ExportInput {
                 cursor: input.cursor,
                 limit,
+                resume: input.resume.clone(),
             },
         )?,
         CarrySource::Held(agent) => {
@@ -2360,6 +2651,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
                     agent: agent.clone(),
                     cursor: input.cursor,
                     limit,
+                    resume: input.resume.clone(),
                 },
             )?
         }
@@ -2427,6 +2719,14 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
     let mut proofs: Vec<CarriedProof> = Vec::with_capacity(page.records.len());
     let mut self_carried: u32 = 0;
     let mut already_carried: u32 = 0;
+    // Page-scoped memo for the held-carry idempotency check (Task 24, G8) — the
+    // records of one page were, if already carried at all, almost always
+    // carried by ONE prior witness, so without this the same witness record is
+    // fetched and decoded once per record. Scoped to the page and dropped with
+    // it: nothing here outlives the call, so a witness committed by an earlier
+    // page of the same sweep is still read fresh.
+    let mut witness_lineage: std::collections::HashMap<ActionHash, Option<DnaHash>> =
+        std::collections::HashMap::new();
 
     for (i, signed) in page.records.iter().enumerate() {
         let action = signed.action().clone();
@@ -2452,7 +2752,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         // link for content already witnessed.
         if held {
             if let Some(entry_hash) = action.entry_hash() {
-                if entry_already_witnessed(entry_hash, &lineage_dna_hash)? {
+                if entry_already_witnessed(entry_hash, &lineage_dna_hash, &mut witness_lineage)? {
                     already_carried = already_carried.saturating_add(1);
                     continue;
                 }
@@ -2549,6 +2849,7 @@ pub fn carry_from(input: CarryInput) -> ExternResult<CarryReceipt> {
         self_carried,
         v1_observed_head: page.observed_head,
         already_carried,
+        resume: page.resume,
     })
 }
 
