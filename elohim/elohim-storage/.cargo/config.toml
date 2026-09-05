@@ -1,0 +1,17 @@
+# elohim-storage — cargo config scoped to this crate root (cargo reads it whenever
+# the working directory is inside elohim/elohim-storage, which is how `just gate
+# elohim-storage`, the pre-push hook, and the CI test stage invoke it).
+#
+# Debuginfo on the top crate is the marginal memory of its codegen. With the
+# local household mesh running (three 0.7 conductors at 2.4–4.3 GB RSS each), a
+# full-debuginfo `cargo test` of this crate peaks ~12.8 GB and the workspace RAM
+# guard sheds it at 80% (signal 15, "recipe `test` was terminated") — which is how
+# the storage gate has been failing every mesh-up push (2026-09-04 overnight,
+# 2026-09-05 integration push #4). `debug = 0` on the top crate alone was the
+# proven cure (~6.4 GB peak, deps stay cached); line-tables-only keeps file:line
+# in panics and backtraces while dropping the type/variable tables that carry the
+# bulk of the memory. Deps keep their full debuginfo — only this package changes.
+#
+# Release builds (the fleet image) are untouched.
+[profile.dev.package.elohim-storage]
+debug = "line-tables-only"

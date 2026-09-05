@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# cargo-jobs-flag — print "-j1" when the workspace RAM guard reports too little
+# headroom for a parallel top-crate codegen, else print nothing.
+#
+# Why: `cargo test` of a large crate (elohim-storage) compiles the lib AND the
+# test harness as two ~5.5 GB rustc processes; with the household mesh up
+# (three 0.7 conductors) that crosses the guard's 80% shed line and the recipe
+# dies with "terminated … by signal 15" (2026-09-04 overnight; 2026-09-05
+# integration push #4, twice). Serializing codegen keeps the peak at one rustc.
+#
+# Contract: no guard on this host (CI, a plain container) → print nothing, so
+# cargo keeps its default parallelism. HEADROOM_GB (default 14) is the budget
+# a parallel codegen needs. Usage in a justfile:
+#   jobs_flag := `sh "$(git rev-parse --show-toplevel)/genesis/agentic/bin/cargo-jobs-flag" 2>/dev/null || true`
+#   test:
+#       cargo test {{jobs_flag}}
+set -euo pipefail
+NEED="${HEADROOM_GB:-14}"
+GUARD="$(dirname "$0")/ram-guard"
+[ -x "$GUARD" ] || exit 0
+# Capture whole output, then take the first line — `| head -1` under pipefail
+# turns the guard's SIGPIPE into an empty result.
+out="$("$GUARD" status 2>/dev/null || true)"
+line="${out%%$'\n'*}"
+# e.g. "RAM-GUARD  OK    committed 13.5G / 31.0G (43.5%)  soft/high/hard 70/80/88%"
+used="$(printf '%s\n' "$line" | sed -n 's/.*committed \([0-9.]*\)G \/ \([0-9.]*\)G.*/\1/p')"
+total="$(printf '%s\n' "$line" | sed -n 's/.*committed \([0-9.]*\)G \/ \([0-9.]*\)G.*/\2/p')"
+[ -n "$used" ] && [ -n "$total" ] || exit 0
+# Headroom is measured to the guard's SHED line (80% of the cgroup), not to the
+# cgroup total — the guard kills at 80%, so that is the budget that exists.
+SHED_PCT="${SHED_PCT:-80}"
+awk -v u="$used" -v t="$total" -v n="$NEED" -v p="$SHED_PCT" 'BEGIN { if (t * p / 100 - u < n) print "-j1" }'

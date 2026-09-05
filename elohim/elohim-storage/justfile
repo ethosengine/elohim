@@ -6,6 +6,16 @@ set dotenv-load := false
 
 export RUSTFLAGS := '--cfg getrandom_backend="custom"'
 
+# RAM-guard-aware codegen cap. `cargo test` of this crate compiles the lib AND the
+# test harness as two ~5.5 GB rustc processes; with the household mesh up (three
+# 0.7 conductors) that crosses the workspace RAM guard's 80% shed line and the
+# recipe dies with "terminated … by signal 15" (2026-09-04 overnight, 2026-09-05
+# integration push #4 and the re-run under line-tables-only debuginfo). When the
+# guard exists and reports less than ~14 GB of headroom, serialize codegen with
+# -j1 (peak ≈ one rustc). No guard (CI, a plain container) → cargo's default.
+# Override explicitly with `just jobs_flag=-j4 gate` or leave it alone.
+jobs_flag := `sh "$(git rev-parse --show-toplevel 2>/dev/null)/genesis/agentic/bin/cargo-jobs-flag" 2>/dev/null || true`
+
 # List available recipes
 default:
     @just --list
@@ -18,9 +28,9 @@ build:
 build-dev:
     cargo build
 
-# Run tests
+# Run tests (jobs_flag: -j1 under RAM-guard pressure, see above)
 test:
-    cargo test
+    cargo test {{jobs_flag}}
 
 # Build with iroh parallel stack enabled (libp2p still default)
 # See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
@@ -101,9 +111,9 @@ export-bindings:
 check:
     cargo check
 
-# Lint with clippy
+# Lint with clippy (jobs_flag: -j1 under RAM-guard pressure, see above)
 clippy:
-    cargo clippy -- -D warnings
+    cargo clippy {{jobs_flag}} -- -D warnings
 
 # Format code
 fmt:
