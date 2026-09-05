@@ -172,13 +172,15 @@ fn parse(args: &[String]) -> Result<GovernArgs> {
 /// naming — a tampered claim reads as `unclaimed`, never as the identity the tamperer wrote.
 fn actor_stamp(root: &Path, session: &str) -> Value {
     match claimed_for(root, session) {
-        Some(claim) => json!({
+        Some((cid, claim)) => json!({
+            "claimCid": cid.to_string(),
             "claimed": claim.claimed.0,
             "session": session,
             "definitionCid": claim.definition_cid,
             "source": "claim",
         }),
         None => json!({
+            "claimCid": Value::Null,
             "claimed": Value::Null,
             "session": session,
             "definitionCid": Value::Null,
@@ -188,7 +190,7 @@ fn actor_stamp(root: &Path, session: &str) -> Value {
 }
 
 /// The claim current for `session`, or `None` for every reason there is not one.
-fn claimed_for(root: &Path, session: &str) -> Option<ActorClaim> {
+fn claimed_for(root: &Path, session: &str) -> Option<(cid::Cid, ActorClaim)> {
     if !root.join(ACTOR_LOG_REL).exists() {
         return None;
     }
@@ -196,7 +198,6 @@ fn claimed_for(root: &Path, session: &str) -> Option<ActorClaim> {
         .and_then(|store| store.current_for(session))
         .ok()
         .flatten()
-        .map(|(_, claim)| claim)
 }
 
 /// Evaluate the prospective write and return the decision payload.

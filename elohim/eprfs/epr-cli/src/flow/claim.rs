@@ -37,7 +37,7 @@ use elohim_epr_rea::{
 };
 use serde::Serialize;
 
-use super::note::{named_identity, non_empty, resolve_attribution, NoteActor, STEWARD_SLOT_PREFIX};
+use super::note::{named_identity, non_empty, resolve_attribution, NoteActor};
 use super::registers;
 use super::{
     body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent, short_cid,
@@ -160,7 +160,7 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
         None => None,
     };
 
-    let mut store = SidecarFlowStore::open(root)?;
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
     let (intent_cid, intent) = resolve_intent(root, on, &records)?;
 
@@ -198,9 +198,7 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     if let Some(habit) = &habit {
         classified_as.push(format!("{HABIT_SLOT_PREFIX}{habit}"));
     }
-    if let Some(steward) = &attribution.steward {
-        classified_as.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
-    }
+    attribution.append_slots(&mut classified_as);
 
     let commitment = Commitment {
         action: ReaVerb::Produce,

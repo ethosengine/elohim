@@ -4,6 +4,9 @@
 //! stale clears; a held edge stays held (excluded from stale); a compiler-governed edge
 //! never goes stale under upstream mutation.
 
+#[path = "support/concurrent_flows.rs"]
+mod concurrent_flows;
+
 use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
@@ -550,6 +553,164 @@ fn actor(as_ref: &str) -> NoteActor {
     NoteActor {
         as_ref: Some(as_ref.to_string()),
         session: None,
+    }
+}
+
+/// A fixture oracle built from the existing atom, independently of attribution resolution.
+fn register_worker(root: &Path, session: &str, identity: &str) -> String {
+    use elohim_epr_rea::{ActorClaim, ActorRecord};
+    let (_, date) = elohim_epr_cli::flow::head_commit_provenance(root).unwrap();
+    let expected = ActorRecord::Claim(ActorClaim::new(identity, session, &date, None).unwrap())
+        .cid()
+        .unwrap()
+        .to_string();
+    elohim_epr_cli::actor::claim(root, identity, session).unwrap();
+    expected
+}
+
+fn record_attribution(root: &Path, cid: &str) -> (String, Vec<String>) {
+    records(root)
+        .into_iter()
+        .find_map(|(address, record)| {
+            if address.to_string() != cid {
+                return None;
+            }
+            match record {
+                FlowRecord::Commitment(c) => Some((c.provider.0, c.resource_spec.classified_as)),
+                FlowRecord::Event(e) => Some((e.provider.0, e.classified_as)),
+                _ => None,
+            }
+        })
+        .expect("the actual stored record exists")
+}
+
+#[test]
+fn interleaved_workers_pin_claim_note_and_fulfillment_to_historical_claims() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let identity = "agent:implementer@gpt-6";
+    let a = NoteActor {
+        as_ref: None,
+        session: Some("worker-a".into()),
+    };
+    let b = NoteActor {
+        as_ref: None,
+        session: Some("worker-b".into()),
+    };
+    let pin_a = register_worker(root, "worker-a", identity);
+    let pin_b = register_worker(root, "worker-b", identity);
+    assert_ne!(pin_a, pin_b);
+    let claim_a = claimed(root, "epic#1", &a);
+    let claim_b = claimed(root, "epic#2", &b);
+    let note_a = note::note(
+        root,
+        "epic#1",
+        "observation",
+        "old model evidence",
+        None,
+        None,
+        &a,
+    )
+    .unwrap();
+    let switched = "agent:implementer@gemini";
+    let pin_new = register_worker(root, "worker-a", switched);
+    let done_b = fulfill::fulfill_on(root, &fulfil_request("epic#2", "DONE", &b)).unwrap();
+    let done_a = fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &a)).unwrap();
+    for (cid, pin, provider) in [
+        (claim_a.as_str(), pin_a.as_str(), identity),
+        (claim_b.as_str(), pin_b.as_str(), identity),
+        (note_a.record_cid.as_str(), pin_a.as_str(), identity),
+        (
+            done_b.record_cid.as_deref().unwrap(),
+            pin_b.as_str(),
+            identity,
+        ),
+        (
+            done_a.record_cid.as_deref().unwrap(),
+            pin_new.as_str(),
+            switched,
+        ),
+    ] {
+        let (actual_provider, slots) = record_attribution(root, cid);
+        assert_eq!(actual_provider, provider);
+        assert_eq!(slots[slots.len() - 2], format!("actor-claim:{pin}"));
+        assert_eq!(slots.last().unwrap(), "steward:author@example.test");
+        assert_eq!(
+            slots
+                .iter()
+                .filter(|s| s.starts_with("actor-claim:"))
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn direct_and_unresolved_flow_attribution_never_fabricates_claim_pins() {
+    for mode in ["direct", "missing", "unclaimed", "corrupt"] {
+        let dir = valueflow_fixture();
+        let root = dir.path();
+        let identity = "agent:implementer@gpt-6";
+        let who = NoteActor {
+            as_ref: (mode == "direct").then(|| identity.into()),
+            session: Some("worker-a".into()),
+        };
+        if mode != "missing" {
+            register_worker(
+                root,
+                if mode == "unclaimed" {
+                    "other-worker"
+                } else {
+                    "worker-a"
+                },
+                identity,
+            );
+        }
+        if mode == "corrupt" {
+            write(root, ".eprfs/status/actors.jsonl", "corrupt\n");
+        }
+        let commitment = claimed(root, "epic#1", &who);
+        let observed = note::note(
+            root,
+            "epic#1",
+            "correction",
+            "evidence survives missing identity",
+            None,
+            None,
+            &who,
+        )
+        .unwrap();
+        assert!(
+            !discharged(root, &commitment),
+            "corrections never discharge work"
+        );
+        let done = fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &who)).unwrap();
+        for cid in [
+            &commitment,
+            &observed.record_cid,
+            done.record_cid.as_ref().unwrap(),
+        ] {
+            let (provider, slots) = record_attribution(root, cid);
+            assert!(
+                !slots.iter().any(|s| s.starts_with("actor-claim:")),
+                "{mode}"
+            );
+            assert_eq!(
+                provider,
+                if mode == "direct" {
+                    identity
+                } else {
+                    "author@example.test"
+                }
+            );
+            assert_eq!(
+                slots.last().unwrap().starts_with("steward:"),
+                mode == "direct"
+            );
+        }
+        if mode == "missing" {
+            assert!(!root.join(".eprfs/status/actors.jsonl").exists());
+        }
     }
 }
 

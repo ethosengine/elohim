@@ -133,7 +133,8 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
     derive_wip_fence(root, &mut deriv)?;
 
     // Dedupe against the existing sidecar, then append the new records.
-    let mut store = SidecarFlowStore::open(root)?;
+    let sidecar = SidecarFlowStore::open(root)?;
+    let mut store = sidecar.transaction()?;
     let recorded = store.records()?;
     let existing: HashSet<Cid> = recorded.iter().map(|(cid, _)| *cid).collect();
     let existing_events: HashSet<EventKey> = recorded
@@ -178,7 +179,7 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
         resources_labeled: deriv.labels.len(),
         counts,
         unresolvable_cites: deriv.unresolvable,
-        sidecar: store.log_path().display().to_string(),
+        sidecar: sidecar.log_path().display().to_string(),
         labels_path: labels_path.display().to_string(),
     })
 }

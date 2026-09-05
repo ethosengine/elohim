@@ -203,7 +203,7 @@ pub fn claim(root: &Path, claimed: &str, session: &str) -> ActorResult<ClaimOutc
     let record = ActorRecord::Claim(claim);
     let record_cid = record.cid()?;
 
-    let mut store = SidecarActorStore::open(root)?;
+    let mut store = SidecarActorStore::open(root)?.transaction()?;
     let prior = store.current_for(session)?;
 
     // Idempotence is scoped to "is this ALREADY what's current for the session", not to "does

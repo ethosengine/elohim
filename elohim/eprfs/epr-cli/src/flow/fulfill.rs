@@ -57,7 +57,7 @@ use elohim_epr_rea::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::note::{named_identity, non_empty, resolve_attribution, NoteActor, STEWARD_SLOT_PREFIX};
+use super::note::{named_identity, non_empty, resolve_attribution, NoteActor};
 use super::read::{commitment_latest_event, is_strictly_newer, OccurredAtKey};
 use super::{
     body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent,
@@ -193,7 +193,7 @@ pub fn fulfill(
     })?;
     let report: SprintReport = serde_json::from_str(&text)?;
 
-    let mut store = SidecarFlowStore::open(root)?;
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
 
     // Index open scenario commitments: `classified_as == ["a2o:scenario-green", <path>]`,
@@ -551,7 +551,7 @@ pub fn fulfill_on(root: &Path, request: &FulfillOnRequest) -> FlowResult<Fulfill
     let status = gate_status(request.status)?;
     let named = named_identity(request.actor.as_ref.as_deref())?;
 
-    let mut store = SidecarFlowStore::open(root)?;
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
     let (commit_cid, commitment) = resolve_commitment(on, &records)?;
 
@@ -605,9 +605,7 @@ pub fn fulfill_on(root: &Path, request: &FulfillOnRequest) -> FlowResult<Fulfill
         classified_as.push(format!("{COMMIT_SLOT_PREFIX}{sha}"));
         commits.push(sha);
     }
-    if let Some(steward) = &attribution.steward {
-        classified_as.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
-    }
+    attribution.append_slots(&mut classified_as);
 
     let event = FlowEvent {
         action: ReaVerb::Produce,

@@ -10,6 +10,9 @@
 //! where the model does, in `elohim/epr-rea/src/actor.rs::tests`. What is asserted here is the
 //! CLI's own contract: what it refuses, what it writes, and what its payload says.
 
+#[path = "support/concurrent_actors.rs"]
+mod concurrent_actors;
+
 use std::path::Path;
 
 use elohim_epr_cli::actor::{claim, current, ActorError};
@@ -18,6 +21,66 @@ use tempfile::TempDir;
 
 const SESSION: &str = "session-abc123";
 const CLAIMED: &str = "agent:scribe@opus-5";
+
+#[test]
+fn governance_pins_the_exact_claim_across_workers_and_supersession() {
+    use elohim_epr_rea::{ActorClaim, ActorRecord};
+    let dir = fixture();
+    let root = dir.path();
+    let (_, date) = elohim_epr_cli::flow::head_commit_provenance(root).unwrap();
+    let expected = |session: &str, identity: &str| {
+        ActorRecord::Claim(ActorClaim::new(identity, session, &date, None).unwrap())
+            .cid()
+            .unwrap()
+            .to_string()
+    };
+    let decision = |session: Option<&str>| {
+        let mut args = vec!["--path".into(), "README.md".into()];
+        if let Some(session) = session {
+            args.extend(["--session".into(), session.into()]);
+        }
+        elohim_epr_cli::govern::evaluate(root, &args).unwrap()
+    };
+    claim(root, CLAIMED, "worker-a").unwrap();
+    claim(root, CLAIMED, "worker-b").unwrap();
+    let first = decision(Some("worker-a"));
+    assert_eq!(first["actor"]["claimCid"], expected("worker-a", CLAIMED));
+    assert_eq!(
+        decision(Some("worker-b"))["actor"]["claimCid"],
+        expected("worker-b", CLAIMED)
+    );
+    assert_ne!(expected("worker-a", CLAIMED), expected("worker-b", CLAIMED));
+    claim(root, "agent:scribe@gpt-6", "worker-a").unwrap();
+    assert_eq!(
+        decision(Some("worker-a"))["actor"]["claimCid"],
+        expected("worker-a", "agent:scribe@gpt-6")
+    );
+    assert_eq!(first["actor"]["claimCid"], expected("worker-a", CLAIMED));
+    assert_eq!(
+        decision(Some("worker-b"))["actor"]["claimCid"],
+        expected("worker-b", CLAIMED)
+    );
+    assert!(decision(Some("unclaimed"))["actor"]["claimCid"].is_null());
+    assert!(decision(None).get("actor").is_none());
+    write(root, ".eprfs/status/actors.jsonl", "corrupt\n");
+    let corrupt = decision(Some("worker-a"));
+    assert_eq!(corrupt["actor"]["source"], "unclaimed");
+    assert!(corrupt["actor"]["claimCid"].is_null());
+    let missing = fixture();
+    let absent = elohim_epr_cli::govern::evaluate(
+        missing.path(),
+        &[
+            "--path".into(),
+            "README.md".into(),
+            "--session".into(),
+            "worker-a".into(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(absent["actor"]["source"], "unclaimed");
+    assert!(absent["actor"]["claimCid"].is_null());
+    assert!(!missing.path().join(".eprfs/status/actors.jsonl").exists());
+}
 
 fn git(root: &Path, args: &[&str]) {
     let status = elohim_epr_cli::process::build_command("git", args, root, &[])

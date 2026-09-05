@@ -336,7 +336,7 @@ pub fn note(
     let verdict = resolve_verdict(kind, verdict)?;
     let named = named_identity(actor.as_ref.as_deref())?;
 
-    let mut store = SidecarFlowStore::open(root)?;
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
     let (resource, label) = resolve_target(root, on, &records)?;
 
@@ -354,14 +354,8 @@ pub fn note(
 
     // Tag first, subject second, authored body after, verdict next, steward last — see
     // `note_slots`, `FlowEvent::classified_as` and `STEWARD_SLOT_PREFIX`.
-    let classified_as = note_slots(
-        kind,
-        &label,
-        reason,
-        switched_to,
-        verdict.as_deref(),
-        attribution.steward.as_deref(),
-    );
+    let mut classified_as = note_slots(kind, &label, reason, switched_to, verdict.as_deref(), None);
+    attribution.append_slots(&mut classified_as);
 
     let event = FlowEvent {
         // `Cite`, never `Produce`: a note produces no resource and discharges no promise — it
@@ -424,6 +418,8 @@ pub(crate) fn non_empty<'a>(value: &'a str, flag: &str) -> FlowResult<&'a str> {
 
 /// The resolved answer to "whose act is this note, and whose tree was it written in".
 pub(crate) struct Attribution {
+    /// The exact existing claim consulted at authoring; direct attribution has no claim pin.
+    claim_cid: Option<Cid>,
     /// The claimed identity the note is attributed to; `None` leaves it with the commit author.
     pub(crate) actor: Option<String>,
     /// The git-signing human, carried on the agent arms only.
@@ -431,6 +427,16 @@ pub(crate) struct Attribution {
 }
 
 impl Attribution {
+    /// Keep descriptive slots stable and the steward last across all authoring verbs.
+    pub(crate) fn append_slots(&self, slots: &mut Vec<String>) {
+        if let Some(cid) = self.claim_cid {
+            slots.push(format!("actor-claim:{cid}"));
+        }
+        if let Some(steward) = &self.steward {
+            slots.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
+        }
+    }
+
     /// The `provider` slot: the claimed identity when there is one, the commit author otherwise.
     /// One place decides this, so the record and the outcome can never disagree about who acted.
     pub(crate) fn provider(&self, author: &str) -> String {
@@ -440,6 +446,7 @@ impl Attribution {
     /// The unattributed arm — the leg's original behaviour, named so the three arms read as three.
     fn authored() -> Self {
         Self {
+            claim_cid: None,
             actor: None,
             steward: None,
         }
@@ -450,6 +457,7 @@ impl Attribution {
     /// and an agent-provided note with no steward is precisely the deniable shape.
     fn claimed(identity: String, author: &str) -> Self {
         Self {
+            claim_cid: None,
             actor: Some(identity),
             steward: Some(author.to_string()),
         }
@@ -489,7 +497,10 @@ pub(crate) fn resolve_attribution(
     match (named, session) {
         (Some(identity), _) => Attribution::claimed(identity, author),
         (None, Some(session)) => match claimed_for_session(root, session) {
-            Some(identity) => Attribution::claimed(identity, author),
+            Some((cid, identity)) => Attribution {
+                claim_cid: Some(cid),
+                ..Attribution::claimed(identity, author)
+            },
             None => Attribution::authored(),
         },
         (None, None) => Attribution::authored(),
@@ -505,7 +516,7 @@ pub(crate) fn resolve_attribution(
 /// The notice names the session on purpose. "Not attributed to an agent" is indistinguishable
 /// from "attributed to the wrong one" in the record itself, so the only place a caller can learn
 /// that its session was not found is at the moment it was not found.
-fn claimed_for_session(root: &Path, session: &str) -> Option<String> {
+fn claimed_for_session(root: &Path, session: &str) -> Option<(Cid, String)> {
     if !root.join(ACTOR_LOG_REL).exists() {
         eprintln!(
             "note: session `{session}` has no actor sidecar — \
@@ -514,7 +525,7 @@ fn claimed_for_session(root: &Path, session: &str) -> Option<String> {
         return None;
     }
     match SidecarActorStore::open(root).and_then(|store| store.current_for(session)) {
-        Ok(Some((_, claim))) => Some(claim.claimed.0),
+        Ok(Some((cid, claim))) => Some((cid, claim.claimed.0)),
         Ok(None) => {
             eprintln!(
                 "note: session `{session}` registered no actor claim — \

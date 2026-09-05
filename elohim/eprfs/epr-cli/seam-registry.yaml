@@ -45,6 +45,45 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: claim::claim / note::note / fulfill::fulfill_on
+    kind: state-transition
+    sourceLocation:
+      file: src/flow/claim.rs
+      modulePath: elohim_epr_cli::flow
+    summary: >
+      Native authoring verbs hold one existing FlowStore transaction across read, semantic
+      duplicate checks and append. Same-intent competing workers cannot both claim; exact
+      claim/note/fulfillment retries remain no-ops, retaining station-1 historical actor pins.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          Independent OS processes race distinct workers and exact retries. Exactly one
+          commitment wins without supersede; exactly one record is appended for identical
+          requests. The actor current/check/append operation uses its own existing store lock.
+      - id: C3
+        status: answered
+        justification: >
+          Actor lookup uses nonblocking shared locks. A paused actor writer cannot stop
+          governance or cause flow-to-actor lock-order deadlock; unavailable attribution
+          retains the established fallback without fabricating a historical claim pin.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_flows.rs
+        testName: competing_same_role_workers_have_one_winner_and_preserve_its_exact_pin
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_flows.rs
+        testName: concurrent_exact_claim_note_and_fulfillment_retries_append_once
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_actors.rs
+        testName: concurrent_actor_retries_are_one_current_claim
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_actors.rs
+        testName: busy_actor_store_does_not_block_governance_or_fabricate_a_claim
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_actors.rs
+        testName: cli_refuses_an_unterminated_actor_record_without_altering_evidence
+        kind: integration
+
   - name: note::resolve_target
     kind: pure-decision-predicate
     sourceLocation:
@@ -424,7 +463,9 @@ decisionPoints:
       (`--as`) outright, then a session's registered claim from the actor sidecar, then the
       commit author exactly as this leg always attributed. The agent arms bind the steward
       (git-signing human) beside the identity as one inseparable claim — an agent-provided note
-      with no steward is precisely the deniable shape.
+      with no steward is precisely the deniable shape. Session resolution retains the exact
+      ActorClaim CID as actor-claim:<CID> before the final steward slot on notes, claims and
+      task-report fulfillments. Direct attribution never invents a claim reference.
     concernIds:
       - id: C4
         status: answered
@@ -443,6 +484,12 @@ decisionPoints:
           substituting the author for an identity the caller explicitly named would mint a
           record asserting someone else spoke.
     contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_edges.rs
+        testName: interleaved_workers_pin_claim_note_and_fulfillment_to_historical_claims
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_edges.rs
+        testName: direct_and_unresolved_flow_attribution_never_fabricates_claim_pins
+        kind: integration
       - path: elohim/eprfs/epr-cli/src/flow/note.rs
         testName: a_malformed_identity_is_refused_rather_than_replaced_by_the_author
         kind: unit
@@ -475,6 +522,8 @@ decisionPoints:
       it: `source` is `"claim"` or `"unclaimed"` and nothing else, because there are only two
       honest states. The key is emitted only when the caller declared a session — a stamp on
       every decision would assert "we looked and found nobody" for callers that never asked.
+      claimCid retains the exact historical ActorClaim address, or null for unclaimed sessions;
+      same-role workers and model supersession remain distinguishable without granting authority.
     concernIds:
       - id: C5
         status: answered
@@ -493,6 +542,9 @@ decisionPoints:
           "identity plane not consulted" — a distinct observable state from "consulted,
           unclaimed".
     contractTests:
+      - path: elohim/eprfs/epr-cli/tests/actor_claim.rs
+        testName: governance_pins_the_exact_claim_across_workers_and_supersession
+        kind: integration
       - path: elohim/eprfs/epr-cli/src/govern.rs
         testName: a_decision_asked_without_a_session_carries_no_actor_key_at_all
         kind: unit
@@ -556,6 +608,8 @@ decisionPoints:
       by this provider, on this resource, in this process, at this instant. CID dedupe answers
       "is this record already written"; this key answers "is this act already recorded", and the
       two stopped being one question the moment events grew optional slots.
+      The existing projection holds one flow transaction over both checks and all appends;
+      labels.json remains a separate derived index, not atomic evidence.
     concernIds:
       - id: C6b
         status: answered
@@ -580,4 +634,7 @@ decisionPoints:
         kind: integration
       - path: elohim/eprfs/epr-cli/tests/flow_coauthors.rs
         testName: projecting_twice_over_unchanged_history_mints_nothing_the_second_time
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/support/concurrent_flows.rs
+        testName: concurrent_projection_preserves_record_and_semantic_deduplication
         kind: integration
