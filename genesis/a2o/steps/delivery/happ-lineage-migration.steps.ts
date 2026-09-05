@@ -127,13 +127,23 @@
  * receipt is the proof, and a probe miss there would silently disarm the fence
  * for the rest of the run.
  *
- * What none of this can do is make the crossing run on a disposable cell: the
- * storage vehicle resolves v1 as the BASE app's role cell
- * (`HappLineageVehicle::seal_close` → `Self::role_cell(&base, role)`, with
- * `install_lineage` inheriting `base_role_seed`), so the household's own
- * node-registry v1 chain is what the sunset seals, and it is spent once. That
- * is a storage seam, named in the Task 31 report, not something this fixture
- * can route around.
+ * What none of these rails can do is CHOOSE the chain the sunset spends. That
+ * is a storage decision, and it is now a declared one (Task 33): a peer's
+ * runtime seals the v1 app the role is BOUND to, and
+ * `POST /admin/lineage/v1-binding {"role","v1AppId"}` declares it. Unbound —
+ * which is where this fixture still is — every crossing resolves v1 to the base
+ * app, so the chain Station 8 seals is the household's own node-registry v1 and
+ * it is spent once. Making the crossing DISPOSABLE is this fixture's remaining
+ * half: stage a run-scoped predecessor on each peer (the same DNA under a
+ * per-run network seed, installed beside the base app under that peer's own
+ * key), read its DNA hash back off `listApps`, bind it through that route
+ * before the crossing, and point this file's v1 rails (`baseRoleCellId`,
+ * `preAuthorizeBaseV1`, `probeChainClose`, `ensureNodeRegistryRecords`,
+ * `walkV1Records` and Station 8's own write) at the bound app instead of
+ * `APP_ID`. Each of those steps depends on facts only a live mesh supplies —
+ * whether a seeded predecessor's DNA hash is one the packaged v2 can declare as
+ * its lineage, and whether three fresh run-scoped cells converge in time for
+ * Station 5's held-carry — so it belongs to a seat that can measure it.
  *
  * ## Run-scoped channel, one channel only (Part 1's scope)
  *
@@ -324,6 +334,47 @@ function canaryManifestPath(): string {
 }
 
 const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
+
+/** The shell `hc-mesh.sh` is invoked through — absolute, never resolved off PATH. */
+const BASH_BIN = process.env['E2E_BASH_BIN'] ?? '/bin/bash';
+
+/**
+ * genesis/a2o/steps/delivery -> repo root -> app/elohim-app/scripts/hc-mesh.sh.
+ * Same resolution `steps/mesh/delivery-notary.steps.ts` uses; overridable for a
+ * mesh script that lives elsewhere.
+ */
+function hcMeshScriptPath(): string {
+  return (
+    process.env['E2E_HC_MESH_SCRIPT'] ??
+    fileURLToPath(new URL('../../../../app/elohim-app/scripts/hc-mesh.sh', import.meta.url))
+  );
+}
+
+/**
+ * `hc-mesh.sh blocks <peer>` — READ-ONLY (Task 30's verb; it reads the peer's
+ * encrypted `BlockSpan` table and the rejected/warrant rows behind it through
+ * `crates/hc-dbtool`, and never writes). Returns the tool's combined output.
+ *
+ * A block is the ONE consequence of a post-close write that lives nowhere on
+ * the wire: holochain 0.7 exposes no admin call and no HDK host fn for it, so
+ * the conductor's own database is the only surface that carries it. That is why
+ * this reads a shell tool rather than an HTTP route — there is no route to read.
+ *
+ * Exit status is NOT asserted here: the verb answers 1 for a peer whose
+ * databases directory is missing and 2 when `hc-dbtool` is not built, and the
+ * caller distinguishes those from "read it, no such block" by what the text
+ * says. Conflating them would let a missing binary read as a missing block.
+ */
+function readPeerBlocks(peer: PeerName): { output: string; status: number | null } {
+  const result = spawnSync(BASH_BIN, [hcMeshScriptPath(), 'blocks', peer], {
+    encoding: 'utf8',
+    timeout: 120_000,
+  });
+  return {
+    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
+    status: result.status,
+  };
+}
 
 type PeerName = 'matthew' | 'jessica' | 'james';
 const PEER_NAMES: readonly PeerName[] = ['matthew', 'jessica', 'james'];
@@ -4464,6 +4515,117 @@ Then(
       lineage().postCloseWriteActionHash,
       "james's v1 conductor refused the post-close write — the epic's own kernel probes (B/B2) " +
         'say it should not'
+    );
+  }
+);
+
+/**
+ * One pass over every neighbour's block table, looking for a row that names
+ * `target` with `warrant` as its cause.
+ *
+ * Split out of the Then so the retry loop is a `while` over one value rather
+ * than two nested loops with three exits — and so the THREE outcomes stay
+ * distinct: a blocker found, a peer that could not be ASKED (no `hc-dbtool`, no
+ * databases), and a peer that answered with no such row. Collapsing the middle
+ * one into the last is how a missing tool would read as a missing block.
+ */
+function sweepNeighbourBlocks(
+  neighbours: readonly PeerName[],
+  target: string,
+  warrant: string
+): { blocker: PeerName | null; unaskable: string[]; lastOutput: string } {
+  const unaskable: string[] = [];
+  let lastOutput = '';
+  for (const neighbour of neighbours) {
+    const { output } = readPeerBlocks(neighbour);
+    lastOutput = output;
+    if (output.includes('no executable hc-dbtool')) {
+      unaskable.push(
+        `${neighbour}: hc-dbtool is not built, so this peer's block table cannot be read. Build ` +
+          "it with: cd crates/hc-dbtool && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev RUSTFLAGS='' cargo build"
+      );
+    } else if (output.includes('no databases directory')) {
+      unaskable.push(`${neighbour}: no conductor databases directory (peer never started?)`);
+    } else if (output.includes(target) && output.includes(warrant)) {
+      return { blocker: neighbour, unaskable, lastOutput };
+    }
+  }
+  return { blocker: null, unaskable, lastOutput };
+}
+
+/**
+ * **Task 33 — the price of the sunset, asserted rather than inferred.**
+ *
+ * A write on a closed chain earns its author a WARRANT from every neighbour
+ * that validates it, and the accepted warrant becomes a permanent CELL BLOCK
+ * (`Timestamp::max()`; holochain 0.7 exposes no unblock, no admin call and no
+ * HDK host fn). Task 30 read exactly that out of the household's conductor
+ * databases after this Station's own post-close write: block rows citing
+ * warrants whose cause is *"No more actions are allowed after a chain close"*.
+ *
+ * It is asserted HERE, from a neighbour's own database, because nothing on the
+ * wire carries it: the blocked peer's view is silence, and silence is
+ * indistinguishable from an unreachable neighbour. That is the whole reason
+ * `hc-mesh.sh blocks` exists, and the reason this Then reads a shell tool.
+ *
+ * **This assertion is why the chain this Station spends should be a chain made
+ * for the purpose.** The block it measures is real and permanent on whichever
+ * v1 cell the sunset sealed — see the Station's own header comment, and
+ * `POST /admin/lineage/v1-binding` for how a run declares a predecessor of its
+ * own instead of the household's.
+ *
+ * Three failure modes are distinguished by name, because collapsing them is how
+ * a missing tool would read as a missing block:
+ *   - `hc-dbtool` not built           → the question could not be ASKED (with the build line);
+ *   - the peer's databases unreadable → the same, per peer;
+ *   - read, and no such row           → the story's claim is FALSE, and says so with the output.
+ */
+Then(
+  "a neighbour's own block list names james's v1 cell, with the warrant {string}",
+  { timeout: 240_000 },
+  async function (this: E2EWorld, warrant: string) {
+    assert.ok(
+      lineage().postCloseWriteActionHash,
+      'the post-close write never landed, so there is no warrant to have earned'
+    );
+    // The cell the harness wrote on — the SAME resolution the write itself used
+    // (`connectRoleConductor(..., APP_ID)`), so the two can never name different
+    // cells. `hc-dbtool` renders a block target as `<dnaHash>:<agentPubKey>` in
+    // the canonical `uhC…` form, which is byte-identical to what
+    // `encodeHashToBase64` produces here.
+    const writerCell = await baseRoleCellId('james');
+    const target = `${encodeHashToBase64(writerCell[0])}:${encodeHashToBase64(writerCell[1])}`;
+
+    // james is the writer; his neighbours are the ones who witness and refuse.
+    const neighbours = PEER_NAMES.filter(peer => peer !== 'james');
+    const deadline = Date.now() + 210_000;
+    let sweep = sweepNeighbourBlocks(neighbours, target, warrant);
+
+    while (!sweep.blocker && sweep.unaskable.length < neighbours.length && Date.now() < deadline) {
+      await new Promise<void>(resolve => setTimeout(resolve, 15_000));
+      sweep = sweepNeighbourBlocks(neighbours, target, warrant);
+    }
+
+    if (sweep.blocker) {
+      console.error(
+        `[happ-lineage-migration] Station 8: ${sweep.blocker} BLOCKS ${target} — ` +
+          `warrant "${warrant}" (hc-mesh.sh blocks ${sweep.blocker})`
+      );
+      return;
+    }
+    assert.equal(
+      sweep.unaskable.length,
+      0,
+      "REFUSED to answer: no neighbour's block table could be read, so this Then cannot tell a " +
+        'missing block from a missing tool — and answering "no block" from an unaskable question ' +
+        `is the one direction of error that would hide the price of the sunset. ${sweep.unaskable.join('; ')}`
+    );
+    assert.fail(
+      `no neighbour's block list names james's v1 cell ${target} with the warrant "${warrant}" ` +
+        'within 210s of the post-close write. The story says a write after a close earns a warrant ' +
+        'and a permanent block from every neighbour that sees it; either it did not, or the write ' +
+        'never reached one. Last output read:\n' +
+        sweep.lastOutput.slice(-3000)
     );
   }
 );

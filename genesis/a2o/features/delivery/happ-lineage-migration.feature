@@ -278,20 +278,25 @@ Feature: The network changes the rules its peers hold each other to without losi
     And jessica's runtime never noticed anything but a head that moved and moved back
 
   # ── Station 8: the sunset is a separate notarized act, and it is the only irreversible one ──
-  # Irreversible in the fixture as well as in the story. Once this Station has run, the household's
-  # node-registry v1 chains are sealed for good: the Stations that follow may still READ them, but
-  # nothing may be written on them again — not a record, not a capability grant — and the next run
-  # of this feature is refused at the Background above until the household is rebuilt. The harness's
-  # post-close write below is the one write this story makes on purpose after a close, and it is the
-  # measurement: the author's conductor accepts it (the substrate — the conductor and its DHT — does
-  # not fence a closed chain), v2's validation refuses it where the close is known, and james's
-  # neighbours will warrant it (publish a record accusing the write) and block his v1 cell (refuse to
-  # gossip with that chain again, permanently; his v2 cell is untouched). That last consequence
-  # REALLY HAPPENS on this household — it is not prevented, only unmeasured here, and it is what
-  # makes the next run refuse at the Background — but this Station does not assert it, because the
-  # assertion belongs on a chain nobody needs afterwards. That Station does not exist yet: it is
-  # epic Task 33, "the disposable crossing", to be added to this feature once the runtime can seal
-  # a chain made for the purpose.
+  #
+  # WHICH CHAIN THIS STATION SPENDS. A close is a sealing act, and the chain it seals is spent:
+  # nothing may be written on it again — not a record, not a capability grant — and the write below
+  # earns its author a permanent block from every neighbour that sees it. WHICH chain that is is a
+  # DECLARATION, not a structural accident: a peer's runtime seals the v1 app the role is BOUND to.
+  # A run that stages a predecessor made for the purpose — a run-scoped cell on the same rule
+  # version, installed beside the base app under the same key, and bound before the crossing —
+  # spends THAT one, and the household's own chain is only ever read. UNBOUND, which is every real
+  # peer and every run of this feature that stages no such predecessor, the chain sealed here is the
+  # household's own node-registry v1: the Stations that follow may still READ it, and the next run
+  # of this feature is refused at the Background above until the household is rebuilt.
+  #
+  # The harness's post-close write below is the one write this story makes on purpose after a close,
+  # and it is the measurement: the author's conductor accepts it (the substrate — the conductor and
+  # its DHT — does not fence a closed chain), v2's validation refuses it where the close is known,
+  # and james's neighbours warrant it (publish a record accusing the write) and block his v1 cell
+  # (refuse to gossip with that chain again, permanently; his v2 cell is untouched). That last
+  # consequence is ASSERTED here, read from a neighbour's own block table — which is exactly why the
+  # chain this Station spends should be one nobody needs afterwards.
   Scenario: Station 8 — no sunset without its own commitment; with it the old chains close, stay readable, and no revocation reopens them
     Given a fresh migration commitment is notarized and all three peers are dual-celled — v1 reading, v2 authoring — and have attested their carry
     But no sunset commitment exists
@@ -312,6 +317,10 @@ Feature: The network changes the rules its peers hold each other to without losi
     # plainly as a limitation still being closed, never as the network's intended shape — the fence
     # this Station rehearses grows to cover every courier, not fewer peers on purpose.
     And a courier who never saw the close is not yet fenced — a limitation still being closed, not the network's intended shape
+    # The neighbour's own refusal, read out of its conductor's block table rather than inferred from
+    # silence. This is the price of the sunset named in the vocabulary above, and the reason the
+    # chain this Station spends should be a chain made for the purpose.
+    And a neighbour's own block list names james's v1 cell, with the warrant "No more actions are allowed after a chain close"
     When a revocation of the migration commitment is notarized after the sunset
     Then nothing changes: the closed chains stay closed, and each peer's passport still shows the node-registry role with v2 authoring and v1 closed
 
