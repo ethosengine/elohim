@@ -162,13 +162,16 @@ test("a shem-hosted alpha human (no field before rung5 Task 3) without runtimeCo
 });
 
 test("alpha humans WITH the field render the real workspace channel line at their declared mode", () => {
-  // james = canary (first household adopter), matthew/jessica = apply (bootstrap
-  // pair), adam/gertrude/susan/eve = observe (shem-hosted) -- rung5 workspace
-  // orchestration Task 3 data.
+  // Fix round 1 (plan run:ruling "Alpha enrolment modes, resolved"): every
+  // active alpha human enrolls at =observe on the FIRST render -- no
+  // apply/canary from a workspace channel while nobody is watching. Promotion
+  // (james to canary, then matthew/jessica to apply on the bootstrap pair) is
+  // a later data change the operator flips after Task 4's first
+  // workspace->alpha receipt, not minted here.
   for (const [name, mode] of [
-    ["james", "canary"],
-    ["matthew", "apply"],
-    ["jessica", "apply"],
+    ["james", "observe"],
+    ["matthew", "observe"],
+    ["jessica", "observe"],
     ["adam", "observe"],
     ["gertrude", "observe"],
     ["susan", "observe"],
