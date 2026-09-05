@@ -1,16 +1,25 @@
 /**
- * Session Migration Service - Upgrade from session to network identity.
+ * Session Migration Service — carry a visitor's progress onto the account they
+ * just created.
  *
  * Philosophy:
  * - Zero-friction entry via session, meaningful upgrade to network
  * - Preserve all session progress during migration
  * - Handle partial failures gracefully with recovery
  *
- * Migration Flow:
+ * This service does NOT create identities. Registration happens at the doorway
+ * portal (apps are relying parties, never portals), so by the time this runs
+ * the human is already authenticated and the only question left is what their
+ * visitor session should contribute:
+ *
  * 1. Package session data (affinity, progress, activities)
- * 2. Register human identity in network
- * 3. Transfer progress data to private source chain
- * 4. Clear session after successful migration
+ * 2. Apply the session's profile fields to the fresh profile — and only the
+ *    fields the portal could not know (a display name it defaulted from the
+ *    identifier, a bio, interests)
+ * 3. Transfer progress data to the private source chain
+ * 4. Link the session to the new identity, then clear it
+ *
+ * Called from AuthCallbackComponent after a successful OAuth exchange.
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
@@ -23,7 +32,7 @@ import { HolochainClientService } from '../../elohim/services/holochain-client.s
 import {
   type MigrationState,
   type MigrationResult,
-  type RegisterHumanRequest,
+  type UpdateProfileRequest,
   INITIAL_MIGRATION_STATE,
 } from '../models/identity.model';
 
@@ -64,35 +73,44 @@ export class SessionMigrationService {
     return status === 'preparing' || status === 'registering' || status === 'transferring';
   });
 
-  /** Whether migration can be started */
-  readonly canMigrate = computed(
-    () =>
-      this.sessionHumanService.hasSession() &&
-      this.holochainClient.isConnected() &&
-      this.identityService.mode() === 'session'
-  );
+  /**
+   * Whether there is visitor progress to carry onto an account.
+   *
+   * Deliberately NOT gated on a conductor socket: an anonymous visitor cannot
+   * open one, and gating on it is what made the old in-app registration form
+   * refuse the very people it existed for. The transfer steps below each fail
+   * soft when the socket is absent — this predicate answers only "is there
+   * something to carry?".
+   */
+  readonly canMigrate = computed(() => this.sessionHumanService.hasSession());
 
   // ==========================================================================
   // Migration
   // ==========================================================================
 
   /**
-   * Perform full migration from session to network identity.
+   * Apply a visitor session to the profile of the human who just signed in,
+   * carry their progress across, then retire the session.
+   *
+   * Registration already happened — at the doorway's portal — so nothing here
+   * creates an identity or handles a credential. `identifier` is the account
+   * the doorway issued; it is used only to tell a real display name apart from
+   * one the doorway defaulted out of the identifier's local part.
    */
-  async migrate(profileOverrides?: Partial<RegisterHumanRequest>): Promise<MigrationResult> {
+  async applySessionToProfile(identifier?: string): Promise<MigrationResult> {
     if (!this.canMigrate()) {
-      return {
-        success: false,
-        error: 'Migration not available - check connection and session status',
-      };
+      return { success: false, error: 'No visitor session to carry over' };
     }
 
     const session = this.sessionHumanService.getSession();
     if (!session) {
-      return {
-        success: false,
-        error: 'No session to migrate',
-      };
+      return { success: false, error: 'No session to migrate' };
+    }
+
+    const humanId = this.identityService.humanId();
+    const agentPubKey = this.identityService.agentPubKey();
+    if (!humanId || !agentPubKey) {
+      return { success: false, error: 'Not signed in yet — nothing to attach the session to' };
     }
 
     try {
@@ -108,30 +126,19 @@ export class SessionMigrationService {
         throw new Error('Failed to prepare migration package');
       }
 
-      // Step 2: Register human in network
+      // Step 2: Apply the session's profile fields to the profile the portal
+      // just created. Profile is not auth — these were never registration
+      // fields; they are what this visitor already told us about themselves.
       this.updateState({
-        status: 'registering',
-        currentStep: 'Creating network identity...',
+        status: 'transferring',
+        currentStep: 'Carrying your profile over...',
         progress: 30,
       });
 
-      const registrationRequest: RegisterHumanRequest = {
-        displayName: profileOverrides?.displayName ?? session.displayName,
-        bio: profileOverrides?.bio ?? session.bio,
-        affinities: profileOverrides?.affinities ?? session.interests ?? [],
-        profileReach: profileOverrides?.profileReach ?? 'community',
-        location: profileOverrides?.location ?? undefined,
-        migrateFromSession: true,
-      };
-
-      const profile = await this.identityService.registerHuman(registrationRequest);
+      await this.applyProfileFields(session, identifier);
 
       // Step 3: Transfer progress data
-      this.updateState({
-        status: 'transferring',
-        currentStep: 'Transferring progress...',
-        progress: 60,
-      });
+      this.updateState({ currentStep: 'Transferring progress...', progress: 60 });
 
       // Transfer path progress
       const pathProgress = migrationPackage.pathProgress ?? [];
@@ -158,7 +165,8 @@ export class SessionMigrationService {
 
       this.updateState({ currentStep: 'Finalizing...', progress: 90 });
 
-      // Step 4: Clear session
+      // Step 4: Link the session to the identity, then clear it
+      this.sessionHumanService.markAsMigrated(agentPubKey, humanId);
       this.sessionHumanService.clearAfterMigration();
 
       // Success!
@@ -166,7 +174,7 @@ export class SessionMigrationService {
 
       return {
         success: true,
-        newHumanId: profile.id,
+        newHumanId: humanId,
         migratedData: {
           affinityCount,
           pathProgressCount: pathProgress.length,
@@ -183,6 +191,53 @@ export class SessionMigrationService {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Push the session's self-description onto the freshly authenticated profile.
+   *
+   * Only fields the portal could not have known are sent, and the display name
+   * is only replaced when the doorway defaulted it out of the identifier's
+   * local part — a name the human actually chose at the portal always wins.
+   * Nothing to say means no request at all.
+   */
+  private async applyProfileFields(
+    session: NonNullable<ReturnType<SessionHumanService['getSession']>>,
+    identifier?: string
+  ): Promise<void> {
+    const update: UpdateProfileRequest = {};
+
+    const sessionName = session.displayName?.trim();
+    if (sessionName && sessionName !== 'Traveler' && this.displayNameIsPlaceholder(identifier)) {
+      update.displayName = sessionName;
+    }
+
+    const bio = session.bio?.trim();
+    if (bio && !this.identityService.profile()?.bio) {
+      update.bio = bio;
+    }
+
+    const interests = session.interests ?? [];
+    if (interests.length > 0 && (this.identityService.profile()?.affinities?.length ?? 0) === 0) {
+      update.affinities = interests;
+    }
+
+    if (Object.keys(update).length === 0) return;
+
+    await this.identityService.updateProfile(update);
+  }
+
+  /**
+   * True when the signed-in display name is nothing but the identifier's local
+   * part — i.e. the doorway had no better answer and neither does the human's
+   * account yet, so the visitor's own name is an improvement.
+   */
+  private displayNameIsPlaceholder(identifier?: string): boolean {
+    const current = this.identityService.displayName()?.trim() ?? '';
+    if (!current) return true;
+    if (!identifier) return false;
+    const localPart = identifier.split('@')[0]?.trim() ?? '';
+    return localPart.length > 0 && current.toLowerCase() === localPart.toLowerCase();
   }
 
   /**

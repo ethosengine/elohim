@@ -17,6 +17,7 @@ import { vi } from 'vitest';
 import { AuthCallbackComponent } from './auth-callback.component';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+import { SessionMigrationService } from '../../services/session-migration.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +55,11 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     setAuthFromResult: ReturnType<typeof vi.fn>;
   };
 
+  let mockMigration: {
+    canMigrate: ReturnType<typeof vi.fn>;
+    applySessionToProfile: ReturnType<typeof vi.fn>;
+  };
+
   const successResult = {
     success: true as const,
     token: 'jwt-abc',
@@ -77,12 +83,18 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
       setAuthFromResult: vi.fn(),
     };
 
+    mockMigration = {
+      canMigrate: vi.fn().mockReturnValue(false),
+      applySessionToProfile: vi.fn().mockResolvedValue({ success: true }),
+    };
+
     await TestBed.configureTestingModule({
       imports: [AuthCallbackComponent],
       providers: [
         provideRouter([]),
         { provide: OAuthAuthProvider, useValue: mockOAuth },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: SessionMigrationService, useValue: mockMigration },
         { provide: ActivatedRoute, useValue: makeRoute(queryParams) },
       ],
     }).compileComponents();
@@ -276,7 +288,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     await setup();
     mockOAuth.consumeReturnUrl.mockReturnValue(null);
 
-    component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
     expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
   });
@@ -285,7 +297,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     await setup();
     mockOAuth.consumeReturnUrl.mockReturnValue('/community/governance');
 
-    component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
     expect(router.navigate).toHaveBeenCalledWith(['/community/governance']);
   });
@@ -293,9 +305,51 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
   it('consumes the return URL (calls consumeReturnUrl) on success', async () => {
     await setup();
 
-    component.onSuccess(new CustomEvent('success', { detail: { session: {} } }));
+    await component.onSuccess(new CustomEvent('success', { detail: { session: {} } }));
 
     expect(mockOAuth.consumeReturnUrl).toHaveBeenCalled();
+  });
+
+  // ==========================================================================
+  // Visitor → hosted carry-over — the upgrade lands HERE, not at a form
+  // ==========================================================================
+
+  it('carries a visitor session onto the fresh profile, naming the issued identifier', async () => {
+    await setup();
+    mockMigration.canMigrate.mockReturnValue(true);
+    const exchangeCode = (component.cbRef!.nativeElement as unknown as Record<string, unknown>)[
+      'exchangeCode'
+    ] as (c: string, s: string) => Promise<unknown>;
+    await exchangeCode('abc', 'xyz');
+
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+
+    expect(mockMigration.applySessionToProfile).toHaveBeenCalledWith('matthew@alpha.elohim.host');
+  });
+
+  it('does nothing when there is no visitor session to carry', async () => {
+    await setup();
+    mockMigration.canMigrate.mockReturnValue(false);
+
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+
+    expect(mockMigration.applySessionToProfile).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalled();
+  });
+
+  it('still lands the human somewhere when the carry-over fails', async () => {
+    await setup();
+    mockMigration.canMigrate.mockReturnValue(true);
+    mockMigration.applySessionToProfile.mockResolvedValue({
+      success: false,
+      error: 'conductor unreachable',
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+
+    expect(router.navigate).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
   });
 
   // ==========================================================================

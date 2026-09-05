@@ -3,6 +3,10 @@
  *
  * Displays benefits, how-it-works steps, and current session summary
  * to encourage visitors to upgrade to a Holochain identity.
+ *
+ * Presentational only: it emits `createAccountRequested` rather than
+ * navigating, because the account is created at the doorway's own portal and
+ * the host decides how to get the visitor there.
  */
 
 import { CommonModule } from '@angular/common';
@@ -23,6 +27,13 @@ export class UpgradeModalComponent {
   @Input() session: SessionHuman | null = null;
   @Input() open = false;
   @Output() closed = new EventEmitter<void>();
+  /** The visitor asked to create an account at their doorway. */
+  @Output() createAccountRequested = new EventEmitter<void>();
+
+  createAccount(): void {
+    this.createAccountRequested.emit();
+    this.close();
+  }
 
   close(): void {
     this.closed.emit();

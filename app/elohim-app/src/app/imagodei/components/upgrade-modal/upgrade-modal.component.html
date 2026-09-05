@@ -159,9 +159,9 @@
       <div class="upgrade-how">
         <h3>How it works:</h3>
         <ol>
-          <li>Install the Elohim app (available soon)</li>
-          <li>Your session progress migrates automatically</li>
-          <li>You join the p2p network and receive updates</li>
+          <li>Create an account at your doorway — the only place your password is ever seen</li>
+          <li>You come straight back here, signed in, and this progress moves across with you</li>
+          <li>You join the p2p network and keep receiving updates</li>
         </ol>
       </div>
 
@@ -181,15 +181,15 @@
             <span class="stat-label">Steps Completed</span>
           </div>
         </div>
-        <p class="summary-note">This progress will migrate when you join.</p>
+        <p class="summary-note">
+          This progress moves across when you create your account at your doorway.
+        </p>
       </div>
     </div>
 
     <div class="modal-footer">
       <button type="button" class="btn-secondary" (click)="close()">Continue as Visitor</button>
-      <button type="button" class="btn-primary" disabled title="Coming soon!">
-        Get Notified When Available
-      </button>
+      <button type="button" class="btn-primary" (click)="createAccount()">Create an Account</button>
     </div>
   </section>
 </dialog>

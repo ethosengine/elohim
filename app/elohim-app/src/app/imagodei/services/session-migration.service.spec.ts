@@ -1,28 +1,48 @@
 /**
  * SessionMigrationService Tests
  *
- * Tests session-to-network identity migration flow.
+ * The visitor→hosted upgrade no longer registers anyone: the account is created
+ * at the doorway's own portal, and this service runs AFTER that, from the OAuth
+ * callback. So these tests assert what a visitor session contributes to an
+ * already-authenticated human — profile fields the portal could not know,
+ * learning progress, and the retirement of the session itself.
  */
 
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+
+import { ContentMasteryService } from '@app/lamad/services/content-mastery.service';
+
+import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import type { SessionHuman } from '../models/session-human.model';
 
 import { SessionMigrationService } from './session-migration.service';
-import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { ContentMasteryService } from '@app/lamad/services/content-mastery.service';
 import { IdentityService } from './identity.service';
 import { SessionHumanService } from './session-human.service';
-import type { SessionHuman } from '../models/session-human.model';
-import type { HumanProfile } from '../models/identity.model';
-import type { HolochainConnection } from '../../elohim/models/holochain-connection.model';
-import { vi, Mock } from 'vitest';
+
+import { vi } from 'vitest';
 
 describe('SessionMigrationService', () => {
   let service: SessionMigrationService;
-  let mockHolochainClient: any;
-  let mockSessionHumanService: any;
-  let mockIdentityService: any;
-  let mockContentMasteryService: any;
+  let mockHolochainClient: {
+    callZome: ReturnType<typeof vi.fn>;
+    isConnected: ReturnType<typeof vi.fn>;
+  };
+  let mockSessionHumanService: {
+    getSession: ReturnType<typeof vi.fn>;
+    prepareMigration: ReturnType<typeof vi.fn>;
+    clearAfterMigration: ReturnType<typeof vi.fn>;
+    markAsMigrated: ReturnType<typeof vi.fn>;
+    hasSession: ReturnType<typeof vi.fn>;
+  };
+  let mockIdentityService: {
+    humanId: ReturnType<typeof vi.fn>;
+    agentPubKey: ReturnType<typeof vi.fn>;
+    displayName: ReturnType<typeof vi.fn>;
+    profile: ReturnType<typeof vi.fn>;
+    updateProfile: ReturnType<typeof vi.fn>;
+    mode: ReturnType<typeof vi.fn>;
+  };
+  let mockContentMasteryService: { migrateToBackend: ReturnType<typeof vi.fn> };
 
   const mockSession: SessionHuman = {
     sessionId: 'session-123',
@@ -50,13 +70,7 @@ describe('SessionMigrationService', () => {
 
   const mockMigrationPackage = {
     sessionId: 'session-123',
-    displayName: 'Test User',
-    bio: 'A test bio',
-    interests: ['learning', 'teaching'],
-    affinity: {
-      'node-1': 0.8,
-      'node-2': 0.6,
-    },
+    affinity: { 'node-1': 0.8, 'node-2': 0.6 },
     pathProgress: [
       {
         pathId: 'path-1',
@@ -67,44 +81,36 @@ describe('SessionMigrationService', () => {
       },
     ],
     activities: [],
-    stats: mockSession.stats,
     migratedAt: '2026-01-01T00:00:00Z',
     status: 'pending' as const,
   };
 
-  const mockProfile: HumanProfile = {
-    id: 'human-123',
-    displayName: 'Test User',
-    bio: 'A test bio',
-    affinities: ['learning', 'teaching'],
-    profileReach: 'community',
-    location: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  };
-
   beforeEach(() => {
-    // Create mock services
     mockHolochainClient = {
-      callZome: vi.fn(),
+      callZome: vi.fn().mockResolvedValue({}),
       isConnected: vi.fn().mockReturnValue(true),
     };
 
     mockSessionHumanService = {
-      getSession: vi.fn(),
-      prepareMigration: vi.fn(),
+      getSession: vi.fn().mockReturnValue(mockSession),
+      prepareMigration: vi.fn().mockReturnValue(mockMigrationPackage),
       clearAfterMigration: vi.fn(),
-      hasSession: vi.fn(),
+      markAsMigrated: vi.fn(),
+      hasSession: vi.fn().mockReturnValue(true),
     };
 
     mockIdentityService = {
-      registerHuman: vi.fn(),
-      mode: vi.fn().mockReturnValue('session'),
-      humanId: vi.fn().mockReturnValue(null),
+      humanId: vi.fn().mockReturnValue('human-123'),
+      agentPubKey: vi.fn().mockReturnValue('agent-pub-key'),
+      // The doorway defaulted the display name out of the identifier local part.
+      displayName: vi.fn().mockReturnValue('matthew'),
+      profile: vi.fn().mockReturnValue({ bio: null, affinities: [] }),
+      updateProfile: vi.fn().mockResolvedValue({}),
+      mode: vi.fn().mockReturnValue('hosted'),
     };
 
     mockContentMasteryService = {
-      migrateToBackend: vi.fn(),
+      migrateToBackend: vi.fn().mockResolvedValue({ success: true, migrated: 4 }),
     };
 
     TestBed.configureTestingModule({
@@ -120,340 +126,147 @@ describe('SessionMigrationService', () => {
     service = TestBed.inject(SessionMigrationService);
   });
 
-  // ==========================================================================
-  // Initial State
-  // ==========================================================================
-
-  describe('initial state', () => {
-    it('should start with idle status', () => {
-      expect(service.status()).toBe('idle');
-    });
-
-    it('should not be in progress initially', () => {
-      expect(service.isInProgress()).toBe(false);
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   // ==========================================================================
-  // Migration Eligibility
+  // canMigrate — no conductor socket in the predicate
   // ==========================================================================
 
   describe('canMigrate', () => {
-    it('should allow migration when session exists and connected', () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-
+    it('is true whenever there is a visitor session', () => {
       expect(service.canMigrate()).toBe(true);
     });
 
-    it('should not allow migration when no session exists', () => {
+    it('does NOT require a conductor socket — an anonymous visitor cannot open one', () => {
+      mockHolochainClient.isConnected.mockReturnValue(false);
+      expect(service.canMigrate()).toBe(true);
+    });
+
+    it('is false with no session', () => {
       mockSessionHumanService.hasSession.mockReturnValue(false);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-
-      expect(service.canMigrate()).toBe(false);
-    });
-
-    it('should not allow migration when not connected', () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-
-      expect(service.canMigrate()).toBe(false);
-    });
-
-    it('should not allow migration when already in network mode', () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
-
       expect(service.canMigrate()).toBe(false);
     });
   });
 
   // ==========================================================================
-  // Migration Flow
+  // applySessionToProfile — the upgrade, after the portal
   // ==========================================================================
 
-  describe('migrate', () => {
-    beforeEach(() => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+  describe('applySessionToProfile', () => {
+    it('registers nobody — there is no registration path left on this service', () => {
+      expect((service as unknown as Record<string, unknown>)['migrate']).toBeUndefined();
+      expect(mockIdentityService).not.toHaveProperty('registerHuman');
     });
 
-    it('should successfully migrate session to network identity', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
+    it('applies the session display name when the doorway defaulted it from the identifier', async () => {
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
 
-      const result = await service.migrate();
+      expect(mockIdentityService.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ displayName: 'Test User' })
+      );
+    });
+
+    it('keeps a name the human actually chose at the portal', async () => {
+      mockIdentityService.displayName.mockReturnValue('Matthew of Alpha');
+
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
+
+      expect(mockIdentityService.updateProfile).toHaveBeenCalledWith(
+        expect.not.objectContaining({ displayName: expect.anything() })
+      );
+    });
+
+    it('carries the bio and interests onto an empty profile', async () => {
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
+
+      expect(mockIdentityService.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bio: 'A test bio',
+          affinities: ['learning', 'teaching'],
+        })
+      );
+    });
+
+    it('never overwrites a bio or affinities the profile already holds', async () => {
+      mockIdentityService.profile.mockReturnValue({
+        bio: 'Written at the portal',
+        affinities: ['governance'],
+      });
+      mockIdentityService.displayName.mockReturnValue('Matthew of Alpha');
+
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
+
+      expect(mockIdentityService.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('transfers path progress and content mastery', async () => {
+      const result = await service.applySessionToProfile('matthew@alpha.elohim.host');
+
+      expect(mockHolochainClient.callZome).toHaveBeenCalled();
+      expect(mockContentMasteryService.migrateToBackend).toHaveBeenCalled();
+      expect(result.migratedData).toEqual({
+        affinityCount: 2,
+        pathProgressCount: 1,
+        activityCount: 0,
+        masteryCount: 4,
+      });
+    });
+
+    it('links the session to the new identity, then clears it', async () => {
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
+
+      expect(mockSessionHumanService.markAsMigrated).toHaveBeenCalledWith(
+        'agent-pub-key',
+        'human-123'
+      );
+      expect(mockSessionHumanService.clearAfterMigration).toHaveBeenCalled();
+    });
+
+    it('reports success with the authenticated human id', async () => {
+      const result = await service.applySessionToProfile('matthew@alpha.elohim.host');
 
       expect(result.success).toBe(true);
       expect(result.newHumanId).toBe('human-123');
-      expect(result.migratedData?.affinityCount).toBe(2);
-      expect(result.migratedData?.pathProgressCount).toBe(1);
-      expect(result.migratedData?.masteryCount).toBe(5);
-      expect(mockSessionHumanService.clearAfterMigration).toHaveBeenCalled();
       expect(service.status()).toBe('completed');
     });
 
-    it('should update status during migration phases', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
+    it('refuses when nobody is signed in yet', async () => {
+      mockIdentityService.humanId.mockReturnValue(null);
 
-      await service.migrate();
-
-      // Should have gone through: idle -> preparing -> registering -> transferring -> completed
-      const state = service.state();
-      expect(state.status).toBe('completed');
-    });
-
-    it('should fail when migration not available', async () => {
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
-
-      const result = await service.migrate();
+      const result = await service.applySessionToProfile('matthew@alpha.elohim.host');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Migration not available');
+      expect(result.error).toContain('Not signed in');
+      expect(mockSessionHumanService.clearAfterMigration).not.toHaveBeenCalled();
     });
 
-    it('should fail when no session exists', async () => {
-      mockSessionHumanService.getSession.mockReturnValue(null);
+    it('refuses when there is no visitor session', async () => {
+      mockSessionHumanService.hasSession.mockReturnValue(false);
 
-      const result = await service.migrate();
+      const result = await service.applySessionToProfile('matthew@alpha.elohim.host');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('No session to migrate');
+      expect(mockIdentityService.updateProfile).not.toHaveBeenCalled();
     });
 
-    it('should fail when migration package cannot be created', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(null);
+    it('surfaces a profile-update failure without clearing the session', async () => {
+      mockIdentityService.updateProfile.mockRejectedValue(new Error('Holochain not connected'));
 
-      const result = await service.migrate();
+      const result = await service.applySessionToProfile('matthew@alpha.elohim.host');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Failed to prepare migration package');
+      expect(result.error).toContain('Holochain not connected');
       expect(service.status()).toBe('failed');
+      expect(mockSessionHumanService.clearAfterMigration).not.toHaveBeenCalled();
     });
 
-    it('should fail when registration fails', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(
-        Promise.reject(new Error('Registration failed'))
-      );
-
-      const result = await service.migrate();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Registration failed');
-      expect(service.status()).toBe('failed');
-    });
-
-    it('should apply profile overrides when provided', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 0, failed: 0, errors: [] })
-      );
-
-      await service.migrate({
-        displayName: 'Custom Name',
-        bio: 'Custom Bio',
-        profileReach: 'public',
-      });
-
-      expect(mockIdentityService.registerHuman).toHaveBeenCalledWith(
-        expect.objectContaining({
-          displayName: 'Custom Name',
-          bio: 'Custom Bio',
-          profileReach: 'public',
-        })
-      );
-    });
-
-    it('should continue migration even if individual path progress fails', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-
-      // Mock callZome to fail on first two calls (get_or_create and update), succeed on subsequent
-      let callCount = 0;
-      mockHolochainClient.callZome.mockImplementation(() => {
-        callCount++;
-        if (callCount <= 2) {
-          return Promise.reject(new Error('Path progress failed'));
-        }
-        return Promise.resolve({ success: true, data: {} as any });
-      });
-
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
-
-      const result = await service.migrate();
-
-      // Migration should still succeed even if one path fails
-      expect(result.success).toBe(true);
-    });
-
-    it('should handle mastery migration failure gracefully', async () => {
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: false, migrated: 0, failed: 5, errors: ['Migration failed'] })
-      );
-
-      const result = await service.migrate();
-
-      expect(result.success).toBe(true);
-      expect(result.migratedData?.masteryCount).toBe(0);
-    });
-  });
-
-  // ==========================================================================
-  // Migration Progress Tracking
-  // ==========================================================================
-
-  describe('migration state', () => {
-    it('should track current step during migration', async () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
-
-      const migrationPromise = service.migrate();
-
-      // State should update during migration
-      await migrationPromise;
-
-      const finalState = service.state();
-      expect(finalState.status).toBe('completed');
-      expect(finalState.currentStep).toBe('Migration complete!');
-      expect(finalState.progress).toBe(100);
-    });
-
-    it('should track error state on failure', async () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.reject(new Error('Network error')));
-
-      await service.migrate();
-
-      const state = service.state();
-      expect(state.status).toBe('failed');
-      expect(state.error).toContain('Network error');
-    });
-  });
-
-  // ==========================================================================
-  // State Management
-  // ==========================================================================
-
-  describe('reset', () => {
-    it('should reset migration state', async () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.reject(new Error('Test error')));
-
-      await service.migrate();
-
-      expect(service.status()).toBe('failed');
-
+    it('resets state back to idle', async () => {
+      await service.applySessionToProfile('matthew@alpha.elohim.host');
       service.reset();
 
       expect(service.status()).toBe('idle');
-      expect(service.state().error).toBeUndefined();
-    });
-  });
-
-  // ==========================================================================
-  // Path Progress Transfer
-  // ==========================================================================
-
-  describe('path progress transfer', () => {
-    it('should call zome functions for each path progress item', async () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      // Mock humanId to return the profile id (needed for transferPathProgress)
-      (mockIdentityService as any).humanId = vi.fn().mockReturnValue(mockProfile.id);
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
-
-      await service.migrate();
-
-      // Should call get_or_create and update for each path
-      expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        expect.objectContaining({
-          zomeName: 'imagodei',
-          fnName: 'get_or_create_agent_progress',
-        })
-      );
-
-      expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        expect.objectContaining({
-          zomeName: 'imagodei',
-          fnName: 'update_agent_progress',
-        })
-      );
-    });
-  });
-
-  // ==========================================================================
-  // Affinity Transfer
-  // ==========================================================================
-
-  describe('affinity transfer', () => {
-    it('should handle affinity data during migration', async () => {
-      mockSessionHumanService.hasSession.mockReturnValue(true);
-      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
-      (mockIdentityService.mode as Mock).mockReturnValue('session');
-      mockSessionHumanService.getSession.mockReturnValue(mockSession);
-      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.mockReturnValue(
-        Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
-      );
-
-      const result = await service.migrate();
-
-      expect(result.migratedData?.affinityCount).toBe(2);
-      // TODO(test-generator): [LOW] Affinity transfer is not implemented
-      // Context: transferAffinity() method is empty stub
-      // Story: Preserve user's learned content preferences during migration
-      // Suggested approach:
-      //   1. Create zome function to batch-import affinity records
-      //   2. Convert session affinity map to network format
-      //   3. Store in imagodei DNA as part of human profile
     });
   });
 });

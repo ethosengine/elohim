@@ -9,8 +9,13 @@
  *   - Extracting code / state / provider from ActivatedRoute snapshot
  *   - Delegating the actual code exchange to OAuthAuthProvider.handleCallback
  *   - Calling AuthService.setAuthFromResult on success
+ *   - Carrying a visitor session onto the freshly authenticated profile
  *   - Navigating to the stored return URL (or /lamad) after success
  *   - Logging errors surfaced by the element
+ *
+ * The visitor→hosted upgrade lands HERE, not at a registration form: the human
+ * created their account at the doorway's own portal, so the only thing left is
+ * to apply what their visitor session already knew about them.
  *
  * Per design spec §1.1, this is the cleanup that achieves "ZERO third portal"
  * — the Lit element is the sole visual surface; the Angular component is a
@@ -34,6 +39,7 @@ import 'elohim-imagodei/register';
 import { type AuthResult } from '../../models/auth.model';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+import { SessionMigrationService } from '../../services/session-migration.service';
 
 @Component({
   selector: 'app-auth-callback',
@@ -58,10 +64,14 @@ export class AuthCallbackComponent implements OnInit, AfterViewInit {
   private readonly router = inject(Router);
   private readonly oauth = inject(OAuthAuthProvider);
   private readonly authService = inject(AuthService);
+  private readonly migration = inject(SessionMigrationService);
 
   readonly code = signal('');
   readonly state = signal('');
   readonly providerLabel = signal('');
+
+  /** The account the doorway issued, used to spot a defaulted display name. */
+  private readonly identifier = signal('');
 
   @ViewChild('cb') cbRef?: ElementRef<HTMLElement>;
 
@@ -93,13 +103,25 @@ export class AuthCallbackComponent implements OnInit, AfterViewInit {
       // Persist auth state before the success event fires so the rest of the
       // app is already authenticated when we navigate.
       this.authService.setAuthFromResult(result);
+      this.identifier.set(result.identifier ?? '');
       this.oauth.clearCallbackParams();
 
       return { session: result };
     };
   }
 
-  onSuccess(_e: Event): void {
+  async onSuccess(_e: Event): Promise<void> {
+    // A visitor who just made an account at their doorway keeps what they did
+    // as a visitor: display name, bio, interests, and their learning progress.
+    // `canMigrate()` is exactly "is there a visitor session"; a failure here is
+    // never a reason to strand the human on the callback page.
+    if (this.migration.canMigrate()) {
+      const result = await this.migration.applySessionToProfile(this.identifier());
+      if (!result.success) {
+        console.warn('[AuthCallback] Session could not be carried over:', result.error);
+      }
+    }
+
     const returnUrl = this.oauth.consumeReturnUrl() ?? '/lamad'; // route-literal-ok: default post-auth return mount (bundle nav target), not a minted content link
     void this.router.navigate([returnUrl]);
   }
