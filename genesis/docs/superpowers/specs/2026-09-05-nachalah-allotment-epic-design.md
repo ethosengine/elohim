@@ -178,7 +178,8 @@ built against — but it is the CEILING, not the goal.
 allotment is deterministic: the minimum holding and verification the physics guarantees, the
 same floor the pre-push gate dogfoods as a reach-earned attestation. The ceiling is the
 ecology's carrying capacity — the limitarian cap, Robeyns' upper limit, the top of the donut —
-and it is reached only at the full-arc global tier. Neither is the everyday. **The everyday goal
+and it is reached only at the full-arc global tier — §2c is where the *maximal diversity the
+physics of the DHT allows* lives, and only there. Neither is the everyday. **The everyday goal
 is the most performant representation that TRUST allows.** Trust is the resource that lets a
 record be held by fewer, validated by fewer, and still be viable: seven hubs that have earned
 each other's trust through witnessed contribution carry what a trustless design would need
@@ -248,7 +249,7 @@ Gaps:
   no completed round + timeouts rising) reds by name in the passport (companion Task 32 mints the
   probe; this epic binds it to the allotment habit).
 
-## 3b. The ontology — allotment as a living ecology (REA + VSM), not a faster deterministic network
+## 3b. The ontology — allotment as a living ecology (REA + VSM + EPR), not a faster deterministic network
 
 Allotment alone is the performance slice. The operator's steering (2026-09-05): the REA and VSM
 primitives are what let Holochain evolve from a deterministic network into a system that reacts
@@ -278,6 +279,19 @@ the repo projects a household's holding commitments from the DHT.
 | S4 intelligence | the trust gradient and the environment: who has earned what, what the world is doing to the mesh | valueflow evidence, saga survival, recovery drills |
 | S5 policy | the tiers and the refusals; Mishpat rulings on blocks | §2, §5; the Mishpat DNA |
 
+**EPR coupling — the minimal atom that keeps the whole network honest.** REA says what the
+economics of holding are and VSM says how the loops regulate; the EPR is what makes any of it
+checkable. Every holding claim, holding event, allotment commitment and trust judgement is an
+EPR atom: content-addressed, witnessed, cite-sealed, carrying its own provenance — the same atom
+the repo's valueflow, the habit register and the lineage witness already use. That is the
+smallest unit at which honesty can be verified without trusting the teller, and it is the unit
+wisdom deliberates over: the elohim scale trust in balance with the whole by reading atoms, not
+narratives — this peer held that portion through that recovery, witnessed by those neighbours,
+at that cost. Trust that scales is trust that resolves to atoms; an allotment negotiated over
+anything less is a story, and stories are how a network drifts from honest. The coupling is
+what lets a trust-full architecture stay viable at width: fewer verifiers, because what they
+verify is atomic and content-addressed rather than everything, everywhere.
+
 Ashby's law is the design rule: the variety of the environment (peers joining, leaving, failing,
 misbehaving; records of every weight) must be met by variety in the regulator. A single full arc
 and a single permanent block are the regulator with no variety; the allotment, graded by tier and
@@ -291,6 +305,9 @@ Gaps added by this reading:
 - G3b.2 Holding events as witnessed economic events (attention/compute-denominated), so a peer's
   holding history IS its trust evidence — the S4 signal that S3 reads, closing the loop without a
   human in it as terminal authority.
+- G3b.4 The EPR coupling: holding claims, events, commitments and trust judgements are EPR
+  atoms (content-addressed, witnessed, cite-sealed) in the existing atom home, so an allotment
+  negotiation and a Mishpat ruling on a block both resolve to atoms a neighbour can re-verify.
 - G3b.3 The five VSM seats named on the seam atlas so a future concern (a new probe, a new policy)
   self-locates: is it S3* (audit) or S5 (policy)?
 
@@ -340,6 +357,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — steering (operator): §2c is where the maximal diversity the physics allows lives (the ceiling, only there); §3b gains the EPR coupling — the minimal atom that keeps the whole network honest, what wisdom deliberates over to scale trust in balance with the whole (G3b.4).
 - 2026-09-05 — operator: satisfied with the allotment design ("you've got the right idea now"); arcs are dynamically negotiated by the elohim, every allotment decision aware of its limits, externalities and context (§3 posture amended).
 - 2026-09-05 — steering (operator): deterministic floor, elohim ceiling — the ceiling (planetary carrying capacity, the limitarian cap) is reached only at the full-arc global tier; the everyday goal is the most performant representation that TRUST allows; a trust-full architecture is more viable; full-arc-everywhere is the trustless crypto anti-pattern in a Holochain costume (§2c corrected, G2c.3 rewritten).
 - 2026-09-05 — steering (operator): (a) values are the same system held at different arcs — immutability is an emergent property of arc width, local/individual values are constructed by the consensus underneath the global covenant (§2b corrected); (b) the Republic ceiling — one space's carrying capacity is the real protocol limit, we are the IPv4 generation, the orchestra is a republic of republics (§2c, gaps G2c.1–3).
