@@ -222,7 +222,12 @@ count.** The crossing work is its rehearsal, because an arc policy, like a DNA l
 under running peers.
 
 Posture: an arc is an **earned, evidence-backed commitment** (a Mishpat commitment bounded by the
-peer's measured reliability), never a geometry accident and never a self-declaration. A peer that
+peer's measured reliability), never a geometry accident and never a self-declaration. Arcs are
+**dynamically negotiated by the elohim**: a good allotment decision is aware of its natural
+limits (the deterministic floor and the elohim ceiling), its externalities (what the holding costs
+the peer and the ecology, what it denies others), and its context (the level, the trust in
+force, the environment S4 is reporting) — so the negotiation is a standing loop, not a
+one-time assignment. A peer that
 claims a wider arc than its evidence supports is refused by the same roster check that refuses a
 forged lineage.
 
@@ -335,6 +340,7 @@ Gaps:
 
 ### 7.1 Ledger (newest first)
 
+- 2026-09-05 — operator: satisfied with the allotment design ("you've got the right idea now"); arcs are dynamically negotiated by the elohim, every allotment decision aware of its limits, externalities and context (§3 posture amended).
 - 2026-09-05 — steering (operator): deterministic floor, elohim ceiling — the ceiling (planetary carrying capacity, the limitarian cap) is reached only at the full-arc global tier; the everyday goal is the most performant representation that TRUST allows; a trust-full architecture is more viable; full-arc-everywhere is the trustless crypto anti-pattern in a Holochain costume (§2c corrected, G2c.3 rewritten).
 - 2026-09-05 — steering (operator): (a) values are the same system held at different arcs — immutability is an emergent property of arc width, local/individual values are constructed by the consensus underneath the global covenant (§2b corrected); (b) the Republic ceiling — one space's carrying capacity is the real protocol limit, we are the IPv4 generation, the orchestra is a republic of republics (§2c, gaps G2c.1–3).
 - 2026-09-05 — steering (operator): the construction is fractal — every holon has a gevul (boundary) and a nachalah inside it; gold at one level is paper at the level above; only the covenant is gold everywhere; a record's reach is a path up the holarchy with a floor at each level — §2b added (gaps G2b.1–4).
