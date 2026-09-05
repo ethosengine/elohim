@@ -2,8 +2,9 @@
 //! (Task 14b) that run at the TOP of every [`AdoptionController`] tick.
 //!
 //! Lifted out of `watch.rs` verbatim (whole-branch review I6: `watch.rs` had
-//! grown past the 3000-line soft ceiling in
-//! `.claude/epr-meta/policies.yaml`). Nothing here changed shape in the move
+//! grown 2155 → 3532 lines on the lineage branch, past the 3000-line
+//! `loc-soft` ceiling in `.claude/epr-meta/policies.yaml`; this move leaves it
+//! at 2843, back under). Nothing here changed shape in the move
 //! — same functions, same signatures, same order, same tests. It is a CHILD
 //! module of `watch` rather than a sibling for one reason that is not
 //! stylistic: every one of these methods reads `AdoptionController`'s private
