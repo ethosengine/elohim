@@ -17,13 +17,24 @@ nothing, the arc stays null, and the round count stays at zero.
 A household has to be able to see the refusal, read the evidence behind it, and
 decide. That is the whole tool.
 
+Two words the output uses: a **warrant** is the DHT record one peer publishes to
+accuse an op of being invalid; the **warrantee** is the agent the warrant accuses.
+A block cites the warrant, and the party it lands on is the warrantee when the
+warrant itself validated (details under "What hash a block actually cites").
+
+The sections "Verbs" and "Building" are how to use the tool. Everything after
+them is how it works inside, for when the output needs interpreting.
+
 ## Verbs
 
 All reads open the database `SQLITE_OPEN_READ_ONLY`, so they are safe against a
-running conductor.
+running conductor. Every command takes `--databases <dir>` — the peer's data root
+holding `conductor.db`, `db.key` and one `dht-<dna>.db` per DNA — and
+`--passphrase <text>` for `db.key` (default `test`, the local household mesh's
+passphrase; a real peer passes its own).
 
 ```bash
-DB=elohim/holochain/local-dev/james/databases
+DB=elohim/holochain/local-dev/james/databases   # substitute your own peer's directory
 
 hc-dbtool --databases $DB apps
 #   this conductor's own agent key per installed app, and each role's DNA
@@ -34,8 +45,9 @@ hc-dbtool --databases $DB blocks
 #   ops the warrantee authored
 
 hc-dbtool --databases $DB rejected --dna uhC0k…
-#   rejected ops in that DNA (ChainOp + LimboChainOp), joined to their
-#   authors, plus the Warrant rows that carry the accusation
+#   rejected ops in that DNA (ChainOp = integrated, LimboChainOp = still in
+#   validation limbo), joined to their authors, plus the Warrant rows that
+#   carry the accusation
 ```
 
 The one write verb refuses while any live process holds `conductor.db` open, and
@@ -43,10 +55,19 @@ refuses without `--yes`:
 
 ```bash
 ./app/elohim-app/scripts/hc-mesh.sh blocks james    # 1. see it
-./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors
+./app/elohim-app/scripts/hc-mesh.sh stop            # 2. stop the conductors (only the blocked peer's own
+                                                    #    conductor must be down — the tool checks its
+                                                    #    conductor.db; the household script stops all three)
 hc-dbtool --databases $DB unblock --cell <dna>:<agent> --yes   # 3. lift it
 ./app/elohim-app/scripts/hc-mesh.sh start           # 4. bring the mesh back
+./app/elohim-app/scripts/hc-mesh.sh blocks james    # 5. confirm: no rows; then watch the space's
+                                                    #    gossip metrics — completed_rounds climbing and
+                                                    #    storageArc no longer null means the peer rejoined
 ```
+
+Lifting is not a cure by itself: whatever wrote the rejected op (for the household
+it was a `CapGrant` written after a chain close) re-earns the block on its next
+write. Fix the writer first.
 
 `--cell <dna>:*` lifts every agent blocked in that DNA. Omitting `--yes` prints
 what would be deleted and changes nothing.
