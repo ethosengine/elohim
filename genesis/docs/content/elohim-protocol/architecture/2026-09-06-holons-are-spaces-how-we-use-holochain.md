@@ -382,6 +382,20 @@ fork item. A person's phone bridges its 10 to 50 spaces; its work is bounded by 
 own allotment, never by the size of the world. That is the whole story, and every part of it is either
 shipped or a bounded, named change.
 
+### Is sharding the lynchpin? (operator question, answered)
+
+Half right. Sharding is the lynchpin for a **large commons held by many** — without it a commons is held only
+by nodes that can hold all of it (racks, a few stewards), which is tolerable now and wrong for the phone-to-rack
+spectrum. But **"shared between holons" is not what sharding gives you.** Cross-holon sharing comes from
+membership and promotion, available today: a data commons is a space everyone joins (most at zero arc) and
+content enters it by witnessed re-publish. Sharding only decides how widely the commons is *held* once it is
+there. Hence the order: (1) placement — fixtures and households out of the commons, no fork; (2) the small fork
+hook — per-space arc, settable hot, so one phone is a full household member and a light commons reader; (3) true
+fractional sharding — the conductor filtering ops by arc, routing gets to out-of-arc authorities, keeping
+validation coverage honest as arcs shrink. Upstream built (3) once and deferred it in the rewrite; their roadmap
+intends to restore it in kitsune2. Track and contribute rather than rewrite alone; (1) and (2) are what unblock
+the pain we feel now.
+
 ## 7. What changes in our design, concretely
 
 This is the decision the overnight ruling recorded on the arc-policy code and in the Nachalah hub, spelled
