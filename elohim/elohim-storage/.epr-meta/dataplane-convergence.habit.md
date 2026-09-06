@@ -604,3 +604,22 @@ per-peer view rides the agent→relay peer store, which is preserved, so the pro
 flight (string-keyed projection in storage `http.rs`). Loki 502'd on every targeted query (untrustworthy zeros).
 Genesis #1558 UNSTABLE is the seed stage's `stampProvenance` reach circuit opening after 5 conductor-path
 failures on rows that are not DHT-anchored (bulk-seed anchor gap) — same family, fleet lane.
+  Post-deploy re-probe 04:2xZ (edge #1432 "Deploy Edge Node - Alpha" SUCCESS, pods restarted): adam's wedge
+  SURVIVED the restart — `stuckSweeps` reset 55→9 but `reanchorDeadRemaining` stayed 9 and `deadRemainingStuck`
+  re-asserted within nine sweeps; landing row still `unverified` / `serverBlobHash null` on B, `live` on A.
+  That settles the class: not a transient of a long-running process but a durable per-row state (re-keyed
+  anchors) that only a re-anchor under the CURRENT key — or a declared supersession — can heal. A restart is
+  not a cure here; the runtime poller (now watching B) will file it as an exhaustion on its next run.
+  Edge #1432 Dataplane Validation (fleet lane, 04:3xZ, ~7 min after the alpha roll): 92 scenarios — 6 passed, 84 HELD
+  (owned-substrate act-i baseline unavailable on alpha, skipped not failed), 2 FAILED: (1) inventory-convergence
+  "the seed-facing doorway peer catches its projection up under sustained gossip" — `elohim.host /health
+  p2p.caughtUp false` (B side, adam; measured inside the ≈20 min post-restart churn window the trust-contract
+  runbook names, AND adam is the wedged peer above — two causes stacked, so this red is not attributable until a
+  validate-only re-measure after the churn); (2) resilience/observable-distribution "coverageShortfall is a present
+  0 when the floor is met (absent != zero)" — the snapshot omits `coverageShortfall` entirely (absent means never
+  measured; a reader cannot tell it from "met"). The second is a card data-plumbing gap, not convergence; it is
+  filed here only because the fleet lane surfaced it — home is the resilience-card plumbing umbrella.
+  Baseline for attribution: edge #1430's validation was 92 = 7 passed / 84 held / 1 failed, and its one failure was
+  the same `coverageShortfall` row — so the ONLY new red on #1432 is the B-side `caughtUp false`, i.e. the wedged
+  peer measured inside its restart churn. Re-measure with `[build:edge] [edge:validate-only]` after the churn
+  before calling it a regression.

@@ -1,7 +1,7 @@
 ---
 name: feedback_valueflow_authorship_is_the_process
 title: Valueflow authorship IS the process
-description: "Authoring/connecting REA valueflows IS the protocol's process. Verbs are designed friction; everything around them must be frictionless."
+description: "Authoring/connecting REA valueflows IS the protocol's process; verbs are designed friction, the rest must be frictionless — bites every SDD/epic loop."
 metadata:
   type: feedback
 ---

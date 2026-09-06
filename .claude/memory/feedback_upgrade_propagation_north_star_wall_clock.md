@@ -1,7 +1,7 @@
 ---
 name: feedback_upgrade_propagation_north_star_wall_clock
 title: "North star: p2p upgrade propagation before builders"
-description: "Master p2p hApp upgrade/revert propagation (mixed-version peers talk, no big-bang rolls) before builders."
+description: "Master p2p hApp upgrade/revert propagation (mixed-version peers talk, no big-bang rolls) before builders; every fleet roll is friction evidence."
 metadata: 
   node_type: memory
   title: P2P upgrade/rollback propagation is the north star; wall-clock friction is first-class signal
