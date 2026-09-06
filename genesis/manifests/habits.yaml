@@ -693,12 +693,25 @@ habits:
         path, the §7 cutover that STOPS the pre-contract immediate debit at api/epr.rs, an additive
         `actRef` on the p2p feedback message with old<->new decode pinned, and
         `POST /api/v1/feedback/operations`.
-        WHAT IS PROVEN. `just gate sweettest-check` EXIT=0, `just gate schema-dna` EXIT=0,
-        `just gate manifest-hygiene` EXIT=0; 96 native zome unit tests pass including 11 new ones;
-        the storage lib+test suite passes locally.
+        WHAT IS PROVEN (re-verified 2026-09-06 22:5xZ–23:4xZ after the box reboot, logs under
+        genesis/a2o/reports/accountable-correction/). `just gate elohim-storage`: fmt + clippy -D warnings
+        clean, lib tests 3618 passed / 1 failed — the one failure is
+        `release_manifest_mirror_agrees_with_the_rakia_schema` reading `../rakia/...` with the
+        `elohim/rakia` submodule absent in the worktree; with the submodule initialised it passes
+        (3619/3619). `just gate sweettest-check` EXIT=0 (compile-only). The feedback sweettests were
+        RUN, not just written: `cargo test --test feedback_signal -- --include-ignored` 14 passed /
+        0 failed in 1805 s, including `content_lineage_names_exact_root_and_author`,
+        `amend_content_by_non_root_author_rejected`, `feedback_signal_refs_report_references_and_resolve_on_request`,
+        `correction_with{out,_mismatched}_embedded_request_rejected`. 19 projector unit tests + 27
+        outbox/wire tests pass (fair rotation, late arrival, crash-window rollback, replay no-op, group
+        dedup, non-root acceptance refused, unfetchable pending, rebuild == published generation).
+        DNA HASH: integrity sources, dna.yaml and Cargo.lock are byte-identical to dev (git), which is
+        the real proof of a coordinator-only change; the local `hc dna hash` numbers above and in the
+        main tree differ from each other because Cargo's per-crate metadata includes the package PATH
+        (worktree vs /projects/elohim) — see memory project_dna_hash_depends_on_build_path and the
+        observation note on dna/Jenkinsfile. Never compare hashes across trees.
         WHAT IS NOT PROVEN — the honest half. NOTHING here has run on the household mesh. The eight
-        stations of @concern:accountable-correction have never executed; the new sweettests are
-        written but not run (they need a packed DNA from the pipeline); no peer has ever discovered,
+        stations of @concern:accountable-correction have never executed; no peer has ever discovered,
         verified and applied a correction authored by another peer. The projector's tick loop is
         written and unit-tested against a fake DHT reader but is NOT yet spawned from main — nothing
         drives it in a running node, so on a live peer today a correction is enqueued and never
