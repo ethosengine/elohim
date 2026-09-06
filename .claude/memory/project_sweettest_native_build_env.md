@@ -3,7 +3,7 @@ index: false
 id: project-sweettest-native-build-env
 name: sweettest-native-build-env
 title: Sweettest native build env
-description: "Sweettest needs RUSTFLAGS=\"\" (WASM getrandom flag breaks native link), BINDGEN_EXTRA_CLANG_ARGS for clang-21; `just pack` (not build) refreshes the .dna bundle."
+description: "Sweettest needs RUSTFLAGS=""; native Rust gates also need CARGO_TARGET_DIR set per workspace."
 metadata: 
   node_type: memory
   type: project

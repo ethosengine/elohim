@@ -1,7 +1,7 @@
 ---
 name: feedback_push_branch_discipline
 title: Push, branch & worktree discipline (umbrella)
-description: "Commit-only (integrator pushes); one push per batch (concurrent pushes mutually abort); NEVER push while an edge deploy or the orchestrator is building (a superseding run cancels the roll mid-rollout — gate the push in the && chain); shared worktree — path-limited commits, never bulk-revert; sprint/* is not CI-indexed."
+description: "Commit-only; one push per batch; never during builds — a superseding run cancels the roll mid-rollout. Shared worktree: path-limited; sprint/* not CI-indexed."
 metadata:
   node_type: memory
   type: feedback

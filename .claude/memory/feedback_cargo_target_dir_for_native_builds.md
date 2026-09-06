@@ -3,7 +3,7 @@ index: false
 id: feedback-cargo-target-dir-for-native-builds
 name: cargo-target-dir-for-native-builds
 title: Set CARGO_TARGET_DIR for native builds
-description: "Native (non-WASM) cargo builds need CARGO_TARGET_DIR at the pool slot per workspace; forgotten legacy target/ dirs balloon to ~30G. WASM workspaces stay default."
+description: "Native cargo builds need CARGO_TARGET_DIR per workspace; WASM stays default. Legacy target/ can balloon to 30G silently."
 metadata: 
   node_type: memory
   type: feedback

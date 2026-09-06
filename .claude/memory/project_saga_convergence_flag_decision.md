@@ -1,4 +1,5 @@
 ---
+index: false
 name: project-saga-convergence-flag-decision
 title: Saga convergence gated on ELOHIM_ADOPT_BEFORE_AUTHOR flip
 description: "The both-sides-missing exit ships dormant (flag default-OFF); an operator env-flip enacts it, then converged-on-A → recording ×2 → saga 11/11."

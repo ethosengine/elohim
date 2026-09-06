@@ -1,7 +1,7 @@
 ---
 name: feedback_onpush_implicit_default_harness_blindness
 title: Angular 22 implicit-OnPush freeze + harness blindness
-description: Angular 22 implicit-OnPush freezes components mutating plain fields from callbacks; overrideComponent(CUT) and fixture-root autoDetect hide it — verify with an Eager host or eyes-on.
+description: "Angular 22 OnPush-default freezes plain-field mutation from callbacks; overrideComponent(CUT)/fixture-root autoDetect hide it — verify w/ Eager host or eyes-on."
 metadata:
   type: feedback
 ---
@@ -25,3 +25,5 @@ NO `detectChanges()` after — verify it FAILS with the stamp removed. When tria
 clears / data loaded but nothing renders" report, check `X.ɵcmp.onPush` in the deployed bundle
 before reading any data-layer code. Inventory: `genesis/data/timeline/backlog/onpush-eager-debt-inventory.md`.
 Related: [[project_angular22_node24_campaign]].
+
+- [[project_angular22_node24_campaign]] — folded (index: false); landed campaign, OnPush/vitest lessons carried here.

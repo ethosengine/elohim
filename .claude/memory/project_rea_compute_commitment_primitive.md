@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-rea-compute-commitment-primitive
 name: rea-compute-commitment-primitive
 title: REA compute-commitment primitive (gospel-tier)

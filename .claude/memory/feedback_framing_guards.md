@@ -1,7 +1,7 @@
 ---
 name: feedback_framing_guards
 title: Framing & ontology guards (umbrella)
-description: "Prose guards: self-sovereign is never the apex tier; justice = Mishpat/capability, not punishment; human-in-the-loop is not terminal authority; peer collectives are starved, not failing; tokens are play over an REA floor, never gamification to strip."
+description: "Guards: self-sovereign ≠ apex; justice = Mishpat/capability, not punishment; human-in-loop ≠ terminal; peer collectives are starved, not failing."
 metadata:
   node_type: memory
   type: feedback

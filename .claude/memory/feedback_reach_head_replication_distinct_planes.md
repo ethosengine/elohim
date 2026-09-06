@@ -2,7 +2,7 @@
 index: false
 name: feedback_reach_head_replication_distinct_planes
 title: Reach ≠ content_head ≠ replication — three orthogonal planes
-description: "Reach (audience, earned) ≠ content_head (version, declared) ≠ replication (availability, custody) — three orthogonal planes; landing-page divergence is a replication bug, not head election."
+description: "Reach (audience) ≠ content_head (version) ≠ replication (custody) — three orthogonal planes. Divergence is replication bug, not head."
 metadata: 
   node_type: memory
   type: feedback

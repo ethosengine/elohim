@@ -1,7 +1,7 @@
 ---
 name: project_holochain_0_7_0_assessment
 title: Holochain 0.7.0 assessment
-description: "Holochain 0.7.0 shipped 2026-07-30; assessed 2026-09-02 vs our 0.6.3 fork — tx5 gone, Action preimage changes, no data migration, kitsune2 0.5 strict relay match; steers Wave 3"
+description: "HC 0.7.0 shipped 2026-07-30; assessed vs our 0.6.3 fork — tx5 gone, Action preimage changes, kitsune2 0.5."
 metadata: 
   node_type: memory
   title: Holochain 0.7.0 assessment vs our 0.6.3 fork

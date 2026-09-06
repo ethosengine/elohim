@@ -2,7 +2,7 @@
 index: false
 name: project-ssr-first-deploy-seed-then-restart
 title: SSR first deploy — seed, then restart doorway
-description: "First SSR deploy of an EPR app: App pipeline seeds serverBlobHash, THEN a doorway restart materializes it; a doorway-only push won't trigger App; edge-before-seed needs one extra edge restart."
+description: "First SSR deploy: seed then restart doorway. Stale shell pins slug-fetched shell under empty head."
 metadata: 
   node_type: memory
   title: SSR first-deploy = App seed serverBlobHash THEN doorway restart

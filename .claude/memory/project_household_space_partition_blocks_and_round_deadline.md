@@ -1,7 +1,7 @@
 ---
 name: project_household_space_partition_blocks_and_round_deadline
 title: Household space partition blocks
-description: "One rejected op makes holochain 0.7 block the author's cell forever (no unblock) → storageArc null on every peer, no authorities, held views local-only; bites when ONE space reds"
+description: "0.7: one rejected op blocks author's cell forever → storageArc null on every peer, no authorities."
 metadata: 
   node_type: memory
   title: "Household space partition: 0.7 blocks + 15 s round deadline"

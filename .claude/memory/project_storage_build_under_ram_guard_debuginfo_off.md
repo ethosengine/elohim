@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_storage_build_under_ram_guard_debuginfo_off
 title: Storage builds under the RAM guard
-description: "elohim-storage cargo test/build gets shed by the 80% RAM guard while the mesh is up; cure in-tree since 2026-09-05 — line-tables-only debuginfo + cargo-jobs-flag -j1; just gate picks it up"
+description: "Storage elohim-storage build: debuginfo off, ram-guard sheds builds. Glibc leak, CPU storm from sys-validation."
 metadata: 
   node_type: memory
   title: Storage builds under the RAM guard

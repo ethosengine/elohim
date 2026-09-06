@@ -1,7 +1,7 @@
 ---
 name: feedback_two_portals_only_apps_share_sso
 title: Two portals only — native + doorway; apps share them like SSO
-description: "Operator decision 2026-09-05 — the ONLY sign-in portals are the p2p-native portal (stewards) and the doorway portal (hosted humans); every app is an OAuth relying party of them, never its own portal — bites on any in-app login/register form"
+description: "Two portals only: p2p-native (stewards) and doorway (hosted). Apps are OAuth relying parties, never own portals."
 metadata: 
   node_type: memory
   title: Two portals only — native + doorway; apps share them like SSO

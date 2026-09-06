@@ -20,3 +20,5 @@ metadata:
 **Why:** stories aren't typechecked in the storybook build and CSS custom properties fail silently — the only reliable gate is `pnpm graphos sheet/story` + Reading the shot ([[feedback-frontend-review-eyes-first]]).
 
 **How to apply:** when authoring/reviewing any designed story or element cssprop change, grep both sides of every binding, prefer full-shorthand border vars, and close with a local-storybook render. Also: a `*/` inside `--token-*/...` text in a block comment terminates the comment and 500s the storybook dev server.
+
+- [[project_storybook_smoke_test_story_budget]] — folded (index: false); cumulative timeout budget trap, subsumed by graphos pipeline concerns.

@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_workspace_stewarded_device_peer_batch
 title: "Workspace as matthew's device — native-sync batch"
-description: "Native content sync from a workspace device peer to both alpha doorways PROVEN 2026-08-30 (no seed, no Jenkins); recipe + the three fleet enablers; identity binding (station 3) still open."
+description: "Stewarded device peer batch: lvi (P2P Che killer), holochain 0.7 parity, upgrade propagation north star."
 metadata: 
   node_type: memory
   title: "Workspace as matthew's device — native-sync batch"

@@ -1,7 +1,7 @@
 ---
 name: project_local_mesh_binary_slot_and_restart
 title: Local mesh binary slot, restart & prologue traps
-description: Local mesh runs the doorway-family DEBUG elohim-storage; rebuild into that slot + `hc-mesh.sh storage-restart` (exe record, loud failure, profile overlay); procfs copyFile is 0 bytes
+description: "Local mesh: doorway-family DEBUG slot, rebuild + hc-mesh.sh storage-restart; procfs copyFile is 0 bytes."
 metadata: 
   node_type: memory
   type: project

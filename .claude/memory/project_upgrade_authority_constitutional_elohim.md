@@ -1,7 +1,7 @@
 ---
 name: project-upgrade-authority-constitutional-elohim
 title: Upgrade authority is constitutional
-description: "Auto-adoption is the default; a core-protocol crossing is the elohim's notarized commitment, never a consent act; humans get branches + a common language (lineage · witness · notarized path · bridge map) — bites in any upgrade/adoption/migration design"
+description: "Auto-adoption is default; a core-protocol crossing is the elohim's notarized commitment, never a consent act — bites in any upgrade/adoption/migration design."
 metadata: 
   node_type: memory
   title: "Upgrade authority is constitutional, elohim-vested"

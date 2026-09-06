@@ -1,7 +1,7 @@
 ---
 name: project_compute_envelope_three_homes_k8s_bridge
 title: Compute envelope has three homes — the k8s-bridge slice
-description: "deployments.json limits, the Rakia ledger and a prose ratification cannot read each other; the capacity ask fires on a stale envelope — cure: observe, typed ratification, manifest render"
+description: "deployments.json limits, Rakia ledger, prose ratification cannot read each other — capacity ask fires on stale envelope."
 metadata: 
   node_type: memory
   title: Compute envelope has three homes — the k8s-bridge slice
@@ -43,3 +43,5 @@ re-observe before ratifying; never restate the ratification in prose; when Stati
 ask cannot fire on a stale envelope at all. Related: [[project_tevah_compute_envelope_canonized]],
 [[feedback_k8s_is_not_the_architecture]], [[feedback_push_branch_discipline]],
 [[project_storage_build_under_ram_guard_debuginfo_off]].
+
+- [[project_tevah_compute_envelope_canonized]] — folded (index: false); canonization detail subsumed by this umbrella.

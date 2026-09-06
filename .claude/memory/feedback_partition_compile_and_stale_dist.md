@@ -2,7 +2,7 @@
 index: false
 name: feedback-partition-compile-and-stale-dist
 title: Commit partitions respect compile deps
-description: Two integration anti-patterns from 2026-07-24 overnight — commit partitions must respect COMPILE deps, and local dist/ presence proves nothing about CI stage coverage
+description: "Commit partitions must respect COMPILE deps; local dist/ presence doesn't prove CI coverage."
 metadata:
   type: feedback
 ---

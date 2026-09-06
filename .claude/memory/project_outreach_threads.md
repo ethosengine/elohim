@@ -1,6 +1,6 @@
 ---
 name: project_outreach_threads
-description: "Cold/warm outreach threads: Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang/civic.ai, Andy Crouch, Andrew Root, Brynjolfsson, p2panda chat."
+description: "Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang, Andy Crouch, Brynjolfsson."
 title: Outreach threads (umbrella)
 metadata: 
   node_type: memory

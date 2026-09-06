@@ -1,7 +1,7 @@
 ---
 name: feedback_valueflow_authorship_is_the_process
 title: Valueflow authorship IS the process
-description: Operator (2026-09-05) — authoring/connecting REA valueflows in context IS the protocol's process; its verbs are the designed friction, everything around them (tool discovery, prompt assembly, ledger duplication) must be frictionless — bites at every SDD/epic loop
+description: "Authoring/connecting REA valueflows IS the protocol's process. Verbs are designed friction; everything around them must be frictionless."
 metadata:
   type: feedback
 ---
@@ -35,3 +35,5 @@ bounds a scope declares on a stock (the inequality curve, [[project_inequality_c
 Frictionless everywhere else because the marginal cost of applied knowledge trends to zero and
 the substrate's performance edge is what lets sensing (lamad · psephos · the register) run
 continuously enough for policy to follow — slow sensing is stale policy.
+
+- [[project_rea_valueflows_are_our_workflow_layer]] — folded (index: false); REA workflow layer detail carried by this feedback note.

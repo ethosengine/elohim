@@ -2,7 +2,7 @@
 index: false
 name: project_ai_future_of_work_outreach_thread
 title: AI & future-of-work outreach (4 critical scholars)
-description: Cold mass-cc 2026-06-24 to Mattei/Woodcock/Gent/Dwarkasing; Beer freedom-machine hook, care-via-peer-witness pitch; crypto-allergic audience — lead care/commons.
+description: "Outreach to Mattei/Woodcock/Gent/Dwarkasing (2026-06-24): freedom-machine + peer-witness care pitch for crypto-allergic scholars."
 metadata:
   type: project
 ---

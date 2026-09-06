@@ -1,7 +1,8 @@
 ---
+index: false
 name: reference_io_guard_berth_rails
 title: io-guard and berth rails
-description: io-guard sheds compile trees past a disk-WRITE budget; berth is the claim registry (claim cargo|mesh before heavy work) — bites before any storage build or mesh start
+description: "I/O guard berth rails: hard NFS deadlock recovery pattern for devspace and container ops."
 metadata: 
   node_type: memory
   title: io-guard write budget + berth session claims

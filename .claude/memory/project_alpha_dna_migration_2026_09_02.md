@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_alpha_dna_migration_2026_09_02
 title: Alpha DNA re-genesis 2026-09-02
-description: 2026-09-02 alpha re-genesis — installed DNAs predated every CI build since Jul 18; drift probe's reinstall tore the source chains; operator chose migration (baseline = holochain #1420 hashes, [dna:migrate]); DNA Hash Guard + happ_manager intent gate now stand
+description: "2026-09-02 alpha re-genesis — DNAs stale since Jul 18; drift probe's reinstall broke chains. Operator chose migration. DNA Hash Guard gated."
 metadata:
   type: project
 ---

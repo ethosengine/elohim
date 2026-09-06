@@ -1,7 +1,8 @@
 ---
+index: false
 name: project-sync-state-contract
 title: Sync-state contract — epoch, position, caught-up
-description: The sync-state contract (2026-08-29) — every replication stream declares epoch/position/declared; caught-up is a comparison, None while unknown; station 1 = epoch in inventory sequence high bits
+description: "Sync-plane state durable: inventory gossip, Automerge gossip, DHT entries. Canonical channels alone move heads."
 metadata:
   type: project
 ---

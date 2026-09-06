@@ -1,7 +1,7 @@
 ---
 name: project_devspace_recovery
 title: Devspace/container recovery (umbrella)
-description: "Devspace recovery: container restarts kill mesh + background agents and wipe /tmp and ~/bin (gh must be reinstalled); ethosengine I/O wedges are hard-NFS deadlocks, not node failure; a local-mesh WRITE STORM on the shared NVMe swaps the pod (controller lease lost) and drops every secret — stop/start heals."
+description: "Devspace recovery: container restarts kill mesh + wipe /tmp; ethosengine I/O wedges = hard NFS deadlocks."
 metadata:
   node_type: memory
   type: project
@@ -51,3 +51,6 @@ re-runs `cargo install --path elohim/eprfs` (load ~20 for the first minutes).
 
 - **Git HTTPS auth after restart (2026-09-05):** `GH_TOKEN` survives but git ignores it — Che's /etc/gitconfig routes lookups to the empty mounted store and `gh` is gone. Durable fix: Che dashboard → User Preferences → Personal Access Tokens → add github.com token; the mounted secret syncs LIVE (~1 min, no restart) and Che's system store helper then serves every repo (done 2026-09-05, user=EthosengineBot). Stopgap if the store is empty: `git config --local credential.https://github.com.helper '!f() { echo "username=x-access-token"; echo "password=$GH_TOKEN"; }; f'` per repo.
 - **VS Code "GitHub wants to sign in" prompt (2026-09-05):** same empty Che credential store — the built-in Git extension asks the GitHub auth provider on every fetch/push. Workspace `.vscode/settings.json` sets `github.gitAuthentication: false` + `git.terminalAuthentication: false`. The Che-side cure is User Preferences → Personal Access Tokens (github.com) or Git Services OAuth, which fills `/.git-credentials/credentials` after a workspace restart. gh 2.100.0 is baked into udi-plus from che-devworkspaces 30b5c86 (nightly cron 02:00 rebuild cascades to udi-plus-mem-rust-nix).
+
+- [[project_workspace_berth_io_guard]] — folded (index: false); berth/io-guard detail subsumed by this umbrella.
+- [[reference_io_guard_berth_rails]] — folded (index: false); io-guard rails reference subsumed by this umbrella.

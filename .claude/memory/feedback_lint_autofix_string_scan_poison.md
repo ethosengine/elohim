@@ -2,7 +2,7 @@
 id: feedback-lint-autofix-string-scan-poison
 name: lint-autofix-string-scan-poison
 title: Lint autofix string-scan poison
-description: "eslint --fix rewrites runtime-critical code (prefer-set-has on strings; prefer-global-this on typeof-window SSR guards; promise-function-async retiming; Array<T> in generated files) — a green suite is NOT enough, run the AOT build too."
+description: "Lint --fix rewrites runtime-critical: prefer-set-has, prefer-global-this, Array<T> in generated. Run AOT build."
 metadata: 
   node_type: memory
   type: feedback

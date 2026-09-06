@@ -1,7 +1,7 @@
 ---
 name: package-first-projection-drift-direction
 title: "Projection-drift gate: read the diff before projecting"
-description: "elohim-agent drift gate — project --write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md from the package; if the runtime side is newer, fold runtime→package first or content is destroyed."
+description: "project --write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md; if runtime is newer, fold runtime→package first or content is lost."
 metadata: 
   node_type: memory
   index: true

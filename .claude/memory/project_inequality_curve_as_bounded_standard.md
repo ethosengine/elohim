@@ -1,7 +1,7 @@
 ---
 name: project_inequality_curve_as_bounded_standard
 title: Inequality curve as a bounded standard
-description: Operator's origin idea (pre-AI, pre-Gesell) — a token that knows its place on the global inequality curve and applies friction to the gradient (dignity floor + limitarian cap); now held as a Mishpat policy over the REA record, door kept open for legacy currency — bites when designing economic bounds, currency posture, or the shefa/economy pillar
+description: "Inequality curve as bounded standard: dignity floor + limitarian cap; now held as Mishpat guidance."
 metadata:
   type: project
 ---

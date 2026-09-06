@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_dataplane_pain_points_sprint_2026_09_02
 title: Dataplane pain-points sprint 2026-09-02
-description: "2026-09-02 sprint state — quiesce leg bounded, federation-deploy re-acted to Act II (scenario 2 holds live, versions diverge), device-peer launcher streamlined; wave 2 = honest handshake + --sync-coordinators-once"
+description: "2026-09-02: quiesce leg bounded, federation Act II re-acted, device-peer launcher streamlined, wave 2 = handshake."
 metadata: 
   node_type: memory
   title: "Dataplane pain-points sprint — wave 1 landed, wave 2 waits on storage slot"

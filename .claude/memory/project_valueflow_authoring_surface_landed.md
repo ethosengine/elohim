@@ -1,7 +1,7 @@
 ---
 name: project_valueflow_authoring_surface_landed
 title: Valueflow authoring surface landed
-description: Valueflow authoring surface LANDED + CLOSED OUT 2026-09-05 — epr flow claim / fulfill --on / context / ledger, ruling|verdict notes, bounded WIP fence stock, flips-need-rulings check, observer hook minting on write, three valueflow-* seat skills; traps (doc-plane cites heal via cite-gen --refresh not reseal; cargo lease etiquette between sessions; blind-reader loop cap) — reach for it before any SDD/epic dispatch
+description: "Valueflow authoring landed 2026-09-05: epr flow claim/fulfill/context/ledger verbs, ruling|verdict notes, 3 valueflow-* skills — reach before SDD/epic dispatch."
 metadata:
   type: project
 ---

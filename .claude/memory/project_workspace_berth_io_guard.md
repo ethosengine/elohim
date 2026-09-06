@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_workspace_berth_io_guard
 title: Workspace berth + io-guard
-description: "berth (moor/claim/release/say — who is here, model@lab, what they hold) + io-guard (write budget 60/100/160 MB/s + PSI; pause/kill tier-1, never critical) live on dev; coordination is a ledger, not chat"
+description: "workspace/berth I/O guard: hard NFS deadlock recovery; devspace container restart kills mesh + wipes /tmp."
 metadata: 
   node_type: memory
   title: "Workspace berth + io-guard — carrying capacity is a write budget; coordination is a ledger, not chat"

@@ -2,7 +2,7 @@
 index: false
 name: saga-banking-validate-only-gate
 title: "Saga banking = validate-only run; gate reads matthew"
-description: "Bank saga/notary measures via [edge:validate-only] (exists since 2026-07-30); the quiesce gate reads MATTHEW only, not the shem trio — bites on every banking attempt"
+description: "validate-only gate (edge:validate-only) records measure without deploying; bakes PREVIOUS happ hash, no DNA reinstall."
 metadata: 
   node_type: memory
   title: Saga banking = validate-only run; quiesce gate reads matthew

@@ -2,7 +2,7 @@
 index: false
 name: project_local_pair_failover_validation_rail
 title: Local pair-failover validation rail
-description: How to validate doorway-failover / saga ch04 locally on `just mesh` (two doorways + 3 peers + mongod) before any [build:edge] — the seeding order, the shed drill, and the traps that cost time on 2026-08-21.
+description: "Failover validation rail: homo-iroh warm recovery PASS 258s; MESH_PEER_TRANSPORTS for hc-mesh.sh."
 metadata:
   type: project
 ---

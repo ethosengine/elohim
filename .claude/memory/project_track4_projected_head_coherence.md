@@ -2,7 +2,7 @@
 index: false
 name: project_track4_projected_head_coherence
 title: Track-4 projected-head coherence arc
-description: "Declared-head rails already existed (Content head + StampMode + authorHeadOnce); real gap was boot-frozen doorway SSR + no served-vs-declared probe; T4-1/T4-2 landed 2026-07-22."
+description: "Track 4: doorway projects heads for every content tier; coherence wire is the reach declaration."
 metadata: 
   node_type: memory
   title: Track-4 projected-head coherence arc

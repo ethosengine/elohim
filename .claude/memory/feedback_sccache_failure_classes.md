@@ -1,6 +1,6 @@
 ---
 name: feedback_sccache_failure_classes
-description: "Three sccache failure classes: cache-corruption null-byte/unclosed-delimiter, intermittent spawn ENOENT, and AccessDenied on a dead Garage key (server won't start → DNA red in 85s)."
+description: "Three sccache failures: cache-corruption null-byte/unclosed-delimiter, spawn ENOENT, AccessDenied on dead Garage key (DNA red ~85s)."
 metadata: 
   node_type: memory
   title: sccache failure classes (umbrella)

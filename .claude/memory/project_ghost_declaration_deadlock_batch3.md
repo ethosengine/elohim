@@ -2,7 +2,7 @@
 index: false
 name: project_ghost_declaration_deadlock_batch3
 title: "Batch-3 = ghost-declaration deadlock, not missing anchors"
-description: "The \"~2000 unanchored rows\" were anchored rows with phantom declared heads (dead incarnations); cure = local-get responder + author-over-ghost decay (ELOHIM_GHOST_DECLARATION_DECAY)"
+description: "Batch-3 deadlock: ghost declared heads stay unjournaled — replay cannot resurrect, merge cannot converge."
 metadata: 
   node_type: memory
   title: "Batch-3 = ghost-declaration deadlock, not missing anchors"

@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_tevah_compute_envelope_canonized
 title: Tevah compute envelope canonized
-description: "Tevah/ark: S0 + station 2 LANDED (2026-09-03) — witnesses custodied via custody-spool with zero DNA change; next station 3b (reach gate on the shard replication plane); traps for running it"
+description: "Compute envelope: CPU/RAM limits, happ selection, mesh topology; durable ledger, prose ratification reconciled."
 metadata: 
   node_type: memory
   title: Tevah compute envelope canonized

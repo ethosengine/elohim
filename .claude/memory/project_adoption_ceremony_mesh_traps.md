@@ -1,7 +1,7 @@
 ---
 name: project_adoption_ceremony_mesh_traps
 title: "Rung-5 adoption ceremony: mesh traps + refusal map"
-description: "Rung-5 adoption ceremony on the local mesh (2026-09-02): preconditions, candidate shape, typed-refusal → fix map, and the drivers' shapes — reach for it before any release/election measure on the mesh."
+description: "Rung-5 adoption ceremony (local mesh 2026-09-02): preconditions, candidate shape, typed-refusal map. Use before release/election measures."
 metadata:
   type: project
 ---

@@ -1,7 +1,7 @@
 ---
 name: project_risk_discipline_timeline_tag
 title: Risk discipline — the timeline risk tag
-description: "Project risks are backlog rows tagged `risk` in a cluster (first: arch-scale-risk-backlog), wired into five recall surfaces — check the cluster before designing on a scale-sensitive plane"
+description: "Project risks in arch-scale-risk-backlog tagged `risk` wired into 5 recall surfaces — check before scale-sensitive design."
 metadata:
   type: project
 ---

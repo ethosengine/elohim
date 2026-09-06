@@ -1,7 +1,7 @@
 ---
 name: reference_memory_system
 title: Memory-system references (umbrella)
-description: "Memory substrate: MemPalace (ChromaDB+SQLite, image-baked, per-subagent MCP scoping); /memory-ceremony four-phase substrate-currency pass; horizon scans in .claude/memory-kit/horizon-scans/."
+description: "Memory: MEMORY.md (index), memory/*.md (entries), MemPalace (ChromaDB+SQLite, per-subagent scoped), CLAUDE.md (gospel); horizon scans in memory-kit/."
 metadata:
   node_type: memory
   type: reference

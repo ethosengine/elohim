@@ -2,7 +2,7 @@
 index: false
 name: project_edge_deploy_restarts_genesis_conductors
 title: Edge deploy restarts genesis-pair conductors
-description: Edge Deploy restarts conductors; genesis pair skips on STS-unchanged (9f9c4aec4), happ-digest stamp keeps real DNA moves restarting; doorway-only fix = operator kubectl path.
+description: "Edge deploy restarts storage conductors; conductors re-join DHT without startup churn."
 metadata: 
   node_type: memory
   type: project

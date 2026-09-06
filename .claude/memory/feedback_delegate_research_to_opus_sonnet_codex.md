@@ -1,7 +1,7 @@
 ---
 name: feedback_delegate_research_to_opus_sonnet_codex
 title: Delegate research legwork to Opus/Sonnet/Codex
-description: "Operator (2026-09-03, reaffirmed 2026-09-05 and 2026-09-06) — research AND plan-implementation legwork fan out to Opus and Codex (Sonnet for code grounding); the top model spends only on decisions, coherence, judgement, delegation, vision-alignment — bites at every grounding fan-out and every plan execution"
+description: "Delegate research and plan-implementation to Opus/Sonnet/Codex; top model spends only on decisions, coherence, judgment, delegation."
 metadata: 
   node_type: memory
   title: "Delegate research to Opus, Sonnet and Codex"

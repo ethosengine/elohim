@@ -2,7 +2,7 @@
 index: false
 name: project_automerge_content_sync_plane_lit
 title: Automerge content-sync plane LIT
-description: "Automerge storage-sync plane LIT (producer + libp2p convergence proof); producer MUST write h_app_id=\"elohim\"; back-fill default-ON w/ fleet-safety invariants."
+description: "Automerge plane lit; iroh dual-stack; ghost declared heads deadlocked batch-3."
 metadata: 
   node_type: memory
   type: project

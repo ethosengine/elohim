@@ -1,7 +1,7 @@
 ---
 name: project_holochain_evolution_epic
 title: Holochain Evolution Epic — start at the hub
-description: "The hApp-lineage-migration epic: spec §11 is the hub every follow-up starts from; 2026-09-05 — Station 6 RED with PROVEN cause (sunset close + CapGrant → permanent blocks), Tasks 29–33 landed, mesh needs a rebuild then r40"
+description: "hApp-lineage migration epic: spec §11 is hub; 2026-09-05 station 6 RED with PROVEN cause; Tasks 29-33 landed."
 metadata:
   type: project
 ---
@@ -65,3 +65,6 @@ the fixture's run-scoped predecessor staging is a measured-only follow-up on the
 is poisoned until rebuilt (fresh cells); Station 6 unmeasurable until then. See
 [[project_household_space_partition_blocks_and_round_deadline]].
 
+
+- [[project_alpha_dna_migration_2026_09_02]] — folded (index: false); dated incident, DNA Hash Guard shipped.
+- [[project_rea_compute_commitment_primitive]] — folded (index: false); commitment primitive detail carried by in-tree spec + this epic.

@@ -1,7 +1,7 @@
 ---
 name: project_nachalah_allotment_epic
 title: Nachalah allotment epic
-description: "Companion to the crossing epic, planted 2026-09-05: owns HOLDING — gold/deeds/paper tiers on DNA seams, earned arcs, block governance, conductor as a rung-5 artifact; start at its §7 hub"
+description: "Nachalah allotment companion to crossing: HOLDING tiers, earned arcs, block governance, conductor rung-5."
 metadata: 
   node_type: memory
   title: Nachalah — the Allotment Epic (companion to the crossing epic)

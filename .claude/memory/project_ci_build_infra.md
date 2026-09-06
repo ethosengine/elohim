@@ -1,7 +1,7 @@
 ---
 name: project_ci_build_infra
 title: CI build infra — images, caches, registries (umbrella)
-description: "CI substrate: ci-playwright layers on ci-builder; cache PVCs are node-pinned hostpath; devspace node 22 vs CI 24 is structural; pull policy Always; Nexus cargo needs a read token."
+description: "CI substrate: ci-playwright on ci-builder; cache PVCs node-pinned; pull policy Always; Nexus cargo needs read token."
 metadata:
   node_type: memory
   type: project

@@ -1,7 +1,7 @@
 ---
 name: project_head_reach_freshness_semantics
 title: Reach / head / freshness semantics (umbrella)
-description: "Reach (audience) ≠ content_head (version) ≠ replication (custody); Reach vocabulary has a canonical spec — plan against it; head is a DECLARED dependency, not recency; staleness graded by stakes."
+description: "Reach (audience) ≠ content_head (version) ≠ replication (custody). Head = declared dependency, not recency."
 metadata:
   node_type: memory
   type: project

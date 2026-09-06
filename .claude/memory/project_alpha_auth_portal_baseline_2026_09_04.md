@@ -1,7 +1,7 @@
 ---
 name: project_alpha_auth_portal_baseline_2026_09_04
 title: Alpha auth-portal baseline — DEV_MODE registration + held act:i
-description: "On alpha, DEV_MODE binds every new hosted registrant to Matthew's Human; act:i a2o is HELD on the fleet unless cluster-state is overridden — bites on any registration/agency work"
+description: "Alpha DEV_MODE binds new registrants to Matthew's Human; act:i a2o HELD unless cluster-state overridden."
 metadata: 
   node_type: memory
   title: Alpha auth-portal baseline — DEV_MODE registration + held act:i

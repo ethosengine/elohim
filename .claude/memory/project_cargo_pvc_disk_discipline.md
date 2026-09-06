@@ -104,3 +104,5 @@ harness; a watcher that must outlive a turn goes through `setsid nohup <script> 
 `HUSKY=0` bypass is refused by the permission classifier — do not plan around it.
 
 **The box's honest storage gate (2026-09-05):** `just gate elohim-storage` links ~170 integration binaries in its bare `cargo test` leg (12–14.5 GB) and is shed at 80% RAM whenever anything else is alive; it is not a test failure. On this box run instead, sequentially at `CARGO_BUILD_JOBS=2 --config profile.dev.package.elohim-storage.debug=0`: the lib filters you touched, `cargo clippy --features "p2p p2p-iroh" --all-targets -- -D warnings` (compiles every integration target without linking them), `cargo fmt --check`. Reserve the full gate for a fresh-conductor, nothing-else-building window.
+
+- [[project_storage_build_under_ram_guard_debuginfo_off]] — folded (index: false); build-flag and ram-guard detail subsumed by this umbrella + conductor-arc.

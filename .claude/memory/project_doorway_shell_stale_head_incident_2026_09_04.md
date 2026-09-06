@@ -1,7 +1,8 @@
 ---
+index: false
 name: project_doorway_shell_stale_head_incident_2026_09_04
 title: Doorway stale-shell incident 2026-09-04
-description: "Blank `/` on both hosts — warm-shell cache pinned a slug-fetched shell under an empty head; fleet doorways never project app-row heads (DEV_MODE); bites on any stale-but-200 landing"
+description: "2026-09-04: warm-shell cache pinned slug-fetched shell under empty head. Fleet doorways never project app rows."
 metadata: 
   node_type: memory
   title: Doorway warm-shell served a previous bundle era (2026-09-04)

@@ -1,4 +1,6 @@
 ---
+index: false
+carried_by: "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
 name: who-is-who-networking-skill-contributor-credit
 title: Who's-who networking skill + contributor credit
 description: "CONTRIBUTORS already exists as genesis/data/presences (standing gradient, on-grain credit); opt-out→commons + who's-who skill remain."

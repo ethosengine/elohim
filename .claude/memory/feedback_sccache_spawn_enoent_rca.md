@@ -3,7 +3,7 @@ index: false
 id: feedback-sccache-spawn-enoent-rca
 name: sccache-spawn-enoent-rca
 title: sccache spawn ENOENT RCA (sweettest)
-description: "Cargo intermittently fails to spawn the sccache binary itself (~1.7%, matches sccache #2023/#2687); classifier grep = `could not execute process .sccache rustc`."
+description: "Cargo intermittently fails to spawn sccache binary itself (~1.7%); grep: 'could not execute process .sccache rustc'."
 metadata: 
   node_type: memory
   type: feedback

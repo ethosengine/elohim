@@ -129,3 +129,24 @@ both delivery fixtures enrol through the route (byte-restore kept as the safety 
 line rewrite. Stations 1–9 re-measured on the rebuilt mesh next. Status unchanged.
 
 DELTA 2026-09-06 (Nachalah #1b-a, exact signed grant record): coordinator ActionHash readback and acting-node action/entry/author authentication verified; full storage gate 4386 passed / 0 failed / 59 ignored, focused coordinator test 1 passed, schema-DNA / manifest-hygiene / sweettest-check green, independent review approved. Preserved app prerequisite gate: 4570 tests passed. Evidence: genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md. Status and scope unchanged: full delegation authority/freshness, activation, automatic rollback and both household upgrade runs remain open; earned-arc actuation remains disabled.
+
+DELTA 2026-09-06 04:39Z (FIRST WORKSPACE→FLEET CROSSING — rung 5 leaves the house; receipt
+`genesis/a2o/reports/workspace-release/2026-09-06/shift-it2.json`, manifest `…/workspace-release-20260906043835.json`,
+candidate `…/candidate-20260906043835-workspace/`): `workspace-to-fleet-release.feature` **Stations 1–5 PASS 5/5, 36/36
+steps, 59 s** against the LIVE alpha fleet (edge #1432 deployed 04:2xZ with every active human enrolled
+`runtime:coordinators:elohim:workspace=observe`). The workspace peer = the fleet's own fork conductor (holochain 0.7.0,
+extracted from harbor `elohim-edgenode:conductor-25dd2d0be144` — no 45-min build) joined via doorway-alpha's bootstrap and
+`relay.alpha.elohim.host`, installed the deployed bundle, and sits in the SAME five spaces the fleet's peer store lists
+(`/db/p2p/conductor-diagnostics`: imagodei RGwtz…, infrastructure 5a385…, lamad Zezl4…, mishpat QwOEw…, node_registry
+51dR_…; agentCount 35→43 as it joined) — not a partition. Its storage follows the channel at observe. Stations: (1) mint
+4.1 s — coordinator-only candidate bound to the installed reality, marker section `elohim.coord-build-marker`; (2) publish
+7.0 s — one act by the developer's own peer, no pipeline; (3) crossing 1.2 s — the election read back through his own
+conductor; (4) 46.7 s — the staging head `uhCkkqmSrk6…` verifies `ok` against the reality the fleet declares and NOBODY
+applies it (appliedRelease null, attestations 0/0 at threshold 1 — observe mode attests nothing, as designed); (5) five
+commands or fewer, the manual step named. Iteration 1 was apparatus (hc-start.sh cold-built a release storage binary,
+then its failure path deleted `.hc_ports` under a live conductor — filed as a seam on the T3 rung). Status stays
+**green**; scope now includes the workspace→fleet observe rung. NOT yet a stability receipt: one pass; the re-run after
+tonight's edge redeploy is the fresh-trigger measurement. NOT observed from here: the fleet peers' own controllers
+resolving the head (their `/admin/adoption` is storage-local; a doorway-projected adoption summary is the missing
+observability node). The `retire-when` fleet leg — three coordinator releases REACHING the fleet by election — needs the
+=observe→canary/apply data flip the operator holds; this receipt is what that flip was waiting on.

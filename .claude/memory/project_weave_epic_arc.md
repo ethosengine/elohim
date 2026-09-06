@@ -1,4 +1,6 @@
 ---
+index: false
+carried_by: "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
 name: weave-epic-arc
 title: The Weave Epic arc
 description: "Weave lens seeds 4 subsystems (VSM recursion, tier-capability, compute contracts, replica encryption); compose-don't-fork, one new DHT entry."
@@ -17,3 +19,5 @@ The operational-weave facing lens (`genesis/docs/superpowers/specs/2026-06-19-op
 - **#4 Private-replica encryption:** blob plane is PLAINTEXT today (`BlobStore::store` → `fs::write`); reuse the `sealed_against_self.rs` dryoc X25519 seal. Only NEW entry type = `KeyEnvelope` (per-READER sealed DEK; custodians get no key). Live path BLOCKED on the conductor-leak fix + an X25519 reader-key substrate (Holochain keys are ed25519).
 
 Forks are documented as per-`/plan` decision points (operator chose to scope, not resolve). Binding constraints honored throughout: DHT-is-notary (capacity/rollup = gossip+projection, never a DHT entry), `agent_cid` is the sole join key (the unsigned `AgentPeerBinding` must NOT be used for economic attribution yet). Also corrected a stale claim in [[resilience-snapshot-humans-junction]]: provide rows ARE seeded outside test_util now (`seed-provide-rows.ts`, CI-wired).
+
+- [[project_tiered_quilt_unblock_state]] — folded (index: false); attestation consolidation landed, subsumed by this file.

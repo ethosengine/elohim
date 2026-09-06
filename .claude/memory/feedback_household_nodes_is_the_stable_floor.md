@@ -2,7 +2,7 @@
 index: false
 name: household-nodes-is-the-stable-floor
 title: household-nodes is the stable floor
-description: "Degraded-6peer/shem-offline ≠ content work blocked: M/J/J household is a live multi-peer mesh; prove deep there — only cross-node discovery needs @requires:shem."
+description: "Household is a live multi-peer mesh — shem-offline doesn't block content work. Only cross-node discovery needs @requires:shem."
 metadata: 
   node_type: memory
   type: feedback

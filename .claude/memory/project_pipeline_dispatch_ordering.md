@@ -1,7 +1,7 @@
 ---
 name: project_pipeline_dispatch_ordering
 title: Pipeline dispatch & deploy ordering (umbrella)
-description: "Dispatch/deploy ordering traps: live-target gates deadlock their own fix; a same-wave dispatch bakes the PREVIOUS happ (edge pulls floating dev-latest; DNA is fire-and-forget); new path-deps need Dockerfile COPY; coordinator changes keep the DNA hash; elohim-edgenode runs che MAIN (ff it), a hand-written gitlink can be a fabricated SHA, Jenkins param defaults lag one build, sweettest shards need 24Gi ephemeral on 0.7."
+description: "Dispatch/deploy ordering: live-target gates deadlock; same-wave bakes PREVIOUS happ; coordinator changes keep DNA hash; new path-deps need Dockerfile COPY."
 metadata:
   node_type: memory
   type: project

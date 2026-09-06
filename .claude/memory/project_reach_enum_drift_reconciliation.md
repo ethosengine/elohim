@@ -2,7 +2,7 @@
 index: false
 name: reach-enum-drift-reconciliation
 title: Reach reconciliation — canonical spec exists
-description: "Reach 5-way vocabulary drift now has a canonical guiding-principles spec (2026-07-22) — sprints plan AGAINST it, never re-derive; schema-8 canonical, geographic-8→locality, Part-V-5→custody, two die."
+description: "Reach enum nomenclature drifted; scope-reconcile.py reconciles cluster-state ↔ deployments.json held/live."
 metadata:
   node_type: memory
   id: project-reach-enum-drift-reconciliation
