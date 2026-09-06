@@ -1490,6 +1490,113 @@ diesel::table! {
     }
 }
 
+// ===========================================================================
+// Accountable correction (contract §§3, 7, 8) — all Category C/B operational.
+// ===========================================================================
+
+// Category C — rebuilt from the DHT. Unit of application = the OPERATION GROUP.
+diesel::table! {
+    feedback_application (generation_id, group_key) {
+        generation_id -> Integer,
+        group_key -> Text,
+        status -> Text,
+        contribution -> Integer,
+        subject_pubkey -> Nullable<Binary>,
+        max_included_at_micros -> Nullable<BigInt>,
+        accepted -> Integer,
+        attempts -> Integer,
+        next_retry_at -> Nullable<Text>,
+        applied_at -> Nullable<Text>,
+        last_error -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+// Category C — one row per DISCOVERED ACT; identity is (origin DNA, action).
+diesel::table! {
+    feedback_application_member (generation_id, origin_dna_hash, action_hash) {
+        generation_id -> Integer,
+        origin_dna_hash -> Text,
+        action_hash -> Text,
+        group_key -> Text,
+        member_status -> Text,
+        member_role -> Text,
+        author_pubkey -> Nullable<Binary>,
+        action_timestamp_micros -> Nullable<BigInt>,
+        last_error -> Nullable<Text>,
+        discovered_at -> Text,
+    }
+}
+
+// Category B — local durable INTENT; not rebuildable from the DHT.
+diesel::table! {
+    feedback_operations (operation_id) {
+        operation_id -> Text,
+        origin_dna_hash -> Text,
+        submitting_cell_agent -> Text,
+        request_bytes_cid -> Text,
+        request_bytes -> Text,
+        target_action_hash -> Text,
+        signal_kind -> Text,
+        standing_impact -> Text,
+        vouch_kind -> Nullable<Text>,
+        phase -> Text,
+        evidence_action_hash -> Nullable<Text>,
+        feedback_action_hash -> Nullable<Text>,
+        status -> Text,
+        last_error -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+// Category C — the durable subscription set discovery enumerates.
+diesel::table! {
+    feedback_subscriptions (member_kind, member_key) {
+        member_kind -> Text,
+        member_key -> Text,
+        origin_dna_hash -> Text,
+        source -> Text,
+        added_at -> Text,
+        last_visited_at -> Nullable<Text>,
+        visit_count -> Integer,
+    }
+}
+
+// Category C — the persisted FAIRNESS cursor (not a history high-water mark).
+diesel::table! {
+    feedback_rotation_cursor (id) {
+        id -> Integer,
+        cursor_kind -> Nullable<Text>,
+        cursor_key -> Nullable<Text>,
+        updated_at -> Text,
+    }
+}
+
+// Category C — one (evaluator, pinned policy bytes) projection per row.
+diesel::table! {
+    standing_generations (generation_id) {
+        generation_id -> Integer,
+        evaluator_pubkey -> Binary,
+        policy_manifest_cid -> Text,
+        policy_bytes -> Text,
+        status -> Text,
+        created_at -> Text,
+        published_at -> Nullable<Text>,
+    }
+}
+
+// Category C — a generation's aggregate while it is still `building`.
+diesel::table! {
+    standing_generation_aggregate (generation_id, evaluator_pubkey, subject_pubkey) {
+        generation_id -> Integer,
+        evaluator_pubkey -> Binary,
+        subject_pubkey -> Binary,
+        debit_weight_sum -> Integer,
+        last_signal_at_micros -> Nullable<BigInt>,
+    }
+}
+
 // EPR Phase 3.5 — standing_view (trust-compute gradient standing projection)
 // Source of truth: FeedbackSignal subgraph (Category C operational — recomputable).
 // Per-evaluator derived view; different evaluators project different scores
@@ -1989,6 +2096,13 @@ diesel::allow_tables_to_appear_in_same_query!(
     schedules,
     shard_locations,
     shard_manifests,
+    feedback_application,
+    feedback_application_member,
+    feedback_operations,
+    feedback_rotation_cursor,
+    feedback_subscriptions,
+    standing_generation_aggregate,
+    standing_generations,
     standing_view,
     statements,
     steward_affinity,

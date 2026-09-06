@@ -210,6 +210,20 @@ pub mod concentration_snapshots;
 // Source of truth: local (operational); reconstruction default mode='sync', network='unknown'.
 pub mod sync_mode;
 
+// Accountable correction (contract 2026-09-06, slice 1).
+// Category C — rebuilt from the DHT FeedbackSignal subgraph. Unit of
+// application is the OPERATION GROUP, not the action (§7 rev 3).
+pub mod feedback_application;
+// Category B — LOCAL DURABLE INTENT, not rebuildable from the DHT: an
+// operation records what this cell meant to do before the act exists (§8).
+pub mod feedback_operations;
+// Category C — the durable subscription set discovery enumerates, plus the
+// persisted FAIRNESS cursor (not a high-water mark over DHT history) (§3).
+pub mod feedback_subscriptions;
+// Category C — one (evaluator, pinned policy bytes) projection per row, and
+// the per-generation aggregate a rebuild fills before publishing (§7).
+pub mod standing_generations;
+
 use std::path::Path;
 use std::time::Duration;
 
