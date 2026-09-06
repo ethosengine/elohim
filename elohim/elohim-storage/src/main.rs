@@ -4756,6 +4756,15 @@ async fn async_main(
         // iroh EprService, and the HttpServer prerequisite gate all share the
         // SAME engine Arc. Re-clone here for the fan-out projection context.
 
+        // This node's OWN content-cell DNA hash (accountable-correction §1).
+        // A feedback act reference naming a different DNA hash is refused —
+        // cross-context evidence is not slice 1. `None` on a node with no
+        // content cell, which admits nothing rather than guessing.
+        let local_content_dna_hash = hc_registry_for_http
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|c| c.cell_id().dna_hash().to_string());
+
         let fan_out_ctx = Arc::new(EprFanOutCtx {
             manifest_registry,
             outbound_sink,
@@ -4765,6 +4774,7 @@ async fn async_main(
             local_peer_id: local_peer_id_opt,
             local_pubkey,
             standing_policy_cid,
+            local_content_dna_hash,
             #[cfg(feature = "graph-native")]
             graph_engine: graph_engine_arc.clone(),
         });

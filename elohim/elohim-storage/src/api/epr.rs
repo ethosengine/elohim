@@ -92,6 +92,13 @@ pub struct EprFanOutCtx {
     pub local_pubkey: Option<Vec<u8>>,
     /// CID of the active standing-policy manifest for standing projector provenance.
     pub standing_policy_cid: Option<String>,
+    /// This node's OWN content-cell DNA hash (accountable-correction §1).
+    ///
+    /// A `feedback-signal` act reference naming a different DNA hash is
+    /// REFUSED: carrying and fetching from another space is explicitly not
+    /// slice 1. `None` means the node cannot scope a reference, so it admits
+    /// nothing — an honest refusal rather than a guess.
+    pub local_content_dna_hash: Option<String>,
     /// Graph engine for post-put EprHead projection (graph-native feature).
     ///
     /// When `Some`, a successful `PUT /api/v1/epr` decodes the atom's canonical
@@ -799,30 +806,41 @@ async fn put_epr(
             match rmp_serde::from_slice::<crate::p2p::feedback_signal::FeedbackSignal>(&raw_payload)
             {
                 Ok(signal) => {
-                    // 1. project_signal — non-fatal, transactional with existing conn.
+                    // 1. ADMIT — never debit here (accountable-correction
+                    //    contract §7 cutover).
+                    //
+                    //    This used to call `standing_projector::project_signal`,
+                    //    which debited `standing_view` the moment a signal
+                    //    arrived: an ALLEGATION debited someone, immediately,
+                    //    against the SIGNAL'S SIGNER, on the word of whoever
+                    //    sent the message. `signed_by` here is a claim, and the
+                    //    signature is over the SEMANTIC bytes, not over the
+                    //    action — the sender is not the authority.
+                    //
+                    //    The act is now ENQUEUED for the projector to fetch and
+                    //    verify (§1) before anything moves. A correction alone
+                    //    contributes zero; only an acceptance by the target's
+                    //    exact root author does.
                     if let Some(fan_out) = fan_out_ctx.as_ref() {
-                        if let (Some(registry), Some(local_pubkey)) = (
-                            fan_out.manifest_registry.as_ref(),
-                            fan_out.local_pubkey.as_ref(),
+                        match crate::services::feedback_projector::admit_notified_signal(
+                            &mut conn,
+                            signal.act_ref.as_ref(),
+                            fan_out.local_content_dna_hash.as_deref(),
                         ) {
-                            let policy = crate::services::standing_projector::ManifestDebitWeightPolicy::from_registry(registry);
-                            let manifest_cid = fan_out
-                                .standing_policy_cid
-                                .as_deref()
-                                .unwrap_or("bootstrap");
-                            if let Err(e) = crate::services::standing_projector::project_signal(
-                                &mut conn,
-                                &policy,
-                                local_pubkey.as_slice(),
-                                &signal,
-                                manifest_cid,
-                            ) {
-                                tracing::warn!(
-                                    ?e,
-                                    %path_cid,
-                                    "put_epr: project_signal failed (non-fatal)"
-                                );
-                            }
+                            Ok(true) => tracing::debug!(
+                                %path_cid,
+                                "put_epr: feedback act enqueued for fetch-and-verify"
+                            ),
+                            Ok(false) => tracing::debug!(
+                                %path_cid,
+                                "put_epr: feedback signal carries no act reference — not \
+                                 projected; discovery still finds the act"
+                            ),
+                            Err(e) => tracing::warn!(
+                                ?e,
+                                %path_cid,
+                                "put_epr: feedback act refused (non-fatal)"
+                            ),
                         }
 
                         // 2. back_prop_one_hop — best-effort, unseals predecessor records

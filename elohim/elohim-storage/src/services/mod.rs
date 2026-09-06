@@ -26,6 +26,11 @@ pub mod anomaly_detection;
 pub mod arc_actuator; // conductor authority-arc actuation core — {0,1} coverage gate + config render (spec §5)
 pub mod arc_policy; // conductor authority-arc Auto policy — pure derive() (2026-06-13-conductor-authority-arc-auto-policy.md)
 pub mod back_prop;
+
+/// The SINGLE application path for witnessed corrections (accountable-correction
+/// contract §§1-3, 5-7). Fair rotating discovery, fetch-and-verify, group
+/// resolution, acceptance verification, transactional apply.
+pub mod feedback_projector;
 pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;
