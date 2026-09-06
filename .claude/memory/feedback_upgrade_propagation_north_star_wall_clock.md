@@ -35,3 +35,12 @@ past `NetworkStage::Simulacra` on soak evidence), never a permanent exclusion. *
 class is called "out of scope", name which RUNG it is waiting on and what receipt admits it; never present
 the MVP cut as the architecture's ceiling. The k8s image roll is the legacy path for the last k8s-hosted
 peers, not the design.
+
+**2026-09-06 04:39Z — the first workspace→fleet crossing PASSED** (rung 5 left the house): workspace-to-fleet-release
+Stations 1–5, 5/5 in 59 s against live alpha — a workspace peer running the fleet's own fork conductor (extracted from
+the harbor image) joined alpha's five DHT spaces via doorway-alpha bootstrap + relay.alpha, minted a coordinator-only
+release, published it on runtime:coordinators:elohim:workspace, read the election back through its own conductor,
+and saw it verify ok against the fleet's declared reality while every alpha human stayed =observe. Receipt
+genesis/a2o/reports/workspace-release/2026-09-06/shift-it2.json; habit delta in runtime-upgrade-propagation. The
+=observe→canary/apply flip on alpha is the operator's data change and is what the retire-when's fleet leg now waits on.
+Missing observability node: fleet peers' own /admin/adoption is storage-local — a doorway-projected adoption summary.
