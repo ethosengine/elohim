@@ -164,3 +164,19 @@ closed at the driver, not the fixture: a long-lived channel's Nth release names 
 (the household sibling had cured the same refusal at its fixture, 5e4d97633). Task 4 of
 `2026-09-05-rung5-workspace-orchestration-plan.md` has its deliverable receipt (a plan checkbox flip is the integrator's).
 Status **green**; the fleet leg of `retire-when` still waits on the operator's =observe→canary data flip.
+
+DELTA 2026-09-06 11:5xZ (FLEET-SIDE OBSERVABILITY CLOSED; james at canary; the last seam named). Edge #1437 (from
+push 950c3964f) deployed the doorway projection `GET /db/p2p/adoption?peer=<name>|all` and the deployments.json
+render with james `=canary`. Read through doorway-alpha at 11:5xZ: ALL SEVEN alpha peers (matthew, adam, jessica,
+james, gertrude, susan, eve) resolved the workspace channel's head `uhCkkU-TS…` (staging, release 4 of the night,
+published from the workspace at 06:51Z) — the fleet-side receipt the morning's crossing could not show now exists,
+without pod access. james reads `mode: canary` (sweeps 7 on the new render). Every peer's verdict is `refused
+artifact_unavailable` (transient, arm `fetch`): "blob bafkrei… not held locally — asked 6 peers we could reach; none
+served the bytes". Cause: the release ARTIFACT was PUT to the workspace peer's own storage (:8090), which joined
+nothing — its `/p2p/status` says "P2P networking not enabled" — while the workspace CONDUCTOR is on alpha's DHT. The
+election crosses on the T1 plane; the bytes ride the T2 plane, and the workspace peer is a member of only one of
+them. This is the seam between "the fleet observes" (Task 4, done) and "james adopts" (next): chain
+runtime-upgrade-propagation / between Station 4 → "a canary applies" / missing node: the workspace peer is a T2
+member too (its storage on alpha's byte plane, or the artifact published where the fleet pulls) / current state:
+7/7 refuse artifact_unavailable, retrying. Not a fixture defect and not a fleet fault — a rung the T3 peer has not
+climbed. Status green (scope unchanged); the canary receipt waits on this node.
