@@ -1,7 +1,7 @@
 ---
 name: project_household_space_partition_blocks_and_round_deadline
 title: Household space partition blocks
-description: "0.7: one rejected op blocks author's cell forever → storageArc null on every peer, no authorities."
+description: "0.7: one rejected op blocks author's cell forever → storageArc null on every peer, no authorities; bites when ONE space reds."
 metadata: 
   node_type: memory
   title: "Household space partition: 0.7 blocks + 15 s round deadline"
