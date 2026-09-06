@@ -654,7 +654,6 @@ impl EprAtomService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

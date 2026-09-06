@@ -2289,14 +2289,8 @@ impl HttpServer {
             (method, p) if p.starts_with("/api/v1/feedback/operations") => {
                 if let Some(ref pool) = self.db_pool {
                     let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
-                    crate::api::feedback_operations::handle(
-                        req,
-                        method,
-                        p,
-                        pool,
-                        hc_lamad.as_ref(),
-                    )
-                    .await
+                    crate::api::feedback_operations::handle(req, method, p, pool, hc_lamad.as_ref())
+                        .await
                 } else {
                     Ok(response::service_unavailable(
                         "Database pool not configured — /api/v1/feedback/operations unavailable",

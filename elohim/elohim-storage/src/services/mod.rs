@@ -27,10 +27,6 @@ pub mod arc_actuator; // conductor authority-arc actuation core — {0,1} covera
 pub mod arc_policy; // conductor authority-arc Auto policy — pure derive() (2026-06-13-conductor-authority-arc-auto-policy.md)
 pub mod back_prop;
 
-/// The SINGLE application path for witnessed corrections (accountable-correction
-/// contract §§1-3, 5-7). Fair rotating discovery, fetch-and-verify, group
-/// resolution, acceptance verification, transactional apply.
-pub mod feedback_projector;
 pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;
@@ -69,6 +65,10 @@ pub mod epr_store;
 pub mod events;
 pub mod exchange_service;
 pub mod federator;
+/// The SINGLE application path for witnessed corrections (accountable-correction
+/// contract §§1-3, 5-7). Fair rotating discovery, fetch-and-verify, group
+/// resolution, acceptance verification, transactional apply.
+pub mod feedback_projector;
 pub mod floor_protections;
 pub mod gate_challenge_namespace_backfill; // level-triggered heal: re-file dark gate-challenge/outcome projections into the canonical namespace
 pub mod genesis_self_heal; // OPERATOR-AUTHORIZED genesis bootstrap — self-heal own NULL agent_pub_key from own cell key (gated, NULL-only)

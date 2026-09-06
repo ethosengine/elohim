@@ -154,15 +154,15 @@ pub trait FeedbackDhtReader: Send + Sync {
     fn origin_dna_hash(&self) -> String;
 
     /// Reference-plus-outcome enumeration for one subscription member.
-    async fn refs_for_target(&self, base_action_hash: &str)
-        -> Result<Vec<DiscoveredRef>, StorageError>;
+    async fn refs_for_target(
+        &self,
+        base_action_hash: &str,
+    ) -> Result<Vec<DiscoveredRef>, StorageError>;
 
     /// The SIGNED record for one act. `Ok(None)` = not retrievable right now,
     /// which is PENDING, never proof of absence.
-    async fn signal_record(
-        &self,
-        action_hash: &str,
-    ) -> Result<Option<FetchedRecord>, StorageError>;
+    async fn signal_record(&self, action_hash: &str)
+        -> Result<Option<FetchedRecord>, StorageError>;
 
     /// Verified exact-root lineage of a content action.
     async fn content_lineage(
@@ -307,8 +307,7 @@ pub fn correction_group_key(act: &VerifiedAct) -> Option<String> {
 
 /// **Pure.** Is this act an acceptance of a correction (§5.2)?
 pub fn is_acceptance(act: &VerifiedAct) -> bool {
-    act.entry.signal_kind == "vouch"
-        && act.entry.vouch_kind.as_deref() == Some("accept-correction")
+    act.entry.signal_kind == "vouch" && act.entry.vouch_kind.as_deref() == Some("accept-correction")
 }
 
 // ---------------------------------------------------------------------------
@@ -536,10 +535,7 @@ pub fn commit_group(
             attempts
         };
         let next_retry_at = if outcome.status == STATUS_PENDING {
-            Some(
-                (Utc::now() + chrono::Duration::seconds(backoff_secs(attempts)))
-                    .to_rfc3339(),
-            )
+            Some((Utc::now() + chrono::Duration::seconds(backoff_secs(attempts))).to_rfc3339())
         } else {
             None
         };
@@ -581,9 +577,9 @@ pub fn commit_group(
                     .unwrap_or(0);
                 // CHECKED arithmetic (§7): the pre-cutover `+` on an i32 column
                 // wraps in release builds, which would silently invert a score.
-                let new_sum = prior.checked_add(outcome.contribution).ok_or(
-                    diesel::result::Error::RollbackTransaction,
-                )?;
+                let new_sum = prior
+                    .checked_add(outcome.contribution)
+                    .ok_or(diesel::result::Error::RollbackTransaction)?;
                 let prior_ts = existing_agg.as_ref().and_then(|r| r.last_signal_at_micros);
                 let new_ts = match (prior_ts, outcome.max_included_at_micros) {
                     (Some(a), Some(b)) => Some(a.max(b)),

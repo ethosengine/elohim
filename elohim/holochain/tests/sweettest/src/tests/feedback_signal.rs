@@ -936,6 +936,21 @@ struct FeedbackSignalRefs {
     pub invalid_link_targets: u32,
 }
 
+/// Epoch-nanos-suffixed content id.
+///
+/// A FIXED id self-poisons a retry: sweettest attempts share the process-global
+/// kitsune2 mem-bootstrap store, so a second attempt re-joins the first's DHT
+/// residue and `create_content` refuses with "already exists" forever. Same cure
+/// as `unique_id()` in the lamad suite (dna #1357); kept local here so this file
+/// gains no cross-suite import.
+fn uniq(base: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{base}-{nanos}")
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 9: correction whose evidence embeds NO request is REJECTED (§8).
 // ---------------------------------------------------------------------------
@@ -954,7 +969,7 @@ async fn correction_without_embedded_request_rejected() -> Result<()> {
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s9-target"),
+            make_content(&uniq("ac-s9-target")),
         )
         .await;
     // A PLAIN content entry — resolvable, but it embeds no correctionRequest.
@@ -962,7 +977,7 @@ async fn correction_without_embedded_request_rejected() -> Result<()> {
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s9-evidence"),
+            make_content(&uniq("ac-s9-evidence")),
         )
         .await;
 
@@ -1006,14 +1021,14 @@ async fn correction_with_mismatched_request_rejected() -> Result<()> {
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s10-target"),
+            make_content(&uniq("ac-s10-target")),
         )
         .await;
     let other: ContentOutput = ca
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s10-other"),
+            make_content(&uniq("ac-s10-other")),
         )
         .await;
     // Evidence binds itself to `other`, but the act is filed against `target`.
@@ -1022,7 +1037,7 @@ async fn correction_with_mismatched_request_rejected() -> Result<()> {
             &cell.zome("content_store"),
             "create_content",
             make_correction_evidence(
-                "ac-s10-evidence",
+                &uniq("ac-s10-evidence"),
                 "ac-s10-op",
                 &other.action_hash,
                 "correction",
@@ -1065,11 +1080,12 @@ async fn content_lineage_names_exact_root_and_author() -> Result<()> {
         .await?;
     let cell = app.cells().first().expect("cell").clone();
 
+    let target_id = uniq("ac-s11-target");
     let root: ContentOutput = ca
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s11-target"),
+            make_content(&target_id),
         )
         .await;
 
@@ -1104,7 +1120,7 @@ async fn content_lineage_names_exact_root_and_author() -> Result<()> {
         "lineage must resolve the EXACT root Create, not the newest ID link"
     );
     assert_eq!(lineage.root_author, a1, "root author is the Create's author");
-    assert_eq!(lineage.content_id, "ac-s11-target");
+    assert_eq!(lineage.content_id, target_id);
     assert_eq!(
         lineage.head_action_hash,
         Some(v2.action_hash.clone()),
@@ -1151,7 +1167,7 @@ async fn amend_content_by_non_root_author_rejected() -> Result<()> {
         .call(
             &cell_a.zome("content_store"),
             "create_content",
-            make_content("ac-s12-target"),
+            make_content(&uniq("ac-s12-target")),
         )
         .await;
 
@@ -1207,7 +1223,7 @@ async fn feedback_signal_refs_report_references_and_resolve_on_request() -> Resu
         .call(
             &cell.zome("content_store"),
             "create_content",
-            make_content("ac-s13-target"),
+            make_content(&uniq("ac-s13-target")),
         )
         .await;
     let signal_ah: ActionHash = ca

@@ -734,8 +734,7 @@ mod act_ref_compat_tests {
             routing_key: "uhCkkTARGET".to_string(),
         }));
         let bytes = rmp_serde::to_vec_named(&signal).expect("encode new");
-        let decoded: OldFeedbackSignal =
-            rmp_serde::from_slice(&bytes).expect("decode new on old");
+        let decoded: OldFeedbackSignal = rmp_serde::from_slice(&bytes).expect("decode new on old");
         assert_eq!(decoded, old_signal());
     }
 

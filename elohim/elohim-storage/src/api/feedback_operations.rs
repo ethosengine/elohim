@@ -239,9 +239,7 @@ async fn create(
             created_at: now.clone(),
             updated_at: now.clone(),
         };
-        if ops_db::insert_new(&mut conn, &row)
-            .map_err(|e| StorageError::Database(e.to_string()))?
-        {
+        if ops_db::insert_new(&mut conn, &row).map_err(|e| StorageError::Database(e.to_string()))? {
             row
         } else {
             let found = ops_db::fetch(&mut conn, &pinned.operation_id)
@@ -372,8 +370,9 @@ async fn create(
                 }
                 Err(recovery_err) => {
                     row.status = STATUS_PENDING.to_string();
-                    row.last_error =
-                        Some(format!("phase 2 failed: {e}; recovery failed: {recovery_err}"));
+                    row.last_error = Some(format!(
+                        "phase 2 failed: {e}; recovery failed: {recovery_err}"
+                    ));
                     persist_and_return(pool, &mut row, StatusCode::BAD_GATEWAY)
                 }
             }
@@ -441,9 +440,8 @@ async fn author_or_recover_evidence(
     };
     match crate::services::conductor_writes::call_create_content(hc, &input).await {
         Ok(bytes) => {
-            let out: lamad_types::ContentOutput = rmp_serde::from_slice(&bytes).map_err(|e| {
-                StorageError::Serialization(format!("decode ContentOutput: {e}"))
-            })?;
+            let out: lamad_types::ContentOutput = rmp_serde::from_slice(&bytes)
+                .map_err(|e| StorageError::Serialization(format!("decode ContentOutput: {e}")))?;
             Ok(Some(out.action_hash.to_string()))
         }
         Err(_) => {

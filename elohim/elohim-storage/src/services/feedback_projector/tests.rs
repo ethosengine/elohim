@@ -118,7 +118,11 @@ impl FakeReader {
         }
     }
     fn with_refs(self, base: &str, refs: Vec<DiscoveredRef>) -> Self {
-        self.state.lock().unwrap().refs.insert(base.to_string(), refs);
+        self.state
+            .lock()
+            .unwrap()
+            .refs
+            .insert(base.to_string(), refs);
         self
     }
     fn with_record(self, r: FetchedRecord) -> Self {
@@ -165,7 +169,13 @@ impl FeedbackDhtReader for FakeReader {
         &self,
         action_hash: &str,
     ) -> Result<Option<ContentLineage>, StorageError> {
-        Ok(self.state.lock().unwrap().lineages.get(action_hash).cloned())
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .lineages
+            .get(action_hash)
+            .cloned())
     }
 }
 
@@ -216,12 +226,8 @@ async fn ninth_subscription_is_visited_within_two_ticks() {
         }
     }
     let reader = Arc::new(FakeReader::new());
-    let projector = FeedbackProjector::new(
-        pool,
-        reader.clone(),
-        key(0xE0),
-        PinnedPolicy::default(),
-    );
+    let projector =
+        FeedbackProjector::new(pool, reader.clone(), key(0xE0), PinnedPolicy::default());
 
     let t1 = projector.tick().await.expect("tick 1");
     assert_eq!(t1.members_visited, MAX_MEMBERS_PER_SWEEP as usize);
@@ -257,7 +263,12 @@ fn accepted_group_fixture() -> (DbPool, Arc<FakeReader>, FeedbackProjector) {
         FakeReader::new()
             // The correction action is the base acceptance vouches link from.
             .with_refs("corr-1", vec![referenced("vouch-1")])
-            .with_record(record("corr-1", 2, 100, correction_entry("content-1", "ev-1", "debit-soft")))
+            .with_record(record(
+                "corr-1",
+                2,
+                100,
+                correction_entry("content-1", "ev-1", "debit-soft"),
+            ))
             .with_record(record("vouch-1", 1, 200, vouch_entry("corr-1")))
             .with_lineage("content-1", lineage("content-1", "content-1", 1)),
     );
@@ -348,7 +359,10 @@ async fn two_members_of_one_group_contribute_once() {
 #[tokio::test]
 async fn late_arrival_after_apply_records_without_recontributing() {
     let (pool, _r, projector) = accepted_group_fixture();
-    projector.tick().await.expect("first tick applies the group");
+    projector
+        .tick()
+        .await
+        .expect("first tick applies the group");
 
     let mut conn = pool.get().unwrap();
     let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
@@ -454,21 +468,28 @@ async fn crash_between_row_and_aggregate_rolls_both_back() {
 
 #[test]
 fn acceptance_by_the_root_author_is_accepted() {
-    let corr = act("corr-1", 2, 100, correction_entry("content-1", "ev-1", "debit-soft"));
+    let corr = act(
+        "corr-1",
+        2,
+        100,
+        correction_entry("content-1", "ev-1", "debit-soft"),
+    );
     let vouch = act("vouch-1", 1, 200, vouch_entry("corr-1"));
     let l = lineage("content-1", "content-1", 1);
     let verdict = verify_acceptance(&vouch, &corr, Some(&l), Some(&key(1)));
-    assert_eq!(
-        verdict,
-        AcceptanceVerdict::Accepted { subject: key(1) }
-    );
+    assert_eq!(verdict, AcceptanceVerdict::Accepted { subject: key(1) });
 }
 
 /// Integrity admits any vouch by anyone. Authority is a STORAGE-verified
 /// classification, and a non-root-author acceptance is REFUSED, not pending.
 #[test]
 fn acceptance_by_a_non_root_author_is_refused() {
-    let corr = act("corr-1", 2, 100, correction_entry("content-1", "ev-1", "debit-soft"));
+    let corr = act(
+        "corr-1",
+        2,
+        100,
+        correction_entry("content-1", "ev-1", "debit-soft"),
+    );
     let vouch = act("vouch-1", 7, 200, vouch_entry("corr-1"));
     let l = lineage("content-1", "content-1", 1);
     match verify_acceptance(&vouch, &corr, Some(&l), Some(&key(1))) {
@@ -483,7 +504,12 @@ fn acceptance_by_a_non_root_author_is_refused() {
 /// shown as accepted.
 #[test]
 fn unfetchable_dependency_is_pending_not_refused() {
-    let corr = act("corr-1", 2, 100, correction_entry("content-1", "ev-1", "debit-soft"));
+    let corr = act(
+        "corr-1",
+        2,
+        100,
+        correction_entry("content-1", "ev-1", "debit-soft"),
+    );
     let vouch = act("vouch-1", 1, 200, vouch_entry("corr-1"));
     match verify_acceptance(&vouch, &corr, None, None) {
         AcceptanceVerdict::Pending(reason) => {
@@ -497,7 +523,12 @@ fn unfetchable_dependency_is_pending_not_refused() {
 /// accepted (§5.2, explicitly unsupported in slice 1).
 #[test]
 fn same_cell_self_acceptance_is_pending_never_accepted() {
-    let corr = act("corr-1", 1, 100, correction_entry("content-1", "ev-1", "debit-soft"));
+    let corr = act(
+        "corr-1",
+        1,
+        100,
+        correction_entry("content-1", "ev-1", "debit-soft"),
+    );
     let vouch = act("vouch-1", 1, 200, vouch_entry("corr-1"));
     let l = lineage("content-1", "content-1", 1);
     match verify_acceptance(&vouch, &corr, Some(&l), Some(&key(1))) {
@@ -637,9 +668,13 @@ async fn rebuild_reproduces_the_published_generation() {
     {
         let mut conn = pool.get().unwrap();
         begin_rebuild(&mut conn, gen_id).unwrap();
-        let g = gen_db::fetch_generation(&mut conn, gen_id).unwrap().unwrap();
+        let g = gen_db::fetch_generation(&mut conn, gen_id)
+            .unwrap()
+            .unwrap();
         assert_eq!(g.status, gen_db::GEN_REBUILDING);
-        assert!(gen_db::list_aggregates(&mut conn, gen_id).unwrap().is_empty());
+        assert!(gen_db::list_aggregates(&mut conn, gen_id)
+            .unwrap()
+            .is_empty());
     }
 
     projector.tick().await.expect("replay");
