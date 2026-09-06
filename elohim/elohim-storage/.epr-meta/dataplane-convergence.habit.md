@@ -630,3 +630,10 @@ failures on rows that are not DHT-anchored (bulk-seed anchor gap) — same famil
   (commitment_record.rs include_str! of the mishpat integrity source + dna.yaml absent from the image) — fixed in
   0de887a3e (COPY to /holochain/dna/mishpat/…, rakia schemas to /rakia/schemas with an empty placeholder on fetch
   failure); the next edge build is the check.
+  Edge #1435 (0de887a3e + 9f2856b48, 08:xxZ): **SUCCESS** — the first green edge build since #1427. Build Storage
+  green with BOTH previously-red tests passing in the image (`release_manifest_mirror_agrees_with_the_rakia_schema`
+  and `schema_pin_tests::commitment_definition_matches_independent_integrity_source_and_manifest`), rakia at
+  13cb31d under ee-bot-pat; landing canonical head CONVERGED on the seam-smoke; Dataplane Validation 7 passed / 84
+  held / 1 failed — the B-side `caughtUp` red from #1432/#1434 is GONE (measured outside the churn window this time),
+  leaving only the chronic `coverageShortfall` row. adam's dead-anchor wedge is unchanged and remains this habit's
+  fleet-side red; the runtime poller files it on its next run.
