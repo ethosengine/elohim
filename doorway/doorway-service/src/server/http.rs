@@ -2430,7 +2430,7 @@ fn is_service_path(path: &str) -> bool {
         "/signal",
         "/api/",
         "/import/",
-        "/db/", // Includes the primary-peer GET /db/p2p/adoption projection.
+        "/db/", // Includes the peer-selectable GET /db/p2p/adoption projection.
         // /sync/* — Automerge doc-sync proxied to storage via the route
         // registry (storage build_manifest declares /sync/v1/*). Without this
         // the EPR router (GET + !is_service_path) would shadow GET /sync to the
@@ -5827,8 +5827,10 @@ async fn handle_request(
         // Doorway-specific redaction + path rewrite: never expose the raw
         // operator-local /admin/adoption through the manifest registry.
         (Method::GET, "/db/p2p/adoption") => to_boxed(
-            routes::storage_proxy::adoption_summary(
+            routes::storage_proxy::adoption_summary_for_peers(
                 state.args.storage_url.as_deref(),
+                &state.args.declared_storage_peers(),
+                req.uri().query(),
                 &state.storage_proxy_client,
                 &state.upstream_breakers,
             )

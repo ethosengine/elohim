@@ -76,6 +76,101 @@ fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
     })
 }
 
+/// Diagnostic labels come from configured DNS endpoints, never from caller URLs.
+/// Fleet endpoints use elohim-<name>-<environment>[-<ordinal>].<service>.
+fn adoption_peer_name(endpoint: &str) -> String {
+    let Ok(url) = reqwest::Url::parse(endpoint) else {
+        return endpoint.to_owned();
+    };
+    let host = url.host_str().unwrap_or_default();
+    if let Some(fleet) = host.strip_prefix("elohim-") {
+        fleet.split('-').next().unwrap_or(fleet).to_owned()
+    } else if host.parse::<std::net::IpAddr>().is_ok() || host == "localhost" {
+        // Local pools commonly distinguish peers by port.
+        url.authority().to_owned()
+    } else {
+        host.split('.').next().unwrap_or(host).to_owned()
+    }
+}
+
+fn adoption_json(status: StatusCode, body: serde_json::Value) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .header("Cache-Control", "no-store")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .expect("valid adoption response")
+}
+
+/// Select only from the existing declared pool, including unavailable peers.
+/// Omitted `peer` retains the primary-peer response contract.
+pub async fn adoption_summary_for_peers(
+    storage_url: Option<&str>,
+    peers: &[String],
+    query: Option<&str>,
+    client: &reqwest::Client,
+    breakers: &UpstreamBreakers,
+) -> Response<Full<Bytes>> {
+    let selector = query.and_then(|query| {
+        query.split('&').find_map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (urlencoding::decode(key).ok()?.as_ref() == "peer").then(|| {
+                urlencoding::decode(value)
+                    .unwrap_or_else(|_| value.into())
+                    .into_owned()
+            })
+        })
+    });
+    let Some(selector) = selector else {
+        return adoption_summary(storage_url, client, breakers).await;
+    };
+    if selector == "all" {
+        let results = futures::future::join_all(peers.iter().map(|endpoint| async move {
+            let peer = adoption_peer_name(endpoint);
+            match fetch_adoption(Some(endpoint), client).await {
+                Some(summary) => serde_json::json!({"peer": peer, "ok": true, "summary": summary}),
+                None => {
+                    serde_json::json!({"peer": peer, "ok": false, "error": "adoption unavailable"})
+                }
+            }
+        }))
+        .await;
+        return adoption_json(StatusCode::OK, serde_json::json!({"peers": results}));
+    }
+    match peers
+        .iter()
+        .find(|endpoint| adoption_peer_name(endpoint) == selector)
+    {
+        Some(endpoint) => adoption_summary(Some(endpoint), client, breakers).await,
+        None => adoption_json(
+            StatusCode::NOT_FOUND,
+            serde_json::json!({"error": "unknown peer", "peer": selector}),
+        ),
+    }
+}
+
+async fn fetch_adoption(
+    storage_url: Option<&str>,
+    client: &reqwest::Client,
+) -> Option<serde_json::Value> {
+    let base = storage_url?;
+    let response = client
+        .get(format!("{}/admin/adoption", base.trim_end_matches('/')))
+        // Covers connect, response headers, and body consumption per peer.
+        .timeout(Duration::from_secs(3))
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let report = response.json::<serde_json::Value>().await.ok()?;
+    (report["controller"].is_object()
+        && report["channels"]
+            .as_array()
+            .is_some_and(|rows| rows.iter().all(serde_json::Value::is_object)))
+    .then(|| project_adoption(&report))
+}
+
 /// Read the primary peer's controller, without registry routing or caching.
 /// Like /p2p/status, this diagnostic bypasses the upstream circuit breaker.
 pub async fn adoption_summary(
@@ -83,32 +178,13 @@ pub async fn adoption_summary(
     client: &reqwest::Client,
     breakers: &UpstreamBreakers,
 ) -> Response<Full<Bytes>> {
-    let report = async {
-        let base = storage_url?;
-        let response = client
-            .get(format!("{}/admin/adoption", base.trim_end_matches('/')))
-            .send()
-            .await
-            .ok()?
-            .error_for_status()
-            .ok()?;
-        let report = response.json::<serde_json::Value>().await.ok()?;
-        // A malformed report is unavailable, not an empty healthy controller.
-        (report["controller"].is_object()
-            && report["channels"]
-                .as_array()
-                .is_some_and(|rows| rows.iter().all(serde_json::Value::is_object)))
-        .then_some(report)
-    }
-    .await;
+    let report = fetch_adoption(storage_url, client).await;
 
     let mut response = match report {
         Some(report) => Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Full::new(Bytes::from(
-                project_adoption(&report).to_string(),
-            )))
+            .body(Full::new(Bytes::from(report.to_string())))
             .expect("valid adoption response"),
         None => catching_up_proxy_response(
             false,
@@ -1235,6 +1311,113 @@ mod tests {
             let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
             assert_eq!(body["status"], "catching-up");
         }
+    }
+
+    #[test]
+    fn adoption_peer_names_follow_configured_endpoints() {
+        assert_eq!(
+            adoption_peer_name("http://elohim-james-alpha-0.elohim-james-alpha-headless:8090"),
+            "james"
+        );
+        assert_eq!(adoption_peer_name("http://james:8090"), "james");
+        assert_eq!(
+            adoption_peer_name("http://127.0.0.1:8090"),
+            "127.0.0.1:8090"
+        );
+    }
+
+    #[tokio::test]
+    async fn adoption_unknown_peer_is_json_404_and_no_store() {
+        let response = adoption_summary_for_peers(
+            None,
+            &["http://james:8090".into()],
+            Some("peer=unknown"),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            serde_json::json!({"error": "unknown peer", "peer": "unknown"})
+        );
+    }
+
+    #[tokio::test]
+    async fn adoption_all_preserves_healthy_peer_when_another_is_unreachable() {
+        let report = serde_json::json!({
+            "controller": {"running": true, "private": "secret"},
+            "channels": [{"channelId": "canary", "private": "secret"}],
+            "reverts": ["secret"]
+        });
+        let (addr, server) =
+            spawn_mock_storage(200, report.to_string().into_bytes(), "application/json").await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let dead = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+        let peers = vec![dead.clone(), format!("http://{addr}")];
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let response =
+            adoption_summary_for_peers(Some(&dead), &peers, Some("peer=all"), &client, &breakers)
+                .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            serde_json::json!({"peers": [
+                {"peer": adoption_peer_name(&dead), "ok": false, "error": "adoption unavailable"},
+                {"peer": addr.to_string(), "ok": true, "summary": project_adoption(&report)}
+            ]})
+        );
+        // Named selection reaches a non-primary peer and uses the identical projection.
+        let query = format!("peer={addr}");
+        let response =
+            adoption_summary_for_peers(Some(&dead), &peers, Some(&query), &client, &breakers).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            project_adoption(&report)
+        );
+        let query = format!("peer={}", adoption_peer_name(&dead));
+        let response =
+            adoption_summary_for_peers(None, &peers, Some(&query), &client, &breakers).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()["content-type"], "application/json");
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn adoption_all_times_out_peers_concurrently() {
+        let (first, first_server) = spawn_hanging_storage().await;
+        let (second, second_server) = spawn_hanging_storage().await;
+        let peers = vec![format!("http://{first}"), format!("http://{second}")];
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let response = tokio::time::timeout(
+            Duration::from_secs(5),
+            adoption_summary_for_peers(None, &peers, Some("peer=all"), &client, &breakers),
+        )
+        .await
+        .expect("both three-second timeouts must run concurrently");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let rows = body["peers"].as_array().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(rows
+            .iter()
+            .all(|row| row["ok"] == false && row["error"].is_string()));
+        first_server.abort();
+        second_server.abort();
     }
 
     #[test]
