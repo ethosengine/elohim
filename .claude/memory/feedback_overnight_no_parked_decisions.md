@@ -1,7 +1,7 @@
 ---
 name: feedback_overnight_no_parked_decisions
 title: Overnight shifts decide, never park decisions
-description: "Operator 2026-09-06 02:41 local: 'Don't leave decisions to me in an overnight shift' — in a granted overnight arc, reversible fleet data flips (e.g. observe→canary) are mine to make; bites whenever I end a night report with 'yours to decide'"
+description: "Operator 2026-09-06 02:41 (via the shift fork): in a granted overnight arc, reversible fleet data flips like observe→canary are the shift's call — bites when a night report ends 'yours to decide'"
 metadata:
   type: feedback
 ---
