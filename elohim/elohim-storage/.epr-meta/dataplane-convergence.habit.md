@@ -670,3 +670,18 @@ DELTA 2026-09-06 (accountable correction, slice 1 — LOCAL ONLY; NO status chan
   applied. That is a deliberate stop: wiring a consumer whose upstream has not been exercised
   end-to-end once is how a no-op ships reading as done. The habit stays RED, and this check is
   born red.
+  ADDENDUM 2026-09-06 23:5xZ (orchestrator, after the box reboot): the 14 feedback_signal
+  sweettests DID run (`cargo test --test feedback_signal -- --include-ignored`, 14 passed / 0
+  failed in 1805 s, log genesis/a2o/reports/accountable-correction/sweettest-feedback-signal.log
+  in the sprint worktree) — content_lineage_names_exact_root_and_author,
+  amend_content_by_non_root_author_rejected, correction_with{out}_embedded_request_rejected,
+  correction_with_mismatched_request_rejected, feedback_signal_refs_report_references_and_resolve_on_request
+  among them. `just gate elohim-storage`: fmt + clippy -D warnings clean, 3618 lib tests pass; the
+  single failure (release_manifest_mirror_agrees_with_the_rakia_schema) is the elohim/rakia
+  submodule being absent in a fresh worktree — passes once `git submodule update --init
+  elohim/rakia` (1 passed). DNA-hash caveat learned here: the hash is PATH-dependent (Cargo's
+  per-crate metadata includes the package path), so the worktree pack (uhC0k0UOV…/uhC0ku0iA…)
+  never equals the main-tree pack (uhC0kbYC3xV…) even with byte-identical integrity source;
+  hash neutrality is proven by "same path before and after" (done) plus git-identical integrity
+  sources + dna.yaml + Cargo.lock (verified), never by comparing packs across trees. Still not
+  proven: any station on the mesh; the projector loop is still not spawned from main.
