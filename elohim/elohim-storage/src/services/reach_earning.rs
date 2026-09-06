@@ -452,6 +452,7 @@ mod tests {
                 standing_impact: StandingImpact::DebitFirm,
                 signed_by: author_b64.clone(),
                 signature: BASE64.encode([0xFFu8; 64]),
+                act_ref: None,
             };
             project_signal(&mut conn, &policy, &evaluator, &sig, "bafyreimanifest").unwrap();
         }

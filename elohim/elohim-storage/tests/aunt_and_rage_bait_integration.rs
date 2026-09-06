@@ -727,6 +727,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         standing_impact: StandingImpact::DebitSoft,
         signed_by: bob_subject_b64.clone(),
         signature: BASE64.encode([0xAAu8; 64]),
+        act_ref: None,
     };
     vouch_signal_1
         .validate()
@@ -760,6 +761,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         standing_impact: StandingImpact::DebitSoft,
         signed_by: bob_subject_b64.clone(),
         signature: BASE64.encode([0xABu8; 64]),
+        act_ref: None,
     };
     vouch_signal_2
         .validate()
@@ -795,6 +797,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         standing_impact: StandingImpact::DebitSoft,
         signed_by: bob_subject_b64.clone(),
         signature: BASE64.encode([0xACu8; 64]),
+        act_ref: None,
     };
     vouch_signal_3
         .validate()

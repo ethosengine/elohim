@@ -192,6 +192,8 @@ pub enum Key {
     EvidenceAbsentBackoffSecs = 4,
     /// `PROJECTION_RECONCILE_SECS` — projection-reconcile sweep cadence.
     ProjectionReconcileSecs = 5,
+    /// `ELOHIM_FEEDBACK_NOTIFY` — the direct-notify ACCELERANT for feedback acts.
+    FeedbackNotify = 6,
 }
 
 impl Key {
@@ -200,13 +202,14 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 6] = [
+    pub const ALL: [Key; 7] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
         Key::HealMissingBackoffSeconds,
         Key::EvidenceAbsentBackoffSecs,
         Key::ProjectionReconcileSecs,
+        Key::FeedbackNotify,
     ];
 }
 
@@ -226,7 +229,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 6] = [
+pub static SPECS: [SettingSpec; 7] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -277,6 +280,21 @@ pub static SPECS: [SettingSpec; 6] = [
             "cadence only — a runtime 0 is IGNORED (it cannot stop a running loop, and the \
              loop is not spawned at all when the BOOT value is 0), and the change takes effect \
              after the next wake at the previous cadence",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_FEEDBACK_NOTIFY",
+        kind: Kind::Bool,
+        default: 1,
+        doc: "May this peer send the DIRECT p2p `feedback-signal` notification for a feedback \
+              act it authors? Notification is an accelerant (accountable-correction contract \
+              §4), never the path: at 0 the act is still committed to the author's own source \
+              chain and still found by every other peer's durable discovery scan (§3). The \
+              flag exists so a scenario can prove discovery ALONE is sufficient.",
+        note: Some(
+            "hot — the send path reads the registry per act, so a scenario can flip this \
+             between two acts on a RUNNING peer without a restart (the local mesh never \
+             restarts a peer between scenarios, so a boot-only flag could not be flipped)",
         ),
     },
 ];
@@ -1126,8 +1144,13 @@ not a pair
         let mut text = String::from("# generated\n");
         for key in Key::ALL {
             let spec = &SPECS[key.index()];
+            // Render the OPPOSITE of each bool's default, not a fixed `true`.
+            // The assertion below is "every setting MOVED off its default", and
+            // a fixed literal only tests that for settings whose default
+            // happens to be the other value — a bool that defaults ON would
+            // silently not move and quietly weaken the count.
             let raw = match spec.kind {
-                Kind::Bool => "true".to_string(),
+                Kind::Bool => if spec.default == 0 { "true" } else { "false" }.to_string(),
                 Kind::Seconds => "77".to_string(),
             };
             text.push_str(&format!("{} = \"{}\"\n", spec.name, raw));
@@ -1141,7 +1164,7 @@ not a pair
         for key in Key::ALL {
             let spec = &SPECS[key.index()];
             let want = match spec.kind {
-                Kind::Bool => 1,
+                Kind::Bool => 1 - spec.default,
                 Kind::Seconds => 77,
             };
             assert_eq!(reg.get(key), want, "{} did not round-trip", spec.name);

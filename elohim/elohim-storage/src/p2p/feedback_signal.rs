@@ -105,6 +105,35 @@ pub enum StandingImpact {
 // Wire struct
 // ---------------------------------------------------------------------------
 
+/// A durable reference to the SIGNED ACT a notification is about
+/// (accountable-correction contract §4).
+///
+/// The semantic payload is a claim; this is the pointer that lets the receiver
+/// go and VERIFY. `signed_by` in the payload is a claim too — the action
+/// signature is over the ACTION, not over the semantic canonical bytes, and the
+/// adapter never presents one as the other.
+///
+/// Identity is `(origin_dna_hash, action_hash)`: the signed act, deliberately
+/// not the entry hash, because two authors' identical corrections share an entry
+/// hash and are two acts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct FeedbackActRef {
+    /// The content-cell DNA hash the act lives in. A receiver whose own content
+    /// cell names a different DNA hash REJECTS the notification: carrying and
+    /// fetching from another space is explicitly not slice 1.
+    pub origin_dna_hash: String,
+    /// Base64 `ActionHash` of the FeedbackSignal action.
+    pub action_hash: String,
+    /// The back-propagation routing key, carried SEPARATELY from the act
+    /// reference. `back_prop`'s predecessor key is `target_cid` as a string;
+    /// resolving an action to its `Content.id` does not by itself yield that
+    /// key, so the two travel side by side rather than being derived from one
+    /// another.
+    pub routing_key: String,
+}
+
 /// FeedbackSignal EPR kind — Phase 3.5 sense-respond nervous system primitive.
 ///
 /// Invariant: when `signal_kind == SignalKind::Correction`, `evidence_cid`
@@ -143,6 +172,15 @@ pub struct FeedbackSignal {
 
     /// Base64-encoded ed25519 signature over canonical bytes.
     pub signature: String,
+
+    /// ADDITIVE notification reference (contract §4). `None` on every message a
+    /// pre-slice-1 peer sends, and ignored by a pre-slice-1 peer that receives
+    /// one: `rmp_serde::to_vec_named` is map-keyed and this struct is not
+    /// `deny_unknown_fields`, so old<->new decode both ways. No protocol-version
+    /// bump is required, and mixed-version peers never DROP a correction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub act_ref: Option<FeedbackActRef>,
 }
 
 impl FeedbackSignal {
@@ -163,6 +201,7 @@ impl FeedbackSignal {
             standing_impact,
             signed_by,
             signature,
+            act_ref: None,
         }
     }
 
@@ -207,6 +246,7 @@ mod tests {
             standing_impact: impact,
             signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
             signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+            act_ref: None,
         }
     }
 
@@ -507,6 +547,7 @@ mod tests {
             standing_impact: StandingImpact::DebitSoft,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         let json = serde_json::to_string(&signal).unwrap();
         assert!(
@@ -531,6 +572,7 @@ mod tests {
             standing_impact: StandingImpact::Advisory,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         let json = serde_json::to_string(&signal).unwrap();
         assert!(
@@ -551,6 +593,7 @@ mod tests {
             standing_impact: StandingImpact::DebitSoft,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         let json = serde_json::to_string(&signal).unwrap();
         assert!(
@@ -569,6 +612,7 @@ mod tests {
             standing_impact: StandingImpact::Advisory,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         assert!(
             signal.validate().is_err(),
@@ -586,6 +630,7 @@ mod tests {
             standing_impact: StandingImpact::Advisory,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         assert!(
             signal.validate().is_err(),
@@ -603,12 +648,120 @@ mod tests {
             standing_impact: StandingImpact::DebitSoft,
             signed_by: "AAA=".to_string(),
             signature: "BBB=".to_string(),
+            act_ref: None,
         };
         let bytes = rmp_serde::to_vec_named(&signal).unwrap();
         let back: FeedbackSignal = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(
             back, signal,
             "MessagePack round-trip failed for vouch signal"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wire-compatibility contract tests (accountable-correction contract §4, §9)
+// ---------------------------------------------------------------------------
+//
+// Registered in `genesis/manifests/seam-registry.yaml` as the two contract
+// tests owed with the notification reference.
+
+#[cfg(test)]
+mod act_ref_compat_tests {
+    use super::*;
+
+    /// The pre-slice-1 shape: identical field set MINUS `actRef`, and NOT
+    /// `deny_unknown_fields` — exactly how an older peer's decoder behaves.
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct OldFeedbackSignal {
+        target_cid: String,
+        signal_kind: SignalKind,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vouch_kind: Option<VouchKind>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        evidence_cid: Option<String>,
+        standing_impact: StandingImpact,
+        signed_by: String,
+        signature: String,
+    }
+
+    fn new_signal(act_ref: Option<FeedbackActRef>) -> FeedbackSignal {
+        FeedbackSignal {
+            target_cid: "uhCkkTARGET".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("uhCkkEVIDENCE".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "c2lnbmVy".to_string(),
+            signature: "c2ln".to_string(),
+            act_ref,
+        }
+    }
+
+    fn old_signal() -> OldFeedbackSignal {
+        OldFeedbackSignal {
+            target_cid: "uhCkkTARGET".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("uhCkkEVIDENCE".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "c2lnbmVy".to_string(),
+            signature: "c2ln".to_string(),
+        }
+    }
+
+    /// CONTRACT TEST 1 (old->new): bytes written by a pre-slice-1 peer decode on
+    /// the new struct, with `act_ref` defaulting to `None`. A mixed-version
+    /// mesh never drops a correction on the receive side.
+    #[test]
+    fn old_bytes_decode_on_the_new_struct() {
+        let bytes = rmp_serde::to_vec_named(&old_signal()).expect("encode old");
+        let decoded: FeedbackSignal = rmp_serde::from_slice(&bytes).expect("decode old on new");
+        assert_eq!(decoded.act_ref, None);
+        assert_eq!(decoded.target_cid, "uhCkkTARGET");
+        assert_eq!(decoded.evidence_cid.as_deref(), Some("uhCkkEVIDENCE"));
+    }
+
+    /// CONTRACT TEST 2 (new->old): bytes carrying the reference decode on a
+    /// struct that has never heard of it. The extra map key is ignored, so a
+    /// new peer's notification is not a poison pill for an old one.
+    #[test]
+    fn new_bytes_decode_on_the_old_struct() {
+        let signal = new_signal(Some(FeedbackActRef {
+            origin_dna_hash: "uhC0kDNA".to_string(),
+            action_hash: "uhCkkACT".to_string(),
+            routing_key: "uhCkkTARGET".to_string(),
+        }));
+        let bytes = rmp_serde::to_vec_named(&signal).expect("encode new");
+        let decoded: OldFeedbackSignal =
+            rmp_serde::from_slice(&bytes).expect("decode new on old");
+        assert_eq!(decoded, old_signal());
+    }
+
+    /// A reference-carrying message round-trips intact between two new peers.
+    #[test]
+    fn act_ref_round_trips_between_new_peers() {
+        let signal = new_signal(Some(FeedbackActRef {
+            origin_dna_hash: "uhC0kDNA".to_string(),
+            action_hash: "uhCkkACT".to_string(),
+            routing_key: "uhCkkTARGET".to_string(),
+        }));
+        let bytes = rmp_serde::to_vec_named(&signal).expect("encode");
+        let decoded: FeedbackSignal = rmp_serde::from_slice(&bytes).expect("decode");
+        assert_eq!(decoded, signal);
+    }
+
+    /// The reference is OMITTED from the wire when absent, so a slice-1 peer
+    /// talking to a slice-1 peer about a pre-slice-1 signal writes byte-identical
+    /// bytes to what the old peer would have written.
+    #[test]
+    fn absent_act_ref_is_omitted_from_the_wire() {
+        let new_bytes = rmp_serde::to_vec_named(&new_signal(None)).expect("encode new");
+        let old_bytes = rmp_serde::to_vec_named(&old_signal()).expect("encode old");
+        assert_eq!(
+            new_bytes, old_bytes,
+            "an absent reference must add ZERO bytes to the wire"
         );
     }
 }

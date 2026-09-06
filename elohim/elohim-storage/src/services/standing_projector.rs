@@ -341,6 +341,7 @@ mod tests {
             standing_impact: impact,
             signed_by: subject_b64(),
             signature: BASE64.encode(vec![0xFFu8; 64]),
+            act_ref: None,
         }
     }
 

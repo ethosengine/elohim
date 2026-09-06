@@ -287,6 +287,7 @@ mod tests {
             standing_impact: StandingImpact::Advisory,
             signed_by: subj_b64,
             signature: BASE64.encode([0xFFu8; 64]),
+            act_ref: None,
         };
         project_signal(
             &mut conn,

@@ -269,6 +269,29 @@ pub fn read_predecessors(
 /// - `Ok(peer_ids)` — predecessor(s) found; signal forwarded to all of them.
 ///   `peer_ids` contains the string PeerIds that were ATTEMPTED.
 /// - `Err(...)` — DB or unseal failure (not a sink failure).
+/// Is the direct-notify ACCELERANT enabled on this peer?
+///
+/// `ELOHIM_FEEDBACK_NOTIFY=0` (or `false`) suppresses the direct p2p
+/// `feedback-signal` send for acts this peer authors. The act is still
+/// committed to the author's own source chain and still found by every other
+/// peer's durable discovery scan (accountable-correction contract §3) —
+/// notification is an accelerant, never the path. The flag exists so a scenario
+/// can prove discovery ALONE is sufficient.
+///
+/// Read from the RUNTIME-CONFIG registry, never with `std::env::var` on this
+/// path. Two reasons, both load-bearing:
+///
+/// 1. An env read on a hot path plus a test that `set_var`s it is a
+///    parallel-test flake generator — `set_var` in one test leaks into every
+///    other.
+/// 2. The local mesh never restarts a peer between scenarios, so a boot-only
+///    flag could not be flipped per scenario. The registry is watched
+///    (`ELOHIM_RUNTIME_CONFIG_PATH`, armed from boot on every mesh peer), so a
+///    scenario flips this on a RUNNING peer between two acts.
+pub fn direct_notify_enabled() -> bool {
+    crate::runtime_config::get_bool(crate::runtime_config::Key::FeedbackNotify)
+}
+
 pub fn back_prop_one_hop(
     conn: &mut SqliteConnection,
     signal: &FeedbackSignal,
@@ -276,6 +299,15 @@ pub fn back_prop_one_hop(
     keys: &UnsealingKeys<'_>,
     local_peer_id: Option<&str>,
 ) -> Result<Vec<String>, StorageError> {
+    if !direct_notify_enabled() {
+        tracing::debug!(
+            target: "back_prop",
+            target_cid = %signal.target_cid,
+            "ELOHIM_FEEDBACK_NOTIFY=0 — direct notification withheld; the act is still \
+             committed and still discoverable by every peer's durable scan"
+        );
+        return Ok(vec![]);
+    }
     let peer_ids = read_predecessors(conn, &signal.target_cid, keys)?;
 
     if peer_ids.is_empty() {
@@ -284,6 +316,13 @@ pub fn back_prop_one_hop(
 
     // Encode the signal for wire transmission (MessagePack, matching the
     // FeedbackSignal wire contract in `p2p/feedback_signal.rs`).
+    //
+    // The act reference travels WITH the semantic signal on every forwarding
+    // hop (accountable-correction contract §4): it is a field on the message,
+    // so a hop cannot forward the claim while dropping the pointer that lets
+    // the next peer verify it. `to_vec_named` is map-keyed, so a hop through an
+    // older peer that re-encodes would drop it — which is why forwarding
+    // re-encodes the SAME struct rather than round-tripping through a mirror.
     let payload_bytes = rmp_serde::to_vec_named(signal)
         .map_err(|e| StorageError::Internal(format!("back_prop: serialize signal: {e}")))?;
 
@@ -455,6 +494,7 @@ mod tests {
             standing_impact: StandingImpact::Advisory,
             signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
             signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+            act_ref: None,
         }
     }
 
@@ -782,5 +822,42 @@ mod tests {
 
         // Only alice comes back; the corrupted row is silently skipped.
         assert_eq!(peer_ids, vec!["alice".to_string()]);
+    }
+}
+
+#[cfg(test)]
+mod act_ref_forwarding_tests {
+    use super::*;
+    use crate::p2p::feedback_signal::{FeedbackActRef, SignalKind, StandingImpact};
+
+    /// A forwarding hop must carry the act reference AND the routing key with
+    /// the semantic signal — a hop that forwards the claim but drops the
+    /// pointer leaves the next peer with something it cannot verify.
+    #[test]
+    fn forwarded_payload_carries_the_act_reference() {
+        let signal = FeedbackSignal {
+            target_cid: "uhCkkTARGET".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("uhCkkEVIDENCE".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "c2lnbmVy".to_string(),
+            signature: "c2ln".to_string(),
+            act_ref: Some(FeedbackActRef {
+                origin_dna_hash: "uhC0kDNA".to_string(),
+                action_hash: "uhCkkACT".to_string(),
+                routing_key: "uhCkkTARGET".to_string(),
+            }),
+        };
+        // The exact encoding `back_prop_one_hop` puts on the wire.
+        let payload = rmp_serde::to_vec_named(&signal).expect("encode");
+        let decoded: FeedbackSignal = rmp_serde::from_slice(&payload).expect("decode");
+        let carried = decoded.act_ref.expect("the reference survives the hop");
+        assert_eq!(carried.action_hash, "uhCkkACT");
+        assert_eq!(carried.origin_dna_hash, "uhC0kDNA");
+        assert_eq!(
+            carried.routing_key, "uhCkkTARGET",
+            "the routing key travels SEPARATELY from the act — it is not derivable from it"
+        );
     }
 }

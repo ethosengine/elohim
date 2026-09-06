@@ -35,6 +35,13 @@ use crate::p2p::reach_gate_allows;
 pub struct EprAtomService {
     db_pool: Option<DbPool>,
     dedup: Arc<DedupLru>,
+    /// This node's OWN content-cell DNA hash, when it has one.
+    ///
+    /// Accountable-correction contract §1/§4: a `feedback-signal` notification
+    /// naming a DIFFERENT origin DNA is rejected — carrying and fetching from
+    /// another space is explicitly not slice 1. `None` means the node cannot
+    /// make that judgement, so it refuses the notification rather than guessing.
+    origin_dna_hash: Option<String>,
 }
 
 impl std::fmt::Debug for EprAtomService {
@@ -47,7 +54,21 @@ impl std::fmt::Debug for EprAtomService {
 
 impl EprAtomService {
     pub fn new(db_pool: Option<DbPool>, dedup: Arc<DedupLru>) -> Self {
-        Self { db_pool, dedup }
+        Self {
+            db_pool,
+            dedup,
+            origin_dna_hash: None,
+        }
+    }
+
+    /// Bind this node's own content-cell DNA hash (contract §1).
+    ///
+    /// Additive by design: every existing `new(..)` call site keeps compiling
+    /// and keeps the honest `None`, which REFUSES a `feedback-signal`
+    /// notification rather than accepting one it cannot scope.
+    pub fn with_origin_dna_hash(mut self, dna_hash: impl Into<String>) -> Self {
+        self.origin_dna_hash = Some(dna_hash.into());
+        self
     }
 
     /// Dispatch an [`EprAtomRequest`].
@@ -454,6 +475,19 @@ impl EprAtomService {
                     }
                 }
             }
+            // Accountable correction (contract §4). A notification is a
+            // POINTER, never evidence: this branch decodes it, refuses a
+            // foreign origin DNA, and durably enqueues the referenced act for
+            // the projector to FETCH AND VERIFY on its next tick.
+            //
+            // The fetch deliberately does NOT happen here. Per-notification
+            // conductor work must be bounded before the uncancellable
+            // `call_zome`, and this handler is a synchronous request-response
+            // arm with no conductor client — doing the verification inline
+            // would put an unbounded, uncancellable DHT read on the notify
+            // path. Enqueue-then-project keeps the notification cheap and the
+            // single application path single.
+            "feedback-signal" => self.handle_feedback_signal_notify(peer_label, &payload_bytes),
             other_kind => {
                 warn!(
                     target: "elohim_storage::integrity",
@@ -468,7 +502,158 @@ impl EprAtomService {
             }
         }
     }
+
+    /// Receive a `feedback-signal` direct notification (contract §4).
+    ///
+    /// Three refusals, all of them honest acks rather than silent drops:
+    ///   - the payload does not decode as the semantic `FeedbackSignal`;
+    ///   - it carries no act reference (a pre-slice-1 peer): the semantic claim
+    ///     alone is not something this node will project, and discovery will
+    ///     find the act anyway;
+    ///   - the reference names a DIFFERENT origin DNA hash than this node's own
+    ///     content cell.
+    ///
+    /// On acceptance the referenced CORRECTION ACTION is added to the durable
+    /// subscription set, so the projector enumerates it, fetches the signed
+    /// record, and verifies §1 for itself.
+    fn handle_feedback_signal_notify(
+        &self,
+        peer_label: &str,
+        payload_bytes: &[u8],
+    ) -> EprAtomResponse {
+        use crate::db::feedback_subscriptions as sub_db;
+
+        let signal: crate::p2p::feedback_signal::FeedbackSignal =
+            match rmp_serde::from_slice(payload_bytes) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!(
+                        target: "elohim_storage::feedback",
+                        from = %peer_label,
+                        error = %e,
+                        "feedback-signal notify: payload did not decode"
+                    );
+                    return EprAtomResponse::IntegrityAck {
+                        received: false,
+                        reason: Some(format!("decode failed: {e}")),
+                    };
+                }
+            };
+
+        let Some(act_ref) = signal.act_ref.as_ref() else {
+            debug!(
+                target: "elohim_storage::feedback",
+                from = %peer_label,
+                "feedback-signal notify carries no act reference (pre-slice-1 peer) — the \
+                 semantic claim alone is not projected; discovery still finds the act"
+            );
+            return EprAtomResponse::IntegrityAck {
+                received: false,
+                reason: Some("no act reference — semantic claim alone is not evidence".to_string()),
+            };
+        };
+
+        let Some(local_dna) = self.origin_dna_hash.as_deref() else {
+            warn!(
+                target: "elohim_storage::feedback",
+                from = %peer_label,
+                "feedback-signal notify refused: this node has no bound content-cell DNA hash, \
+                 so it cannot scope the reference"
+            );
+            return EprAtomResponse::IntegrityAck {
+                received: false,
+                reason: Some("no local content DNA hash bound".to_string()),
+            };
+        };
+        if act_ref.origin_dna_hash != local_dna {
+            warn!(
+                target: "elohim_storage::feedback",
+                from = %peer_label,
+                foreign = %act_ref.origin_dna_hash,
+                local = %local_dna,
+                "feedback-signal notify refused: foreign origin DNA hash"
+            );
+            return EprAtomResponse::IntegrityAck {
+                received: false,
+                reason: Some("foreign origin DNA hash".to_string()),
+            };
+        }
+
+        // Dedup on the SIGNED ACT, not on the semantic payload: two authors'
+        // identical corrections share an entry hash and are two acts.
+        let dedup_key = format!(
+            "feedback-signal:{}:{}",
+            act_ref.origin_dna_hash, act_ref.action_hash
+        );
+        if !self.dedup.insert(&dedup_key) {
+            debug!(
+                target: "elohim_storage::dedup",
+                from = %peer_label,
+                action = %act_ref.action_hash,
+                "duplicate feedback-signal notify — dropped"
+            );
+            return EprAtomResponse::IntegrityAck {
+                received: true,
+                reason: Some("duplicate".to_string()),
+            };
+        }
+
+        let Some(pool) = self.db_pool.as_ref() else {
+            return EprAtomResponse::Error {
+                message: "storage unavailable".to_string(),
+            };
+        };
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(error = %e, "feedback-signal notify: db pool exhausted");
+                return EprAtomResponse::Error {
+                    message: "storage busy".to_string(),
+                };
+            }
+        };
+        let now = chrono::Utc::now().to_rfc3339();
+        // Subscribe to the ACT ITSELF and to its routing key. The act reference
+        // is what the projector fetches; the routing key is the content target
+        // whose OTHER acts (including this one's acceptance) hang off it.
+        for (kind, key) in [
+            (sub_db::KIND_CORRECTION_ACTION, act_ref.action_hash.as_str()),
+            (sub_db::KIND_CONTENT_TARGET, act_ref.routing_key.as_str()),
+        ] {
+            if let Err(e) = sub_db::add_member(
+                &mut conn,
+                kind,
+                key,
+                &act_ref.origin_dna_hash,
+                sub_db::SOURCE_NOTIFIED,
+                &now,
+            ) {
+                warn!(
+                    target: "elohim_storage::feedback",
+                    error = %e,
+                    key = %key,
+                    "feedback-signal notify: could not persist the subscription"
+                );
+                return EprAtomResponse::Error {
+                    message: "could not persist subscription".to_string(),
+                };
+            }
+        }
+
+        info!(
+            target: "elohim_storage::feedback",
+            from = %peer_label,
+            action = %act_ref.action_hash,
+            kind = ?signal.signal_kind,
+            "feedback-signal notify accepted — the act is enqueued for fetch-and-verify"
+        );
+        EprAtomResponse::IntegrityAck {
+            received: true,
+            reason: None,
+        }
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
