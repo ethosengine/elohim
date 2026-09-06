@@ -49,6 +49,81 @@ pub const STORAGE_PROXY_CONNECT_TIMEOUT_SECS: u64 = 3;
 /// Whole-request timeout — browser-facing, well under warm-up's 45s.
 pub const STORAGE_PROXY_REQUEST_TIMEOUT_SECS: u64 = 12;
 
+/// Public operational fields only; newly added operator fields stay private.
+fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
+    fn select(value: &serde_json::Value, fields: &[&str]) -> serde_json::Value {
+        fields
+            .iter()
+            .filter_map(|key| {
+                value
+                    .get(*key)
+                    .map(|value| ((*key).to_owned(), value.clone()))
+            })
+            .collect::<serde_json::Map<_, _>>()
+            .into()
+    }
+
+    serde_json::json!({
+        "controller": select(&report["controller"], &[
+            "running", "sweeps", "sweepIntervalSecs", "applyVehicles",
+        ]),
+        "channels": report["channels"].as_array().into_iter().flatten().map(|channel| {
+            select(channel, &[
+                "channelId", "mode", "resolvedHead", "verdict", "appliedRelease",
+                "attestations", "sweeps", "consecutiveRefusals", "lastCheckedAt",
+            ])
+        }).collect::<Vec<_>>(),
+    })
+}
+
+/// Read the primary peer's controller, without registry routing or caching.
+/// Like /p2p/status, this diagnostic bypasses the upstream circuit breaker.
+pub async fn adoption_summary(
+    storage_url: Option<&str>,
+    client: &reqwest::Client,
+    breakers: &UpstreamBreakers,
+) -> Response<Full<Bytes>> {
+    let report = async {
+        let base = storage_url?;
+        let response = client
+            .get(format!("{}/admin/adoption", base.trim_end_matches('/')))
+            .send()
+            .await
+            .ok()?
+            .error_for_status()
+            .ok()?;
+        let report = response.json::<serde_json::Value>().await.ok()?;
+        // A malformed report is unavailable, not an empty healthy controller.
+        (report["controller"].is_object()
+            && report["channels"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().all(serde_json::Value::is_object)))
+        .then_some(report)
+    }
+    .await;
+
+    let mut response = match report {
+        Some(report) => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(
+                project_adoption(&report).to_string(),
+            )))
+            .expect("valid adoption response"),
+        None => catching_up_proxy_response(
+            false,
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+            storage_url.unwrap_or_default(),
+            breakers,
+        ),
+    };
+    response.headers_mut().insert(
+        "Cache-Control",
+        hyper::header::HeaderValue::from_static("no-store"),
+    );
+    response
+}
+
 /// Classifies an upstream result for the per-endpoint circuit breaker (D6).
 /// Only transient saturation/connectivity counts as Failure; a 404 is a normal
 /// blob miss (no-fanout rule) and must NEVER open the breaker.
@@ -1087,6 +1162,80 @@ mod tests {
     /// the parallel test runner produces flakes (e.g. an 18-byte payload
     /// failing to cache because the oversized-blob test set the limit to 10).
     static BLOB_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn adoption_projection_allow_lists_controller_and_channel_fields() {
+        let public = serde_json::json!({
+            "controller": {
+                "running": true, "sweeps": 9, "sweepIntervalSecs": 30,
+                "applyVehicles": ["coordinators"]
+            },
+            "channels": [{
+                "channelId": "runtime:coordinators:elohim:workspace", "mode": "observe",
+                "resolvedHead": {"cid": "release-cid", "tier": "staging"},
+                "verdict": {"state": "refused", "refusal": "insufficient-attestations"},
+                "appliedRelease": null,
+                "attestations": {"qualifying": 0, "total": 2, "threshold": 1},
+                "sweeps": 4, "consecutiveRefusals": 2, "lastCheckedAt": 12345
+            }, {
+                "channelId": "other", "mode": "observe", "resolvedHead": null,
+                "verdict": null, "appliedRelease": "previous-release",
+                "attestations": null, "sweeps": 0, "consecutiveRefusals": 0,
+                "lastCheckedAt": null
+            }]
+        });
+        let mut private = public.clone();
+        private["controller"]["backoffLadderSecs"] = serde_json::json!([30, 60]);
+        private["controller"]["maxChannelsPerSweep"] = serde_json::json!(4);
+        private["controller"]["maxArtifactBytesPerSweep"] = serde_json::json!(1000);
+        private["controller"]["futurePrivateField"] = serde_json::json!("private");
+        private["channels"][0]["futurePrivateField"] = serde_json::json!("private");
+        private["configRefusals"] = serde_json::json!(["private"]);
+        private["reverts"] = serde_json::json!(["private"]);
+        assert_eq!(project_adoption(&private), public);
+    }
+
+    #[tokio::test]
+    async fn adoption_summary_is_json_and_no_store() {
+        let report = serde_json::json!({"controller": {"running": false}, "channels": []});
+        let (addr, server) =
+            spawn_mock_storage(200, report.to_string().into_bytes(), "application/json").await;
+        let response = adoption_summary(
+            Some(&format!("http://{addr}/")),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            report
+        );
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn adoption_summary_unavailable_is_json_503_and_no_store() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+        for storage in [Some(url.as_str()), None] {
+            let response = adoption_summary(
+                storage,
+                &reqwest::Client::new(),
+                &UpstreamBreakers::default(),
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.headers()["cache-control"], "no-store");
+            assert_eq!(response.headers()["content-type"], "application/json");
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["status"], "catching-up");
+        }
+    }
 
     #[test]
     #[allow(clippy::assertions_on_constants)] // intentional invariant guard on tuning constants

@@ -2430,7 +2430,7 @@ fn is_service_path(path: &str) -> bool {
         "/signal",
         "/api/",
         "/import/",
-        "/db/",
+        "/db/", // Includes the primary-peer GET /db/p2p/adoption projection.
         // /sync/* — Automerge doc-sync proxied to storage via the route
         // registry (storage build_manifest declares /sync/v1/*). Without this
         // the EPR router (GET + !is_service_path) would shadow GET /sync to the
@@ -2751,6 +2751,12 @@ mod shakeout_tests {
         assert!(is_service_path("/sync"));
         assert!(is_reserved_url_path("/sync"));
     }
+    #[test]
+    fn is_service_path_covers_adoption_summary() {
+        assert!(is_service_path("/db/p2p/adoption"));
+        assert!(is_reserved_url_path("/db/p2p/adoption"));
+    }
+
     #[test]
     fn shakeout_service_path_guards_p2p() {
         // /p2p/* (node-local P2P sync status, proxied to storage via the route
@@ -5816,6 +5822,17 @@ async fn handle_request(
                 .header("Content-Type", "text/plain")
                 .body(Full::new(Bytes::from("OK")))
                 .unwrap(),
+        ),
+
+        // Doorway-specific redaction + path rewrite: never expose the raw
+        // operator-local /admin/adoption through the manifest registry.
+        (Method::GET, "/db/p2p/adoption") => to_boxed(
+            routes::storage_proxy::adoption_summary(
+                state.args.storage_url.as_deref(),
+                &state.storage_proxy_client,
+                &state.upstream_breakers,
+            )
+            .await,
         ),
 
         // Transport-manifest bootstrap projection (T0'): the same web2
