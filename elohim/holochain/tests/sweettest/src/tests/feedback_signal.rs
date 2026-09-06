@@ -23,8 +23,9 @@ use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::network_seed,
 };
-use holo_hash::{ActionHash, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain::sweettest::{await_consistency_s, SweetConductor};
+use hdk::prelude::Timestamp;
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -158,6 +159,35 @@ fn make_content(id: &str) -> CreateContentInput {
     }
 }
 
+/// A Correction EPR that satisfies slice-1 admission (contract §8): PUBLIC
+/// reach, and a `correctionRequest` embedded in `metadata_json` that matches the
+/// act it will be cited by, field for field.
+///
+/// The `operationId` is the group key §7 applies contributions once per. Two
+/// acts citing THIS evidence are one group, not two contributions.
+fn make_correction_evidence(
+    id: &str,
+    operation_id: &str,
+    target_action_hash: &ActionHash,
+    signal_kind: &str,
+    standing_impact: &str,
+) -> CreateContentInput {
+    let metadata_json = format!(
+        r#"{{"correctionRequest":{{"operationId":"{operation_id}","targetActionHash":"{target}","signalKind":"{signal_kind}","standingImpact":"{standing_impact}"}}}}"#,
+        target = target_action_hash
+    );
+    CreateContentInput {
+        id: id.to_string(),
+        content_type: "correction".to_string(),
+        title: format!("Correction EPR {id}"),
+        description: "Correction evidence for feedback_signal sweettests".to_string(),
+        content: "# Correction\nThe cited claim was wrong.".to_string(),
+        content_format: "markdown".to_string(),
+        reach: "public".to_string(),
+        metadata_json,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 1: Squelch by third party succeeds.
 // ---------------------------------------------------------------------------
@@ -266,12 +296,20 @@ async fn correction_with_evidence_succeeds() -> Result<()> {
         .await;
     let content_ah = target_output.action_hash;
 
-    // B creates the correction EPR (another content entry serves as evidence placeholder).
+    // B creates the Correction EPR. Slice-1 admission (§8) requires it to be
+    // PUBLIC and to embed the immutable request this act is filed under — a
+    // bare content entry no longer qualifies as evidence.
     let evidence_output: ContentOutput = cb
         .call(
             &cell_b.zome("content_store"),
             "create_content",
-            make_content("t8-s2-evidence"),
+            make_correction_evidence(
+                "t8-s2-evidence",
+                "t8-s2-op",
+                &content_ah,
+                "correction",
+                "debit-soft",
+            ),
         )
         .await;
     let evidence_ah = evidence_output.action_hash;
@@ -634,7 +672,13 @@ async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
         .call(
             &cell_b.zome("content_store"),
             "create_content",
-            make_content("t7-s8-evidence"),
+            make_correction_evidence(
+                "t7-s8-evidence",
+                "t7-s8-op",
+                &content_ah,
+                "correction",
+                "debit-soft",
+            ),
         )
         .await;
     let evidence_ah = evidence_output.action_hash;
@@ -791,5 +835,431 @@ async fn create_vouch_rejects_self_vouch() -> Result<()> {
         "error message must mention self-vouch or forbidden: {err_str}"
     );
 
+    Ok(())
+}
+
+// ===========================================================================
+// Accountable correction — slice 1 (contract §§3, 5.3, 6, 8)
+// ===========================================================================
+//
+// Scenarios 9-13 cover the coordinator surface the accountable-correction
+// contract adds. All coordinator-only: the DNA hash does not move.
+
+/// Mirror of `content_store::correction::GetContentLineageInput`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct GetContentLineageInput {
+    pub action_hash: ActionHash,
+    #[serde(default)]
+    pub local: bool,
+}
+
+/// Mirror of `content_store::correction::LineageCandidate`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct LineageCandidate {
+    pub action_hash: ActionHash,
+    pub predecessor: Option<ActionHash>,
+    pub author: Option<AgentPubKey>,
+    pub timestamp: Option<Timestamp>,
+    pub fetch_outcome: String,
+    pub in_root: bool,
+}
+
+/// Mirror of `content_store::correction::ContentLineageOutput`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct ContentLineageOutput {
+    pub referenced_action_hash: ActionHash,
+    pub root_action_hash: ActionHash,
+    pub root_author: AgentPubKey,
+    pub content_id: String,
+    pub candidates: Vec<LineageCandidate>,
+    pub head_action_hash: Option<ActionHash>,
+    pub contested: bool,
+    pub contested_predecessors: Vec<ActionHash>,
+    pub link_count: u32,
+    pub duplicate_links: u32,
+    pub invalid_link_targets: u32,
+    pub other_root_candidates: u32,
+    pub unfetchable_candidates: u32,
+    pub truncated: bool,
+}
+
+/// Mirror of `content_store::correction::AmendContentPatch`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, SerializedBytes)]
+struct AmendContentPatch {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub metadata_json: Option<String>,
+    #[serde(default)]
+    pub blob_cid: Option<String>,
+    #[serde(default)]
+    pub content_size_bytes: Option<u64>,
+    #[serde(default)]
+    pub content_hash: Option<String>,
+    #[serde(default)]
+    pub reach: Option<String>,
+}
+
+/// Mirror of `content_store::correction::AmendContentInput`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct AmendContentInput {
+    pub predecessor_action_hash: ActionHash,
+    pub content: AmendContentPatch,
+}
+
+/// Mirror of `content_store::feedback_signal::FeedbackSignalRefsForTargetInput`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct FeedbackSignalRefsForTargetInput {
+    pub target_action_hash: ActionHash,
+    #[serde(default)]
+    pub resolve: bool,
+}
+
+/// Mirror of `content_store::feedback_signal::FeedbackSignalRef`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct FeedbackSignalRef {
+    pub action_hash: ActionHash,
+    pub fetch_outcome: String,
+    pub entry: Option<FeedbackSignalEntry>,
+}
+
+/// Mirror of `content_store::feedback_signal::FeedbackSignalRefs`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct FeedbackSignalRefs {
+    pub refs: Vec<FeedbackSignalRef>,
+    pub link_count: u32,
+    pub duplicate_links: u32,
+    pub invalid_link_targets: u32,
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 9: correction whose evidence embeds NO request is REJECTED (§8).
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn correction_without_embedded_request_rejected() -> Result<()> {
+    let (mut ca, a1) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell").clone();
+
+    let target: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s9-target"),
+        )
+        .await;
+    // A PLAIN content entry — resolvable, but it embeds no correctionRequest.
+    let evidence: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s9-evidence"),
+        )
+        .await;
+
+    let result = ca
+        .call_fallible::<_, ActionHash>(
+            &cell.zome("content_store"),
+            "create_feedback_signal",
+            CreateFeedbackSignalInput {
+                target_action_hash: target.action_hash,
+                signal_kind: "correction".to_string(),
+                evidence_action_hash: Some(evidence.action_hash),
+                standing_impact: "debit-soft".to_string(),
+            },
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "evidence that resolves but embeds no correctionRequest must be refused"
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 10: correction whose evidence names a DIFFERENT target is REJECTED.
+// A non-matching act is a NON-MEMBER of the operation group (§7), not a second
+// contribution that gets silently collapsed.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn correction_with_mismatched_request_rejected() -> Result<()> {
+    let (mut ca, a1) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell").clone();
+
+    let target: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s10-target"),
+        )
+        .await;
+    let other: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s10-other"),
+        )
+        .await;
+    // Evidence binds itself to `other`, but the act is filed against `target`.
+    let evidence: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_correction_evidence(
+                "ac-s10-evidence",
+                "ac-s10-op",
+                &other.action_hash,
+                "correction",
+                "debit-soft",
+            ),
+        )
+        .await;
+
+    let result = ca
+        .call_fallible::<_, ActionHash>(
+            &cell.zome("content_store"),
+            "create_feedback_signal",
+            CreateFeedbackSignalInput {
+                target_action_hash: target.action_hash,
+                signal_kind: "correction".to_string(),
+                evidence_action_hash: Some(evidence.action_hash),
+                standing_impact: "debit-soft".to_string(),
+            },
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "evidence bound to a different target must be refused"
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 11: get_content_lineage names the EXACT root and its author (§6).
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn content_lineage_names_exact_root_and_author() -> Result<()> {
+    let (mut ca, a1) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell").clone();
+
+    let root: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s11-target"),
+        )
+        .await;
+
+    // One amendment, naming the root explicitly.
+    let v2: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "amend_content",
+            AmendContentInput {
+                predecessor_action_hash: root.action_hash.clone(),
+                content: AmendContentPatch {
+                    title: Some("amended title".to_string()),
+                    ..Default::default()
+                },
+            },
+        )
+        .await;
+
+    let lineage: ContentLineageOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "get_content_lineage",
+            GetContentLineageInput {
+                action_hash: v2.action_hash.clone(),
+                local: true,
+            },
+        )
+        .await;
+
+    assert_eq!(
+        lineage.root_action_hash, root.action_hash,
+        "lineage must resolve the EXACT root Create, not the newest ID link"
+    );
+    assert_eq!(lineage.root_author, a1, "root author is the Create's author");
+    assert_eq!(lineage.content_id, "ac-s11-target");
+    assert_eq!(
+        lineage.head_action_hash,
+        Some(v2.action_hash.clone()),
+        "the deterministic pick is the newest root-authored in-root version"
+    );
+    assert!(
+        !lineage.contested,
+        "a sequential amendment is not a fork: {:?}",
+        lineage.contested_predecessors
+    );
+    // The v2 candidate names the root as its predecessor — the Supersedes edge.
+    let v2_candidate = lineage
+        .candidates
+        .iter()
+        .find(|c| c.action_hash == v2.action_hash)
+        .expect("v2 present among candidates");
+    assert_eq!(v2_candidate.predecessor, Some(root.action_hash.clone()));
+    assert!(v2_candidate.in_root);
+    assert_eq!(v2_candidate.fetch_outcome, "fetched");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 12: amend_content refuses a NON-root-author (§5.3).
+// `update_content` has no author gate at all; the correction successor does.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn amend_content_by_non_root_author_rejected() -> Result<()> {
+    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app_a = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna.clone()])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("elohim-app-b", a2.clone(), &[dna])
+        .await?;
+    let cell_a = app_a.cells().first().expect("cell A").clone();
+    let cell_b = app_b.cells().first().expect("cell B").clone();
+
+    // A authors the content.
+    let root: ContentOutput = ca
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content("ac-s12-target"),
+        )
+        .await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency_s(10, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
+    // B — not the root author — attempts the amendment.
+    let result = cb
+        .call_fallible::<_, ContentOutput>(
+            &cell_b.zome("content_store"),
+            "amend_content",
+            AmendContentInput {
+                predecessor_action_hash: root.action_hash.clone(),
+                content: AmendContentPatch {
+                    title: Some("hijacked".to_string()),
+                    ..Default::default()
+                },
+            },
+        )
+        .await;
+
+    let err = result.expect_err("a non-root-author amendment must be refused");
+    assert!(
+        format!("{err:?}").contains("is not the author"),
+        "refusal must carry the 'is not the author' substring the facade maps to 403: {err:?}"
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 13: reference discovery reports links WITHOUT fetching (§3).
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn feedback_signal_refs_report_references_and_resolve_on_request() -> Result<()> {
+    let (mut ca, a1) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell").clone();
+
+    let target: ContentOutput = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("ac-s13-target"),
+        )
+        .await;
+    let signal_ah: ActionHash = ca
+        .call(
+            &cell.zome("content_store"),
+            "create_feedback_signal",
+            CreateFeedbackSignalInput {
+                target_action_hash: target.action_hash.clone(),
+                signal_kind: "squelch".to_string(),
+                evidence_action_hash: None,
+                standing_impact: "advisory".to_string(),
+            },
+        )
+        .await;
+
+    // Cheap path: one reference, no record fetched.
+    let refs: FeedbackSignalRefs = ca
+        .call(
+            &cell.zome("content_store"),
+            "get_feedback_signal_refs_for_target",
+            FeedbackSignalRefsForTargetInput {
+                target_action_hash: target.action_hash.clone(),
+                resolve: false,
+            },
+        )
+        .await;
+    assert_eq!(refs.refs.len(), 1);
+    assert_eq!(refs.refs[0].action_hash, signal_ah);
+    assert_eq!(refs.refs[0].fetch_outcome, "referenced");
+    assert!(refs.refs[0].entry.is_none());
+    assert_eq!(refs.duplicate_links, 0);
+    assert_eq!(refs.invalid_link_targets, 0);
+
+    // Resolved path: an EXPLICIT outcome, never a silently dropped record.
+    let resolved: FeedbackSignalRefs = ca
+        .call(
+            &cell.zome("content_store"),
+            "get_feedback_signal_refs_for_target",
+            FeedbackSignalRefsForTargetInput {
+                target_action_hash: target.action_hash,
+                resolve: true,
+            },
+        )
+        .await;
+    assert_eq!(resolved.refs[0].fetch_outcome, "fetched");
+    assert_eq!(
+        resolved.refs[0]
+            .entry
+            .as_ref()
+            .expect("entry present")
+            .signal_kind,
+        "squelch"
+    );
     Ok(())
 }

@@ -30,7 +30,7 @@
 //!   keyed on `"feedback_signer/<agent_pubkey_b64>"`, target = new
 //!   FeedbackSignal action hash. Supports `list_feedback_signals_by_signer`.
 
-use content_store_integrity::{EntryTypes, FeedbackSignal, LinkTypes, StringAnchor};
+use content_store_integrity::{Content, EntryTypes, FeedbackSignal, LinkTypes, StringAnchor};
 use hdk::prelude::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use serde::{Deserialize, Serialize};
@@ -117,8 +117,22 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
                 "correction requires evidence_action_hash".to_string()
             ))
         })?;
-        // Attempt resolution — returns error if not found.
-        must_get_valid_record(evidence_hash.clone())?;
+        // ADMISSION (contract §8). Resolution alone is not enough: the evidence
+        // must be a PUBLIC Correction EPR whose embedded, immutable request
+        // matches this act's own fields. That binding is what makes a second
+        // act filed under the same operation a GROUP MEMBER (§7) rather than a
+        // second contribution — the substrate half of "one intended act
+        // survives a lost response".
+        let operation_id = admit_correction_evidence(
+            evidence_hash,
+            &input.target_action_hash,
+            &input.signal_kind,
+            &input.standing_impact,
+        )?;
+        debug!(
+            "create_feedback_signal: correction admitted under operation {}",
+            operation_id
+        );
     }
 
     // ------------------------------------------------------------------
@@ -353,4 +367,404 @@ pub fn list_feedback_signals_by_signer(
     }
 
     Ok(results)
+}
+
+// ===========================================================================
+// Accountable correction — slice 1 additions (contract §§1, 3, 8)
+// ===========================================================================
+//
+// Three things land here, all coordinator-only (no DNA hash move):
+//
+//   1. `get_feedback_signal_record` — the signed action + entry for ONE act,
+//      so a discovering peer can verify §1 (entry type, entry-hash binding,
+//      entry bytes present) and recover the author from the SIGNED action
+//      rather than trusting the coordinator-derived `signer_pubkey`.
+//
+//   2. `get_feedback_signal_refs_for_target` / `list_feedback_signal_refs_by_signer`
+//      — REFERENCE-plus-OUTCOME queries. The existing `_for_target` /
+//      `_by_signer` functions fetch every linked record before returning AND
+//      silently drop fetch failures, so a peer pays for history it has already
+//      applied and cannot tell "absent" from "unfetchable". These return one
+//      row per DEDUPLICATED link with an explicit outcome, and only fetch when
+//      the caller asks. The originals are untouched for compatibility.
+//
+//   3. Correction ADMISSION. Today the coordinator checks only that the
+//      evidence action resolves. §8 binds the act to an immutable request: the
+//      evidence must be a PUBLIC Correction EPR whose embedded request matches
+//      the feedback's own fields, so a second act filed under the same
+//      operation is a GROUP MEMBER rather than a second contribution.
+
+/// The immutable request an operation pins, embedded in the Correction EPR's
+/// `metadata_json` under the `correctionRequest` key (contract §8).
+///
+/// This is a JSON field on the EXISTING `Content` entry — deliberately not a new
+/// entry type. The DNA's entry-type budget is the scarce resource; a new social
+/// binding is carried in the body of a record that already exists.
+///
+/// Wire shape (camelCase, because it is authored by the storage outbox and read
+/// by both the coordinator and the projector):
+///
+/// ```json
+/// { "correctionRequest": {
+///     "operationId": "1f0c…",
+///     "targetActionHash": "uhCkk…",
+///     "signalKind": "correction",
+///     "standingImpact": "debit-soft" } }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorrectionRequest {
+    pub operation_id: String,
+    pub target_action_hash: String,
+    pub signal_kind: String,
+    pub standing_impact: String,
+}
+
+/// The `metadata_json` key the request lives under.
+pub const CORRECTION_REQUEST_KEY: &str = "correctionRequest";
+
+/// Reach tiers a Correction EPR may carry. §8 requires the evidence to be a
+/// PUBLIC Correction EPR: a correction whose evidence no peer may read cannot
+/// be verified by the peers the correction is addressed to.
+pub const PUBLIC_EVIDENCE_REACH: [&str; 2] = ["public", "commons"];
+
+/// **Pure.** Extract the embedded request from a Content entry's
+/// `metadata_json`. `Err` carries the refusal text the caller returns verbatim.
+pub fn parse_correction_request(metadata_json: &str) -> Result<CorrectionRequest, String> {
+    let root: serde_json::Value = serde_json::from_str(metadata_json)
+        .map_err(|e| format!("evidence metadata_json is not valid JSON: {e}"))?;
+    let node = root.get(CORRECTION_REQUEST_KEY).ok_or_else(|| {
+        format!("evidence carries no '{CORRECTION_REQUEST_KEY}' object in metadata_json")
+    })?;
+    let req: CorrectionRequest = serde_json::from_value(node.clone())
+        .map_err(|e| format!("evidence '{CORRECTION_REQUEST_KEY}' is malformed: {e}"))?;
+    if req.operation_id.trim().is_empty() {
+        return Err("evidence correctionRequest.operationId is empty".to_string());
+    }
+    Ok(req)
+}
+
+/// **Pure.** The request must match the act being filed, field for field.
+///
+/// A mismatch is a REJECTION, not a retryable condition: it means the act does
+/// not belong to the operation its evidence names, and §7 rejects such an act as
+/// a non-member of the group rather than collapsing it into one.
+pub fn check_correction_request(
+    req: &CorrectionRequest,
+    target_action_hash: &str,
+    signal_kind: &str,
+    standing_impact: &str,
+) -> Result<(), String> {
+    if req.target_action_hash != target_action_hash {
+        return Err(format!(
+            "evidence correctionRequest.targetActionHash '{}' does not match the feedback target \
+             '{}'",
+            req.target_action_hash, target_action_hash
+        ));
+    }
+    if req.signal_kind != signal_kind {
+        return Err(format!(
+            "evidence correctionRequest.signalKind '{}' does not match the feedback signal_kind \
+             '{}'",
+            req.signal_kind, signal_kind
+        ));
+    }
+    if req.standing_impact != standing_impact {
+        return Err(format!(
+            "evidence correctionRequest.standingImpact '{}' does not match the feedback \
+             standing_impact '{}'",
+            req.standing_impact, standing_impact
+        ));
+    }
+    Ok(())
+}
+
+/// Admission for a `correction` act (contract §8).
+///
+/// The evidence record must (a) resolve, (b) carry a `Content` entry, (c) be
+/// public, and (d) embed a `correctionRequest` matching this act's own fields.
+/// Returns the pinned `operation_id` so the caller can log the group key.
+fn admit_correction_evidence(
+    evidence_hash: &ActionHash,
+    target_action_hash: &ActionHash,
+    signal_kind: &str,
+    standing_impact: &str,
+) -> ExternResult<String> {
+    let record = must_get_valid_record(evidence_hash.clone())?;
+    let content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "correction evidence decode failed: {e}"
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "correction evidence must be a Correction EPR (a Content record); the referenced \
+                 action carries no Content entry"
+                    .to_string()
+            ))
+        })?;
+
+    if !PUBLIC_EVIDENCE_REACH.contains(&content.reach.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "correction evidence must be a PUBLIC Correction EPR (reach one of {:?}); this \
+             evidence carries reach '{}' — a correction whose evidence its addressee cannot read \
+             is not accountable",
+            PUBLIC_EVIDENCE_REACH, content.reach
+        ))));
+    }
+
+    let req = parse_correction_request(&content.metadata_json)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("correction evidence: {e}"))))?;
+    check_correction_request(
+        &req,
+        &format!("{}", target_action_hash),
+        signal_kind,
+        standing_impact,
+    )
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("correction evidence: {e}"))))?;
+
+    Ok(req.operation_id)
+}
+
+// ---------------------------------------------------------------------------
+// Reference + outcome discovery (contract §3)
+// ---------------------------------------------------------------------------
+
+/// One discovered act reference with an EXPLICIT outcome.
+///
+/// `fetch_outcome` is `"referenced"` when the caller did not ask for
+/// resolution — the cheap path that lets a peer skip acts it has already
+/// applied. With `resolve: true` it is one of `"fetched"`, `"not-found"`,
+/// `"no-entry"` or `"wrong-type"`; an unfetchable act is REPORTED so the caller
+/// can hold it pending instead of reading absence as "uncontested".
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct FeedbackSignalRef {
+    pub action_hash: ActionHash,
+    pub fetch_outcome: String,
+    /// Present only when `resolve` was set AND the outcome is `"fetched"`.
+    pub entry: Option<FeedbackSignal>,
+}
+
+/// The full answer of a reference query, including what it could NOT turn into
+/// a reference. An empty `refs` at one tick means "not observed", never
+/// "uncontested" (§3).
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct FeedbackSignalRefs {
+    pub refs: Vec<FeedbackSignalRef>,
+    pub link_count: u32,
+    pub duplicate_links: u32,
+    pub invalid_link_targets: u32,
+}
+
+/// Input for [`get_feedback_signal_refs_for_target`].
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct FeedbackSignalRefsForTargetInput {
+    pub target_action_hash: ActionHash,
+    /// Fetch each referenced record and report a real outcome. Default `false`
+    /// — the point of this query is to NOT pay for records the caller has
+    /// already applied.
+    #[serde(default)]
+    pub resolve: bool,
+}
+
+/// Input for [`list_feedback_signal_refs_by_signer`].
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct FeedbackSignalRefsBySignerInput {
+    pub signer_pubkey: AgentPubKey,
+    #[serde(default)]
+    pub resolve: bool,
+}
+
+/// Shared body: enumerate links from `base`, deduplicate targets, and report an
+/// explicit outcome per reference.
+fn refs_from_links(base: AnyLinkableHash, resolve: bool) -> ExternResult<FeedbackSignalRefs> {
+    let query = LinkQuery::try_new(base, LinkTypes::TargetToFeedbackSignal)?;
+    let links = get_links(query, GetStrategy::default())?;
+    refs_from_link_set(links, resolve)
+}
+
+fn refs_from_link_set(links: Vec<Link>, resolve: bool) -> ExternResult<FeedbackSignalRefs> {
+    let link_count = links.len() as u32;
+    let mut duplicate_links = 0u32;
+    let mut invalid_link_targets = 0u32;
+    let mut seen: Vec<ActionHash> = Vec::new();
+    for link in &links {
+        match ActionHash::try_from(link.target.clone()) {
+            Ok(ah) => {
+                if seen.contains(&ah) {
+                    duplicate_links += 1;
+                } else {
+                    seen.push(ah);
+                }
+            }
+            Err(_) => invalid_link_targets += 1,
+        }
+    }
+
+    let mut refs = Vec::with_capacity(seen.len());
+    for ah in seen {
+        if !resolve {
+            refs.push(FeedbackSignalRef {
+                action_hash: ah,
+                fetch_outcome: "referenced".to_string(),
+                entry: None,
+            });
+            continue;
+        }
+        match get(ah.clone(), GetOptions::default())? {
+            None => refs.push(FeedbackSignalRef {
+                action_hash: ah,
+                fetch_outcome: "not-found".to_string(),
+                entry: None,
+            }),
+            Some(record) => {
+                let decoded: Option<FeedbackSignal> =
+                    record.entry().to_app_option().ok().flatten();
+                match decoded {
+                    Some(entry) => refs.push(FeedbackSignalRef {
+                        action_hash: ah,
+                        fetch_outcome: "fetched".to_string(),
+                        entry: Some(entry),
+                    }),
+                    None => refs.push(FeedbackSignalRef {
+                        action_hash: ah,
+                        // A record with no readable app entry is either a
+                        // Hidden/NotStored remote answer or a different entry
+                        // type behind the link. Either way it is NOT evidence.
+                        fetch_outcome: if record.entry().as_option().is_none() {
+                            "no-entry".to_string()
+                        } else {
+                            "wrong-type".to_string()
+                        },
+                        entry: None,
+                    }),
+                }
+            }
+        }
+    }
+
+    Ok(FeedbackSignalRefs {
+        refs,
+        link_count,
+        duplicate_links,
+        invalid_link_targets,
+    })
+}
+
+/// Reference + outcome variant of [`get_feedback_signals_for_target`] (§3).
+#[hdk_extern]
+pub fn get_feedback_signal_refs_for_target(
+    input: FeedbackSignalRefsForTargetInput,
+) -> ExternResult<FeedbackSignalRefs> {
+    refs_from_links(input.target_action_hash.into(), input.resolve)
+}
+
+/// Reference + outcome variant of [`list_feedback_signals_by_signer`] (§3).
+///
+/// This is the query §8's phase-2 recovery reads: after an uncertain
+/// `create_feedback_signal`, the submitting cell enumerates its OWN acts and
+/// matches the operation tuple. Zero matches is `unresolved`, never a licence
+/// to resubmit.
+#[hdk_extern]
+pub fn list_feedback_signal_refs_by_signer(
+    input: FeedbackSignalRefsBySignerInput,
+) -> ExternResult<FeedbackSignalRefs> {
+    let signer_anchor_key = format!("feedback_signer/{}", input.signer_pubkey);
+    let signer_anchor = StringAnchor::new("feedback_signer", &signer_anchor_key);
+    let signer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(signer_anchor))?;
+    let query = LinkQuery::try_new(signer_anchor_hash, LinkTypes::SignerToFeedbackSignal)?;
+    let links = get_links(query, GetStrategy::default())?;
+    refs_from_link_set(links, input.resolve)
+}
+
+/// Return the SIGNED record for one FeedbackSignal action (§1, §3).
+///
+/// The caller verifies from this record, not from the entry payload:
+///   - the returned action hash equals the requested one,
+///   - the entry is the public `FeedbackSignal` variant,
+///   - the entry hash matches the action's entry hash,
+///   - entry BYTES are present (a remote fetch may answer `Hidden`/`NotStored`;
+///     a signed header alone is never evidence),
+///   - the author is `record.action().author()` — `signer_pubkey` in the entry
+///     is coordinator-derived, not integrity-bound to the action author.
+///
+/// `Ok(None)` = not retrievable from THIS peer's DHT view right now. That is a
+/// PENDING condition, never proof of absence.
+#[hdk_extern]
+pub fn get_feedback_signal_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(action_hash, GetOptions::default())
+}
+
+// ---------------------------------------------------------------------------
+// Tests — pure admission helpers (the externs need a conductor: sweettests)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod correction_admission_tests {
+    use super::*;
+
+    fn metadata(op: &str, target: &str, kind: &str, impact: &str) -> String {
+        format!(
+            r#"{{"correctionRequest":{{"operationId":"{op}","targetActionHash":"{target}",
+               "signalKind":"{kind}","standingImpact":"{impact}"}}}}"#
+        )
+    }
+
+    #[test]
+    fn well_formed_request_parses_and_matches() {
+        let md = metadata("op-1", "uhCkkTARGET", "correction", "debit-soft");
+        let req = parse_correction_request(&md).expect("parses");
+        assert_eq!(req.operation_id, "op-1");
+        check_correction_request(&req, "uhCkkTARGET", "correction", "debit-soft").expect("matches");
+    }
+
+    #[test]
+    fn missing_request_object_is_refused() {
+        let err = parse_correction_request("{}").unwrap_err();
+        assert!(err.contains("correctionRequest"), "got: {err}");
+    }
+
+    #[test]
+    fn empty_operation_id_is_refused() {
+        let md = metadata("", "uhCkkTARGET", "correction", "debit-soft");
+        let err = parse_correction_request(&md).unwrap_err();
+        assert!(err.contains("operationId"), "got: {err}");
+    }
+
+    #[test]
+    fn non_json_metadata_is_refused() {
+        let err = parse_correction_request("not json").unwrap_err();
+        assert!(err.contains("valid JSON"), "got: {err}");
+    }
+
+    /// §7: an act whose fields do not match the immutable request is a
+    /// NON-MEMBER, refused — not silently collapsed into the group.
+    #[test]
+    fn mismatched_target_kind_or_impact_is_refused() {
+        let md = metadata("op-1", "uhCkkTARGET", "correction", "debit-soft");
+        let req = parse_correction_request(&md).unwrap();
+        assert!(
+            check_correction_request(&req, "uhCkkOTHER", "correction", "debit-soft").is_err(),
+            "target mismatch must be refused"
+        );
+        assert!(
+            check_correction_request(&req, "uhCkkTARGET", "squelch", "debit-soft").is_err(),
+            "signal_kind mismatch must be refused"
+        );
+        assert!(
+            check_correction_request(&req, "uhCkkTARGET", "correction", "debit-firm").is_err(),
+            "standing_impact mismatch must be refused"
+        );
+    }
+
+    #[test]
+    fn public_reach_whitelist_is_exactly_public_and_commons() {
+        assert!(PUBLIC_EVIDENCE_REACH.contains(&"public"));
+        assert!(PUBLIC_EVIDENCE_REACH.contains(&"commons"));
+        assert!(!PUBLIC_EVIDENCE_REACH.contains(&"private"));
+        assert!(!PUBLIC_EVIDENCE_REACH.contains(&"community"));
+    }
 }

@@ -31,9 +31,19 @@ pub use governance_action::{
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
 pub use feedback_signal::{
-    create_feedback_signal, create_vouch, get_feedback_signals_for_target,
-    list_feedback_signals_by_signer, CreateFeedbackSignalInput, CreateVouchInput,
-    FeedbackSignalRecord,
+    create_feedback_signal, create_vouch, get_feedback_signal_record,
+    get_feedback_signal_refs_for_target, get_feedback_signals_for_target,
+    list_feedback_signal_refs_by_signer, list_feedback_signals_by_signer, CorrectionRequest,
+    CreateFeedbackSignalInput, CreateVouchInput, FeedbackSignalRecord, FeedbackSignalRef,
+    FeedbackSignalRefs, FeedbackSignalRefsBySignerInput, FeedbackSignalRefsForTargetInput,
+};
+
+// Accountable correction (slice 1) — exact-root lineage, explicit-predecessor
+// amendment, and the ONE shared version-DAG total order. Coordinator only.
+pub mod correction;
+pub use correction::{
+    amend_content, get_content_lineage, AmendContentInput, AmendContentPatch, ContentLineageOutput,
+    GetContentLineageInput, LineageCandidate,
 };
 
 // EPR Phase 3.5 T9: AttentionTending coordinator functions.
@@ -266,7 +276,7 @@ fn wire_to_integrity_path(w: &WireLearningPath) -> content_store_integrity::Lear
     }
 }
 
-fn content_to_wire(c: &content_store_integrity::Content) -> WireContent {
+pub(crate) fn content_to_wire(c: &content_store_integrity::Content) -> WireContent {
     WireContent {
         id: c.id.clone(),
         content_type: c.content_type.clone(),
@@ -2817,19 +2827,14 @@ pub struct CarriedRecordOutput {
 /// link in the update chain, so a chain of depth D costs D network round-trips
 /// under `Network`.
 fn resolve_root_author(
-    mut action_hash: ActionHash,
+    action_hash: ActionHash,
     strategy: GetStrategy,
 ) -> ExternResult<Option<AgentPubKey>> {
-    loop {
-        let record = match get(action_hash.clone(), GetOptions::from(strategy))? {
-            Some(r) => r,
-            None => return Ok(None),
-        };
-        match &record.action().data {
-            ActionData::Update(update) => action_hash = update.original_action_address.clone(),
-            _ => return Ok(Some(record.action().author().clone())),
-        }
-    }
+    // ONE walk, not two. `correction::resolve_root_create` returns the root
+    // RECORD (a superset of what this needed) and adds a depth bound, so an
+    // adversarial or cyclic lineage can no longer spin here forever.
+    Ok(correction::resolve_root_create(action_hash, strategy)?
+        .map(|r| r.action().author().clone()))
 }
 
 /// Gather the retrievable IdToContent link-target records for an id plus the
@@ -3126,8 +3131,8 @@ fn run_election(candidates: Vec<CanonicalCandidate>) -> Option<ElectionOutcome> 
 /// [`select_canonical_winner`] arbitrates on) never reached the projection. The
 /// storage heal guard was left comparing head-ACTION timestamps, which are not
 /// declaration times, and refused every forward move it should have taken.
-struct CanonicalHeadAnswer {
-    record: Record,
+pub(crate) struct CanonicalHeadAnswer {
+    pub(crate) record: Record,
     /// The winning declaration LINK's DHT timestamp.
     declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
@@ -3229,7 +3234,7 @@ fn gather_election_candidates(
     Ok(candidates)
 }
 
-fn gather_canonical_head_record(
+pub(crate) fn gather_canonical_head_record(
     id: &str,
     strategy: GetStrategy,
 ) -> ExternResult<Option<CanonicalHeadAnswer>> {
@@ -4171,10 +4176,11 @@ fn resolve_content_head_inner(
         Some(x) => x,
         None => return Ok(None),
     };
-    let head = records
-        .into_iter()
-        .filter(|r| *r.action().author() == root_author)
-        .max_by_key(|r| r.action().timestamp());
+    // TOTAL order, shared with the declare path and `get_content_lineage`
+    // (contract §6). The prior bare `max_by_key(timestamp)` was enumeration-order
+    // dependent on equal timestamps, so two peers holding the same two versions
+    // could serve different heads.
+    let head = correction::pick_authored_head(&records, &root_author).cloned();
     match head {
         Some(record) => Ok(Some(build_content_head_output(id, &record, false)?)),
         None => Ok(None),
@@ -5341,10 +5347,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
     })?;
 
     // Current head = newest author-authored record (same election as resolve).
-    let current_head = records
-        .iter()
-        .filter(|r| *r.action().author() == root_author)
-        .max_by_key(|r| r.action().timestamp())
+    let current_head = correction::pick_authored_head(&records, &root_author)
         .cloned()
         .ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(format!(
@@ -8482,7 +8485,7 @@ fn path_exists_by_id(id: &str) -> ExternResult<bool> {
 // Link Helper Functions
 // =============================================================================
 
-fn create_id_to_content_link(id: &str, target: &ActionHash) -> ExternResult<()> {
+pub(crate) fn create_id_to_content_link(id: &str, target: &ActionHash) -> ExternResult<()> {
     let anchor = StringAnchor::new("content_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(anchor_hash, target.clone(), LinkTypes::IdToContent, ())?;
