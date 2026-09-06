@@ -2283,6 +2283,27 @@ impl HttpServer {
                 }
             }
 
+            // Accountable-correction submission outbox (contract §8). Matched
+            // before the /api/v1/ catch-all so the content-cell client is
+            // injected directly. Two-phase, single-flight, immutable request.
+            (method, p) if p.starts_with("/api/v1/feedback/operations") => {
+                if let Some(ref pool) = self.db_pool {
+                    let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
+                    crate::api::feedback_operations::handle(
+                        req,
+                        method,
+                        p,
+                        pool,
+                        hc_lamad.as_ref(),
+                    )
+                    .await
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — /api/v1/feedback/operations unavailable",
+                    ))
+                }
+            }
+
             // Acquisition DevicePins (spec §1.1, §4.4) — OWN NODE ONLY.
             // Deliberately absent from build_manifest(); a doorway MUST NEVER
             // serve another agent's pins. Matched before the /api/v1/ catch-all
@@ -14822,6 +14843,20 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/api/v1/signal/emit")
                 .handler("signal_emit")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/feedback — accountable-correction submission outbox (§8)
+        // =====================================================================
+        // Declared so a doorway RouteRegistry learns it is proxiable
+        // (single-target, as always). The outbox is LOCAL DURABLE INTENT: it
+        // records what this cell meant to do before the act exists on chain,
+        // so a lost response is recovered by lookup rather than by a blind
+        // retry that would mint a second act.
+        .route(
+            Route::post("/api/v1/feedback/operations")
+                .handler("feedback_operation_create")
                 .auth_required()
                 .build(),
         )

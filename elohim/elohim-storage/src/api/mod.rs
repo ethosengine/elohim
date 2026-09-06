@@ -33,6 +33,10 @@ pub mod diagnostics_mutuality;
 pub mod economic_events;
 pub mod epr;
 pub mod exchange;
+/// The submission outbox — POST /api/v1/feedback/operations (accountable
+/// correction §8). Two-phase submission whose first phase is content-addressed
+/// by the operation id, so recovery after a lost response is a lookup.
+pub mod feedback_operations;
 pub mod flow_planning;
 pub mod gate;
 pub mod governance;
