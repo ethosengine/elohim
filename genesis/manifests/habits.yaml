@@ -2897,6 +2897,20 @@ habits:
       resolving the head (their `/admin/adoption` is storage-local; a doorway-projected adoption summary is the missing
       observability node). The `retire-when` fleet leg — three coordinator releases REACHING the fleet by election — needs the
       =observe→canary/apply data flip the operator holds; this receipt is what that flip was waiting on.
+
+      STABILITY 2026-09-06 07:1xZ (workspace→fleet, four releases on ONE long-lived channel across a fleet redeploy; receipts
+      `genesis/a2o/reports/workspace-release/2026-09-06/shift-it{2,5,6,7}.json`): it2 5/5 (04:39Z, edge #1432 fleet) · edge #1434
+      redeployed alpha (fresh trigger, 06:1xZ) · it5 4/5 — the SECOND release on `runtime:coordinators:elohim:workspace` was
+      refused `lineage_parent_mismatch` (envelope declared no parent; the channel chain supersedes release 1) · driver cure
+      9f2856b48: `epr-release-package.ts` derives `lineageParentCid` from the workspace peer's own `/admin/adoption`
+      resolvedHead (explicit `--lineage-parent` wins, `--first-release` opts out) · it6 5/5 (71 s) · it7 5/5 (81 s) — two
+      consecutive passes on the cured driver, releases 3 and 4 each naming the head they supersede, every one verifying `ok`
+      against the fleet's declared reality with appliedRelease null on a fleet that follows at observe. The `checks:` line's
+      scope now reads: Stations 1–9 on the household mesh AND Stations 1–5 workspace→fleet (observe rung) on alpha. Seam
+      closed at the driver, not the fixture: a long-lived channel's Nth release names its parent by construction
+      (the household sibling had cured the same refusal at its fixture, 5e4d97633). Task 4 of
+      `2026-09-05-rung5-workspace-orchestration-plan.md` has its deliverable receipt (a plan checkbox flip is the integrator's).
+      Status **green**; the fleet leg of `retire-when` still waits on the operator's =observe→canary data flip.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
