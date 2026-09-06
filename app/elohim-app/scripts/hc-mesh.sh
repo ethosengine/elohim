@@ -492,7 +492,8 @@ write_ark_declarations() { # <peer-name> <peer-index>
       stdin: "passphrase",
       readiness: [
         { stdout_line: { contains: "Conductor ready.", patience_ms: 120000 } },
-        { tcp_listen: { port_key: "admin_ws", patience_ms: 30000 } }
+        { tcp_listen: { port_key: "admin_ws", patience_ms: 30000 } },
+        { executable_identity: { patience_ms: 5000 } }
       ],
       policy: { shutdown: { signal: 2, grace_ms: 20000 } }
     }]

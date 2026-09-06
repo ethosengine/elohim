@@ -22,6 +22,10 @@ retire-when: >
   in the arc doc — the CI roll is then no longer a delivery path for the class and the
   register describes a product, not a practice.
 ---
+DELTA 2026-09-06: Nachalah #1a's non-actuating signed candidate/compatibility contract passed `just gate elohim-ark` (EXIT=0, 126 tests) and independent review; report `genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md`. Grant proof/current revocation (#1b), activation, rollback and repeated household ceremonies remain open; no adoption or earned-arc claim is added.
+
+DELTA 2026-09-05 (Nachalah prerequisite): `just gate elohim-ark` passes 120 tests including kernel-observed executable identity and witnessed readiness failure; `hc-mesh.sh` declares the identity rung. This is not a conductor-adoption or rollback receipt; the existing coordinator-only green scope is unchanged and `nachalah-allotment` remains unwired.
+
 DELTA 2026-09-02 00:43Z (local mesh receipt, r2 channel; transcript
 `genesis/a2o/reports/release-ceremony/2026-09-01/transcript.md`): the full §10 chain
 PASSED by hand-composed drivers — publish→3/3 staged ≤19 s; canary (james, mode
@@ -123,3 +127,5 @@ DELTA 2026-09-05 (a peer joins a channel through its own API). rung-5 Task 2 (ee
 runtime-config (temp + rename), reloads, refuses malformed ids/modes by name, 503 without a watched file;
 both delivery fixtures enrol through the route (byte-restore kept as the safety net); unit tests for the
 line rewrite. Stations 1–9 re-measured on the rebuilt mesh next. Status unchanged.
+
+DELTA 2026-09-06 (Nachalah #1b-a, exact signed grant record): coordinator ActionHash readback and acting-node action/entry/author authentication verified; full storage gate 4386 passed / 0 failed / 59 ignored, focused coordinator test 1 passed, schema-DNA / manifest-hygiene / sweettest-check green, independent review approved. Preserved app prerequisite gate: 4570 tests passed. Evidence: genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md. Status and scope unchanged: full delegation authority/freshness, activation, automatic rollback and both household upgrade runs remain open; earned-arc actuation remains disabled.

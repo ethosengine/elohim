@@ -34,6 +34,7 @@ pub mod capacity_pledge_author; // Explicit Class-A commons-capacity pledge via 
 pub mod capacity_reporter; // Periodic local capacity reporter — measures + upserts custodian_metrics, sets the cluster-capacity gauges
 pub mod cluster_view;
 pub mod commitment_fetcher;
+pub mod commitment_record;
 pub mod concentration_service;
 pub mod conductor_commitment_author; // Slice-2b — production CommitmentAuthor (conductor-backed provide loop)
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls

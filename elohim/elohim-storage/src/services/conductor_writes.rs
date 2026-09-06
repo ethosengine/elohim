@@ -2180,3 +2180,28 @@ mod batch_wire_contract_tests {
         assert!(!is_unknown_function_error(&ws));
     }
 }
+
+/// Read and authenticate one exact notarized grant using independently provisioned pins.
+/// This does not establish current authority or non-revocation.
+pub async fn get_authenticated_commitment_record(
+    hc: &Arc<HcClient>,
+    pins: super::commitment_record::CommitmentRecordPins,
+) -> Result<Option<super::commitment_record::AuthenticatedCommitmentRecord>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&pins.action_hash)
+        .map_err(|e| StorageError::Serialization(format!("encode commitment ActionHash: {e}")))?;
+    let bytes = hc
+        .call_zome_mishpat(MISHPAT_ZOME, "get_commitment_record", payload)
+        .await
+        .map_err(|e| {
+            if is_unknown_function_error(&e) {
+                StorageError::Conductor(
+                    "mishpat coordinator does not expose get_commitment_record — coordinator \
+                     not updated"
+                        .to_string(),
+                )
+            } else {
+                e
+            }
+        })?;
+    super::commitment_record::verify_commitment_record(&bytes, pins)
+}

@@ -25,6 +25,8 @@ retire-when: >
   build with no developer-shaped tool in the path — the habit then describes the runtime, not a
   storage feature.
 ---
+DELTA 2026-09-05: `just gate elohim-ark` passes 120 tests; a readiness timeout now remains a ReadinessFailed state until death is witnessed and judged by the restart governor, instead of closing as an intentional successful stop. Kernel executable identity is a new explicit readiness rung; custody/attestation delivery remains outside this local proof.
+
 DELTA 2026-09-02 (BORN red — design canonized, nothing built; the census refuses `unwired` when a
 runnable check is declared, and two are: the a2o concern is declared with every station @wip, and
 the cargo leg proves only the classifier — so the invariant is measured NOT held, which is red).

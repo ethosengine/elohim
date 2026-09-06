@@ -555,6 +555,11 @@ shows `conductor(ark) <peer> pid= incarnation= ready=` rows. Two refusals are ne
 `start_all` refuses to wipe a data root while an ark or conductor pid survives, and a peer's
 `incarnation` read-back from an existing passport is fail-closed (malformed passport → that peer's
 launch aborts). Toolchain parity is skipped in ark mode (like `direct`); `jq` is required.
+The conductor readiness ladder ends by hashing the kernel-observed executable (`/proc/<pid>/exe`)
+and comparing it with the manifest pin; a staged replacement path is not running identity.
+Rebuild ark before using a mesh script that declares `executable_identity`: older arks refuse
+the unknown probe. A failed readiness rung is witnessed and judged by restart policy rather
+than reported as an intentional successful stop. This does not implement binary adoption or rollback.
 Death drill: `kill -9 $(mesh_conductor_pid jessica)` then
 `$ARK_BIN witness ls --berth elohim/holochain/local-dev/jessica/ark/berth.json` (witness within ~1 s;
 the ark restarts the conductor; the ark's incarnation is unchanged). Rolling the arks onto a new binary:

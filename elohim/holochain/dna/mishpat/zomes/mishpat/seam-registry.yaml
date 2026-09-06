@@ -1,0 +1,152 @@
+seamRegistryVersion: 1
+crate: mishpat
+crateRoot: elohim/holochain/dna/mishpat/zomes/mishpat
+seamLocus: Exact signed Commitment readback coordinator; grant-authority and activation are separate unbound
+  decisions.
+decisionPoints:
+- name: get_commitment_record
+  kind: verdict-fn
+  sourceLocation:
+    file: src/commitment_record.rs
+    modulePath: commitment_record::get_commitment_record
+    line: 7
+  summary: Exact ActionHash coordinator read preserving signed Record for independent acting-node authentication.
+    No new entries, heads or authority.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Notarized immutable action/entry identity is verified at the acting node; storage is
+      not authority.
+  - id: C1
+    status: n-a
+    justification: This verifier neither elects heads nor authors candidates.
+  - id: C2
+    status: n-a
+    justification: No authority ordering or head move is performed.
+  - id: C3
+    status: partial
+    justification: Pure readback can be retried by a future supervisor; activation state machine remains
+      open.
+  - id: C4
+    status: answered
+    justification: None means conductor could not return the record; malformed and unverifiable evidence
+      returns error, never authority or non-revocation.
+  - id: C5
+    status: partial
+    justification: Coordinator recomputes action/entry identity and checks app definition; actual signature
+      is independently verified by storage services::commitment_record. This read alone confers nothing.
+  - id: C6a
+    status: partial
+    justification: One exact get, no sweep or retry; ordinary DNA entry limits apply here. Acting-node
+      wire input is capped at 256 KiB before decode/crypto.
+  - id: C6b
+    status: answered
+    justification: Read-only verification has no persistent or process effects on replay.
+  - id: C7
+    status: partial
+    justification: 'Authenticates immutable content only; supervisor wiring and full authority remain
+      open at #1b-b.'
+  - id: C8
+    status: unbound
+    justification: Typed decision meters are deferred to the acting supervisor; this prerequisite returns
+      errors without production counters.
+  - id: C9
+    status: partial
+    justification: 'Exact historical Holochain author pin is required; no cross-namespace issuer or rotated-key
+      equivalence is inferred. Lineage binding remains #1b-b.'
+  - id: C10
+    status: partial
+    justification: 'Scoped Commitment entry index is derived from the integrity enum. Full grant payload
+      schema validation remains #1b-b.'
+  - id: C11
+    status: partial
+    justification: Input crypto work is byte-bounded and existing conductor admission is reused; counted
+      supervisor degradation policy remains open.
+  - id: C12
+    status: unbound
+    justification: 'Full grant authority, issuer/recipient/scope/validity and fresh non-revocation remain
+      #1b-b. AuthenticatedCommitmentRecord confers no activation permission.'
+  - id: C13
+    status: n-a
+    justification: Constitutional record signature and identity checks have no lower-social-tier exception.
+  - id: C14
+    status: unbound
+    justification: Errors reach caller; witnessed residual context capsules and supervisor RCA disposition
+      remain open with activation.
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/commitment_record.rs
+    testName: exact_read_requires_commitment_create_type_and_present_entry
+    kind: unit
+- name: is_commitment_create
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/commitment_record.rs
+    modulePath: commitment_record::is_commitment_create
+    line: 41
+  summary: 'Private shape predicate bound only inside exact signed readback: Create, current scoped Commitment
+    app type, public visibility and present app entry. This shape check alone proves no signature or authority.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Notarized immutable action/entry identity is verified at the acting node; storage is
+      not authority.
+  - id: C1
+    status: n-a
+    justification: This verifier neither elects heads nor authors candidates.
+  - id: C2
+    status: n-a
+    justification: No authority ordering or head move is performed.
+  - id: C3
+    status: partial
+    justification: Pure readback can be retried by a future supervisor; activation state machine remains
+      open.
+  - id: C4
+    status: answered
+    justification: None means conductor could not return the record; malformed and unverifiable evidence
+      returns error, never authority or non-revocation.
+  - id: C5
+    status: partial
+    justification: Coordinator recomputes action/entry identity and checks app definition; actual signature
+      is independently verified by storage services::commitment_record. This read alone confers nothing.
+  - id: C6a
+    status: partial
+    justification: One exact get, no sweep or retry; ordinary DNA entry limits apply here. Acting-node
+      wire input is capped at 256 KiB before decode/crypto.
+  - id: C6b
+    status: answered
+    justification: Read-only verification has no persistent or process effects on replay.
+  - id: C7
+    status: partial
+    justification: 'Authenticates immutable content only; supervisor wiring and full authority remain
+      open at #1b-b.'
+  - id: C8
+    status: unbound
+    justification: Typed decision meters are deferred to the acting supervisor; this prerequisite returns
+      errors without production counters.
+  - id: C9
+    status: partial
+    justification: 'Exact historical Holochain author pin is required; no cross-namespace issuer or rotated-key
+      equivalence is inferred. Lineage binding remains #1b-b.'
+  - id: C10
+    status: partial
+    justification: 'Scoped Commitment entry index is derived from the integrity enum. Full grant payload
+      schema validation remains #1b-b.'
+  - id: C11
+    status: partial
+    justification: Input crypto work is byte-bounded and existing conductor admission is reused; counted
+      supervisor degradation policy remains open.
+  - id: C12
+    status: unbound
+    justification: 'Full grant authority, issuer/recipient/scope/validity and fresh non-revocation remain
+      #1b-b. AuthenticatedCommitmentRecord confers no activation permission.'
+  - id: C13
+    status: n-a
+    justification: Constitutional record signature and identity checks have no lower-social-tier exception.
+  - id: C14
+    status: unbound
+    justification: Errors reach caller; witnessed residual context capsules and supervisor RCA disposition
+      remain open with activation.
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/commitment_record.rs
+    testName: exact_read_requires_commitment_create_type_and_present_entry
+    kind: unit

@@ -39,3 +39,4 @@ retire-when: >
   by construction — so a NEW plane is enforced the moment it exists, rather than after
   someone remembers to gate it. The per-plane gate is what this habit is really watching.
 ---
+DELTA 2026-09-05: `nachalah-allotment.feature` now declares household outsider exclusion, blind custody without plaintext/metadata access, witnessed promotion, and selective carry boundaries; all are @wip, so no additional egress enforcement is claimed and RED is preserved.

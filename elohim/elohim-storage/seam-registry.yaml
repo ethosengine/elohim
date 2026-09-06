@@ -3459,3 +3459,192 @@ decisionPoints:
       - path: elohim/elohim-storage/src/app_deliverability.rs
         testName: a_root_relative_ref_resolves_at_the_bundle_root_for_a_nested_index
         kind: unit
+
+  - name: verify_commitment_record
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/commitment_record.rs
+      modulePath: services::commitment_record::verify_commitment_record
+      line: 50
+    summary: 'Exact notarized grant record authentication, no activation permission or fresh non-revocation.
+      Parent nachalah-supervised-activation#1b and #1b-b remain open.'
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Notarized immutable action/entry identity is verified at the acting node; storage is
+        not authority.
+    - id: C1
+      status: n-a
+      justification: This verifier neither elects heads nor authors candidates.
+    - id: C2
+      status: n-a
+      justification: No authority ordering or head move is performed.
+    - id: C3
+      status: partial
+      justification: Pure readback can be retried by a future supervisor; activation state machine remains
+        open.
+    - id: C4
+      status: answered
+      justification: None means conductor could not return the record; malformed and unverifiable evidence
+        returns error, never authority or non-revocation.
+    - id: C5
+      status: answered
+      justification: Recomputes action and entry hashes and verifies Ed25519 signature on serialized Action
+        against independently supplied pins.
+    - id: C6a
+      status: answered
+      justification: One exact conductor get; verifier rejects wire payloads above 256 KiB before decode/hash/crypto,
+        with no retry loop.
+    - id: C6b
+      status: answered
+      justification: Read-only verification has no persistent or process effects on replay.
+    - id: C7
+      status: partial
+      justification: 'Authenticates immutable content only; supervisor wiring and full authority remain
+        open at #1b-b.'
+    - id: C8
+      status: unbound
+      justification: Typed decision meters are deferred to the acting supervisor; this prerequisite returns
+        errors without production counters.
+    - id: C9
+      status: partial
+      justification: 'Exact historical Holochain author pin is required; no cross-namespace issuer or rotated-key
+        equivalence is inferred. Lineage binding remains #1b-b.'
+    - id: C10
+      status: partial
+      justification: 'Typed Record parsing and source-pinned entry definition detect malformed records and
+        index drift; future grant payload schema validation remains #1b-b.'
+    - id: C11
+      status: partial
+      justification: Input crypto work is byte-bounded and existing conductor admission is reused; counted
+        supervisor degradation policy remains open.
+    - id: C12
+      status: unbound
+      justification: 'Full grant authority, issuer/recipient/scope/validity and fresh non-revocation remain
+        #1b-b. AuthenticatedCommitmentRecord confers no activation permission.'
+    - id: C13
+      status: n-a
+      justification: Constitutional record signature and identity checks have no lower-social-tier exception.
+    - id: C14
+      status: unbound
+      justification: Errors reach caller; witnessed residual context capsules and supervisor RCA disposition
+        remain open with activation.
+    contractTests:
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: exact_signed_record_authenticates_without_authority_or_effect
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: identical_entry_from_another_author_is_not_the_pinned_act
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: tampered_action_entry_signature_and_cached_hash_are_refused
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: independent_pins_are_all_enforced
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: wrong_type_update_delete_and_missing_entry_are_refused
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: malformed_oversized_and_absent_inputs_have_distinct_results
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: commitment_definition_matches_independent_integrity_source_and_manifest
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: correctly_signed_malformed_commitment_content_is_refused
+      kind: unit
+  - name: AuthenticatedCommitmentRecord
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/services/commitment_record.rs
+      modulePath: services::commitment_record::AuthenticatedCommitmentRecord
+      line: 24
+    summary: Private-field, non-deserializable authenticated immutable record. Read-only accessors expose
+      exact content and independently provisioned pins, never activation authority.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Notarized immutable action/entry identity is verified at the acting node; storage is
+        not authority.
+    - id: C1
+      status: n-a
+      justification: This verifier neither elects heads nor authors candidates.
+    - id: C2
+      status: n-a
+      justification: No authority ordering or head move is performed.
+    - id: C3
+      status: partial
+      justification: Pure readback can be retried by a future supervisor; activation state machine remains
+        open.
+    - id: C4
+      status: answered
+      justification: None means conductor could not return the record; malformed and unverifiable evidence
+        returns error, never authority or non-revocation.
+    - id: C5
+      status: answered
+      justification: Recomputes action and entry hashes and verifies Ed25519 signature on serialized Action
+        against independently supplied pins.
+    - id: C6a
+      status: answered
+      justification: One exact conductor get; verifier rejects wire payloads above 256 KiB before decode/hash/crypto,
+        with no retry loop.
+    - id: C6b
+      status: answered
+      justification: Read-only verification has no persistent or process effects on replay.
+    - id: C7
+      status: partial
+      justification: 'Authenticates immutable content only; supervisor wiring and full authority remain
+        open at #1b-b.'
+    - id: C8
+      status: unbound
+      justification: Typed decision meters are deferred to the acting supervisor; this prerequisite returns
+        errors without production counters.
+    - id: C9
+      status: partial
+      justification: 'Exact historical Holochain author pin is required; no cross-namespace issuer or rotated-key
+        equivalence is inferred. Lineage binding remains #1b-b.'
+    - id: C10
+      status: partial
+      justification: 'Typed Record parsing and source-pinned entry definition detect malformed records and
+        index drift; future grant payload schema validation remains #1b-b.'
+    - id: C11
+      status: partial
+      justification: Input crypto work is byte-bounded and existing conductor admission is reused; counted
+        supervisor degradation policy remains open.
+    - id: C12
+      status: unbound
+      justification: 'Full grant authority, issuer/recipient/scope/validity and fresh non-revocation remain
+        #1b-b. AuthenticatedCommitmentRecord confers no activation permission.'
+    - id: C13
+      status: n-a
+      justification: Constitutional record signature and identity checks have no lower-social-tier exception.
+    - id: C14
+      status: unbound
+      justification: Errors reach caller; witnessed residual context capsules and supervisor RCA disposition
+        remain open with activation.
+    contractTests:
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: exact_signed_record_authenticates_without_authority_or_effect
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: identical_entry_from_another_author_is_not_the_pinned_act
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: tampered_action_entry_signature_and_cached_hash_are_refused
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: independent_pins_are_all_enforced
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: wrong_type_update_delete_and_missing_entry_are_refused
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: malformed_oversized_and_absent_inputs_have_distinct_results
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: commitment_definition_matches_independent_integrity_source_and_manifest
+      kind: unit
+    - path: elohim/elohim-storage/src/services/commitment_record.rs
+      testName: correctly_signed_malformed_commitment_content_is_refused
+      kind: unit

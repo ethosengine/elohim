@@ -16,6 +16,8 @@ retire-when: >
   silent and irreversible — nobody reports the blob they can no longer fetch — which is
   exactly the class that must not depend on someone remembering to look.
 ---
+DELTA 2026-09-05: `nachalah-allotment.feature` declares device-loss and household-loss reconstruction and the seven-diverse-hub gold floor as @wip acceptance obligations; ark identity tests provide no new reconstruction or physical-diversity evidence, so the existing measured green scope is unchanged.
+
 DELTA 2026-09-01 (GREEN preserved; sequential-chunk restart receipt):
 `@chunked-restart` PUT a deterministic 17 MiB artifact to matthew, restarted
 the actual storage process, then proved the composite GET byte-identical —

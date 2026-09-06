@@ -108,7 +108,134 @@ gap-item/valueflow machinery:
 These observations do not fulfil any household ceremony or rollback acceptance.
 Earned-arc actuation remains disabled.
 
+## Delegation proof continuation — 2026-09-06
+
+Base `7f95ac47f` contains the signed candidate increment. Station #1b decomposes
+into two measured prerequisites, leaving its original acceptance intact:
+
+- **#1b-a, exact signed grant record:** resolve the exact Commitment Create
+  ActionHash, preserve its signed action, and independently verify author,
+  ActionHash, EntryHash and entry definition at the acting node. Probe: two
+  authors create identical entry bytes; only the independently pinned exact
+  record succeeds, and altered actions, entries and signatures are refused.
+  Implementation brief: `task-nachalah-grant-record-brief.md`; gate and review
+  evidence: `task-nachalah-grant-record-report.md`. The report bounds completion
+  to this non-actuating substation. The legacy entry-hash read's assumption that
+  immutable entries have only one authoring action is false. Holochain signs serialized Action bytes,
+  not the ActionHash or a JSON re-encoding; signed fixtures preserve that
+  constraint independently of the verifier.
+- **#1b-b, authority and fresh status at stop:** bind provider/recipient, exact
+  candidate target scope and validity, then require authenticated fresh status
+  before process mutation. Probe: absent, stale, forged or revoked evidence
+  leaves the incumbent PID unchanged. Empty DHT lifecycle results are not proof
+  of non-revocation: gossip may omit a valid revocation, and existing lifecycle
+  tags carry discoverability rather than authority. An issuer-signed status
+  snapshot still has a revocation race; any bounded lease must declare its
+  outstanding-lease semantics rather than silently delay immediate revocation.
+
+The decomposition ruling is recorded on #1b with `epr flow note`. Neither new
+substation is a new release controller or permission to activate earned arcs.
+No household processes have been changed during this continuation.
+
+Tooling prerequisite reproduced and locally resolved: the globally selected pnpm
+attempts to create `/nix/xdg/cache/pnpm/store/v11` and fails. Corepack with
+`COREPACK_HOME=/tmp/nachalah-corepack` runs the repository's pinned pnpm `10.30.3`;
+`/tmp/nachalah-bin/pnpm` is a session-local wrapper for gate execution. This is
+tool availability evidence only, not an app gate pass.
+
+Preservation checks during this continuation: package projections passed all
+1,772 checks across 88 packages (`/tmp/nachalah-continuation-packages.log`), habit
+projection `--check` passed, `epr check` returned exit 0 with local advisories,
+the mesh script passed `bash -n`, and all 20 existing Nachalah scenarios/outlines
+parsed. The scenarios were not executed and their `@wip` tags remain intact.
+
 ## Current implementation boundaries
+
+### Authority/status audit — 2026-09-06 continuation
+
+Read-only implementation audit at `8c32aa11e` confirms two missing nodes inside
+#1b-b. These are source findings, not passing runtime probes. The exact-record
+implementation and its reported gate/review evidence remain preserved and
+uncommitted; no household process was changed in this audit.
+
+- **#1b-b-identity**, between exact-record authentication and authority evaluation:
+  authenticate the grant author's binding to the provider identity, the acting
+  peer's binding to the recipient, and the candidate signer's delegated standing.
+  Probe: each missing or mismatched binding leaves the incumbent PID and source
+  chains unchanged. Current state: **unimplemented**. `CandidatePin::signer` is
+  an Agent EPR CID; `AuthenticatedCommitmentRecord::author` is a Holochain key.
+  `p2p/binding_proof_wire.rs::classify_binding_signature` verifies transport/key
+  control but explicitly cannot classify Agent EPR CIDs. Neither raw identifier
+  equality nor a projected identity row supplies the missing authority/lineage.
+- **#1b-b-ordering**, between authenticated authority/status and process stop:
+  establish an explicit rule ordering revocation against the first destructive
+  process action. Probe: revoke after an authentic active-status response but
+  before stop, with gossip delayed; a response alone leaves the incumbent PID
+  unchanged. Current state: **unimplemented; semantics unresolved**. Immediate
+  revocation needs a shared ordering boundary; bounded outstanding permits change
+  revocation semantics and require an explicit decision. This audit authorizes
+  neither a permit nor an activation path.
+
+### Ruling — the stop-boundary contract (2026-09-06, orchestrator)
+
+**Revocation dominates. Permits are not bearer instruments.** A `delegates-compute`
+grant is a bounded, revocable commitment; a permit, lease, or positive status
+response is a *claim against* that commitment, never a second commitment, so it
+inherits the grant's liveness. Expiry is the ceiling on a claim's life and
+revocation is its floor. Therefore:
+
+1. **Revocation cancels every not-yet-started activation.** There are no
+   outstanding-lease semantics: nothing issued before a revocation stays usable
+   after it. (An outstanding lease makes revocation's effective time
+   `max(remaining lease)`, which this audit already names as silently delaying
+   immediate revocation. In this protocol the grantor holds the arc; the acting
+   node's authority is the bounded thing.)
+2. **The stop boundary is the first destructive process action against the
+   incumbent.** The ordering rule: authenticated fresh grant status is the LAST
+   check inside that boundary — after identity bindings, compatibility and
+   staging, immediately before the stop signal. Fresh means an issuer-signed
+   positive assertion ("active at T") with T later than the activation's own
+   decision time and later than every revocation this peer has seen. An empty
+   search, an unsigned or aged assertion, or a forged one is `unavailable`:
+   refuse, incumbent PID and chains unchanged (the outline rows stand as written).
+3. **The residual race is closed by reversibility, not by a permit.** Revoke
+   after a fresh positive status but before the stop, with gossip delayed, is
+   irreducible in a distributed system. The ark's activation witness records the
+   grant ActionHash and the exact status assertion it acted on; an authenticated
+   revocation that arrives later with a notarized time before the recorded stop
+   is a *late revocation* and MUST trigger local rollback to the retained
+   previous runtime (Station 3 machinery), attested through the evidence path.
+   The window shrinks to gossip delay, the exercise is reverted, and a record
+   remains — an authority leak becomes a witnessed, reverted act.
+4. **An activation whose destructive action has begun runs to the next safe
+   stop** (never a half-killed incumbent), then the same rule applies.
+
+Consequence for the story: "A signed status response cannot conceal a revocation
+before stop" currently expects refusal because no ordering rule exists. Under this
+ruling a fresh positive status inside the window DOES authorize the stop, and the
+late revocation produces rollback plus attestation. Reshape that scenario so its
+finish line is "James's conductor runs the previous release again, and both the
+late revocation and the status it superseded are attested"; the refusal outline
+keeps its five rows. Route the `#1b-b-identity` bindings through the
+`identity-cross-signed` habit's home (imagodei device/agent attestation), not a
+new binding type in ark or storage.
+
+Concrete reuse limits: `services/commitment_fetcher.rs` reads `revoked_at` from
+the original immutable payload in its conductor path, or from mutable SQLite in
+its projection path. Revocations are separate `revokes-commitment` entries.
+`mishpat/src/commitments.rs` validates non-lineage revocation target/time without
+binding its author to the grant provider and emits no lifecycle-discovery links
+for that class. Existing lifecycle tags are discoverability hints, not authority.
+An authenticated positive revocation can justify refusal; absent search results
+cannot justify permission. `services/bounds_validator.rs` also does not compare
+its event performer to the fetched recipient; it cannot alone discharge the
+recipient-binding prerequisite. Preserve the shared bounds-validator home when
+addressing that gap rather than duplicating its scope/reach/rate policy.
+
+Three new `@wip` scenarios/outlines in `nachalah-allotment.feature` preserve these
+refusal requirements before the existing household finish-line scenario. They
+are specifications only; identity, authority, freshness, activation, rollback,
+and both household ceremony runs remain open. Earned-arc actuation stays disabled.
 
 | Concern | Existing home and what to reuse | Missing work |
 |---|---|---|

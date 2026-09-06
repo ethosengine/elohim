@@ -13,6 +13,7 @@ const LAMAD_ROLE: &str = "lamad";
 pub mod bootstrap_steward;
 
 // Commitment coordinator — REA compute delegation primitive (Z.D deploy flow).
+pub mod commitment_record;
 pub mod commitments;
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
@@ -482,8 +483,9 @@ pub struct GetCommitmentOutput {
 /// `dht_anchor_hash`. Used by `ConductorCommitmentFetcher::fetch` (Slice 2b T1).
 ///
 /// `get(EntryHash, ..)` returns the oldest live record for the content address;
-/// Commitments are immutable (see `validate_update_entry`), so there is exactly
-/// one. `None` when the entry is not yet on this conductor's DHT view.
+/// Immutability does not imply one authoring act: different authors may create
+/// identical bytes. Use `get_commitment_record` for exact provenance.
+/// `None` when the entry is not yet on this conductor's DHT view.
 #[hdk_extern]
 pub fn get_commitment(cid: String) -> ExternResult<Option<GetCommitmentOutput>> {
     let entry_hash = EntryHash::try_from(cid.clone()).map_err(|_| {
