@@ -367,3 +367,19 @@ Gaps:
 - 2026-09-05 — epic planted from the operator's sidebar after the sunset partition finding
   (companion §11.4). Brand *Nachalah*, name *Allotment*. Boundary with the companion recorded in
   frontmatter `boundary:`. Status Draft; nothing decomposed yet — the first plan waits on §6 step 1.
+
+### Placement rule — holons are spaces; content declares its space (ruling 2026-09-06)
+
+The operator asked whether "arc policy must never live in DNA modifiers" is a hard constraint, given that a holonic
+architecture needs declarable arcs. Ruling: the constraint is on the mechanism (a DNA property is hashed into the DNA
+hash, so a policy change would partition the network); the goal is met by Holochain's own holonic primitive one level
+up. **The unit of arc is the space** — a DNA plus its network seed, minted by clone cells with the same integrity rules
+and no reinstall. Content's "arc" is therefore two declarations: which holon (space) it lives in, and the holding floor
+that holon owes it; each holon's members hold it at the arc the trust gradient allots (the gold/deeds/paper tiers above
+are spaces, promotion is a witnessed re-publish into the wider space). Verified on the 0.7 fleet line (fork 25dd2d0be):
+the conductor still clamps a peer's target arc to full-or-zero per space ("not yet allowed until sharding is
+implemented"), while kitsune2 0.5.1 already carries arcs as ranges — so fractional arcs *inside* a space are the fork
+item (§11.3's arc-policy hook), an optimization within a holon, not the architecture. The immediate gossip cost
+(thousands of fixture EPRs at full arc on every peer) is cured without a fork: fixtures and household working notes get
+their own clone spaces and non-stewards follow them at zero arc. The EPR-native arc work therefore targets space
+placement + per-space {0,1} policy first; per-entry arc knobs are out.
