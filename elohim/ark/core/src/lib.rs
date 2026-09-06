@@ -5,6 +5,7 @@
 //! is the only ARK construction site for sidecar stores.
 
 pub mod berth;
+pub mod candidate;
 pub mod exit;
 pub mod intent;
 pub mod lifecycle;
@@ -48,6 +49,7 @@ mod boundary {
     /// `boundary_scan_covers_every_module` keeps this list honest as modules are added.
     const SOURCES: &[(&str, &str)] = &[
         ("berth.rs", include_str!("berth.rs")),
+        ("candidate.rs", include_str!("candidate.rs")),
         ("exit.rs", include_str!("exit.rs")),
         ("intent.rs", include_str!("intent.rs")),
         ("lib.rs", include_str!("lib.rs")),

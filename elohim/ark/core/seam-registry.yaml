@@ -278,3 +278,282 @@ decisionPoints:
     - path: elohim/ark/supervisor/tests/supervise_death.rs
       testName: service_readiness_cannot_certify_a_different_executable
       kind: integration
+
+  - name: authenticate_candidate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/candidate.rs
+      modulePath: ark_core::candidate::authenticate_candidate
+      line: 191
+    summary: Non-actuating authenticated candidate content; notarized activation authority is deliberately
+      unavailable.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Pure candidate content validation only; authentic content test proves repeatable
+        output, no process effect or election API.
+    - id: C1
+      status: partial
+      justification: Expected elected release is supplied independently and exact-match checked. Election
+        itself remains the existing storage watcher, not exercised here.
+    - id: C2
+      status: partial
+      justification: Independent predecessor and berth incarnation refuse stale content. This is not
+        a channel election clock; notarized ordering remains upstream.
+    - id: C3
+      status: n-a
+      justification: Single terminating pure function; no process lifecycle, retry state or supervisor
+        integration exists.
+    - id: C4
+      status: partial
+      justification: Malformed, wrong-target, invalid-proof and incompatibility are distinct refusals.
+        Observations must be independently acquired; no unavailable-state acquisition is claimed.
+    - id: C5
+      status: answered
+      justification: Tamper test mutates signed bytes then even repairs CID; signature still refuses.
+        Independent wrong key and issuer also refuse.
+    - id: C6a
+      status: answered
+      justification: Input payload and variable envelope fields are bounded before decoding and verification;
+        oversized payload test pins refusal.
+    - id: C6b
+      status: answered
+      justification: Repeat authentication gives identical content and CID with no effect-producing
+        interface.
+    - id: C7
+      status: partial
+      justification: Return type explicitly authenticates candidate content only; supervisor staging/activation
+        remains unwired.
+    - id: C8
+      status: partial
+      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
+        counters require an eventual consumer.
+    - id: C9
+      status: partial
+      justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
+        live identity continuity is outside this non-actuating seat.
+    - id: C10
+      status: answered
+      justification: Pinned schema/domain and deny_unknown_fields refuse unsupported contracts; independently
+        signed unknown-field fixture verifies refusal.
+    - id: C11
+      status: n-a
+      justification: No queue, concurrency admission, I/O or externally scheduled load handled by this
+        pure function.
+    - id: C12
+      status: unbound
+      justification: Signature authenticates content, never mutation. Acting-node notarized grant author/recipient/scope/validity/revocation
+        proof is missing station 1b; no activation API exists.
+    - id: C13
+      status: partial
+      justification: Issuer pin explicitly documented as bootstrap scaffold; graduation requires acting-node
+        notarized delegation proof, with reach vocabulary resolution still outstanding.
+    - id: C14
+      status: partial
+      justification: All expected failures have typed outcomes. Future supervisor must persist unexpected
+        failure context; this function owns no witness persistence.
+    contractTests:
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: authentic_content_is_repeatable_but_has_no_activation_authority
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: tampering_and_independent_wrong_key_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: independent_target_and_installed_changes_refuse_stale_content
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: signed_incompatible_candidates_do_not_gain_compatibility_from_signature
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: refusal_labels_are_stable_and_distinct
+      kind: integration
+
+  - name: CandidateRefusal
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/candidate.rs
+      modulePath: ark_core::candidate::CandidateRefusal
+      line: 133
+    summary: Non-actuating authenticated candidate content; notarized activation authority is deliberately
+      unavailable.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Pure candidate content validation only; authentic content test proves repeatable
+        output, no process effect or election API.
+    - id: C1
+      status: partial
+      justification: Expected elected release is supplied independently and exact-match checked. Election
+        itself remains the existing storage watcher, not exercised here.
+    - id: C2
+      status: partial
+      justification: Independent predecessor and berth incarnation refuse stale content. This is not
+        a channel election clock; notarized ordering remains upstream.
+    - id: C3
+      status: n-a
+      justification: Single terminating pure function; no process lifecycle, retry state or supervisor
+        integration exists.
+    - id: C4
+      status: partial
+      justification: Malformed, wrong-target, invalid-proof and incompatibility are distinct refusals.
+        Observations must be independently acquired; no unavailable-state acquisition is claimed.
+    - id: C5
+      status: answered
+      justification: Tamper test mutates signed bytes then even repairs CID; signature still refuses.
+        Independent wrong key and issuer also refuse.
+    - id: C6a
+      status: answered
+      justification: Input payload and variable envelope fields are bounded before decoding and verification;
+        oversized payload test pins refusal.
+    - id: C6b
+      status: answered
+      justification: Repeat authentication gives identical content and CID with no effect-producing
+        interface.
+    - id: C7
+      status: partial
+      justification: Return type explicitly authenticates candidate content only; supervisor staging/activation
+        remains unwired.
+    - id: C8
+      status: partial
+      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
+        counters require an eventual consumer.
+    - id: C9
+      status: partial
+      justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
+        live identity continuity is outside this non-actuating seat.
+    - id: C10
+      status: answered
+      justification: Pinned schema/domain and deny_unknown_fields refuse unsupported contracts; independently
+        signed unknown-field fixture verifies refusal.
+    - id: C11
+      status: n-a
+      justification: No queue, concurrency admission, I/O or externally scheduled load handled by this
+        pure function.
+    - id: C12
+      status: unbound
+      justification: Signature authenticates content, never mutation. Acting-node notarized grant author/recipient/scope/validity/revocation
+        proof is missing station 1b; no activation API exists.
+    - id: C13
+      status: partial
+      justification: Issuer pin explicitly documented as bootstrap scaffold; graduation requires acting-node
+        notarized delegation proof, with reach vocabulary resolution still outstanding.
+    - id: C14
+      status: partial
+      justification: All expected failures have typed outcomes. Future supervisor must persist unexpected
+        failure context; this function owns no witness persistence.
+    contractTests:
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: authentic_content_is_repeatable_but_has_no_activation_authority
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: tampering_and_independent_wrong_key_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: independent_target_and_installed_changes_refuse_stale_content
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: signed_incompatible_candidates_do_not_gain_compatibility_from_signature
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: refusal_labels_are_stable_and_distinct
+      kind: integration
+
+  - name: AuthenticatedCandidateContent
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/candidate.rs
+      modulePath: ark_core::candidate::AuthenticatedCandidateContent
+      line: 115
+    summary: Non-actuating authenticated candidate content; notarized activation authority is deliberately
+      unavailable.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Pure candidate content validation only; authentic content test proves repeatable
+        output, no process effect or election API.
+    - id: C1
+      status: partial
+      justification: Expected elected release is supplied independently and exact-match checked. Election
+        itself remains the existing storage watcher, not exercised here.
+    - id: C2
+      status: partial
+      justification: Independent predecessor and berth incarnation refuse stale content. This is not
+        a channel election clock; notarized ordering remains upstream.
+    - id: C3
+      status: n-a
+      justification: Single terminating pure function; no process lifecycle, retry state or supervisor
+        integration exists.
+    - id: C4
+      status: partial
+      justification: Malformed, wrong-target, invalid-proof and incompatibility are distinct refusals.
+        Observations must be independently acquired; no unavailable-state acquisition is claimed.
+    - id: C5
+      status: answered
+      justification: Tamper test mutates signed bytes then even repairs CID; signature still refuses.
+        Independent wrong key and issuer also refuse.
+    - id: C6a
+      status: answered
+      justification: Input payload and variable envelope fields are bounded before decoding and verification;
+        oversized payload test pins refusal.
+    - id: C6b
+      status: answered
+      justification: Repeat authentication gives identical content and CID with no effect-producing
+        interface.
+    - id: C7
+      status: partial
+      justification: Return type explicitly authenticates candidate content only; supervisor staging/activation
+        remains unwired.
+    - id: C8
+      status: partial
+      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
+        counters require an eventual consumer.
+    - id: C9
+      status: partial
+      justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
+        live identity continuity is outside this non-actuating seat.
+    - id: C10
+      status: answered
+      justification: Pinned schema/domain and deny_unknown_fields refuse unsupported contracts; independently
+        signed unknown-field fixture verifies refusal.
+    - id: C11
+      status: n-a
+      justification: No queue, concurrency admission, I/O or externally scheduled load handled by this
+        pure function.
+    - id: C12
+      status: unbound
+      justification: Signature authenticates content, never mutation. Acting-node notarized grant author/recipient/scope/validity/revocation
+        proof is missing station 1b; no activation API exists.
+    - id: C13
+      status: partial
+      justification: Issuer pin explicitly documented as bootstrap scaffold; graduation requires acting-node
+        notarized delegation proof, with reach vocabulary resolution still outstanding.
+    - id: C14
+      status: partial
+      justification: All expected failures have typed outcomes. Future supervisor must persist unexpected
+        failure context; this function owns no witness persistence.
+    contractTests:
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: authentic_content_is_repeatable_but_has_no_activation_authority
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: tampering_and_independent_wrong_key_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: independent_target_and_installed_changes_refuse_stale_content
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: signed_incompatible_candidates_do_not_gain_compatibility_from_signature
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: refusal_labels_are_stable_and_distinct
+      kind: integration
