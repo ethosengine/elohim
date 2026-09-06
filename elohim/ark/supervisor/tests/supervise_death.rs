@@ -488,10 +488,17 @@ fn shutdown_sends_policy_signal_then_kills_after_grace() {
         .expect("the supervisor thread panicked")
         .expect("the supervisor returned an error");
 
+    let elapsed = requested.elapsed();
     assert!(
-        requested.elapsed() < Duration::from_secs(1),
-        "the child outlived its grace period by {:?}",
-        requested.elapsed()
+        elapsed >= Duration::from_millis(300),
+        "the stubborn child must receive its full declared grace period"
+    );
+    // Joining includes polling, durable intent/witness fsyncs and reaping, not
+    // only the 300ms grace. Leave a bounded integration-test budget for shared
+    // host scheduling; this is not a one-second storage-latency contract.
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "shutdown did not finish within its test budget: {elapsed:?}"
     );
     assert_eq!(outcome.exit_code, 0, "a clean shutdown is not a failure");
     assert!(wait_nowait(pid).is_err(), "pid {pid} was left unreaped");
@@ -810,9 +817,21 @@ fn identity_refusal(identity_unavailable: bool) {
         "one write-ahead witness and one decided witness"
     );
     assert_eq!(witnesses[0].pid, witnesses[1].pid);
-    assert!(witnesses[0].verdict.is_none());
-    assert!(witnesses[1].verdict.is_some());
-    let witness = spool.read_witness(&witnesses[0].cid).unwrap();
+    // Both records retain the same death timestamp. The spool breaks ties by
+    // CID, whose lexical order says nothing about when a record was written.
+    // The lifecycle tests establish write-before-decide ordering; here prove
+    // that both distinct durable records survived the real process failure.
+    let undecided = witnesses
+        .iter()
+        .find(|witness| witness.verdict.is_none())
+        .expect("the write-ahead witness must survive the decision");
+    let decided = witnesses
+        .iter()
+        .find(|witness| witness.verdict.is_some())
+        .expect("the decision must have its own durable witness");
+    assert_ne!(undecided.cid, decided.cid);
+    assert_eq!(undecided.exit, decided.exit);
+    let witness = spool.read_witness(&undecided.cid).unwrap();
     assert_eq!(
         witness.last_intent.unwrap().reason,
         "readiness rung 1 patience exhausted"
