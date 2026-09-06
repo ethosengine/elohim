@@ -290,8 +290,44 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 // What the staged bytes WOULD install — the by-bytes evidence (2026-09-04)
 // ---------------------------------------------------------------------------
 
-/// Read the per-role TARGET coordinator wasm hashes out of a release's STAGED
-/// artifact, for [`super::verify::already_runs_target`].
+/// Both facts the verify floor needs about a release's STAGED bytes.
+///
+/// - `target_coordinators` — what applying WOULD install
+///   ([`super::verify::already_runs_target`]).
+/// - `bundle_dna_hashes` — what integrity line the bytes CARRY
+///   ([`super::verify::verify_artifact_dna_line`]).
+///
+/// They travel together, from ONE unpack, because reading them separately would
+/// let them describe two different artifacts. The manifest's `appliesTo`
+/// dnaHash is a THIRD, independent claim — the one the envelope checks — and on
+/// alpha 2026-09-06 it agreed with the fleet while the bytes did not.
+pub struct StagedBundleEvidence {
+    pub target_coordinators: seam_contracts::Answer<super::verify::TargetCoordinators>,
+    pub bundle_dna_hashes: seam_contracts::Answer<super::verify::BundleDnaHashes>,
+}
+
+impl StagedBundleEvidence {
+    /// No bundle to read — an artifact class that carries none. Never an exit,
+    /// never a refusal.
+    fn absent() -> Self {
+        Self {
+            target_coordinators: seam_contracts::Answer::Absent,
+            bundle_dna_hashes: seam_contracts::Answer::Absent,
+        }
+    }
+
+    /// A bundle we could not read as evidence. Same non-answer in both fields,
+    /// so neither check can be talked into a verdict by half a fact.
+    fn unreachable() -> Self {
+        Self {
+            target_coordinators: seam_contracts::Answer::Unreachable,
+            bundle_dna_hashes: seam_contracts::Answer::Unreachable,
+        }
+    }
+}
+
+/// Read what a release's STAGED artifact would install, and what integrity line
+/// it carries, out of the artifact bytes themselves.
 ///
 /// Lives here rather than in `verify` because it is I/O — `verify` is pure by
 /// contract, and the caller assembles evidence. Lives here rather than in
@@ -299,22 +335,25 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// is the same `happ_manager` resolution the hot-swap vehicle above routes to,
 /// so the hashes compared are exactly the hashes a hot-swap would splice in.
 ///
-/// Honest absence, three ways — and none of them ever takes the exit:
+/// Honest absence, three ways — and none of them ever takes an exit or forces a
+/// refusal:
 ///
-/// - `Absent` — this artifact class installs no coordinators (`config-epr`,
-///   `storage-binary`), so there is nothing to be already-current *by*.
+/// - `Absent` — this artifact class carries no bundle (`config-epr`,
+///   `storage-binary`), so there is nothing to be already-current *by* and no
+///   integrity line to compare.
 /// - `Unreachable` — the bytes are not usable evidence: the positional pairing
 ///   between `manifest.artifacts` and the staged paths does not hold, the
 ///   fetched bytes do not match the manifest's declared length/digest, or the
 ///   bundle could not be unpacked. **The digest guard is load-bearing**: this
 ///   runs before `verify_artifacts` has judged, so it re-checks rather than
-///   assumes — target hashes read out of unverified bytes could otherwise talk
-///   a peer into "already current" from a substituted artifact.
-/// - `Present` — role → (zome → wasm hash) for every role the bundle resolves.
-pub async fn staged_target_coordinators(
+///   assumes — hashes read out of unverified bytes could otherwise talk a peer
+///   into "already current" from a substituted artifact.
+/// - `Present` — role → (zome → wasm hash) and role → DNA hash, for every role
+///   the bundle resolves.
+pub async fn staged_bundle_evidence(
     manifest: &super::ReleaseManifest,
     fetched: &[super::verify::FetchedArtifact],
-) -> seam_contracts::Answer<super::verify::TargetCoordinators> {
+) -> StagedBundleEvidence {
     use seam_contracts::Answer;
 
     match manifest.artifact_class {
@@ -330,21 +369,34 @@ pub async fn staged_target_coordinators(
         | ArtifactClass::HappLineage => {}
         // A config or binary release installs no coordinator wasm; "already
         // current by coordinator bytes" is not a question it can answer.
-        ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary => return Answer::Absent,
+        ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary => {
+            return StagedBundleEvidence::absent()
+        }
     }
 
     let [declared] = manifest.artifacts.as_slice() else {
-        return Answer::Unreachable;
+        return StagedBundleEvidence::unreachable();
     };
     let Some(actual) = fetched.iter().find(|f| f.blob_cid == declared.blob_cid) else {
-        return Answer::Unreachable;
+        return StagedBundleEvidence::unreachable();
     };
     if actual.bytes != declared.bytes || !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
-        return Answer::Unreachable;
+        return StagedBundleEvidence::unreachable();
     }
 
-    match crate::happ_manager::bundle_coordinator_wasm_hashes(&actual.path).await {
-        Ok(target) => Answer::Present(target),
+    match crate::happ_manager::bundle_role_dna_and_coordinators(&actual.path).await {
+        Ok(by_role) => {
+            let mut target = super::verify::TargetCoordinators::new();
+            let mut dnas = super::verify::BundleDnaHashes::new();
+            for (role, (dna_hash, coordinators)) in by_role {
+                dnas.insert(role.clone(), dna_hash);
+                target.insert(role, coordinators);
+            }
+            StagedBundleEvidence {
+                target_coordinators: Answer::Present(target),
+                bundle_dna_hashes: Answer::Present(dnas),
+            }
+        }
         Err(e) => {
             tracing::debug!(
                 path = %actual.path.display(),
@@ -352,9 +404,102 @@ pub async fn staged_target_coordinators(
                 "release-adoption: staged bundle could not be read for its target coordinator \
                  hashes — the by-bytes exit is simply not available for this release"
             );
-            Answer::Unreachable
+            StagedBundleEvidence::unreachable()
         }
     }
+}
+
+/// **A partial hot-swap is not an apply.** Pure over the report, so the whole
+/// decision is testable without a conductor.
+///
+/// # The defect (alpha, 2026-09-06)
+///
+/// The old predicate was `drifted_count > 0 && applied_count == 0`: refuse only
+/// when NOTHING was healed. james drifted five roles, healed one, and the
+/// verdict was `applied` — leaving a peer running `lamad` at the release target
+/// and four roles at baseline. That state is a trap, not a way-point:
+/// [`super::verify::already_runs_target`] can never exit it (the four roles do
+/// not equal the target) and [`super::verify::verify_coordinator_lineage`]
+/// refuses it forever (the one healed role no longer runs what the release
+/// supersedes). A mixture recorded as a success is worse than a refusal,
+/// because a refusal is a thing the next sweep re-examines.
+///
+/// So: ANY role the sweep did not bring to the target makes the whole apply a
+/// refusal. That covers a lineage refusal, a failed coordinator-bundle build,
+/// and an `update_coordinators` error — and also a role whose evaluation
+/// errored without a drift verdict, because "we could not tell" is not
+/// "healed".
+///
+/// # What is NOT rolled back
+///
+/// Roles that DID swap stay swapped. There is no un-swap: `update_coordinators`
+/// is a live splice, and attempting to reverse it would be a second unreviewed
+/// write on top of a state we already do not understand. The refusal detail
+/// says so explicitly, and it is the honest outcome — the next sweep's
+/// `already_runs_target` sees those roles as current, which is exactly what
+/// they are.
+///
+/// # The retry axis
+///
+/// `apply_failed` is transient by default, which is right for a conductor that
+/// may answer next sweep. When EVERY unhealed role was refused for DNA lineage,
+/// nothing about the next sweep is different — only a new release is — so the
+/// refusal is forced terminal ([`AdoptionRefusal::non_transient`]).
+pub(crate) fn partial_apply_refusal(
+    report: &crate::happ_manager::CoordinatorSyncReport,
+) -> Option<AdoptionRefusal> {
+    let unhealed: Vec<&crate::happ_manager::CoordinatorRoleReport> = report
+        .roles
+        .iter()
+        .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
+        .collect();
+    if unhealed.is_empty() {
+        return None;
+    }
+
+    let lineage_only = unhealed.iter().all(|r| {
+        r.error
+            .as_deref()
+            .is_some_and(|e| e.starts_with("dnaHashMismatch:"))
+    });
+    let per_role = unhealed
+        .iter()
+        .map(|r| {
+            format!(
+                "{} (drifted={}, {})",
+                r.role,
+                r.drifted,
+                r.error
+                    .as_deref()
+                    .unwrap_or("no error reported — the swap simply did not run")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    let swapped: Vec<&str> = report
+        .roles
+        .iter()
+        .filter(|r| r.applied)
+        .map(|r| r.role.as_str())
+        .collect();
+
+    let refusal = AdoptionRefusal::new(
+        RefusalReason::ApplyFailed,
+        format!(
+            "PARTIAL APPLY — {} of {} role(s) were not brought to the release target: {per_role}. \
+             The {} role(s) that DID swap stay swapped ({swapped:?}); no rollback is attempted, \
+             because un-splicing a live cell is a second unreviewed write. This peer is running a \
+             MIXTURE, which no later sweep can converge on its own",
+            unhealed.len(),
+            report.roles.len(),
+            swapped.len()
+        ),
+    );
+    Some(if lineage_only {
+        refusal.non_transient()
+    } else {
+        refusal
+    })
 }
 
 fn receipt(verified: &VerifiedRelease, vehicle: &str, detail: serde_json::Value) -> AppliedReceipt {
@@ -380,11 +525,16 @@ fn receipt(verified: &VerifiedRelease, vehicle: &str, detail: serde_json::Value)
 /// re-install, no restart — the ~2-minute vehicle rung 1 already proved on the
 /// mesh three times.
 ///
-/// The DNA line is not re-checked here: `verify_envelope` already refused any
-/// release binding a different per-role integrity lineage
-/// (`dna_lineage_mismatch`), and `sync_coordinators_for_app_info` holds the
-/// same guard per role a second time. Two independent refusals for the one
-/// corruption vector that matters is deliberate, not redundant.
+/// The DNA line is not re-checked here, and it is now checked in THREE places
+/// before this vehicle runs: `verify_envelope` refuses a release whose
+/// MANIFEST binds a different per-role lineage, `verify_artifact_dna_line`
+/// refuses one whose staged BYTES carry a different lineage (the claim nothing
+/// checked until alpha 2026-09-06 proved the two can disagree), and
+/// `sync_coordinators_for_app_info` holds the same guard per role a fourth
+/// time. Independent refusals for the one corruption vector that matters are
+/// deliberate, not redundant — and [`partial_apply_refusal`] is what makes the
+/// last of them count, because a per-role refusal the vehicle reports as
+/// `applied` protects nothing.
 pub struct CoordinatorBundleVehicle {
     admin: holochain_client::AdminWebsocket,
     app_id: String,
@@ -453,17 +603,21 @@ impl CoordinatorBundleVehicle {
         });
 
         // Drift that the swap did not heal is a FAILED apply, not a quiet
-        // success with a note. Zero drift is a success: the peer already runs
+        // success with a note — and that is true of ONE unhealed role, not
+        // only of all of them. Zero drift is a success: the peer already runs
         // these coordinators, which is convergence, not a no-op to hide.
-        if report.drifted_count > 0 && report.applied_count == 0 {
-            return Err(AdoptionRefusal::new(
-                RefusalReason::ApplyFailed,
-                format!(
-                    "{} role(s) drifted and none were hot-swapped (failed: {failed_roles:?}) — \
-                     detail on the report",
-                    report.drifted_count
-                ),
-            ));
+        if let Some(refusal) = partial_apply_refusal(&report) {
+            tracing::error!(
+                channel = %verified.channel_id,
+                release_cid = %verified.release_cid,
+                drifted = report.drifted_count,
+                applied = report.applied_count,
+                failed_roles = ?failed_roles,
+                vehicle,
+                detail = %refusal.detail,
+                "release-adoption: PARTIAL APPLY refused — this peer runs a mixture"
+            );
+            return Err(refusal);
         }
 
         tracing::info!(
@@ -2278,5 +2432,144 @@ mod tests {
         assert_eq!(CARRY_PAGE_LIMIT, 32);
         assert_eq!(CARRY_ZOME, "node_registry_coordinator");
         assert_eq!(CARRY_FN, "carry_from");
+    }
+
+    // -----------------------------------------------------------------------
+    // A partial hot-swap is not an apply (alpha, 2026-09-06)
+    // -----------------------------------------------------------------------
+
+    use crate::happ_manager::{CoordinatorRoleReport, CoordinatorSyncReport};
+
+    fn role(
+        role: &str,
+        drifted: bool,
+        applied: bool,
+        error: Option<&str>,
+    ) -> CoordinatorRoleReport {
+        CoordinatorRoleReport {
+            role: role.to_string(),
+            drifted,
+            applied,
+            installed_coordinators: BTreeMap::new(),
+            bundled_coordinators: BTreeMap::new(),
+            error: error.map(str::to_string),
+        }
+    }
+
+    fn report(roles: Vec<CoordinatorRoleReport>) -> CoordinatorSyncReport {
+        let drifted_count = roles.iter().filter(|r| r.drifted).count();
+        let applied_count = roles.iter().filter(|r| r.applied).count();
+        CoordinatorSyncReport {
+            app_id: "elohim".to_string(),
+            apply: true,
+            roles,
+            drifted_count,
+            applied_count,
+        }
+    }
+
+    const LINEAGE_ERR: &str = "dnaHashMismatch: bundle carries a different DNA lineage \
+                               (integrity change) — hot-swap refused";
+
+    /// **THE MEASURED INCIDENT.** james: five roles drifted, `lamad` swapped,
+    /// four refused for DNA lineage, verdict `applied`. The old predicate
+    /// (`drifted > 0 && applied == 0`) let it through because ONE role healed.
+    #[test]
+    fn one_swapped_role_out_of_five_is_a_refusal_not_an_apply() {
+        let r = report(vec![
+            role("lamad", true, true, None),
+            role("infrastructure", true, false, Some(LINEAGE_ERR)),
+            role("imagodei", true, false, Some(LINEAGE_ERR)),
+            role("mishpat", true, false, Some(LINEAGE_ERR)),
+            role("node_registry", true, false, Some(LINEAGE_ERR)),
+        ]);
+        assert_eq!(r.drifted_count, 5);
+        assert_eq!(r.applied_count, 1);
+        assert!(
+            !(r.drifted_count > 0 && r.applied_count == 0),
+            "precondition: the OLD predicate passes this report — that is the defect"
+        );
+
+        let refusal = partial_apply_refusal(&r).expect("a mixture is never an apply");
+        assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
+        assert!(
+            !refusal.transient,
+            "every unhealed role was refused for lineage — no later sweep changes that"
+        );
+
+        let d = &refusal.detail;
+        for named in ["infrastructure", "imagodei", "mishpat", "node_registry"] {
+            assert!(d.contains(named), "per-role outcome missing {named}: {d}");
+        }
+        assert!(d.contains("4 of 5"), "detail was: {d}");
+        assert!(
+            d.contains("lamad") && d.contains("stay swapped"),
+            "the receipt must say what is NOT rolled back: {d}"
+        );
+    }
+
+    /// Every drifted role healed → an apply, with no refusal invented.
+    #[test]
+    fn a_complete_hot_swap_is_an_apply() {
+        let r = report(vec![
+            role("lamad", true, true, None),
+            role("imagodei", true, true, None),
+        ]);
+        assert!(partial_apply_refusal(&r).is_none());
+    }
+
+    /// Zero drift is convergence, not a no-op to hide — and not a refusal.
+    #[test]
+    fn zero_drift_is_convergence_never_a_partial_apply() {
+        let r = report(vec![
+            role("lamad", false, false, None),
+            role("imagodei", false, false, None),
+        ]);
+        assert_eq!(r.drifted_count, 0);
+        assert!(partial_apply_refusal(&r).is_none());
+    }
+
+    /// A conductor-side `update_coordinators` failure may well work next
+    /// sweep, so it keeps `apply_failed`'s transient default. Only the
+    /// all-lineage case is forced terminal.
+    #[test]
+    fn a_mechanism_failure_stays_on_the_transient_retry_ladder() {
+        let r = report(vec![
+            role("lamad", true, true, None),
+            role(
+                "imagodei",
+                true,
+                false,
+                Some("update_coordinators failed: websocket closed"),
+            ),
+        ]);
+        let refusal = partial_apply_refusal(&r).expect("one role never reached the target");
+        assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
+        assert!(
+            refusal.transient,
+            "a conductor that answers next sweep cures this"
+        );
+        assert!(refusal.detail.contains("imagodei"));
+    }
+
+    /// A role whose evaluation ERRORED has no drift verdict at all
+    /// (`get_dna_definition` failed, so both hash maps are empty and `drifted`
+    /// is false). "We could not tell" is not "healed" — it is exactly the
+    /// silence that let a mixture read as a success.
+    #[test]
+    fn an_unevaluated_role_is_not_a_healed_role() {
+        let r = report(vec![
+            role("lamad", true, true, None),
+            role(
+                "mishpat",
+                false,
+                false,
+                Some("get_dna_definition failed: timeout"),
+            ),
+        ]);
+        let refusal = partial_apply_refusal(&r).expect("an unevaluated role is not an apply");
+        assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
+        assert!(refusal.detail.contains("mishpat"));
+        assert!(refusal.transient, "a timeout may not recur next sweep");
     }
 }

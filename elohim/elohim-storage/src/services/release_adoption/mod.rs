@@ -978,6 +978,22 @@ impl AdoptionRefusal {
     pub fn reason_code(&self) -> RefusalReason {
         self.reason_code
     }
+
+    /// Force this refusal terminal on the RETRY axis, keeping its reason.
+    ///
+    /// [`RefusalReason::is_transient`] is the reason's default answer, and for
+    /// `apply_failed` that default is "transient" because most apply mechanics
+    /// (a conductor error, an IO error) really may work next sweep. One case
+    /// under that reason is not like the others: a hot-swap the conductor
+    /// REFUSED for DNA-lineage reasons will be refused identically forever —
+    /// only a new release changes it — so retrying it on the transient ladder
+    /// is hammering a wall. Overriding the axis without inventing a parallel
+    /// reason keeps the metric cardinality (and the operator's cure lookup)
+    /// exactly where it was.
+    pub fn non_transient(mut self) -> Self {
+        self.transient = false;
+        self
+    }
 }
 
 impl std::fmt::Display for AdoptionRefusal {

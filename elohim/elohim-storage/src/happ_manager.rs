@@ -641,13 +641,32 @@ pub async fn ensure_happ_installed(
             // DHT state all preserved, so it is safe wherever a deploy is.
             let allow_coordinator_update = coordinator_update_allowed();
             match sync_coordinators(admin_ws, app_info, happ_path, allow_coordinator_update).await {
-                Ok(0) => info!(app_id = app_id, "No coordinator-zome drift"),
-                Ok(n) => info!(
+                Ok(report) if report.drifted_count == 0 => info!(
                     app_id = app_id,
-                    drifted_roles = n,
-                    applied = allow_coordinator_update,
-                    "Coordinator-zome drift handled"
+                    roles_evaluated = report.roles.len(),
+                    "No coordinator-zome drift"
                 ),
+                Ok(report) => {
+                    // `applied` used to be logged as the operator GATE, which
+                    // says whether a swap was permitted — never whether one
+                    // happened. Report both, and name the roles left behind:
+                    // drifted-minus-applied is the mixture, and it is the one
+                    // number a boot log has to be able to say out loud.
+                    let unhealed: Vec<&str> = report
+                        .roles
+                        .iter()
+                        .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
+                        .map(|r| r.role.as_str())
+                        .collect();
+                    info!(
+                        app_id = app_id,
+                        drifted_roles = report.drifted_count,
+                        applied_roles = report.applied_count,
+                        gate_allows_apply = allow_coordinator_update,
+                        unhealed = ?unhealed,
+                        "Coordinator-zome drift handled"
+                    );
+                }
                 Err(e) => error!(
                     app_id = app_id,
                     error = %e,
@@ -1122,14 +1141,35 @@ async fn bundle_role_dna_files(
 /// Same resolution path as [`bundle_role_dna_files`], so the hashes equal what
 /// a hot-swap of this exact bundle would splice in — computed once, from the
 /// bundle, rather than re-derived by a second implementation that could drift.
-pub(crate) async fn bundle_coordinator_wasm_hashes(
+///
+/// # Why the DNA hash rides along
+///
+/// **Measured on alpha 2026-09-06.** james applied a coordinator-bundle release
+/// whose manifest `appliesTo` dnaHashes matched the fleet — so `verify_envelope`
+/// passed — while the ARTIFACT carried a different integrity line for four of
+/// its five roles. The vehicle hot-swapped `lamad`, refused the other four with
+/// `dna_lineage_mismatch`, and reported `applied`. Nothing had ever compared the
+/// bundle's own DNA line against installed reality, because nothing ever read
+/// it: the target-coordinator resolver threw the `DnaFile`'s hash away.
+///
+/// Returning both facts from ONE unpack is the fix's floor: the coordinator
+/// hashes decide whether applying would CHANGE anything, the DNA hash decides
+/// whether applying is LEGAL at all (`update_coordinators` matches integrity
+/// dependencies BY NAME — see [`lineage_mismatch_error`]), and reading them from
+/// the same unpack of the same bytes is what makes them impossible to disagree.
+pub(crate) async fn bundle_role_dna_and_coordinators(
     happ_path: &Path,
-) -> anyhow::Result<std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>>
-{
+) -> anyhow::Result<
+    std::collections::BTreeMap<String, (String, std::collections::BTreeMap<String, String>)>,
+> {
     let role_dnas = bundle_role_dna_files(happ_path).await?;
     Ok(role_dnas
         .into_iter()
-        .map(|(role, dna_file)| (role, coordinator_wasm_hashes(dna_file.dna_def())))
+        .map(|(role, dna_file)| {
+            let dna_hash = dna_file.dna_hash().to_string();
+            let coordinators = coordinator_wasm_hashes(dna_file.dna_def());
+            (role, (dna_hash, coordinators))
+        })
         .collect())
 }
 
@@ -1244,25 +1284,69 @@ fn lineage_mismatch_error(installed_dna_hash: &str, bundled_dna_hash: &str) -> O
     ))
 }
 
+/// Why a role the installed app runs takes NO part in a coordinator sweep.
+///
+/// Both arms used to be bare `continue`s with no log line at all, which is how
+/// a peer could finish a sweep having evaluated one of its five roles and say
+/// nothing whatsoever about the other four. Naming them makes the sweep's
+/// coverage legible: `roles evaluated + roles skipped == roles installed`,
+/// always, and an operator reading the boot log can tell "clean" from
+/// "never looked".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SweepSkip {
+    /// The installed app runs this role but the bundle does not carry it — a
+    /// SUBSET bundle. The role keeps the coordinators it has and produces NO
+    /// report row. That is correct (there is nothing to compare it against),
+    /// and it must never read as "clean".
+    RoleNotInBundle,
+    /// The role has no provisioned cell (clone-only, or a deferred cell), so
+    /// there is nothing to hot-swap into.
+    NoProvisionedCell,
+}
+
+impl SweepSkip {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            SweepSkip::RoleNotInBundle => "role_not_in_bundle",
+            SweepSkip::NoProvisionedCell => "no_provisioned_cell",
+        }
+    }
+}
+
+/// Pure: does this installed role take part in the sweep? `None` = evaluate it.
+pub(crate) fn coordinator_sweep_skip(
+    in_bundle: bool,
+    has_provisioned_cell: bool,
+) -> Option<SweepSkip> {
+    if !in_bundle {
+        return Some(SweepSkip::RoleNotInBundle);
+    }
+    if !has_provisioned_cell {
+        return Some(SweepSkip::NoProvisionedCell);
+    }
+    None
+}
+
 /// Detect and (when `apply`) heal coordinator-zome drift between the installed
 /// cells and the bundle on disk via the conductor's `update_coordinators`
 /// hot-swap — which preserves the agent key, the cell, and all DHT state
 /// (unlike a reinstall, which mints a new key).
 ///
-/// Returns the number of roles whose coordinators drifted. Per-role failures
-/// are logged and skipped so one bad role can never block startup or the
-/// remaining roles. Thin wrapper over [`sync_coordinators_for_app_info`] — the
-/// boot path keeps its count-only contract while the HTTP vehicle reads the
-/// full report from the same single implementation.
+/// Per-role failures are recorded on the report and logged, never propagated,
+/// so one bad role can never block startup or the remaining roles. Thin alias
+/// for [`sync_coordinators_for_app_info`] so the boot path and the HTTP vehicle
+/// read the SAME report from one implementation — the boot path used to reduce
+/// it to `drifted_count` and then log `applied = <the operator gate>`, which is
+/// a claim about permission, not about what happened. A peer can be permitted
+/// and still leave roles unhealed; that is exactly the mixture alpha shipped on
+/// 2026-09-06, and the count-only return is what made it unsayable.
 async fn sync_coordinators(
     admin_ws: &AdminWebsocket,
     app_info: &holochain_client::AppInfo,
     happ_path: &Path,
     apply: bool,
-) -> anyhow::Result<usize> {
-    sync_coordinators_for_app_info(admin_ws, app_info, happ_path, apply)
-        .await
-        .map(|report| report.drifted_count)
+) -> anyhow::Result<CoordinatorSyncReport> {
+    sync_coordinators_for_app_info(admin_ws, app_info, happ_path, apply).await
 }
 
 /// Report-returning entry point keyed by installed app id — the node-local
@@ -1301,15 +1385,35 @@ async fn sync_coordinators_for_app_info(
     let mut drifted = 0usize;
     let mut applied_count = 0usize;
 
+    let mut skipped: Vec<(&str, SweepSkip)> = Vec::new();
+
     for (role, cells) in &app_info.cell_info {
-        let Some(dna_file) = role_dnas.get(role) else {
-            continue;
-        };
-        let Some(cell_id) = cells.iter().find_map(|c| match c {
+        let bundled = role_dnas.get(role);
+        let provisioned = cells.iter().find_map(|c| match c {
             CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
             _ => None,
-        }) else {
+        });
+        // The two skips used to be silent. A sweep that says nothing about a
+        // role is indistinguishable, in a log, from a sweep that found it
+        // clean — and that is precisely the read that let a partial apply pass
+        // for an apply on alpha.
+        if let Some(skip) = coordinator_sweep_skip(bundled.is_some(), provisioned.is_some()) {
+            info!(
+                app_id = app_info.installed_app_id.as_str(),
+                role = role.as_str(),
+                skip = skip.label(),
+                bundle_roles = ?role_dnas.keys().collect::<Vec<_>>(),
+                "coordinator sweep: role SKIPPED — no report row is emitted for it, which is \
+                 NOT the same as finding it clean"
+            );
+            skipped.push((role.as_str(), skip));
             continue;
+        }
+        let (dna_file, cell_id) = match (bundled, provisioned) {
+            (Some(d), Some(c)) => (d, c),
+            // `coordinator_sweep_skip` returned `None`, which it only does when
+            // both are present.
+            _ => unreachable!("coordinator_sweep_skip already refused the absent cases"),
         };
 
         let installed_def = match admin_ws.get_dna_definition(cell_id.clone()).await {
@@ -1404,6 +1508,40 @@ async fn sync_coordinators_for_app_info(
         }
         roles.push(report);
     }
+
+    // Per-role legibility, at INFO, for EVERY evaluated role — clean ones
+    // included. The boot sweep's only prior voice was a WARN on drift and an
+    // ERROR on refusal, so the successful half of a partial apply was silent
+    // and the whole sweep's shape had to be inferred from what did NOT appear.
+    for r in &roles {
+        info!(
+            app_id = app_info.installed_app_id.as_str(),
+            role = r.role.as_str(),
+            drifted = r.drifted,
+            applied = r.applied,
+            error = r.error.as_deref().unwrap_or("-"),
+            installed = ?r.installed_coordinators,
+            bundled = ?r.bundled_coordinators,
+            "coordinator sweep: role outcome"
+        );
+    }
+    let unhealed: Vec<&str> = roles
+        .iter()
+        .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
+        .map(|r| r.role.as_str())
+        .collect();
+    info!(
+        app_id = app_info.installed_app_id.as_str(),
+        apply,
+        roles_installed = app_info.cell_info.len(),
+        roles_evaluated = roles.len(),
+        roles_skipped = skipped.len(),
+        skipped = ?skipped.iter().map(|(r, s)| format!("{r}:{}", s.label())).collect::<Vec<_>>(),
+        drifted_count = drifted,
+        applied_count,
+        unhealed = ?unhealed,
+        "coordinator sweep complete — a peer with unhealed roles is running a MIXTURE"
+    );
 
     Ok(CoordinatorSyncReport {
         app_id: app_info.installed_app_id.clone(),
@@ -1674,6 +1812,52 @@ mod tests {
             err.contains("reinstall"),
             "the refusal must name the path that IS correct for an integrity change"
         );
+    }
+
+    /// **The subset bundle.** A role the installed app runs but the bundle does
+    /// NOT carry is skipped — it produces no report row, which is correct
+    /// (there is nothing to compare it against) and is emphatically not the
+    /// same as finding it clean. Both skips used to be silent `continue`s; the
+    /// decision is pure so the sweep's coverage can be asserted without a
+    /// conductor.
+    #[test]
+    fn a_role_absent_from_the_bundle_is_skipped_and_produces_no_report_row() {
+        assert_eq!(
+            coordinator_sweep_skip(false, true),
+            Some(SweepSkip::RoleNotInBundle)
+        );
+        assert_eq!(
+            coordinator_sweep_skip(false, true).map(SweepSkip::label),
+            Some("role_not_in_bundle")
+        );
+    }
+
+    /// A role with no provisioned cell has nothing to hot-swap into. Distinct
+    /// from the subset case because the cures differ: one is a bundle that
+    /// does not carry the role, the other is a cell that is not there yet.
+    #[test]
+    fn a_role_with_no_provisioned_cell_is_skipped_for_its_own_reason() {
+        assert_eq!(
+            coordinator_sweep_skip(true, false),
+            Some(SweepSkip::NoProvisionedCell)
+        );
+        assert_eq!(
+            coordinator_sweep_skip(true, false).map(SweepSkip::label),
+            Some("no_provisioned_cell")
+        );
+        // Bundle absence is reported first when both are true: a bundle that
+        // does not carry the role is the fact an operator acts on.
+        assert_eq!(
+            coordinator_sweep_skip(false, false),
+            Some(SweepSkip::RoleNotInBundle)
+        );
+    }
+
+    /// The only shape that gets evaluated: carried by the bundle AND
+    /// provisioned on this conductor.
+    #[test]
+    fn a_bundled_provisioned_role_takes_part_in_the_sweep() {
+        assert_eq!(coordinator_sweep_skip(true, true), None);
     }
 
     /// A refused role reports the mismatch and MUST NOT be marked applied —

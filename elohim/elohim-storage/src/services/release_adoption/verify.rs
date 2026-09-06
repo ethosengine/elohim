@@ -621,9 +621,113 @@ pub fn verify_envelope(
 
 /// What a release's artifact bytes WOULD install, per role: role name → (zome
 /// name → coordinator wasm hash). Derived from the staged bundle itself
-/// (`happ_manager::bundle_coordinator_wasm_hashes`), because a release manifest
-/// declares only the hashes it SUPERSEDES and never the ones it provides.
+/// (`happ_manager::bundle_role_dna_and_coordinators`), because a release
+/// manifest declares only the hashes it SUPERSEDES and never the ones it
+/// provides.
 pub type TargetCoordinators = BTreeMap<String, BTreeMap<String, String>>;
+
+/// What integrity line a release's artifact bytes CARRY, per role: role name →
+/// DNA hash (`uhC0k…`). Read from the same unpack as [`TargetCoordinators`].
+pub type BundleDnaHashes = BTreeMap<String, String>;
+
+/// **The artifact's own DNA line, against installed reality.**
+///
+/// # The hole this closes (measured on alpha, 2026-09-06)
+///
+/// [`verify_envelope`] ties the MANIFEST's `appliesTo[role].dnaHash` to the
+/// installed cell. That is a check on what the release DECLARES. It says
+/// nothing whatsoever about what the release CARRIES — and on 2026-09-06 james
+/// applied a coordinator-bundle release whose `appliesTo` hashes matched the
+/// fleet exactly (so the envelope passed) while the artifact's own bytes
+/// carried a different integrity line for four of its five roles, because the
+/// workspace toolchain that packaged it moved integrity bytes. The vehicle
+/// hot-swapped `lamad`, the per-role guard in
+/// `happ_manager::sync_coordinators_for_app_info` refused `infrastructure`,
+/// `imagodei`, `mishpat` and `node_registry` with `dnaHashMismatch`, and the
+/// verdict came back `applied`. The peer was left running a MIXTURE that
+/// [`already_runs_target`] can never exit and [`verify_coordinator_lineage`]
+/// refuses forever.
+///
+/// The manifest and the artifact were two independent claims and only one of
+/// them was ever checked. This checks the other one.
+///
+/// # Why bundle-vs-installed is the sufficient comparison
+///
+/// One might instead tie the manifest's `appliesTo` dnaHash to the BUNDLE's.
+/// It is not needed: [`verify_envelope`] already ties `appliesTo` → installed,
+/// so for any role in BOTH sets this check composes into
+/// `appliesTo == installed == bundle`. And it is not enough on its own either
+/// — the incident's four poisoned roles were carried by the bundle without
+/// being named in `appliesTo` at all, so an `appliesTo`-vs-bundle check would
+/// have had nothing to compare. Installed reality is the thing a hot-swap
+/// actually splices into, so installed reality is what the bytes are judged
+/// against.
+///
+/// # Scope
+///
+/// - **Roles in the bundle AND installed** — compared. Any mismatch refuses,
+///   naming EVERY mismatching role with both hashes (one refusal, whole truth
+///   — the incident's log named them one ERROR line at a time and the verdict
+///   named none of them).
+/// - **Roles in the bundle but NOT installed** — skipped, following the
+///   existing convention for absent roles: `sync_coordinators_for_app_info`
+///   iterates the installed app's cells and simply never visits a bundle role
+///   this peer does not run, so such a role cannot be corrupted by a hot-swap
+///   and is not this check's business. Role PRESENCE is `verify_envelope`'s
+///   job, and only for roles the manifest binds.
+/// - **`happ-lineage` releases** — exempt. Crossing the DNA line is the entire
+///   point of that class; `verify_envelope`'s `crossing_ok` arm and
+///   [`verify_path`]'s notarized-commitment requirement govern it.
+/// - **Absent / unreachable evidence** — no refusal. Honest absence never
+///   takes an exit, in either direction: a `config-epr` release has no bundle
+///   to read, and an unreadable one is already covered by the per-role guard
+///   the vehicle runs a second time.
+///
+/// Non-transient by reason: `dna_lineage_mismatch` stays true until a new
+/// release is cut.
+pub fn verify_artifact_dna_line(
+    manifest: &ReleaseManifest,
+    installed: &Answer<InstalledReality>,
+    bundle_dna_hashes: &Answer<BundleDnaHashes>,
+) -> Result<(), AdoptionRefusal> {
+    if manifest.artifact_class == ArtifactClass::HappLineage {
+        return Ok(());
+    }
+    let (Answer::Present(installed), Answer::Present(bundle)) = (installed, bundle_dna_hashes)
+    else {
+        return Ok(());
+    };
+
+    let mismatched: Vec<String> = bundle
+        .iter()
+        .filter_map(|(role, bundle_dna)| {
+            let installed_role = installed.roles.get(role)?;
+            (installed_role.dna_hash != *bundle_dna).then(|| {
+                format!(
+                    "{role} (installed {}, artifact {bundle_dna})",
+                    installed_role.dna_hash
+                )
+            })
+        })
+        .collect();
+
+    if !mismatched.is_empty() {
+        return Err(refuse(
+            RefusalReason::DnaLineageMismatch,
+            format!(
+                "the STAGED ARTIFACT carries a different integrity line than this peer runs for \
+                 {} role(s): {}. The manifest's appliesTo hashes may well match — they are a \
+                 separate claim, and this is the one about the bytes. Applying would hot-swap \
+                 only the roles whose lines happen to agree and leave this peer running a \
+                 MIXTURE no later sweep can exit (alpha, 2026-09-06). Crossing the DNA line \
+                 needs a happ-lineage release under a notarized path, never a coordinator bundle",
+                mismatched.len(),
+                mismatched.join("; ")
+            ),
+        ));
+    }
+    Ok(())
+}
 
 /// **Already current by BYTES.** Does this peer's installed reality ALREADY
 /// equal what this release would install, for every role the release touches?
@@ -703,6 +807,15 @@ pub fn verify_coordinator_lineage(
             ));
         }
     };
+    // Every divergent role, in ONE refusal. Returning on the first one made
+    // the refusal detail a keyhole: on alpha 2026-09-06 the peer that was left
+    // running a mixture of five roles reported a single role name, and the
+    // shape of the actual problem — that four roles diverged and one did not —
+    // was invisible from the verdict. Same reason code, same pass/fail, whole
+    // truth. `role_not_installed` still short-circuits: it is a different
+    // refusal, and `verify_envelope` has already raised it for every role the
+    // manifest binds before this function ever runs.
+    let mut divergent: Vec<String> = Vec::new();
     for (role, binding) in &manifest.applies_to.roles {
         let Some(installed_role) = installed.roles.get(role) else {
             return Err(refuse(
@@ -720,14 +833,21 @@ pub fn verify_coordinator_lineage(
             .filter(|h| !running.contains(h.as_str()))
             .collect();
         if !missing.is_empty() {
-            return Err(refuse(
-                RefusalReason::CoordinatorLineageMismatch,
-                format!(
-                    "role '{role}': release supersedes coordinator wasm {missing:?}, which this \
-                     peer does not run (running: {running:?})"
-                ),
+            divergent.push(format!(
+                "role '{role}': release supersedes coordinator wasm {missing:?}, which this peer \
+                 does not run (running: {running:?})"
             ));
         }
+    }
+    if !divergent.is_empty() {
+        return Err(refuse(
+            RefusalReason::CoordinatorLineageMismatch,
+            format!(
+                "{} role(s) do not run what this release supersedes — {}",
+                divergent.len(),
+                divergent.join("; ")
+            ),
+        ));
     }
     Ok(())
 }
@@ -1239,6 +1359,11 @@ pub struct VerifyInput<'a> {
     /// no coordinators, `Answer::Unreachable` when the bytes could not be read.
     /// Read only by [`already_runs_target`]; absence never takes the exit.
     pub target_coordinators: &'a Answer<TargetCoordinators>,
+    /// **The artifact's own DNA line (2026-09-06).** Per-role DNA hash read out
+    /// of the STAGED bytes, from the same unpack as `target_coordinators`.
+    /// Read only by [`verify_artifact_dna_line`]; `Answer::Absent` for artifact
+    /// classes that carry no bundle, and absence never refuses.
+    pub bundle_dna_hashes: &'a Answer<BundleDnaHashes>,
     /// **Rung 6 (2026-09-04).** Caller-fetched evidence for the manifest's
     /// `adoptionDiscipline.path` commitment — this module does no I/O (module
     /// docs), so the fetch lives entirely on the caller's side. Read only by
@@ -1314,6 +1439,14 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
         verify_threshold(&manifest, input.attestations)?;
     }
     let artifact_paths = verify_artifacts(&manifest, input.artifacts)?;
+
+    // THE ARTIFACT'S OWN DNA LINE — after the digest check (so the bytes the
+    // line was read out of are the bytes the manifest declares) and BEFORE the
+    // by-bytes exit. Before, because a peer whose installed reality contradicts
+    // the artifact for even one role must never record convergence on it: the
+    // exit stops work, and stopping work on a poisoned artifact is how the
+    // mixture becomes permanent.
+    verify_artifact_dna_line(&manifest, input.installed, input.bundle_dna_hashes)?;
 
     // ALREADY CURRENT BY BYTES — decided from bytes that just proved out, and
     // decided BEFORE the supersedes check that would otherwise refuse exactly
@@ -2354,6 +2487,200 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // The ARTIFACT's own DNA line (2026-09-06) — the live james mixture
+    // -----------------------------------------------------------------------
+
+    /// Installed reality for several roles at once. `installed_from` covers the
+    /// one-role case; the whole 2026-09-06 defect is about a peer whose roles
+    /// disagree with each other, so it cannot be measured one role at a time.
+    fn installed_roles(roles: &[(&str, &str, &str, &str)]) -> Answer<InstalledReality> {
+        InstalledReality::from_happ_passport(&HappPassport {
+            app_id: "elohim".to_string(),
+            roles: roles
+                .iter()
+                .map(|(role, dna, zome, wasm)| HappRolePassport {
+                    role: role.to_string(),
+                    dna_hash: dna.to_string(),
+                    coordinator_wasm_hashes: [(zome.to_string(), wasm.to_string())]
+                        .into_iter()
+                        .collect(),
+                    error: None,
+                    lineage: None,
+                    constitution_root: None,
+                })
+                .collect(),
+            error: None,
+            lineage_apps: Vec::new(),
+        })
+    }
+
+    fn bundle_dnas(entries: &[(&str, &str)]) -> Answer<BundleDnaHashes> {
+        Answer::Present(
+            entries
+                .iter()
+                .map(|(r, d)| (r.to_string(), d.to_string()))
+                .collect(),
+        )
+    }
+
+    const INSTALLED_IMAGODEI_DNA: &str = "uhC0kIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
+    const INSTALLED_MISHPAT_DNA: &str = "uhC0kMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM";
+    const WORKSPACE_IMAGODEI_DNA: &str = "uhC0kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+    const WORKSPACE_MISHPAT_DNA: &str = "uhC0kVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+    const WORKSPACE_INFRA_DNA: &str = "uhC0kFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+
+    /// **THE MEASURED INCIDENT (alpha, 2026-09-06).** The manifest's `appliesTo`
+    /// dnaHashes matched the fleet exactly — so the envelope passed — while the
+    /// staged ARTIFACT carried a different integrity line for the roles
+    /// `appliesTo` never named. Two independent claims; only one was checked.
+    ///
+    /// The refusal must name EVERY mismatching role with both hashes, must not
+    /// name the role that agrees, and must not name a bundle role this peer
+    /// does not run at all.
+    #[test]
+    fn the_artifacts_own_dna_line_is_checked_not_only_the_manifests() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let lamad_dna = manifest.applies_to.roles["lamad"].dna_hash.clone();
+
+        let installed = installed_roles(&[
+            ("lamad", &lamad_dna, "content_store", TARGET_WASM),
+            (
+                "imagodei",
+                INSTALLED_IMAGODEI_DNA,
+                "identity",
+                "uhCokIdentityBaseline",
+            ),
+            (
+                "mishpat",
+                INSTALLED_MISHPAT_DNA,
+                "governance",
+                "uhCokGovernanceBaseline",
+            ),
+        ]);
+
+        // The envelope is HAPPY: `appliesTo` names only lamad, and lamad's
+        // declared dnaHash is exactly what this peer runs. This is the check
+        // that passed on james.
+        verify_envelope(&manifest, &installed)
+            .expect("the manifest's own DNA claim matches the fleet — as it did on alpha");
+
+        // The bundle carries five roles. Four of them were built by a workspace
+        // toolchain that moved integrity bytes.
+        let bundle = bundle_dnas(&[
+            ("lamad", &lamad_dna),
+            ("imagodei", WORKSPACE_IMAGODEI_DNA),
+            ("mishpat", WORKSPACE_MISHPAT_DNA),
+            ("infrastructure", WORKSPACE_INFRA_DNA),
+        ]);
+
+        let refusal = verify_artifact_dna_line(&manifest, &installed, &bundle)
+            .expect_err("the ARTIFACT contradicts installed reality");
+        assert_eq!(refusal.reason_code(), RefusalReason::DnaLineageMismatch);
+        assert!(
+            !refusal.transient,
+            "only a new release changes an artifact's integrity line"
+        );
+
+        let d = &refusal.detail;
+        assert!(d.contains("imagodei"), "detail was: {d}");
+        assert!(d.contains("mishpat"), "detail was: {d}");
+        assert!(d.contains(INSTALLED_IMAGODEI_DNA), "detail was: {d}");
+        assert!(d.contains(WORKSPACE_IMAGODEI_DNA), "detail was: {d}");
+        assert!(d.contains(INSTALLED_MISHPAT_DNA), "detail was: {d}");
+        assert!(d.contains(WORKSPACE_MISHPAT_DNA), "detail was: {d}");
+        assert!(
+            d.contains("2 role(s)"),
+            "every mismatching role in ONE refusal, counted: {d}"
+        );
+        assert!(
+            !d.contains("infrastructure"),
+            "a bundle role this peer does not run cannot be corrupted by a hot-swap: {d}"
+        );
+        assert!(
+            !d.contains("lamad"),
+            "the role whose line agrees is not part of the refusal: {d}"
+        );
+    }
+
+    /// The same artifact, honestly packaged: every bundle role's line equals
+    /// this peer's. No refusal — the check must not become a tax on correct
+    /// releases.
+    #[test]
+    fn an_artifact_whose_dna_line_agrees_passes() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let lamad_dna = manifest.applies_to.roles["lamad"].dna_hash.clone();
+        let installed = installed_roles(&[
+            ("lamad", &lamad_dna, "content_store", TARGET_WASM),
+            (
+                "imagodei",
+                INSTALLED_IMAGODEI_DNA,
+                "identity",
+                "uhCokIdentityBaseline",
+            ),
+        ]);
+        let bundle = bundle_dnas(&[
+            ("lamad", &lamad_dna),
+            ("imagodei", INSTALLED_IMAGODEI_DNA),
+            // A bundle role this peer does not run — skipped, not refused.
+            ("infrastructure", WORKSPACE_INFRA_DNA),
+        ]);
+        verify_artifact_dna_line(&manifest, &installed, &bundle)
+            .expect("every role in both sets agrees");
+    }
+
+    /// Honest absence never refuses, in either direction: a `config-epr`
+    /// release carries no bundle, and an unreadable one is already covered by
+    /// the per-role guard the vehicle runs. Refusing on absence would ground
+    /// every non-bundle class.
+    #[test]
+    fn absent_bundle_evidence_never_refuses_the_dna_line() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let installed = installed_roles(&[(
+            "lamad",
+            &manifest.applies_to.roles["lamad"].dna_hash.clone(),
+            "content_store",
+            TARGET_WASM,
+        )]);
+        verify_artifact_dna_line(&manifest, &installed, &Answer::Absent).expect("absent");
+        verify_artifact_dna_line(&manifest, &installed, &Answer::Unreachable).expect("unreachable");
+        // And an unreadable installed reality is `installed_reality_unknown`'s
+        // business (verify_envelope), never this check's.
+        verify_artifact_dna_line(
+            &manifest,
+            &Answer::Unreachable,
+            &bundle_dnas(&[("lamad", WORKSPACE_INFRA_DNA)]),
+        )
+        .expect("unknown reality");
+    }
+
+    /// **Rung 6 exemption.** Crossing the DNA line is the whole point of a
+    /// `happ-lineage` release; `verify_envelope`'s `crossing_ok` arm and
+    /// `verify_path`'s notarized commitment govern it. This check must not
+    /// re-refuse what that ceremony exists to permit.
+    #[test]
+    fn a_happ_lineage_release_is_exempt_from_the_artifact_dna_line() {
+        let body = fixture("release-manifest-happ-lineage.json");
+        let manifest = verify_shape(&body).unwrap();
+        assert_eq!(manifest.artifact_class, ArtifactClass::HappLineage);
+        let role = manifest
+            .applies_to
+            .roles
+            .keys()
+            .next()
+            .expect("the lineage fixture binds a role")
+            .clone();
+        let installed =
+            installed_roles(&[(&role, INSTALLED_IMAGODEI_DNA, "content_store", TARGET_WASM)]);
+        // A different line — which is exactly what a crossing IS.
+        let bundle = bundle_dnas(&[(&role, WORKSPACE_IMAGODEI_DNA)]);
+        verify_artifact_dna_line(&manifest, &installed, &bundle)
+            .expect("a lineage crossing is governed by verify_path, not by this check");
+    }
+
+    // -----------------------------------------------------------------------
     // Already current BY BYTES (2026-09-04) — the live james refusal
     // -----------------------------------------------------------------------
 
@@ -2435,6 +2762,105 @@ mod tests {
                 .expect_err("runs neither")
                 .reason_code(),
             RefusalReason::CoordinatorLineageMismatch
+        );
+    }
+
+    /// Add a second bound role to the coordinator-bundle fixture's manifest,
+    /// so the multi-role refusal shape can be measured. The fixture binds one
+    /// role, which is exactly why a first-role-wins refusal went unnoticed.
+    fn manifest_binding_two_roles(second: &str, dna: &str, superseded: &str) -> ReleaseManifest {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let mut manifest = verify_shape(&body).unwrap();
+        manifest.applies_to.roles.insert(
+            second.to_string(),
+            RoleBinding {
+                dna_hash: dna.to_string(),
+                coordinator_wasm_hashes: vec![superseded.to_string()],
+                coordinator_zomes: None,
+                migrate_from: None,
+                lineage: None,
+                constitution_root: None,
+            },
+        );
+        manifest
+    }
+
+    /// **One refusal, whole truth.** Two roles diverge; the detail names BOTH.
+    /// Returning on the first divergent role made the refusal a keyhole — on
+    /// alpha the peer left running a five-role mixture reported one role name
+    /// and the shape of the problem was invisible from the verdict.
+    #[test]
+    fn every_divergent_role_is_named_in_one_coordinator_lineage_refusal() {
+        let manifest = manifest_binding_two_roles(
+            "imagodei",
+            INSTALLED_IMAGODEI_DNA,
+            "uhCokImagodeiSuperseded",
+        );
+        let lamad_dna = manifest.applies_to.roles["lamad"].dna_hash.clone();
+        // Neither role runs what the release supersedes.
+        let installed = installed_roles(&[
+            ("lamad", &lamad_dna, "content_store", THIRD_WASM),
+            (
+                "imagodei",
+                INSTALLED_IMAGODEI_DNA,
+                "identity",
+                "uhCokSomethingElseEntirely",
+            ),
+        ]);
+
+        let refusal = verify_coordinator_lineage(&manifest, &installed)
+            .expect_err("both roles run neither the superseded nor the target bytes");
+        assert_eq!(
+            refusal.reason_code(),
+            RefusalReason::CoordinatorLineageMismatch,
+            "behaviour-identical: still ONE coordinator_lineage_mismatch"
+        );
+        let d = &refusal.detail;
+        assert!(d.contains("lamad"), "detail was: {d}");
+        assert!(d.contains("imagodei"), "detail was: {d}");
+        assert!(d.contains("2 role(s)"), "detail was: {d}");
+    }
+
+    /// The MIXTURE, as verify sees it today: lamad already at the release
+    /// target, imagodei still at the superseded generation. The by-bytes exit
+    /// cannot fire (imagodei is not at target), and the supersedes check
+    /// refuses naming ONLY lamad — because imagodei is a peer this release was
+    /// legitimately cut for. That asymmetry is the trap `verify_artifact_dna_line`
+    /// now prevents a peer from entering in the first place.
+    #[test]
+    fn a_mixed_peer_is_refused_naming_only_the_role_that_moved_ahead() {
+        let superseded_imagodei = "uhCokImagodeiSuperseded";
+        let manifest =
+            manifest_binding_two_roles("imagodei", INSTALLED_IMAGODEI_DNA, superseded_imagodei);
+        let lamad_dna = manifest.applies_to.roles["lamad"].dna_hash.clone();
+        let installed = installed_roles(&[
+            // Hot-swapped by the partial apply.
+            ("lamad", &lamad_dna, "content_store", TARGET_WASM),
+            // Left at baseline by the four lineage refusals.
+            (
+                "imagodei",
+                INSTALLED_IMAGODEI_DNA,
+                "identity",
+                superseded_imagodei,
+            ),
+        ]);
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+
+        assert!(
+            !already_runs_target(&manifest, &installed, &target),
+            "a mixture can never take the convergence exit — imagodei is not at target"
+        );
+        let refusal = verify_coordinator_lineage(&manifest, &installed)
+            .expect_err("lamad no longer runs what the release supersedes");
+        assert_eq!(
+            refusal.reason_code(),
+            RefusalReason::CoordinatorLineageMismatch
+        );
+        let d = &refusal.detail;
+        assert!(d.contains("lamad"), "detail was: {d}");
+        assert!(
+            d.contains("1 role(s)"),
+            "imagodei still runs the superseded bytes, so it is not divergent: {d}"
         );
     }
 
@@ -2733,6 +3159,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("wrong channel");
@@ -2775,6 +3202,7 @@ mod tests {
             attestations: Some(&evidence),
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("every arm passes");
@@ -2782,6 +3210,89 @@ mod tests {
         assert_eq!(verified.channel_id, manifest.channel_id);
         assert_eq!(verified.release_cid, "uhCkkTheWinningVersion");
         assert_eq!(verified.artifact_paths.len(), manifest.artifacts.len());
+    }
+
+    /// The whole floor, on the alpha 2026-09-06 evidence: an envelope that
+    /// passes, artifacts whose digests prove out, and a bundle whose own
+    /// integrity line contradicts installed reality for roles `appliesTo`
+    /// never named. Before this check the floor VERIFIED that release and
+    /// handed it to a vehicle that hot-swapped one of five roles.
+    #[test]
+    fn the_composed_floor_refuses_an_artifact_that_contradicts_installed_reality() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_roles(&[
+            (
+                "lamad",
+                &binding.dna_hash,
+                "content_store",
+                &binding.coordinator_wasm_hashes[0],
+            ),
+            (
+                "imagodei",
+                INSTALLED_IMAGODEI_DNA,
+                "identity",
+                "uhCokIdentityBaseline",
+            ),
+        ]);
+        let lineage = Answer::Present(LineageEvidence { supersedes: None });
+        let declared = &manifest.artifacts[0];
+        let artifacts = vec![FetchedArtifact {
+            blob_cid: declared.blob_cid.clone(),
+            path: PathBuf::from("/var/lib/elohim/release-staging/x/content_store.wasm"),
+            bytes: declared.bytes,
+            sha256: declared.sha256.clone(),
+        }];
+        let evidence = QualifyingEvidence {
+            qualifying: 2,
+            threshold: 2,
+            total: 2,
+            ..Default::default()
+        };
+        let poisoned = bundle_dnas(&[
+            ("lamad", &binding.dna_hash),
+            ("imagodei", WORKSPACE_IMAGODEI_DNA),
+        ]);
+
+        let refusal = verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkTheWorkspaceCut",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: Some(&evidence),
+            tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &poisoned,
+            path: Answer::Absent,
+        })
+        .expect_err("the artifact contradicts installed reality for imagodei");
+        assert_eq!(refusal.reason_code(), RefusalReason::DnaLineageMismatch);
+        assert!(refusal.detail.contains("imagodei"));
+
+        // The same release, honestly packaged, still verifies — the new arm
+        // must not be a tax on the peers a release WAS cut for.
+        let honest = bundle_dnas(&[
+            ("lamad", &binding.dna_hash),
+            ("imagodei", INSTALLED_IMAGODEI_DNA),
+        ]);
+        let verified = verify(VerifyInput {
+            channel_id: &manifest.channel_id,
+            release_cid: "uhCkkTheHonestCut",
+            body: &body,
+            installed: &installed,
+            lineage: &lineage,
+            artifacts: &artifacts,
+            attestations: Some(&evidence),
+            tier: HeadTier::Earned,
+            target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &honest,
+            path: Answer::Absent,
+        })
+        .expect("an artifact whose line agrees passes the floor as before");
+        assert_eq!(expect_verified(verified).release_cid, "uhCkkTheHonestCut");
     }
 
     /// **Design 2026-09-01 (canary-first adoption) — the defect this fixes.**
@@ -2826,6 +3337,7 @@ mod tests {
             attestations: Some(&unmet),
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("an EARNED head with an unmet threshold is still refused");
@@ -2841,6 +3353,7 @@ mod tests {
             attestations: Some(&unmet),
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("the SAME unmet evidence never refuses a STAGING head");
@@ -2861,6 +3374,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("unchecked is not a pass on an EARNED head");
@@ -2879,6 +3393,7 @@ mod tests {
             attestations: None,
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
+            bundle_dna_hashes: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("an unread threshold never gates a STAGING head either");

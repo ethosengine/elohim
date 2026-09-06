@@ -698,6 +698,61 @@ impl AdoptionController {
         *self.cached_reality.lock().await = None;
     }
 
+    /// **The C6b exit's one bounded read.** Re-read installed reality IF the
+    /// snapshot is invalidated or older than [`INSTALLED_REALITY_TTL_SECS`];
+    /// otherwise do nothing at all. Returns whether a conductor read happened,
+    /// so the zero-call contract is assertable rather than merely intended.
+    ///
+    /// # The defect (alpha, 2026-09-06)
+    ///
+    /// james applied `uhCkkV8l1w…` at 19:07:52Z, hot-swapping `lamad` from
+    /// `uhCokL5-8…` to `uhCokBbQH…`. His installed-reality snapshot had been
+    /// taken at 19:07:51Z — one second BEFORE the apply — and
+    /// [`Self::installed_reality_invalidate`] duly cleared the cache. But
+    /// clearing a cache only helps a reader that comes back, and every
+    /// subsequent sweep took the C6b idempotence exit, which returns before
+    /// [`Self::installed_reality`] is ever called. So nothing re-read, the
+    /// snapshot `state::record_installed_reality` had recorded stayed at
+    /// 19:07:51, and `GET /admin/adoption` (and the doorway projection over it)
+    /// served a PRE-apply reality for ten minutes and more, indefinitely, while
+    /// the peer ran the new bytes. A converged peer reporting a reality it no
+    /// longer has is worse than a peer reporting nothing.
+    ///
+    /// # Why this does not break the exit's cost contract
+    ///
+    /// C6b's contract is "ZERO conductor calls beyond the resolve" for a
+    /// **re-sweep on a current head**, and a converged peer sweeping every
+    /// minute holds a snapshot far younger than the 300s TTL, so this is a
+    /// lock, a subtraction and a return. The read fires only in the two cases
+    /// where the report is otherwise KNOWN to be wrong: right after this node's
+    /// own apply invalidated the snapshot, and once per TTL thereafter. That
+    /// is one bounded read per five minutes in the steady state, on a path that
+    /// already spends a resolve.
+    ///
+    /// The verdict shape is untouched — this changes only what the report says
+    /// about the peer, never what the controller decides about the release.
+    async fn refresh_installed_reality_if_stale(&self, now: i64) -> bool {
+        if self.installed.is_none() {
+            return false;
+        }
+        // Scoped so the guard is provably dropped before
+        // `installed_reality_refresh` takes the same lock.
+        let stale = {
+            let cached = self.cached_reality.lock().await;
+            match cached.as_ref() {
+                Some((read_at, _)) => now - read_at >= INSTALLED_REALITY_TTL_SECS,
+                // Invalidated by this node's own apply — the case the whole
+                // function exists for.
+                None => true,
+            }
+        };
+        if !stale {
+            return false;
+        }
+        self.installed_reality_refresh(now).await;
+        true
+    }
+
     /// Resolve one channel's canonical head through THIS node's conductor —
     /// `resolve_content_head_local` (`GetStrategy::Local`), never the network
     /// variant. This controller reads what gossip has already delivered to
@@ -1262,6 +1317,22 @@ impl AdoptionController {
         // guard, read once instead of twice.
         if let Some(applied) = applied {
             if applied.cid == release_cid {
+                // The ONE thing this exit still owes: an installed-reality
+                // snapshot that is not a lie. A fresh snapshot costs nothing
+                // here (see `refresh_installed_reality_if_stale`); an
+                // invalidated one — which is exactly what this node's own apply
+                // leaves behind, one sweep ago — is re-read once. Without this,
+                // the exit's zero-call purity preserved a PRE-apply reality on
+                // `/admin/adoption` forever (alpha, 2026-09-06).
+                if self.refresh_installed_reality_if_stale(now).await {
+                    tracing::info!(
+                        channel = %channel.channel_id,
+                        release_cid = %release_cid,
+                        "release-adoption: re-read installed reality on the idempotence exit — \
+                         the snapshot was invalidated or past its TTL, and a converged peer must \
+                         not report a reality it no longer has"
+                    );
+                }
                 return CheckOutcome::Checked {
                     head: Some(resolved),
                     verdict: Verdict::Applied {
@@ -1483,11 +1554,13 @@ impl AdoptionController {
             }
         }
 
-        // What the staged bytes WOULD install — the evidence the by-bytes exit
-        // reads. Derived from the artifact itself because a manifest declares
-        // only what it SUPERSEDES.
-        let target_coordinators =
-            super::apply::staged_target_coordinators(&manifest, &fetched).await;
+        // What the staged bytes WOULD install, and what integrity line they
+        // CARRY — both read from ONE unpack of the artifact, because a manifest
+        // declares only what it SUPERSEDES and (alpha 2026-09-06) what it
+        // declares about the DNA line can be true while the bytes are not.
+        let staged = super::apply::staged_bundle_evidence(&manifest, &fetched).await;
+        let target_coordinators = staged.target_coordinators;
+        let bundle_dna_hashes = staged.bundle_dna_hashes;
         // FRESHNESS GATE. The by-bytes exit STOPS work on the strength of the
         // installed-reality snapshot, so — unlike a refusal, which self-heals
         // on the next sweep — it may not be taken from a stale one. Exactly one
@@ -1510,6 +1583,7 @@ impl AdoptionController {
             attestations: attestations.as_ref(),
             tier: resolved.tier,
             target_coordinators: &target_coordinators,
+            bundle_dna_hashes: &bundle_dna_hashes,
             // **Rung 6.** The fetch site (I1/C5): the commitment is read
             // through THIS peer's own conductor, its lifecycle off this
             // peer's own projection. Absent for every artifact class but
@@ -2277,6 +2351,125 @@ mod tests {
             "invalidate must force the very next installed_reality() call to miss the cache, \
              even though it is still well within the TTL"
         );
+    }
+
+    /// **C6b's cost contract, asserted rather than intended.** A re-sweep on a
+    /// current head holds a snapshot far younger than the TTL (the sweep
+    /// interval is a minute; the TTL is five), so the idempotence exit's
+    /// installed-reality re-read must be a lock, a subtraction and a return —
+    /// ZERO conductor calls, right up to the last second of the TTL.
+    #[tokio::test]
+    async fn a_fresh_snapshot_costs_the_idempotence_exit_zero_conductor_calls() {
+        use std::sync::atomic::Ordering;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = Arc::new(CountingInstalledReality {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let controller = AdoptionController::new(dir.path()).with_installed_reality(source.clone());
+
+        controller.installed_reality(1_000).await;
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+
+        assert!(
+            !controller.refresh_installed_reality_if_stale(1_000).await,
+            "a snapshot taken this instant is not stale"
+        );
+        assert!(
+            !controller
+                .refresh_installed_reality_if_stale(1_000 + SWEEP_INTERVAL_SECS as i64)
+                .await,
+            "the ordinary converged sweep, one interval later, must still read nothing"
+        );
+        assert!(
+            !controller
+                .refresh_installed_reality_if_stale(1_000 + INSTALLED_REALITY_TTL_SECS - 1)
+                .await,
+            "the last second inside the TTL is still a cache hit"
+        );
+        assert_eq!(
+            source.calls.load(Ordering::SeqCst),
+            1,
+            "the idempotence exit spends ZERO conductor calls on a fresh snapshot"
+        );
+    }
+
+    /// **The measured defect (alpha, 2026-09-06).** james applied at 19:07:52Z
+    /// against a snapshot read at 19:07:51Z. `installed_reality_invalidate`
+    /// cleared the cache — but every sweep after that took the C6b idempotence
+    /// exit, which returns before `installed_reality()` is ever called, so
+    /// nothing came back to re-read. `/admin/adoption` served the PRE-apply
+    /// `lamad` hash for ten minutes and counting while the peer ran the new
+    /// bytes.
+    ///
+    /// An invalidated snapshot must therefore be re-read on the idempotent
+    /// sweep — exactly once, and only because it is invalidated.
+    #[tokio::test]
+    async fn an_invalidated_snapshot_is_re_read_on_the_idempotent_sweep() {
+        use std::sync::atomic::Ordering;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = Arc::new(CountingInstalledReality {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let controller = AdoptionController::new(dir.path()).with_installed_reality(source.clone());
+
+        // 19:07:51 — the pre-apply read.
+        controller.installed_reality(1_000).await;
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+
+        // 19:07:52 — the apply lands and invalidates.
+        controller.installed_reality_invalidate().await;
+
+        // The next sweep, one interval later, takes the C6b exit.
+        assert!(
+            controller.refresh_installed_reality_if_stale(1_060).await,
+            "an invalidated snapshot is re-read even on the exit that spends nothing else"
+        );
+        assert_eq!(source.calls.load(Ordering::SeqCst), 2);
+
+        // And it converges: the sweep after that is free again. One bounded
+        // read, not a read per sweep.
+        assert!(!controller.refresh_installed_reality_if_stale(1_120).await);
+        assert_eq!(
+            source.calls.load(Ordering::SeqCst),
+            2,
+            "the re-read must not become a per-sweep conductor call"
+        );
+        // The refreshed snapshot is the one a subsequent reader gets.
+        let (_, age) = controller.installed_reality(1_120).await;
+        assert_eq!(age, 60, "aged from the RE-READ at 1_060, not from 1_000");
+    }
+
+    /// Past the TTL the exit re-reads too — a converged peer whose reality
+    /// drifted underneath it (an operator hot-swap, a restart onto different
+    /// bytes) must not report a five-minute-old passport indefinitely.
+    #[tokio::test]
+    async fn a_snapshot_past_its_ttl_is_re_read_on_the_idempotent_sweep() {
+        use std::sync::atomic::Ordering;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = Arc::new(CountingInstalledReality {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let controller = AdoptionController::new(dir.path()).with_installed_reality(source.clone());
+
+        controller.installed_reality(1_000).await;
+        assert!(
+            controller
+                .refresh_installed_reality_if_stale(1_000 + INSTALLED_REALITY_TTL_SECS)
+                .await
+        );
+        assert_eq!(source.calls.load(Ordering::SeqCst), 2);
+    }
+
+    /// A node with no installed-reality source reads nothing and says so —
+    /// never a panic, never a phantom call, on a path that runs every minute.
+    #[tokio::test]
+    async fn an_unequipped_node_never_reads_installed_reality_on_the_exit() {
+        let dir = tempfile::tempdir().unwrap();
+        let controller = AdoptionController::new(dir.path());
+        assert!(!controller.refresh_installed_reality_if_stale(1_000).await);
     }
 
     /// **The re-read-once decision, as a pure table.** Only a lineage
