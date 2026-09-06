@@ -105,6 +105,7 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
       - "a2o @concern:trust-priced-sync (genesis/a2o/features/dataplane/trust-priced-sync.feature) — RED-FIRST 2026-09-01: a household peer prices its household edges `trusted` and no edge `public` on a pure-household mesh; the trust handshake is a stub that prices every edge `public`, so this check is born red and runnable on existing steps"
+      - "a2o @concern:accountable-correction (genesis/a2o/features/dataplane/accountable-correction.feature — RED-FIRST 2026-09-06: a correction filed by one household peer against another's record converges to the SAME verdict on every peer, and only the record's root author can accept it or publish its successor. Contract: genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md; the coordinator + storage surface it binds to is documented in features/dataplane/README-accountable-correction.md. Born red: the eight stations have never run on the mesh)"
     evidence: >
       DELTA 2026-09-02 (dataplane pain-points sprint, wave 1; NO status flip): LIVE PROBE
       2026-09-02 — federation-deploy scenario 2 conditions HOLD on both doorways (GET / 200;
@@ -672,6 +673,38 @@ habits:
         held / 1 failed — the B-side `caughtUp` red from #1432/#1434 is GONE (measured outside the churn window this time),
         leaving only the chronic `coverageShortfall` row. adam's dead-anchor wedge is unchanged and remains this habit's
         fleet-side red; the runtime poller files it on its next run.
+
+      DELTA 2026-09-06 (accountable correction, slice 1 — LOCAL ONLY; NO status change and no mesh
+        claim). Landed on sprint/accountable-correction and verified on this desk, nowhere else.
+        WHAT LANDED. Coordinator (elohim DNA `content_store`, COORDINATOR-ONLY — lamad.dna packs to
+        uhC0k0UOVlaaZ-2pKSHmgaM30CS26IC3jdiShEMaXJy5iT5xYAoNK before AND after, while the bundle
+        sha256 and the coordinator wasm size both move, so this heals by `update_coordinators`
+        hot-swap and never re-keys an agent): `get_content_lineage` (verified EXACT root Create,
+        per-candidate fetch outcomes, deduplicated links, observed-fork marker), `amend_content`
+        (root-author-gated Update against an EXPLICIT predecessor, refusing when a cross-root
+        canonical head means it could never be served), `get_feedback_signal_record` plus
+        reference+outcome discovery queries, and correction ADMISSION binding the act to an immutable
+        request embedded in a public Correction EPR. The read resolver and the declare path now share
+        ONE version-DAG total order with an action-hash tiebreak — the previous bare
+        `max_by_key(timestamp)` was enumeration-order dependent, so two peers holding the same two
+        versions could serve different heads. Storage: four migrations (application keyed by the
+        OPERATION GROUP, the local-intent outbox, the durable subscription set with a fairness cursor,
+        and per-evaluator generations), `services/feedback_projector.rs` as the single application
+        path, the §7 cutover that STOPS the pre-contract immediate debit at api/epr.rs, an additive
+        `actRef` on the p2p feedback message with old<->new decode pinned, and
+        `POST /api/v1/feedback/operations`.
+        WHAT IS PROVEN. `just gate sweettest-check` EXIT=0, `just gate schema-dna` EXIT=0,
+        `just gate manifest-hygiene` EXIT=0; 96 native zome unit tests pass including 11 new ones;
+        the storage lib+test suite passes locally.
+        WHAT IS NOT PROVEN — the honest half. NOTHING here has run on the household mesh. The eight
+        stations of @concern:accountable-correction have never executed; the new sweettests are
+        written but not run (they need a packed DNA from the pipeline); no peer has ever discovered,
+        verified and applied a correction authored by another peer. The projector's tick loop is
+        written and unit-tested against a fake DHT reader but is NOT yet spawned from main — nothing
+        drives it in a running node, so on a live peer today a correction is enqueued and never
+        applied. That is a deliberate stop: wiring a consumer whose upstream has not been exercised
+        end-to-end once is how a no-op ships reading as done. The habit stays RED, and this check is
+        born red.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

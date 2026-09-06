@@ -66,3 +66,101 @@ so a reader does not have to re-derive who is who per scenario:
 - **Matthew** — the third peer: never a root author, correction author, or acceptor in these
   stations. He is the durable-discovery witness — the peer whose scan (contract §3) is what
   proves discovery does not depend on notification.
+
+## The Rust surface as it landed (rust-architect, 2026-09-06)
+
+Written after the coordinator + storage slice landed on `sprint/accountable-correction`. Bind
+step definitions to what is written here; where this contradicts an earlier expectation above,
+this section is what the code does.
+
+### `ELOHIM_FEEDBACK_NOTIFY` — landed as a RUNTIME-CONFIG setting, not a raw env read
+
+The a2o note above asks for a flag readable "at call time, not only at boot", because
+`hc-mesh.sh` never restarts a peer between scenarios. A process cannot have its environment
+changed from outside after it starts, so a literal `std::env::var` at the send site could not
+have satisfied that — it would only ever see the boot value.
+
+What landed instead is a registered setting in this crate's existing **watched runtime-config
+registry** (`elohim/elohim-storage/src/runtime_config.rs`, `Key::FeedbackNotify`), which is the
+mechanism already armed on every mesh peer (`ELOHIM_RUNTIME_CONFIG_PATH=<mesh>/<peer>/runtime-config.toml`,
+set from boot by `hc-mesh.sh`). It is hot: the send path reads the registry per act.
+
+A scenario flips it on a RUNNING peer, two equivalent ways:
+
+- write `ELOHIM_FEEDBACK_NOTIFY=0` into that peer's `runtime-config.toml` and wait for the 10s
+  poller, or force it immediately with `POST /admin/runtime-config/reload` on that peer;
+- read back the effective value and its provenance (`boot-env` vs `runtime-config`) from
+  `GET /admin/runtime-config` — use this to ASSERT the flip took, rather than assuming it did.
+
+Boot-time `ELOHIM_FEEDBACK_NOTIFY=0` in the process environment also works and remains the
+default source; the file overrides it while present, and removing the key restores the boot value.
+
+Semantics as implemented (`services::back_prop::direct_notify_enabled`): at `0`, `back_prop_one_hop`
+returns "no predecessors targeted" without sending. The act is still committed to the author's own
+source chain and still discoverable by every other peer's durable scan. Default (unset) is `1`.
+
+### Coordinator functions (elohim DNA, `content_store` zome — coordinator-only, DNA hash unmoved)
+
+| Function | Input | Returns |
+|---|---|---|
+| `create_feedback_signal` | `{ target_action_hash, signal_kind, evidence_action_hash?, standing_impact }` | `ActionHash` |
+| `create_vouch` | `{ target_action_hash, vouch_kind, standing_impact }` | `ActionHash` |
+| `amend_content` | `{ predecessor_action_hash, content: { title?, description?, content?, metadata_json?, blob_cid?, content_size_bytes?, content_hash?, reach? } }` | `ContentOutput` |
+| `get_content_lineage` | `{ action_hash, local? }` | `ContentLineageOutput` |
+| `get_feedback_signal_record` | `ActionHash` | `Option<Record>` |
+| `get_feedback_signal_refs_for_target` | `{ target_action_hash, resolve? }` | `FeedbackSignalRefs` |
+| `list_feedback_signal_refs_by_signer` | `{ signer_pubkey, resolve? }` | `FeedbackSignalRefs` |
+
+`ContentLineageOutput` carries `root_action_hash`, `root_author`, `content_id`, `candidates[]`
+(each `{ action_hash, predecessor, author, timestamp, fetch_outcome, in_root }`),
+`head_action_hash`, `contested`, `contested_predecessors[]`, and the honest counters
+`link_count` / `duplicate_links` / `invalid_link_targets` / `other_root_candidates` /
+`unfetchable_candidates` / `truncated`.
+
+**Correction admission changed (contract §8).** `create_feedback_signal` with
+`signal_kind: "correction"` now REFUSES unless `evidence_action_hash` resolves to a Content
+record that is (a) public — `reach` one of `public` / `commons` — and (b) carries this exact
+object in its `metadata_json`:
+
+```json
+{ "correctionRequest": {
+    "operationId": "<the operation id>",
+    "targetActionHash": "<same value as target_action_hash>",
+    "signalKind": "correction",
+    "standingImpact": "<same value as standing_impact>" } }
+```
+
+Any mismatch is a refusal, not a retry. A station that files a correction must author its
+evidence in that shape — or use the outbox below, which does it for you.
+
+**Refusal substrings** worth asserting on: `"is not the author"` (a non-root-author
+`amend_content`), `"cross-root canonical head already stands"` (an amendment that could never
+become the served head), `"correction evidence"` (every admission refusal).
+
+### Storage HTTP
+
+| Route | Purpose |
+|---|---|
+| `POST /api/v1/feedback/operations` | The submission outbox (§8). Body: `{ operationId, targetActionHash, signalKind, standingImpact, vouchKind?, body? }`. Runs BOTH phases: authors the Correction EPR with Content id `correction:<operationId>` and the embedded request, then files the feedback citing it. |
+| `GET /api/v1/feedback/operations/{operationId}` | `{ operationId, phase, status, evidenceActionHash, feedbackActionHash, requestBytesCid, lastError, … }`. |
+
+Status codes: `201` resolved · `202` accepted-but-not-resolved (read `status`: `pending` or
+`unresolved`) · `409` the operation id was reused with DIFFERENT request bytes (the request an
+operation pins is immutable) · `503` this node has no content cell.
+
+`status: "unresolved"` is a terminal-for-automation state: an uncertain call whose recovery
+enumeration found ZERO matches is NEVER auto-resubmitted. A scenario that wants to retry POSTs
+the same `operationId` again, which reuses the same evidence action and therefore the same
+group — a second act would be a group MEMBER, never a second contribution.
+
+### What a station can and cannot observe today
+
+- **Can:** the coordinator refusals above; `get_content_lineage` naming the exact root and
+  reporting `contested`; the outbox's phase/status; `GET /admin/runtime-config` proving the
+  notify flip took.
+- **Cannot yet:** there is no HTTP read for the per-generation application rows or the
+  `rebuilding` generation state. Standing is still read through the existing
+  `GET /api/v1/standing/{agent_cid}`, whose semantics CHANGED at this cutover: a correction alone
+  now contributes zero and leaves the subject's aggregate ABSENT (Unknown), where before it
+  debited the signal's SIGNER immediately. A station asserting "an allegation costs the filer
+  nothing" should assert Unknown/absent for the TARGET's root author, not a zero score.

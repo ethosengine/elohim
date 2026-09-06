@@ -3659,6 +3659,126 @@ decisionPoints:
       a local capability secret and exact local cell actor. Native grant signature,
       selected provider, requester, scope, bounds and observed DHT revocation are
       checked before one-use launch accounting. CID verification binds task and receipt.
+  # =========================================================================
+  # Accountable correction — slice 1 (contract 2026-09-06, revision 3)
+  # =========================================================================
+
+  - name: FeedbackActRef
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/p2p/feedback_signal.rs
+      modulePath: p2p::feedback_signal::FeedbackActRef
+      line: 122
+    summary: >
+      The ADDITIVE notification reference the direct p2p `feedback-signal` message gained
+      (accountable-correction contract §4). It is the pointer that turns a notification from
+      a CLAIM into something a receiver can go and verify: identity is
+      (origin_dna_hash, action_hash) — the SIGNED ACT, deliberately not the entry hash,
+      because two authors' identical corrections share an entry hash and are two acts. The
+      routing key rides alongside rather than being derived: back_prop's predecessor key is
+      `target_cid` as a string, and resolving an action to its Content.id does not by itself
+      yield that key. Carried as `#[serde(default)] Option<FeedbackActRef>` on the existing
+      `FeedbackSignal`, so `rmp_serde::to_vec_named`'s map keying makes it decode both ways
+      across mixed-version peers with NO protocol-version bump.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A reference confers nothing on its own. The receiver
+          (`epr_atom_service::handle_feedback_signal_notify`) refuses a foreign
+          origin_dna_hash outright and otherwise only ENQUEUES the act; every authority
+          question is settled later by the projector against the fetched, signed record.
+      - id: C4
+        status: answered
+        justification: >
+          The reference is a positive observation of an act's address, never an absence
+          claim. A message that carries none is refused as "semantic claim alone is not
+          evidence" rather than being projected on the sender's word.
+      - id: C6b
+        status: answered
+        justification: >
+          Receiving the same reference twice is deduped on (origin DNA, action hash) and
+          otherwise lands as an idempotent `add_member` on the subscription set.
+      - id: C10
+        status: answered
+        justification: >
+          Old->new and new->old decode are both pinned by contract tests, and an absent
+          reference is proven byte-identical on the wire to the pre-slice-1 encoding, so a
+          mixed-version mesh cannot drop or mis-parse a correction.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/feedback_signal.rs
+        testName: old_bytes_decode_on_the_new_struct
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/feedback_signal.rs
+        testName: new_bytes_decode_on_the_old_struct
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/feedback_signal.rs
+        testName: absent_act_ref_is_omitted_from_the_wire
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/feedback_signal.rs
+        testName: act_ref_round_trips_between_new_peers
+        kind: unit
+
+  - name: AcceptanceVerdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/feedback_projector.rs
+      modulePath: services::feedback_projector::verify_acceptance
+      line: 0
+    summary: >
+      Acceptance of a correction is a STORAGE-VERIFIED PROJECTION CLASSIFICATION, not an
+      integrity guarantee: the integrity validator admits any vouch by anyone. This verdict
+      walks the whole §5.2 chain — vouch -> correction -> target content -> EXACT root author
+      — and separates three outcomes that the pre-contract code conflated: Accepted, Pending
+      (a dependency is unfetchable; retried, never shown as accepted) and Refused (a positive
+      mismatch; not retried). Same-cell self-acceptance is held PENDING, never reported as
+      accepted.
+    concernIds:
+      - id: C1
+        status: partial
+        justification: >
+          Slice 1 admits the TARGET's exact root author only. Delegate acceptance is a named
+          gap: `HeadDelegation` is signed and returned but never committed, so no remote
+          consumer can fetch it, and its expiry uses verifier `sys_time()`, which makes
+          replay non-deterministic.
+      - id: C4
+        status: answered
+        justification: >
+          Pending and Refused are distinct outcomes with distinct handling. An unfetchable
+          dependency never degrades into a rejection, and absence is never read as
+          "uncontested".
+      - id: C6b
+        status: answered
+        justification: >
+          The verdict is a pure function of (vouch, correction, lineage, root author); it
+          holds no state and returns the same answer on every replay of the same inputs.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: acceptance_by_the_root_author_is_accepted
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: acceptance_by_a_non_root_author_is_refused
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: unfetchable_dependency_is_pending_not_refused
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: same_cell_self_acceptance_is_pending_never_accepted
+        kind: unit
+
+  - name: commit_group
+    kind: state-transition
+    sourceLocation:
+      file: src/services/feedback_projector.rs
+      modulePath: services::feedback_projector::commit_group
+      line: 0
+    summary: >
+      The ONE write that moves a standing aggregate. Registrable claim is the SHAPE OF ITS
+      EFFECT under REPEATED application: the application row, its member rows and the
+      aggregate commit in one diesel transaction that PROPAGATES failure, and a group already
+      applied in this generation re-records late members without re-contributing. Admission is
+      narrow by design — this is a reconcile-tick write whose invariant is only observable
+      across repeated and concurrent application.
     concernIds:
       - id: C6b
         status: answered
@@ -3684,4 +3804,31 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/api/compute_tasks.rs
         testName: receipt_binding_rejects_wrong_actor_artifact_and_empty_pass
+          Replay after commit is a no-op on the aggregate, pinned by a three-tick test. A
+          late-arriving member of an applied group is recorded and contributes nothing, so
+          two peers that discover the same group in different orders converge.
+      - id: C4
+        status: answered
+        justification: >
+          Checked i32 arithmetic: an overflowing contribution aborts the transaction rather
+          than wrapping a score. The pre-contract `+` on the i32 column would have silently
+          inverted it.
+      - id: C11
+        status: answered
+        justification: >
+          A partial apply is impossible: the row and the aggregate roll back together, so a
+          crash between them cannot leave a committed row that makes replay a permanent
+          no-op with no contribution.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: replay_after_commit_is_a_no_op
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: two_members_of_one_group_contribute_once
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: late_arrival_after_apply_records_without_recontributing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: crash_between_row_and_aggregate_rolls_both_back
         kind: unit
