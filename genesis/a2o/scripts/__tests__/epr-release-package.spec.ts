@@ -557,11 +557,15 @@ async function packageFromAdoption(report: JsonObject, extra: string[] = []): Pr
 
 void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts the release FOR the target peer', () => {
   void it("binds each role to the TARGET's installed reality, not the builder's passport", async () => {
-    const manifest = JSON.parse(await packageFromAdoption(adoptionReportFixture('present'))) as JsonObject;
+    const manifest = JSON.parse(
+      await packageFromAdoption(adoptionReportFixture('present'))
+    ) as JsonObject;
     const result = validateManifest(manifest);
     assert.equal(result.ok, true, result.errors.join('\n'));
     const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
-    assert.deepEqual((roles['mishpat'] as JsonObject)['coordinatorWasmHashes'], [FLEET_MISHPAT_WASM]);
+    assert.deepEqual((roles['mishpat'] as JsonObject)['coordinatorWasmHashes'], [
+      FLEET_MISHPAT_WASM,
+    ]);
     assert.deepEqual((roles['node_registry'] as JsonObject)['coordinatorWasmHashes'], [
       UNCROSSED_ZOME_HASH,
     ]);
@@ -578,7 +582,7 @@ void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts th
   void it('refuses to cut for a peer whose installed reality is unreachable', async () => {
     await assert.rejects(
       packageFromAdoption(adoptionReportFixture('unreachable')),
-      (error: Error) => /installed reality is unreachable/.test(String(error))
+      (error: Error) => String(error).includes('installed reality is unreachable')
     );
   });
 });

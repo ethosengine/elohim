@@ -63,7 +63,7 @@ fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
             .into()
     }
 
-    serde_json::json!({
+    let mut projected = serde_json::json!({
         "controller": select(&report["controller"], &[
             "running", "sweeps", "sweepIntervalSecs", "applyVehicles",
         ]),
@@ -73,12 +73,16 @@ fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
                 "attestations", "sweeps", "consecutiveRefusals", "lastCheckedAt",
             ])
         }).collect::<Vec<_>>(),
-        // Per-role installed reality — what this peer runs, the map a release
-        // is verified against. Passed through whole (it is the peer's own
-        // self-report, no operator-private tuning inside), `null` until the
-        // controller's first passport read; absent on a storage predating it.
-        "installedReality": report.get("installedReality").cloned().unwrap_or(serde_json::Value::Null),
-    })
+    });
+    // Per-role installed reality — what this peer runs, the map a release is
+    // verified against. Passed through whole (it is the peer's own self-report,
+    // no operator-private tuning inside): `null` until the controller's first
+    // passport read, and ABSENT — not null — on a storage predating the field,
+    // so a reader can tell "not read yet" from "this build cannot say".
+    if let Some(reality) = report.get("installedReality") {
+        projected["installedReality"] = reality.clone();
+    }
+    projected
 }
 
 /// Diagnostic labels come from configured DNS endpoints, never from caller URLs.
@@ -1278,10 +1282,11 @@ mod tests {
         private["configRefusals"] = serde_json::json!(["private"]);
         private["reverts"] = serde_json::json!(["private"]);
         assert_eq!(project_adoption(&private), public);
-        // A storage predating the field still projects — as `null`, never absent.
+        // A storage predating the field projects WITHOUT it — absent, not null,
+        // so "not read yet" (null) stays distinguishable from "cannot say".
         let mut older = private.clone();
         older.as_object_mut().unwrap().remove("installedReality");
-        assert!(project_adoption(&older)["installedReality"].is_null());
+        assert!(project_adoption(&older).get("installedReality").is_none());
     }
 
     #[tokio::test]

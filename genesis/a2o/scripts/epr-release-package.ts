@@ -1153,7 +1153,9 @@ export function rolesFromInstalledReality(
         ? (entry['coordinatorZomes'] as Record<string, string>)
         : {};
     if (!dnaHash) continue;
-    console.error(`role "${role}": appliesTo read from the target peer's installed reality (dnaHash ${dnaHash})`);
+    console.error(
+      `role "${role}": appliesTo read from the target peer's installed reality (dnaHash ${dnaHash})`
+    );
     out[role] = {
       dnaHash,
       coordinatorWasmHashes: [...new Set(Object.values(zomes))].sort((a, b) => a.localeCompare(b)),
