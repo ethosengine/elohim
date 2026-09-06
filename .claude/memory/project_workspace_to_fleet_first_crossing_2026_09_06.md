@@ -1,7 +1,7 @@
 ---
 name: project_workspace_to_fleet_first_crossing_2026_09_06
 title: Workspace→fleet first crossing 2026-09-06
-description: "Rung 5 left the house 2026-09-06: 4 coordinator releases ×5/5 on alpha's long-lived channel; T3 peer bring-up recipe + traps — reach for it before any fleet-facing rung-5 measure"
+description: "Rung 5 left the house 2026-09-06: 4 coordinator releases 5/5 on alpha's long-lived channel; T3 peer bring-up recipe + traps — read before any fleet rung-5 measure"
 metadata:
   type: project
 ---
