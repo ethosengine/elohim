@@ -39,16 +39,31 @@ $ CONDUCTOR_RELEASE_CHANNELS=runtime:coordinators:elohim:workspace=observe just 
 ```
 
 ```
-$ cd genesis/a2o && pnpm exec tsx scripts/epr-release-package.ts --artifact <your.happ> --artifact-class coordinator-bundle --channel-id runtime:coordinators:elohim:workspace --applies-to-from http://127.0.0.1:8090 --peer http://127.0.0.1:8090 --soak-secs 30 --attestation-threshold 1 --out /tmp/workspace-release.json
+$ cd genesis/a2o && pnpm exec tsx steps/delivery/coordinator-candidate.ts --baseline-happ ../../elohim/holochain/local-dev/deployed-bundles/elohim.happ --report-dir /tmp/workspace-release --role lamad --marker "$(date -u +%Y%m%d%H%M%S)-workspace" > /tmp/workspace-mint.json && pnpm exec tsx scripts/epr-release-package.ts --artifact "$(jq -r .happPath /tmp/workspace-mint.json)" --artifact-class coordinator-bundle --channel-id runtime:coordinators:elohim:workspace --applies-to-from-adoption "http://127.0.0.1:8090/db/p2p/adoption?peer=<target-peer-name>" --applies-to-role lamad --peer http://127.0.0.1:8090 --soak-secs 30 --attestation-threshold 1 --out /tmp/workspace-release.json
 ```
 
-`--applies-to-from` reads **this peer's own** `GET /version` passport, so the release binds to the
-validation-rule identity the workspace peer actually runs — the fleet's, because the peer joined
-it. On a peer whose role has crossed a lineage, the packager reads that role's *authoring* cell.
-The artifact bytes are PUT to this peer's own content-addressed store; any peer can fetch them.
-A follow-up release on the same channel automatically supersedes its current head from the workspace
-peer's `GET /admin/adoption` (`E2E_WORKSPACE_STORAGE_URL`, default `http://127.0.0.1:8090`); override
-with `--lineage-parent <cid>` or skip lookup with `--first-release` for a genuinely new channel.
+**Mint a single-role candidate, then package it scoped to that same role — never hand a full
+multi-role `.happ` to the packager.** The measured 2026-09-06 incident: a candidate built by
+`elohim/holochain/dna/elohim/build.sh` rebuilds every DNA in the workspace tree, so its other four
+roles carry bytes that differ from the fleet baseline for no reason a reviewer can see; packaging it
+with an unscoped `appliesTo` let the fleet's `sync_coordinators` accept the one role that actually
+changed and refuse the other four on DNA lineage, stranding a peer no later release could verify.
+Two fixes compose in the one command above: `coordinator-candidate.ts` reads ONLY the named `--role`'s
+integrity+coordinator wasm out of `--baseline-happ` and packs a `.happ` naming that one role (the other
+roles are never read, copied, or referenced); and `epr-release-package.ts` REFUSES to package a
+`coordinator-bundle` release whose resolved `appliesTo` would name more than one role unless
+`--applies-to-role` is given explicitly — naming it (`lamad`, matching `--role` above) is how a
+developer confirms, every time, that the release covers only the role it changes. Pass
+`--rollback-to-baseline` instead of `--marker` to mint a REVERT candidate — the role's coordinator wasm
+kept byte-identical to the baseline — for returning a peer that adopted a forward candidate back to the
+fleet's own bytes through the same channel.
+`--applies-to-from-adoption <doorway>/db/p2p/adoption?peer=<name>` reads the TARGET peer's own
+installed-reality self-report, so the release is cut FOR the peer that will verify it — the doorway's
+own base URL replaces `http://127.0.0.1:8090` above when the target is a deployed peer, not this
+workstation. The artifact bytes are PUT to this peer's own content-addressed store; any peer can fetch
+them. A follow-up release on the same channel automatically supersedes its current head from the
+workspace peer's `GET /admin/adoption` (`E2E_WORKSPACE_STORAGE_URL`, default `http://127.0.0.1:8090`);
+override with `--lineage-parent <cid>` or skip lookup with `--first-release` for a genuinely new channel.
 
 ## Publish
 

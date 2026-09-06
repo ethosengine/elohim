@@ -301,6 +301,7 @@ const FLAG_ARTIFACT_CLASS = '--artifact-class';
 const ARTIFACT_CLASS_COORDINATOR_BUNDLE = 'coordinator-bundle';
 const FLAG_CHANNEL_ID = '--channel-id';
 const FLAG_APPLIES_TO_FROM = '--applies-to-from';
+const FLAG_APPLIES_TO_ROLE = '--applies-to-role';
 const FLAG_SOAK_SECS = '--soak-secs';
 const FLAG_ATTESTATION_THRESHOLD = '--attestation-threshold';
 // Station 9's packaging call site uses the constants rather than the literals
@@ -319,6 +320,19 @@ const RUNTIME_CONFIG_FOLLOW_PATH = '/admin/runtime-config/follow';
 const VERSION_PATH = '/version';
 const HEALTH_PATH = '/health';
 const LAMAD_ROLE = 'lamad';
+
+/**
+ * Every role `BASELINE_HAPP` declares (its own `happ.yaml`, unpacked
+ * 2026-09-06). Named explicitly wherever a call site packages the FULL
+ * baseline bundle (teardown, Station 6's revert): those releases legitimately
+ * apply to every role at once (the artifact literally carries correct
+ * baseline bytes for all of them), so the intent is declared here rather
+ * than left to `epr-release-package.ts` inferring "every role the peer
+ * happens to have installed" from an unfiltered `--applies-to-from` —
+ * `epr-release-package.ts`'s coordinator-bundle guard (2026-09-06) refuses
+ * that inference for a multi-role appliesTo.
+ */
+const ALL_BASELINE_ROLES = ['lamad', 'infrastructure', 'imagodei', 'mishpat', 'node_registry'];
 
 const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
 
@@ -1421,6 +1435,10 @@ async function runOneTeardown(
       teardownChannelId,
       FLAG_APPLIES_TO_FROM,
       repPeerUrl,
+      // The artifact IS the full baseline bundle — every role, declared
+      // explicitly (epr-release-package.ts's coordinator-bundle guard,
+      // 2026-09-06, refuses inferring "every role the peer runs" silently).
+      ...ALL_BASELINE_ROLES.flatMap(role => [FLAG_APPLIES_TO_ROLE, role]),
       FLAG_SOAK_SECS,
       '0',
       FLAG_ATTESTATION_THRESHOLD,
@@ -1625,6 +1643,11 @@ async function ensureStaged(world: E2EWorld): Promise<void> {
       CHANNEL_ID,
       FLAG_APPLIES_TO_FROM,
       matthewUrl,
+      // The candidate is single-role (coordinator-candidate.ts, 2026-09-06
+      // fix) — scope appliesTo to match, or the packager's coordinator-bundle
+      // guard refuses a manifest naming every role matthew's full passport reports.
+      FLAG_APPLIES_TO_ROLE,
+      LAMAD_ROLE,
       // No --lineage-parent: this is the FIRST release on CHANNEL_ID (minted
       // per run), so the chain has nothing for it to supersede. Station 6's
       // revert and Station 9's second fix are the non-first releases that do
@@ -1993,6 +2016,9 @@ async function ensureReverted(world: E2EWorld): Promise<void> {
         CHANNEL_ID,
         '--applies-to-from',
         matthewUrl,
+        // The artifact IS the full baseline bundle — every role, declared
+        // explicitly (see `ALL_BASELINE_ROLES`'s doc).
+        ...ALL_BASELINE_ROLES.flatMap(role => [FLAG_APPLIES_TO_ROLE, role]),
         FLAG_LINEAGE_PARENT,
         revertParentCid,
         '--soak-secs',
@@ -2194,6 +2220,10 @@ async function ensurePersonalVariantPublished(world: E2EWorld): Promise<void> {
       PERSONAL_CHANNEL_ID,
       '--applies-to-from',
       matthewUrl,
+      // The candidate is single-role — scope appliesTo to match (see the
+      // `ensureStaged` packaging call site's matching comment).
+      FLAG_APPLIES_TO_ROLE,
+      LAMAD_ROLE,
       // No --lineage-parent: the FIRST release on the personal channel. Its
       // rebases in `republishPersonalVariant` are the non-first ones that
       // need one.
@@ -2307,6 +2337,10 @@ async function republishPersonalVariant(
       PERSONAL_CHANNEL_ID,
       '--applies-to-from',
       jamesUrl,
+      // The candidate is single-role — scope appliesTo to match (see the
+      // `ensureStaged` packaging call site's matching comment).
+      FLAG_APPLIES_TO_ROLE,
+      LAMAD_ROLE,
       FLAG_LINEAGE_PARENT,
       personalParentCid,
       '--wire-epoch',
@@ -2628,6 +2662,10 @@ async function ensureSecondPublished(world: E2EWorld): Promise<void> {
       CHANNEL_ID,
       FLAG_APPLIES_TO_FROM,
       matthewUrl,
+      // The candidate is single-role — scope appliesTo to match (see the
+      // `ensureStaged` packaging call site's matching comment).
+      FLAG_APPLIES_TO_ROLE,
+      LAMAD_ROLE,
       // What this release builds ON: the channel's standing earned head. The
       // driver refuses the publish outright without it.
       FLAG_LINEAGE_PARENT,

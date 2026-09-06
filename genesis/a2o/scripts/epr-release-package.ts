@@ -37,7 +37,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,7 +121,13 @@ appliesTo (what installed reality this release binds to):
                                 /db/p2p/adoption?peer=<name>); cut the release FOR the
                                 peers that will verify it, not for the builder's conductor
   --applies-to <json|@file>     literal { "roles": { … } } or { role: … } map
-  --applies-to-role <name>      restrict the derived roles; repeatable
+  --applies-to-role <name>      restrict the derived roles; repeatable. REQUIRED when
+                                --artifact-class coordinator-bundle would otherwise resolve
+                                more than one role — a coordinator release must name only
+                                the role(s) it changes (2026-09-06: an unscoped multi-role
+                                appliesTo let a fleet peer apply one role and refuse four
+                                others on DNA lineage). Also checked against the artifact's
+                                OWN role set when it is a .happ and hc is on PATH.
 
 Provenance:
   --builder-agent <id>          who built the artifact (default: $USER@$HOSTNAME)
@@ -1173,6 +1180,99 @@ export function rolesFromInstalledReality(
 }
 
 // ---------------------------------------------------------------------------
+// coordinator-bundle guard (2026-09-06) — a workspace→fleet coordinator
+// candidate carried a full 5-role appliesTo (derived by inferring "every role
+// the builder/target peer runs") while the artifact itself only rebuilt one
+// role's coordinator wasm; `sync_coordinators` applied that one role and
+// refused the other four on DNA lineage (`drifted=5, applied=1`), leaving a
+// mixed peer no later release could verify. A coordinator release must name
+// only the role(s) it changes, and must not name a role its own artifact
+// does not ship.
+// ---------------------------------------------------------------------------
+
+/**
+ * Cheaply derives the role set a `.happ` artifact actually carries, by
+ * unpacking it with `hc app unpack` (one subprocess call — no cargo, no wasm
+ * hashing). Returns null when the artifact is not a `.happ` (only that shape
+ * is checkable this way) or when `hc` is not on PATH — a packaging run with
+ * no way to check degrades to skipping this half of the guard rather than
+ * failing on a missing dev tool. No JS msgpack-reading dependency is
+ * available in genesis/a2o today (verified 2026-09-06), so `hc app unpack`
+ * is the cheap path per this guard's design; a JS reader would replace this
+ * only if such a dependency is added later.
+ */
+function deriveArtifactRoles(file: string): string[] | null {
+  if (!file.toLowerCase().endsWith('.happ')) return null;
+  const parent = mkdtempSync(path.join(tmpdir(), 'epr-release-package-unpack-'));
+  const scratchDir = path.join(parent, 'unpack');
+  try {
+    // eslint-disable-next-line sonarjs/no-os-command-from-path
+    execFileSync('hc', ['app', 'unpack', '--output', scratchDir, file], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (code === 'ENOENT') {
+      console.error(
+        'warn: `hc` is not on PATH — skipping coordinator-bundle artifact role-set derivation'
+      );
+    } else {
+      console.error(
+        `warn: \`hc app unpack\` failed for ${file} — skipping artifact role-set derivation: ${String(error)}`
+      );
+    }
+    return null;
+  }
+  try {
+    const happYaml = readFileSync(path.join(scratchDir, 'happ.yaml'), 'utf8');
+    const roles = [...happYaml.matchAll(/^- name: (\S+)/gm)].map(match => match[1]);
+    return roles.length > 0 ? roles : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refuses a `coordinator-bundle` release whose resolved `appliesTo` is
+ * broader than the artifact — either more than one role with no explicit
+ * `--applies-to-role`, or ANY role the artifact itself cannot be shown to
+ * carry. A coordinator release cannot supersede a role it does not ship.
+ */
+function guardCoordinatorBundleScope(
+  artifactClass: ArtifactClass,
+  appliesTo: { roles: Record<string, RoleBinding> },
+  options: Options
+): void {
+  if (artifactClass !== 'coordinator-bundle') return;
+  const roleNames = Object.keys(appliesTo.roles);
+
+  if (roleNames.length > 1 && options.appliesToRoles.length === 0) {
+    throw new PackagingFailure(
+      `a coordinator-bundle release resolves appliesTo to ${roleNames.length} roles ` +
+        `(${roleNames.join(', ')}) but --applies-to-role was not given — a coordinator ` +
+        'release must name only the role(s) it changes; pass --applies-to-role <name> ' +
+        '(repeatable) to scope it explicitly'
+    );
+  }
+
+  for (const file of options.artifacts) {
+    const carried = deriveArtifactRoles(file);
+    if (!carried) continue;
+    const extra = roleNames.filter(role => !carried.includes(role));
+    if (extra.length > 0) {
+      throw new PackagingFailure(
+        `appliesTo names role(s) ${extra.join(', ')} but the artifact ${path.basename(file)} ` +
+          `carries only ${carried.join(', ')} — a release cannot supersede a role it does not ship`
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Adoption discipline — declared or inherited, never defaulted
 // ---------------------------------------------------------------------------
 
@@ -1425,6 +1525,7 @@ async function assembleManifest(options: Options): Promise<{
   }
 
   const appliesTo = applyLineageBindings(await resolveAppliesTo(options), options);
+  guardCoordinatorBundleScope(artifactClass, appliesTo, options);
   const buildInfo = await resolveBuildInfo(options);
   const gitCommit = options.gitCommit ?? git(['rev-parse', 'HEAD']);
   if (!gitCommit) {

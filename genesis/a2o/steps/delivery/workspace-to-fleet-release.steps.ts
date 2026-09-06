@@ -372,17 +372,25 @@ Given('the workspace peer follows that same channel in observe mode', async func
 // Station 1 — mint and package, against this peer's own installed reality
 // ---------------------------------------------------------------------------
 
+/**
+ * The role this run's candidate carries, and whether it is a forward (marker)
+ * or rollback (verbatim-baseline) candidate — env-selectable so this same
+ * fixture can mint either shape without a second code path. Defaults match
+ * every existing scenario: forward, lamad-only.
+ */
+const MINT_ROLE = process.env['A2O_WORKSPACE_MINT_ROLE'] ?? LAMAD_ROLE;
+const MINT_ROLLBACK_TO_BASELINE = process.env['A2O_WORKSPACE_ROLLBACK_TO_BASELINE'] === '1';
+
 function ensureCandidate(): string | undefined {
   if (state.candidateHapp) return state.candidateHapp;
   if (!existsSync(FLEET_BASELINE_HAPP)) return undefined;
   mkdirSync(REPORT_DIR, { recursive: true });
-  const minted = mintCoordinatorCandidate(
-    FLEET_BASELINE_HAPP,
-    REPORT_DIR,
-    RUN_STAMP,
-    `${CHANNEL_ID}#${RUN_STAMP}`,
-    'workspace'
-  );
+  const marker = `${CHANNEL_ID}#${RUN_STAMP}${MINT_ROLLBACK_TO_BASELINE ? '#rollback' : ''}`;
+  const minted = mintCoordinatorCandidate(FLEET_BASELINE_HAPP, REPORT_DIR, RUN_STAMP, marker, {
+    variantLabel: 'workspace',
+    role: MINT_ROLE,
+    rollbackToBaseline: MINT_ROLLBACK_TO_BASELINE,
+  });
   state.candidateHapp = minted.happPath;
   return minted.happPath;
 }
@@ -416,6 +424,12 @@ function packageRelease(): void {
       WORKSPACE_STORAGE_URL,
       '--applies-to-from',
       WORKSPACE_STORAGE_URL,
+      // The candidate is single-role by construction (coordinator-candidate.ts,
+      // 2026-09-06 fix) — scope appliesTo to that same role, or the packager's
+      // own coordinator-bundle guard refuses a manifest naming every role the
+      // workspace peer's full passport reports.
+      '--applies-to-role',
+      MINT_ROLE,
       '--peer',
       WORKSPACE_STORAGE_URL,
       '--soak-secs',

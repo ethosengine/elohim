@@ -54,6 +54,7 @@ const FLAG_ARTIFACT_CLASS = '--artifact-class';
 const FLAG_APPLIES_TO = '--applies-to';
 const FLAG_SOAK_SECS = '--soak-secs';
 const FLAG_ATTESTATION_THRESHOLD = '--attestation-threshold';
+const FLAG_APPLIES_TO_ROLE = '--applies-to-role';
 const ARTIFACT_CLASS_HAPP_LINEAGE = 'happ-lineage';
 const ARTIFACT_CLASS_COORDINATOR_BUNDLE = 'coordinator-bundle';
 
@@ -361,6 +362,91 @@ void describe('epr-release-package.ts CLI — happ-lineage flags', () => {
   });
 });
 
+/** A literal `appliesTo` naming TWO roles — the shape the 2026-09-06 guard refuses
+ * for `coordinator-bundle` when neither role is named via --applies-to-role. */
+function twoRoleAppliesToLiteral(): string {
+  return JSON.stringify({
+    roles: {
+      lamad: { dnaHash: 'uhC0k' + 'K'.repeat(48), coordinatorWasmHashes: [] },
+      mishpat: { dnaHash: 'uhC0k' + 'L'.repeat(48), coordinatorWasmHashes: [] },
+    },
+  });
+}
+
+function assertUsageFailure(fn: () => unknown, expectedStatus: number): void {
+  assert.throws(fn, (error: unknown) => {
+    const status = (error as { status?: number }).status;
+    assert.equal(status, expectedStatus, `expected exit ${expectedStatus}, got ${String(status)}`);
+    return true;
+  });
+}
+
+void describe('epr-release-package.ts CLI — coordinator-bundle scope guard (2026-09-06)', () => {
+  void it('refuses a coordinator-bundle release whose appliesTo resolves to >1 role with no --applies-to-role', () => {
+    assertUsageFailure(
+      () =>
+        runPackager([
+          FLAG_ARTIFACT,
+          tempArtifact(),
+          FLAG_ARTIFACT_CLASS,
+          ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+          FLAG_APPLIES_TO,
+          twoRoleAppliesToLiteral(),
+          FLAG_SOAK_SECS,
+          '900',
+          FLAG_ATTESTATION_THRESHOLD,
+          '2',
+          '--no-put',
+        ]),
+      2
+    );
+  });
+
+  void it('packages fine when the two-role appliesTo is scoped with --applies-to-role for each role', () => {
+    const stdout = runPackager([
+      FLAG_ARTIFACT,
+      tempArtifact(),
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_APPLIES_TO,
+      twoRoleAppliesToLiteral(),
+      FLAG_APPLIES_TO_ROLE,
+      'lamad',
+      FLAG_APPLIES_TO_ROLE,
+      'mishpat',
+      FLAG_SOAK_SECS,
+      '900',
+      FLAG_ATTESTATION_THRESHOLD,
+      '2',
+      '--no-put',
+      '--compact',
+    ]);
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.deepEqual(new Set(Object.keys(roles)), new Set(['lamad', 'mishpat']));
+  });
+
+  void it('packages fine for a single-role appliesTo with no --applies-to-role at all', () => {
+    const stdout = runPackager([
+      FLAG_ARTIFACT,
+      tempArtifact(),
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_APPLIES_TO,
+      appliesToLiteral(),
+      FLAG_SOAK_SECS,
+      '900',
+      FLAG_ATTESTATION_THRESHOLD,
+      '2',
+      '--no-put',
+      '--compact',
+    ]);
+    const manifest = JSON.parse(stdout) as JsonObject;
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.deepEqual(Object.keys(roles), ['node_registry']);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Part 3 — `--applies-to-from` reads the AUTHORING cell of a crossed role
 // (rung5-workspace Task 1; mirrors
@@ -456,7 +542,10 @@ async function servePassport(
   });
 }
 
-async function packageFromPassport(passport: JsonObject): Promise<JsonObject> {
+async function packageFromPassport(
+  passport: JsonObject,
+  onlyRoles: string[] = []
+): Promise<JsonObject> {
   const { url, close } = await servePassport(passport);
   try {
     const stdout = await runPackagerAsync([
@@ -466,6 +555,10 @@ async function packageFromPassport(passport: JsonObject): Promise<JsonObject> {
       ARTIFACT_CLASS_COORDINATOR_BUNDLE,
       '--applies-to-from',
       url,
+      // Scope to the role(s) each case actually asserts on — the packager's
+      // coordinator-bundle guard (2026-09-06) refuses a resolved appliesTo
+      // with more than one role when --applies-to-role is not given.
+      ...onlyRoles.flatMap(role => [FLAG_APPLIES_TO_ROLE, role]),
       FLAG_SOAK_SECS,
       '900',
       FLAG_ATTESTATION_THRESHOLD,
@@ -558,7 +651,15 @@ async function packageFromAdoption(report: JsonObject, extra: string[] = []): Pr
 void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts the release FOR the target peer', () => {
   void it("binds each role to the TARGET's installed reality, not the builder's passport", async () => {
     const manifest = JSON.parse(
-      await packageFromAdoption(adoptionReportFixture('present'))
+      // Both roles named explicitly — the packager's coordinator-bundle guard
+      // (2026-09-06) refuses inferring "every role the target reports" when
+      // more than one resolves and --applies-to-role is not given.
+      await packageFromAdoption(adoptionReportFixture('present'), [
+        FLAG_APPLIES_TO_ROLE,
+        'mishpat',
+        FLAG_APPLIES_TO_ROLE,
+        'node_registry',
+      ])
     ) as JsonObject;
     const result = validateManifest(manifest);
     assert.equal(result.ok, true, result.errors.join('\n'));
@@ -573,7 +674,7 @@ void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts th
 
   void it('--applies-to-role narrows to the named roles', async () => {
     const manifest = JSON.parse(
-      await packageFromAdoption(adoptionReportFixture('present'), ['--applies-to-role', 'mishpat'])
+      await packageFromAdoption(adoptionReportFixture('present'), [FLAG_APPLIES_TO_ROLE, 'mishpat'])
     ) as JsonObject;
     const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
     assert.deepEqual(Object.keys(roles), ['mishpat']);
@@ -589,7 +690,7 @@ void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts th
 
 void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware derivation', () => {
   void it('an un-crossed role reads base values, byte-identical to the pre-lineage shape', async () => {
-    const manifest = await packageFromPassport(lineagePassportFixture());
+    const manifest = await packageFromPassport(lineagePassportFixture(), ['node_registry']);
     const result = validateManifest(manifest);
     assert.equal(result.ok, true, result.errors.join('\n'));
     const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
@@ -604,7 +705,7 @@ void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware de
   });
 
   void it('an OPEN-window crossed role reads the authoring cell, not the base cell', async () => {
-    const manifest = await packageFromPassport(lineagePassportFixture());
+    const manifest = await packageFromPassport(lineagePassportFixture(), ['imagodei']);
     const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
     const imagodei = roles['imagodei'] as JsonObject;
     assert.equal(imagodei['dnaHash'], CROSSED_AUTHORING_DNA_HASH);
@@ -613,7 +714,7 @@ void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware de
   });
 
   void it('a CLOSED-after-sunset role reads the authoring cell even with a matching app id', async () => {
-    return packageFromPassport(lineagePassportFixture()).then(manifest => {
+    return packageFromPassport(lineagePassportFixture(), ['mishpat']).then(manifest => {
       const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
       const mishpat = roles['mishpat'] as JsonObject;
       assert.equal(mishpat['dnaHash'], SUNSET_AUTHORING_DNA_HASH);
@@ -628,7 +729,10 @@ void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware de
     ] as JsonObject[];
     const imagodei = happRoles.find(r => r['role'] === 'imagodei') as JsonObject;
     (imagodei['lineage'] as JsonObject)['authoringDnaHash'] = 'unknown';
-    const manifest = await packageFromPassport(passport);
+    // `imagodei` deliberately excluded: it demotes (returns no binding) before
+    // an --applies-to-role filter would even apply, so naming it here would
+    // make rolesFromPassport refuse with "passport has no role(s): imagodei".
+    const manifest = await packageFromPassport(passport, ['node_registry']);
     const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
     assert.equal(
       'imagodei' in roles,
