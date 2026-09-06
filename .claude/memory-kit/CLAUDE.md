@@ -31,7 +31,6 @@ Each entry below is a **link = path + a 1-2 sentence explainer** (the project li
 - **`delivery-status-distribution.json`** (+`.prev`) — per-plan delivery-status snapshot; `.prev` is the
   last run, kept for the diff section.
 - **`story-coverage-audit.json`** (+`.prev`) — stories ↔ features coverage data each ceremony lens reads.
-- **`next-ceremony-inputs.md`** — the librarian's hand-off into the next memory ceremony.
 
 ## Sub-directories
 - **`balance-sheets/`** — per-cycle memory balance sheets.

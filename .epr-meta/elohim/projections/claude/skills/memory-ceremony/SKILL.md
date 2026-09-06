@@ -132,6 +132,28 @@ applied per their structural-vs-substantive authority split — it does **not** 
 roadmap as one of the 1-2 gospel-tier rewrite surfaces unless the drift is a substantive re-framing (in
 which case it joins the candidate list and the storyteller pens it in Phase 3, same as any surface).
 
+### Phase 1c — Lane pick (~1 min, deterministic)
+
+The ceremony has two lanes and runs exactly ONE per cycle. Read `index_unloaded` from
+`.claude/memory-kit/memory-index-drift.json` (emitted by `memory-index-projector.py`): the count of
+`MEMORY.md` index rows whose cumulative byte offset is past the 24.4 KB harness load cap — entries that
+cost tokens to write and never reach a session's context.
+
+- **`index_unloaded > 0` → HEAD-COMPACTION lane.** This cycle's work is the index head, not a
+  gospel-tier rewrite. The storyteller triages the lowest-value index rows with their three verbs: a
+  project note whose incident an umbrella already carries, a history doc, or a spec **memorializes**
+  into that umbrella as an `index: false` member; a row whose lesson a canonical story can carry
+  **graduates** to `genesis/data/stories/`; anything not yet ready is **held** for the next cycle.
+  Feedback notes stay unless a surviving entry duplicates them. The librarian applies the dispositions
+  (topic-file frontmatter edits, then `memory-index-projector.py --apply`) and re-projects.
+- **`index_unloaded == 0` → gospel-rewrite lane.** Proceed to Phase 2 with the picked surfaces.
+
+**The split is the LANE, not the ceremony: one invocation, one team, two lanes — and the storyteller
+owns compaction**, as they already own the admission gate. Phases 0 and 1 triage for both lanes, so
+neither needs a skill of its own. Phase 0's STALE record in particular feeds both: a witnessed
+correction on a gospel surface is a rewrite candidate, and one on a memory topic file is a compaction
+candidate — a row whose claim is already stale is the cheapest row to memorialize.
+
 ## Phase 2 — Four-lens deep-read (~25-30 min)
 
 Each picked surface goes through the four lenses. The librarian runs first as prologue; the other three run in parallel against the librarian's verified-facts ground.
@@ -175,7 +197,7 @@ Dispatch the storyteller (one Task per surface; in parallel if more than one) wi
 
 > "**Substrate-currency ceremony Phase 3 — synthesis pen.** Picked surface: `<path>`. Four inputs attached verbatim: (1) librarian verified-facts, (2) your Phase 2 narrative-coherence findings, (3) historian missing-citations, (4) cartographer coverage-gaps.
 >
-> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-3 sub-section, compose the paste-ready rewrite of `<path>`. Preserve structural skeleton (frontmatter, section headings) unless lens findings argue for restructure. A rewrite is not an expansion: match its length to the substrate it must carry, and do not pad with filler sections, redundant summaries, or boilerplate the original did not need. Each addition must cite at least one input. Apply canonical vocabulary; apply `[[feedback_agent_prompts_no_process_status]]`.
+> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-3 sub-section, compose the paste-ready rewrite of `<path>`. Preserve structural skeleton (frontmatter, section headings) unless lens findings argue for restructure. A rewrite is not an expansion: match its length to the substrate it must carry, and do not pad with filler sections, redundant summaries, or boilerplate the original did not need. Each addition must cite at least one input. Apply canonical vocabulary; apply `[[feedback_agent_prompts_no_process_status]]`. Do not upgrade a hedged claim into a confident dated assertion; preserve the original's tentativeness unless a lens supplies evidence — rewriting is itself a hazard ([Manufactured Confidence](https://arxiv.org/abs/2606.29279): a casual, hedged remark becomes a confident, dated assertion the next agent obeys like a verified fact).
 >
 > Output: (a) full rewritten surface body, ready to paste, (b) 1-paragraph diff-rationale citing which findings drove which changes. Cap ~15 min. If the surface needs more, return what you have plus a one-sentence two-cycle-rewrite note for the operator to elevate as backlog."
 
@@ -237,6 +259,9 @@ surfaces_rewritten:
 diff_review_verdict: GREEN | YELLOW | RED   # Phase-4b Lens 1 (/code-review)
 coherence_verdict: GREEN | YELLOW | RED     # Phase-4b Lens 2 (fresh-context Explore)
 next_topic_sampled: <topic>
+agent_minutes: <n>              # what this cycle cost in agent wall-clock
+surfaces_read: <n>              # surfaces the lenses actually read (denominator for cost-per-surface)
+stale_record_closed: <n>/<m>    # Phase-0 corrections absorbed / present at Phase 0
 ---
 
 ## What changed
@@ -252,7 +277,7 @@ next_topic_sampled: <topic>
 <Only write this section if the cycle taught something cross-cutting that the next ceremony should know. Otherwise omit. NOT a ritual section — silence is the default.>
 ```
 
-The chronicle is forensic record, not narrative scaffolding. Future ceremonies grep it to recall "have we rewritten this surface recently?" and "did the coherence-check find anything we should remember?" — that's the deterministic drift-surface role it plays. If a cycle taught nothing cross-cutting, the Wisdom section is omitted. Most cycles will land there.
+The three metered fields exist because nothing measured this ceremony's cost before: a GREEN verdict with no number beside it leaves "expensive" a feeling on both sides, and three consecutive chronicles carrying them give a cost-per-surface trend instead. The chronicle is forensic record, not narrative scaffolding. Future ceremonies grep it to recall "have we rewritten this surface recently?" and "did the coherence-check find anything we should remember?" — that's the deterministic drift-surface role it plays. If a cycle taught nothing cross-cutting, the Wisdom section is omitted. Most cycles will land there.
 
 ### Phase 4d — MemPalace re-embed (the ceremony just rewrote the canonical surface)
 

@@ -27,7 +27,7 @@ HEAD_DAYS = 30          # full-retention working window
 TAIL_DAYS = 90          # compacted-to-digest window; older than this is memorialized + dropped
 SIZE_CAP_MB = 8         # soft cap for the whole tier; over this the headline flags overflow
 
-KEEP_LOOSE = {"CLAUDE.md", "TRAJECTORY.md", "next-ceremony-inputs.md"}  # guide + spine + live handoff
+KEEP_LOOSE = {"CLAUDE.md", "TRAJECTORY.md"}  # guide + spine + live handoff
 KEEP_DIRS = {"gap-items", "balance-sheets", "horizon-scans"}            # live budget + periodic series (own cadence)
 DATED = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 

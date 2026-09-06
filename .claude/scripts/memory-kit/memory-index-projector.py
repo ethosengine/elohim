@@ -15,7 +15,9 @@ Per-entry discipline (enforced here, taught by .claude/memory/.epr-meta at birth
   description project a visible placeholder and count as violations.
 
 Budget escalation (dogfoods flag -> agent -> canon -> stasis): over-soft-budget and per-file
-violations land in .claude/memory-kit/memory-index-drift.json (`items`), which
+violations land in .claude/memory-kit/memory-index-drift.json (`items`), alongside
+`index_unloaded` — the count of rows past the hard cap, i.e. entries no session can ever read
+(the compaction measure the memory-stasis-loop holds at 0) — which
 cleanup-pressure.py counts toward the memory-stasis-loop gate. The drift items are a
 SNAPSHOT of current violations (self-healing: fixing a file removes its item), unlike the
 pure since-last-reset accumulators. Real budget relief is population work — umbrella
@@ -107,6 +109,24 @@ def collect_entries(mem_dir: Path) -> tuple[list[dict], dict[str, str]]:
     return entries, violations
 
 
+def count_unloaded(entries: list[dict]) -> int:
+    """Index rows the harness never loads: rows whose cumulative byte offset runs past the cap.
+
+    The always-loaded index is truncated at the cap, so every row after it cost tokens to write and
+    can never be read — the one deterministic compaction measure (unfakeable: a byte count over
+    generated output). HARD_BUDGET_BYTES is the same 24_000 that placement-audit.py declares as
+    MEMORY_MD_BUDGET (that module's hyphenated filename is not importable; the two were aligned
+    2026-07-02 and its comment names this file as the pair).
+    """
+    offset = len(HEADER.encode("utf-8"))
+    unloaded = 0
+    for e in entries:
+        offset += len(f"- [{e['title']}]({e['file']}) — {e['desc']}\n".encode("utf-8"))
+        if offset > HARD_BUDGET_BYTES:
+            unloaded += 1
+    return unloaded
+
+
 def render(entries: list[dict]) -> str:
     lines = [HEADER]
     for e in entries:
@@ -130,6 +150,7 @@ def project(repo: Path) -> dict:
         "fresh": on_disk == text,
         "over_soft": size > SOFT_BUDGET_BYTES,
         "over_hard": size > HARD_BUDGET_BYTES,
+        "index_unloaded": count_unloaded(entries),
     }
 
 
@@ -148,7 +169,10 @@ def sync_drift(repo: Path, p: dict) -> None:
     items: dict[str, str] = dict(p["violations"])
     if p["over_soft"]:
         items["index-over-soft-budget"] = f"{p['bytes']}B > {SOFT_BUDGET_BYTES}B — consolidate (umbrella/graduate)"
-    _store.save_json(drift_path(repo), {"schema_version": 1, "items": items})
+    _store.save_json(
+        drift_path(repo),
+        {"schema_version": 1, "items": items, "index_unloaded": p["index_unloaded"]},
+    )
 
 
 def apply(repo: Path, quiet: bool = False) -> dict:
