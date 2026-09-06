@@ -2024,6 +2024,23 @@ spec:
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 
+                        // elohim/rakia carries the T1 release-manifest schema
+                        // (schemas/v1/release-manifest.schema.json) that the non-blocking
+                        // Storage quality gate's release_adoption::verify test reads. No
+                        // pipeline checkout ever initialized this submodule, so the docker
+                        // build context held an empty dir and the schema COPY had to be
+                        // dropped from the Dockerfile (edge #1431, 68dfe1c9b) — schemas keep
+                        // ONE home in rakia, so the fix is here, not a vendored copy. rakia
+                        // is a PUBLIC repo (verified via anonymous `git ls-remote`), unlike
+                        // the private `ee-bot-pat`-gated elohim checkout above, so no
+                        // credential is needed for this fetch. `update = none` submodules
+                        // (holochain-conductor, tx5, kitsune2 — see .gitmodules) are
+                        // reference-only and deliberately left uninitialized; only rakia is
+                        // touched here. `sh` fails the build on a non-zero exit by default,
+                        // so a submodule that cannot be fetched fails loud instead of
+                        // silently reverting to the old empty-dir state.
+                        sh 'git submodule update --init --depth 1 -- elohim/rakia'
+
                         computeValidateOnly()
 
                         echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
