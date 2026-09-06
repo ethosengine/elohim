@@ -433,9 +433,11 @@ from every peer's gossip and is the cleanest possible measurement that the model
 **The second slice:** household working notes into household content spaces, using the seeds the mishpat
 role already mints. The `reach-enforced-everywhere` habit's outsider scenario becomes true *by construction*.
 
-**The fork slice (later, separable):** lift the arc clamp and land the arc-policy hook on the fresh 0.7
-fork, so a large commons can be held at fractional arcs by many small stewards instead of full arcs by a
-few racks.
+**The fork slice (small, and not optional for phones):** plumb the *per-space* arc hint the conductor
+already ignores, so one device can be full-arc at home and zero-arc in the commons. Until that lands, a
+phone is a full member of every space it joins or a reader of all of them — so phones stay spokes to a
+household hub, which is what the seam map already draws. Fractional arcs inside a big space are a
+separate, larger item (see §10).
 
 ---
 
@@ -458,20 +460,279 @@ few racks.
 
 ---
 
-## 9. Open questions the epic now owns
+## 9. The five open questions, answered
 
-1. **Holon granularity.** Household = 1 space per family; collective = 1 per organization; commons = 1
-   global, or several by language/region? The seam map's device spectrum (watch → rack) suggests the
-   commons needs the fork's fractional arcs sooner than the others.
-2. **Membrane proofs.** Holochain supports a proof-of-membership at join. We have imagodei attestations
-   and household affirmations; wiring them as membrane proofs is the natural "who may join this space."
-3. **Cell count per device.** A person in 40 holons runs 40 cells per role. Measure conductor memory per
-   idle cell before promising watches and phones anything.
-4. **Migration of the existing commons.** The current `lamad` space *is* the commons; nothing moves out of
-   it except fixtures and household notes. Good: the big space stays where it is.
-5. **Elohim as the cross-holon plane.** Aggregation, routing care, recovery quorums — all of it spans
-   spaces by design and none of it is in the DHT. That was always the intended split; it now has a
-   reason written down.
+Each of these was open when the first draft of this document went out. Each was then grounded by a
+reader against the code and the corpus (file references are in the commit that added this section), and
+each now has an answer in the shape *"if holons are spaces, then ___, so this suggests doing ___."*
+Where an answer is a theory rather than a measured fact, it says so.
+
+### 9.1 Holon granularity — what should be a space?
+
+**What we found.** The deployed hApp manifest sets `clone_limit: 0` on every role, with a comment that
+says "default-deny; revisit when per-household infrastructure…" So there are no clone spaces because we
+told the conductor to refuse them. Meanwhile the *vocabulary* for holons already exists, three times over:
+a locality axis (private → bioregional → commons), an affinity axis (personal, household, congregation,
+denomination, professional, interest group, open), and a projection scope that already names
+`commons | qahal:<id> | household:<id>`. A `Collective` is already the one governance-context record,
+with "household" as its special case. We had the words and refused the spaces.
+
+**The reasoning.** A space costs one cell per device per role, and cells are the conductor's unit of
+memory (see 9.3). A space buys three things: privacy by membership, a holding floor its members can
+actually meet, and validation by people who agreed to the rules. So a space should be *the smallest group
+that can validate its own writes and afford its own recovery*. Per document is refused outright: it
+buys nothing and multiplies cells. Per affinity is refused as a rung: a denomination can be a million
+people across every region, which is a commons, not a middle layer.
+
+**If we did it this way, then** a person carries roughly five kinds of space and ten to twenty in total:
+
+| Rung | Size | Who holds it fully | Floor |
+|---|---|---|---|
+| Device | no space; private records stay on the source chain | the device | — |
+| Household | 2–10 devices | every device | survives any one device loss |
+| Collective | 30–10,000 members | 3–7 *independent households* as holding domains; readers at zero arc | three evidenced domains |
+| Commons per language/region | millions of readers | tens to hundreds of stewards; the fork's fractional arcs later | seven diverse hubs |
+| The protocol commons | everyone | rack-tier stewards | seven diverse hubs |
+
+Affinity and locality become *filters on records inside a rung* (`{space: commons-en, affinity:
+denomination}`), never rungs of their own.
+
+**And per role:** content and governance go **per holon** (a household's pages and its commitments are
+its own business). Identity, infrastructure and node registration stay **global**, and the reason is the
+best argument in this whole document: a recovery quorum is deliberately made of people *outside* your
+household (the "grandma case" in the identity zome, the backup custodian who may not read the note). A
+household space cannot validate its own rescue. Identity must be readable across the membrane.
+
+**So this suggests doing:** raise `clone_limit`, mint a `fixtures` clone of the content role, and let no
+fleet peer follow it. It is the cheapest possible falsification of the whole model, it needs no fork,
+and it removes thousands of records from every peer's gossip on the day it lands.
+
+### 9.2 Membrane proofs — who may join a space?
+
+**What we found.** Holochain has the mechanism end to end. A joiner supplies a *membrane proof* (bytes)
+when a cell is installed or cloned; the conductor runs the integrity zome's `genesis_self_check` on it
+*before* the source chain is created; a rejection means the cell is never born; an acceptance writes the
+proof permanently as the second record of the chain, where any later validation can inspect it. And
+every one of our integrity zomes implements that callback as a stub that returns *valid* for anyone. Our
+hApp manager never passes a proof; the lineage install writes `None` explicitly.
+
+**What we already have that is proof-shaped.** Two things: the cross-signed binding between an agent
+key and its transport identity (the `identity-cross-signed` habit, red today, observe-only), and mishpat's
+`verify_credentials`, built for "collective membership CIDs presented by connecting peers," which checks
+that a record exists and who authored it.
+
+**If we did it this way, then** joining a household or collective space would require presenting a
+signed membership record that the space's own rules can check without asking anyone. Concretely: the
+membership is a mishpat commitment (the household affirmation the Nachalah stories already describe),
+signed through the existing conductor signing path; those bytes travel as the membrane proof on the
+clone call; the space's `genesis_self_check` deserializes them and checks the signature against the
+space's founding rule ("signed by a key this household's affirmation names"). Outsiders who know the
+network seed are refused at genesis, which is exactly the "outsider knows the seed" scenario in the
+allotment story.
+
+**So this suggests doing:** three small pieces, in order. Replace the stub `genesis_self_check` in the
+content and governance zomes with a real check of a membership record; add the one code path that turns
+a mishpat membership into proof bytes; pass it on clone creation. None of it moves the DNA hash of the
+*commons* space (the commons stays open); it only gives holons a door.
+
+### 9.3 Cell count per device — what does a holon cost?
+
+*(Measured on 2026-09-06 with an isolated stock holochain 0.7.0 sandbox; numbers below are from that run.
+See the table and commands in the commit that added this section.)*
+
+MEASUREMENT_PLACEHOLDER
+
+### 9.4 Migration of the existing commons — does anything have to move?
+
+**What we found.** The content space holds 3,442 rows on doorway-A this morning and there is no
+by-kind breakdown route; the a2o fixtures plant thousands of records per run and nothing ever removes
+them, so fixtures may already outnumber real content. The seeder knows nothing about spaces: every seed
+path writes to the base cell. And the crossing machinery built for the Evolution epic is *lineage-only*:
+it moves one role from an old DNA hash to a new one, same role, same purpose. It is the wrong shape for
+"re-publish these records into space B and sunset them in A."
+
+**If we did it this way, then** the current content space simply *is* the commons and stays where it
+is. Nothing real needs to move. Two things stop being written there: fixtures (which go to their own
+clone from the next seed run onward) and new household notes (which go to household spaces from the day
+those exist). Old fixtures already in the commons are an honest residue; a one-time sunset of records
+authored by the seeder's fixture identities is a cleanup, not a migration.
+
+**So this suggests doing:** give the seeder a cell selector (it has none), make the fixtures clone the
+default target of every a2o seed run, and never ask fleet peers to provision it. Household notes need no
+crossing machinery at all: new notes go to the household space from now on.
+
+### 9.5 Elohim as the cross-holon plane — what lives between membranes?
+
+**What we found.** A great deal of our system already lives outside every DHT space, on purpose: the
+steward-peers pool, the conductor registry, the upstream circuit breakers, the self-healing read model,
+the transport-manifest bootstrap cache, the freshness pantry, the coherence fingerprint; on the storage
+side the reconcile controllers, the arc policy and actuator, head adoption, and the *follow-set* of the
+release controller (the elected head is notarized; the decision to follow it is node-local). The
+federation-failover plan's whole gap list is likewise non-DHT. This is not debt. It is the inversion
+the seam map names: the social, governance, trust and recovery plane has no hyperscaler equivalent, and
+no single space can hold it because it is *about the relationships between spaces*.
+
+**If we did it this way, then** five things follow, each of which resolves something that has felt like
+a bug:
+
+1. *A doorway projects exactly the spaces its steward joined.* The steward-peers pool stops being a
+   hand-edited list and becomes a derived membership roster; "the doorway can't see a household" becomes
+   correct behavior.
+2. *Discovery is a social graph in identity, not a DHT lookup.* This is why identity and infrastructure
+   stay global (9.1): a per-holon identity space would make holons unreachable.
+3. *A recovery quorum is a cross-space commitment recorded in the custodian's governance space, not the
+   household's.* The custodian must validate it without joining the household, and the allotment story
+   says the custodian may not read the note.
+4. *A release channel becomes per cell, not per role.* Following is already a node-local act (james's
+   promotion to canary this morning was a data change on his row alone); the adoption controller's
+   "installed reality" must enumerate clones.
+5. *The hub cluster is the commons' rack-tier stewards*, and per-space arc is the only way a phone is a
+   full household member and a light commons reader at once, which is the fork hook of §6½.
+
+**The design rule that falls out:** *inside a membrane, the DHT is the truth; across a membrane, the
+elohim plane carries a witnessed commitment recorded in the receiving holon's governance space.* The
+aggregation plane's node-local state is correctly placed. The work is to make it *derive from
+membership* rather than from config.
+
+**So this suggests doing:** nothing new in the DHT. Derive the steward-peers pool from space
+membership once spaces exist, record recovery quorums and promotions in the receiving holon, and let
+the release controller enumerate cells. Each is a small change in code that already exists.
+
+### 9.6 What this section decides, in one breath
+
+Spaces are memberships with their own rules, sized household → collective → regional commons → protocol
+commons; content and governance per holon, identity and discovery global; a door on every holon made
+from a signed membership record; nothing in the commons moves except fixtures and new household notes;
+and the elohim plane stays where it is, deriving from membership. First move on all of it: raise
+`clone_limit`, mint the fixtures clone, measure the difference in gossip.
+
+## 10. The red team — a Holochain reviewer runs us through it
+
+*The operator asked for a hostile review from a Holochain core contributor's point of view before
+committing to any pivot. What follows is that review's findings, each followed by the orchestrator's
+verdict. Where I disagree I say so; where I accept, the answer above is amended.*
+
+### 10.1 "You screwed up the layout, not the architecture — except for one thing."
+
+**Finding.** One space, full arc, fixtures in the commons, `clone_limit: 0`: all layout, all reversible in
+days, and every serious hApp team (Acorn, Moss, Neighbourhoods) shipped single-space first before cloning per
+group. The three irreversible choices — CID as identity, blobs off the DHT, integrity/coordinator discipline —
+are right, and they are why a pivot is available at all. **But** the content integrity zome is an omnibus:
+about 4,800 lines, **75 entry types and 225 link types**, spanning learning, community, identity, economy
+and infrastructure, and it **duplicates identity's own types** (Human, Agent, Relationship, ContentMastery,
+ContributorPresence appear in both DNAs, the content copies marked "legacy"). Two networks are authoritative
+for the same fact, so neither is. That is an architecture error, not layout. Alongside it: every DNA's
+membership check is a permissive stub and no role commits to a progenitor, so every space today is an open
+network whose hash binds to no root.
+
+**Verdict: accepted, and it changes the order of everything in §7.** Cloning the content role as it stands
+would clone the omnibus into every household. The split is one lineage crossing per seam, and the crossing
+machinery is exactly what the Evolution epic just proved on the mesh. So: **the zome split comes before any
+household space.** §9.1's role table stands; the content role that goes per-holon is the *split* one.
+
+### 10.2 "Your storage layer is legitimate — with two organs over the line."
+
+**Finding.** A projection is legitimate when it is rebuildable by replay, never originates truth, and fails
+to staleness rather than divergence. By that test the storage layer is a proper peer-hoster. Two organs are
+over the line: **read-time reach enforcement** (every full-arc peer *holds* the household bytes; only our
+code declines to serve them; patch the binary and serve everything — that is authorization outside the
+validated substrate, not caching) and **per-host custody stamps**. Everything else the reviewer would defend
+to upstream, including the honest `{0,1}` arc actuator and the node-local follow-set ("following is consent,
+and consent is node-local"). The number to worry about: roughly 330,000 lines of storage against a 4,800-line
+integrity zome. Design gravity has been outside the DHT for two years, and the pivot *increases* it, because
+cross-space reads by CID become storage-side joins.
+
+**Verdict: accepted, with one framing change.** §5 called read-time reach "necessary today"; it is more
+honest to call it *an authorization boundary that membership will retire*. And the reviewer is right that the
+pivot does not shrink storage — it moves storage from *shedding load* to *joining across membranes*, which
+is the job the elohim plane was always going to have (§9.5). The projection DB stays, and it is what keeps the
+commons usable offline.
+
+### 10.3 "The pivot is right. Six things will bite."
+
+1. **The per-cell cost was unmeasured** when this document went out (9.3 was a placeholder). Community
+   experience: clone-per-group works around 5–20 cells with *small* zomes and hurts as cells grow heavy.
+   Ours is heavy (10.1). *Verdict: measure before promising; 9.3 now carries the numbers.*
+2. **A membrane proof cannot do a DHT read** — `genesis_self_check` runs before the chain exists, so the
+   proof must be checkable against something in the DNA itself. *Verdict: accepted; 9.2 already says so.*
+3. **Anything in DNA properties folds into the hash.** A per-household founding key means each household is a
+   distinct DNA hash, not merely a distinct seed; "per cell" release channels are really "per DNA hash," and
+   the hApp manager's stale-check is role-structure-only today. *Verdict: accepted as a consequence, not a
+   blocker — clones share integrity wasm, the coordinator hot-swap already applies per cell, and the adoption
+   controller must enumerate cells by role. It is a real change and it is now in §7's table.*
+4. **Cross-space reference by CID kills link traversal**; every cross-holon read is a storage-side join.
+   *Verdict: accepted (see 10.2).*
+5. **Per-space arc is fork-gated, and §7 had contradicted §6½ by calling it "later, separable."** A phone in
+   fifteen spaces is full-arc in all or zero in all until the hint lands. *Verdict: accepted; §7 corrected
+   above. Phones stay spokes to a household hub until then.*
+6. **Blocks scale with spaces.** On our own mesh one rejected write after a seal blocked a cell permanently,
+   with no unblock. Multiply that by every household. *Verdict: accepted; this is why the unblock API moves
+   ahead of any household space (10.5).*
+
+### 10.4 "On the fork: three patches, each with an open upstream PR — and refuse sharding."
+
+**Finding, per change.** Cross-relay fix: upstream it. Jemalloc: an image choice, not a patch. Sys-validation
+backoff: should be a config knob, PR the knob. A `list_blocks`/`unblock` admin API: **the best contribution we
+have**, small, genuinely missing upstream, retires our worst risk. Per-space arc hint: small plumbing of a
+field the conductor already ignores, PR-able. **Fractional sharding: refuse.** Upstream built dynamic arcs
+once, removed them in the rewrite, and has restoring them on the roadmap; a small team re-implementing op
+filtering by arc, out-of-arc reads and validation-coverage accounting on a moving 0.x line is a multi-year
+commitment against a target that will be rebuilt under it. Discipline: at most three carried patches, each
+under ~200 lines, each with an open PR; and stop pinning the fork submodule as reference-only so it can be
+bisected against upstream.
+
+**Verdict: accepted in full.** This overrides the softer "track and contribute" wording earlier in §6½: we do
+not attempt fractional sharding. We carry the unblock API and the per-space arc hint as PRs first, fork
+second.
+
+### 10.5 "What a person feels."
+
+Joining a household must feel like tap-accept on an invitation; if anyone ever sees proof bytes we have
+failed. **Promotion gets better**: "share to the church" becomes a visible, witnessed, attributable act rather
+than a flag — lead with it. **Reading the commons at zero arc gets worse**: no local authority, tail latency on
+network reads, offline broken — the projection DB and pin-what-you-read are what hide this, and pinning is
+content-level caching, never to be confused with arc. **A phone in fifteen spaces is the weak point** until
+the per-space hint lands: keep phones as spokes to a household hub, as the seam map already draws. **Recovery
+by people outside the household** is the strongest argument in the document; identity never goes per-holon.
+Hide entirely: seeds, DNA hashes, arcs, cell counts, proof bytes, re-publish mechanics. Show: who can see
+this, who holds a copy, who witnessed the move.
+
+**Verdict: accepted as the UX contract for the epic.**
+
+### 10.6 The recommendation, resequenced
+
+The reviewer's option: the §9 pivot, in a different order than §7 first proposed. Household spaces before an
+unblock API is a support catastrophe; per-holon spaces before the zome split clones the mess. So:
+
+1. **Fixtures clone, instrumented.** Raise `clone_limit`, give the seeder a cell selector, no fleet peer
+   follows the clone — and measure per-cell cost the same week (9.3). Risk: low; the only way to fail is to do
+   it without instruments.
+2. **`list_blocks` / `unblock`: upstream PR plus a carried patch.** Risk: medium (fork discipline). Nothing
+   downstream — no household space — before it lands.
+3. **The omnibus split as one lineage crossing**: shed the identity duplicates, the economy and the
+   infrastructure types from the content zome, and in the *same* hash move land a real membership check, a
+   lineage record and a non-null progenitor. Risk: high — a hash move on the fleet's largest space, with a
+   reinstall path that still mints keys — but it is what the Evolution epic exists for, and doing it after the
+   pivot means doing it per household.
+4. Only then: household spaces, with membrane proofs.
+5. Explicitly not: fractional sharding.
+
+**Verdict: adopted as the plan.** §7's "second slice" (household notes) moves to step 4.
+
+### 10.7 The reviewer's verdict, verbatim
+
+> You did not screw up the architecture — you screwed up the layout, and then you built 330,000 lines of
+> storage to make the layout survivable, which is what made it look like architecture. The three choices that
+> would have been fatal to get wrong (CID identity, blobs off the DHT, integrity/coordinator hygiene) you got
+> right, and that is why the pivot is available to you at all. The one genuine architecture error is the
+> 75-entry-type omnibus integrity zome that duplicates your own identity DNA — fix that *with* the crossing
+> machinery you just proved, *before* you multiply spaces, or you will clone it into every household on Earth.
+> The pivot is correct and its first slice is cheap, but do not create a single household space until the
+> conductor can unblock a cell, do not sell the phone-in-fifteen-spaces story until the per-space arc hint
+> lands, and do not attempt fractional sharding at all. Ship the fixtures clone this week with instrumentation,
+> PR the unblock API, split the zome, and leave the shadow-database question alone — the two organs that are
+> actually over the line are read-time reach enforcement and per-host custody stamps, and membership will
+> retire the first one for you.
 
 *Grounding for this document: the fork conductor at the fleet pin (`elohim/holochain-conductor` 25dd2d0be,
 `crates/holochain_p2p/src/local_agent.rs:133`), `kitsune2_api` 0.5.1 `DhtArc`, the alpha peer store via
