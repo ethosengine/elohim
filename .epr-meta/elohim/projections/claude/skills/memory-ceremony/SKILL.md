@@ -46,6 +46,38 @@ The phases below define the ceremony's *content* regardless of how it's executed
 
 **Effort — a second dial, independent of model tier (both modes).** Task dispatches and workflow `agent()` both accept `effort` alongside `model`. Use `low`/`medium` liberally for the mechanical legs — the librarian's Phase-2a fact-verification, the Phase-1b deterministic currency readouts, the Phase-4d re-embed confirmation — where quality holds at a fraction of the tokens; reserve high or `xhigh` for the judgment legs: the storyteller's Phase-3 synthesis pen and Phase-4b's two adversarial-verify lenses.
 
+## Phase 0 — Read the in-flight record first (~1 min, deterministic)
+
+The ceremony's cheapest and most reliable input is what agents already witnessed while working:
+every session that finds a stale claim in a gospel surface, a memory note, a script's rationale
+comment, or a skill records it AT DISCOVERY with the run-plane's own correction verb —
+
+```
+epr flow note --on <surface path> --kind correction --reason 'STALE (<date>): "<claim as written>" → <what is true now> (<evidence>)'
+```
+
+That is the record. It is not a new ledger: notes are REA events in `.eprfs/status/flows.jsonl`
+(`unit: run-note`, `classifiedAs[0] = run:correction`, `classifiedAs[1] = target path`) and each
+target's notes render with `epr flow ledger <path>`. The ceremony reads them across targets with
+
+```
+python3 .claude/scripts/memory-kit/stale-record.py [--since <ISO date>]   # groups STALE corrections by surface
+```
+
+and treats every surface with a witnessed correction as a Phase 1 candidate BEFORE the
+population-wide audit runs. Witnessed staleness outranks scanned drift: a correction carries the
+claim, the truth, and the evidence, so the Phase 2 deep-read on that surface starts from a
+known delta instead of re-deriving one — that is where the ceremony's token cost drops. Default
+picks: every surface in the record (they are pre-triaged), then top up to N from the Phase 1
+audit only if the record is thin. A surface whose corrections are all applied is announced as
+such and skipped. Entries the ceremony absorbs are closed in the chronicle (Phase 4c) by naming
+the surface and the correction date, so the same STALE line is never carried into a second
+ceremony. `--since` defaults to the newest chronicle's date.
+
+Rule of thumb for authors of the record: one note per stale CLAIM (not per file), the quoted
+claim verbatim so the ceremony can grep it, and the replacement truth in the same note — a
+correction that says only "stale" is a dump.
+
 ## Phase 1 — Population-wide triage (~2 min)
 
 Run the substrate-currency audit. Cheap, deterministic, idempotent:
