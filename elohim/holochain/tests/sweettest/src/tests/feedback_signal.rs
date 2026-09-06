@@ -165,6 +165,13 @@ fn make_content(id: &str) -> CreateContentInput {
 ///
 /// The `operationId` is the group key §7 applies contributions once per. Two
 /// acts citing THIS evidence are one group, not two contributions.
+///
+/// `content_type` is `issue-report`, NOT `correction`: the protocol content-type
+/// enum is DNA-notarized (`ALL_CONTENT_TYPES` in the INTEGRITY zome, validated
+/// by `healing.rs`) and has no `correction` member, so adding one would move the
+/// DNA hash — which a coordinator-only slice must not do. A Correction EPR is
+/// identified by the `correctionRequest` embedded in its body, never by its
+/// content type; the admission gate reads the body and ignores the type.
 fn make_correction_evidence(
     id: &str,
     operation_id: &str,
@@ -178,7 +185,7 @@ fn make_correction_evidence(
     );
     CreateContentInput {
         id: id.to_string(),
-        content_type: "correction".to_string(),
+        content_type: "issue-report".to_string(),
         title: format!("Correction EPR {id}"),
         description: "Correction evidence for feedback_signal sweettests".to_string(),
         content: "# Correction\nThe cited claim was wrong.".to_string(),
@@ -795,7 +802,13 @@ async fn create_vouch_rejects_self_vouch() -> Result<()> {
         .call(
             &cell_b.zome("content_store"),
             "create_content",
-            make_content("t7-s9-evidence"),
+            make_correction_evidence(
+                "t7-s9-evidence",
+                "t7-s9-op",
+                &content_ah,
+                "correction",
+                "debit-soft",
+            ),
         )
         .await;
     let evidence_ah = evidence_output.action_hash;

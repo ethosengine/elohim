@@ -235,6 +235,29 @@ pub fn read_predecessors(
     Ok(peer_ids)
 }
 
+/// Is the direct-notify ACCELERANT enabled on this peer?
+///
+/// `ELOHIM_FEEDBACK_NOTIFY=0` (or `false`) suppresses the direct p2p
+/// `feedback-signal` send for acts this peer authors. The act is still
+/// committed to the author's own source chain and still found by every other
+/// peer's durable discovery scan (accountable-correction contract §3) —
+/// notification is an accelerant, never the path. The flag exists so a scenario
+/// can prove discovery ALONE is sufficient.
+///
+/// Read from the RUNTIME-CONFIG registry, never with `std::env::var` on this
+/// path. Two reasons, both load-bearing:
+///
+/// 1. An env read on a hot path plus a test that `set_var`s it is a
+///    parallel-test flake generator — `set_var` in one test leaks into every
+///    other.
+/// 2. The local mesh never restarts a peer between scenarios, so a boot-only
+///    flag could not be flipped per scenario. The registry is watched
+///    (`ELOHIM_RUNTIME_CONFIG_PATH`, armed from boot on every mesh peer), so a
+///    scenario flips this on a RUNNING peer between two acts.
+pub fn direct_notify_enabled() -> bool {
+    crate::runtime_config::get_bool(crate::runtime_config::Key::FeedbackNotify)
+}
+
 /// Walk back one hop: for `signal.target_cid`, unseal all predecessors and
 /// forward the signal to each.
 ///
@@ -269,29 +292,6 @@ pub fn read_predecessors(
 /// - `Ok(peer_ids)` — predecessor(s) found; signal forwarded to all of them.
 ///   `peer_ids` contains the string PeerIds that were ATTEMPTED.
 /// - `Err(...)` — DB or unseal failure (not a sink failure).
-/// Is the direct-notify ACCELERANT enabled on this peer?
-///
-/// `ELOHIM_FEEDBACK_NOTIFY=0` (or `false`) suppresses the direct p2p
-/// `feedback-signal` send for acts this peer authors. The act is still
-/// committed to the author's own source chain and still found by every other
-/// peer's durable discovery scan (accountable-correction contract §3) —
-/// notification is an accelerant, never the path. The flag exists so a scenario
-/// can prove discovery ALONE is sufficient.
-///
-/// Read from the RUNTIME-CONFIG registry, never with `std::env::var` on this
-/// path. Two reasons, both load-bearing:
-///
-/// 1. An env read on a hot path plus a test that `set_var`s it is a
-///    parallel-test flake generator — `set_var` in one test leaks into every
-///    other.
-/// 2. The local mesh never restarts a peer between scenarios, so a boot-only
-///    flag could not be flipped per scenario. The registry is watched
-///    (`ELOHIM_RUNTIME_CONFIG_PATH`, armed from boot on every mesh peer), so a
-///    scenario flips this on a RUNNING peer between two acts.
-pub fn direct_notify_enabled() -> bool {
-    crate::runtime_config::get_bool(crate::runtime_config::Key::FeedbackNotify)
-}
-
 pub fn back_prop_one_hop(
     conn: &mut SqliteConnection,
     signal: &FeedbackSignal,

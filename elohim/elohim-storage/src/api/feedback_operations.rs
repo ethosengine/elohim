@@ -419,7 +419,14 @@ async fn author_or_recover_evidence(
 
     let input = lamad_types::CreateContentInput {
         id: pinned.evidence_content_id(),
-        content_type: "correction".to_string(),
+        // `issue-report`, NOT `correction`. The protocol content-type enum is
+        // DNA-notarized (`ALL_CONTENT_TYPES`, validated in the INTEGRITY zome's
+        // `healing.rs`) and has no `correction` member, so minting one would
+        // move the DNA hash — which this coordinator-only slice must not do. A
+        // Correction EPR is identified by the `correctionRequest` embedded in
+        // its body, which is exactly what the admission gate reads; the content
+        // type is not part of that binding.
+        content_type: "issue-report".to_string(),
         title: format!("Correction: {}", pinned.target_action_hash),
         description: "Correction EPR — evidence for an accountable correction".to_string(),
         content: body.unwrap_or("").to_string(),

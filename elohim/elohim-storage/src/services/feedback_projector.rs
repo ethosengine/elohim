@@ -620,7 +620,7 @@ pub fn publish_generation(
         for agg in &aggregates {
             let last_signal_at = agg
                 .last_signal_at_micros
-                .and_then(|micros| chrono::DateTime::<Utc>::from_timestamp_micros(micros))
+                .and_then(chrono::DateTime::<Utc>::from_timestamp_micros)
                 .map(|dt| dt.to_rfc3339())
                 .unwrap_or_else(|| now.clone());
             upsert_standing_view(
