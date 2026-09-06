@@ -954,6 +954,36 @@ fn view_blob_hash_for_id(
     .and_then(|cwt| cwt.content.blob_hash)
 }
 
+/// Preserve transport stats while making byte-serialized DNA hashes valid JSON keys.
+fn project_transport_stats(
+    stats: &holochain_types::network::HolochainTransportStats,
+) -> Result<serde_json::Value, serde_json::Error> {
+    let holochain_types::network::HolochainTransportStats {
+        transport_stats,
+        blocked_message_counts,
+    } = stats;
+    let by_url: std::collections::HashMap<_, _> = blocked_message_counts
+        .iter()
+        .map(|(url, counts)| {
+            let by_dna: std::collections::HashMap<_, _> = counts
+                .iter()
+                .map(|(dna, count)| (dna.to_string(), count))
+                .collect();
+            (url, by_dna)
+        })
+        .collect();
+    let mut projected = serde_json::Map::new();
+    projected.insert(
+        "transport_stats".into(),
+        serde_json::to_value(transport_stats)?,
+    );
+    projected.insert(
+        "blocked_message_counts".into(),
+        serde_json::to_value(by_url)?,
+    );
+    Ok(serde_json::Value::Object(projected))
+}
+
 /// Project one kitsune2 `AgentInfoSigned` JSON string (as returned by the
 /// conductor admin `agent_info` call) into a compact diagnostic view.
 ///
@@ -7695,7 +7725,7 @@ impl HttpServer {
         // Transport stats: best-effort — a failure here should not hide the
         // peer store (the more load-bearing half of the diagnostic).
         let transport_stats = match admin.dump_network_stats().await {
-            Ok(stats) => serde_json::to_value(&stats)
+            Ok(stats) => project_transport_stats(&stats)
                 .unwrap_or_else(|e| serde_json::json!({ "serializeError": e.to_string() })),
             Err(e) => serde_json::json!({ "error": e.to_string() }),
         };
@@ -19348,6 +19378,40 @@ mod admission_tests {
 #[cfg(test)]
 mod conductor_diagnostics_tests {
     use super::project_agent_info;
+
+    #[test]
+    fn transport_stats_serializes_blocked_dna_keys_as_strings() {
+        use holochain_types::prelude::DnaHash;
+
+        let transport = serde_json::json!({
+            "backend": "test",
+            "peer_urls": [],
+            "connections": [],
+        });
+        let mut stats: holochain_types::network::HolochainTransportStats =
+            serde_json::from_value(serde_json::json!({
+                "transport_stats": transport,
+                "blocked_message_counts": {},
+            }))
+            .unwrap();
+        let url = "ws://localhost:3340";
+        let dna = DnaHash::from_raw_32(vec![7; 32]);
+        let dna_key = dna.to_string();
+        let count = serde_json::json!({ "incoming": 3, "outgoing": 5 });
+        stats.blocked_message_counts.insert(
+            url.parse().unwrap(),
+            [(dna, serde_json::from_value(count.clone()).unwrap())]
+                .into_iter()
+                .collect(),
+        );
+
+        assert!(serde_json::to_value(&stats).is_err());
+        let projected = super::project_transport_stats(&stats).unwrap();
+        let serialized = serde_json::to_value(projected).unwrap();
+        assert!(dna_key.starts_with("uhC0k"));
+        assert_eq!(serialized["transport_stats"], transport);
+        assert_eq!(serialized["blocked_message_counts"][url][&dna_key], count);
+    }
 
     #[test]
     fn p2p_namespace_survives_app_context_extraction() {
