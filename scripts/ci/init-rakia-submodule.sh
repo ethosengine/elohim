@@ -40,6 +40,10 @@ set -euo pipefail
 set +x
 
 warn_unavailable() {
+    # Keep the storage image's `COPY elohim/rakia/schemas /rakia/schemas` satisfiable: an
+    # EMPTY placeholder means the docker build proceeds and the schema mirror test reads
+    # red honestly in the non-blocking gate, instead of the COPY failing the deploy path.
+    mkdir -p elohim/rakia/schemas/v1
     echo "RAKIA-UNAVAILABLE: elohim/rakia could not be fetched — the release-manifest schema mirror test will read as red in the non-blocking Storage gate; deploy continues" >&2
 }
 

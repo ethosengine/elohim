@@ -373,6 +373,19 @@ COPY elohim/elohim-storage/config ./config
 # doorway/doorway-service/Dockerfile). Kept UNSTABLE since the Wave C1 DID work.
 COPY bridges/did/schemas /bridges/did/schemas
 COPY elohim/sdk /sdk
+# holochain/dna/mishpat: same cfg(test) include_str! class — services/commitment_record.rs pins
+# the Commitment entry index against the INTEGRITY zome source and dna.yaml
+# ("../../../holochain/dna/mishpat/…" clamps to /holochain/dna/mishpat from /app/src/services).
+# Two small in-repo files, always present in the context; edge #1434's test layer failed
+# compile without them (couldn't read … No such file → the E0282 that followed was downstream).
+COPY elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs /holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs
+COPY elohim/holochain/dna/mishpat/dna.yaml /holochain/dna/mishpat/dna.yaml
+# rakia/schemas: the T1 release-manifest schema the release_adoption::verify mirror test reads at
+# runtime ("../rakia/schemas/v1/…" from /app → /rakia/schemas). The Checkout stage initialises
+# the submodule under ee-bot-pat (scripts/ci/init-rakia-submodule.sh) and, on a fetch failure,
+# leaves an EMPTY elohim/rakia/schemas/v1 placeholder so this COPY never fails the build — the
+# mirror test then reads red honestly in the non-blocking gate instead of taking the deploy down.
+COPY elohim/rakia/schemas /rakia/schemas
 RUN cargo fmt --check
 RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
 
