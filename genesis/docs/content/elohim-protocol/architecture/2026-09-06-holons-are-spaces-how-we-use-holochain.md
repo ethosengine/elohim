@@ -505,7 +505,10 @@ household space cannot validate its own rescue. Identity must be readable across
 
 **So this suggests doing:** raise `clone_limit`, mint a `fixtures` clone of the content role, and let no
 fleet peer follow it. It is the cheapest possible falsification of the whole model, it needs no fork,
-and it removes thousands of records from every peer's gossip on the day it lands.
+and it removes thousands of records from every peer's gossip on the day it lands. Two landmines from the
+field (§11): keep the role *provisioned* and just raise `clone_limit` — the `clone_only` strategy leaves
+the role unprovisioned and the 0.7 conductor panics assembling app info; and the `deferred` flag is
+ignored on install. A provisioned role with a clone limit in the hundreds runs in production elsewhere.
 
 ### 9.2 Membrane proofs — who may join a space?
 
@@ -533,7 +536,10 @@ allotment story.
 **So this suggests doing:** three small pieces, in order. Replace the stub `genesis_self_check` in the
 content and governance zomes with a real check of a membership record; add the one code path that turns
 a mishpat membership into proof bytes; pass it on clone creation. None of it moves the DNA hash of the
-*commons* space (the commons stays open); it only gives holons a door.
+*commons* space (the commons stays open); it only gives holons a door. One field warning (§11): the self
+check is a courtesy; the only real gate is validating the proof record on the chain, and Sweettest has no
+support for membrane proofs at all — so the test harness for holons must be decided *before* the door is
+built, not retrofitted.
 
 ### 9.3 Cell count per device — what does a holon cost?
 
@@ -733,6 +739,25 @@ unblock API is a support catastrophe; per-holon spaces before the zome split clo
 > PR the unblock API, split the zome, and leave the shadow-database question alone — the two organs that are
 > actually over the line are read-time reach enforcement and per-host custody stamps, and membership will
 > retire the first one for you.
+
+## 11. Field guides we adopt, adapt, and still have to write
+
+Two days before this document, Sacha Pignot (hAppenings Community) published `holochain-agent-skills`
+(Apache-2.0): one skill with twenty references, eight workflows, seventeen templates and a compiling example
+hApp, pinned to the same HDK and HDI versions our DNAs use, with citations into the crate sources and a CI
+gate that fails when a document teaches a removed API. His own app is single-space with `clone_limit: 0`, so
+the cloning and membrane material is upstream-derived rather than app-proven, but it is careful.
+
+**Adopt as-is (planted as a package with attribution):** membranes, source chain, countersigning, testing
+(multi-conductor Sweettest and partitions), the 0.6→0.7 upgrade break list, troubleshooting, cryptography,
+scheduling. **Adapt:** cell cloning (take the manifest mechanics and the `clone_only` panic verbatim; add our
+holon vocabulary and the "a cell is a full participant" cost rule), and the zome-review checklist (take the
+API items; *drop* its default of a path-plus-agent discovery link on every entry, which is the query-index
+link pattern our link budget refuses — the content zome already sits at 225 of 256 link types). **Write
+ourselves, because nothing exists:** per-space arc policy (his networking reference stops at the global knob
+and does not know about the clamp or that the factor is conductor-wide), the head-plane cost model, holon
+placement and promotion by witnessed re-publish, and cross-space reference by CID. **Contribute back:** the
+arc clamp and the conductor-wide finding, which his repository explicitly asks for.
 
 *Grounding for this document: the fork conductor at the fleet pin (`elohim/holochain-conductor` 25dd2d0be,
 `crates/holochain_p2p/src/local_agent.rs:133`), `kitsune2_api` 0.5.1 `DhtArc`, the alpha peer store via
