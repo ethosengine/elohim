@@ -163,13 +163,14 @@ test("a shem-hosted alpha human (no field before rung5 Task 3) without runtimeCo
 
 test("alpha humans WITH the field render the real workspace channel line at their declared mode", () => {
   // Fix round 1 (plan run:ruling "Alpha enrolment modes, resolved"): every
-  // active alpha human enrolls at =observe on the FIRST render -- no
+  // 2026-09-06: james promoted to =canary after the first workspace→alpha receipts (Task 4).
+  // Every OTHER active alpha human enrolls at =observe on the FIRST render -- no
   // apply/canary from a workspace channel while nobody is watching. Promotion
   // (james to canary, then matthew/jessica to apply on the bootstrap pair) is
   // a later data change the operator flips after Task 4's first
   // workspace->alpha receipt, not minted here.
   for (const [name, mode] of [
-    ["james", "observe"],
+    ["james", "canary"],
     ["matthew", "observe"],
     ["jessica", "observe"],
     ["adam", "observe"],
