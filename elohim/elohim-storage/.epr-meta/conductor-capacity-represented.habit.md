@@ -151,3 +151,5 @@ db_max_readers in the conductor fork; occupancy well under capacity while
 calls still fail says the pool was never the binding constraint and the
 diagnosis moves elsewhere. This habit flips green on the live leg, never on
 the unit tests.
+
+2026-09-06 — Fixtures clone harness: five TS and four Rust selector tests pass; three-peer gossip cell-cost and identity-isolation measurements NOT RUN (occupied mesh ports). Evidence: genesis/a2o/fixtures-clone-2026-09-06-report.md; no capacity/status change.
