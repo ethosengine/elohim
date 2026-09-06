@@ -12,6 +12,7 @@ Endpoints (per node, degrade-quiet — a missing one contributes no fields):
   GET /admin/self-healing   PRIMARY (PENDING — stability-surface plan C)
   GET /admin/render-stats   SECONDARY (LANDED)
   GET /admin/residuals      C14 residual capsules (PENDING — seam-concern plan P4.7)
+  GET /p2p/status           dataplane self-report: provideLoop + replication (LANDED)
   GET /health               liveness
 
 Stores:
@@ -29,8 +30,21 @@ core. What DID need changing is right here in the shell: `render` used to hardco
 in its dispatch directive, which would have described a witnessed residual as a self-reported
 exhaustion and sent runtime-triage hunting a circuit breaker that never opened — the harvester
 committing C4 (honest absence) and C7 (advertise/serve) against its own findings.
-  • self-heal-exhaustion            — window predicates over /admin/self-healing + /admin/render-stats
-  • concern:c14-witnessed-residual  — capsules served at /admin/residuals (see _lib/residual_channel.py)
+  • self-heal-exhaustion                     — window predicates over /admin/self-healing + /admin/render-stats
+  • concern:c14-witnessed-residual           — capsules served at /admin/residuals (see _lib/residual_channel.py)
+  • provide-loop-dead-remaining-stuck        — /p2p/status provideLoop.deadRemainingStuck (see p2p_status_findings below;
+                                                the persistence — 3 unchanged reanchor sweeps — is already computed
+                                                server-side by elohim-storage's provide_loop_status.rs, so this classifier
+                                                relays a self-report rather than re-deriving the window)
+  • replication-caughtup-false-sustained     — /p2p/status replication.caughtUp == false for
+                                                REPLICATION_LAG_POLLS consecutive polls (mirrors the ring-buffer /
+                                                consecutive-observation pattern _lib/runtime_harvest.py already uses
+                                                for projector lag; kept in this shell file rather than the pure core
+                                                so multi-doorway B-side coverage lands without touching _lib)
+
+Nodes (dict, node -> base URL): "alpha" -> doorway-alpha (storage peer matthew, A-side) and
+"alpha-b" -> elohim.host (storage peer adam, B-side) — added so the B-side doorway is polled too;
+fingerprints already key on `node`, so this never re-fires existing "alpha" entries.
 
 Modes:
   (default)  poll all NODES, append sample, reconcile; human summary
@@ -62,12 +76,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import residual_channel as rc  # noqa: E402
 from _lib import runtime_harvest as rh  # noqa: E402
 
-NODES = ["alpha"]  # doorway-alpha pod; extend per cluster-state
-BASE_TMPL = "https://doorway-{node}.elohim.host"
+# node -> base URL, explicit (not templated) because the B-side doorway does not follow the
+# "doorway-{node}" convention. A/B are separate storage peers/doorways (matthew, adam) with no
+# shared coherence today (project_doorway_ops_incidents) — the poller must see both to catch an
+# exhaustion the other side can't observe.
+NODE_BASES = {
+    "alpha": "https://doorway-alpha.elohim.host",     # A-side: storage peer matthew
+    "alpha-b": "https://elohim.host",                 # B-side: storage peer adam
+}
+NODES = list(NODE_BASES)  # extend per cluster-state
+BASE_TMPL = "https://doorway-{node}.elohim.host"  # fallback for a node not in NODE_BASES
 ENDPOINTS = {
     "self_healing": "/admin/self-healing",
     "render": "/admin/render-stats",
     "residuals": "/admin/residuals",
+    "p2p_status": "/p2p/status",
     "health": "/health",
 }
 HTTP_TIMEOUT = 8
@@ -112,10 +135,72 @@ def poll_node(node, base):
     if isinstance(res, list):
         reached = True
         sample["residuals"] = res
+    ps = get_json(base + ENDPOINTS["p2p_status"])
+    if isinstance(ps, dict):
+        reached = True
+        sample["p2p_status"] = ps
     h = get_json(base + ENDPOINTS["health"])
     if isinstance(h, dict):
         reached = True
     return sample if reached else None
+
+
+PROVIDE_LOOP_CLASS = "provide-loop-dead-remaining-stuck"
+REPLICATION_LAG_CLASS = "replication-caughtup-false-sustained"
+REPLICATION_LAG_POLLS = 3  # consecutive-observation window, mirrors rh.LAG_POLLS' pattern
+
+
+def _provide_loop_stuck_finding(node, samples):
+    """Self-heal exhaustion: elohim-storage's provide-loop watchdog already computed
+    `deadRemainingStuck` after >= 3 unchanged reanchor sweeps
+    (elohim/elohim-storage/src/services/provide_loop_status.rs:57-68,130-132) — the persistence
+    happened server-side, so relaying the latest sample is sufficient; no window needed here."""
+    if not samples:
+        return None
+    ps = samples[-1].get("p2p_status")
+    pl = ps.get("provideLoop") if isinstance(ps, dict) else None
+    if not isinstance(pl, dict) or pl.get("deadRemainingStuck") is not True:
+        return None
+    return {
+        "node": node, "class": PROVIDE_LOOP_CLASS,
+        "provenance": "p2p-status:provide-loop",
+        "line": f"provideLoop.deadRemainingStuck reanchorDeadRemaining="
+                f"{pl.get('reanchorDeadRemaining')} reanchorPending={pl.get('reanchorPending')} "
+                f"stuckSweeps={pl.get('stuckSweeps')}",
+    }
+
+
+def _replication_caughtup_finding(node, samples):
+    """Sustained replication.caughtUp == false across REPLICATION_LAG_POLLS consecutive polls.
+    Uses the same ring-buffer / consecutive-observation notion _lib/runtime_harvest.py's
+    predicates already rely on (window kept in cursor.windows[node]); kept here rather than in
+    the pure core so B-side coverage lands without an _lib change."""
+    win = samples[-REPLICATION_LAG_POLLS:] if len(samples) >= REPLICATION_LAG_POLLS else []
+    if not win:
+        return None
+    states = []
+    for s in win:
+        ps = s.get("p2p_status")
+        rep = ps.get("replication") if isinstance(ps, dict) else None
+        states.append(isinstance(rep, dict) and rep.get("caughtUp") is False)
+    if not all(states):
+        return None
+    return {
+        "node": node, "class": REPLICATION_LAG_CLASS,
+        "provenance": "p2p-status:replication",
+        "line": f"replication.caughtUp == false sustained >= {REPLICATION_LAG_POLLS} polls",
+    }
+
+
+def p2p_status_findings(node, samples):
+    """PURE-ish (reads only the sample window, no I/O): exhaustion predicates over /p2p/status,
+    combined the same way rh.evaluate() combines its predicates."""
+    findings = []
+    for pred in (_provide_loop_stuck_finding, _replication_caughtup_finding):
+        f = pred(node, samples)
+        if f is not None:
+            findings.append(f)
+    return findings
 
 
 def load_cursor():
@@ -161,7 +246,7 @@ def harvest(nodes, base_override, as_hook):
         entries = load_jsonl(LEDGER_PATH)
         active = []
         for node in nodes:
-            base = base_override or BASE_TMPL.format(node=node)
+            base = base_override or NODE_BASES.get(node) or BASE_TMPL.format(node=node)
             sample = poll_node(node, base)
             if sample is None:
                 continue  # wholly unreachable -> no append, no finding (D3)
@@ -169,10 +254,11 @@ def harvest(nodes, base_override, as_hook):
             win = cursor["windows"].setdefault(node, [])
             win.append(sample)
             del win[: -rh.WINDOW]  # keep last WINDOW samples
-            # Two producers, ONE fingerprint/reconcile core (C14 binds this pipeline, D5 closure
-            # and the storm guard apply to residuals unchanged).
+            # Three producers, ONE fingerprint/reconcile core (C14 binds this pipeline, D5 closure
+            # and the storm guard apply to residuals + p2p-status findings unchanged).
             produced = (rh.evaluate({"node": node, "samples": win})
-                        + rc.findings_from_capsules(node, capsules))
+                        + rc.findings_from_capsules(node, capsules)
+                        + p2p_status_findings(node, win))
             for f in produced:
                 f["fp"] = rh.fingerprint(f["node"], f["class"], f["provenance"])
                 active.append(f)
