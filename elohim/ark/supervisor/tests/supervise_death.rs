@@ -17,6 +17,7 @@
 
 use std::{
     collections::BTreeMap,
+    net::TcpListener,
     path::PathBuf,
     sync::atomic::Ordering,
     thread,
@@ -782,25 +783,30 @@ fn identity_refusal(identity_unavailable: bool) {
     let root = tempfile::tempdir().unwrap();
     let mut policy = policy(0, 100);
     policy.same_cause_limit = 1;
-    // The shell starts successfully and announces service readiness, but then
-    // replaces itself with sleep. A spawn hash or a stdout marker cannot prove
-    // the identity of the image now occupying the very same PID.
+    // Bind service readiness before supervision so no pipe-reader scheduling
+    // can prevent reaching the identity rung. Keep the listener alive for the run.
+    let listener = (!identity_unavailable).then(|| TcpListener::bind("127.0.0.1:0").unwrap());
+    let mut readiness = Vec::new();
+    if listener.is_some() {
+        readiness.push(Probe::TcpListen {
+            port_key: "service".into(),
+            patience_ms: 1000,
+        });
+    }
+    let identity_rung = readiness.len();
+    readiness.push(Probe::ExecutableIdentity { patience_ms: 200 });
+    // The shell replaces itself with sleep. Neither a spawn hash nor an
+    // available service proves the identity of the image at the same PID.
     let manifest = RuntimeManifest {
-        processes: vec![child(
-            "runtime",
-            "echo booted; exec sleep 30",
-            vec![
-                Probe::StdoutLine {
-                    contains: "booted".into(),
-                    patience_ms: 1000,
-                },
-                Probe::ExecutableIdentity { patience_ms: 200 },
-            ],
-            policy,
-        )],
+        processes: vec![child("runtime", "exec sleep 30", readiness, policy)],
         ..Default::default()
     };
-    let berth = berth_for(&manifest, root.path().into(), &["runtime"]);
+    let mut berth = berth_for(&manifest, root.path().into(), &["runtime"]);
+    if let Some(listener) = &listener {
+        berth
+            .ports
+            .insert("service".into(), listener.local_addr().unwrap().port());
+    }
     let spool = reader(&berth, &manifest);
     let driver: Box<dyn Driver> = Box::new(ImageReplacingDriver {
         identity_unavailable,
@@ -832,9 +838,20 @@ fn identity_refusal(identity_unavailable: bool) {
     assert_ne!(undecided.cid, decided.cid);
     assert_eq!(undecided.exit, decided.exit);
     let witness = spool.read_witness(&undecided.cid).unwrap();
+    let intents = intents_of(root.path(), "runtime");
+    let kills: Vec<_> = intents
+        .iter()
+        .filter(|intent| matches!(intent.action, IntentAction::Kill))
+        .collect();
     assert_eq!(
-        witness.last_intent.unwrap().reason,
-        "readiness rung 1 patience exhausted"
+        kills.first().expect("readiness must record a kill").reason,
+        format!("readiness rung {identity_rung} patience exhausted")
+    );
+    // Grace can expire before death is observed, recording another kill.
+    // The witness promises the last decision, while the log retains the cause.
+    assert_eq!(
+        witness.last_intent.as_ref().unwrap(),
+        *kills.last().unwrap()
     );
     assert_eq!(
         witnesses[0].exit,
@@ -870,7 +887,7 @@ impl Driver for ImageReplacingDriver {
     fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError> {
         let started = NativeDriver.start(spec, berth)?;
         // Synchronize with the fixture's exec instead of relying on scheduling
-        // between the stdout marker and the supervisor's identity observation.
+        // between spawn and the supervisor's identity observation.
         for _ in 0..200 {
             if NativeDriver
                 .running_artifact_sha256(started.pid)
