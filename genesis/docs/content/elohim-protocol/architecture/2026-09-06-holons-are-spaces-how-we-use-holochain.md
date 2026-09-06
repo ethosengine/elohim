@@ -125,11 +125,14 @@ Every full-arc peer validates and holds all of it. When a peer restarts, it re-g
 The habit ledger's "restart churn ≈ 20 minutes" and "RAM ∝ corpus at full arc" are direct consequences
 of this single layout decision.
 
-**Where the household spaces exist, they are the exception.** The mishpat role *does* mint household
-spaces with their own network seeds (that is the `network seed` the Nachalah acceptance stories
-reference, and the "household space partition" incident of 2026-09-05 was a household space getting its
-cell blocked). So the primitive is in use — but only for governance records, not for content, and not
-as the general placement rule.
+**And there are no household spaces yet.** I want to be exact here, because I got this wrong in the
+first draft of this document. The only place our hApp manager uses a network seed today is a *lineage*
+install — a role moving from an old DNA hash to a new one keeps its seed so it stays on the same network.
+No code path creates a clone cell for a household or a collective; the "household space" the Nachalah
+stories describe is a design, and the "household space partition" of 2026-09-05 was a cell on the local
+household *mesh* being blocked, not a clone space. Every integrity zome's membership check
+(`genesis_self_check`) is a stub that returns *valid* for anyone. So the primitive is available in the
+substrate and unused in the product: one space per role, open to any key, everything at full arc.
 
 **Then we built a second system to cope.** This is the honest part. Because everything sat in one space
 at full arc, we grew, in *our own* storage layer:
@@ -243,7 +246,8 @@ Being fair to the last two years:
    mechanism, no pipeline in the path.
 4. **Coordinator hot-swap.** Behavior changes without changing the network's identity. This is
    Holochain's own gift and we lean on it hard.
-5. **Household spaces for governance.** The mishpat role already mints per-household spaces with seeds.
+5. **Lineage installs keep their seed.** A role crossing to a new DNA hash stays on its network — the
+   seed plumbing the holon model needs is already exercised, just not for holons.
 6. **The Nachalah tiers on DNA seams.** Gold, deeds, paper: the epic already says the tiers are spaces.
    We had the design; we had not applied it to content.
 
