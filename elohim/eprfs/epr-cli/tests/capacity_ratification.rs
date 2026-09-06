@@ -37,8 +37,15 @@ fn shared_capacity_ratification_vectors() {
         }
         let temp = TempDir::new().unwrap();
         let root = temp.path();
+        // A git hook (pre-push) exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE to every child;
+        // inherited, they would make `git init` initialise the HOOK's repo instead of the temp
+        // dir, and `epr govern` would then fail to find a worktree from /tmp (push #9,
+        // 2026-09-06). The temp repo must be discovered by path, never by ambient env.
         assert!(Command::new("git")
             .args(["init", "-q"])
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
             .current_dir(root)
             .status()
             .unwrap()
@@ -52,6 +59,9 @@ fn shared_capacity_ratification_vectors() {
                 .arg("--content-file")
                 .arg(root.join(path))
                 .env("EPR_META_NOW", case["now"].as_str().unwrap())
+                .env_remove("GIT_DIR")
+                .env_remove("GIT_WORK_TREE")
+                .env_remove("GIT_INDEX_FILE")
                 .output()
                 .unwrap();
             assert!(

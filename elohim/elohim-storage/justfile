@@ -14,7 +14,10 @@ export RUSTFLAGS := '--cfg getrandom_backend="custom"'
 # guard exists and reports less than ~14 GB of headroom, serialize codegen with
 # -j1 (peak ≈ one rustc). No guard (CI, a plain container) → cargo's default.
 # Override explicitly with `just jobs_flag=-j4 gate` or leave it alone.
-jobs_flag := `sh "$(git rev-parse --show-toplevel 2>/dev/null)/genesis/agentic/bin/cargo-jobs-flag" 2>/dev/null || true`
+# Resolved from this justfile's own directory, not `git rev-parse`: inside a git hook GIT_DIR is
+# exported, and from a linked worktree that made rev-parse answer wrong/empty, so the push #9
+# storage gate ran without -j1 and was shed again (2026-09-06).
+jobs_flag := shell('sh "$1/../../genesis/agentic/bin/cargo-jobs-flag" 2>/dev/null || true', justfile_directory())
 
 # List available recipes
 default:
