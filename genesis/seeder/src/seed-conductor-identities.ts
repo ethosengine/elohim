@@ -223,10 +223,14 @@ async function connectToConductor(
   }
 
   try {
+    const cellTarget = seedCellTarget(process.argv.slice(2));
     const apps = await adminWs.listApps({});
     const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
 
     if (!matchingApp) {
+      if (cellTarget !== undefined) {
+        throw new Error(`App '${appIdPrefix}' missing for cell target '${cellTarget}'; no fallback`);
+      }
       await adminWs.client.close();
       return null;
     }
@@ -237,7 +241,7 @@ async function connectToConductor(
     //   { provisioned: { cell_id: [...] } }                 — older
     const cellId = selectSeedCell(
       matchingApp.cell_info,
-      seedCellTarget(process.argv.slice(2)) ?? 'imagodei',
+      cellTarget ?? 'imagodei',
     );
 
     await adminWs.authorizeSigningCredentials(cellId);
