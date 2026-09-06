@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 151,
+ "n_points_routed": 156,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -151,7 +151,8 @@
    ],
    "reach_tier": "community",
    "registry_crates": [
-    "elohim-ark-core"
+    "elohim-ark-core",
+    "elohim-ark-supervisor"
    ],
    "habits": [],
    "n_a_concerns": []
@@ -417,9 +418,9 @@
  },
  "counts": {
   "unexamined": 170,
-  "variant": 57,
-  "conformant": 25,
-  "n-a": 4
+  "variant": 59,
+  "conformant": 24,
+  "n-a": 3
  },
  "cells": [
   {
@@ -492,6 +493,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -503,6 +532,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -929,6 +965,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "n-a",
      "verified": true,
@@ -940,6 +1004,13 @@
      "status": "n-a",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -1416,6 +1487,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "n-a",
      "verified": true,
@@ -1427,6 +1526,13 @@
      "status": "n-a",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -1894,7 +2000,7 @@
    "seam": "S3.3",
    "plane": "control-truth",
    "state": "conformant",
-   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T2",
     "T3"
@@ -1917,6 +2023,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -1928,6 +2062,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -2368,6 +2509,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "partial",
      "verified": true,
@@ -2379,6 +2548,13 @@
      "status": "partial",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -3157,6 +3333,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -3168,6 +3372,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -3651,6 +3862,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "partial",
      "verified": true,
@@ -3662,6 +3901,13 @@
      "status": "partial",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -4195,6 +4441,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -4206,6 +4480,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -4633,6 +4914,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -4644,6 +4953,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -5085,6 +5401,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "partial",
      "verified": true,
@@ -5096,6 +5440,13 @@
      "status": "partial",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -5647,14 +5998,42 @@
    "concern": "C9",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "n-a",
-   "reason": "2 point(s) declare n-a with justification",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T2",
     "T3"
    ],
    "reach_tier": "community",
    "points": [
+    {
+     "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
     {
      "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
@@ -5668,6 +6047,13 @@
      "status": "n-a",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -6032,6 +6418,34 @@
    "points": [
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "answered",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "partial",
      "verified": true,
@@ -6043,6 +6457,13 @@
      "status": "partial",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -6411,8 +6832,8 @@
    "concern": "C11",
    "seam": "S3.3",
    "plane": "control-truth",
-   "state": "conformant",
-   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T2",
     "T3"
@@ -6428,6 +6849,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "n-a",
      "verified": true,
@@ -6439,6 +6888,13 @@
      "status": "n-a",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -6858,7 +7314,7 @@
    "seam": "S3.3",
    "plane": "control-truth",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T2",
     "T3"
@@ -6874,6 +7330,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "n-a",
      "verified": true,
@@ -6885,6 +7369,13 @@
      "status": "n-a",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -7347,6 +7838,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "answered",
      "verified": true,
@@ -7358,6 +7877,13 @@
      "status": "answered",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -7743,6 +8269,34 @@
     },
     {
      "crate": "elohim-ark-core",
+     "point": "readiness_failure_lifecycle",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lifecycle.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "authenticate_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "CandidateRefusal",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
+     "point": "AuthenticatedCandidateContent",
+     "status": "partial",
+     "verified": true,
+     "file": "src/candidate.rs"
+    },
+    {
+     "crate": "elohim-ark-core",
      "point": "RuntimeManifest::validate",
      "status": "partial",
      "verified": true,
@@ -7754,6 +8308,13 @@
      "status": "partial",
      "verified": true,
      "file": "core/src/rea.rs"
+    },
+    {
+     "crate": "elohim-ark-supervisor",
+     "point": "executable_identity_readiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/driver.rs"
     }
    ]
   },
@@ -8531,7 +9092,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:847357cc8289d5c53ec3b5483c455b79",
+ "digest": "sha256:6653f151e1556e1773068cd3c7b46500",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

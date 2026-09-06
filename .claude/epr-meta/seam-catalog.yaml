@@ -250,7 +250,7 @@ seams:
     # This is a routing of the CORE crate only, per the birth rule: `elohim-ark-supervisor` and
     # `elohim-ark` carry no row-bearing registry yet (I/O and CLI instantiate decisions minted
     # here). Route them on the commit that mints one.
-    registry_crates: [elohim-ark-core]
+    registry_crates: [elohim-ark-core, elohim-ark-supervisor]
     # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
     habits: []
     n_a_concerns: []
