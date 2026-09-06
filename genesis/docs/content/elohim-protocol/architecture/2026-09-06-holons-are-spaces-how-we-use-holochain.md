@@ -543,10 +543,39 @@ built, not retrofitted.
 
 ### 9.3 Cell count per device — what does a holon cost?
 
-*(Measured on 2026-09-06 with an isolated stock holochain 0.7.0 sandbox; numbers below are from that run.
-See the table and commands in the commit that added this section.)*
+**What we measured.** An isolated stock holochain 0.7.0 conductor, our five-role hApp installed once, then
+clones of the content role added in steps with a minute of idle between checkpoints, on loopback only:
 
-MEASUREMENT_PLACEHOLDER
+| Cells | RSS | Per added cell | Disk | Open files | Threads |
+|---:|---:|---:|---:|---:|---:|
+| 5 (the base roles) | 1,205 MiB | — | 186 MiB | 118 | 56 |
+| 10 | 1,215 MiB | 2.1 MiB | 188 MiB | 208 | 96 |
+| 20 | 1,240 MiB | 2.5 MiB | 190 MiB | 390 | 177 |
+| 40 | 1,287 MiB | 2.4 MiB | 196 MiB | 754 | 339 |
+
+Clone creation took about 126 ms each. Growth was linear: **about 2.4 MiB of memory, 0.26 MiB of disk,
+18 open files and 8 threads per idle cell.** (Commands and raw numbers are kept under the shift's
+scratchpad, `cellcost/rerun.sh`.)
+
+**How to read it.** Memory is not the constraint people expected. Forty extra holons cost 80 MiB. What is
+striking is the *baseline*: 1.2 GiB for five idle cells, before any content and before gossip. That is
+the omnibus integrity zome and its four siblings being loaded and warmed, and it is the number that
+decides whether a phone can run a conductor at all — which is the red team's point in §10.1, arriving
+from a different direction. The second constraint is **threads and file descriptors**: eight threads per
+cell means 200 cells (forty holons across five roles) is roughly 1,600 threads and 3,600 open files. A
+laptop shrugs; a phone's OS does not.
+
+**If we did it this way, then** the marginal holon is cheap and the fixed cost is not. A 4 GB phone can
+plausibly carry ten to twenty holons *if* the base cells get lighter; a 2 GB phone is tight at any count;
+a watch cannot run a conductor at all and must be a spoke to a household hub — which is what the seam
+map has always drawn.
+
+**So this suggests doing:** two things, in this order. First, the zome split (§10.1) is also the memory
+fix: the base cost is the price of loading everything for everyone. Second, budget holons by *threads*,
+not bytes: keep phones at roughly fifteen spaces until the per-space arc hint (§6½) lets a zero-arc cell
+be genuinely dormant, and treat "a person in forty holons" as a hub-class statement, not a phone-class
+one. This is an x86 idle measurement; the mobile validation with real gossip is the next measurement,
+and it belongs to the fixtures-clone week (§10.6, step 1).
 
 ### 9.4 Migration of the existing commons — does anything have to move?
 
