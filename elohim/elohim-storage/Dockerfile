@@ -122,15 +122,19 @@ COPY elohim/epr-rea ./epr-rea
 COPY bridges ./bridges
 # Test fixtures the crate's unit tests read by RELATIVE path from the crate root
 # (release_adoption/{mod,verify}.rs: `../../genesis/a2o/scripts/__tests__/fixtures/*.json`
-# — the release-manifest fixtures shared with the a2o TS tests, one source of truth —
-# and `../rakia/schemas/v1/release-manifest.schema.json`, the T1 schema). In the flattened
-# /app layout those resolve to /genesis/… and /rakia/…, which did not exist, so the
+# — the release-manifest fixtures shared with the a2o TS tests, one source of truth). In
+# the flattened /app layout that resolves to /genesis/…, which did not exist, so the
 # `check` stage's `cargo test --lib` failed 52 tests with "No such file or directory"
 # (edge #1430, 2026-09-05 — "Quality Gate: Storage - failures (non-blocking while
 # stabilizing)", i.e. every storage image since the fixtures were introduced shipped
-# with that gate silently red). Copied to the paths the tests already name; ~130 KB.
+# with that gate silently red). Copied to the path the tests already name; ~50 KB.
+# NOT copied: `../rakia/schemas/v1/release-manifest.schema.json` (the T1 schema one
+# verify.rs test reads) — `elohim/rakia` is a git submodule no pipeline checkout
+# initialises, so the build context holds an empty dir and a COPY of it fails the whole
+# image build (edge #1431, 2026-09-06). That single test stays red in the non-blocking
+# gate until the schema is either vendored into the crate with a drift guard or the
+# edge checkout initialises the submodule — an operator decision, tracked in the backlog.
 COPY genesis/a2o/scripts/__tests__/fixtures /genesis/a2o/scripts/__tests__/fixtures
-COPY elohim/rakia/schemas /rakia/schemas
 
 # Substrate-rea-replication-fix (2026-05-26): elohim-storage's
 # conductor_writes facade depends on `shefa-types` and `lamad-types` as
