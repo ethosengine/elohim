@@ -46,6 +46,9 @@ $ cd genesis/a2o && pnpm exec tsx scripts/epr-release-package.ts --artifact <you
 validation-rule identity the workspace peer actually runs — the fleet's, because the peer joined
 it. On a peer whose role has crossed a lineage, the packager reads that role's *authoring* cell.
 The artifact bytes are PUT to this peer's own content-addressed store; any peer can fetch them.
+A follow-up release on the same channel automatically supersedes its current head from the workspace
+peer's `GET /admin/adoption` (`E2E_WORKSPACE_STORAGE_URL`, default `http://127.0.0.1:8090`); override
+with `--lineage-parent <cid>` or skip lookup with `--first-release` for a genuinely new channel.
 
 ## Publish
 

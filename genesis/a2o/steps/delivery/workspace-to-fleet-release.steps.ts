@@ -410,6 +410,10 @@ function packageRelease(): void {
       'coordinator-bundle',
       '--channel-id',
       CHANNEL_ID,
+      // Use the same peer's adoption row as workspaceAdoptionRow(); the packager
+      // resolves the current parent for every run, including follow-up releases.
+      '--lineage-parent-from',
+      WORKSPACE_STORAGE_URL,
       '--applies-to-from',
       WORKSPACE_STORAGE_URL,
       '--peer',

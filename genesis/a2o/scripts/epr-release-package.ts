@@ -106,7 +106,10 @@ Channel and reach:
 
 Compatibility envelope (spec §8):
   --wire-epoch <n>              protocol wire epoch this release speaks; repeatable (default: 0)
-  --lineage-parent <cid>        previous release CID on this channel (default: null)
+  --lineage-parent <cid>        explicit previous release CID (overrides automatic lookup)
+  --lineage-parent-from <url>   read the channel's resolvedHead.cid from GET /admin/adoption
+                                (default: E2E_WORKSPACE_STORAGE_URL or http://127.0.0.1:8090)
+  --first-release              skip parent lookup for a genuinely new channel
   --additive-only <true|false>  additive-wire floor assertion (default: true)
 
 appliesTo (what installed reality this release binds to):
@@ -151,7 +154,8 @@ happ-lineage (spec 2026-09-03-holochain-evolution-epic-design §4):
 Blob plane:
   --peer <url>                  storage peer for the blob PUT (default: ${DEFAULT_PEER})
   --agent-id <id>               x-agent-id on the PUT (default: ${DEFAULT_AGENT_ID})
-  --no-put                      package offline: address the bytes, skip PUT and round-trip
+  --no-put                      skip blob PUT and round-trip; offline also needs an explicit parent
+                                or --first-release (and literal inputs for other peer reads)
   --request-timeout <ms>        per-request timeout (default: ${DEFAULT_REQUEST_TIMEOUT_MS})
 
 Output:
@@ -232,6 +236,8 @@ interface Options {
   declaredReach: string;
   wireEpochs: number[];
   lineageParent: string | null;
+  lineageParentFrom: string | null;
+  firstRelease: boolean;
   additiveOnly: boolean;
   appliesToFrom: string | null;
   appliesToLiteral: string | null;
@@ -267,11 +273,12 @@ interface Options {
 
 /**
  * The flags whose value is a peer base URL, and the `Options` field each
- * fills. One switch arm parses all three (`parseHttpUrl` is the same
+ * fills. One switch arm parses these URLs (`parseHttpUrl` is the same
  * validation for each), which also keeps the argv switch under the lint's
  * case ceiling.
  */
 const URL_VALUED_FLAGS = {
+  '--lineage-parent-from': 'lineageParentFrom',
   '--applies-to-from': 'appliesToFrom',
   '--build-info-from': 'buildInfoFrom',
   '--inherit-discipline-from': 'inheritDisciplineFrom',
@@ -360,6 +367,8 @@ function parseArgs(argv: string[]): Options {
     declaredReach: DEFAULT_REACH,
     wireEpochs: [],
     lineageParent: null,
+    lineageParentFrom: null,
+    firstRelease: false,
     additiveOnly: true,
     appliesToFrom: null,
     appliesToLiteral: null,
@@ -389,6 +398,10 @@ function parseArgs(argv: string[]): Options {
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
+    if (arg === '--first-release') {
+      options.firstRelease = true;
+      continue;
+    }
     switch (arg) {
       case '-h':
       case '--help':
@@ -441,6 +454,7 @@ function parseArgs(argv: string[]): Options {
       // `URL_VALUED_FLAGS`) — three separate cases would push this switch past
       // the 30-case lint ceiling for no reader benefit.
       case '--applies-to-from':
+      case '--lineage-parent-from':
       case '--build-info-from':
       case '--inherit-discipline-from':
         options[URL_VALUED_FLAGS[arg]] = parseHttpUrl(requiredValue(argv, index, arg), arg);
@@ -748,6 +762,32 @@ async function getJson(url: string, timeoutMs: number): Promise<JsonObject> {
   const response = await reach(url, { signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new PackagingFailure(`GET ${url} returned ${response.status}`);
   return (await response.json()) as JsonObject;
+}
+
+/** Match the following peer's current L2 head, as the household release driver does. */
+async function resolveLineageParent(options: Options, channelId: string): Promise<string | null> {
+  if (options.lineageParent !== null) return options.lineageParent;
+  if (options.firstRelease) return null;
+  const base =
+    options.lineageParentFrom ??
+    parseHttpUrl(
+      process.env['E2E_WORKSPACE_STORAGE_URL'] ?? 'http://127.0.0.1:8090',
+      '--lineage-parent-from'
+    );
+  const url = `${base}/admin/adoption`;
+  const report = await getJson(url, options.requestTimeoutMs);
+  if (!Array.isArray(report['channels'])) {
+    throw new PackagingFailure(`GET ${url} returned no channels array`);
+  }
+  const row = (report['channels'] as JsonObject[]).find(row => row['channelId'] === channelId);
+  const head = row?.['resolvedHead'] as JsonObject | null | undefined;
+  if (head === null || head === undefined) return null;
+  const cid = head['cid'];
+  if (typeof cid !== 'string' || cid.length === 0) {
+    throw new PackagingFailure(`GET ${url} returned an invalid resolvedHead.cid for ${channelId}`);
+  }
+  console.error(`lineage parent for ${channelId}: ${cid} (resolved head at ${url})`);
+  return cid;
 }
 
 /** `@path` reads a file; anything else is parsed as literal JSON. */
@@ -1305,6 +1345,7 @@ async function assembleManifest(options: Options): Promise<{
   // usage refusal, and refusing it after PUTting a nine-megabyte bundle
   // would make the tool look slow rather than strict.
   const adoptionDiscipline = await resolveAdoptionDiscipline(options, channelId);
+  const lineageParentCid = await resolveLineageParent(options, channelId);
 
   const blobs: BlobResult[] = [];
   for (const file of options.artifacts) {
@@ -1329,7 +1370,7 @@ async function assembleManifest(options: Options): Promise<{
     appliesTo,
     envelope: {
       wireEpochs: [...new Set(options.wireEpochs)].sort((a, b) => a - b),
-      lineageParentCid: options.lineageParent,
+      lineageParentCid,
       additiveOnly: options.additiveOnly,
     },
     provenance: {
