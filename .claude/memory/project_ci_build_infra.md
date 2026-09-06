@@ -30,3 +30,11 @@ them under `${WORKSPACE}` (shared volume) — never `readFile` an absolute `/tmp
   .110/.111/.112); the node hit 0.13 GB free ~3 min into `Build App`, the JNLP channel closed and the controller's exec
   fallback got "Expected HTTP 101 but was 500" ×5 — reads as a control-plane fault but is node OOM. Fixed with
   requests 6Gi / limits 10Gi. Rule: any CI agent running a multi-GB build declares memory, or the ThinkPads eat it.
+
+**2026-09-06 — `elohim/rakia` is PRIVATE to the Jenkins agent.** `git submodule update --init -- elohim/rakia` in the edge
+Checkout stage died with `could not read Username for https://github.com` (edge #1433 → orchestrator #1821 FAILURE, no
+deploy). An agent's "anonymous `ls-remote` works" from the devspace proves nothing about CI's network — the devspace holds
+credential helpers. Rule: any CI fetch of an ethosengine repo other than the main checkout rides the `ee-bot-pat`
+credential (process-local `git -c url.…insteadOf` in a `scripts/ci/*.sh`, token via withCredentials env, never argv);
+and a step that only feeds an ADVISORY test (the rakia schema mirror) must be warn-only — print `RAKIA-UNAVAILABLE` and
+exit 0 — so it can never take the deploy path down.

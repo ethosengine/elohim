@@ -2030,16 +2030,35 @@ spec:
                         // pipeline checkout ever initialized this submodule, so the docker
                         // build context held an empty dir and the schema COPY had to be
                         // dropped from the Dockerfile (edge #1431, 68dfe1c9b) — schemas keep
-                        // ONE home in rakia, so the fix is here, not a vendored copy. rakia
-                        // is a PUBLIC repo (verified via anonymous `git ls-remote`), unlike
-                        // the private `ee-bot-pat`-gated elohim checkout above, so no
-                        // credential is needed for this fetch. `update = none` submodules
-                        // (holochain-conductor, tx5, kitsune2 — see .gitmodules) are
-                        // reference-only and deliberately left uninitialized; only rakia is
-                        // touched here. `sh` fails the build on a non-zero exit by default,
-                        // so a submodule that cannot be fetched fails loud instead of
-                        // silently reverting to the old empty-dir state.
-                        sh 'git submodule update --init --depth 1 -- elohim/rakia'
+                        // ONE home in rakia, so the fix is here, not a vendored copy.
+                        // `elohim/rakia` is NOT anonymously clonable from the CI agent — it
+                        // is a PRIVATE repo, exactly like the elohim checkout above; the
+                        // earlier claim here that an anonymous `git ls-remote` proved it
+                        // public was wrong (edge #1433): that check only passed because the
+                        // devspace running it already carried ambient GitHub credentials, and
+                        // the bare unauthenticated fetch died in CI with "could not read
+                        // Username for 'https://github.com'". Reuse the same `ee-bot-pat`
+                        // credential the elohim checkout above uses. `update = none`
+                        // submodules (holochain-conductor, tx5, kitsune2 — see .gitmodules)
+                        // are reference-only and deliberately left uninitialized; only rakia
+                        // is touched here. The bash body lives in scripts/ci/ (Jenkinsfile
+                        // helpers stay heredoc-free — this pipeline sits near the 64KB CPS
+                        // method-size limit). WARN-ONLY: rakia only feeds the advisory
+                        // schema-mirror test in the non-blocking Storage gate, so a fetch
+                        // failure here must never take the edge deploy path down (that is
+                        // exactly what build #1433 did by failing the whole Checkout stage).
+                        // The script fails LOUD to the pipeline LOG (a greppable
+                        // RAKIA-UNAVAILABLE banner on stderr) but always exits 0 — loud for
+                        // the log, never blocking for the deploy. The token is bound via
+                        // environment only — never placed on argv — and the script never
+                        // echoes it.
+                        withCredentials([usernamePassword(
+                            credentialsId: 'ee-bot-pat',
+                            usernameVariable: 'RAKIA_GIT_USER',
+                            passwordVariable: 'RAKIA_GIT_TOKEN'
+                        )]) {
+                            sh "bash '${env.WORKSPACE}/scripts/ci/init-rakia-submodule.sh'"
+                        }
 
                         computeValidateOnly()
 
