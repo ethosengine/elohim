@@ -114,6 +114,11 @@ Compatibility envelope (spec §8):
 
 appliesTo (what installed reality this release binds to):
   --applies-to-from <url>       derive roles from a peer's GET /version passport
+  --applies-to-from-adoption <url>
+                                derive roles from an adoption report's installedReality —
+                                the TARGET peer's own self-report (e.g. a doorway's
+                                /db/p2p/adoption?peer=<name>); cut the release FOR the
+                                peers that will verify it, not for the builder's conductor
   --applies-to <json|@file>     literal { "roles": { … } } or { role: … } map
   --applies-to-role <name>      restrict the derived roles; repeatable
 
@@ -240,6 +245,7 @@ interface Options {
   firstRelease: boolean;
   additiveOnly: boolean;
   appliesToFrom: string | null;
+  appliesToFromAdoption: string | null;
   appliesToLiteral: string | null;
   appliesToRoles: string[];
   builderAgent: string | null;
@@ -280,6 +286,7 @@ interface Options {
 const URL_VALUED_FLAGS = {
   '--lineage-parent-from': 'lineageParentFrom',
   '--applies-to-from': 'appliesToFrom',
+  '--applies-to-from-adoption': 'appliesToFromAdoption',
   '--build-info-from': 'buildInfoFrom',
   '--inherit-discipline-from': 'inheritDisciplineFrom',
 } as const satisfies Record<string, keyof Options>;
@@ -371,6 +378,7 @@ function parseArgs(argv: string[]): Options {
     firstRelease: false,
     additiveOnly: true,
     appliesToFrom: null,
+    appliesToFromAdoption: null,
     appliesToLiteral: null,
     appliesToRoles: [],
     builderAgent: null,
@@ -454,6 +462,7 @@ function parseArgs(argv: string[]): Options {
       // `URL_VALUED_FLAGS`) — three separate cases would push this switch past
       // the 30-case lint ceiling for no reader benefit.
       case '--applies-to-from':
+      case '--applies-to-from-adoption':
       case '--lineage-parent-from':
       case '--build-info-from':
       case '--inherit-discipline-from':
@@ -1097,7 +1106,68 @@ async function resolveAppliesTo(options: Options): Promise<{ roles: Record<strin
     const passport = await getJson(`${options.appliesToFrom}/version`, options.requestTimeoutMs);
     return { roles: rolesFromPassport(passport, options.appliesToRoles) };
   }
-  throw new UsageError('one of --applies-to-from <url> or --applies-to <json|@file> is required');
+  if (options.appliesToFromAdoption) {
+    const report = await getJson(options.appliesToFromAdoption, options.requestTimeoutMs);
+    return { roles: rolesFromInstalledReality(report, options.appliesToRoles) };
+  }
+  throw new UsageError(
+    'one of --applies-to-from <url>, --applies-to-from-adoption <url> or --applies-to <json|@file> is required'
+  );
+}
+
+/**
+ * Derive `appliesTo.roles` from an adoption report's `installedReality` — the
+ * TARGET peer's own per-role self-report (`GET /admin/adoption`, or a doorway's
+ * `/db/p2p/adoption?peer=<name>` projection of it). This is the map the
+ * peer's controller verifies a release against, so a release cut from it is
+ * cut FOR that peer by construction. The builder's own passport
+ * (`--applies-to-from`) is only right when builder and target run the same
+ * coordinators — the workspace→fleet crossing of 2026-09-06 is the case where
+ * they did not.
+ */
+export function rolesFromInstalledReality(
+  report: JsonObject,
+  only: string[]
+): Record<string, RoleBinding> {
+  const reality = report['installedReality'] as JsonObject | null | undefined;
+  if (!reality || typeof reality !== 'object') {
+    throw new PackagingFailure(
+      'adoption report carries no installedReality — the target storage predates it, or the controller has not read its conductor yet'
+    );
+  }
+  if (reality['answer'] !== 'present') {
+    throw new PackagingFailure(
+      `target peer's installed reality is ${String(reality['answer'] ?? 'unknown')} — refusing to cut a release for a peer that could not read its own conductor`
+    );
+  }
+  const roles = reality['roles'] as Record<string, JsonObject> | null | undefined;
+  if (!roles || typeof roles !== 'object' || Object.keys(roles).length === 0) {
+    throw new PackagingFailure('target peer reports no installed roles');
+  }
+  const out: Record<string, RoleBinding> = {};
+  for (const [role, entry] of Object.entries(roles)) {
+    if (only.length > 0 && !only.includes(role)) continue;
+    const dnaHash = typeof entry['dnaHash'] === 'string' ? entry['dnaHash'] : null;
+    const zomes =
+      typeof entry['coordinatorZomes'] === 'object' && entry['coordinatorZomes'] !== null
+        ? (entry['coordinatorZomes'] as Record<string, string>)
+        : {};
+    if (!dnaHash) continue;
+    console.error(`role "${role}": appliesTo read from the target peer's installed reality (dnaHash ${dnaHash})`);
+    out[role] = {
+      dnaHash,
+      coordinatorWasmHashes: [...new Set(Object.values(zomes))].sort((a, b) => a.localeCompare(b)),
+      ...(Object.keys(zomes).length > 0 ? { coordinatorZomes: zomes } : {}),
+    };
+  }
+  const missing = only.filter(role => !(role in out));
+  if (missing.length > 0) {
+    throw new PackagingFailure(`target peer has no role(s): ${missing.join(', ')}`);
+  }
+  if (Object.keys(out).length === 0) {
+    throw new PackagingFailure('target peer yielded no usable roles');
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

@@ -418,6 +418,19 @@ fn merge_candidates(inventory: Vec<String>, connected: &[String], cap: usize) ->
     out
 }
 
+/// The spelling a peer pull puts on the wire: the `sha256-<hex>` key every
+/// blob store indexes by. The manifest's CIDv1 (`bafkrei…`) names the same
+/// digest, but a holder resolves `ShardRequest::Get { hash }` against its disk
+/// key; sending the CID is how 2026-09-06's fleet pull asked 7 peers and heard
+/// "not found" from all of them. Unparseable input passes through unchanged.
+#[cfg(feature = "p2p")]
+pub(crate) fn wire_address(blob_cid: &str) -> String {
+    match crate::p2p::blob_fetch::content_address_hex(blob_cid) {
+        Some(hex) => format!("sha256-{hex}"),
+        None => blob_cid.to_string(),
+    }
+}
+
 #[cfg(feature = "p2p")]
 #[async_trait::async_trait]
 impl BlobPuller for RaceFetchPuller {
@@ -425,6 +438,10 @@ impl BlobPuller for RaceFetchPuller {
         use crate::p2p::blob_fetch::finalize_fetch_success;
         use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
 
+        // What goes on the wire is the holder's on-disk key, not the
+        // manifest's CIDv1 spelling: an unpatched holder looks the key up
+        // literally and answers an honest NotFound for bytes it has.
+        let blob_cid = &wire_address(blob_cid);
         let connected: Vec<String> = self
             .peers
             .list_peers()
@@ -820,6 +837,18 @@ mod tests {
         let candidates = merge_candidates(many.clone(), &[], 9);
         assert_eq!(candidates.len(), 9);
         assert_eq!(candidates[0], many[0], "ordering survives the cap");
+    }
+
+    /// The manifest spells the artifact as a CIDv1; the wire must carry the
+    /// on-disk key, and a legacy key must pass through untouched.
+    #[cfg(feature = "p2p")]
+    #[test]
+    fn the_wire_address_is_the_holders_on_disk_key() {
+        let cid = "bafkreieuv7mhe4yezvkveojnttanmbyritm752gqx2gkx2lmlm7te7osg4";
+        let key = "sha256-94afd8727304cd5552392d9cc0d6071144d9fee8d0be8cabe96c5b3f327dd237";
+        assert_eq!(wire_address(cid), key);
+        assert_eq!(wire_address(key), key);
+        assert_eq!(wire_address("not-an-address"), "not-an-address");
     }
 
     /// A digest mismatch is not a replication problem — asking a peer again

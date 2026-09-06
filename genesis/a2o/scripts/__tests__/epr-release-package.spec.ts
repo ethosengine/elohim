@@ -480,6 +480,109 @@ async function packageFromPassport(passport: JsonObject): Promise<JsonObject> {
   }
 }
 
+/** Serves one fixed JSON body at ANY path on an ephemeral local port (an adoption projection URL carries a query). */
+async function serveAnyJson(
+  body: JsonObject
+): Promise<{ url: string; close: () => Promise<void> }> {
+  return new Promise((resolve, reject) => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    });
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address() as AddressInfo | null;
+      if (address === null) {
+        reject(new Error('fixture adoption server did not bind to a port'));
+        return;
+      }
+      resolve({
+        url: `http://127.0.0.1:${address.port}/db/p2p/adoption?peer=james`,
+        close: async () => new Promise<void>(res2 => server.close(() => res2())),
+      });
+    });
+  });
+}
+
+const FLEET_MISHPAT_WASM = 'uhCokfb6qTP0X6PdgjxfzwsTo5lJNQaMP-rigSQLJ96ozDJhum4ck';
+
+function adoptionReportFixture(answer: string): JsonObject {
+  return {
+    controller: { running: true },
+    channels: [],
+    installedReality: {
+      answer,
+      appId: 'elohim',
+      readAtUnixSecs: 1788704000,
+      roles:
+        answer === 'present'
+          ? {
+              mishpat: {
+                dnaHash: UNCROSSED_DNA_HASH,
+                coordinatorZomes: { mishpat: FLEET_MISHPAT_WASM },
+              },
+              node_registry: {
+                dnaHash: UNCROSSED_DNA_HASH,
+                coordinatorZomes: { node_registry_coordinator: UNCROSSED_ZOME_HASH },
+              },
+            }
+          : null,
+    },
+  };
+}
+
+async function packageFromAdoption(report: JsonObject, extra: string[] = []): Promise<string> {
+  const { url, close } = await serveAnyJson(report);
+  try {
+    return await runPackagerAsync([
+      FLAG_ARTIFACT,
+      tempArtifact(),
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      '--applies-to-from-adoption',
+      url,
+      FLAG_SOAK_SECS,
+      '900',
+      FLAG_ATTESTATION_THRESHOLD,
+      '2',
+      '--no-put',
+      '--compact',
+      '--strict',
+      ...extra,
+    ]);
+  } finally {
+    await close();
+  }
+}
+
+void describe('epr-release-package.ts CLI — --applies-to-from-adoption cuts the release FOR the target peer', () => {
+  void it("binds each role to the TARGET's installed reality, not the builder's passport", async () => {
+    const manifest = JSON.parse(await packageFromAdoption(adoptionReportFixture('present'))) as JsonObject;
+    const result = validateManifest(manifest);
+    assert.equal(result.ok, true, result.errors.join('\n'));
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.deepEqual((roles['mishpat'] as JsonObject)['coordinatorWasmHashes'], [FLEET_MISHPAT_WASM]);
+    assert.deepEqual((roles['node_registry'] as JsonObject)['coordinatorWasmHashes'], [
+      UNCROSSED_ZOME_HASH,
+    ]);
+  });
+
+  void it('--applies-to-role narrows to the named roles', async () => {
+    const manifest = JSON.parse(
+      await packageFromAdoption(adoptionReportFixture('present'), ['--applies-to-role', 'mishpat'])
+    ) as JsonObject;
+    const roles = (manifest['appliesTo'] as JsonObject)['roles'] as JsonObject;
+    assert.deepEqual(Object.keys(roles), ['mishpat']);
+  });
+
+  void it('refuses to cut for a peer whose installed reality is unreachable', async () => {
+    await assert.rejects(
+      packageFromAdoption(adoptionReportFixture('unreachable')),
+      (error: Error) => /installed reality is unreachable/.test(String(error))
+    );
+  });
+});
+
 void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware derivation', () => {
   void it('an un-crossed role reads base values, byte-identical to the pre-lineage shape', async () => {
     const manifest = await packageFromPassport(lineagePassportFixture());

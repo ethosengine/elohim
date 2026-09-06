@@ -3015,6 +3015,10 @@ impl HttpServer {
                 .body(Full::new(Bytes::from("Missing shard hash")))
                 .unwrap());
         }
+        // Same key resolution as the wire shard plane (`ShardService::handle_get`):
+        // any accepted spelling reads the one on-disk key, so this route is a
+        // faithful local probe of what a peer's `ShardRequest::Get` will see.
+        let hash = &crate::shard_service::on_disk_key(hash);
 
         match self.blob_store.get(hash).await {
             Ok(data) => {
@@ -3046,6 +3050,7 @@ impl HttpServer {
                 .unwrap());
         }
 
+        let hash = &crate::shard_service::on_disk_key(hash);
         match self.blob_store.size(hash).await {
             Ok(size) => Ok(Response::builder()
                 .status(StatusCode::OK)

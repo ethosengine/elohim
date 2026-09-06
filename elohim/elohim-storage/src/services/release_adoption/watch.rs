@@ -665,6 +665,7 @@ impl AdoptionController {
             }
         }
         let fresh = source.read().await;
+        super::state::record_installed_reality(now, &fresh);
         *cached = Some((now, fresh.clone()));
         (fresh, 0)
     }
@@ -678,6 +679,7 @@ impl AdoptionController {
             return Answer::Unreachable;
         };
         let fresh = source.read().await;
+        super::state::record_installed_reality(now, &fresh);
         *self.cached_reality.lock().await = Some((now, fresh.clone()));
         fresh
     }

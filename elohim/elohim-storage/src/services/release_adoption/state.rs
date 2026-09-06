@@ -706,6 +706,16 @@ struct Registry {
     /// role per crossing, but a peer that crossed twice has two of them and
     /// collapsing them onto a role key would hide the first.
     sunsets: Mutex<Vec<super::sunset::SunsetReceipt>>,
+    /// **The fleet's own answer to "what do you run?"** The controller's
+    /// last installed-reality read (passport-derived, TTL-cached), kept here
+    /// so `GET /admin/adoption` can say per role which DNA and which
+    /// coordinator wasm this peer ACTUALLY runs. A release is verified
+    /// against exactly this map, so a packager cutting a release FOR this
+    /// peer reads it from here rather than from the builder's own conductor —
+    /// which is how 2026-09-06's first workspace→fleet release was refused
+    /// `coordinator_lineage_mismatch` on 5/7 peers: it was cut for the
+    /// workspace's mishpat coordinator, not the fleet's.
+    installed_reality: Mutex<Option<(i64, serde_json::Value)>>,
 }
 
 /// How many revert receipts `/admin/adoption` keeps. A revert is a rare,
@@ -722,7 +732,33 @@ static REGISTRY: LazyLock<Registry> = LazyLock::new(|| Registry {
     sweeps: Mutex::new(0),
     reverts: Mutex::new(Vec::new()),
     sunsets: Mutex::new(Vec::new()),
+    installed_reality: Mutex::new(None),
 });
+
+/// Record the controller's latest installed-reality read for the report.
+/// `Unreachable` / `Absent` are recorded as `null` with the answer named, so a
+/// reader can tell "this peer could not read its conductor" from "no roles".
+pub fn record_installed_reality(
+    read_at_unix: i64,
+    reality: &seam_contracts::Answer<super::verify::InstalledReality>,
+) {
+    use seam_contracts::Answer;
+    let value = match reality {
+        Answer::Present(reality) => serde_json::json!({
+            "answer": "present",
+            "appId": reality.app_id,
+            "roles": reality.roles.iter().map(|(role, installed)| {
+                (role.clone(), serde_json::json!({
+                    "dnaHash": installed.dna_hash,
+                    "coordinatorZomes": installed.coordinator_zomes,
+                }))
+            }).collect::<serde_json::Map<_, _>>(),
+        }),
+        Answer::Unreachable => serde_json::json!({ "answer": "unreachable", "roles": null }),
+        Answer::Absent => serde_json::json!({ "answer": "absent", "roles": null }),
+    };
+    *REGISTRY.installed_reality.lock().unwrap() = Some((read_at_unix, value));
+}
 
 /// Record one reverted window. Called by the controller's revert sweep after
 /// the vehicle's revert path returns.
@@ -902,6 +938,18 @@ pub fn report_json() -> serde_json::Value {
             "lastSweepUnixSecs": *REGISTRY.last_sweep_unix.lock().unwrap(),
         },
         "channels": channels,
+        // What this peer runs, per role — the map every release is verified
+        // against. `null` until the controller's first passport read.
+        "installedReality": REGISTRY
+            .installed_reality
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|(read_at, value)| {
+                let mut value = value.clone();
+                value["readAtUnixSecs"] = serde_json::json!(read_at);
+                value
+            }),
         "configRefusals": config_refusals,
         // **Task 13a.** What this peer reverted and why. Always present (an
         // empty array on a peer that never crossed), because an operator
@@ -1746,6 +1794,42 @@ mod tests {
     fn the_report_states_the_builds_apply_posture() {
         let report = report_json();
         assert_eq!(report["controller"]["applyVehiclesCompiled"], true);
+        // Installed reality rides the report once recorded — the per-role map a
+        // packager reads to cut a release FOR this peer.
+        {
+            use super::super::verify::{InstalledReality, InstalledRole};
+            use seam_contracts::Answer;
+            let mut roles = std::collections::BTreeMap::new();
+            roles.insert(
+                "mishpat".to_string(),
+                InstalledRole {
+                    role: "mishpat".to_string(),
+                    dna_hash: "uhC0kdna".to_string(),
+                    coordinator_zomes: [("mishpat".to_string(), "uhCokwasm".to_string())]
+                        .into_iter()
+                        .collect(),
+                    constitution_root: None,
+                },
+            );
+            record_installed_reality(
+                4_242,
+                &Answer::Present(InstalledReality {
+                    app_id: "elohim".to_string(),
+                    roles,
+                }),
+            );
+            let report = report_json();
+            assert_eq!(report["installedReality"]["answer"], "present");
+            assert_eq!(report["installedReality"]["readAtUnixSecs"], 4_242);
+            assert_eq!(
+                report["installedReality"]["roles"]["mishpat"]["coordinatorZomes"]["mishpat"],
+                "uhCokwasm"
+            );
+            record_installed_reality(4_243, &Answer::Unreachable);
+            let report = report_json();
+            assert_eq!(report["installedReality"]["answer"], "unreachable");
+            assert!(report["installedReality"]["roles"].is_null());
+        }
         assert!(
             report["controller"]["applyVehicles"].is_array(),
             "the equipped classes are a fact this node reports, not one a reader infers"

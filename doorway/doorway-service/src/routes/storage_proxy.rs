@@ -73,6 +73,11 @@ fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
                 "attestations", "sweeps", "consecutiveRefusals", "lastCheckedAt",
             ])
         }).collect::<Vec<_>>(),
+        // Per-role installed reality — what this peer runs, the map a release
+        // is verified against. Passed through whole (it is the peer's own
+        // self-report, no operator-private tuning inside), `null` until the
+        // controller's first passport read; absent on a storage predating it.
+        "installedReality": report.get("installedReality").cloned().unwrap_or(serde_json::Value::Null),
     })
 }
 
@@ -1258,7 +1263,11 @@ mod tests {
                 "verdict": null, "appliedRelease": "previous-release",
                 "attestations": null, "sweeps": 0, "consecutiveRefusals": 0,
                 "lastCheckedAt": null
-            }]
+            }],
+            "installedReality": {
+                "answer": "present", "appId": "elohim", "readAtUnixSecs": 12000,
+                "roles": {"mishpat": {"dnaHash": "uhC0kdna", "coordinatorZomes": {"mishpat": "uhCokwasm"}}}
+            }
         });
         let mut private = public.clone();
         private["controller"]["backoffLadderSecs"] = serde_json::json!([30, 60]);
@@ -1269,6 +1278,10 @@ mod tests {
         private["configRefusals"] = serde_json::json!(["private"]);
         private["reverts"] = serde_json::json!(["private"]);
         assert_eq!(project_adoption(&private), public);
+        // A storage predating the field still projects — as `null`, never absent.
+        let mut older = private.clone();
+        older.as_object_mut().unwrap().remove("installedReality");
+        assert!(project_adoption(&older)["installedReality"].is_null());
     }
 
     #[tokio::test]

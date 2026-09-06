@@ -288,6 +288,15 @@ impl ShardService {
     }
 
     async fn handle_get(&self, requester: &Requester, hash: String) -> ShardResponse {
+        // The wire may spell the address any way the protocol accepts (CIDv1
+        // `bafkrei…`, bare hex, `sha256-<hex>`); the blob store's key is only
+        // ever the last. Resolve ONCE here so the reach gate, the on-disk read
+        // and the iroh alias all agree. Before this, a release artifact asked
+        // for by its manifest CID was an honest `NotFound` on every holder —
+        // 2026-09-06, 7/7 alpha peers × 18 sweeps, while the workspace served
+        // the same bytes over HTTP (`/blob/<cid>` normalises, `/shard/<cid>`
+        // did not).
+        let hash = on_disk_key(&hash);
         debug!(hash = %hash, "Handling shard Get request");
         // Station 3b: the bytes of a blob referenced ONLY by private rows leave
         // this peer only toward the ward or a standing custodian. A refusal is
@@ -620,6 +629,16 @@ impl ShardService {
     }
 }
 
+/// The blob store's key for any accepted spelling of a SHA-256 content
+/// address. Unparseable input passes through unchanged so a genuinely unknown
+/// name still reads as an honest miss rather than a decode error.
+pub(crate) fn on_disk_key(addr: &str) -> String {
+    match crate::p2p::blob_fetch::content_address_hex(addr) {
+        Some(hex) => format!("sha256-{hex}"),
+        None => addr.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -630,6 +649,34 @@ mod tests {
         let dir = tempdir().unwrap();
         let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
         ShardService::new(blob_store, None)
+    }
+
+    /// **The wire-spelling trap.** The release manifest names its artifact as a
+    /// CIDv1; the on-disk key is `sha256-<hex>`. A holder must serve the same
+    /// bytes whichever spelling arrives, or every peer pull in the fleet reads
+    /// as "none served it" while the bytes sit one hop away.
+    #[tokio::test]
+    async fn get_by_cid_spelling_serves_the_same_bytes_as_the_on_disk_key() {
+        let dir = tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+        let stored = blob_store.store(b"release artifact bytes").await.unwrap();
+        assert!(stored.cid.starts_with("bafkrei"), "precondition: CIDv1 raw");
+        assert_ne!(stored.cid, stored.hash);
+        let svc = ShardService::new(blob_store, None);
+        for spelling in [stored.cid.clone(), stored.hash.clone()] {
+            match svc
+                .handle(
+                    &Requester::local(),
+                    ShardRequest::Get {
+                        hash: spelling.clone(),
+                    },
+                )
+                .await
+            {
+                ShardResponse::Data(bytes) => assert_eq!(bytes, b"release artifact bytes"),
+                other => panic!("{spelling} must serve the stored bytes, got {other:?}"),
+            }
+        }
     }
 
     #[tokio::test]
