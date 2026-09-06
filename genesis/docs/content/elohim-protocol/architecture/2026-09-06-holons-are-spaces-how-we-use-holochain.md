@@ -1,40 +1,356 @@
 ---
-title: Holons Are Spaces — How We Actually Use Holochain, and How It Scales
+title: Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider
 id: holons-are-spaces-how-we-use-holochain
 date: 2026-09-06
 status: reference
 author: orchestrator (overnight shift, 2026-09-06; grounded in the 0.7 fleet line at fork 25dd2d0be and kitsune2 0.5.1)
 tier: architecture
+stewardship-frame: adversary
 cites:
+  - "elohim-protocol-manifesto | The purpose governing this reassessment: intelligence and coordination that scale to human complexity while restoring dignity and resisting capture. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "values-forward | The declared constraints on commons enclosure, accountable trust, concentrated power, and phased AI authority that the technical design must honor. | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "hardware-spec | The physical participation and inclusion vision connecting everyday devices and household capacity to the protocol promise. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
+  - "hardware-providence-commons | The existing proof obligations for dependable household operation, bounded automated care, practical substitution, and resistance to rent extraction. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
+  - "resilience-protocol-spec | The convenience requirement: ordinary people must receive dependable services through reciprocal infrastructure without becoming system administrators or captive tenants. | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
+  - "genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md"
+  - "trust-as-efficiency-signal | Trust as reciprocal reduction of distribution and verification cost, distinct from a permanent privilege or a global score. | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
+  - "ubiquitous-wisdom-dissolves-chokepoint | Distributed judgment at authoring, relay, and consumption as the anti-capture deployment thesis behind social reach. | sha256:ad2345f8adb56ee9 | path: genesis/docs/content/elohim-protocol/architecture/ubiquitous-wisdom-dissolves-chokepoint.md"
+  - "genesis/docs/content/elohim-protocol/social_medium/epic.md"
   - "nachalah-allotment-epic | Nachalah | sha256:855a5cb52df7f201 | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md"
   - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:597157e7bb552d73 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md"
 ---
 
-# Holons Are Spaces — How We Actually Use Holochain, and How It Scales
+# Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider
 
-*An explainer you can teach from. Start at the top. Every section builds on the one before. Numbers are
-from the live alpha fleet on 2026-09-06 unless marked otherwise.*
+*An architecture explainer reopened for product refounding on 2026-09-06. Start with §0 and §0a:
+they distinguish the human purpose from the proposed technical answer. The later measurements and
+review history remain evidence to examine, not proof that the proposed experience is right.
+Fleet numbers are the original author's dated observations unless marked otherwise.*
 
 ---
 
-## 0. The one-paragraph version
+## 0. Start at the manifesto
 
-Holochain scales by making many small networks, one per group of people who share rules.
-Each person's device joins only the networks it belongs to. These networks are **spaces**
-(a DNA plus a network seed). A space is Holochain's **holon**: a whole in itself, part of a larger
-whole, with a membrane.
+The [manifesto](../manifesto.md) asks for digital infrastructure organized around human flourishing:
+people able to learn, care, create, remember, and repair their shared lives without having those lives
+turned into someone else's instrument of accumulation. Its ambition is intimacy and dignity at the
+scale of humanity. The hardware, network, and AI architecture must deliver that ambition in forms
+ordinary people can actually use.
 
-We built the Elohim Protocol on Holochain. For our first two years, we put almost everything into
-**one** space and asked every peer to hold **all** of it. Then we built machinery in our storage
-layer to shed the load that layout created.
+It starts from a present crisis: people trying to understand and act together are overwhelmed by
+industrialized falsehood, attention extraction, and technologies that concentrate power over their
+shared reality. Adversarial uses of AI belong to that operating environment. The manifesto's concern
+is the loss of the conditions for shared understanding and agency, including their conversion into
+instruments of authoritarian control. The protocol exists to make another way of living credible,
+available, and attractive.
 
-The cure is to use existing spaces, with the tiers named by **Nachalah**, the epic that designs
-holding: who keeps what, how widely. Content should declare *which space it lives in* rather than
-*how much of a space each peer should hold*. This needs neither a fork nor a new feature.
-Fractional arcs inside one space are a separate optimization that does need a fork.
-They are not the architecture, and §10.4 rules out implementing them ourselves.
+The [hardware specification](../hardware-spec.md) makes the promise physical. A browser user, a person
+with only a phone, and a household tending a rack should all receive capable infrastructure through
+community-grounded participation. The convenience people expect from a hyperscaler, and the power
+operators expect from cluster orchestration, must become dependable everyday services: keep our
+records safe, run our applications, recover from failure, coordinate available resources, and keep
+within our limits. Participation must not require everyone to become a systems administrator.
+
+**The telos is to put that operational power and applied intelligence into people's hands through
+infrastructure their communities can steward, and let it compose to planetary scale without creating
+a point from which anyone can dominate, enclose, or charge permanent rent on their participation.**
+
+Integrity is constitutive of that promise: people can investigate a claim, receive a correction,
+preserve an accountable shared memory, and act together without surrendering their judgment or
+dignity. That experience must also be useful, welcoming, and dependable enough to choose in daily
+life. It cannot require permanent vigilance or technical expertise from every participant.
+
+Social reach is central to that composition. The protocol already proposes earned distribution,
+relationship-grounded responsibility, distributed discernment, and feedback that travels back along
+propagation relationships. Those mechanisms are part of how trust becomes a scaling resource and
+manipulation becomes accountable. They cannot be reduced to which Holochain space holds a record.
+
+This document originally answered a narrower problem: too much content in too few Holochain spaces,
+held at full arc. Spaces remain an important candidate remedy. But the design question is larger:
+**how do we aggregate capacity, knowledge, and coordination without aggregating an unaccountable
+power over the people who make them possible?** In this review, the immediate question is what
+Holochain contributes to that promise, what its use costs the daily experience, and whether we must
+change its role substantially—or replace it. The alternative must work within this present reality;
+we judge the technical choices by how they make its integrity and usefulness real.
+
+## 0a. Product refounding — what Holochain must earn, and what we must change
+
+### The chain of reasoning we need to restore
+
+Read the argument in this order. Each step supplies a requirement for the next:
+
+1. **Manifesto:** human flourishing, accountable biography, care, and dignity; the people overlooked
+   by existing systems are the audience of first resort. Intelligence should scale to human
+   complexity. [Values Forward](../values-forward.md), especially Stances I.3 and II.1–II.4, makes
+   the constraints explicit: capability must arrive in people's lives, trust must remain accountable,
+   and neither capital nor AI acquires final authority over the commons.
+2. **Hardware and inclusion:** the [hardware spec](../hardware-spec.md) describes the participation
+   gradient. Its status is **Vision envelope**, not a demonstrated device-capability matrix. The
+   [Hardware Providence companion](../hardware-providence-commons.md) names the proof: a bounded
+   operator carries sensing, action, verification, and recovery while households retain authority
+   and can change suppliers. Hardware capacity varies; human standing is not purchased with a rack.
+3. **P2P capability:** the [resilience argument](../resilience/README.md) explains why cloud
+   convenience must survive changing the custodian. The [seam map](./2026-06-21-elohim-seam-map-concern-routing.md)
+   locates the mechanisms across the notary, byte transport, projections, hub orchestration, and
+   resource governance. The map is a capability destination, not evidence of delivered cloud parity.
+4. **Social reach and trust:** [Social Reach](./social-reach-nervous-system.md) and
+   [Trust as an Efficiency Signal](./trust-as-efficiency-signal.md) explain how participation earns
+   wider distribution and how accountable relationships reduce repeated work. This is a distinct
+   scaling mechanism, alongside partitioning data and adding hardware.
+5. **Aggregation with recourse:** larger coordination must preserve the evidence, obligations,
+   limits, and paths of correction beneath its summaries. A larger aggregate must not become a
+   landlord over its constituent communities or a dossier of their private lives.
+6. **Primitives and adversarial proof:** choose spaces, content addressing, witnessed commitments,
+   sync, coverage rollups, and deployment arrangements by whether they sustain those promises under
+   failure, growth, manipulation, and attempted capture. The primitive earns its place through proof.
+
+This is the level set. The vision is the fixed point; the present mapping from it to implementation
+is open for correction. The previous revision began with privacy and consent journeys. Those remain
+necessary, but they are tests within this larger purpose, not a substitute for it.
+
+### What hyperscaler convenience and k8s-like power mean in a household
+
+The human request is “keep this dependable within the commitments we made.” The system carries the
+operational detail. These are experience requirements mapped to the existing architecture, not new
+APIs or a claim that a complete household orchestrator ships today.
+
+| What a person should be able to rely on | Existing architectural home | The authority boundary it must preserve |
+|---|---|---|
+| Our applications remain available and recover when a device fails | Hub process, cluster, and pod coordination in `steward/node`; runtime supervision | Permission to restart or place a workload does not grant authority to change its purpose or read its records |
+| Our records have recoverable copies and follow us to another provider | Content addressing, custody and reconciliation in `elohim-storage`; confidential replication | Holding bytes does not grant readership, canonical-version authority, or a toll on departure |
+| A task can use suitable shared capacity within our budget | Capability-bound commitments, operation authorization, resource bounds, and placement | More supplied compute does not buy more governance power; delegated work stays within its mandate |
+| We can find and use services without depending on one company | P2P discovery and transport; doorway web projection | A discovery or gateway service must not become the necessary broker of identity, reach, or recovery |
+| Updates and repairs complete without losing our continuity | Witnessed release adoption and the Hardware Providence care loop | Publishing an artifact or recommendation is distinct from authorizing its adoption or a destructive action |
+
+The k8s analogy has a precise boundary. Coordination **within a hub** concerns its blades and
+processes. Cooperation **between households** concerns independently governed participants and their
+commitments. The seam map locates these in separate hub-internal and inter-hub swarms. A planetary
+aggregate is not a cluster administrator entitled to schedule arbitrary work on every household.
+
+Current source makes the gap visible: `steward/node/src/cluster/{discovery,leader,membership}.rs`
+are TODO stubs. Storage reconciliation and bounded operator verbs provide real pieces, but the
+complete observe–authorize–act–verify household loop remains a proof obligation. The failed-SSD
+journey in Hardware Providence is a stronger test of convenience than another healthy-service badge.
+
+### What job are we actually asking Holochain to do?
+
+Holochain's candidate role is **agent-authored, tamper-evident records with peer validation under
+shared integrity rules**. A source chain records one agent's actions; a cell is that agent's
+participation in one DNA space; the DHT distributes and validates the relevant public operations.
+There is no single global transaction order. The DNA hash includes integrity code and modifiers,
+including the network seed. Coordinator behavior can change without changing that identity.
+
+Those mechanisms can witness authorship, commitments, provenance, and rule-governed changes. They do
+not by themselves decide whether a social claim is wise or true, provide a complete human identity
+and recovery experience, encrypt off-DHT custody, schedule a workload, or operate a household rack.
+“Notarized” must say precisely what was checked. A valid signature is not evidence that an observed
+need was real; a validated entry is not proof that a repair happened; a source-chain sequence is not
+a global consensus about events.
+
+Our current use is concrete: five hApp roles, cloning disabled in the manifest, permissive content
+admission, a large content integrity zome spanning several domains, and the full-or-empty arc surface
+described in §6½. Much of the day-to-day product runs through storage projections, CRDT sync, the
+blob plane, and doorway access. We need to explain why each consequential act crosses the notary,
+what the crossing earns, and what a person can still do while it is unavailable or catching up.
+
+| Technical boundary to explain | What the person experiences | The design question it forces |
+|---|---|---|
+| Source-chain authorship and eventual DHT validation | “I wrote it” may precede “others can verify or retrieve it” | Which actions need witnessing before their effects are relied on, and how do pending or rejected actions remain understandable? |
+| Cell admission and DNA-scoped validation | An invitation must establish a real relationship and usable access | Which community agreements belong in shared integrity rules, and which membership or consent changes must remain possible without a disruptive migration? |
+| Off-DHT records, blobs, and serving projections | A page can be available, stale, unwitnessed, or unreadable to a particular person | Which plane is authoritative for each claim, and what prevents a convenient projection from silently becoming that authority? |
+| Multiple cells and spaces on bounded hardware | A phone's responsiveness, battery, offline access, and dependence on a hub | What must run locally, what can be delegated, and does the same person retain continuity when that arrangement changes? |
+| Integrity changes versus coordinator updates | An upgrade should not unexpectedly divide a community or replace its identity | Which invariants truly deserve a DNA-hash boundary, and what migration evidence is required before changing them? |
+| Cross-space references and social reach | A contribution, correction, or commitment travels between communities | How do provenance, currentness, consent, and responsibility survive that crossing without a central joining service becoming indispensable? |
+
+These are the seams to handle honestly. A missing feature in our use of Holochain, a constraint of
+our pinned conductor, and a mismatch between Holochain's model and our desired experience are three
+different findings. “Holochain supports clones” answers none of them on its own. Conversely, a large
+storage crate is not proof that Holochain failed: bytes, fast queries, orchestration, and contextual
+judgment were never all the same job as peer validation.
+
+### Serious alternatives belong on the table
+
+The following are alternatives to investigate against the same journeys, not a migration decision:
+
+| Direction | What it would change | What it must establish before we choose it |
+|---|---|---|
+| Use Holochain more deliberately | Reconsider integrity-domain boundaries, admission, and space placement; measure cloning with the actual workload | The model improves lived continuity and bounded cost without multiplying migrations or confusing membership with social reach |
+| Give Holochain a narrower notary role | Reassess which enduring facts need peer validation, reusing private, linked, ephemeral, and derived classifications where appropriate | We can identify the authority behind every consequential claim and avoid both notarizing every transient observation and treating mutable projections as truth |
+| Replace Holochain for some or all of that role | Change the witnessing substrate while retaining the purpose and portable record contracts | An alternative actually supplies the required authorship, integrity, validation, currentness, revocation, discovery, and recovery guarantees, with a credible migration and operating cost |
+
+The first two can overlap. The third is a legitimate outcome if evidence warrants it. This document
+does not yet compare a concrete replacement implementation, so it cannot responsibly select one.
+Content addressing and portable EPR envelopes give us room to investigate; they are not a replacement
+for shared validation or currentness. Signatures and P2P byte transport alone do not close those gaps.
+
+**Holochain has to earn its role by making the vision easier to deliver.** Continuing to use it is
+not the objective of this review. Nor is removing it. The objective is a coherent account of what
+the substrate guarantees, how a person experiences those guarantees, and what we must change when
+the two do not line up.
+
+### Social reach is an active scaling mechanism
+
+The social-reach canon explicitly distinguishes reach from geography and visibility. Its contract
+must survive any space redesign:
+
+- **Earn at authoring.** A declaration of wide reach is a claim to substantiate through the graph
+  of relationships, standing, and responsibility before publishing at that scope. Cheap generation
+  must not automatically create a claim on everyone's bandwidth and attention.
+- **Pre-authorize reciprocal service.** Standing relationships and stewardship agreements let peers
+  take responsibility for distribution, discovery, and validation with less repeated work. They
+  provide an efficiency benefit, not a universal requirement for prior membership or reputation
+  before receiving anything. Protected new-voice and local floors remain available. The design
+  avoids making every receiver absorb an unlimited stream and buy a filtering service.
+- **Sense and respond through provenance.** Recognition and correction travel back through the
+  relationships that carried the content. Propagation has consequences for authors and relayers;
+  reach is not permanently earned once and then immune to subsequent evidence.
+- **Quarantine and restitution at the edges.** The intended loop limits further harmful propagation
+  and accounts for consequences through shefa's economic events. It distributes judgment and repair
+  rather than installing a single moderation authority over the network.
+- **Personal preference contributes without becoming an echo chamber.** The canon's guards are
+  consciously expressed, expiring, tended, bounded by anti-bubble policy, and contribute collective
+  signals. Individual preference, consented readership, and collective earned reach remain distinct.
+
+The [social-medium epic](../social_medium/epic.md) makes the positive experience concrete. Maria's
+account of a school-board success reaches the people who can use it, with context added before it
+travels. When a correction arrives, there is a path to acknowledge and repair. This is how useful
+experience becomes shared intelligence without making maximum virality the objective. The epic
+also describes standing as a relationship-dependent pattern of contribution, correction, vouching,
+and repair; different communities interpret it through their commitments. A local numeric evaluator
+must not quietly become a global reputation authority. Wider influence carries responsibilities;
+losing amplification must not erase a person's intimate relationships or standing as a human.
+
+[Ubiquitous Wisdom](./ubiquitous-wisdom-dissolves-chokepoint.md) supplies the deployment thesis:
+contextual judgment at authoring, relay, and consumption, near the people concerned. Holochain,
+iroh/libp2p, and doorways provide separable infrastructure for that judgment. Deploying the same
+model at many endpoints is not sufficient evidence that judgment or authority is independent.
+
+This is **trustful scaling**: trustworthy participation should reduce redundant discovery and
+verification work and improve useful distribution, while carrying reciprocal duties and consequences.
+That benefit must not become a permanent incumbent privilege. New voices, local relationships,
+recovery, and constitutional protections need their declared floors even when standing is low.
+Amortized work must preserve the applicable integrity and authorization checks.
+
+The mechanisms have differing maturity. `services/reach_earning.rs` contains a deterministic
+standing-and-manifest evaluator and explicit floor classes. `p2p/mod.rs` records predecessors;
+`api/epr.rs` wires feedback projection and back-propagation with its runtime context;
+`services/back_prop.rs` supports a sealed, immediate-predecessor walk rather than broadcasting a
+complete social trail. The forwarding result reports attempted delivery, not a confirmed end-to-end
+correction. These are substantive primitives. They do
+not establish universal authoring-path coverage or a completed quarantine–restitution loop. The
+canonical documents and source comments contain older deferred labels; neither labels nor symbols
+alone certify the end-to-end behavior. No such behavioral certification is claimed in this revision.
+
+**Space membership cannot replace this nervous system.** Nor is `reach` one knob that can safely
+stand in for audience, propagation entitlement, holding responsibility, and governance standing.
+The couple's private-note story remains a useful counterexample to that collapse: James can belong
+to Matthew and Jessica's household and help hold backups without being a reader. The relevant
+`genesis/a2o/features/lms/intimate-reach-household.feature` scenarios remain `@wip`, with confidential
+custody also `@envisioned`. Their unfinished state is a requirement to fulfill, not a reason to
+simplify the intended relationships away.
+
+### Scale the aggregates without erasing the people
+
+There are at least four different costs to bound: records held and validated within a space;
+bytes and operations moved between peers; social signals evaluated and propagated; and evidence
+summarized across communities. Smaller spaces address part of the first cost. They do not alone
+bound the other three. Trust-aware routing and reuse, appropriately scoped custody, and recursive
+aggregation must compose with them.
+
+The existing `CoverageRollup` in `elohim/elohim-storage/src/recursion.rs` offers a useful primitive:
+union child coverage, expose unmet obligations as a deficit, and retain constituent pointers so a
+summary can be investigated. The design direction is **summarize upward while preserving authorized
+descent to evidence**. A collective can recognize an unmet care obligation and trace its cause
+without demanding a complete account of each person's life. Missing evidence must remain distinguishable
+from a measured absence of care; privacy is not proof of non-contribution.
+
+The current implementation is narrower than the destination. Its production shefa helper builds a
+flat rollup; the rollup constructor initializes witness quorum and source-head metadata empty, and
+its hash does not include `required`. Agreement on that hash therefore does not establish agreement
+on the obligation itself, independently witnessed coverage, or freshness. A pointer alone also grants
+no right to read its target. These are questions to resolve before citing recursive aggregation as
+proof of planetary coordination.
+
+A peer roster is not evidence of independent failure domains. A volume of endorsements is not proof
+of independent judgment. Compute contribution is not governance authority. Each aggregate needs an
+explicit account of what it combines, what evidence warrants that combination, who can challenge it,
+and which powers the result actually authorizes. The same question applies to aggregated storage,
+care, standing, preference guards, and AI recommendations.
+
+### Integrity is the alternative people must be able to inhabit
+
+The destructive information environment is the starting condition of this work. Manipulation,
+manufactured consensus, and the enclosure of relationships are the problems the manifesto addresses;
+AI extends the means available to actors already pursuing them. People need the ability to recognize
+what warrants trust and coordinate around it without handing that judgment to an unaccountable owner.
+An attractive alternative makes useful contribution, trustworthy context, correction, and repair
+ordinary experiences. Its success is felt as greater agency, dependable help, and time for living.
+
+This gives integrity several inseparable meanings. **Record integrity** preserves authorship,
+provenance, and the evidence of change. **Epistemic integrity** keeps claims investigable and
+correctable without equating a signature, popularity, or a model's confidence with truth.
+**Relational integrity** connects reach and responsibility while preserving dignity and repair.
+**Institutional integrity** keeps power bounded, decisions contestable, and participation free of
+an indispensable intermediary's right to impose new terms. These are promises to people whose
+mechanisms must compose; they are not four names for what the DHT alone guarantees.
+
+The existing primitives give this purpose technical form: witnessed records, earned social reach,
+contextual judgment near participants, feedback through propagation relationships, and aggregates
+that preserve paths to evidence. Hardware Providence adds the practical proof of continuity when
+a household changes its provider or operator. Each must carry its part without quietly discarding
+another: fast propagation cannot erase accountability; aggregation cannot erase the person;
+convenient recovery cannot become a permanent claim over their life.
+
+The commitment is to the dignity of life and the architectural properties that protect it. Elohim
+must be willing to recognize a peer system that keeps those same commitments; its own adoption and
+dominance are not the measure of success. Holochain is one implementation choice to assess against
+them. Fidelity to those commitments gives us reason to change its role wherever the evidence calls
+for it.
+
+We do not need a completed theory of every future adversary to take these obligations seriously.
+We do need to identify what each mechanism actually guarantees, where present seams break the
+promised experience, and what substantial changes will make the alternative more trustworthy and
+more livable. That is the immediate purpose of this Holochain reassessment.
+
+### Bring this whole chain to the design board
+
+Begin with the manifesto, hardware participation promise, and social-reach mechanisms. Then walk
+one connected day: a phone-only participant opens a community-hosted application, writes a useful
+account, shares it with appropriate reach, receives a correction, benefits from a collective response,
+and keeps working while a household device fails. Include the moment a misleading account reaches
+the community and people discover, acknowledge, and repair the error. Integrity and convenience
+must be observable within the same ordinary day.
+
+For each step, put four things beside one another: **the person's expectation; the technical act
+actually performed; the guarantee and its evidence; the unresolved seam.** Trace that act through
+Holochain, storage, sync, reach, and the client. Do not describe an intended mechanism as wired, a
+wired mechanism as a passing story, or a passing local story as evidence of planetary scale.
+
+Breakouts examine that same day through three lenses:
+
+- **Experience and hardware:** what the person can rely on across hosted, phone, and hub participation;
+  where waiting, failure, recovery, or operational labor breaks the convenience promise.
+- **Holochain and adjacent primitives:** what is witnessed and why; which boundaries are required,
+  chosen, or accidental; how each of the alternatives above changes cost and continuity.
+- **Social reach and aggregates:** how useful contributions, feedback, responsibility, and shared
+  capacity compose; which evidence survives aggregation and which authority must never be inferred.
+
+Each group returns a present design assumption to retain or change, the existing primitive it would
+reuse or needs to reconsider, its costs at household and aggregate scale, and a probe that could
+change the decision. Recombine where the same journey produces incompatible answers. Record the
+chosen changes in the existing design, a2o stories, and owning habits, with unfinished proof named.
+
+A fixtures clone remains a bounded experiment in isolation and cell cost. It neither removes old
+published fixtures nor proves that every household should be a space. The sequence in §10.6 is prior
+technical review history to reassess, not a predetermined outcome. The original “holons are spaces”
+thesis is under examination, including the proposed zome split, global roles, and cross-space joins.
+
+**The review clears the way when we can explain Holochain's role in the person's day, name the
+seams without pretending they are solved, and commit to the changes that evidence compels.** That
+may mean using Holochain differently, using less of it, or establishing a credible replacement. The
+vision decides what must be preserved; the current technology does not get to decide the vision.
 
 
 ---
@@ -48,8 +364,10 @@ an append-only, signed log of the things that agent did. Nobody else writes in i
 ledger. There is no consensus about "the order of everything." There is only "Matthew signed this, after
 that, at this time."
 
-**1b. Journals are gossiped into a shared shelf.** When you write an entry, it is also handed to a set of
-other peers to hold and validate. Which peers? The ones whose *address* is near the entry's *hash*. Every
+**1b. Public records contribute operations to a shared shelf.** Public entry data can be held and
+validated by other peers; private entry payloads stay off the DHT, although their associated public
+actions still participate in validation. Which peers hold a public operation depends on its DHT
+location and their declared arcs. Every
 entry and every agent has a hash. Both live on the same circle of 2^32 addresses.
 
 A peer holds
@@ -58,9 +376,9 @@ the slice of that circle it has declared responsibility for — its **arc**. The
 
 **1c. The rules are the network.** Before a peer holds your entry, it runs the *validation rules*.
 Those rules are compiled code — the **integrity zome** — and the hash of that code (plus a few
-modifiers) *is the identity of the network*. Two peers are on the same network if and only if they run
-the byte-identical rules. Change one byte of the rules and you have created a different network with
-nobody in it.
+modifiers) *is the identity of the network*. Matching integrity code alone is not enough: the modifiers must match too. Changing integrity code
+or a hashed modifier produces a different DNA hash and therefore a different space. Existing
+participants do not migrate to it automatically.
 
 That third point is the one to hold onto. In Holochain, **"which network am I on" and "which rules do
 I run" are the same fact**, and it is content-addressed: the network's name is the hash of its rules.
@@ -144,7 +462,8 @@ of this single layout decision.
 
 **And there are no household spaces yet.** I want to be exact here, because I got this wrong in the
 first draft of this document. The only place our hApp manager uses a network seed today is a *lineage*
-install — a role moving from an old DNA hash to a new one keeps its seed so it stays on the same network.
+install — a role moving from an old DNA hash to a new one preserves its seed. The new DNA hash
+still denotes a different network; preserving the seed does not remove the lineage crossing.
 No code path creates a clone cell for a household or a collective. The "household space" the Nachalah
 stories describe is a design, and the "household space partition" of 2026-09-05 was a cell on the local
 household *mesh* being blocked, not a clone space. Every integrity zome's membership check
@@ -167,8 +486,9 @@ at full arc, we grew, in *our own* storage layer:
 
 None of that is wrong code. Most of it is load-bearing today. But look at what it is: it is
 **membership and holding, re-derived one layer up, because we did not use the layer that has it.**
-A household space with five members never needs read-time reach enforcement against outsiders —
-outsiders are not in the space. A fixture space nobody stewards costs nobody gossip.
+An enforced household membrane could exclude nonmembers from that DHT. It would not settle
+which members may read a record or secure its off-DHT copies. A separate fixture space could keep
+future test writes out of the commons; existing published fixtures would remain.
 
 ### The mental model we were carrying
 
@@ -223,9 +543,11 @@ five, each a space of five peers holding a few thousand documents, plus a long t
 Each one is the size of the mesh we already run in this workspace (three peers, one household). We
 have been rehearsing the unit of scale for a year without naming it.
 
-### 4c. The two things that do scale globally, and how
+### 4c. Identity and discovery across spaces
 
-Two things must cross holons: **identity** and **discovery**.
+Two infrastructure concerns must cross holons: **identity** and **discovery**. They are not the
+whole cross-holon story: social reach, accountable commitments, and aggregate evidence also cross
+relationships. §0a restores those mechanisms to the scaling argument.
 
 - **Identity** crosses because we chose content addressing. An EPR's CID is the hash of its bytes. It is
   the same in every space it is published into. The DHT anchor (the action hash) is per space. The
@@ -267,8 +589,8 @@ Being fair to the last two years:
    `elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md`.
 4. **Coordinator hot-swap.** Behavior changes without changing the network's identity. This is
    Holochain's own gift and we lean on it hard.
-5. **Lineage installs keep their seed.** A role crossing to a new DNA hash stays on its network — the
-   seed plumbing the holon model needs is already exercised, just not for holons.
+5. **Lineage installs keep their seed.** The seed plumbing is exercised, but a new DNA hash still
+   means a new network. Continuity depends on the crossing machinery, not seed preservation alone.
 6. **The Nachalah tiers on DNA seams.** Gold, deeds, paper: the epic already says the tiers are spaces.
    We had the design but had not applied it to content.
 
@@ -276,9 +598,10 @@ Being fair to the last two years:
 1. **One content space for the world.** Everything else on this list follows from it.
 2. **Treating arc as the knob.** Arc actuators, fractional aims, "shed to zero on OOM" — all of it is
    trying to make a peer hold *less of the wrong space* instead of *not being in it*.
-3. **Reach enforced at read time in storage.** This is an authorization boundary
-   that membership will retire. Today it re-implements a membrane at the wrong layer. Holochain's membrane is *space membership + membrane proof*. If outsiders are not
-   members, the bytes never reach them. There is nothing to refuse at read time.
+3. **Treating read-time reach as the whole confidentiality boundary.** Serve refusal alone cannot
+   protect plaintext already held by a peer. But membership alone cannot express the intimate,
+   creator-only, and blind-custody distinctions our stories require either. The boundary needs review
+   across DHT records, blob custody, and serving paths; §0a reopens the claim that membership retires it.
 4. **Per-host custody stamps** (the `serverBlobHash` PATCH the dataplane-convergence habit now flags):
    a doorway telling its storage peer "you serve this bundle" is a per-host imperative because there was
    no space to say "the doorway stewards hold the served commons at full arc" declaratively.
@@ -440,14 +763,15 @@ This is the decision the overnight ruling recorded on the arc-policy code and in
 out.
 
 **The placement rule:** *content declares its space. Its members hold it at the arc the trust gradient allots.* Today, full or zero arc is conductor-wide. The per-space hint needs an upstream PR and a carried patch.
-An EPR's reach/holding declaration is the **input**. Space placement is the **output**.
+An EPR's reach and holding declarations constrain placement, but social reach also governs earning,
+propagation, feedback, and accountability. Space placement is one output; it cannot replace that loop.
 
 **What that means for each plane:**
 
 | Plane | Today | After |
 |---|---|---|
 | Content (`lamad`) | one space, full arc for all | commons space (stewards full arc, readers zero) + collective spaces + household spaces + a fixtures space |
-| Reach | enforced at read time in storage | enforced by membership; read-time check remains as defense-in-depth for the commons |
+| Reach | enforced through existing serving paths, with known gaps | membership, consented readership, and confidential custody must each be demonstrated; membership alone does not retire serving authorization |
 | Holding floor | a global replica target | per holon: "held by ≥ r of this holon's members" (the Nachalah gold/deeds/paper floors) |
 | Promotion | copy + flag | witnessed re-publish into the wider space; CID unchanged, anchor per space |
 | Arc policy | shed a peer to zero on OOM | choose which spaces a device joins and at what arc, once the per-space hint lands. Until then, phones stay spokes to a household hub. OOM becomes "too many full-arc memberships," a social/allotment question |
@@ -455,13 +779,15 @@ An EPR's reach/holding declaration is the **input**. Space placement is the **ou
 | Fixtures | in the commons | in their own clone space; only the test runner follows it |
 | Doorway | projects "the" content | projects the spaces its steward belongs to |
 
-**What does NOT need to change:** identity (CID), the blob plane, heads and elections, release channels,
-the coordinator hot-swap, the doorway as projection, the a2o stories (they already speak in households and
-collectives). The stories were ahead of the substrate.
+**Foundations to preserve:** content addressing, blobs off the DHT, declared heads, release channels,
+and coordinator hot-swap. Their use across new spaces still needs verification. The existing a2o
+stories provide requirements, including consent and blind custody, that the proposed topology must
+satisfy; the blob and serving planes cannot be assumed unchanged merely because they sit outside the DHT.
 
-**The first slice (no fork, days not months):** an instrumented `fixtures` clone of the content role with its own seed.
+**The proposed first experiment (existing clone primitive; effort to be measured):** an instrumented `fixtures` clone of the content role with its own seed.
 The seeder targets it, and fleet peers do not follow it at full arc. Measure per-cell cost that same week.
-This removes thousands of EPRs from every peer's gossip and directly tests the model.
+This tests isolation for new fixtures and measures cell cost. It does not remove previously
+published EPRs from the commons or validate the household experience.
 For the adopted sequence and risks, see §10.6.
 
 **The second slice:** the `list_blocks` / `unblock` admin API, as an upstream PR plus a carried patch.
@@ -472,7 +798,8 @@ Remove identity duplicates, economy types, and infrastructure types from content
 Land a real membership check, a lineage record, and a non-null progenitor in the same hash move.
 
 **The fourth slice:** household working notes into household content spaces, using the seeds the mishpat role already mints, with membrane proofs.
-The `reach-enforced-everywhere` habit's outsider scenario becomes true *by construction*.
+The `reach-enforced-everywhere` habit still requires evidence across the serving and custody paths;
+rejecting an outsider at DHT admission alone does not prove that habit.
 
 **The fork slice (small, and not optional for phones):** carry the *per-space* arc hint as an upstream PR first.
 The conductor already ignores this hint. Plumbing it through lets one device hold its household fully and read the commons at zero arc.
@@ -485,26 +812,27 @@ Fractional arcs inside a big space remain separate, larger work that §10.4 leav
 
 ## 8. How to explain it to someone else in two minutes
 
-> Holochain isn't one big shared database. It's a way for a *group* to keep a shared, tamper-evident
-> shelf of records that every member helps hold and check. Each group is its own little network, called a
-> space, and the rules the group agreed to *are* the network's name. Your phone can be in lots of spaces
-> at once: your family's, your church's, the public commons. It only holds and gossips the ones it's in.
+> We want people to have dependable applications, records, recovery, and applied intelligence
+> through infrastructure their communities can steward. A person with only a phone should benefit
+> without becoming a systems administrator or a captive tenant. Social reach helps useful work
+> travel with context and responsibility; corrections and repair are part of that same system.
+> This is the alternative we owe people facing manipulation and an overwhelming stream of claims:
+> a useful place to learn what deserves trust, contribute, receive help, and act together with dignity.
 >
-> We built Elohim on that, but for the first stretch we put everything into one space and asked every
-> node to hold all of it, then wrote a lot of code to cope. The fix is to do what the design wanted:
-> households get a space, collectives get a space, the commons gets a space, and a document's "reach" is
-> really "which of those spaces it's been published into." Moving a note from your family to your church
-> is a witnessed act, not a flag. That's what makes it scale to everyone: each space is family-sized or
-> church-sized, and nobody ever holds a stranger's journal.
+> Holochain can supply signed histories and peer validation under shared rules. Our storage and
+> transport supply other parts of the experience. The question is whether we have assigned those
+> jobs well: what must be witnessed, who must participate, what happens while a witness is unavailable,
+> and whether upgrades and community changes preserve people's continuity.
 >
-> The one thing we still want from a fork is letting many small holders share a *big* public space by
-> each holding a slice. Nice to have. Not the architecture.
-
-This original teaching quote predates the adopted fork policy. Under §10.4, we pursue the per-space hint and leave fractional sharding to upstream.
+> More spaces might help. A narrower notary role might help. A different witnessing substrate must
+> remain an option if it can meet the actual requirements. We need to walk an ordinary person's day
+> through those choices, measure their consequences, and change the architecture where it fails the
+> vision. The integrity of that lived alternative is the commitment; our use of Holochain must earn
+> its place in delivering it.
 
 ---
 
-## 9. The five open questions, answered
+## 9. The five technical questions — original answers under product review
 
 Each of these was open when the first draft of this document went out. Each was then grounded by a
 reader against the code and the corpus (file references are in the commit that added this section), and
@@ -522,7 +850,7 @@ denomination, professional, interest group, open), and a projection scope that a
 with "household" as its special case. We had the words and refused the spaces.
 
 **The reasoning.** A space costs one cell per device per role, and cells are the conductor's unit of
-memory (see 9.3). A space buys three things: privacy by membership, a holding floor its members can
+memory (see 9.3). A space buys three things: a membership boundary, a holding floor its members can
 actually meet, and validation by people who agreed to the rules. So a space should be *the smallest group
 that can validate its own writes and afford its own recovery*. Per document is refused outright: it
 buys nothing and multiplies cells. Per affinity is refused as a rung: a denomination can be a million
@@ -550,7 +878,8 @@ household (the "grandma case" in the identity zome, the backup custodian who may
 household space cannot validate its own rescue. Identity must be readable across the membrane.
 
 **So this suggests doing:** raise `clone_limit`, mint a `fixtures` clone of the content role, and let no fleet peer follow it.
-This is the cheapest way to try to falsify the model, needs no fork, and removes thousands of records from every peer's gossip immediately.
+This is a bounded test of the placement mechanism using an existing primitive. It prevents future
+fixture writes in the commons; it does not remove previously published records.
 
 Two landmines from the field (§11): keep the role *provisioned* and just raise `clone_limit`.
 The `clone_only` strategy leaves it unprovisioned, and the 0.7 conductor panics while assembling app info.
@@ -583,7 +912,9 @@ allotment story.
 **So this suggests doing:** three small pieces, in order.
 Replace the stub `genesis_self_check` in the content and governance zomes with a real membership-record check.
 Add the code path that turns a mishpat membership into proof bytes. Pass those bytes on clone creation.
-None of this moves the *commons* space's DNA hash: the commons stays open, while holons gain a door.
+Changing the integrity code changes its DNA hash. Keeping the existing commons space would require
+retaining its existing integrity definition while introducing the restricted variant separately;
+otherwise the commons needs a lineage crossing too. That choice must be explicit.
 
 One field warning (§11): the self check is a courtesy.
 The real gate is validation of the proof record on the chain. Sweettest has no support for membrane proofs at all.
@@ -668,8 +999,9 @@ a bug:
 4. *A release channel becomes per cell, not per role.* The adoption controller's "installed reality" must enumerate clones, while following stays node-local: james's canary promotion this morning changed only his row.
 5. *The hub cluster is the commons' rack-tier stewards.* Only per-space arc lets a phone hold its household fully and read the commons lightly at once, hence §6½'s fork hook.
 
-**The design rule that falls out:** *inside a membrane, the DHT is the truth.
-Across a membrane, the elohim plane carries a witnessed commitment recorded in the receiving holon's governance space.* The
+**The design rule to examine:** *inside a membrane, the DHT provides the shared record of acts
+validated under that space's rules; it does not establish unquestionable social truth.
+Across a membrane, the proposed elohim plane carries a witnessed commitment recorded in the receiving holon's governance space.* The
 aggregation plane's node-local state is correctly placed. The work is to make it *derive from
 membership* rather than from config.
 
@@ -705,8 +1037,9 @@ Holochain allows 256 link types per integrity zome. Content sits at **225 of 256
 It spans learning, community, identity, economy and infrastructure, and **duplicates identity's own types**.
 Human, Agent, Relationship, ContentMastery, and ContributorPresence appear in both DNAs, with content's copies marked "legacy".
 
-Two networks claim authority over the same identity records, leaving no single authority.
-That is an architecture error, not layout.
+These duplicate declarations create an authority question: which live authoring and reading paths
+use which definition? Their presence alone does not establish two active authorities over the same
+record. The coupling is real; the authoritative home and the proposed split need that path evidence.
 Every DNA's membership check is also a permissive stub, and no role commits to a progenitor.
 Every space today is therefore an open network whose hash binds to no root.
 
@@ -731,11 +1064,11 @@ The measured size is about 330,612 lines of Rust across 563 files in the storage
 Design gravity has been outside the DHT for two years.
 The pivot *increases* it, because cross-space reads by CID become storage-side joins.
 
-**Verdict: accepted, with one framing change.** The original §5 called read-time reach "necessary today".
-It now calls it *an authorization boundary that membership will retire*. And the reviewer is right that the
-pivot does not shrink storage — it moves storage from *shedding load* to *joining across membranes*, which
-is the job the elohim plane was always going to have (§9.5). The projection DB stays, and it is what keeps the
-commons usable offline.
+**Verdict revised during product refounding, 2026-09-06.** The earlier acceptance said membership
+would retire read-time reach. The couple's-note and blind-custody stories contradict that conclusion
+(§0a). Storage must still distinguish who holds bytes from who may read them, and demonstrate
+confidentiality where the holder is not a reader. Cross-space projection and offline access remain
+legitimate work; their authorization contract needs design and evidence.
 
 ### 10.3 "The pivot is right. Six things will bite."
 
@@ -790,7 +1123,9 @@ Keep phones as spokes to a household hub, as the seam map already draws.
 Hide seeds, DNA hashes, arcs, cell counts, proof bytes, and re-publish mechanics entirely.
 Show who can see this, who holds a copy, and who witnessed the move.
 
-**Verdict: accepted as the UX contract for the epic.**
+**Original verdict: accepted as the UX contract for the epic. Reopened in §0a.** Invitation and
+sharing labels are only part of the experience. Membership disagreements, selective sharing,
+departure, supported agency, and offline continuity must shape the architecture before it is hidden.
 
 ### 10.6 The recommendation, resequenced
 
@@ -810,9 +1145,15 @@ Per-holon spaces before the zome split would copy the omnibus into every holon. 
 4. Only then: household spaces, with membrane proofs.
 5. Explicitly not: fractional sharding.
 
-**Verdict: adopted as the plan.** Household notes, originally §7's "second slice", are now step 4 in both sections.
+**Original verdict: adopted as the plan.** Household notes, originally §7's "second slice", became
+step 4. Product refounding (§0a) reopens the household mapping and the claims about authorization.
+This is the recorded technical sequence to reassess against the human journeys, not evidence that
+those journeys have been designed or delivered.
 
 ### 10.7 The reviewer's verdict, verbatim
+
+*Historical review retained for traceability. Its claim that membership retires read-time reach is
+challenged by §0a and the revised §10.2; this quotation is not the current product conclusion.*
 
 > You did not screw up the architecture — you screwed up the layout, and then you built 330,000 lines of
 > storage to make the layout survivable, which is what made it look like architecture. The three choices that
