@@ -2966,6 +2966,38 @@ habits:
       total 1, failed 0, unresolved 0 (threshold 1 met). Publish 14:24:34Z → fleet verify 14:25:03Z → canary apply
       14:25:04Z → attestation readable from outside the fleet 14:29:37Z: **five minutes, publish to attested, no
       pipeline.** The retire-when's fleet leg has its first complete receipt short of promotion.
+
+
+      DELTA 2026-09-06 19:2xZ (RELEASES 2 AND 3 REACH THE FLEET — the retire-when's three, each by election; receipts
+      `genesis/a2o/reports/workspace-release/2026-09-06/release2-rollback/` and `…/release3-forward/`, cycle-time rows in the arc doc).
+      What the pod roll for edge #1438 (16:29Z) revealed: james's 14:25Z apply of release 1 had logged `drifted=5, applied=1` — the
+      5-role candidate (every DNA rebuilt from the workspace tree, whose toolchain moves INTEGRITY bytes too) hot-swapped lamad and was
+      REFUSED on DNA lineage for the other four roles, so james ran a mixture (lamad at the release target, four roles at baseline). The
+      adopted lamad SURVIVED the roll; the controller's in-memory `appliedRelease` did not, and a mixed peer satisfies neither
+      `already_runs_target` (all-or-nothing over appliesTo) nor `verify_coordinator_lineage` → `coordinator_lineage_mismatch` on every
+      sweep, 1800 s backoff. Nothing checked the ARTIFACT's own DNA line against installed reality before the vehicle swapped one role —
+      the manifest's `appliesTo` dnaHashes were true of the fleet and the bundle contradicted them.
+      Cures (workspace, this batch): (1) a coordinator release carries ONLY the role it changes — `coordinator-candidate.ts --role
+      <r> [--rollback-to-baseline|--marker]` packs a single-role .happ with the baseline's integrity wasm byte-identical, and
+      `epr-release-package.ts` refuses a coordinator-bundle whose appliesTo is unscoped multi-role or names a role the artifact does not
+      ship; (2) `verify` refuses `dna_lineage_mismatch` when the staged bundle's DNA hash ≠ installed for any role it carries, BEFORE the
+      by-bytes exit; (3) `verify_coordinator_lineage` names every divergent role in one refusal; (4) a partial hot-swap is `apply_failed`
+      (roles that swapped stay swapped, said in the detail); (5) boot-sweep per-role INFO + explicit skip lines; (6) the idempotence exit
+      re-reads an invalidated installed-reality snapshot (the projection had served james's PRE-apply reality for 10+ min).
+      Focused tests: `services::release_adoption` 228/228, `happ_manager` 31/31 (EXIT=0 both).
+      Release 2 (19:06:58Z publish, lamad-only ROLLBACK to the fleet baseline cut FOR james): james pulled the artifact from a peer in 640 ms,
+      hot-swapped `uhCokL5-8…→uhCokBbQH…` +54 s, attested +86 s (qualifying 1/1); observers read already-current `ok`. The canary rejoined the
+      fleet line through the channel — no pod hand. Release 3 (19:16:45Z publish, lamad-only FORWARD marker cut for the fleet): james applied
+      +68 s, attestation qualifying 1/1 by 19:21Z; four observers verified `ok`. Three coordinator releases reached the alpha fleet by
+      election today (14:24Z · 19:07Z · 19:17Z), each applied and attested by the canary, no pipeline in any delivery path; the edge roll
+      between releases 1 and 2 shipped a fix, it delivered no release. Status **green**. The retire-when's fleet leg has its three receipts
+      short of PROMOTION: six peers follow at `observe`, so an earned head moves nobody — the =observe→apply data flip
+      (deployments.json, an edge render) is the deliberate next change, and the store's `retire` remains the operator's call.
+      SEAMS: chain runtime-upgrade-propagation / between "publish" → "every peer resolves the head" / missing node: gertrude and eve still
+      resolved release 1's head 15 min after release 3 (election read lag on two of seven peers; the other five resolved within two sweeps) /
+      current state: observed, not diagnosed. And: the workspace peer follows its own channel at `observe`, so it never records an adoption —
+      with single-role releases it CAN adopt (its lamad matched every appliesTo tonight); flipping it to `apply` closes the
+      adopt-before-author wedge for publishing over an earned head (`runtime-steward-adoption-of-fleet-cut-release.md`).
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"

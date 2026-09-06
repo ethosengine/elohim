@@ -36,3 +36,10 @@ Recreated 2026-06-04 (the original was graduated to MemPalace 2026-06-02, but li
 **Gate caveat — RESOLVED 2026-06-04:** the pre-push hook now redirects ALL native Rust gates (storage/epr/doorway/steward + sweettest) into per-crate pool slots via `gate_pool_slot` (explicit ws_rel constants — the "do NOT use `cargo-pool key` dynamically" rule still holds, it mis-keys storage and offers slots for DNA workspaces that must stay un-redirected). Backlog item `prepush-cargo-target-pool.md` marked resolved. Sweettest is also now an integration-tier gate: default-runs only on pushes targeting dev/main (`RUN_SWEETTEST=1` forces elsewhere).
 
 Related: [[multi-agent-pvc-pacing]], [[cargo-target-dir-for-native-builds]], [[pvc-threshold-and-recovery]]
+
+**2026-09-06 (verified):** at 89% the pool was 239G, ALL in the `dev` family, and `cargo-pool enforce --yes` freed **0B** — the
+172G `elohim__elohim-storage/dev` slot is exempt as *in use* (the workspace peer runs from it) and 130G of that was
+`debug/incremental/` (2132 crate-hash dirs, ~3G each, 1733 older than 24h). Incremental dirs are compile-time caches only, so
+pruning old ones cannot affect a running binary: `find <slot>/debug/incremental -mindepth 1 -maxdepth 1 -type d -mtime +0
+-print0 | xargs -0 rm -rf` took the volume 89% → 78% (~97G) with the peer still running. Gap to close in policy: enforce's
+in-use guard should still GC stale incremental sessions inside an in-use slot.
