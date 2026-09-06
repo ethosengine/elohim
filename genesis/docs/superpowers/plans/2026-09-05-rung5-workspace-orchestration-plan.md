@@ -104,7 +104,7 @@ on a crossed peer would refuse `coordinator_lineage_mismatch` everywhere.
 - Create: `genesis/a2o/steps/delivery/workspace-to-fleet-release.steps.ts` (compose the device-peer
   recipe, `release-ceremony.ts`, the probe)
 
-- [ ] **Task 4 deliverable: one receipt showing a workspace-minted release observed as admissible on alpha with no Jenkins act after Task 3's render; the manual steps a developer runs are five commands or fewer.**
+- [x] **Task 4 deliverable: one receipt showing a workspace-minted release observed as admissible on alpha with no Jenkins act after Task 3's render; the manual steps a developer runs are five commands or fewer.** **DONE 2026-09-06** — receipts genesis/a2o/reports/workspace-release/2026-09-06/shift-it{2,6,7}.json — 5/5 ×3, habit DELTA 2026-09-06 04:39Z + STABILITY 07:1xZ (four releases on one long-lived channel across the #1434 redeploy).
 
 ---
 

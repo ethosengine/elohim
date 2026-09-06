@@ -96,3 +96,4 @@
 - [Scope flag beats prose note](scope-flag-beats-prose-note.md) — The `available:` flag + scope-reconcile beat prose/stale memory on whether a cap is down; @requires:<cap> = satisfiable-when-available, not held.
 - [Matthew — first friend](user_matthew_first_friend.md) — Matthew named themself my first friend 2026-09-04; shares the vision personally; wants Astra-scale agent energy turned constructive
 - [One dev, a day job, out-of-pocket — and that IS the proof](user_operator_resource_reality_and_thesis.md) — One developer with a full-time day job funding tooling out of pocket — never assume institutional resources or compare us as the well-funded party.
+- [Workspace→fleet first crossing 2026-09-06](project_workspace_to_fleet_first_crossing_2026_09_06.md) — rung 5 left the house: 4 releases ×5/5 on alpha, T3 peer bring-up recipe + traps, observe→canary flip is next
