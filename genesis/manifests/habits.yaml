@@ -658,6 +658,13 @@ habits:
         the same `coverageShortfall` row — so the ONLY new red on #1432 is the B-side `caughtUp false`, i.e. the wedged
         peer measured inside its restart churn. Re-measure with `[build:edge] [edge:validate-only]` after the churn
         before calling it a regression.
+        VERIFIED LIVE 2026-09-06 ~06:5xZ (edge #1434 deployed 0e9ac6c25): `GET /db/p2p/conductor-diagnostics` on BOTH doorways
+        now returns `transportStats` with `transport_stats` + `blocked_message_counts` (string-keyed DnaHash projection,
+        ee3b77975) — the probe is no longer dim. adam's wedge unchanged across the second restart (9 dead / stuck);
+        validation 6/84/2 again with the same two rows. Edge #1434's storage test layer failed to COMPILE
+        (commitment_record.rs include_str! of the mishpat integrity source + dna.yaml absent from the image) — fixed in
+        0de887a3e (COPY to /holochain/dna/mishpat/…, rakia schemas to /rakia/schemas with an empty placeholder on fetch
+        failure); the next edge build is the check.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
