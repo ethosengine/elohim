@@ -20,3 +20,8 @@ task with a claim/fulfil/verdict in the flow; never push without credentials (mo
 never restart the workspace (it kills the mesh); integrate prior work rather than reinvent it.
 Related: [[project_holochain_evolution_epic]], [[feedback_delegate_research_to_opus_sonnet_codex]],
 [[feedback_local_mesh_first_cadence]], [[feedback_upgrade_propagation_north_star_wall_clock]].
+
+**2026-09-06 (wider-net validation night):** operator grant — "you're the orchestrator AND integrator tonight,
+you have wide latitude here, you can push whatever you need (if you need it), and can /shift on the pipeline
+overnight if need be to shake anything out." Pipeline snapshot data (look shots, sprint-reports) is fair game;
+delegate well. Push discipline still applies: never push while an edge deploy or the orchestrator is mid-build.

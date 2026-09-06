@@ -1,7 +1,7 @@
 ---
 name: feedback_delegate_research_to_opus_sonnet_codex
 title: Delegate research legwork to Opus/Sonnet/Codex
-description: "Operator (2026-09-03, reaffirmed 2026-09-05) — research AND plan-implementation legwork fan out to Opus and Codex (Sonnet for code grounding); the top model spends only on decisions, coherence, judgement, delegation, vision-alignment — bites at every grounding fan-out and every plan execution"
+description: "Operator (2026-09-03, reaffirmed 2026-09-05 and 2026-09-06) — research AND plan-implementation legwork fan out to Opus and Codex (Sonnet for code grounding); the top model spends only on decisions, coherence, judgement, delegation, vision-alignment — bites at every grounding fan-out and every plan execution"
 metadata: 
   node_type: memory
   title: "Delegate research to Opus, Sonnet and Codex"
@@ -38,3 +38,9 @@ verification legwork (it ran the epr-rea/eprfs gates and audited task-report tes
 "I wouldn't necessarily trust it if it needs to make a moral judgement" — keep governance/ethics/
 framing calls with the top model. Practical: `--sandbox danger-full-access` is needed when the task
 runs cargo (the target pool lives outside the workspace); keep the prompt in the scratchpad.
+
+**Reaffirmed 2026-09-06 (wider-net validation session):** "use Opus, Codex, and even Sonnet to help us
+with any legwork.. Codex chatgpt-6 astra is new here and is just as technically capable as you, so feel
+comfortable to delegate even hard challenges." My lane is coherence with the epic/manifesto vision,
+planning, decisions, and delegating for clean architecture/composition toward final delivery. Hard
+technical problems (not only research) are fair game for Codex.

@@ -580,3 +580,27 @@ conductor-verified record names the row's EXISTING declared head (exact, untrimm
 absent size refuses; saturating downcast) — 5 unit tests. Live confirmation (both doorways' `blob_hash`
 for `elohim-host-landing` before/after a sweep, the `pointer-heal (T7)` WARN with `size_bytes`) waits for
 the rebuilt household mesh. Status unchanged.
+
+DELTA 2026-09-06 03:3xZ (fleet probe, wider-net validation; RED preserved, fleet-side evidence added). Both
+doorways serve `elohim-host-landing` with the SAME `blobHash`/`dhtAnchorHash` (sha256-6899…/uhCkkvlmH…), but the
+B side (`elohim.host`, storage peer adam) reports `dhtAnchorState: unverified` + `serverBlobHash: null` where A
+(`doorway-alpha`, matthew) reports `live` + a hash, and adam's provide loop is WEDGED: `reanchorDeadRemaining: 9,
+stuckSweeps: 55, deadRemainingStuck: true` (threshold is 3 — `services/provide_loop_status.rs`), while
+`projectionReconcile.converged: true`. "Dead" here is the re-keyed-peer class (`reanchor_backfill.rs`: a row is
+anchored but this node's conductor answers Absent for the chain) — consistent with the 2026-09-02/03 re-genesis
+minting new agent keys under rows anchored by the old ones. Two findings for THIS habit's invariant:
+  (1) `serverBlobHash` is a per-storage-node deploy-time PATCH stamped by each doorway's SSR render registry
+      (`doorway/…/render/registry.rs`; the PATCH bypasses the conductor, `content_service.rs`) — i.e. a per-host
+      imperative write that the invariant says must never be load-bearing. Seam: chain dataplane-convergence /
+      between "declared head" → "served SSR bundle" / missing node: the server bundle hash must be DERIVED from the
+      declared head (an attribute of the elected head record) and converge like any other row attribute, not
+      PATCHed per host / current state: per-host PATCH, B never received it.
+  (2) The runtime-harvest poller is blind on both axes to this exhaustion (polls doorway-A only; never reads
+      `/p2p/status`) — `.claude/data/runtime-findings.jsonl` is empty by construction, not by health. Poller
+      extension in flight this session (adds `elohim.host` + `/p2p/status` + a `deadRemainingStuck` fingerprint).
+Also observed: `GET /db/p2p/conductor-diagnostics` → `transportStats: {"serializeError":"key must be a string"}`
+(holochain_client 0.9 `blocked_message_counts` is keyed by `DnaHash`, which serializes as bytes) — the runbook's
+per-peer view rides the agent→relay peer store, which is preserved, so the probe is dimmer, not blind; fix in
+flight (string-keyed projection in storage `http.rs`). Loki 502'd on every targeted query (untrustworthy zeros).
+Genesis #1558 UNSTABLE is the seed stage's `stampProvenance` reach circuit opening after 5 conductor-path
+failures on rows that are not DHT-anchored (bulk-seed anchor gap) — same family, fleet lane.
