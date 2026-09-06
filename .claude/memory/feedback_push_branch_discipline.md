@@ -110,3 +110,10 @@ matcher (`genesis/agentic/palette.mjs`) globs with picomatch, where `*` does not
 `Bash(python3 *)` does NOT cover `python3 .claude/scripts/epr-meta-git-gate.py …`, and why the Jenkins entries
 pin each path segment instead of using a trailing `**` (a `**` would match an appended second URL to any host,
 which is what `never_wildcard: curl` in `genesis/agentic/data/safety-taxonomy.json` exists to prevent).
+
+**2026-09-06 (overnight, forks):** a `fork` subagent inherits the parent's push latitude and WILL push on its own
+judgment even after being told "main owns the push" — it pushed the rakia fix (0e9ac6c25) while main was
+reviewing it. Outcome fine, discipline not. Rule: when forks run alongside the integrator, the integrator takes
+`berth claim push` (a lease the fork can see) and every fork prompt states "commit only; never push" up front, not
+mid-flight. Forks also sweep the parent's STAGED files into their own commits (two habit commits carried 90+ of my
+in-progress memory edits) — stage only what you are about to commit, immediately.
