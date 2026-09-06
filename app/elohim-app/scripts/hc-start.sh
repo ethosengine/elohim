@@ -13,6 +13,10 @@
 #
 # ENVIRONMENT VARIABLES:
 #   STORAGE_PORT     Storage HTTP port (default: 8090)
+#   DOORWAY_PORT     Doorway HTTP port (default: 8888). Together with
+#                    STORAGE_PORT, lets a workspace peer run BESIDE the
+#                    household mesh (which owns 8888/8090):
+#                    STORAGE_PORT=8093 DOORWAY_PORT=8889
 #   STORAGE_DIR      Storage data directory, passed through to the
 #                    elohim-storage binary (binary default: ~/.local/share/elohim-storage)
 #   SEED_LIMIT       Number of items to seed with --seed (default: 200)
@@ -87,6 +91,10 @@ mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_
 
 # Environment with defaults
 : "${STORAGE_PORT:=8090}"
+# 2026-09-06: DOORWAY_PORT knob (Step 4, workspace-peer-beside-mesh) — the
+# household mesh owns 8888/8090, so a workspace peer running alongside it
+# needs both ports free to move.
+: "${DOORWAY_PORT:=8888}"
 : "${SEED_LIMIT:=200}"
 : "${NETWORK_PROFILE:=isolated}"
 : "${DOORWAY_AUTH:=auto}"
@@ -100,7 +108,10 @@ ADMIN_KEY_FILE="$DOORWAY_STATE_DIR/api-key-admin"
 # Options
 RUN_SEED=false
 CONDUCTOR_ONLY=false
-FORCE_BUILD=false
+# 2026-09-06: honor a pre-set FORCE_BUILD=1 the same as --build (Step 3, pool
+# debug binary reuse below prints this as the escape hatch back to a cold build).
+: "${FORCE_BUILD:=false}"
+[ "$FORCE_BUILD" = "1" ] && FORCE_BUILD=true
 
 # ============================================================================
 # Help
@@ -163,16 +174,22 @@ case "$NETWORK_PROFILE" in
 esac
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Conductor parity (2026-08-28, sovereign-peer T3 rung). Alpha's conductors run
-# the ethosengine FORK on the iroh transport (agent URLs are
-# https://relay.alpha.elohim.host/…, conductor-config carries relay_url).
-# So, like hc-mesh.sh, a matching 0.7 pair (holochain +
+# Conductor parity (2026-08-28, sovereign-peer T3 rung; reworded 2026-09-06 — see
+# runtime-workspace-stack-idempotent-live-conductor backlog "Also fold in"). Alpha
+# is a TWO-RELAY fleet, and the ethosengine FORK carries a cross-relay preflight
+# fix that stock Holochain 0.7.0 kitsune2 lacks — a stock conductor would land
+# joined-but-partitioned against that topology, not merely unconnected (the prior
+# tx5 "never connects" measurement is stale: tx5 is gone on 0.7, superseded by
+# kitsune2/iroh). So, like hc-mesh.sh, a matching 0.7 pair (holochain +
 # the MATCHING hc — the CLI writes conductor-config.yaml in its own schema) is
 # used when one is present, and join-alpha REFUSES a stock conductor unless
 # ALLOW_STOCK_JOIN=1 says the skew is deliberate.
 #   HOLOCHAIN_BIN=/dir/holding/both        explicit pair
 #   MESH_FORK_BIN_DIRS=a:b:c               search list (hc-mesh.sh's convention)
 # Default search adds the cargo-pool release slot the fork is built into.
+# Fleet-parity pair without a 45-minute fork build: extract layer 25/26 (only
+# that layer — extracting all layers lets the base image's stock 0.6 binaries
+# overwrite the fork) from harbor `elohim-edgenode:conductor-<hc12>`.
 # ──────────────────────────────────────────────────────────────────────────────
 : "${CONDUCTOR_RELAY_URL:=https://relay.alpha.elohim.host}"   # doorway-A relay (D2/D7)
 # App-interface port. The household mesh owns 4445/4455/4465 (matthew/jessica/james, hc-mesh.sh
@@ -232,11 +249,14 @@ if [ -n "$FORK_BIN_DIR" ]; then
 elif [ "$NETWORK_PROFILE" = "join-alpha" ] && [ "${ALLOW_STOCK_JOIN:-0}" != "1" ]; then
     echo ""
     echo "   ❌ join-alpha refused: no fork conductor pair found (holochain + hc in one dir)."
-    echo "      Alpha's conductors run the iroh transport; the stock $(holochain --version 2>/dev/null | head -1) on PATH"
-    echo "      would publish itself, be listed, and never connect (connections: [] — measured"
-    echo "      2026-08-28). Point HOLOCHAIN_BIN at a dir holding BOTH binaries, e.g."
+    echo "      Alpha is a TWO-RELAY fleet; the stock $(holochain --version 2>/dev/null | head -1) on PATH"
+    echo "      lacks the fork's cross-relay preflight fix, so it would publish itself, be"
+    echo "      listed, and land partitioned rather than a full DHT participant. Point"
+    echo "      HOLOCHAIN_BIN at a dir holding BOTH binaries, e.g."
     echo "      HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release"
-    echo "      or set ALLOW_STOCK_JOIN=1 to accept a listed-but-unconnected peer on purpose."
+    echo "      (or extract layer 25/26 ALONE from harbor elohim-edgenode:conductor-<hc12>"
+    echo "      for a fleet-parity pair without a fork build), or set ALLOW_STOCK_JOIN=1"
+    echo "      to accept a listed-but-partitioned peer on purpose."
     exit 1
 fi
 
@@ -335,15 +355,29 @@ echo "└───────────────────────�
 ADMIN_PORT=$(get_admin_port)
 CONDUCTOR_RUNNING=false
 
-if [ -n "$ADMIN_PORT" ] && hc sandbox call --running "$ADMIN_PORT" list-apps >/dev/null 2>&1; then
+# 2026-09-06: `hc sandbox call --running` needs a matching hc CLI/schema and can
+# fail against a perfectly healthy conductor (e.g. this shell's hc vs the fork's),
+# which used to fall through into starting a SECOND sandbox on the same pinned
+# join-alpha app port (4485) — the root of Defect B in the
+# runtime-workspace-stack-idempotent-live-conductor backlog. Plain TCP
+# reachability on BOTH the recorded admin port and the recorded app port is a
+# more robust, CLI-independent reuse signal, and is tried first.
+LIVE_APP_PORT=""
+[ -f "$HC_PORTS_FILE" ] && LIVE_APP_PORT=$(grep "app_port" "$HC_PORTS_FILE" | grep -o "[0-9]*" | head -1)
+if [ -n "$ADMIN_PORT" ] && [ -n "$LIVE_APP_PORT" ] && timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$LIVE_APP_PORT" 2>/dev/null; then
+    echo "   ✅ Conductor already running (admin: $ADMIN_PORT, app: $LIVE_APP_PORT) — reusing"
+    CONDUCTOR_RUNNING=true
+    CONDUCTOR_APP_PORT="$LIVE_APP_PORT"
+elif [ -n "$ADMIN_PORT" ] && hc sandbox call --running "$ADMIN_PORT" list-apps >/dev/null 2>&1; then
     echo "   ✅ Conductor already running on port $ADMIN_PORT"
     CONDUCTOR_RUNNING=true
-    if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
-        echo "   ⚠️  NETWORK_PROFILE=join-alpha requested, but the network profile"
-        echo "      only applies at sandbox generate time. This conductor keeps"
-        echo "      whatever network config it was generated with."
-        echo "      To re-generate: npm run hc:stop, then re-run with the profile."
-    fi
+fi
+
+if [ "$CONDUCTOR_RUNNING" = true ] && [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+    echo "   ⚠️  NETWORK_PROFILE=join-alpha requested, but the network profile"
+    echo "      only applies at sandbox generate time. This conductor keeps"
+    echo "      whatever network config it was generated with."
+    echo "      To re-generate: npm run hc:stop, then re-run with the profile."
 fi
 
 if [ "$CONDUCTOR_RUNNING" = false ]; then
@@ -351,7 +385,15 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
     mkdir -p "$LOCAL_DEV_DIR"
     cd "$LOCAL_DEV_DIR"
 
-    rm -f "$HC_PORTS_FILE"
+    # 2026-09-06: only clear a ports record that's actually stale. Deleting it
+    # unconditionally erases the ONLY structural signal a live-but-undetected
+    # conductor has (workspace-to-fleet-release.steps.ts reads this file) —
+    # Defect B, runtime-workspace-stack-idempotent-live-conductor backlog.
+    _stale_admin_port=""
+    [ -f "$HC_PORTS_FILE" ] && _stale_admin_port=$(grep "admin_port" "$HC_PORTS_FILE" | grep -o "[0-9]*" | head -1)
+    if [ -z "$_stale_admin_port" ] || ! timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$_stale_admin_port" 2>/dev/null; then
+        rm -f "$HC_PORTS_FILE"
+    fi
 
     SANDBOX_LOG="$LOCAL_DEV_DIR/.sandbox_log"
     HC_WRAPPER="$LOCAL_DEV_DIR/.hc_wrapper.sh"
@@ -481,8 +523,16 @@ echo "└───────────────────────�
 STORAGE_CRATE_DIR="$HC_DIR/../elohim-storage"
 STORAGE_BIN="$STORAGE_TARGET_DIR/release/elohim-storage"
 
-# Build if needed
-if [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
+# 2026-09-06: prefer an existing binary over a cold release build. A release
+# build on a near-full disk is what bit the workspace→fleet crossing (Defect A,
+# runtime-workspace-stack-idempotent-live-conductor backlog); if the pool's
+# DEBUG slot for this crate already holds a fresh binary (the same one
+# hc-mesh.sh resolves), reuse it instead of compiling.
+STORAGE_DEBUG_BIN="$(slot_path "$POOL_FAMILY" "elohim/elohim-storage" dev)/debug/elohim-storage"
+if [ ! -f "$STORAGE_BIN" ] && [ "$FORCE_BUILD" != true ] && [ -f "$STORAGE_DEBUG_BIN" ]; then
+    echo "   ℹ️  using pool debug binary (no release build; set FORCE_BUILD=1 or --build to compile release)"
+    STORAGE_BIN="$STORAGE_DEBUG_BIN"
+elif [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building elohim-storage..."
     cd "$STORAGE_CRATE_DIR"
     CARGO_TARGET_DIR="$STORAGE_TARGET_DIR" \
@@ -593,8 +643,13 @@ echo "└───────────────────────�
 DOORWAY_DIR="$APP_DIR/../../doorway/doorway-service"
 DOORWAY_BIN="$DOORWAY_TARGET_DIR/release/doorway"
 
-# Build if needed
-if [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
+# 2026-09-06: same pool-debug-binary preference as elohim-storage above — see
+# that block's comment for the rationale.
+DOORWAY_DEBUG_BIN="$(slot_path "$POOL_FAMILY" "doorway/doorway-service" dev)/debug/doorway"
+if [ ! -f "$DOORWAY_BIN" ] && [ "$FORCE_BUILD" != true ] && [ -f "$DOORWAY_DEBUG_BIN" ]; then
+    echo "   ℹ️  using pool debug binary (no release build; set FORCE_BUILD=1 or --build to compile release)"
+    DOORWAY_BIN="$DOORWAY_DEBUG_BIN"
+elif [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building doorway..."
     cd "$DOORWAY_DIR"
     CARGO_TARGET_DIR="$DOORWAY_TARGET_DIR" RUSTFLAGS="" cargo build --release
@@ -602,14 +657,14 @@ if [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
 fi
 
 # Check status
-PROXY_STATUS=$(curl -s http://localhost:8888/status 2>/dev/null || echo "")
+PROXY_STATUS=$(curl -s "http://localhost:$DOORWAY_PORT/status" 2>/dev/null || echo "")
 STORAGE_CONFIGURED=$(echo "$PROXY_STATUS" | grep -o '"configured":true' || echo "")
 
 if [ -n "$PROXY_STATUS" ] && [ -n "$STORAGE_CONFIGURED" ]; then
     echo "   ✅ Doorway already running with storage integration"
 else
     # Stop existing doorway
-    fuser -k 8888/tcp 2>/dev/null || true
+    fuser -k "$DOORWAY_PORT/tcp" 2>/dev/null || true
     sleep 1
 
     # ------------------------------------------------------------------
@@ -709,16 +764,16 @@ else
     # exercised the admin path from the doorway side (the browser drove the
     # admin socket itself), so the mis-derivation was invisible.
     env "${DOORWAY_ENV[@]}" "$DOORWAY_BIN" "${DOORWAY_FLAGS[@]}" \
-        --listen 0.0.0.0:8888 \
+        --listen "0.0.0.0:$DOORWAY_PORT" \
         --conductor-url "ws://localhost:$CONDUCTOR_APP_PORT" \
         --conductor-admin-url "ws://localhost:$ADMIN_PORT" \
         --storage-url "http://localhost:$STORAGE_PORT" &
 
     echo -n "   ⏳ Waiting for doorway"
     for i in {1..10}; do
-        if curl -s http://localhost:8888/health >/dev/null 2>&1; then
+        if curl -s "http://localhost:$DOORWAY_PORT/health" >/dev/null 2>&1; then
             echo ""
-            echo "   ✅ Doorway ready (port: 8888)"
+            echo "   ✅ Doorway ready (port: $DOORWAY_PORT)"
             break
         fi
         printf "."
@@ -736,7 +791,7 @@ if [ "$RUN_SEED" = true ]; then
     echo "└──────────────────────────────────────────────────────────────┘"
 
     cd "$HC_DIR/../../genesis/seeder"
-    DOORWAY_URL="http://localhost:8888" \
+    DOORWAY_URL="http://localhost:$DOORWAY_PORT" \
     STORAGE_URL="http://localhost:$STORAGE_PORT" \
     HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT" \
     npx tsx src/seed.ts --limit "$SEED_LIMIT"
@@ -761,7 +816,7 @@ printf "│ Agent SDK   │ http://localhost:%-4s (inference sidecar)     │\n"
 else
 echo "│ Agent SDK   │ (skipped — no ANTHROPIC_API_KEY)              │"
 fi
-echo "│ Doorway     │ http://localhost:8888 (unified API)           │"
+echo "│ Doorway     │ http://localhost:$DOORWAY_PORT (unified API)           │"
 echo "└─────────────┴────────────────────────────────────────────────┘"
 echo ""
 case "${DOORWAY_POSTURE:-unknown}" in
@@ -785,12 +840,12 @@ echo ""
 echo "📋 Quick Commands:"
 echo ""
 echo "   # Health & status"
-echo "   curl http://localhost:8888/status"
-echo "   curl http://localhost:8888/db/stats"
+echo "   curl http://localhost:$DOORWAY_PORT/status"
+echo "   curl http://localhost:$DOORWAY_PORT/db/stats"
 echo ""
 echo "   # Content API"
-echo "   curl http://localhost:8888/db/content?limit=10"
-echo "   curl http://localhost:8888/db/paths"
+echo "   curl http://localhost:$DOORWAY_PORT/db/content?limit=10"
+echo "   curl http://localhost:$DOORWAY_PORT/db/paths"
 echo ""
 echo "   # Seed content"
 echo "   npm run hc:seed"
