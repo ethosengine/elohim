@@ -383,3 +383,14 @@ item (§11.3's arc-policy hook), an optimization within a holon, not the archite
 (thousands of fixture EPRs at full arc on every peer) is cured without a fork: fixtures and household working notes get
 their own clone spaces and non-stewards follow them at zero arc. The EPR-native arc work therefore targets space
 placement + per-space {0,1} policy first; per-entry arc knobs are out.
+
+**Correction (2026-09-06, second opinion):** the automatic household→DNA mapping this ruling implied is
+retired. Group clone spaces (household, collective) are an operator-selected candidate direction, not
+a demonstrated destination, with explicit reconsideration criteria — a failed operating or composition
+test (overlapping memberships, phone participation, discovery, upgrade, custody, cross-space
+coordination) can change the boundary. Aggregates (region, supply chain, coverage) are composed views,
+never DNAs. The per-concern act contract (D0 — authority, durable source, validation contract,
+projection/rebuild path, gaps, named per act class) precedes any placement decision. Sequence: D0 (the
+contract) → the peer-side membrane (D3) → group clone spaces (D6), each gated on the one before it. See
+§0b of [the holons explainer](../../content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md)
+and the reimplementation plan's D0/D1/D3/D6 for the full sealed decisions.

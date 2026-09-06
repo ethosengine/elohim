@@ -13,7 +13,7 @@ cites:
   - "hardware-spec | The envisioned device spectrum against which the plan must measure actual convenience and operating cost. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "hardware-providence-commons | The existing household repair, bounded operation, and practical substitution promises translated into executable acceptance boundaries. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
   - "resilience-protocol-spec | The ordinary-person reliability requirement governing recovery and infrastructure convenience. | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
-  - "holons-are-spaces-how-we-use-holochain | The companion diagnosis and Holochain reassessment that this human story turns into a sequenced reimplementation decision. | sha256:bc473bea9747a1d6 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
+  - "holons-are-spaces-how-we-use-holochain | The companion diagnosis and Holochain reassessment that this human story turns into a sequenced reimplementation decision. | sha256:931b9b05cae78c40 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
   - "elohim-seam-map-concern-routing | The canonical placement of client, runtime, SDK, witness, P2P, aggregation, and hub responsibilities used to avoid parallel subsystems. | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md
   - "trust-as-efficiency-signal | The contextual and reciprocal role of standing that correction and restoration must preserve without creating a global score. | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
@@ -118,7 +118,7 @@ The anonymous `/community` baseline was rendered in light and dark mode on 2026-
 
 The [manifesto](../manifesto.md) describes a present loss of shared understanding and agency under attention extraction, industrial falsehood, and concentrated technological power. A desirable alternative must make truthful correction, care, and competent cooperation easier in ordinary life. It must be attractive enough to use before a crisis and accountable enough to trust during one.
 
-**Recommendation: make the EPR/P2P substrate carry the connected valueflow graph across society; retain Holochain initially as bounded witnessing contexts beneath that graph; substantially recompose the runtime around ambient stewardship and incremental evidence-qualified projections.** The smaller Holochain role must not shrink the connected human world into disconnected islands. Retire the assumptions that the application pillar is the validation boundary, that AI stewardship is a write interceptor, and that a successful command response proves a successful repair. Do not start by replacing the conductor or cloning every social group into a DHT.
+**Recommendation: make the EPR/P2P substrate carry the connected valueflow graph across society; give every consequential act class the five-column contract — authority, durable source, validation contract, projection/rebuild path, and gaps (D0) — before deciding, per class, whether it needs Holochain witnessing; substantially recompose the runtime around ambient stewardship and incremental evidence-qualified projections.** No "smaller Holochain job" is asserted here (correction, 2026-09-06, D2): the day-to-day writes this plan is built around — relationships, humans, presence, comments — already write to elohim-storage's SQLite with `dht_anchor_hash` null and never cross a DNA, so "narrower" describes the undocumented present, not a proposed change. The recomposition must not shrink the connected human world into disconnected islands. Retire the assumptions that the application pillar is the validation boundary, that AI stewardship is a write interceptor, and that a successful command response proves a successful repair. Do not start by replacing the conductor or cloning every social group into a DHT.
 
 This is a choice for the first implementation, not a declaration that Holochain must survive it. The replacement and fork gates in §8 decide its continued role. The sacred commitments are human dignity, accountable action, protected participation, repair, and practical freedom from capture. No particular database, model, identity vendor, gateway, or protocol brand occupies that position.
 
@@ -266,6 +266,14 @@ sequenceDiagram
 The peer topology in this proof is a propagation path, not a public friendship graph. Feedback may fork across actual predecessors, but it must have loop suppression, bounded retry, durable deduplication, and explicit acknowledgments. A sender's attempted fanout count is not a delivered count.
 
 First implement `feedback-signal` reception in `epr_atom_service.rs`, validating signer, target, admissible scope, and replay behavior before projection. Implement the missing `FeedbackSignalCommitted` storage consumer as part of the same cut. Both ingestion paths must converge on one idempotent verification/projector path; receiving the same signal through the DHT and direct transport must not double-apply it. Confirm ingress signature validation instead of trusting a signed-looking payload.
+
+**Correction (2026-09-06):** `FeedbackSignalCommitted` is emitted by `post_commit` on the *authoring*
+cell only; a remote peer never receives it via the DHT. The durable path is discovery and replay of
+the witnessed act — link enumeration of the subscribed target (`get_feedback_signals_for_target` /
+`list_feedback_signals_by_signer`) plus a per-act consumption table — not a `post_commit` hook on the
+receiving side. A notification carries a reference (origin DNA hash plus action hash) and only
+accelerates that same fetch; it does not substitute for discovery. Act identity is (origin DNA hash,
+action hash); the author comes from the signed action, never from a payload field.
 
 These paths currently carry different representations. The DNA coordinator accepts action-hash targets/evidence and relies on signed Holochain actions for authorship; the direct `p2p/feedback_signal.rs` representation carries CID strings, a signing identity, and a detached signature. First define and verify the mapping between target revisions, evidence addresses, actor keys, and the identity of the particular feedback act. Preserve the original signed material and verify the binding between signing identities. Do not fabricate a detached signature from a witnessed record, equate action hashes with content CIDs by string conversion, or deduplicate merely by target: two people can legitimately report on the same revision. Only a proven common feedback identity may share an applied-effect receipt.
 
@@ -424,25 +432,7 @@ Define observation payload contracts that reuse `elohim/epr/src/measure.rs` prim
 
 **Provenance** is that traceable basis. **Providence** is what the elohim does with it: notice an impending need, coordinate care within limits, and observe whether the action helped. Confidence belongs to a specific claim and its method, not to the story's reassuring tone.
 
-### 6.2a The box in the closet is the intimate inference boundary
-
-The household runtime can receive continuous local sensor streams and perform perception, interpretation, and memory formation there. The elohim earns the freedom to attend by being useful, discreet, correctable, and respectful of the people it accompanies. Its loyalty serves their flourishing and relationships; it does not make one household member entitled to expose everyone else. Shared-space expectations, guests, supported decision-making, and requests for privacy belong in that lived relationship, without turning every ordinary moment into a consent dialog.
-
-Local execution is necessary to this proposed deployment, but locality alone does not establish loyalty. The runtime must uphold the relationship in its data paths, action mandates, update behavior, and disclosure controls. The agent can recognize a private need and act within a standing mandate without exporting the observation that revealed it.
-
-| Boundary | What stays or crosses |
-|---|---|
-| Sensors → household inference | Welcomed continuous streams processed locally, under the household’s actual compute and sensing capabilities |
-| Inference → local memory | Useful event understanding, confidence, and selected supporting observations; raw-stream retention has its own policy |
-| Household → reciprocal peers | Only the context or assistance request appropriate to that relationship; protected custody may hold ciphertext without readership |
-| Household → commons aggregates | Permitted valueflow, capacity, and feedback contributions; no automatic access to the underlying intimate stream |
-| Accountable act → Holochain | The qualifying commitment, event, or attestation and its permitted evidence references; not the kitchen’s continuous sensory history |
-
-Use existing observation, local inference, private custody, and authority seams to implement these boundaries. An unavailable or overloaded local model must not silently redirect intimate streams to a remote provider. Any supported remote assistance follows a separately established disclosure relationship. Updates and recovery must preserve those choices.
-
-Benchmark continuous perception and memory on the intended household device: sustained compute, memory, power, thermal behavior, latency, and retained-data growth. Degrade gracefully within that device’s capacity. A phone can remain a light interface to the household elohim; households without continuous sensing retain participation and care with a less detailed account.
-
-The acceptance proof is concrete: Jessica cooks while local inference composes the process; permitted summaries support the commons; an ordinary remote peer cannot retrieve the underlying kitchen stream; pausing a sensing context is honored; and restart restores the agreed memory and disclosure boundaries. Continuous attention earns its place through the experience of care it produces.
+**Continuous kitchen sensing (formerly §6.2a) is a held product goal, 2026-09-06 — see §12.**
 
 ### 6.3 Incremental aggregation, not global replay
 
@@ -471,17 +461,7 @@ Two gaps matter immediately. The current latch does not implement reset/recovery
 
 Route an exception first to the lowest competent, authorized steward. Escalate a material unresolved threat along the commitments it endangers, potentially faster than ordinary summary cadence. The receiver seeks help or modifies a plan within authority; the producer's pain does not authorize a superior to seize its resources. Closing the signal requires observed recovery, not merely acknowledgment. Sensor absence and uncertain risk remain distinct from a verified bound crossing.
 
-### 6.5 Supply chain and token flows are bounded consequences of evidence
-
-The commons combines offered supply, permitted need forecasts, actual stock, carrying limits, and existing agreements. It can arrange replenishment, pool a procurement order, match transport, and distribute agreed value automatically within those mandates. Planning projections may use estimates; irreversible allocations and settlement use the evidence threshold and acceptance rules of their actual agreement.
-
-For the soup, receipts may evidence paid ingredients; event terms may recognize cooking, farming, hosting, and transport contributions; an agreement may allocate a commons share. These are different flows. Do not charge the ingredients again because their provenance appears in the meal story. Do not mint twelve units of settled reward simply because the model inferred twelve diners. A gift can remain a gift while its contribution is remembered.
-
-Where a token flow is specified, bind its issuance, transfer, redemption, or allocation to the authorizing agreement, qualifying event, applicable unit and policy version, and observed fulfillment. Preserve an idempotent reference to the particular economic act. Enforce conservation or permitted issuance, entitlement, and resource limits independently of the narrative generator. Unknown contribution can remain pending or provisional where policy allows; uncertainty is not a route to unlimited minting.
-
-**Shefa's value accounting is not itself a fully implemented currency or settlement engine.** Its vision includes value-aware tokens and commons-held attribution; the protocol domain currently describes accounting primitives. Choose and prove the actual settlement mechanism for a concrete flow. Holochain signatures alone do not supply globally serialized spending across disconnected communities. Shared scarce balances need a defined authority, reservation/serialization or appropriate countersigning contract, and a partition policy before spend is accepted. No new blockchain is implied merely because an aggregate spans communities.
-
-This prevents the AI commons from becoming an unaccountable treasury: every action and allocation remains bounded by participating agreements, with attributable evidence and a repair/dispute path. Local care and human participation cannot depend on producing a complete monetizable biography.
+**Farm-to-token settlement (formerly §6.5) is a held product goal, 2026-09-06 — see §12.**
 
 ### 6.6 Holochain composes accountability around aggregates, not their hot path
 
@@ -566,7 +546,8 @@ This is a proposed sequence serving existing habit boundaries, not a second work
 | Cut | Concrete work and story station | Proof before advancing | Retire when proven |
 |---|---|---|---|
 | 0. Establish honest baseline | Capture ambient cooking story and interruption count; inventory observation signing/durability, writers, identities and mandates; separate personal continuity from node-operation status | Reproduce signing/projection gaps and three-peer failures; distinguish estimates, promises, witnessed events and completed effects | Fabricated success and confidence projections |
-| 1. Observe, compose and correct | Fix immutable signed observations and durable replay; map one cooking process to typed quantities and evidence; compose real authoring and both feedback paths | Replay cannot inflate stock/confidence; authorized routine correction updates the story without Jessica administering it | Mutable signed records, placeholder actors, disconnected feedback, prompt-per-correction defaults |
+| 0.5. The correction's contract (slice 0, D4) | Name, before any code, for one record kind: authority for the successor, the durable grant, predecessor and rule version, and declared partition behavior (pending / conflict-visible) when currentness can't be checked; keep feedback (claim), acceptance (by the authority holder), and content successor (new head) as three acts, never collapsed | Adversarial review of the contract (read-only) before cut 1 code starts | Nothing runtime; this is the entrance gate for cuts 1 and 2, not a behavior to retire |
+| 1. Accountable correction converges (`@concern:accountable-correction`, under `dataplane-convergence`) | Eight stations: discovery without notification, incl. late arrival; notification accelerates, never substitutes; acceptance by the authority holder; both crash windows (after consumption recorded / after projection applied); standing does not debit the reporter; conflicting successors surface as conflict, never last-arrival-wins; rebuild resets derived tables and their consumption state atomically; one minimal first-party app proof incl. the submission-uncertainty window | All eight stations pass on the 3-peer household mesh (`just test mesh genesis/a2o/features/dataplane/accountable-correction.feature`), station 1 with notifications disabled; declared as a new `checks:` line under the active `dataplane-convergence` habit, no new habit | Mutable signed records, placeholder actors, disconnected feedback, prompt-per-correction defaults |
 | 2. Close the ambient loop across witness scopes | Add dependency invalidation, one cross-scope transfer/evidence edge, and one correctly typed pantry-floor alarm with recovery; connect existing grants to one actual coordination action | Changed consumption updates only affected views; cross-scope correction survives failure; one real authorized effect verified; zero routine bookkeeping prompts | Whole-history replay on every change, DHT-bound story assumptions, AI-only completion and fake repairs |
 | 3. Deliver confidential custody | Put encryption before production placement; integrate reader envelopes, rotation, and supported recovery | Non-reader custodian recovery, future revocation, no protected metadata in declared surfaces | Plaintext non-reader replication and membership-as-reader shortcuts |
 | 4. Reconsider validation spaces | Run annual workload/recovery measurements; prototype required admission/lifecycle; choose retained and moved integrity concerns | Authority continuity, currentness, rebuild, offline and cold recovery on target hardware | Superseded writers/cells after migration, not before |
@@ -586,33 +567,35 @@ The first missing chain is: **embodied observation → immutable verified record
 
 ### First executable acceptance boundary
 
+**Sensorless, 2026-09-06:** this is slice 1's acceptance boundary — the eight stations from the cut-1
+row above, with no kitchen-sensing precondition. The ambient cooking-story scenario stays a later
+acceptance boundary under the held product goals (§12); it is not slice 1's proof.
+
 ```gherkin
-Scenario: The elohim carries the soup's story across accountable networks
-  Given Jessica has offered soup under the supper's agreed terms
-  And routine coordination and household replenishment have bounded mandates
-  And farm and store evidence originates in a different validation context
-  And the household elohim interprets welcomed kitchen sensing locally
-  And ingredient evidence retains explicit uncertainty and disclosure boundaries
-  When Jessica cooks and brings soup without completing bookkeeping forms
-  Then the elohim links the permitted accounts into one cooking process
-  And familiar cooperation proceeds without fresh proof requests to each participant
-  And the story distinguishes trusted accounts from independently verified facts
-  And it distinguishes portions planned, served, consumed and unknown
-  And the commons receives scoped valueflow and capacity changes
-  And the cross-context transfer is counted once with qualified acceptance
-  When a source corrects a quantity used in multiple stories
-  Then only affected projections are invalidated and recomputed
-  And no duplicate evidence increases confidence or token entitlement
-  And Jessica receives no routine correction or allocation approval prompt
-  When a relevant capacity bound is crossed
-  Then the appropriate steward receives evidence with correct floor or ceiling semantics
-  And it completes an allowed action or escalates the actual unresolved choice
-  And an observed outcome closes the incident
-  And appropriate repair restores ordinary cooperation rather than permanent suspicion
-  When a peer or witness provider becomes unavailable
-  Then retained evidence and repair paths preserve the connected flow
-  And unavailable currentness or settlement is shown as pending
-  And no participant must join every source network to use permitted evidence
+Scenario: Accountable correction converges across the household mesh
+  Given Sarah, Matthew, and a third peer share one content space
+  And Matthew's peer has notifications disabled
+  When Sarah commits a correction against a shared record
+  Then Matthew's storage discovers the witnessed act by periodic enumeration of its subscribed
+    target's links, against the per-act consumption table, with no notification received
+  And an older act that becomes discoverable only after newer acts were processed is still applied once
+  When notifications are enabled and Sarah commits a second correction
+  Then Matthew's storage receives a notification carrying the witnessed-act reference
+  And it fetches, verifies, and applies the act through the same path as discovery, exactly once
+  When the party holding amendment authority accepts a correction
+  Then a content successor is adopted through existing head adoption
+  And feedback, acceptance, and successor remain three distinct visible records
+  When Matthew's storage restarts after consumption is recorded but before projection is applied
+  Then exactly one effect survives and no pending state is lost
+  When Matthew's storage restarts after projection is applied but before consumption is recorded
+  Then replay is safe and does not duplicate the effect
+  Then the reporter is not debited and any adverse consequence requires its own authorization
+  When two authentic successors of one predecessor arrive
+  Then the conflict is surfaced, never resolved by last-arrival-wins
+  When Matthew's derived feedback and standing tables are rebuilt
+  Then their consumption state resets atomically and replay reproduces identical canonical rows
+  When a first-party view submits one real correction and the response is lost before reload
+  Then retry after reload recovers the one intended submission through the operation-to-act binding
 ```
 
 
@@ -827,15 +810,7 @@ Replace `EprHome`'s one-size content legs with appropriate subject facets. Commo
 
 Also fix `epr-home.model.ts::reachSubtitle` during extraction: its household/steward shorthand must not substitute for actual readership and authority. A human-readable access explanation comes from the applicable disclosure context, not a global mapping from a reach word to a social relationship.
 
-### 11.4 Two execution profiles, not a fictional universal plugin
-
-**First-party built-in views:** can remain compiled Angular components using a shared typed projection/action interface. Their isolation is organizational and code-reviewed; they remain trusted application code. Extracting an interface improves composition but does not sandbox them. This is the fastest way to prove the shared subject journey without replacing the app framework.
-
-**Independently supplied community tools:** use an enforced isolated execution profile and a narrow host interaction channel. Prototype one browser profile with separated origin/storage or an appropriately sandboxed context, authenticated instance/channel binding, bounded messages, scoped data and operations, and revoked handles on teardown. Do not dynamically load arbitrary remote Angular code into the privileged application injector and call it permission-limited. Test actual browser behavior and server-side API enforcement before offering third-party installation.
-
-SSR/native execution is a separate trust profile, not automatically covered by browser isolation. Initially retain the trusted server-rendered shell and approved first-party renderers; an external tool may activate client-side after the host establishes its scope. Do not execute a community-supplied server bundle with the host's filesystem, network and session authority merely because its browser portion is isolated. Expand those profiles only with their own concrete execution boundary.
-
-This explicitly limits the first release: first-party composability before unrestricted third-party installation. The independent-bundle proof is valuable, but it must not shortcut the security boundary. Signing or content addressing proves package identity and integrity, not benevolence.
+**Third-party tool isolation (formerly §11.4) is a held product goal, 2026-09-06 — see §12.**
 
 ### 11.5 State must survive the view that happened to create it
 
@@ -862,18 +837,26 @@ A browser cache or outbox is a delivery convenience, not a second authority. Dis
 
 This is the practical seam: **different products can participate in one ongoing activity without making that activity belong to the product.** It requires changes to resolution, API use, state lifetime, navigation, and execution trust—not merely an attractive common frame.
 
-### 11.7 Migration cuts that actually remove the old couplings
+### 11.7 The minimal first-party app proof that rides with slice 1
 
-| Cut | Change in the current tree | Removal/compatibility boundary | Required proof |
-|---|---|---|---|
-| A. Resolve one non-Content subject | Extend existing resolver/contracts and one backend projection; adapt EPR home | Content loading remains its existing adapter, not the universal subject model | One process opens with resource/commitment relationships and explicit revision/currentness |
-| B. Extract the focal input boundary | Move shared content/render interfaces out of Lamad through existing SDK/library seams; pass a resolved projection to the adapted renderer | Remove the migrated focal path's independent ContentService fetch and private Lamad imports; preserve learning renderers | No mixed-revision frame/body; shell no longer requires private Lamad services for this path |
-| C. Make views plural | Add installed-view compatibility resolution beside existing URL dispatch; change `openInBundle` for migrated subjects | Keep old route aliases; remove first-match-as-ownership and guessed mounts for migrated views | Two views coexist for one subject; URL/back-context survives switches and full loads |
-| D. Move one write lifecycle | Adapt the selected UI action and household elohim to the same durable runtime intent/status contract | Retire the corresponding direct callback/write path after equivalence proof | Reload, tab close and duplicate submission preserve one legitimate operation |
-| E. Bound third-party access | Implement one isolated browser tool profile and enforced host/API grants | Keep first-party injector explicitly trusted; do not expose arbitrary remote code through it | Tool cannot obtain broad session credentials, read raw sensing, or act outside its scope |
-| F. Package and recover the composition | Connect actual bundle registration, dependencies, route/view records and selected recoverable state | No fresh hApp install for a view; old packages retained only for needed compatibility/history | Replace the view and the device while retaining identity, commitments, history and permissible ongoing work |
+**Correction (2026-09-06, D9):** cuts A–D below are reduced to the minimal first-party app proof that
+rides with slice 1 (§7 cut 1, station 8), not the full app-redesign migration. Cuts E and F are held
+product goals — see §12.
 
-Cuts A–D are part of the first actual app redesign, not “frontend polish after the architecture is done.” Cut E gates third-party installation. Do not require E before proving first-party composition, and do not advertise E merely because A–D pass. After this slice, use the same contracts to untangle remaining Lamad, Shefa and Qahal consumers; do not launch simultaneous total rewrites of every pillar.
+- **One subject.** One real record, addressed once, not the universal subject model across every
+  pillar.
+- **One real action.** File the correction from a first-party view, using the durable runtime
+  intent/status contract, not a mock or a direct callback.
+- **Two presentations.** The same subject rendered by two distinct views, without a mixed-revision
+  frame/body.
+- **Operation continuity after reload.** The operation survives by its own identity, not the
+  component's lifetime; reload finds the same accepted operation.
+- **Submission-uncertainty window.** Commit succeeds, the response is lost, reload/retry recovers the
+  one intended submission through the operation→act binding, never a second act.
+
+Sensorless operation is the minimum acceptance profile: this proof needs no kitchen sensing and no
+third-party tool. It does not require E–F, the full breaking redesign in §§11.1–11.6, 11.8, or
+migrating remaining Lamad/Shefa/Qahal consumers — those stay the forward design, not slice-1 scope.
 
 Shared contract movement must respect the existing import ratchet and generated Rust-to-TypeScript sources. Where generated wire types change, update their authoritative schema/source and consumer bindings together. Where an Angular-only interface moves, preserve explicit public entry points and remove superseded imports. Legacy URL redirects and version adapters are compatibility artifacts with bounded purpose, not excuses for two permanent canonical write paths.
 
@@ -881,11 +864,92 @@ Shared contract movement must respect the existing import ratchet and generated 
 
 Source inspection establishes the concrete couplings above. A read-only render of `/epr/elohim-protocol-manifesto` on the inspected doorway showed the existing out-of-reach state and a content 404; that is not evidence that the EPR shell is absent or that a successfully loaded subject already supports this redesign. A subsequent dark-mode render of `/epr/elohim-host-landing` did load the EPR frame, embedded application content, and its relationship/governance/custody legs. It also recorded cache-core and embedded version-resource 404s. This demonstrates an existing content-oriented composed surface, not the proposed shared subject/action lifecycle or third-party isolation. Local captures are under `genesis/a2o/reports/look/commons-app-redesign-epr{,-loaded}/`. The rendered baselines and source contracts are grounding, not acceptance proofs.
 
-The remaining hard design questions are now narrow enough to prototype: the typed subject contract across existing REA/EPR identities; authority-aware projection/subscription semantics; durable intent lifecycle; plural view resolution without breaking route claims; and one enforced external-tool profile. The first spike must walk §11.6 through cuts A–D in §11.7 using real runtime data and one real action; third-party isolation and full composition recovery in E–F remain separately gated. A static mock, two identical screens backed by duplicated records, or an iframe that simply loads the old SPA does not settle this intersection.
+The remaining hard design questions are now narrow enough to prototype: the typed subject contract across existing REA/EPR identities; authority-aware projection/subscription semantics; durable intent lifecycle; plural view resolution without breaking route claims; and one enforced external-tool profile. The first spike must walk §11.6 through the minimal first-party app proof in §11.7 using real runtime data and one real action; third-party isolation and full composition recovery (§12's cuts E–F) remain separately gated. A static mock, two identical screens backed by duplicated records, or an iframe that simply loads the old SPA does not settle this intersection.
 
+
+## 12. Held product goals (2026-09-06)
+
+D9 holds these as later product goals: the ambient story stays the design target, but "held" is not
+permission to replace it with permanent manual correction administration. Slice 1 (§7) depends on
+none of them.
+
+### Continuous kitchen sensing (formerly §6.2a)
+
+The household runtime can receive continuous local sensor streams and perform perception, interpretation, and memory formation there. The elohim earns the freedom to attend by being useful, discreet, correctable, and respectful of the people it accompanies. Its loyalty serves their flourishing and relationships; it does not make one household member entitled to expose everyone else. Shared-space expectations, guests, supported decision-making, and requests for privacy belong in that lived relationship, without turning every ordinary moment into a consent dialog.
+
+Local execution is necessary to this proposed deployment, but locality alone does not establish loyalty. The runtime must uphold the relationship in its data paths, action mandates, update behavior, and disclosure controls. The agent can recognize a private need and act within a standing mandate without exporting the observation that revealed it.
+
+| Boundary | What stays or crosses |
+|---|---|
+| Sensors → household inference | Welcomed continuous streams processed locally, under the household’s actual compute and sensing capabilities |
+| Inference → local memory | Useful event understanding, confidence, and selected supporting observations; raw-stream retention has its own policy |
+| Household → reciprocal peers | Only the context or assistance request appropriate to that relationship; protected custody may hold ciphertext without readership |
+| Household → commons aggregates | Permitted valueflow, capacity, and feedback contributions; no automatic access to the underlying intimate stream |
+| Accountable act → Holochain | The qualifying commitment, event, or attestation and its permitted evidence references; not the kitchen’s continuous sensory history |
+
+Use existing observation, local inference, private custody, and authority seams to implement these boundaries. An unavailable or overloaded local model must not silently redirect intimate streams to a remote provider. Any supported remote assistance follows a separately established disclosure relationship. Updates and recovery must preserve those choices.
+
+Benchmark continuous perception and memory on the intended household device: sustained compute, memory, power, thermal behavior, latency, and retained-data growth. Degrade gracefully within that device’s capacity. A phone can remain a light interface to the household elohim; households without continuous sensing retain participation and care with a less detailed account.
+
+The acceptance proof is concrete: Jessica cooks while local inference composes the process; permitted summaries support the commons; an ordinary remote peer cannot retrieve the underlying kitchen stream; pausing a sensing context is honored; and restart restores the agreed memory and disclosure boundaries. Continuous attention earns its place through the experience of care it produces.
+
+**Why held:** slice 1's acceptance profile is sensorless (D9); this is the sensing story slice 1 does
+not need. **Reopens when:** cuts 2/5 (§7) pick up continuous local sensing after the correction
+lifecycle is proven end to end.
+
+### Farm-to-token settlement (formerly §6.5)
+
+The commons combines offered supply, permitted need forecasts, actual stock, carrying limits, and existing agreements. It can arrange replenishment, pool a procurement order, match transport, and distribute agreed value automatically within those mandates. Planning projections may use estimates; irreversible allocations and settlement use the evidence threshold and acceptance rules of their actual agreement.
+
+For the soup, receipts may evidence paid ingredients; event terms may recognize cooking, farming, hosting, and transport contributions; an agreement may allocate a commons share. These are different flows. Do not charge the ingredients again because their provenance appears in the meal story. Do not mint twelve units of settled reward simply because the model inferred twelve diners. A gift can remain a gift while its contribution is remembered.
+
+Where a token flow is specified, bind its issuance, transfer, redemption, or allocation to the authorizing agreement, qualifying event, applicable unit and policy version, and observed fulfillment. Preserve an idempotent reference to the particular economic act. Enforce conservation or permitted issuance, entitlement, and resource limits independently of the narrative generator. Unknown contribution can remain pending or provisional where policy allows; uncertainty is not a route to unlimited minting.
+
+**Shefa's value accounting is not itself a fully implemented currency or settlement engine.** Its vision includes value-aware tokens and commons-held attribution; the protocol domain currently describes accounting primitives. Choose and prove the actual settlement mechanism for a concrete flow. Holochain signatures alone do not supply globally serialized spending across disconnected communities. Shared scarce balances need a defined authority, reservation/serialization or appropriate countersigning contract, and a partition policy before spend is accepted. No new blockchain is implied merely because an aggregate spans communities.
+
+This prevents the AI commons from becoming an unaccountable treasury: every action and allocation remains bounded by participating agreements, with attributable evidence and a repair/dispute path. Local care and human participation cannot depend on producing a complete monetizable biography.
+
+**Why held:** shefa's settlement engine is not implemented and slice 1 needs no token flow. **Reopens
+when:** a concrete settlement contract is chosen and proven per this section's own criteria, ahead of
+cut 5 (§7).
+
+### Third-party tool isolation (formerly §11.4)
+
+**First-party built-in views:** can remain compiled Angular components using a shared typed projection/action interface. Their isolation is organizational and code-reviewed; they remain trusted application code. Extracting an interface improves composition but does not sandbox them. This is the fastest way to prove the shared subject journey without replacing the app framework.
+
+**Independently supplied community tools:** use an enforced isolated execution profile and a narrow host interaction channel. Prototype one browser profile with separated origin/storage or an appropriately sandboxed context, authenticated instance/channel binding, bounded messages, scoped data and operations, and revoked handles on teardown. Do not dynamically load arbitrary remote Angular code into the privileged application injector and call it permission-limited. Test actual browser behavior and server-side API enforcement before offering third-party installation.
+
+SSR/native execution is a separate trust profile, not automatically covered by browser isolation. Initially retain the trusted server-rendered shell and approved first-party renderers; an external tool may activate client-side after the host establishes its scope. Do not execute a community-supplied server bundle with the host's filesystem, network and session authority merely because its browser portion is isolated. Expand those profiles only with their own concrete execution boundary.
+
+This explicitly limits the first release: first-party composability before unrestricted third-party installation. The independent-bundle proof is valuable, but it must not shortcut the security boundary. Signing or content addressing proves package identity and integrity, not benevolence.
+
+**Why held:** slice 1 ships only first-party views (D9); no third-party tool profile is required.
+**Reopens when:** cut E (below) is scheduled, after the minimal first-party proof (§11.7) is accepted.
+
+### Cut E — Bound third-party access (formerly §11.7)
+
+Implement one isolated browser tool profile and enforced host/API grants. Keep the first-party
+injector explicitly trusted; do not expose arbitrary remote code through it. Required proof: a tool
+cannot obtain broad session credentials, read raw sensing, or act outside its scope.
+
+**Why held:** gated behind first-party composition; not required for slice 1's minimal app proof.
+**Reopens when:** the minimal first-party proof (§11.7) is accepted.
+
+### Cut F — Package and recover the composition (formerly §11.7)
+
+Connect actual bundle registration, dependencies, route/view records, and selected recoverable state,
+so no fresh hApp install is needed for a view and old packages are retained only for needed
+compatibility/history. Required proof: replace the view and the device while retaining identity,
+commitments, history, and permissible ongoing work.
+
+**Why held:** depends on cuts A–D and cut E landing first. **Reopens when:** the minimal first-party
+proof (§11.7) is accepted and third-party isolation (cut E) lands.
 
 ## Evidence and open decisions
 
 This document is a **proposed reimplementation plan**. Source inspection and the two anonymous UI captures were performed; the acceptance journeys, annual-load measurements, confidential custody integration, and fork/replacement comparison have not been run. Capture artifacts are under `genesis/a2o/reports/look/commons-plan-baseline-{light,dark}/` and are local, gitignored observations.
 
 Before dependent implementation, resolve: public domain APIs and the permission-aware package/runtime/witness resolution contract in §10; the personal continuity contract and its device-independent recovery proof; cross-context identity/rule/currentness evidence and resolver contract; immutable observation signing and persistence; correlation-aware quantity composition and floor-alarm semantics; the concrete settlement contract; private-note schema/reader recovery mapping; agreement acceptance and delivery-event vocabulary; amendment and appeal policy for each participating group; identity binding enforcement at each ingress; resource and latency budgets on actual devices; and the witness-space migration/admission mechanism. These are bounded design decisions with corresponding proofs above. They do not postpone fixing the demonstrated feedback and false-completion seams.
+
+**2026-09-06:** the fork/replacement comparison in §8 is judged only after slice 1 (§7 cut 1) makes one
+act class — accountable correction — real end-to-end. §8's decision experiment does not start early.

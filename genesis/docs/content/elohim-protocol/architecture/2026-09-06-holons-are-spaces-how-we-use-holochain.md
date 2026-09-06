@@ -355,6 +355,37 @@ vision decides what must be preserved; the current technology does not get to de
 
 ---
 
+## 0b. Second opinion and sealed decisions (2026-09-06)
+
+A second opinion (Opus fact-check, Sonnet habit mapping, Codex adjudication, plus an outside-developer
+read) reviewed this document and its companion, [the reimplementation plan](./2026-09-06-ai-stewarded-commons-reimplementation-plan.md),
+which now owns the resulting sequence. Ten decisions (D0–D10) were sealed; in plain words:
+
+- **D0** — classify every act by authority, durable source, validation contract, and rebuild path
+  before deciding whether it needs witnessing. No default DHT-or-projection binary.
+- **D1** — the connected graph across validation contexts is the product; aggregates are composed
+  views, never DNAs.
+- **D3** — the membrane gate is peer-side validation of the join proof; the genesis self-check this
+  document proposed leading with is a courtesy only.
+- **D4** — a cross-plane or cross-space act needs named successor authority and stated partition
+  behavior, designed before slice-1 code.
+- **D5** — the omnibus split folds into the next integrity crossing already needed; "no live writer"
+  does not make deletion safe.
+- **D6** — group clone spaces are an operator-selected candidate, gated behind D0, D3, and a measured
+  phone/hub budget, not a demonstrated destination.
+- **D7** — the fixtures clone is a harness experiment run in parallel with slice 1; it grants no
+  downstream authority.
+- **D10** — the first slice is "accountable correction converges," under the existing
+  `dataplane-convergence` habit: commissioning evidence, not settled placement.
+
+So: (a) the automatic household→DNA mapping described below is retired; group clone spaces remain an
+operator-selected candidate with reconsideration criteria. (b) the omnibus split is not a
+prerequisite; no live writer does not by itself make deletion safe. (c) the fixtures clone is a
+harness experiment with no downstream authority. (d) the first slice is accountable-correction
+convergence, not the household-spaces sequence in §10.6.
+
+---
+
 ## 1. First principles — what a Holochain network actually is
 
 Forget "blockchain" and forget "database." Picture three things.
@@ -466,8 +497,11 @@ install — a role moving from an old DNA hash to a new one preserves its seed. 
 still denotes a different network; preserving the seed does not remove the lineage crossing.
 No code path creates a clone cell for a household or a collective. The "household space" the Nachalah
 stories describe is a design, and the "household space partition" of 2026-09-05 was a cell on the local
-household *mesh* being blocked, not a clone space. Every integrity zome's membership check
-(`genesis_self_check`) is a stub that returns *valid* for anyone. So the primitive is available in the
+household *mesh* being blocked, not a clone space. Four of our five integrity zomes implement
+`genesis_self_check` as a one-line stub returning *valid* for anyone (content, imagodei, mishpat,
+infrastructure); `node_registry_integrity` has no `genesis_self_check` at all. No integrity zome
+validates the `AgentValidationPkg` op either — the peer-side membrane gate does not exist in any
+form (correction, 2026-09-06; see §9.2). So the primitive is available in the
 substrate and unused in the product: one space per role, open to any key, everything at full arc.
 
 **Then we built a second system to cope.** This is the honest part. Because everything sat in one space
@@ -500,7 +534,20 @@ of *what a space is for*. We thought of a space as a **schema**. Holochain think
 
 ---
 
-## 4. The scaling question, with numbers
+## 4. The scaling question, with numbers — a decomposition to benchmark, not a measurement
+
+**Correction (2026-09-06):** the arithmetic below is a decomposition, not an extrapolation. Before §4b
+can be believed, measure:
+
+1. Per-space bootstrap, peer-store, and relay state, not just document storage.
+2. What the 1.2 GiB idle baseline (§9.3) is actually attributable to.
+3. The authorship cost of a zero-arc cell (it still joins, bootstraps, and holds peer-store state).
+4. The cost of the global roles (identity, infrastructure, node registry) at scale.
+5. Cross-scope fanout when a record crosses a holon boundary.
+6. Phone-class RAM, thread, file-descriptor, and battery cost, not idle x86 (§9.3).
+7. Year-equivalent history growth per holon, not a day-one snapshot.
+8. Multi-household failure and recovery behavior, not a single isolated space.
+9. Service-side (doorway/hub) bootstrap and relay scaling across many spaces.
 
 Let me do the arithmetic the way I'd do it on a whiteboard.
 
@@ -552,8 +599,13 @@ relationships. §0a restores those mechanisms to the scaling argument.
 - **Identity** crosses because we chose content addressing. An EPR's CID is the hash of its bytes. It is
   the same in every space it is published into. The DHT anchor (the action hash) is per space. The
   *thing* is not. Our earlier choice to make the CID the identity and the DHT anchor a per-space
-  attribute is the single decision that makes holonic placement possible at all. Hard fact B (no
-  cross-space links) does not bite: we link across spaces by CID, never by action hash.
+  attribute is the single decision that makes holonic placement possible at all. **Correction
+  (2026-09-06):** "we link across spaces by CID, never by action hash" is wrong as stated. Content
+  bodies and blobs are CID-addressed, but two live paths ship action hashes under CID-shaped names —
+  `content_store/src/feedback_signal.rs:137,143` formats an `ActionHash` into `target_cid`, and
+  `conductor_writes.rs:74,156-179`'s collective "CID" is `collective:{ActionHash}`; head adoption is
+  keyed on `head_action_hash` throughout. The mapping between action identity and content identity
+  needs an explicit rule before more crosses a space (D4 in §0b).
 - **Discovery** — "which peers are in this space, and how do I reach them" — is per space too, and
   that is fine. Kitsune2 bootstraps per space. Our doorways already serve bootstrap and relay per space.
   A new household mints a seed, its five devices bootstrap through any doorway, and no global registry
@@ -606,7 +658,9 @@ Being fair to the last two years:
    a doorway telling its storage peer "you serve this bundle" is a per-host imperative because there was
    no space to say "the doorway stewards hold the served commons at full arc" declaratively.
 5. **Fixtures in the commons.** Thousands of test EPRs in the same space as elohim.host's landing page,
-   gossiped by every fleet peer forever. A `fixtures` clone space nobody follows at full arc costs nothing.
+   gossiped by every fleet peer forever. A `fixtures` clone space nobody follows at full arc is cheap,
+   not free (correction, 2026-09-06): a zero-authority clone still authors, bootstraps, and holds
+   peer-store state.
 6. **Full-arc-everywhere as the trust posture.** The Nachalah spec already names this: full-arc
    everywhere is the *trustless* anti-pattern. A holon holds what its members trust each other to hold.
 
@@ -731,6 +785,11 @@ Axis 1, available now.
 Tens of millions of collectives of 100 to 10,000, each a space held fully by its
 stewards and at zero arc by its members: Axis 1, available now.
 
+**Correction (2026-09-06):** "available now" means available for *creating* each of these as a
+separate network. It is not available for the advertised mixed-arc phone — full household membership
+plus zero-arc commons reading, on one conductor — until the per-space hint above lands. Until then, a
+device is full-arc in every space it joins or zero-arc in all of them.
+
 A few thousand commons spaces — the
 protocol's own, a language's, a region's, a movement's — each with millions of readers and thousands of
 stewards, held in *slices* by those stewards so that no rack needs to hold a whole commons: Axis 2, the
@@ -759,8 +818,9 @@ Following §10.4, we carry the unblock API and per-space arc hint as upstream PR
 
 ## 7. What changes in our design, concretely
 
-This is the decision the overnight ruling recorded on the arc-policy code and in the Nachalah hub, spelled
-out.
+This is the technical hypothesis recorded on the arc-policy code and in the Nachalah hub, spelled out
+below; sequencing across it is decided in [the reimplementation plan](./2026-09-06-ai-stewarded-commons-reimplementation-plan.md)
+under D1/D5/D6 (§0b).
 
 **The placement rule:** *content declares its space. Its members hold it at the arc the trust gradient allots.* Today, full or zero arc is conductor-wide. The per-space hint needs an upstream PR and a carried patch.
 An EPR's reach and holding declarations constrain placement, but social reach also governs earning,
@@ -775,7 +835,7 @@ propagation, feedback, and accountability. Space placement is one output; it can
 | Holding floor | a global replica target | per holon: "held by ≥ r of this holon's members" (the Nachalah gold/deeds/paper floors) |
 | Promotion | copy + flag | witnessed re-publish into the wider space; CID unchanged, anchor per space |
 | Arc policy | shed a peer to zero on OOM | choose which spaces a device joins and at what arc, once the per-space hint lands. Until then, phones stay spokes to a household hub. OOM becomes "too many full-arc memberships," a social/allotment question |
-| Upgrade propagation | per role | per **cell**: a coordinator release must reach every clone of a role. The adoption controller's "installed reality" becomes per cell. One adjustment, already in scope of the Evolution epic. |
+| Upgrade propagation | per role | per **cell**: a coordinator release must reach every clone of a role. The adoption controller's "installed reality" becomes per cell. **Correction (2026-09-06):** `sync_coordinators_for_app_info` (`happ_manager.rs:1310-1314`) filters `CellInfo::Provisioned` and silently drops clones today — a clone would not receive a coordinator hot-swap and would not appear in drift reports. That gap is in scope of the Evolution epic, not yet closed. |
 | Fixtures | in the commons | in their own clone space; only the test runner follows it |
 | Doorway | projects "the" content | projects the spaces its steward belongs to |
 
@@ -791,7 +851,8 @@ published EPRs from the commons or validate the household experience.
 For the adopted sequence and risks, see §10.6.
 
 **The second slice:** the `list_blocks` / `unblock` admin API, as an upstream PR plus a carried patch.
-It must land before any household space.
+It must land before any household space. It is administrative: clearing a local block never repairs
+an invalid history. It lives in the Holochain Evolution epic §11.3 as an upstream PR.
 
 **The third slice:** the zome split as one lineage crossing.
 Remove identity duplicates, economy types, and infrastructure types from content.
@@ -893,32 +954,44 @@ A joiner supplies a *membrane proof* (bytes) when a cell is installed or cloned.
 The conductor runs the integrity zome's `genesis_self_check` *before* creating the source chain.
 Rejection means the cell is never born. Acceptance writes the proof permanently as the chain's second record, where later validation can inspect it.
 
-Every one of our integrity zomes implements that callback as a stub returning *valid* for anyone.
-Our hApp manager never passes a proof. The lineage install explicitly writes `None`.
+**Correction (2026-09-06):** four of our five integrity zomes implement that callback as a one-line
+stub returning *valid* for anyone (content, imagodei, mishpat, infrastructure); `node_registry_integrity`
+has no `genesis_self_check` at all. And a stronger gap: no integrity zome validates the
+`AgentValidationPkg` op — the peer-side membrane gate does not exist in any form, only the
+genesis-time courtesy check does. Our hApp manager never passes a proof. The lineage install
+explicitly writes `None`.
 
 **What we already have that is proof-shaped.** Two things: the cross-signed binding between an agent
 key and its transport identity (the `identity-cross-signed` habit, red today, observe-only), and mishpat's
 `verify_credentials`, built for "collective membership CIDs presented by connecting peers," which checks
 that a record exists and who authored it.
 
-**If we did it this way, then** joining a household or collective space would require presenting a
-signed membership record that the space's own rules can check without asking anyone. Concretely: the
-membership is a mishpat commitment (the household affirmation the Nachalah stories already describe),
-signed through the existing conductor signing path. Those bytes travel as the membrane proof on the clone call.
-The space's `genesis_self_check` deserializes them and checks the signature against the space's founding rule ("signed by a key this household's affirmation names"). Outsiders who know the
-network seed are refused at genesis, which is exactly the "outsider knows the seed" scenario in the
-allotment story.
+**If we did it this way, then (reordered per D3, §0b)** joining a household or collective space
+requires presenting a signed membership record, and the gate that matters is **peer-side**: every
+other member's `validate()` checks the `AgentValidationPkg` op against the space's founding rule
+before gossiping anything the joiner sends. `genesis_self_check` reuses that same rule as an early,
+local courtesy — it runs before the chain exists and cannot itself protect anyone but the joiner. The
+trust root ("signed by a key this household's affirmation names") is fixed in the *target DNA's own
+rules*, never self-named by the proof the joiner presents. Concretely: the membership is a mishpat
+commitment (the household affirmation the Nachalah stories already describe), signed through the
+existing conductor signing path, carried as the membrane proof on the clone call. An honest installer
+rejects a malformed or unauthorized invitation early; honest peers running `validate()` refuse a
+joiner with no or invalid proof even when that joiner's own `genesis_self_check` was patched to
+always pass — the honest peers, not the joiner's binary, are the gate.
 
-**So this suggests doing:** three small pieces, in order.
-Replace the stub `genesis_self_check` in the content and governance zomes with a real membership-record check.
-Add the code path that turns a mishpat membership into proof bytes. Pass those bytes on clone creation.
-Changing the integrity code changes its DNA hash. Keeping the existing commons space would require
-retaining its existing integrity definition while introducing the restricted variant separately;
-otherwise the commons needs a lineage crossing too. That choice must be explicit.
+**So this suggests doing:** four pieces, in order. First, implement peer-side validation of the
+`AgentValidationPkg` op in the content and governance zomes' `validate()` — this is the actual gate.
+Second, have `genesis_self_check` reuse the same rule as a courtesy, never a substitute. Third, add
+the code path that turns a mishpat membership into proof bytes and pass those bytes on clone creation.
+Fourth, no restricted space ships until a Sweettest harness includes a joiner that bypasses its own
+self-check and confirms honest peers still refuse it. Changing the integrity code changes its DNA
+hash. Keeping the existing commons space would require retaining its existing integrity definition
+while introducing the restricted variant separately; otherwise the commons needs a lineage crossing
+too. That choice must be explicit.
 
-One field warning (§11): the self check is a courtesy.
-The real gate is validation of the proof record on the chain. Sweettest has no support for membrane proofs at all.
-Decide the holon test harness *before* building the door.
+One field warning (§11): the self check is a courtesy; the real gate is peer-side `validate()`.
+Sweettest has no support for membrane proofs at all. Decide the holon test harness *before* building
+the door.
 
 ### 9.3 Cell count per device — what does a holon cost?
 
@@ -935,6 +1008,9 @@ clones of the content role added in steps with a minute of idle between checkpoi
 Clone creation took about 126 ms each. Growth was linear: **about 2.4 MiB of memory, 0.26 MiB of disk,
 18 open files and 8 threads per idle cell.** Commands and raw measurements are in
 `genesis/a2o/reports/cellcost-2026-09-06/`: `rerun.sh`, `measure.mjs`, and `measurements.jsonl`.
+**Note (2026-09-06):** that directory is gitignored (`genesis/a2o/.gitignore:3`) and not in the repo;
+the numbers above were verified byte-exact against `measurements.jsonl` during the second-opinion
+review.
 
 **How to read it.** Memory is not the constraint people expected. Forty extra holons cost 80 MiB.
 The striking number is the *baseline*: 1.2 GiB for five idle cells, before content or gossip.
@@ -1009,7 +1085,10 @@ membership* rather than from config.
 Nothing new goes in the DHT. Record recovery quorums and promotions in the receiving holon, and let the release controller enumerate cells.
 Each is a small change to existing code.
 
-### 9.6 What this section decides, in one breath
+### 9.6 What this section's hypothesis was, in one breath
+
+This is the technical hypothesis recorded here; sequencing across it is decided in the
+reimplementation plan under D1/D5/D6 (§0b).
 
 Spaces are memberships with their own rules, sized household → collective → regional commons → protocol commons.
 Content and governance go per holon. Identity and discovery stay global.
@@ -1035,7 +1114,15 @@ They are why a pivot is available.
 **But** the content integrity zome is an omnibus: about 4,800 lines, with **75 entry types and 225 link types**.
 Holochain allows 256 link types per integrity zome. Content sits at **225 of 256**.
 It spans learning, community, identity, economy and infrastructure, and **duplicates identity's own types**.
-Human, Agent, Relationship, ContentMastery, and ContributorPresence appear in both DNAs, with content's copies marked "legacy".
+**Correction (2026-09-06):** eight types overlap between content and identity, not five —
+`Agent`, `AgentProgress`, `ContentMastery`, `ContributorPresence`, `Human`, `HumanProgress`,
+`HumanRelationship`, and `StringAnchor`. `Relationship` is content-only, not a duplicate; imagodei's
+overlapping type is `HumanRelationship`. Only `Human` and `HumanProgress` carry a "legacy" comment.
+
+**Live-writer finding (new, 2026-09-06):** for every one of those eight types, no DNA is the live
+writer today — elohim-storage's SQLite is. `POST /db/relationships` writes Diesel with
+`dht_anchor_hash` null (`http.rs:9050,9061`). The only DHT writer for Human/Agent is the genesis
+seeder into imagodei.
 
 These duplicate declarations create an authority question: which live authoring and reading paths
 use which definition? Their presence alone does not establish two active authorities over the same
@@ -1043,7 +1130,8 @@ record. The coupling is real; the authoritative home and the proposed split need
 Every DNA's membership check is also a permissive stub, and no role commits to a progenitor.
 Every space today is therefore an open network whose hash binds to no root.
 
-**Verdict: accepted, and it changes the order of everything in §7.** Cloning the content role as it stands
+**Verdict: accepted as the technical hypothesis recorded here; sequencing is decided in the
+reimplementation plan under D1/D5/D6 (§0b).** Cloning the content role as it stands
 would clone the omnibus into every household. A split requires a lineage crossing at the affected seam. §10.6 combines the content zome changes into one crossing.
 The Evolution epic just proved that crossing machinery on the mesh. So: **the zome split comes before any
 household space.** §9.1's role table stands. The content role that goes per-holon is the *split* one.
@@ -1131,7 +1219,9 @@ departure, supported agency, and offline continuity must shape the architecture 
 
 The reviewer recommends the §9 pivot in a different order than §7 originally proposed.
 Household spaces before an unblock API would be a support catastrophe.
-Per-holon spaces before the zome split would copy the omnibus into every holon. The adopted sequence is:
+Per-holon spaces before the zome split would copy the omnibus into every holon. What follows is the
+technical hypothesis recorded here; sequencing is decided in the reimplementation plan under
+D1/D5/D6 (§0b):
 
 1. **Fixtures clone, instrumented.** Raise `clone_limit` and give the seeder a cell selector.
    No fleet peer follows the clone. Measure per-cell cost in the same week (9.3).
@@ -1150,7 +1240,7 @@ step 4. Product refounding (§0a) reopens the household mapping and the claims a
 This is the recorded technical sequence to reassess against the human journeys, not evidence that
 those journeys have been designed or delivered.
 
-### 10.7 The reviewer's verdict, verbatim
+### 10.7 The reviewer's verdict, verbatim (historical annex — superseded 2026-09-06)
 
 *Historical review retained for traceability. Its claim that membership retires read-time reach is
 challenged by §0a and the revised §10.2; this quotation is not the current product conclusion.*
