@@ -88,6 +88,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { selectSeedCell, seedCellTarget } from './cell-target.js';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
@@ -234,32 +235,11 @@ async function connectToConductor(
     // @holochain/client returns two possible cell formats depending on version:
     //   { type: "provisioned", value: { cell_id: [...] } }  — newer
     //   { provisioned: { cell_id: [...] } }                 — older
-    const imagodeiCells = matchingApp.cell_info['imagodei'];
-    if (!imagodeiCells || imagodeiCells.length === 0) {
-      await adminWs.client.close();
-      throw new Error(`App '${matchingApp.installed_app_id}' has no imagodei cells`);
-    }
+    const cellId = selectSeedCell(
+      matchingApp.cell_info,
+      seedCellTarget(process.argv.slice(2)) ?? 'imagodei',
+    );
 
-    let cellId: [Uint8Array, Uint8Array] | null = null;
-    for (const cell of imagodeiCells as unknown[]) {
-      const c = cell as Record<string, unknown>;
-      if (c['type'] === 'provisioned' && c['value']) {
-        cellId = (c['value'] as Record<string, unknown>)['cell_id'] as [Uint8Array, Uint8Array];
-        break;
-      } else if (c['provisioned']) {
-        cellId = (c['provisioned'] as Record<string, unknown>)['cell_id'] as [Uint8Array, Uint8Array];
-        break;
-      }
-    }
-
-    if (!cellId) {
-      await adminWs.client.close();
-      throw new Error(
-        `App '${matchingApp.installed_app_id}' imagodei cell is not provisioned`
-      );
-    }
-
-    // Authorize signing credentials for this cell
     await adminWs.authorizeSigningCredentials(cellId);
 
     // Issue a short-lived app auth token

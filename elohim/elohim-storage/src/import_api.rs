@@ -274,7 +274,8 @@ pub struct ImportApiConfig {
     pub app_url: String,
     /// App ID for authentication
     pub app_id: String,
-    /// Role for cell selection (e.g., "lamad")
+    /// Cell target: provisioned role or enabled role.clone name/id; never falls back.
+    /// The storage executable supplies SEED_CELL_TARGET here (default: lamad).
     pub role: Option<String>,
     /// Zome name for import operations
     pub zome_name: String,

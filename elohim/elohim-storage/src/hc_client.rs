@@ -86,7 +86,7 @@ pub struct HcClientConfig {
     pub app_url: String,
     /// Installed app ID
     pub app_id: String,
-    /// Role to use for the cell (e.g., "lamad")
+    /// Cell target: provisioned role ("lamad") or enabled clone name/id ("lamad.fixtures").
     pub role: Option<String>,
 }
 
@@ -349,15 +349,11 @@ impl HcClient {
 
         // Find the cell for the specified role
         let cell_id = if let Some(role) = &config.role {
-            app_info
-                .cell_info
-                .get(role)
-                .and_then(|cells| cells.first())
-                .and_then(|cell| match cell {
-                    holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
-                    _ => None,
-                })
-                .ok_or_else(|| StorageError::NotFound(format!("Role '{}' not found", role)))?
+            let (role_name, _) = crate::cell_discovery::split_cell_target(role)?;
+            let cells = app_info.cell_info.get(role_name).ok_or_else(|| {
+                StorageError::NotFound(format!("Cell target '{role}' not found; no fallback"))
+            })?;
+            crate::cell_discovery::select_target_cell(cells, role)?
         } else {
             // Use first available cell
             app_info

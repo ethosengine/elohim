@@ -38,7 +38,8 @@
  *   DRY_RUN - Set to 'true' to validate without seeding
  */
 
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holochain/client';
+import { AdminWebsocket, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+import { selectSeedCell, seedCellTarget } from './cell-target.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -66,6 +67,7 @@ interface SeedConfig {
 
   // Elohim Storage (optional - for unified shard model)
   storageUrl?: string;
+  cellTarget?: string;
 
   // Content
   contentDir: string;
@@ -133,6 +135,24 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
     startTime: Date.now(),
     endTime: 0,
   };
+
+  config.cellTarget ??= process.env.SEED_CELL_TARGET;
+  if (config.cellTarget !== undefined) {
+    if (config.skipDna) throw new Error('--cell cannot be combined with --skip-dna');
+    const admin = await AdminWebsocket.connect({
+      url: new URL(config.adminUrl),
+      wsClientOptions: { origin: 'http://localhost' },
+    });
+    try {
+      const app = (await admin.listApps({})).find(a => a.installed_app_id === config.hAppId);
+      if (!app) throw new Error(`App '${config.hAppId}' not found`);
+      const cell = selectSeedCell(app.cell_info, config.cellTarget);
+      console.log(JSON.stringify({ cellTarget: config.cellTarget, appId: config.hAppId,
+        cellId: cell.map(encodeHashToBase64) }));
+    } finally {
+      await admin.client.close();
+    }
+  }
 
   console.log('═'.repeat(70));
   console.log('PRODUCTION SEEDER - DNA + Projection Cache');
@@ -381,30 +401,15 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           throw new Error(`App '${config.hAppId}' not found`);
         }
 
-        // Find the first role with provisioned cells
-        // Handle both cell formats: native { type: "provisioned", value: {...} } and JS { provisioned: {...} }
-        const roleNames = Object.keys(app.cell_info);
-        const roleName = roleNames.find(name => {
-          const cells = app.cell_info[name];
-          if (!cells || cells.length === 0) return false;
-          const cell = cells[0];
-          return ('provisioned' in cell) || (cell.type === 'provisioned');
-        });
-
-        if (!roleName) {
-          throw new Error('No provisioned cells found');
+        const cellId = selectSeedCell(app.cell_info, config.cellTarget);
+        if (config.cellTarget !== undefined) {
+          await adminWs.authorizeSigningCredentials(cellId);
         }
-
-        const cellInfo = app.cell_info[roleName][0];
-        const isProvisioned = ('provisioned' in cellInfo) || (cellInfo.type === 'provisioned');
-        if (!isProvisioned) {
-          throw new Error('Cell not provisioned');
-        }
-
-        const cellId: CellId = ('provisioned' in cellInfo)
-          ? (cellInfo as any).provisioned.cell_id
-          : (cellInfo as any).value.cell_id;
-        const appInfo = await adminWs.attachAppInterface({ allowed_origins: '*' });
+        const existingInterface = config.cellTarget !== undefined
+          ? (await adminWs.listAppInterfaces()).find(i =>
+              i.installed_app_id === config.hAppId || i.installed_app_id == null)
+          : undefined;
+        const appInfo = existingInterface ?? await adminWs.attachAppInterface({ allowed_origins: '*' });
         const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: config.hAppId });
         const appWsUrl = `ws://localhost:${appInfo.port}`;
         const appWs = await AppWebsocket.connect({
@@ -575,6 +580,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
         await adminWs.client.close();
       } catch (e) {
         console.error(`\n❌ Holochain error: ${e instanceof Error ? e.message : 'Unknown'}`);
+        if (config.cellTarget !== undefined) throw e;
       }
     }
   } else {
@@ -622,6 +628,7 @@ async function main() {
     hAppId: process.env.HOLOCHAIN_APP_ID || 'elohim',
     doorwayUrl: process.env.DOORWAY_URL || 'http://localhost:3000',
     doorwayApiKey: process.env.DOORWAY_API_KEY,
+    cellTarget: seedCellTarget(args),
     storageUrl: process.env.STORAGE_URL, // Optional - enables unified shard model
     contentDir: process.env.CONTENT_DIR || path.join(__dirname, '../../data/lamad/content'),
     pathsDir: process.env.PATHS_DIR || path.join(__dirname, '../../data/lamad/paths'),
@@ -642,6 +649,7 @@ Usage:
 
 Options:
   --dry-run              Validate and log without actually seeding
+  --cell role.clone      Select an enabled clone by name or id; no fallback
   --validate-only        Only run validation, don't seed
   --skip-blobs           Skip blob extraction and cache seeding
   --skip-dna             Skip DNA seeding (blobs only)
@@ -651,6 +659,7 @@ Options:
 
 Environment:
   HOLOCHAIN_ADMIN_URL  Holochain admin websocket URL (default: ws://localhost:8888)
+  SEED_CELL_TARGET    Cell selector (role or role.clone); --cell takes precedence
   HOLOCHAIN_APP_ID     Holochain app ID (default: elohim)
   DOORWAY_URL          Doorway base URL (default: http://localhost:3000)
   DOORWAY_API_KEY      API key for doorway admin operations

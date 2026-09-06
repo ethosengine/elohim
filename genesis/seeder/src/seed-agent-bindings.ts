@@ -62,6 +62,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { selectSeedCell, seedCellTarget } from './cell-target.js';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
@@ -200,34 +201,10 @@ async function connectToConductor(
       return null;
     }
 
-    const imagodeiCells = matchingApp.cell_info['imagodei'];
-    if (!imagodeiCells || imagodeiCells.length === 0) {
-      await adminWs.client.close();
-      throw new Error(`App '${matchingApp.installed_app_id}' has no imagodei cells`);
-    }
-
-    let cellId: [Uint8Array, Uint8Array] | null = null;
-    for (const cell of imagodeiCells as unknown[]) {
-      const c = cell as Record<string, unknown>;
-      if (c['type'] === 'provisioned' && c['value']) {
-        cellId = (c['value'] as Record<string, unknown>)['cell_id'] as [
-          Uint8Array,
-          Uint8Array,
-        ];
-        break;
-      } else if (c['provisioned']) {
-        cellId = (c['provisioned'] as Record<string, unknown>)['cell_id'] as [
-          Uint8Array,
-          Uint8Array,
-        ];
-        break;
-      }
-    }
-
-    if (!cellId) {
-      await adminWs.client.close();
-      throw new Error(`App '${matchingApp.installed_app_id}' imagodei cell is not provisioned`);
-    }
+    const cellId = selectSeedCell(
+      matchingApp.cell_info,
+      seedCellTarget(process.argv.slice(2)) ?? 'imagodei',
+    );
 
     await adminWs.authorizeSigningCredentials(cellId);
 

@@ -191,12 +191,57 @@ where
     Ok(response)
 }
 
+/// An explicit role.clone selector never resolves to a provisioned cell.
+/// Clone suffixes match either the human name or the conductor's role.N id.
+pub(crate) fn split_cell_target(target: &str) -> Result<(&str, Option<&str>), StorageError> {
+    let mut parts = target.split('.');
+    let role = parts.next().unwrap_or_default();
+    let clone = parts.next();
+    if role.is_empty()
+        || clone == Some("")
+        || parts.next().is_some()
+        || target.chars().any(char::is_whitespace)
+    {
+        return Err(StorageError::Parse(format!(
+            "Invalid cell target '{target}': expected role or role.clone"
+        )));
+    }
+    Ok((role, clone))
+}
+
+pub(crate) fn select_target_cell(
+    cells: &[holochain_client::CellInfo],
+    target: &str,
+) -> Result<holochain_client::CellId, StorageError> {
+    let (_, clone) = split_cell_target(target)?;
+    let matches: Vec<_> = cells
+        .iter()
+        .filter_map(|cell| match (clone, cell) {
+            (None, holochain_client::CellInfo::Provisioned(p)) => Some(p.cell_id.clone()),
+            (Some(name), holochain_client::CellInfo::Cloned(c))
+                if c.enabled && (c.name == name || c.clone_id.to_string() == target) =>
+            {
+                Some(c.cell_id.clone())
+            }
+            _ => None,
+        })
+        .collect();
+    if matches.len() != 1 {
+        return Err(StorageError::NotFound(format!(
+            "Cell target '{target}': expected one enabled cell, found {}; no fallback",
+            matches.len()
+        )));
+    }
+    Ok(matches[0].clone())
+}
+
 /// Parse cell_id from list_apps response
 fn parse_cell_id_from_apps(
     response: &Value,
     app_id: &str,
     role_filter: Option<&str>,
 ) -> Result<CellIdComponents, StorageError> {
+    let selector = role_filter.map(split_cell_target).transpose()?;
     // Log response structure for debugging
     debug!(
         app_id = %app_id,
@@ -278,13 +323,59 @@ fn parse_cell_id_from_apps(
                         };
 
                         // Check role filter if specified
-                        if let Some(filter) = role_filter {
+                        if let Some((filter, _)) = selector {
                             if role_name.as_deref() != Some(filter) {
                                 continue;
                             }
                         }
 
                         if let Value::Array(cell_arr) = cells {
+                            if let Some((_, Some(clone_name))) = selector {
+                                let mut matches = Vec::new();
+                                for cell in cell_arr {
+                                    let Value::Map(map) = cell else { continue };
+                                    let value = if get_string_field(map, "type").as_deref()
+                                        == Some("cloned")
+                                    {
+                                        get_field(map, "value")
+                                    } else {
+                                        get_field(map, "cloned")
+                                    };
+                                    let Some(Value::Map(cloned)) = value else {
+                                        continue;
+                                    };
+                                    if get_field(cloned, "enabled") != Some(&Value::Boolean(true)) {
+                                        continue;
+                                    }
+                                    if get_string_field(cloned, "name").as_deref()
+                                        != Some(clone_name)
+                                        && get_string_field(cloned, "clone_id").as_deref()
+                                            != role_filter
+                                    {
+                                        continue;
+                                    }
+                                    // Reuse the existing cell-id decoding for both tuple/map encodings.
+                                    let wrapped = vec![(
+                                        Value::from("provisioned"),
+                                        Value::Map(cloned.clone()),
+                                    )];
+                                    if let Some((dna_hash, agent_pub_key)) =
+                                        extract_js_provisioned_cell_id(&wrapped)
+                                    {
+                                        matches.push(CellIdComponents {
+                                            dna_hash,
+                                            agent_pub_key,
+                                        });
+                                    }
+                                }
+                                if matches.len() != 1 {
+                                    return Err(StorageError::NotFound(format!(
+                                        "Cell target '{}': expected one enabled clone, found {}; no fallback",
+                                        role_filter.unwrap_or_default(), matches.len()
+                                    )));
+                                }
+                                return Ok(matches.remove(0));
+                            }
                             for cell in cell_arr {
                                 if let Value::Map(cell_map) = cell {
                                     // Try Holochain 0.3+ provisioned format first
@@ -542,6 +633,110 @@ fn extract_js_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_clone_selection_is_strict() {
+        use holochain_client::{CellId, CellInfo};
+        use holochain_types::prelude::{AgentPubKey, CloneId, DnaHash, DnaModifiers};
+        let base_id = CellId::new(
+            DnaHash::from_raw_32(vec![1; 32]),
+            AgentPubKey::from_raw_32(vec![2; 32]),
+        );
+        let clone_id = CellId::new(
+            DnaHash::from_raw_32(vec![3; 32]),
+            base_id.agent_pubkey().clone(),
+        );
+        let modifiers = DnaModifiers {
+            network_seed: "fixture-test".into(),
+            properties: ().try_into().unwrap(),
+        };
+        let base = CellInfo::new_provisioned(base_id.clone(), modifiers.clone(), "lamad".into());
+        let clone = CellInfo::new_cloned(
+            clone_id.clone(),
+            CloneId::new(&"lamad".into(), 0),
+            base_id.dna_hash().clone(),
+            modifiers,
+            "fixtures".into(),
+            true,
+        );
+        let cells = [base.clone(), clone.clone()];
+        assert_eq!(select_target_cell(&cells, "lamad").unwrap(), base_id);
+        for target in ["lamad.fixtures", "lamad.0"] {
+            assert_eq!(select_target_cell(&cells, target).unwrap(), clone_id);
+        }
+        assert!(select_target_cell(&cells, "lamad.missing").is_err());
+        assert!(select_target_cell(&[base.clone()], "lamad.fixtures").is_err());
+        assert!(select_target_cell(&[clone.clone(), clone.clone()], "lamad.fixtures").is_err());
+        let CellInfo::Cloned(mut disabled) = clone else {
+            unreachable!()
+        };
+        disabled.enabled = false;
+        assert!(select_target_cell(&[base, CellInfo::Cloned(disabled)], "lamad.fixtures").is_err());
+    }
+
+    fn clone_response(keyed: bool, enabled: bool, copies: usize) -> Value {
+        let clone = Value::Map(vec![
+            (
+                Value::from("cell_id"),
+                Value::Array(vec![Value::Binary(vec![3; 39]), Value::Binary(vec![4; 39])]),
+            ),
+            (Value::from("clone_id"), Value::from("lamad.0")),
+            (Value::from("name"), Value::from("fixtures")),
+            (Value::from("enabled"), Value::Boolean(enabled)),
+        ]);
+        let cloned = if keyed {
+            Value::Map(vec![(Value::from("cloned"), clone)])
+        } else {
+            Value::Map(vec![
+                (Value::from("type"), Value::from("cloned")),
+                (Value::from("value"), clone),
+            ])
+        };
+        let mut cells = vec![Value::Map(vec![(
+            Value::from("cell_id"),
+            Value::Array(vec![Value::Binary(vec![1; 39]), Value::Binary(vec![2; 39])]),
+        )])];
+        cells.extend(std::iter::repeat_n(cloned, copies));
+        Value::Array(vec![Value::Map(vec![
+            (Value::from("installed_app_id"), Value::from("elohim")),
+            (
+                Value::from("cell_info"),
+                Value::Map(vec![(Value::from("lamad"), Value::Array(cells))]),
+            ),
+        ])])
+    }
+
+    #[test]
+    fn clone_targets_never_fall_back() {
+        for keyed in [true, false] {
+            let response = clone_response(keyed, true, 1);
+            for target in ["lamad.fixtures", "lamad.0"] {
+                assert_eq!(
+                    parse_cell_id_from_apps(&response, "elohim", Some(target))
+                        .unwrap()
+                        .dna_hash,
+                    vec![3; 39]
+                );
+            }
+            assert_eq!(
+                parse_cell_id_from_apps(&response, "elohim", None)
+                    .unwrap()
+                    .dna_hash,
+                vec![1; 39]
+            );
+            for target in ["lamad.missing", "imagodei.fixtures", "lamad.", ""] {
+                assert!(parse_cell_id_from_apps(&response, "elohim", Some(target)).is_err());
+            }
+            for (enabled, copies) in [(false, 1), (true, 0), (true, 2)] {
+                assert!(parse_cell_id_from_apps(
+                    &clone_response(keyed, enabled, copies),
+                    "elohim",
+                    Some("lamad.fixtures")
+                )
+                .is_err());
+            }
+        }
+    }
 
     #[test]
     fn test_parse_cell_id() {

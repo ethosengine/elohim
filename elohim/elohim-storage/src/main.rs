@@ -4148,7 +4148,9 @@ async fn async_main(
                     .unwrap_or_else(|| "ws://localhost:4444".to_string()),
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
-                role: Some("lamad".to_string()),
+                role: Some(
+                    std::env::var("SEED_CELL_TARGET").unwrap_or_else(|_| "lamad".to_string()),
+                ),
                 zome_name: args.zome_name.clone(),
                 chunk_size: args.import_chunk_size,
                 chunk_delay: std::time::Duration::from_millis(args.import_chunk_delay_ms),
