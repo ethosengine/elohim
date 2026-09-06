@@ -2934,6 +2934,38 @@ habits:
       member too (its storage on alpha's byte plane, or the artifact published where the fleet pulls) / current state:
       7/7 refuse artifact_unavailable, retrying. Not a fixture defect and not a fleet fault — a rung the T3 peer has not
       climbed. Status green (scope unchanged); the canary receipt waits on this node.
+
+      DELTA 2026-09-06 14:25Z (FIRST FLEET PEER APPLIES A WORKSPACE-CUT RELEASE BY ELECTION — the canary receipt). james
+      (alpha, `mode: canary`) applied release `uhCkkaqtOU_V…` (it8, coordinator-bundle, bytes identical to release 4 of the
+      night) at 14:25:04Z — 59 s after the workspace published it at 14:24:34Z — `vehicle: sync_coordinators`,
+      `alreadyCurrent: false`: a real coordinator hot-swap on a deployed peer with no pipeline, no image, no pod roll in
+      the path. matthew and jessica (observe) verified the same head `ok` within 30 s of publish; the other observers
+      followed on their next sweep. Read through doorway-alpha `/db/p2p/adoption?peer=all`. Two seams were closed to get
+      here, both at the driver, judge untouched: (1) `artifact_unavailable` was NOT a plane-membership problem after the
+      workspace storage joined the iroh byte plane (12:05Z) — it was a wire ADDRESS-FORM defect: `artifact_pull` raced
+      `ShardRequest::Get { hash: <CIDv1 bafkrei…> }` while every holder's `ShardService::handle_get` looked the key up
+      literally against the on-disk `sha256-<hex>` — an honest `NotFound` on all 7 peers × 18 sweeps
+      (`elohim_iroh_blob_fetches_total{result="not_found"}` 18/pod over 3 h) while the workspace served the same bytes over
+      HTTP (`/blob/<cid>` normalises; `/shard/<cid>` did not — the local repro). Cure: `shard_service::on_disk_key`
+      resolves any accepted spelling on the serve side; `artifact_pull::wire_address` sends the on-disk key on the pull
+      side (unpatched holders answer too); the HTTP `/shard` route uses the same key. The patched workspace served the
+      bytes 7× at 14:17Z and 5/7 peers advanced to the verify arm the same minute. (2) `coordinator_lineage_mismatch` was
+      honest: the manifest's `appliesTo` (what the release applies ONTO) is read from the BUILDER's passport, and the
+      workspace's mishpat coordinator (`uhCok-wvjf…`, post-#1b-b) is not the fleet's (`uhCokfb6q…`); the other four roles
+      matched. Bridge: it8 was cut with a literal `--applies-to` whose mishpat binding is the hash every fleet peer
+      self-reported in its refusal (provenance in the manifest notes). Durable: `GET /admin/adoption` now carries
+      `installedReality` (per-role dnaHash + coordinatorZomes, the exact map verify uses), the doorway projection passes it
+      through, and the packager gains `--applies-to-from-adoption <url>` — a release is cut FOR the peers that will verify
+      it, from their own report, not for the builder's conductor. Chain: runtime-upgrade-propagation / between Station 4
+      ("the fleet verifies") → "a canary applies" / node closed: the workspace peer is a T2 member AND the wire address is
+      the holder's key AND the release is cut for the target's installed reality / current state: james applied; soak
+      attestation pending at write time (next sweep). Status **green**; `retire-when`'s fleet leg now has its first
+      receipt — the remaining question is the attestation/promote loop on a live fleet, measured next.
+      DELTA 2026-09-06 14:29Z (THE CANARY ATTESTED). james's soak attestation on `uhCkkaqtOU_V…` is on the network:
+      `release-ceremony attestations` read through the WORKSPACE conductor at 14:29:37Z → linkedCount 1, qualifying 1,
+      total 1, failed 0, unresolved 0 (threshold 1 met). Publish 14:24:34Z → fleet verify 14:25:03Z → canary apply
+      14:25:04Z → attestation readable from outside the fleet 14:29:37Z: **five minutes, publish to attested, no
+      pipeline.** The retire-when's fleet leg has its first complete receipt short of promotion.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
