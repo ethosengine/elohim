@@ -1695,6 +1695,40 @@ archive_release_adoption_slot() { # <peer> <slot> <applied|failed> <exe-record> 
   echo "  $name: release slot $outcome; exe record=$(head -1 "$exefile" 2>/dev/null || echo absent) receipt=${receipt_destination}"
 }
 
+# Capture a storage peer's environment AT LAUNCH, in the exact shape and location
+# restart_storage's dead-peer branch reads (<MESH_DIR>/storage-restart/<name>.{environ,exe}).
+#
+# restart_storage captures the environ from the LIVE process, which is correct for an
+# orderly restart and useless for the case that most needs it: a peer that has already
+# DIED (panic, OOM, or a deliberate crash-injection test). There is then no /proc to read
+# and — until now — no file either, so the restore fell through to
+# "not running and no captured environment — use ./hc-mesh.sh start", i.e. the whole mesh
+# had to be rebuilt to recover ONE peer. Measured 2026-09-07: the accountable-correction
+# crash station killed jessica's storage on purpose, `storage-restart jessica` refused,
+# and the four scenarios after it failed on a peer that was simply down.
+#
+# Writing it at boot costs one small file per peer and changes nothing for a healthy
+# restart (the live capture still wins — this is only the fallback). Uses python rather
+# than cp/copyFile: a procfs read must be a single read()/write() pair, or the copy lands
+# 0 bytes (2026-08-22), which restart_storage explicitly reports as an EMPTY capture.
+capture_storage_environ() { # <peer-name> <pid> <binary>
+  local name="$1" pid="$2" bin="$3" workdir="${MESH_DIR}/storage-restart"
+  mkdir -p "$workdir" 2>/dev/null || return 0
+  # The child needs a moment to exec before /proc/<pid>/environ reflects the new image.
+  local t=10
+  while [ "$t" -gt 0 ] && [ ! -r "/proc/$pid/environ" ]; do sleep 1; t=$((t-1)); done
+  python3 - "$pid" "$workdir/$name.environ" <<'PY' 2>/dev/null || return 0
+import sys
+pid, destination = sys.argv[1:]
+with open(f"/proc/{pid}/environ", "rb") as source:
+    raw = source.read()
+if raw:
+    with open(destination, "wb") as target:
+        target.write(raw)
+PY
+  printf '%s\n' "$bin" > "$workdir/$name.exe"
+}
+
 restart_storage() {
   # Restart storage peers in place, each with the EXACT environment it is already
   # running with — recovered from /proc/<pid>/environ, never rebuilt from this
@@ -2407,6 +2441,7 @@ start_storage_peer() { # <peer-name> <peer-index>
     ALLOW_SEED_SHARD_MANIFEST=1 \
     nohup "$STORAGE_BIN" --http-port "$(http_port "$i")" > "$LOGDIR/$name.log" 2>&1 &
     record_mesh_pid storage "$name" "$!" || true
+    capture_storage_environ "$name" "$!" "$STORAGE_BIN"
     echo "storage $name: http=$(http_port "$i") p2p=$(p2p_port "$i") transport=$(peer_transport "$name") agent=${agent:0:16}..."
   else
     record_listener_pid storage "$name" "$(http_port "$i")" || true

@@ -125,10 +125,16 @@ export async function http(peer: Peer, path: string, body?: unknown): Promise<Ro
   assert.ok(res.ok, `${peer} ${path}: HTTP ${res.status}: ${text}`);
   return JSON.parse(text) as Row;
 }
+// 180s left the poll budget SHORTER than the 240s step timeout wrapping it, so a
+// third peer's durable scan (gossip + its own sweep + apply) ran out of poll while
+// the step still had a minute in hand: station 1 failed at 180s and the row it was
+// waiting for landed moments later (measured 2026-09-07 — matthew's application row
+// was present and correct in the projection after the run). 210s spends the step's
+// budget while leaving headroom for the assertion that follows.
 export async function until(
   label: string,
   check: () => Promise<boolean> | boolean,
-  ms = 180_000
+  ms = 210_000
 ): Promise<void> {
   const deadline = Date.now() + ms;
   let last: unknown;
@@ -158,11 +164,14 @@ export function peerEnv(world: E2EWorld, peer: Peer): Record<string, string> {
     .trim()
     .split(/\s+/);
   assert.match(pid, /^\d+$/);
-  if (launchTicks !== undefined) {
+  if (launchTicks) {
     // Mirror hc-mesh.sh's parse: `comm` may contain spaces, so strip pid+comm through
     // the final ')' first; starttime is field 20 of what remains.
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-    const started = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\s+/)[19];
+    const started = stat
+      .slice(stat.lastIndexOf(')') + 1)
+      .trim()
+      .split(/\s+/)[19];
     assert.equal(started, launchTicks, `${peer}: pid ${pid} is not the process the mesh launched`);
   }
   const entries = readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0');
@@ -251,13 +260,32 @@ export async function accept(world: E2EWorld): Promise<void> {
   await until('Jessica can fetch correction', async () =>
     Boolean(await call(world, 'jessica', 'get_feedback_signal_record', raw(s.correction)))
   );
-  s.acceptance = hash(
-    await call(world, 'jessica', 'create_vouch', {
-      target_action_hash: raw(s.correction),
-      vouch_kind: 'accept-correction',
-      standing_impact: 'debit-soft',
-    })
-  );
+  // `create_vouch`'s coordinator gate is `must_get_valid_record(target)` — a strictly
+  // stronger primitive than the `get` above. A record Jessica can GET is not yet one her
+  // conductor can resolve as VALID, so acceptance raced DHT convergence and died with
+  // Host("Failed to get Record …") in four stations (measured 2026-09-07). Contract §6
+  // draws exactly this line: a dependency that cannot be FETCHED is pending and retried,
+  // while a positive MISMATCH (wrong author, wrong type) is rejected. So retry the fetch
+  // failure only, and let every real refusal out immediately rather than spending the
+  // whole deadline turning a rejection into a timeout.
+  let refusal: unknown;
+  await until('Jessica accepts the correction', async () => {
+    try {
+      s.acceptance = hash(
+        await call(world, 'jessica', 'create_vouch', {
+          target_action_hash: raw(s.correction),
+          vouch_kind: 'accept-correction',
+          standing_impact: 'debit-soft',
+        })
+      );
+      return true;
+    } catch (e) {
+      if (String(e).includes('Failed to get Record')) return false;
+      refusal = e;
+      return true;
+    }
+  });
+  if (refusal) throw refusal;
 }
 export async function lineage(world: E2EWorld, peer: Peer = 'jessica'): Promise<LineageOutput> {
   return call(world, peer, 'get_content_lineage', {
