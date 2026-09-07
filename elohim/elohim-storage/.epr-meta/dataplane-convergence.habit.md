@@ -72,6 +72,38 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-09-07 (T6 feedback-discovery cold-retire, sprint 2026-09-08 batch 2; NO status
+flip): the feedback projector's rotation now retires a subscription member after
+COLD_AFTER_CLEAN_SWEEPS = 3 sweeps that found nothing open or unapplied, and re-arms it
+Hot-and-first on a notification (`admit_notified_signal`) or a new act reference — cures
+(a)+(b) of backlog atom `feedback-discovery-sweep-is-o-n-in-history.md`. BEFORE (the atom's
+own measure, 2026-09-07 rounds 045232Z/051633Z/055414Z at the 60 s product default):
+acceptance→application row 106.6 s / 212.5 s / 252.6 s at N between 14 and 30 members and
+332.8 s at N=44 (= ceil(44/8) = 6 sweeps), with acceptance→published tally one further sweep
+on top (272.5 s against a 212.5 s row) — cost proportional to the peer's whole history,
+because every content record and every discovered correction stayed in the rotation forever.
+AFTER (run 20260907T173826Z, household mesh, dual, 3 peers, storage rebuilt at b67e3d082,
+sweep still at its 60 s product default, no env override): station 7's attached lag record
+reads acceptance→published tally **92.5 s** (first mark 92.2 s) at N=32 on jessica, against a
+derived budget of 1020 s — under two sweeps where a full rotation of that set is ceil(32/8) =
+4. The mechanism is directly visible in `feedback_subscriptions.last_visited_at` 22 minutes
+after the restart: matthew 5 of 45 members still in rotation (40 retired), jessica 6 of 32
+(26 retired), james 5 of 31 (26 retired) — the rotation now follows live targets, and the two
+`sha256-…` members that keep producing work are among the handful still swept. `get_links`
+per sweep did NOT rise: it is bounded by members-visited-per-sweep, which fell, and the
+per-sweep budget MAX_MEMBERS_PER_SWEEP = 8 is unchanged (the atom's refused cure). There is
+no `get_links` counter in storage — `grep -c get_links` is 0 across all three peer logs — so
+members-in-rotation is the honest proxy and is named as such. Verdict of the scoped run:
+3 scenarios, 2 passed / 1 failed, 34 steps (28 passed / 1 failed / 5 skipped), 18m38s;
+receipts `genesis/a2o/reports/sprint-report-household-20260907T173826Z-5c00bc08.{json,md}`.
+The single failure is station 4's crash window ("projector consumes crash arm: deadline
+exceeded", 1020.3 s) — the pre-existing T7b harness-deadline item the sprint assigns
+separately, not a regression from this change. Stations 1-3 remain @wip and unmeasured.
+Local gate: `cargo test --lib feedback_projector` 29/29 green three times, full crate lib
+3646/0, clippy -D warnings clean. Habit stays red: this narrows one measured lag on one
+concern, and the fleet legs (inventory-convergence caughtUp, federation-deploy divergence)
+are untouched.
+---
 DELTA 2026-09-02 (dataplane pain-points sprint, wave 1; NO status flip): LIVE PROBE
 2026-09-02 — federation-deploy scenario 2 conditions HOLD on both doorways (GET / 200;
 blobHash non-null: elohim.host sha256-f0f0e637…, doorway-alpha sha256-04ae4310…, same
