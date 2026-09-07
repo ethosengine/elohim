@@ -64,6 +64,8 @@ just mesh recovery <warm|cold> <peer> [--label k=v]  # single recovery run (hc-m
 just mesh recovery-matrix      # cycle the recovery scenario library (MESH_PEER_TRANSPORTS + hc-mesh-recovery.sh)
 just mesh stop
 MESH_RELAY_BIN=<dir>/bin/iroh-relay just mesh start   # holochain 0.7: the conductors need a REAL iroh-relay (see below)
+
+**Conductor selection (2026-09-07):** `hc-mesh.sh` auto-detects the pinned fork at `$MESH_TOOLS_DIR/hc-fork-<submodule-pin12>/bin` (pin read from the `elohim/holochain-conductor` gitlink) and REFUSES a conductor whose line differs from the DNA's `hdk` line (`assert_conductor_matches_dna`; `MESH_ALLOW_TOOLCHAIN_SKEW=1` overrides). The workspace image still ships stock 0.6.0 in `/opt/holochain/bin` (Dockerfile pins 0.7.0 since 2026-09-03; `:latest` predates it) — see backlog `workspace-image-ships-stock-holochain-0-6`.
 ```
 
 `MESH_TRANSPORT_BACKEND=libp2p|dual|iroh` selects the elohim-storage Track-2
