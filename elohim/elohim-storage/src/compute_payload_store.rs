@@ -20,11 +20,60 @@ struct Leases {
     owners: BTreeMap<String, u64>,
 }
 
+// Test-only clock seam. `now()` drives every TTL comparison in this module
+// (put/get/release/cleanup) off the real wall clock. A `#[tokio::test]` body
+// runs as one task on one worker thread with no explicit sleeps between its
+// awaits, so in isolation "immediately after put" really is immediate. Under
+// a fully-loaded `cargo test` run (thousands of concurrently-scheduled test
+// tasks contending for a handful of OS threads, per the PVC-pressure trap in
+// CLAUDE.md) that same task can be starved for real wall-clock seconds
+// between two `.await` points with no code-level race at all — a short TTL
+// (60s) makes that starvation window visible as a spurious `NotFound`. A
+// `task_local` lets a test freeze/advance "now" deterministically so this
+// class of flake can be reproduced and hardened against without a real
+// `sleep` or a widened timeout. Scoped per-task (not a global static) so it
+// never leaks across the many tests `cargo test` runs concurrently in one
+// process.
+#[cfg(test)]
+tokio::task_local! {
+    static FROZEN_CLOCK: std::cell::Cell<Option<u64>>;
+}
+
 pub fn now() -> u64 {
+    #[cfg(test)]
+    {
+        if let Ok(Some(frozen)) = FROZEN_CLOCK.try_with(|c| c.get()) {
+            return frozen;
+        }
+    }
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+/// Run `fut` with `now()` pinned to the real wall clock's value at entry, for
+/// the lifetime of `fut`'s task. Removes a test's dependence on how much real
+/// time the test harness lets it run in — see `FROZEN_CLOCK` above.
+#[cfg(test)]
+async fn with_frozen_clock<F: std::future::Future>(fut: F) -> F::Output {
+    let pinned = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    FROZEN_CLOCK.scope(std::cell::Cell::new(Some(pinned)), fut).await
+}
+
+/// Deterministically simulate real time elapsing (without sleeping) inside a
+/// `with_frozen_clock` scope.
+#[cfg(test)]
+fn advance_frozen_clock(delta_secs: u64) {
+    FROZEN_CLOCK.with(|c| {
+        let current = c
+            .get()
+            .expect("advance_frozen_clock called outside with_frozen_clock");
+        c.set(Some(current.saturating_add(delta_secs)));
+    });
 }
 
 fn paths(root: &Path, address: &str) -> Result<(PathBuf, PathBuf), StorageError> {
@@ -231,47 +280,100 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn expiry_never_deletes_independently_retained_content() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = BlobStore::new(dir.path()).await.unwrap();
-        let retained = store.store(b"evidence").await.unwrap();
-        put(dir.path(), &retained.cid, "one", 60, b"evidence")
-            .await
-            .unwrap();
-        put(dir.path(), &retained.cid, "two", 60, b"evidence")
-            .await
-            .unwrap();
-        release(dir.path(), &retained.cid, "one").await.unwrap();
-        assert_eq!(get(dir.path(), &retained.cid).await.unwrap(), b"evidence");
-        release(dir.path(), &retained.cid, "two").await.unwrap();
-        assert!(get(dir.path(), &retained.cid).await.is_err());
-        assert_eq!(store.get(&retained.hash).await.unwrap(), b"evidence");
+        with_frozen_clock(async {
+            let dir = tempfile::tempdir().unwrap();
+            let store = BlobStore::new(dir.path()).await.unwrap();
+            let retained = store.store(b"evidence").await.unwrap();
+            put(dir.path(), &retained.cid, "one", 60, b"evidence")
+                .await
+                .unwrap();
+            put(dir.path(), &retained.cid, "two", 60, b"evidence")
+                .await
+                .unwrap();
+            release(dir.path(), &retained.cid, "one").await.unwrap();
+            assert_eq!(get(dir.path(), &retained.cid).await.unwrap(), b"evidence");
+            release(dir.path(), &retained.cid, "two").await.unwrap();
+            assert!(get(dir.path(), &retained.cid).await.is_err());
+            assert_eq!(store.get(&retained.hash).await.unwrap(), b"evidence");
+        })
+        .await;
     }
+    // Regression for compute-payload-store-expiry-test-flake.md: this test
+    // panicked once under a fully-loaded `cargo test` run with a `NotFound`
+    // from the final `get`, then passed 1/1 on rerun and 15/15 isolated.
+    // Named mechanism: real wall-clock elapsing past the 60s TTL between the
+    // second `put` and the final `get` because the test's single task was
+    // starved of scheduling time under thousands of concurrently-running
+    // test tasks — not a logic race in this module (every write here is
+    // already serialized by `WRITES`, and this test never touches a
+    // `BlobStore`, so the `ELOHIM_COMPUTE_LOCAL_API` background reaper in
+    // `blob_store.rs` cannot be involved either). Freezing the clock for the
+    // test's lifetime removes the dependence on how much real time the
+    // harness lets the task run in, hardening it against that starvation
+    // class without widening the TTL.
     #[tokio::test]
     async fn expired_owner_stays_expired_when_identical_bytes_are_reused() {
-        let dir = tempfile::tempdir().unwrap();
-        let cid = BlobStore::compute_cid(b"shared").to_string();
-        put(dir.path(), &cid, "old", 60, b"shared").await.unwrap();
-        release(dir.path(), &cid, "old").await.unwrap();
-        cleanup(dir.path()).await.unwrap();
-        put(dir.path(), &cid, "new", 60, b"shared").await.unwrap();
-        assert!(owner_expiry(dir.path(), &cid, "old").await.unwrap() <= now());
-        assert!(owner_expiry(dir.path(), &cid, "new").await.unwrap() > now());
-        assert!(put(dir.path(), &cid, "old", 60, b"shared").await.is_err());
-        assert_eq!(get(dir.path(), &cid).await.unwrap(), b"shared");
+        with_frozen_clock(async {
+            let dir = tempfile::tempdir().unwrap();
+            let cid = BlobStore::compute_cid(b"shared").to_string();
+            put(dir.path(), &cid, "old", 60, b"shared").await.unwrap();
+            release(dir.path(), &cid, "old").await.unwrap();
+            cleanup(dir.path()).await.unwrap();
+            put(dir.path(), &cid, "new", 60, b"shared").await.unwrap();
+            assert!(owner_expiry(dir.path(), &cid, "old").await.unwrap() <= now());
+            assert!(owner_expiry(dir.path(), &cid, "new").await.unwrap() > now());
+            assert!(put(dir.path(), &cid, "old", 60, b"shared").await.is_err());
+            assert_eq!(get(dir.path(), &cid).await.unwrap(), b"shared");
+        })
+        .await;
+    }
+    /// Deterministic reproducer for the flake above: no sleep, no real time
+    /// elapses — the frozen clock is advanced explicitly past the lease TTL
+    /// between `put` and `get`, in the same two-line shape the flaky test
+    /// has. This is the exact mechanism a CI scheduler stall reproduces by
+    /// accident: from the store's point of view, a lease that has genuinely
+    /// outlived its TTL is correctly reported `NotFound`, whether the delay
+    /// was real (starvation) or simulated (this test).
+    #[tokio::test]
+    async fn get_reports_not_found_once_frozen_clock_advances_past_ttl() {
+        with_frozen_clock(async {
+            let dir = tempfile::tempdir().unwrap();
+            let cid = BlobStore::compute_cid(b"clock-advance").to_string();
+            put(dir.path(), &cid, "task", 60, b"clock-advance")
+                .await
+                .unwrap();
+            assert_eq!(
+                get(dir.path(), &cid).await.unwrap(),
+                b"clock-advance",
+                "lease is fresh: get must succeed before the TTL elapses"
+            );
+            advance_frozen_clock(61);
+            let err = get(dir.path(), &cid)
+                .await
+                .expect_err("a lease 1s past its 60s TTL must report NotFound");
+            assert!(
+                matches!(err, StorageError::NotFound(ref address) if address == &cid),
+                "expected NotFound({cid}), got {err:?}"
+            );
+        })
+        .await;
     }
     #[tokio::test]
     async fn native_blob_reads_serve_only_unexpired_chunks() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = BlobStore::new(dir.path()).await.unwrap();
-        let cid = BlobStore::compute_cid(b"payload").to_string();
-        put(dir.path(), &cid, "task", 60, b"payload").await.unwrap();
-        assert_eq!(store.get_by_address(&cid).await.unwrap(), b"payload");
-        let (_, meta) = paths(dir.path(), &cid).unwrap();
-        fs::write(&meta, br#"{"owners":{"task":1}}"#).await.unwrap();
-        assert!(!store.exists_by_address(&cid).await.unwrap());
-        assert!(store.get_by_address(&cid).await.is_err());
-        cleanup(dir.path()).await.unwrap();
-        assert!(get(dir.path(), &cid).await.is_err());
-        assert!(put(dir.path(), &cid, "task", 60, b"wrong").await.is_err());
+        with_frozen_clock(async {
+            let dir = tempfile::tempdir().unwrap();
+            let store = BlobStore::new(dir.path()).await.unwrap();
+            let cid = BlobStore::compute_cid(b"payload").to_string();
+            put(dir.path(), &cid, "task", 60, b"payload").await.unwrap();
+            assert_eq!(store.get_by_address(&cid).await.unwrap(), b"payload");
+            let (_, meta) = paths(dir.path(), &cid).unwrap();
+            fs::write(&meta, br#"{"owners":{"task":1}}"#).await.unwrap();
+            assert!(!store.exists_by_address(&cid).await.unwrap());
+            assert!(store.get_by_address(&cid).await.is_err());
+            cleanup(dir.path()).await.unwrap();
+            assert!(get(dir.path(), &cid).await.is_err());
+            assert!(put(dir.path(), &cid, "task", 60, b"wrong").await.is_err());
+        })
+        .await;
     }
 }
