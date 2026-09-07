@@ -89,6 +89,19 @@ independently moved every DNA hash before). Concretely:
   whose absolute path differs from the one that produced the last comparison point," which
   includes every worktree by construction.
 
+- **Measured on the running mesh, 2026-09-07 20:09Z (T7a):** `just mesh coordswap` from this
+  worktree against a mesh installed from the main-tree bundle was refused by
+  `happ_manager::lineage_mismatch_error` for the lamad role only —
+  `dnaHashMismatch (installed=uhC0keuLMYBe0sj4ZqLvIyuVqCXcxPL3PbHyiqx40UGgBh-bTbBOl,
+  bundle=uhC0k8pow3EM3IVN9lZhCBlgnwyKrReAAXLKTEKnEFcPJQxjPZLNm)` — while the four roles whose
+  DNAs were copied unchanged showed zero drift, which isolates the cause to the path. The guard
+  is right (it cannot tell path drift from an integrity change) and the operational rule
+  follows: **rung-1 coordinator hot-swap is a main-tree vehicle; a worktree needs a full
+  `just mesh stop` / `MESH_HAPP_PATH=<its bundle> just mesh start`** (fresh DHT, fresh keys;
+  ready in 194 s that night). The coordinator-only change itself was proven hash-neutral by
+  packing before/after from ONE path (`uhC0kEZTgq…` identical, only `content_store.wasm`
+  moved) — the comparison discipline this atom prescribes.
+
 ## Remedy (held — do not implement this sprint, per D-F)
 
 **Correction (2026-09-08, from the measurement above):** the mechanism is the rustc
