@@ -112,8 +112,13 @@ export class LoginComponent implements OnInit, AfterViewInit {
 
     // Pre-fetch authority from doorway so the shell element receives it as a
     // property rather than fetching itself. Failure is non-fatal — the shell
-    // renders with placeholder chrome and emits authority-needed.
-    void this._prefetchAuthority();
+    // renders with placeholder chrome and emits authority-needed. The `.catch`
+    // is attached synchronously (not via an `await` in an async wrapper) so a
+    // rejection is claimed before zone.js's unhandled-rejection check runs —
+    // an `await`'s thenable-job attaches too late and the rejection false-flags.
+    this._prefetchAuthority().catch((err: unknown) => {
+      console.warn('[LoginComponent] Authority pre-fetch failed:', err);
+    });
   }
 
   private async _prefetchAuthority(): Promise<void> {
@@ -176,7 +181,12 @@ export class LoginComponent implements OnInit, AfterViewInit {
    * the human already typed or clicked.
    */
   private async _prefetchAuthorityFromDiscovery(origin: string): Promise<void> {
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: caller returns early when window is undefined
+    // Guarded independently of the caller: this is a fire-and-forget prefetch
+    // (see ngOnInit), so it can still be mid-flight after an `await` when
+    // `window` disappears out from under it — a test's jsdom teardown, or SSR.
+    // The caller's earlier guard only proves `window` existed at call time.
+    if (typeof window === 'undefined') return;
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded immediately above
     const hostname = window.location.hostname;
     try {
       const resp = await fetch(`${origin}/.well-known/elohim-auth`);

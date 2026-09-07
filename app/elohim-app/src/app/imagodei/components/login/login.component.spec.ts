@@ -429,5 +429,40 @@ describe('LoginComponent (Lit wrapper)', () => {
 
       expect(component.authority).toBeNull();
     });
+
+    it('tolerates window disappearing between awaits — no unhandled rejection, no throw', async () => {
+      // Regression: the discovery fallback used to read `window.location.hostname`
+      // trusting that the caller's earlier `typeof window === 'undefined'` guard
+      // still held — but this is a fire-and-forget prefetch (ngOnInit never
+      // awaits it), so `window` can vanish out from under it after the `/auth/me`
+      // await resolves (e.g. a test's jsdom teardown racing the pending promise),
+      // and the read threw `ReferenceError: window is not defined` from inside
+      // `_prefetchAuthorityFromDiscovery`, escaping as an unhandled rejection.
+      const originalWindow = globalThis.window;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          if (url.endsWith('/auth/me')) {
+            // Simulate window disappearing while the first await is in flight.
+            Reflect.deleteProperty(globalThis, 'window');
+            return unauthorized;
+          }
+          return jsonResponse({ version: 1, doorwayId: 'alpha.elohim.host' });
+        })
+      );
+
+      try {
+        await expect(prefetch()).resolves.toBeUndefined();
+      } finally {
+        Object.defineProperty(globalThis, 'window', {
+          value: originalWindow,
+          writable: true,
+          configurable: true,
+        });
+      }
+
+      // Guarded return, not a crash mid-assignment.
+      expect(component.authority).toBeNull();
+    });
   });
 });
