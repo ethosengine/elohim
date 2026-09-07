@@ -7,7 +7,7 @@ title: "Workspace image still ships stock holochain 0.6.0 — the rust-dev Docke
 slug: "workspace-image-ships-stock-holochain-0-6"
 written: "2026-09-07"
 author: "orchestrator (second-opinion session 2026-09-06/07)"
-status: "open"
+status: "done"
 priority: "high"
 jobs: [che-devworkspaces]
 cluster: "arch-dataplane-refactor-backlog"
@@ -36,3 +36,9 @@ hdk line — see the sibling atom.
 
 **Done when:** a fresh workspace prints `holochain 0.7.0` for `/opt/holochain/bin/holochain`, and `just mesh
 status` shows the fork as NEXT LAUNCH with no `HOLOCHAIN_BIN` in the environment.
+
+**Closed 2026-09-07 (evidence, fresh workspace after the image rebuild):** `/opt/holochain/bin/holochain --version`
+→ `holochain 0.7.0`, `hc` → `holochain_cli 0.7.0` (binaries dated 2026-09-07 03:01). `just mesh status` with no
+`HOLOCHAIN_BIN`/`MESH_TOOLS_DIR` in the environment prints `NEXT LAUNCH: …/hc-fork-25dd2d0be144/bin/holochain
+(holochain 0.7.0) [FORK, auto-detected]` and `hc CLI … [matches the conductor]`. Both done-when legs hold.
+The devfile still pulls `:latest`; the versioned-tag suggestion stays a suggestion, not a debt.
