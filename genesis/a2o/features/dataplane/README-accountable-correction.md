@@ -336,3 +336,60 @@ Notes for whoever runs it next:
 - The stations share three cell agents and do not reset state between scenarios or between
   runs. Station 5's assertion is the one that notices; treat a fresh mesh as part of its
   fixture.
+
+## Mesh rounds 2026-09-07 04:52 - 08:24 (rust-architect)
+
+Five rounds, three completed. Receipts: `genesis/a2o/reports/accountable-correction/mesh-20260907T045232Z/`,
+`.../mesh-20260907T051633Z/`, `.../mesh-20260907T055414Z/` (each `run.log` + `sprint-report.json`),
+plus an aborted partial at `.../mesh-20260907T082426Z-aborted/`.
+
+| Station | 045232Z (600 s ceiling) | 051633Z | 055414Z |
+|---|---|---|---|
+| 1 discovery | PENDING | PENDING | PENDING |
+| 2 notification | PENDING | PENDING | PENDING |
+| 3 root author settles | PENDING | PENDING | PENDING |
+| 4 crash window | FAILED (crash env absent) | FAILED (210 s crash-arm budget) | **PASSED** |
+| 5 allegation costs nobody | **PASSED** | FAILED (stale baseline) | **PASSED** |
+| 6 contested fork | **PASSED** | **PASSED** | **PASSED** |
+| 7 rebuilt generation | **PASSED** | **PASSED** | FAILED (Background quiescence timeout) |
+| 8 lost response | **PASSED** | **PASSED** | FAILED (Background quiescence timeout) |
+
+Every one of stations 4-8 has now passed on the household mesh; none of the rounds carries all
+five at once, so **no `@wip` was removed this pass**. A tag flips on a round that carries the
+station, never on a union across rounds.
+
+**Station 7's numbers** (round 045232Z, ceiling raised so the run reported lag instead of a
+deadline): rebuild requested → generation published **59,974 ms** (one sweep), then the fresh
+generation's canonical rows matched the live generation's exactly with zero pending members.
+The old 210 s budget was not waiting on the rebuild at all — it was waiting on this scenario's
+own acceptance: **212,471 ms** to the application row, **272,528 ms** to the republished tally.
+It expired two seconds before the row appeared. Station 7 was a harness budget, not a substrate
+defect.
+
+**Why the budgets are now derived.** Discovery is a rotation: `MAX_MEMBERS_PER_SWEEP = 8`
+members per `SWEEP_INTERVAL_SECS` tick, and `publish_generation` republishes only on a tick
+ending with nothing unvisited and nothing pending. So an act lands within `ceil(N/8)` sweeps
+plus a clean sweep — and N is every content record and every discovered correction this peer
+has ever seen. It grew 14 → 44 → 127 members over the day's rounds, and the measured lag grew
+with it (106.6 s, 212.5 s, 252.6 s, then 332.8 s at N=44, exactly `ceil(44/8)` sweeps). At the
+60 s product default a single act passed 25 minutes by the fourth round. The lane pins
+`ELOHIM_FEEDBACK_SWEEP_SECONDS=5`; the budget is a 300 s DHT-propagation floor (measured 2-3
+min, which no sweep setting accelerates — dropping the floor made four previously-passing
+stations fail) plus `2 x (ceil(N/8) + 2)` sweeps read from the peer's own live environment.
+
+**Environment this round** (added to the previous section's list):
+
+```bash
+MESH_RESTART_ENV_OVERLAY="ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1 ELOHIM_FEEDBACK_SWEEP_SECONDS=5" \
+  just mesh storage-restart matthew jessica james
+```
+
+- Without `ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1` on jessica's peer, station 4 cannot pass: the arm
+  file is written but never consumed (`feedback_projector/rebuild.rs:50`).
+- `MESH_RELAY_BIN=/projects/.claude-config/tools/iroh-relay-1.0.3/bin/iroh-relay` is required on
+  this branch — `hc-mesh.sh` refuses to start without a relay and does not auto-detect one.
+- `STORAGE_BIN` must be named: this branch's `hc-mesh.sh` defaults to the **dev** pool family and
+  the worktree binary lives in the **sprint** family.
+- `just mesh prologue` was again NOT run. It needs built Angular dists, and this worktree has no
+  `elohim-library` build (`elohim-core/register` unresolved by the app bundler). These stations
+  author their own content and read peer HTTP, conductor calls and SQLite directly.
