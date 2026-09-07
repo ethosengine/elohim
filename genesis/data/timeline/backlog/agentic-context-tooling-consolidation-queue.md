@@ -319,6 +319,18 @@ before investing.
 
 22. **The shift judge trips on itself — readiness git-clean fails on hook-owned ledgers; palette matcher `*` cannot match path arguments.** Measured 2026-08-29 (shift `2026-08-29T22-16-edge-lands-bdd5f9ef`, Che sandbox): `pnpm run agentic:readiness` → `ready:false` on `git status --porcelain --ignore-submodules=all` because of `.claude/data/ci-cursor.json` (written by `ci-harvest.py`, which the agentic-developer skill mandates at Ground), `.claude/data/{deprecations,governance-findings}.jsonl` (sentinel hooks) and `.claude/memory/*.md` (memory hooks) — insertions-only, never committed by a shift; in a live session the check is unsatisfiable. It first failed with `fatal: detected dubious ownership` (shell uid 0 vs repo uid 1234; readiness spawns `git` without `safe.directory`). And `matchesPalette('python3 .claude/shifts/x.py', ['Bash(python3 *)'])` is false: `toGlob` hands picomatch `python3 *` and `*` does not cross `/`, so every scripted command with a path argument reads GAP against an entry that allows it. Cure (in `genesis/agentic/`): readiness ignores `.claude/data/**` + `.claude/memory/**` and passes `safe.directory` through; `toGlob` maps a bare trailing ` *` to ` **` (or picomatch `{ bash: true }`). Verify against the 119-entry local palette with the commands a shift actually runs (measure script, ci-harvest, `curl` to Jenkins, `git -c safe.directory=…`). Until cured, a shift must journal the readiness override as an interpretive decision (done in the shift above).
 
+23. **Composition is a query the repo can answer; today it leans on the model's mental map — the
+    progressive-discovery substrate (eprfs · epr-meta · palace convergence).** Emergent concern,
+    surfaced by the operator 2026-09-08 mid-sprint, not yet designed. Standalone entry with the
+    design concerns and research breadcrumbs:
+    [progressive-discovery-substrate-emergent-concern](epr:progressive-discovery-substrate-emergent-concern).
+    How it came up: the sprint plan of 2026-09-08 needed an Opus reviewer to correct SIX
+    load-bearing facts that were all already on disk; the same session saw two `inject` nudges
+    fire correctly on real seams while the design audit fired on the literal word "schema" in a
+    plan file, and the palace index was 247 files behind. The knowledge was present; the query
+    was missing. Not a deep pass yet — the entry exists so the research pass can be bootstrapped
+    from breadcrumbs rather than re-derived.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
