@@ -67,6 +67,14 @@ of their social compute surface.
 - *Shefa's device view is the same three columns.* Per-device custody rows, hosting/compute
   commitments from the reciprocity fold, and the governance holder of each grant.
 
+**Surface principle (operator, 2026-09-08 follow-up).** Simple on the surface, distinct one layer
+down. The person sees one click ("open with", "install", "install to my hub"); the four installer acts,
+the custody/runtime facets, the grant, and the election are composed by the system beneath that
+click through carefully drawn seams. The distinctions live in the seams and the receipts, never in the
+prompts: a person is asked only for the choices that need them (§10.4 "quiet by default, intelligible
+on demand"), and every composed act stays inspectable one layer deeper (Shefa's device view, the
+resilience chip's facets) so the seamlessness never hides authority.
+
 **Guards before any route.**
 
 1. `p2p-design-gate` on every record: the host offer is Class A; local install state is private or
