@@ -89,12 +89,67 @@ STORAGE_TARGET_DIR="$(slot_path "$POOL_FAMILY" "elohim/elohim-storage" release)"
 DOORWAY_TARGET_DIR="$(slot_path "$POOL_FAMILY" "doorway/doorway-service" release)"
 mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_DIR")"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# T3 workspace peer beside the household mesh (sprint 2026-09-08, T2). The mesh
+# (hc-mesh.sh) owns 8090/8888 (matthew's storage + doorway A) plus every other
+# port its `mesh_owned_ports` scheme derives. When the mesh's own pid dir shows
+# live conductor peers, this workspace conductor auto-offsets STORAGE_PORT and
+# DOORWAY_PORT so the two can run side by side without hand-tuning env vars —
+# but ONLY when the caller left them unset: an explicit STORAGE_PORT/
+# DOORWAY_PORT always wins, and the isolated (no-mesh) default stays exactly
+# 8090/8888 as it always has.
+# ──────────────────────────────────────────────────────────────────────────────
+_t3_mesh_dir="${MESH_DIR:-/tmp/elohim-local-mesh}"
+mesh_peers_live() { # -> 0 when the mesh's pid dir names at least one live conductor
+  local pid_dir="$_t3_mesh_dir/pids" f pid started current
+  [ -d "$pid_dir" ] || return 1
+  for f in "$pid_dir"/conductor-*; do
+    [ -f "$f" ] || continue
+    read -r pid started < "$f" 2>/dev/null || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    [ -n "$started" ] || continue
+    current="$(sed 's/^[^)]*) //' "/proc/$pid/stat" 2>/dev/null | awk '{print $20}')"
+    [ -n "$current" ] && [ "$current" = "$started" ] && return 0
+  done
+  return 1
+}
+MESH_IS_UP=false
+mesh_peers_live && MESH_IS_UP=true
+
 # Environment with defaults
-: "${STORAGE_PORT:=8090}"
-# 2026-09-06: DOORWAY_PORT knob (Step 4, workspace-peer-beside-mesh) — the
-# household mesh owns 8888/8090, so a workspace peer running alongside it
-# needs both ports free to move.
-: "${DOORWAY_PORT:=8888}"
+if [ "$MESH_IS_UP" = true ]; then
+    : "${STORAGE_PORT:=8095}"
+    : "${DOORWAY_PORT:=8898}"
+else
+    : "${STORAGE_PORT:=8090}"
+    # 2026-09-06: DOORWAY_PORT knob (Step 4, workspace-peer-beside-mesh) — the
+    # household mesh owns 8888/8090, so a workspace peer running alongside it
+    # needs both ports free to move.
+    : "${DOORWAY_PORT:=8888}"
+fi
+
+# Refuse rather than silently collide: a port about to be claimed (defaulted OR
+# caller-set) that is already bound by something NOT answering /health is not
+# safely reusable the way an already-running elohim-storage/doorway of ours is
+# (the reuse checks further down key on exactly that /health response).
+t3_port_conflict() { # <port> <path> -> 0 when genuinely occupied by something else
+    local port="$1" path="$2"
+    timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null || return 1
+    curl -s -m 2 "http://localhost:$port$path" >/dev/null 2>&1 && return 1
+    return 0
+}
+if [ "$MESH_IS_UP" = true ]; then
+    if t3_port_conflict "$STORAGE_PORT" "/health"; then
+        echo "❌ t3 peer: STORAGE_PORT=$STORAGE_PORT is already bound by something not answering /health — refusing to reuse it." >&2
+        echo "   Set STORAGE_PORT to a free port and re-run." >&2
+        exit 1
+    fi
+    if t3_port_conflict "$DOORWAY_PORT" "/health"; then
+        echo "❌ t3 peer: DOORWAY_PORT=$DOORWAY_PORT is already bound by something not answering /health — refusing to reuse it." >&2
+        echo "   Set DOORWAY_PORT to a free port and re-run." >&2
+        exit 1
+    fi
+fi
 : "${SEED_LIMIT:=200}"
 : "${NETWORK_PROFILE:=isolated}"
 : "${DOORWAY_AUTH:=auto}"
@@ -398,6 +453,20 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
     SANDBOX_LOG="$LOCAL_DEV_DIR/.sandbox_log"
     HC_WRAPPER="$LOCAL_DEV_DIR/.hc_wrapper.sh"
 
+    # T3-beside-the-mesh (T2): give this sandbox an explicit name + root distinct
+    # from any mesh peer (hc-mesh.sh names its own sandboxes matthew/jessica/james
+    # directly under the same local-dev/) instead of `hc`'s random directory name.
+    # Only engaged when the mesh is actually up — the plain isolated/join-alpha
+    # solo case keeps today's `hc sandbox generate` invocation byte-identical.
+    T3_SANDBOX_FLAGS=""
+    T3_SANDBOX_PATH=""
+    if [ "$MESH_IS_UP" = true ]; then
+        T3_SANDBOX_NAME="t3-$NETWORK_PROFILE"
+        T3_SANDBOX_FLAGS="-d \"$T3_SANDBOX_NAME\" --root \"$LOCAL_DEV_DIR\""
+        T3_SANDBOX_PATH="$LOCAL_DEV_DIR/$T3_SANDBOX_NAME"
+        echo "t3 peer: storage=$STORAGE_PORT doorway=$DOORWAY_PORT sandbox=$T3_SANDBOX_PATH"
+    fi
+
     if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
         echo ""
         echo "   ╔══════════════════════════════════════════════════════════════╗"
@@ -441,12 +510,12 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
 #!/bin/bash
 export PATH="$PATH"
 ${HC_HOLOCHAIN_PATH:+export HC_HOLOCHAIN_PATH="$HC_HOLOCHAIN_PATH"}
-exec hc sandbox generate --app-id elohim --in-process-lair -r=$CONDUCTOR_APP_PORT "$JOIN_HAPP_PATH" $NETWORK_TAIL
+exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT "$JOIN_HAPP_PATH" $NETWORK_TAIL
 EOF
     else
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id elohim --in-process-lair -r=$CONDUCTOR_APP_PORT "$HAPP_PATH"
+exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT "$HAPP_PATH"
 EOF
     fi
     chmod +x "$HC_WRAPPER"
