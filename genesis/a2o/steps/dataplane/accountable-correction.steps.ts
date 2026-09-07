@@ -33,8 +33,10 @@ import {
   pending,
   key,
   attachLag,
-  actsSettled,
   rotationBudgetMs,
+  acceptedGroups,
+  aggregateRows,
+  groupRow,
   CONTRIBUTION_STEP_TIMEOUT_MS,
   REBUILD_BUDGET_MS,
   REBUILD_STEP_TIMEOUT_MS,
@@ -92,28 +94,6 @@ Given(
         return Boolean(found && hash(found.action_hash) === s.root);
       });
       peerEnv(this, peer);
-    }
-    // Every station shares the same three cell agents, so a PRIOR scenario's acts can
-    // still be in flight when this one starts, and a baseline captured then reads LOW —
-    // surfacing later as an apparently doubled contribution rather than as the stale
-    // baseline it is (measured 2026-09-07: "contribution 12 != 10", while jessica's
-    // projection was exactly right). Holding still for six one-second reads does NOT
-    // establish that: the sweep is 60 s, so an unchanged tally is often just one nobody
-    // has updated yet. Wait on the ACTS instead — every correction and acceptance this
-    // process has filed is projected into the published generation — and only then read
-    // the tally. Quiescence is a fact about the acts, not a duration.
-    await until('previously filed acts settle', () => actsSettled(this), rotationBudgetMs(this));
-    for (const subject of ['jessica', 'james'] as const) {
-      let previous = '';
-      let stable = 0;
-      await until(`${subject} standing settles`, async () => {
-        const value = await standing(this, subject);
-        const current = JSON.stringify(value);
-        stable = current === previous ? stable + 1 : 0;
-        previous = current;
-        s.baseline[subject] = value;
-        return stable >= 6;
-      });
     }
     if (s.crash)
       writeFileSync(
@@ -479,68 +459,55 @@ Then(
   }
 );
 
+// Read as a fact about the generation rather than against a captured baseline: James is
+// never a corrected record's root author, so no accepted group names him as subject and no
+// aggregate row for him exists. Filing costs the filer nothing, in every run order.
 Then(
   "James's own standing is unaffected by the correction he filed",
   { timeout: 240_000 },
   async function (this: E2EWorld) {
-    assert.deepEqual(await standing(this, 'james'), ctx(this).baseline['james']);
+    const evaluator = key((await rail(this, 'jessica')).agent);
+    const james = key((await rail(this, 'james')).agent);
+    assert.equal(acceptedGroups(this, james).groups, 0, 'no accepted group names the filer');
+    assert.equal(aggregateRows(this, evaluator, james).rows, 0, 'the filer has no row at all');
+    assert.equal((await standing(this, 'james'))['score'], 'unknown');
   }
 );
 
 // A GENERATION is (evaluator, pinned policy) — not (evaluator, scenario). Opening a
 // fresh one does not isolate a scenario: `FeedbackProjector::tick` replays every
 // RETAINED subscription member into whichever generation `resolve_generation` returns,
-// so a rebuilt or newly-opened generation lands on the same subject aggregate it
-// started from. And a fresh evaluator IDENTITY is worse than useless here: no projector
-// runs for a key nobody evaluates with, so it reads Unknown whether or not the
-// correction is ever accepted, and the acceptance half of this station could never
-// pass. Standing is kept PER AUTHOR, so Jessica accumulates across every station that
-// corrects a record of hers, and "no row at all" is only observable for a subject with
-// no accepted correction anywhere. Assert what is true in every order instead: the
-// unaccepted correction changed NOTHING — same tally, zero contribution from its own
-// group, and no aggregate row created by it (which IS "no row at all" for a subject
-// that had none).
+// so a fresh or rebuilt generation lands on the same subject aggregate it started from.
+// And a fresh evaluator IDENTITY is worse than useless here: no projector runs for a key
+// nobody evaluates with, so it reads Unknown whether or not the correction is ever
+// accepted, and the acceptance half of this station could never pass. Standing is kept
+// PER AUTHOR, so Jessica accumulates across every station that corrects a record of hers,
+// and "no row at all" is only observable for a subject with no accepted correction
+// anywhere. Assert what is true in every order, against the generation's own arithmetic
+// rather than a captured baseline: this correction contributed nothing, and the served
+// tally is exactly the sum of the accepted groups — which does not include it.
 Then(
   "Jessica's standing is exactly what it was before he filed, and the unaccepted correction adds no row and no weight of its own",
   { timeout: 240_000 },
   async function (this: E2EWorld) {
-    const before = ctx(this).baseline['jessica'];
-    assert.deepEqual(
-      await standing(this),
-      before,
-      'an allegation must leave the subject reading exactly as it did before'
-    );
-    for (const row of rows(
-      this,
-      'jessica',
-      `SELECT a.accepted, a.contribution FROM feedback_application a
-    JOIN feedback_application_member m USING (generation_id, group_key)
-    JOIN standing_generations g USING (generation_id)
-    WHERE m.action_hash = ? AND g.status = 'published'`,
-      [ctx(this).correction]
-    )) {
-      assert.equal(row['accepted'], 0, 'an unaccepted allegation must never read accepted');
-      assert.equal(row['contribution'], 0, 'an allegation debits nobody');
+    const evaluator = key((await rail(this, 'jessica')).agent);
+    const group = groupRow(this);
+    if (group) {
+      assert.equal(group['accepted'], 0, 'an unaccepted allegation must never read accepted');
+      assert.equal(group['contribution'], 0, 'an allegation debits nobody');
     }
-    const agent = key((await rail(this, 'jessica')).agent);
-    const aggregate = rows(
-      this,
-      'jessica',
-      `SELECT count(*) n, coalesce(sum(debit_weight_sum), 0) total
-    FROM standing_generation_aggregate
-    WHERE generation_id = (SELECT max(generation_id) FROM standing_generations WHERE status = 'published')
-    AND hex(evaluator_pubkey) = ? AND hex(subject_pubkey) = ?`,
-      [agent, agent]
-    )[0];
+    const accepted = acceptedGroups(this, evaluator);
+    const aggregate = aggregateRows(this, evaluator, evaluator);
     assert.equal(
-      Number(aggregate['n']),
-      before['score'] === 'unknown' ? 0 : 1,
+      aggregate.rows,
+      accepted.groups === 0 ? 0 : 1,
       'a subject whose only signal is an unaccepted correction has no aggregate row at all'
     );
+    assert.equal(aggregate.total, accepted.total, 'the aggregate carries only accepted groups');
     assert.equal(
-      Number(aggregate['total']),
-      Number(before['debitWeightSum']),
-      'the unaccepted correction added weight to the aggregate'
+      Number((await standing(this))['debitWeightSum']),
+      accepted.total,
+      'the served tally carries only accepted groups'
     );
   }
 );

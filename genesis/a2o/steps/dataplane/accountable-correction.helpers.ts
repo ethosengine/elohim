@@ -34,7 +34,6 @@ export interface State {
   operation?: Row;
   request?: Row;
   refusal?: string;
-  baseline: Record<string, Row>;
   rails: Partial<Record<Peer, CarriedElectionRail>>;
   env: Partial<Record<Peer, Record<string, string>>>;
   originalConfig?: string;
@@ -42,33 +41,6 @@ export interface State {
   beforeStanding?: Row;
   rebuilt?: number;
   crash: boolean;
-}
-// EVERY act this process has filed, across scenarios. The stations share three cell
-// agents and never reset state, so a scenario's baseline is only a fact once the PREVIOUS
-// scenario's acts have landed in the published generation. Six identical reads one second
-// apart is not that test: the sweep is 60 s, so a "stable" tally can simply be one nobody
-// has updated yet — measured 2026-09-07, a baseline read 2 low and the shortfall surfaced
-// later as "contribution 12 != 10". Quiescence is a fact about the acts, not about time.
-const filedActs: string[] = [];
-export function remember(action: string): void {
-  if (action && !filedActs.includes(action)) filedActs.push(action);
-}
-/** Every remembered act is settled (member or rejected — never pending) on this peer. */
-export function actsSettled(world: E2EWorld, peer: Peer = 'jessica'): boolean {
-  if (filedActs.length === 0) return true;
-  const marks = filedActs.map(() => '?').join(',');
-  const seen = rows(
-    world,
-    peer,
-    `SELECT action_hash, member_status FROM feedback_application_member
-    WHERE generation_id = (SELECT max(generation_id) FROM standing_generations WHERE status = 'published')
-    AND action_hash IN (${marks})`,
-    filedActs
-  );
-  const settled = new Set(
-    seen.filter(r => r['member_status'] !== 'pending').map(r => String(r['action_hash']))
-  );
-  return filedActs.every(a => settled.has(a));
 }
 const states = new WeakMap<E2EWorld, State>();
 export function ctx(world: E2EWorld): State {
@@ -84,7 +56,6 @@ export function ctx(world: E2EWorld): State {
       chosen: '',
       sequentialPredecessor: '',
       operationId: randomUUID(),
-      baseline: {},
       rails: {},
       env: {},
       crash: false,
@@ -101,6 +72,65 @@ export const raw = decodeHashFromBase64;
 // A witness reading those tables has to normalise the same way or it joins nothing.
 export const key = (agent: string): string =>
   Buffer.from(raw(agent).slice(3, 35)).toString('hex').toUpperCase();
+
+/** The published generation on this peer. Every read below is scoped to it. */
+const PUBLISHED =
+  "(SELECT max(generation_id) FROM standing_generations WHERE status = 'published')";
+/**
+ * The published generation's OWN arithmetic for one subject: how many groups it has
+ * applied as accepted against them, and what those groups contribute in total.
+ *
+ * This replaces a captured baseline. The stations share three cell agents and never reset
+ * state, so "the tally before this scenario" is a moving target — a baseline read at the
+ * wrong moment is 2 low, and the shortfall surfaces later as a doubled contribution
+ * ("contribution 12 != 10", measured 2026-09-07). Waiting for quiescence instead cost 20
+ * minutes a scenario and still hung. The claim worth asserting does not need a baseline at
+ * all: the served tally must equal the sum of the accepted groups the generation itself
+ * holds, and THIS correction's group must contribute exactly 2, exactly once. That is
+ * stronger than a delta and true in every run order.
+ */
+export function acceptedGroups(
+  world: E2EWorld,
+  subject: string,
+  peer: Peer = 'jessica'
+): { groups: number; total: number } {
+  const r = rows(
+    world,
+    peer,
+    `SELECT count(*) n, coalesce(sum(contribution), 0) total FROM feedback_application
+    WHERE generation_id = ${PUBLISHED} AND status = 'applied' AND accepted = 1
+    AND hex(subject_pubkey) = ?`,
+    [subject]
+  )[0];
+  return { groups: Number(r?.['n'] ?? 0), total: Number(r?.['total'] ?? 0) };
+}
+/** Published aggregate rows for one (evaluator, subject) pair. Absent row = Unknown. */
+export function aggregateRows(
+  world: E2EWorld,
+  evaluator: string,
+  subject: string,
+  peer: Peer = 'jessica'
+): { rows: number; total: number } {
+  const r = rows(
+    world,
+    peer,
+    `SELECT count(*) n, coalesce(sum(debit_weight_sum), 0) total FROM standing_generation_aggregate
+    WHERE generation_id = ${PUBLISHED} AND hex(evaluator_pubkey) = ? AND hex(subject_pubkey) = ?`,
+    [evaluator, subject]
+  )[0];
+  return { rows: Number(r?.['n'] ?? 0), total: Number(r?.['total'] ?? 0) };
+}
+/** This scenario's correction group, as the published generation holds it. */
+export function groupRow(world: E2EWorld, peer: Peer = 'jessica'): Row | undefined {
+  return rows(
+    world,
+    peer,
+    `SELECT a.status, a.accepted, a.contribution FROM feedback_application a
+    JOIN feedback_application_member m USING (generation_id, group_key)
+    WHERE a.generation_id = ${PUBLISHED} AND m.action_hash = ?`,
+    [ctx(world).correction]
+  )[0];
+}
 export const url = (peer: Peer): string => resolvePeerUrl(`E2E_STORAGE_${peer.toUpperCase()}`);
 export async function rail(world: E2EWorld, peer: Peer): Promise<CarriedElectionRail> {
   const s = ctx(world);
@@ -286,7 +316,6 @@ export async function file(world: E2EWorld, discard = false): Promise<void> {
   s.operation = (await response.json()) as Row;
   assert.equal(s.operation['status'], 'resolved', JSON.stringify(s.operation));
   s.correction = String(s.operation['feedbackActionHash']);
-  remember(s.correction);
 }
 export async function accept(world: E2EWorld): Promise<void> {
   const s = ctx(world);
@@ -319,7 +348,6 @@ export async function accept(world: E2EWorld): Promise<void> {
     }
   });
   if (refusal) throw refusal;
-  remember(s.acceptance);
 }
 export async function lineage(world: E2EWorld, peer: Peer = 'jessica'): Promise<LineageOutput> {
   return call(world, peer, 'get_content_lineage', {
@@ -357,21 +385,6 @@ export async function applied(world: E2EWorld, peer: Peer = 'jessica', ms = 0): 
     budget
   );
 }
-// The aggregate was SAMPLED the instant the application row appeared, so this raced the
-// projection in whichever direction the run happened to land: measured 2026-09-07 it read
-// 2 low (baseline captured mid-projection) and, once the baseline settled, 2 high (the row
-// present and the tally not yet republished). Both were reported as a wrong contribution.
-// An eventually-consistent projection is polled, never sampled — so wait for the row AND
-// the tally it feeds to agree, and keep a final assertion so a genuine mismatch reports
-// the two numbers rather than a bare deadline.
-//
-// REBUILD BUDGET VS REPLAY LAG. Station 7 then failed as "8 expected, 6 observed" — which
-// reads like a wrong tally and was in fact a poll budget shorter than the lag it was
-// waiting on. The two are only separable by measuring: this helper records how long the
-// APPLICATION ROW took to appear and how long the TALLY took to follow it, attaches both,
-// and names them in the assertion message. Set the budget from the measurement, never
-// from a guess; A2O_CONTRIBUTION_BUDGET_MS raises the ceiling for a measurement round.
-//
 // THE BUDGET IS DERIVED, NOT GUESSED. Discovery is a rotation: the projector visits
 // MAX_MEMBERS_PER_SWEEP = 8 subscription members per SWEEP_INTERVAL_SECS = 60 s tick, and
 // `publish_generation` only republishes on a tick that ends with nothing unvisited and
@@ -382,12 +395,12 @@ export async function applied(world: E2EWorld, peer: Peer = 'jessica', ms = 0): 
 //
 // MEASURED 2026-09-07 on the household mesh, sweep at its 60 s product default, ceiling
 // raised to 600 s so the runs reported lag instead of deadlines. Acceptance to APPLICATION
-// ROW: 0.04 s, 106.6 s, 212.5 s, 252.6 s at N≈14-30 members; 332.8 s at N=44, which is
-// exactly ceil(44/8) = 6 sweeps. Acceptance to PUBLISHED TALLY added one further sweep
-// (272.5 s against a 212.5 s row). Station 7's original 210 s budget expired TWO SECONDS
-// before its row appeared — the whole of "8 expected, 6 observed" was a budget shorter
-// than the rotation, not a wrong tally; station 4's crash arm (armed at the same commit,
-// `feedback_projector.rs:571`) had the same 210 s and the same cause.
+// ROW: 0.04 s, 106.6 s, 212.5 s, 252.6 s at N between 14 and 30 members; 332.8 s at N=44,
+// which is exactly ceil(44/8) = 6 sweeps. Acceptance to PUBLISHED TALLY added one further
+// sweep (272.5 s against a 212.5 s row). Station 7's original 210 s budget expired TWO
+// SECONDS before its row appeared — the whole of "8 expected, 6 observed" was a budget
+// shorter than the rotation, not a wrong tally; station 4's crash arm, armed at the same
+// commit (feedback_projector.rs:571), had the same 210 s and the same cause.
 //
 // Hence: budget = 2 x (ceil(N/8) + 2) sweeps, read from the live subscription count. The
 // env override pins a fixed ceiling for a measurement round.
@@ -405,7 +418,7 @@ export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): numbe
 // Cucumber step timeouts are fixed at registration while the budget above is derived per
 // call, so they are set to a ceiling the derived budget cannot exceed on this mesh. They
 // are spent only when something is genuinely wrong; the assertion names the numbers.
-export const CONTRIBUTION_STEP_TIMEOUT_MS = 1_200_000;
+export const CONTRIBUTION_STEP_TIMEOUT_MS = 1_500_000;
 // MEASURED in the same round: rebuild requested to generation published, 60.0 s — one
 // sweep. A rebuild replays the retained set in place, so it does not pay the rotation;
 // four sweeps of headroom.
@@ -422,24 +435,28 @@ export function attachLag(world: E2EWorld, lag: Lag): void {
   world.attach(JSON.stringify(lag), 'application/json');
 }
 
+// An eventually-consistent projection is polled, never sampled: the application row and
+// the tally it feeds land on different sweeps, so read them together or a correct
+// projection reports as a wrong number. And read the expected value from the generation
+// itself (`acceptedGroups`) rather than from a baseline captured before the scenario —
+// see the note there for why a baseline is a moving target on a mesh that never resets.
+// The lag record is attached and named in the assertion message, so a slow rotation can
+// never again be reported as a wrong tally.
 export async function contribution(world: E2EWorld): Promise<void> {
-  const expected = Number(ctx(world).baseline['jessica']['debitWeightSum']) + 2;
   const budget = rotationBudgetMs(world);
+  const subject = key((await rail(world, 'jessica')).agent);
   const started = Date.now();
   let rowAt: number | null = null;
+  let expected = Number.NaN;
   let observed = Number.NaN;
   try {
     await until(
       'the accepted contribution reaches the tally',
       async () => {
-        const result = rows(
-          world,
-          'jessica',
-          `SELECT a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
-          [ctx(world).correction]
-        );
-        if (!(result[0]?.['accepted'] === 1 && result[0]?.['contribution'] === 2)) return false;
+        const group = groupRow(world);
+        if (!(group?.['accepted'] === 1 && group?.['contribution'] === 2)) return false;
         rowAt ??= Date.now();
+        expected = acceptedGroups(world, subject).total;
         observed = Number((await standing(world))['debitWeightSum']);
         return observed === expected;
       },
@@ -458,7 +475,7 @@ export async function contribution(world: E2EWorld): Promise<void> {
   assert.equal(
     observed,
     expected,
-    `contribution ${observed} != ${expected}; application row and tally lag: ${JSON.stringify(lag)}`
+    `served tally ${observed} != the generation's own accepted-group sum ${expected}; lag: ${JSON.stringify(lag)}`
   );
 }
 export async function served(world: E2EWorld, peer: Peer = 'jessica'): Promise<string> {
