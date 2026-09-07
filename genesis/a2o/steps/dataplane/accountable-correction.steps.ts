@@ -34,6 +34,7 @@ import {
   key,
   attachLag,
   rotationBudgetMs,
+  DHT_STEP_TIMEOUT_MS,
   acceptedGroups,
   aggregateRows,
   groupRow,
@@ -105,7 +106,7 @@ Given(
 
 Given(
   "James's peer has peer-to-peer feedback notifications disabled",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await notify(this, false);
   }
@@ -113,7 +114,7 @@ Given(
 
 Given(
   "James's peer has peer-to-peer feedback notifications enabled",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await notify(this, true);
   }
@@ -121,7 +122,7 @@ Given(
 
 When(
   "James files a correction against Jessica's record with no notification sent",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await file(this);
   }
@@ -145,7 +146,7 @@ Then(
 
 Given(
   'James has filed an earlier correction whose target link is not published until after the later one has been applied',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -164,7 +165,7 @@ Given(
 
 When(
   "the earlier correction's link surfaces to Matthew's peer on a later scan",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -175,7 +176,7 @@ When(
 
 Then(
   "Matthew's peer applies the earlier correction exactly once",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -194,7 +195,7 @@ Then(
 
 When(
   "James files a correction against Jessica's record with a notification sent",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await notify(this, true);
     await file(this);
@@ -203,7 +204,7 @@ When(
 
 Then(
   "Matthew's peer applies the correction before its next scheduled discovery scan would otherwise have found it",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -225,7 +226,7 @@ Then(
 
 When(
   "a feedback notification arrives at Matthew's peer naming a foreign origin DNA hash",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -236,7 +237,7 @@ When(
 
 Then(
   "Matthew's peer rejects the foreign-DNA notification without applying anything from it",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -247,7 +248,7 @@ Then(
 
 Then(
   "Matthew's peer's own content cell DNA hash is unchanged by the rejected notification",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -258,7 +259,7 @@ Then(
 
 Given(
   "James has filed a correction against Jessica's record",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await file(this);
   }
@@ -266,7 +267,7 @@ Given(
 
 When(
   "Jessica accepts James's correction with an accept-correction vouch",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await accept(this);
   }
@@ -274,7 +275,7 @@ When(
 
 Given(
   "Jessica has accepted James's correction with an accept-correction vouch",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await accept(this);
   }
@@ -282,7 +283,7 @@ Given(
 
 Then(
   "Jessica's acceptance vouch is a distinct, visible record from James's correction",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.notEqual(ctx(this).acceptance, ctx(this).correction);
     for (const action of [ctx(this).acceptance, ctx(this).correction]) {
@@ -293,7 +294,7 @@ Then(
 
 When(
   "Jessica publishes the amended content naming the corrected record's exact predecessor action",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     ctx(this).successor = await amend(this, ctx(this).root, 'Corrected claim');
   }
@@ -301,7 +302,7 @@ When(
 
 Then(
   "Jessica's successor is a third record, distinct from both the correction and the acceptance",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     assert.equal(
       new Set([ctx(this).successor, ctx(this).correction, ctx(this).acceptance]).size,
@@ -312,7 +313,7 @@ Then(
 
 Then(
   "all three of Matthew's, Jessica's, and James's peers adopt Jessica's successor as the served head",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     for (const peer of MESH_PEER_ORDER) {
       await until(
@@ -325,7 +326,7 @@ Then(
 
 Then(
   "a dependent view reading the record re-renders the successor's content",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     return pending(
       this,
@@ -336,7 +337,7 @@ Then(
 
 When(
   'James attempts to accept his own correction with an accept-correction vouch',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     try {
       await call(this, 'james', 'create_vouch', {
@@ -352,7 +353,7 @@ When(
 
 Then(
   "James's acceptance attempt is refused because he is not the record's root author",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     assert.ok(ctx(this).refusal, 'James must be refused');
     assert.match(ctx(this).refusal!, /self|own|same|signer/i);
@@ -361,7 +362,7 @@ Then(
 
 Then(
   "Jessica's earlier acceptance and successor are unaffected by James's refused attempt",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.ok(await call(this, 'jessica', 'get_feedback_signal_record', raw(ctx(this).acceptance)));
     assert.equal(await served(this), ctx(this).successor);
@@ -390,7 +391,7 @@ When(
 
 Then(
   "Jessica's peer's projection shows neither a correction marked applied with no matching tally change, nor a tally change with no correction marked applied",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     const result = rows(
       this,
@@ -453,7 +454,7 @@ When(
 
 Then(
   "Jessica's standing tally is unchanged by the replay",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.deepEqual(await standing(this), ctx(this).beforeStanding);
   }
@@ -464,7 +465,7 @@ Then(
 // aggregate row for him exists. Filing costs the filer nothing, in every run order.
 Then(
   "James's own standing is unaffected by the correction he filed",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const evaluator = key((await rail(this, 'jessica')).agent);
     const james = key((await rail(this, 'james')).agent);
@@ -531,7 +532,7 @@ Then(
 
 When(
   "Jessica accepts James's same correction with a second, redundant accept-correction vouch",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await accept(this);
   }
@@ -558,7 +559,7 @@ Then(
 
 When(
   'Jessica publishes two amended successors that each name the same predecessor action',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     ctx(this).branches = [
       await amend(this, ctx(this).root, 'Branch A'),
@@ -569,7 +570,7 @@ When(
 
 Then(
   "Jessica's peer marks the record contested, visibly listing both branches",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const l = await lineage(this);
     assert.equal(l.contested, true);
@@ -582,7 +583,7 @@ Then(
 
 When(
   "the deterministic pick resolves one of Jessica's two branches as the served head",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await until('served head is a branch', async () => {
       ctx(this).chosen = await served(this);
@@ -593,7 +594,7 @@ When(
 
 Then(
   'the record is still marked contested after the deterministic pick',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.equal((await lineage(this)).contested, true);
   }
@@ -601,7 +602,7 @@ Then(
 
 When(
   'Jessica publishes a further amendment naming her already-resolved served head as its predecessor',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     ctx(this).sequentialPredecessor = ctx(this).chosen;
     ctx(this).successor = await amend(this, ctx(this).chosen, 'Sequential fix');
@@ -610,7 +611,7 @@ When(
 
 Then(
   'this sequential amendment is not marked contested',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const l = await lineage(this);
     assert.ok(
@@ -671,7 +672,7 @@ When(
 
 Then(
   "the fresh generation's tallies are identical to the live generation's, excluding storage layout and operational timestamps",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     assert.deepEqual(canonicalRows(this), ctx(this).beforeRows);
   }
@@ -679,7 +680,7 @@ Then(
 
 Then(
   'readers of the fresh generation see it as still rebuilding until every retained correction and acceptance has replayed, never a partial tally',
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
     assert.ok(ctx(this).rebuilt, 'rebuild was actually requested');
     assert.equal(
@@ -696,7 +697,7 @@ Then(
 
 Given(
   "James's first-party view files a correction against Jessica's record under one operation id it minted",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await file(this, true);
   }
@@ -704,7 +705,7 @@ Given(
 
 When(
   "the response to James's filing is lost before his view receives it",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.equal(
       ctx(this).operation,
@@ -722,7 +723,7 @@ When(
 
 When(
   "James's view reloads and retries the filing with the same operation id",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await file(this);
   }
@@ -730,7 +731,7 @@ When(
 
 Then(
   "James's peer reports the operation as resolved to exactly one correction, or unresolved, but never two",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const outcome = await http('james', `/api/v1/feedback/operations/${ctx(this).operationId}`);
     assert.ok(['resolved', 'unresolved'].includes(String(outcome['status'])));
@@ -749,7 +750,7 @@ Then(
 
 Then(
   "a second presentation reading the same subject agrees with James's view about what was filed",
-  { timeout: 240_000 },
+  { timeout: DHT_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const operation = await http('james', `/api/v1/feedback/operations/${ctx(this).operationId}`);
     const record = await call(

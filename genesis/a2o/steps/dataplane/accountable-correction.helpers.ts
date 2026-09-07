@@ -196,7 +196,7 @@ export async function http(peer: Peer, path: string, body?: unknown): Promise<Ro
 export async function until(
   label: string,
   check: () => Promise<boolean> | boolean,
-  ms = 210_000
+  ms = 300_000
 ): Promise<void> {
   const deadline = Date.now() + ms;
   let last: unknown;
@@ -407,6 +407,7 @@ export async function applied(world: E2EWorld, peer: Peer = 'jessica', ms = 0): 
 // Hence: budget = 2 x (ceil(N/8) + 2) sweeps, read from the live subscription count. The
 // env override pins a fixed ceiling for a measurement round.
 export const DEFAULT_SWEEP_MS = 60_000;
+export const DHT_PROPAGATION_MS = 300_000;
 export const MEMBERS_PER_SWEEP = 8;
 export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): number {
   const fixed = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? Number.NaN);
@@ -421,12 +422,20 @@ export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): numbe
     rows(world, peer, 'SELECT count(*) n FROM feedback_subscriptions')[0]?.['n'] ?? 0
   );
   const sweeps = Math.ceil(n / MEMBERS_PER_SWEEP) + 2;
-  return Math.max(180_000, 2 * sweeps * sweepMs);
+  // A rotation is only the projector's own scan. Before it can scan anything the ACT has
+  // to reach this peer's conductor over the DHT, which no sweep setting accelerates and
+  // which measured 2-3 minutes on this mesh. Budget the two separately or a fast sweep
+  // makes the deadline shorter than the propagation it still has to wait for — measured
+  // 2026-09-07, pinning the sweep to 5 s alone reduced the floor to 180 s and failed four
+  // stations that had passed at 60 s.
+  return DHT_PROPAGATION_MS + 2 * sweeps * sweepMs;
 }
 // Cucumber step timeouts are fixed at registration while the budget above is derived per
 // call, so they are set to a ceiling the derived budget cannot exceed on this mesh. They
 // are spent only when something is genuinely wrong; the assertion names the numbers.
-export const CONTRIBUTION_STEP_TIMEOUT_MS = 1_500_000;
+export const CONTRIBUTION_STEP_TIMEOUT_MS = 1_800_000;
+/** Steps whose only wait is DHT propagation between peers, not the projector's rotation. */
+export const DHT_STEP_TIMEOUT_MS = 420_000;
 // MEASURED in the same round: rebuild requested to generation published, 60.0 s — one
 // sweep. A rebuild replays the retained set in place, so it does not pay the rotation;
 // four sweeps of headroom.
