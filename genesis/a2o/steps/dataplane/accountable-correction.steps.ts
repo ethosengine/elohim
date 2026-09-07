@@ -34,6 +34,7 @@ import {
   key,
   attachLag,
   rotationBudgetMs,
+  crashRestartBudget,
   DHT_STEP_TIMEOUT_MS,
   acceptedGroups,
   aggregateRows,
@@ -41,6 +42,17 @@ import {
   CONTRIBUTION_STEP_TIMEOUT_MS,
   REBUILD_BUDGET_MS,
   REBUILD_STEP_TIMEOUT_MS,
+  fileDeferred,
+  publishLink,
+  applicationRows,
+  appliedAction,
+  subscription,
+  subscriptionCount,
+  sweepMs,
+  originDna,
+  deliverNotification,
+  verdictOf,
+  MEMBERS_PER_SWEEP,
 } from './accountable-correction.helpers.js';
 
 Before({ tags: '@concern:accountable-correction' }, function (this: E2EWorld, { pickle }) {
@@ -147,10 +159,28 @@ Then(
 Given(
   'James has filed an earlier correction whose target link is not published until after the later one has been applied',
   { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      "create_feedback_signal commits the entry and BOTH index links in one extern call (content_store/src/feedback_signal.rs:168-192: create_entry, then create_link TargetToFeedbackSignal, then create_link SignerToFeedbackSignal); there is no link-only extern, so an act's link cannot be published later than the act. Delaying it needs a new coordinator extern authored for the product, not for this fixture."
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    // `create_feedback_signal { defer_target_link: true }` commits the act and
+    // withholds ONLY its TargetToFeedbackSignal index edge. A Holochain action
+    // cannot be backdated, so what is staged is PUBLICATION ORDER: this act
+    // exists now, and becomes enumerable from the target later.
+    s.deferred = await fileDeferred(this, 'The earlier correction, indexed late.');
+    assert.notEqual(s.deferred, s.correction, 'a second, distinct act');
+    // It is genuinely invisible from the target: nobody can enumerate it there.
+    for (const peer of MESH_PEER_ORDER) {
+      const refs = (await call(this, peer, 'get_feedback_signal_refs_for_target', {
+        target_action_hash: raw(s.root),
+        resolve: false,
+      })) as { refs: { action_hash: Uint8Array }[] };
+      assert.ok(
+        !refs.refs.some(r => hash(r.action_hash) === s.deferred),
+        `${peer} must not be able to enumerate an act whose index edge was never published`
+      );
+    }
+    this.attach(
+      JSON.stringify({ deferredAct: s.deferred, indexPublished: false }),
+      'application/json'
     );
   }
 );
@@ -166,22 +196,37 @@ Given(
 When(
   "the earlier correction's link surfaces to Matthew's peer on a later scan",
   { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      'The delayed-link fixture in the preceding Given does not exist: link creation is bound to entry creation in create_feedback_signal.'
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    assert.ok(s.deferred, 'the deferred act was staged');
+    // Link only, and its target is read from the ACT — the extern cannot point
+    // somebody else's act at a target that act never named.
+    const published = await publishLink(this, s.deferred);
+    assert.equal(published['already_published'], false, JSON.stringify(published));
+    assert.equal(hash(published['target_action_hash']), s.root);
+    this.attach(
+      JSON.stringify({
+        act: s.deferred,
+        target: hash(published['target_action_hash']),
+        link: hash(published['link_action_hash']),
+      }),
+      'application/json'
     );
   }
 );
 
 Then(
   "Matthew's peer applies the earlier correction exactly once",
-  { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      'No delayed-link act was staged; asserting exactly-once against an act that arrived in order would be vacuous.'
-    );
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    assert.ok(s.deferred, 'the deferred act was staged');
+    // Order of arrival is not order of effect: an act discovered AFTER a later
+    // one still lands, and lands once.
+    await appliedAction(this, 'matthew', s.deferred);
+    const settled = applicationRows(this, 'matthew', s.deferred);
+    assert.equal(settled.length, 1, `exactly one application row: ${JSON.stringify(settled)}`);
+    this.attach(JSON.stringify(settled), 'application/json');
   }
 );
 
@@ -190,6 +235,9 @@ Then(
   { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
+    const first = applicationRows(this, 'matthew', ctx(this).correction);
+    assert.equal(first.length, 1, `still exactly one row: ${JSON.stringify(first)}`);
+    assert.equal(first[0]['status'], 'applied');
   }
 );
 
@@ -204,12 +252,90 @@ When(
 
 Then(
   "Matthew's peer applies the correction before its next scheduled discovery scan would otherwise have found it",
-  { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      'Notifications only enqueue subscriptions; there is no notification-driven wake or observable next-scan deadline. The current loop cannot prove acceleration before its scheduled tick.'
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    s.localDna = await originDna('matthew');
+
+    // The measurable claim. Discovery is a ROTATION: MAX_MEMBERS_PER_SWEEP = 8
+    // members per sweep, so a member the rotation has to reach waits up to
+    // ceil(N/8) sweeps. A NOTIFIED member is re-armed Hot by
+    // `admit_notified_signal` and leads the very next sweep. The deadline the
+    // notification beats is therefore the rotation, and it is read from this
+    // peer's own live state, never assumed.
+    const members = subscriptionCount(this, 'matthew');
+    const sweep = sweepMs(this, 'matthew');
+    const rotationSweeps = Math.ceil(members / MEMBERS_PER_SWEEP);
+
+    // Prefer the household's own back-prop route. If this mesh's predecessor
+    // graph does not reach Matthew, deliver the SAME reference to the SAME
+    // receiver both transports call — the notification is what is under test,
+    // not which wire carried it.
+    let routed = true;
+    try {
+      await until(
+        "Matthew's peer is notified of the act",
+        () => subscription(this, 'matthew', s.correction)?.['source'] === 'notified',
+        Math.min(2 * sweep + 30_000, 90_000)
+      );
+    } catch {
+      routed = false;
+      const verdict = verdictOf(
+        await deliverNotification(
+          'matthew',
+          {
+            originDnaHash: s.localDna,
+            actionHash: s.correction,
+            routingKey: s.root,
+          },
+          'james-peer'
+        )
+      );
+      assert.ok(verdict.received, `the receiver admitted the reference: ${verdict.reason}`);
+    }
+
+    // The wake itself: the notified member is VISITED within a sweep or two of
+    // being admitted, not after a full rotation.
+    await until(
+      'the notified member is swept',
+      () => Number(subscription(this, 'matthew', s.correction)?.['visit_count'] ?? 0) > 0,
+      Math.max(4 * sweep, 60_000)
     );
+    const row = subscription(this, 'matthew', s.correction);
+    assert.ok(row, 'the act is a durable member of Matthew rotation');
+    assert.equal(row['source'], 'notified', 'it entered by notification, not by scan');
+    const waited = Date.parse(String(row['last_visited_at'])) - Date.parse(String(row['added_at']));
+    this.attach(
+      JSON.stringify({
+        routedByHouseholdBackProp: routed,
+        members,
+        sweepMs: sweep,
+        rotationSweeps,
+        rotationWouldHaveWaitedMs: rotationSweeps * sweep,
+        notifiedWaitedMs: waited,
+      }),
+      'application/json'
+    );
+    assert.ok(
+      waited <= 2 * sweep,
+      `the notified member was swept in ${waited} ms, within two sweeps (${2 * sweep} ms)`
+    );
+    // The rotation is what the notification beat. On a peer whose whole
+    // subscription set fits in one sweep there is nothing to beat, and saying so
+    // is more honest than asserting a tautology.
+    if (rotationSweeps > 2) {
+      assert.ok(
+        waited < rotationSweeps * sweep,
+        `the notification beat the rotation it would otherwise have waited for (${rotationSweeps * sweep} ms)`
+      );
+    } else {
+      this.attach(
+        `rotation is ${rotationSweeps} sweep(s) at N=${members}: acceleration is not distinguishable from the rotation on this peer, so only the wake itself is asserted`,
+        'text/plain'
+      );
+    }
+
+    await applied(this, 'matthew');
   }
 );
 
@@ -227,11 +353,25 @@ Then(
 When(
   "a feedback notification arrives at Matthew's peer naming a foreign origin DNA hash",
   { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      'No household fixture can inject a foreign-DNA feedback envelope through the P2P receive path. HTTP submission is not that path.'
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    s.localDna ??= await originDna('matthew');
+    // A DNA hash from some other network entirely. Well-formed, correctly
+    // prefixed, and NOT this peer's space — the only thing wrong with it is the
+    // one thing the receiver is supposed to catch.
+    const foreignDna = `uhC0k${'F'.repeat(48)}`;
+    assert.notEqual(foreignDna, s.localDna);
+    s.foreignAction = `uhCkk${'A'.repeat(48)}`;
+    s.foreignVerdict = await deliverNotification(
+      'matthew',
+      {
+        originDnaHash: foreignDna,
+        actionHash: s.foreignAction,
+        routingKey: s.root,
+      },
+      'peer-in-another-space'
     );
+    this.attach(JSON.stringify(s.foreignVerdict), 'application/json');
   }
 );
 
@@ -239,21 +379,31 @@ Then(
   "Matthew's peer rejects the foreign-DNA notification without applying anything from it",
   { timeout: DHT_STEP_TIMEOUT_MS },
   function (this: E2EWorld) {
-    return pending(
-      this,
-      'No foreign-DNA envelope was delivered; absence of an application row would not prove rejection.'
+    const s = ctx(this);
+    assert.ok(s.foreignVerdict, 'an envelope was actually delivered');
+    const verdict = verdictOf(s.foreignVerdict);
+    assert.equal(verdict.received, false, `refused, not accepted: ${JSON.stringify(verdict)}`);
+    assert.match(verdict.reason, /foreign origin DNA/i);
+    // And it left nothing behind: not a subscription, not an application row.
+    assert.equal(
+      subscription(this, 'matthew', String(s.foreignAction)),
+      undefined,
+      'nothing from another space entered the durable subscription set'
     );
+    assert.deepEqual(applicationRows(this, 'matthew', String(s.foreignAction)), []);
   }
 );
 
 Then(
   "Matthew's peer's own content cell DNA hash is unchanged by the rejected notification",
   { timeout: DHT_STEP_TIMEOUT_MS },
-  function (this: E2EWorld) {
-    return pending(
-      this,
-      'The preceding foreign-DNA transport injection is unavailable; no rejection was exercised.'
-    );
+  async function (this: E2EWorld) {
+    const s = ctx(this);
+    // The receiver reports the space it scoped by. A refusal must not have
+    // moved it: an envelope never gets to say which network this peer is in.
+    const after = String(s.foreignVerdict?.['originDnaHash'] ?? '');
+    assert.equal(after, s.localDna, 'the receiver scoped by its OWN space');
+    assert.equal(await originDna('matthew'), s.localDna, 'and still does afterwards');
   }
 );
 
@@ -412,7 +562,14 @@ When(
   "Jessica's peer's discovery resumes after the restart",
   { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
-    await applied(this);
+    // Post-T6 (feedback_projector.rs SweepScheduler), a warm peer's steady-state rotation
+    // is bounded by re-arm + one sweep, not ceil(N/8) — but the restart just before this
+    // step throws that saving away: heat is in-memory, so it is rebuilt from nothing and
+    // every member is Hot again, paying the SAME full-rotation bound the pre-T6 projector
+    // always paid. Neither the correction nor the acceptance needs re-fetching — both
+    // landed locally before the crash arm fired — so no DHT floor applies here.
+    const budget = crashRestartBudget(this, 'jessica', false);
+    await applied(this, 'jessica', budget.budgetMs);
   }
 );
 

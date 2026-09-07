@@ -93,7 +93,6 @@ Feature: A correction reaches the person it names, only that person can settle i
   # ---------------------------------------------------------------------------------
   # Station 1 — discovery is durable and does not depend on being told (contract §3)
   # ---------------------------------------------------------------------------------
-  @wip
   Scenario: Matthew's peer finds James's correction on its own, and a late arrival never double-applies
     # Notifications OFF on James's peer (README's ELOHIM_FEEDBACK_NOTIFY=0): the only way
     # Matthew's peer can learn of the correction is its own periodic re-scan (§3), never
@@ -116,7 +115,6 @@ Feature: A correction reaches the person it names, only that person can settle i
   # ---------------------------------------------------------------------------------
   # Station 2 — notification accelerates discovery, and never substitutes for it (§4)
   # ---------------------------------------------------------------------------------
-  @wip
   Scenario: A notification reference speeds Matthew up, but a foreign-DNA envelope is refused rather than trusted
     Given James's peer has peer-to-peer feedback notifications enabled
     When James files a correction against Jessica's record with a notification sent

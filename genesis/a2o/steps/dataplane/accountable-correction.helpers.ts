@@ -20,6 +20,8 @@ import { resolvePeerUrl, probeDeclaredHead } from '../../src/framework/dataplane
 import { E2EWorld } from '../../src/framework/world.js';
 
 export type Peer = 'matthew' | 'jessica' | 'james';
+/** The one standing impact every station in this feature files under. */
+export const DEBIT_SOFT = 'debit-soft';
 type Row = Record<string, unknown>;
 export interface State {
   id: string;
@@ -41,6 +43,14 @@ export interface State {
   beforeStanding?: Row;
   rebuilt?: number;
   crash: boolean;
+  /** Station 1: the act filed with its target index DEFERRED. */
+  deferred?: string;
+  /** Station 2: Matthew's own content-space DNA hash, read before delivery. */
+  localDna?: string;
+  /** Station 2: the receiver's verdict on the foreign-DNA envelope. */
+  foreignVerdict?: Row;
+  /** Station 2: the action hash the foreign envelope claimed. */
+  foreignAction?: string;
 }
 const states = new WeakMap<E2EWorld, State>();
 export function ctx(world: E2EWorld): State {
@@ -298,7 +308,7 @@ export async function file(world: E2EWorld, discard = false): Promise<void> {
     operationId: s.operationId,
     targetActionHash: s.root,
     signalKind: 'correction',
-    standingImpact: 'debit-soft',
+    standingImpact: DEBIT_SOFT,
     body: 'The original statement needs correction.',
   };
   const response = await fetch(`${url('james')}/api/v1/feedback/operations`, {
@@ -339,7 +349,7 @@ export async function accept(world: E2EWorld): Promise<void> {
         await call(world, 'jessica', 'create_vouch', {
           target_action_hash: raw(s.correction),
           vouch_kind: 'accept-correction',
-          standing_impact: 'debit-soft',
+          standing_impact: DEBIT_SOFT,
         })
       );
       return true;
@@ -430,6 +440,95 @@ export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): numbe
   // stations that had passed at 60 s.
   return DHT_PROPAGATION_MS + 2 * sweeps * sweepMs;
 }
+
+// ---------------------------------------------------------------------------
+// Station 4 (crash window): the deadline AFTER a real storage restart.
+//
+// `rotationBudgetMs` above budgets a WARM peer's rotation. Post-T6
+// (`feedback_projector.rs` commit b67e3d082 — `SweepScheduler`, `MemberHeat`),
+// a warm peer's steady-state discovery is no longer O(N): a member with
+// nothing open goes Cold after `COLD_AFTER_CLEAN_SWEEPS` clean sweeps and
+// leaves the rotation, and a fresh act or `admit_notified_signal` re-arms it
+// Hot at the front — so a Hot member's worst case is one re-arm plus one
+// sweep, not a full `ceil(N/8)` rotation over the peer's whole history.
+//
+// A storage restart defeats exactly that saving. `SweepScheduler` is
+// deliberately in-memory (its own doc comment: "a restart forgets it, every
+// member starts Hot") — there is no durable column for heat
+// (`feedback_subscriptions` carries only `last_visited_at`/`visit_count`,
+// confirmed in `db/feedback_subscriptions.rs`), so the scheduler is rebuilt
+// from `SweepScheduler::default()` on boot and every member defaults Hot
+// again. The first post-restart rotation therefore costs a full
+// `ceil(N/8)` sweeps — the SAME bound the projector always paid before T6 —
+// not the warm-peer saving `rotationBudgetMs` now assumes elsewhere in this
+// feature. Station 4's post-restart wait needs its own budget for exactly
+// this reason; reusing `rotationBudgetMs` unchanged would be right by
+// accident today and wrong the day someone tightens it because "T6 made
+// discovery faster."
+//
+// N_LIVE (members still in rotation, i.e. not Cold) is the number the
+// post-T6 model actually names, but it is scheduler-internal state with no
+// external surface: `TickReport.members_cold` (`feedback_projector.rs:1072`)
+// is computed per tick and never persisted, and there is no admin/diagnostic
+// route exposing it. The only externally-observable count is N_TOTAL from
+// `feedback_subscriptions` (the same query `rotationBudgetMs` already
+// runs) — a restart makes N_LIVE == N_TOTAL anyway (every member is Hot), so
+// for THIS station the distinction collapses and N_TOTAL is exact, not just
+// a safe superset.
+export interface CrashRestartBudget {
+  budgetMs: number;
+  nTotal: number;
+  sweeps: number;
+  sweepMs: number;
+  restartSettleMs: number;
+  dhtFloorMs: number;
+}
+// tokio::time::interval fires its first tick immediately on creation
+// (`feedback_projector.rs::spawn`), so the projector does not sit idle for a
+// whole SWEEP_INTERVAL_SECS before its first post-restart sweep — the
+// settle cost is process/DB-pool startup, not a missed tick. One sweep
+// interval of pad (the product default, not the lane's pinned test value)
+// covers that startup plus jitter without inventing an unmeasured number.
+export const RESTART_SETTLE_MS = DEFAULT_SWEEP_MS;
+/**
+ * Pure: the arithmetic alone, with no DB/env access, so it is unit-testable
+ * without a mesh. `nTotal` is N_LIVE == N_TOTAL immediately after a restart
+ * (see module comment above). `freshAct` adds the DHT propagation floor only
+ * when this wait's target has NOT already been fetched-and-verified onto
+ * this peer before the restart — station 4's crash window never sets it,
+ * because the correction and the acceptance both landed locally before the
+ * crash (the arm fires after the application row is written); the restart
+ * only has to finish the LOCAL transaction, never re-fetch anything.
+ */
+export function deriveCrashRestartBudgetMs(
+  nTotal: number,
+  sweepMs: number,
+  freshAct = false
+): CrashRestartBudget {
+  const sweeps = Math.ceil(Math.max(nTotal, 0) / MEMBERS_PER_SWEEP) + 2;
+  const dhtFloorMs = freshAct ? DHT_PROPAGATION_MS : 0;
+  const budgetMs = RESTART_SETTLE_MS + sweeps * sweepMs + dhtFloorMs;
+  return { budgetMs, nTotal, sweeps, sweepMs, restartSettleMs: RESTART_SETTLE_MS, dhtFloorMs };
+}
+/** Reads the live peer env + subscription count, derives, and logs the inputs. */
+export function crashRestartBudget(
+  world: E2EWorld,
+  peer: Peer = 'jessica',
+  freshAct = false
+): CrashRestartBudget {
+  const configured = Number(peerEnv(world, peer)['ELOHIM_FEEDBACK_SWEEP_SECONDS']);
+  const sweepMs =
+    Number.isFinite(configured) && configured > 0 ? configured * 1000 : DEFAULT_SWEEP_MS;
+  const nTotal = Number(
+    rows(world, peer, 'SELECT count(*) n FROM feedback_subscriptions')[0]?.['n'] ?? 0
+  );
+  const budget = deriveCrashRestartBudgetMs(nTotal, sweepMs, freshAct);
+  world.attach(
+    JSON.stringify({ label: 'crash-restart rotation budget', peer, ...budget }),
+    'application/json'
+  );
+  return budget;
+}
 // Cucumber step timeouts are fixed at registration while the budget above is derived per
 // call, so they are set to a ceiling the derived budget cannot exceed on this mesh. They
 // are spent only when something is genuinely wrong; the assertion names the numbers.
@@ -501,4 +600,183 @@ export async function served(world: E2EWorld, peer: Peer = 'jessica'): Promise<s
 export function pending(world: E2EWorld, reason: string): 'pending' {
   world.attach(`UNBOUND: ${reason}`, 'text/plain');
   return 'pending';
+}
+
+// ---------------------------------------------------------------------------
+// Station 1 — index publication is separable from the act (contract §3)
+// ---------------------------------------------------------------------------
+
+/**
+ * File a correction whose `TargetToFeedbackSignal` index link is NOT published.
+ *
+ * The act commits, is fetchable by its own action hash, and is enumerable from
+ * its SIGNER's anchor — but a peer scanning the TARGET cannot see it, because
+ * the index edge does not exist yet. That is how a "late link" is staged
+ * honestly: a Holochain action cannot be backdated, so the thing made late is
+ * PUBLICATION ORDER, exactly as the station's own comment requires.
+ *
+ * Two phases, the same two the outbox runs (§8): author the public Correction
+ * EPR carrying the immutable request, then file the feedback citing it — here
+ * with `defer_target_link: true`.
+ */
+export async function fileDeferred(world: E2EWorld, label: string): Promise<string> {
+  const s = ctx(world);
+  const operationId = randomUUID();
+  const evidence = await call(world, 'james', 'create_content', {
+    id: `correction:${operationId}`,
+    title: 'Deferred-index correction evidence',
+    description: label,
+    content_type: 'concept',
+    content_format: 'markdown',
+    content: label,
+    tags: [],
+    reach: 'public',
+    metadata_json: JSON.stringify({
+      correctionRequest: {
+        operationId,
+        targetActionHash: s.root,
+        signalKind: 'correction',
+        standingImpact: DEBIT_SOFT,
+      },
+    }),
+  });
+  const evidenceHash = hash(evidence.action_hash);
+  // The coordinator's admission runs `must_get_valid_record` on the evidence,
+  // which is strictly stronger than the `create_content` that just returned —
+  // the same race `accept()` documents. Retry the fetch failure only; every
+  // real refusal is let out immediately rather than spending the deadline.
+  let refusal: unknown;
+  let action = '';
+  await until('James files the deferred-index correction', async () => {
+    try {
+      action = hash(
+        await call(world, 'james', 'create_feedback_signal', {
+          target_action_hash: raw(s.root),
+          signal_kind: 'correction',
+          evidence_action_hash: raw(evidenceHash),
+          standing_impact: DEBIT_SOFT,
+          defer_target_link: true,
+        })
+      );
+      return true;
+    } catch (e) {
+      if (String(e).includes('Failed to get Record')) return false;
+      refusal = e;
+      return true;
+    }
+  });
+  if (refusal) throw refusal;
+  return action;
+}
+
+/** Publish the withheld index edge — link only, derived from the act itself. */
+export async function publishLink(world: E2EWorld, correction: string): Promise<Row> {
+  return (await call(world, 'james', 'publish_feedback_signal_target_link', {
+    feedback_action_hash: raw(correction),
+  })) as Row;
+}
+
+/** Every application row this peer holds for ONE act, newest generation first. */
+export function applicationRows(world: E2EWorld, peer: Peer, action: string): Row[] {
+  return rows(
+    world,
+    peer,
+    `SELECT a.status, a.accepted, a.contribution, a.generation_id
+     FROM feedback_application a
+     JOIN feedback_application_member m USING (generation_id, group_key)
+     JOIN standing_generations g USING (generation_id)
+     WHERE m.action_hash = ? AND g.status = 'published'
+     ORDER BY g.generation_id DESC`,
+    [action]
+  );
+}
+
+/** Wait until `peer` has applied `action` — exactly one row, status applied. */
+export async function appliedAction(
+  world: E2EWorld,
+  peer: Peer,
+  action: string,
+  ms = 0
+): Promise<void> {
+  const budget = ms || rotationBudgetMs(world, peer);
+  await until(
+    `${peer} applies ${action.slice(0, 12)} once`,
+    () => {
+      const result = applicationRows(world, peer, action);
+      return result.length === 1 && result[0]['status'] === 'applied';
+    },
+    budget
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Station 2 — the notification receiver (contract §4)
+// ---------------------------------------------------------------------------
+
+/** One subscription row, or undefined when this peer has never heard of it. */
+export function subscription(world: E2EWorld, peer: Peer, memberKey: string): Row | undefined {
+  return rows(
+    world,
+    peer,
+    'SELECT member_kind, member_key, source, added_at, last_visited_at, visit_count FROM feedback_subscriptions WHERE member_key = ?',
+    [memberKey]
+  )[0];
+}
+
+/** How many members are in this peer's rotation right now. */
+export function subscriptionCount(world: E2EWorld, peer: Peer): number {
+  return Number(rows(world, peer, 'SELECT count(*) n FROM feedback_subscriptions')[0]?.['n'] ?? 0);
+}
+
+/** This peer's sweep interval, read from its own live environment. */
+export function sweepMs(world: E2EWorld, peer: Peer): number {
+  const configured = Number(peerEnv(world, peer)['ELOHIM_FEEDBACK_SWEEP_SECONDS']);
+  return Number.isFinite(configured) && configured > 0 ? configured * 1000 : DEFAULT_SWEEP_MS;
+}
+
+/** What space is this peer in? (the test ingress reports its own binding) */
+export async function originDna(peer: Peer): Promise<string> {
+  const report = await http(peer, '/admin/test/feedback-notify');
+  const dna = report['originDnaHash'];
+  assert.ok(
+    typeof dna === 'string' && dna.length > 0,
+    `${peer} must report its own content-cell DNA hash (is ELOHIM_TEST_FEEDBACK_INGRESS=1 set on it?): ${JSON.stringify(report)}`
+  );
+  return dna;
+}
+
+/**
+ * Deliver a `feedback-signal` notification to `peer`'s REAL receiver.
+ *
+ * The route hands MessagePack bytes to the same
+ * `EprAtomService::handle(IntegrityNotify { kind: "feedback-signal" })` both
+ * transports call, and returns that receiver's own verdict verbatim. It is
+ * armed only by `ELOHIM_TEST_FEEDBACK_INGRESS=1`.
+ */
+export async function deliverNotification(
+  peer: Peer,
+  actRef: { originDnaHash: string; actionHash: string; routingKey: string },
+  from = 'peer-notifier'
+): Promise<Row> {
+  return http(peer, '/admin/test/feedback-notify', {
+    from,
+    signal: {
+      targetCid: actRef.routingKey,
+      signalKind: 'correction',
+      evidenceCid: 'evidence-carried-by-reference',
+      standingImpact: DEBIT_SOFT,
+      signedBy: 'claim',
+      signature: 'claim',
+      actRef,
+    },
+  });
+}
+
+/** The receiver's `IntegrityAck` fields, whatever shape the enum tags it with. */
+export function verdictOf(response: Row): { received: boolean; reason: string } {
+  const verdict = (response['verdict'] ?? {}) as Row;
+  return {
+    received: verdict['received'] === true,
+    reason: String(verdict['reason'] ?? ''),
+  };
 }
