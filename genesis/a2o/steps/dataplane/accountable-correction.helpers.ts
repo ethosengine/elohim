@@ -241,7 +241,9 @@ export function peerEnv(world: E2EWorld, peer: Peer): Record<string, string> {
   for (const entry of entries) {
     const at = entry.indexOf('=');
     const name = entry.slice(0, at);
-    if (['STORAGE_DIR', 'ELOHIM_RUNTIME_CONFIG_PATH'].includes(name))
+    if (
+      ['STORAGE_DIR', 'ELOHIM_RUNTIME_CONFIG_PATH', 'ELOHIM_FEEDBACK_SWEEP_SECONDS'].includes(name)
+    )
       selected[name] = entry.slice(at + 1);
   }
   assert.ok(selected['ELOHIM_RUNTIME_CONFIG_PATH'], `${peer}: runtime-config watcher not armed`);
@@ -404,16 +406,22 @@ export async function applied(world: E2EWorld, peer: Peer = 'jessica', ms = 0): 
 //
 // Hence: budget = 2 x (ceil(N/8) + 2) sweeps, read from the live subscription count. The
 // env override pins a fixed ceiling for a measurement round.
-export const SWEEP_MS = 60_000;
+export const DEFAULT_SWEEP_MS = 60_000;
 export const MEMBERS_PER_SWEEP = 8;
 export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): number {
   const fixed = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? Number.NaN);
   if (Number.isFinite(fixed)) return fixed;
+  // The sweep is read from the PEER's own live environment, never assumed: this lane pins
+  // ELOHIM_FEEDBACK_SWEEP_SECONDS, and a budget derived from the wrong sweep is exactly
+  // the mistake this helper exists to stop making.
+  const configured = Number(peerEnv(world, peer)['ELOHIM_FEEDBACK_SWEEP_SECONDS']);
+  const sweepMs =
+    Number.isFinite(configured) && configured > 0 ? configured * 1000 : DEFAULT_SWEEP_MS;
   const n = Number(
     rows(world, peer, 'SELECT count(*) n FROM feedback_subscriptions')[0]?.['n'] ?? 0
   );
   const sweeps = Math.ceil(n / MEMBERS_PER_SWEEP) + 2;
-  return Math.max(180_000, 2 * sweeps * SWEEP_MS);
+  return Math.max(180_000, 2 * sweeps * sweepMs);
 }
 // Cucumber step timeouts are fixed at registration while the budget above is derived per
 // call, so they are set to a ceiling the derived budget cannot exceed on this mesh. They
