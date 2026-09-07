@@ -989,29 +989,53 @@ const JOINED_PEER_LINE =
 /** Fixed path, not a PATH-resolved lookup (mirrors late-joiner-receipt.ts's BASH_BIN). */
 const BASH_BIN = '/bin/bash';
 
+/**
+ * join-peer's own incumbent-readiness check is a 2s curl per existing peer
+ * (hc-mesh.sh join_peer()) — a deadline tuned for an idle mesh, not one still
+ * settling from a fresh prologue seed + a station's own conductor kill/restart
+ * (2026-09-07: matthew's /health flapped 000/200 under sustained ~70% CPU from
+ * the post-seed custody-reconcile sweep). That refusal ("incumbent … is not
+ * fully running") is a transient scheduling artifact, not a join-peer defect,
+ * so this retries the whole command rather than loosening hc-mesh.sh's own
+ * bound for every caller.
+ */
+const JOIN_PEER_INCUMBENT_RETRY_LIMIT = 4;
+const JOIN_PEER_INCUMBENT_RETRY_DELAY_MS = 5_000;
+const JOIN_PEER_INCUMBENT_NOT_READY = /incumbent \S+ is not fully running/;
+
 /** Stages one fresh storage peer against the already-running mesh (`hc-mesh.sh join-peer`). */
 function stageLateJoiner(name: string): { url: string; nodeId: string } {
-  const result = spawnSync(BASH_BIN, [MESH_SCRIPT_PATH, 'join-peer', name], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    env: process.env,
-    maxBuffer: 8 * 1024 * 1024,
-    timeout: JOIN_PEER_TIMEOUT_MS,
-  });
-  assert.equal(
-    result.error,
-    undefined,
-    `hc-mesh.sh join-peer ${name} could not run: ${result.error?.message ?? 'unknown spawn error'}`
-  );
-  const transcript = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  assert.equal(
-    result.status,
-    0,
-    `hc-mesh.sh join-peer ${name} exited ${String(result.status)}:\n${transcript.slice(-2000)}`
-  );
-  const match = JOINED_PEER_LINE.exec(transcript);
-  assert.ok(match, `join-peer emitted no machine-readable JOINED_PEER line for "${name}"`);
-  return { url: match[3], nodeId: match[4] };
+  let transcript = '';
+  for (let attempt = 1; attempt <= JOIN_PEER_INCUMBENT_RETRY_LIMIT; attempt++) {
+    const result = spawnSync(BASH_BIN, [MESH_SCRIPT_PATH, 'join-peer', name], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: process.env,
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: JOIN_PEER_TIMEOUT_MS,
+    });
+    assert.equal(
+      result.error,
+      undefined,
+      `hc-mesh.sh join-peer ${name} could not run: ${result.error?.message ?? 'unknown spawn error'}`
+    );
+    transcript = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+    if (result.status === 0) {
+      const match = JOINED_PEER_LINE.exec(transcript);
+      assert.ok(match, `join-peer emitted no machine-readable JOINED_PEER line for "${name}"`);
+      return { url: match[3], nodeId: match[4] };
+    }
+    const incumbentNotReady = JOIN_PEER_INCUMBENT_NOT_READY.test(transcript);
+    if (!incumbentNotReady || attempt === JOIN_PEER_INCUMBENT_RETRY_LIMIT) {
+      assert.equal(
+        result.status,
+        0,
+        `hc-mesh.sh join-peer ${name} exited ${String(result.status)}:\n${transcript.slice(-2000)}`
+      );
+    }
+    spawnSync('sleep', [String(JOIN_PEER_INCUMBENT_RETRY_DELAY_MS / 1000)]);
+  }
+  throw new Error(`hc-mesh.sh join-peer ${name} never succeeded:\n${transcript.slice(-2000)}`);
 }
 
 /** Sums every Prometheus line naming `name`, tolerating any (or no) labels. */

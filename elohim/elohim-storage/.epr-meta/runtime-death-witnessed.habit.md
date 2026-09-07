@@ -25,6 +25,36 @@ retire-when: >
   build with no developer-shaped tool in the path — the habit then describes the runtime, not a
   storage feature.
 ---
+DELTA 2026-09-07 (T11 — 3b-ii attempted on the ark-launched household mesh, NOT reached): mesh raised
+`MESH_CONDUCTOR_LAUNCH=ark MESH_TRANSPORT_BACKEND=dual just mesh start` (3 conductors each a live child
+of its own ark — `conductor(ark) matthew/jessica/james ready=true`, spool=`<peer>/ark`), ready in 193s;
+lamad DNA hash confirmed against T7a's measured worktree hash (DHT space `8pow3EM3IVN9lZhCBlgnwyKrReAAXLKTEKnEFcPJQxg`
+matches the middle of `uhC0k8pow3EM3IVN9lZhCBlgnwyKrReAAXLKTEKnEFcPJQxjPZLNm`); prologue all-MUST-SUCCEED-green
+on its second run (first run's `seed-base-corpus-via-A` hard leg failed on a timing race, harmless retry).
+`just test mesh features/resilience/death-witness.feature`: station 1 and 3b PASSED clean across every
+run today; station 2 and 3b-ii did NOT complete a clean pass. Two harness bugs found and fixed in
+`genesis/a2o/steps/mesh/death-witness.steps.ts`: (1) the household fixture written by
+`hc-mesh-prologue.sh` carries no `agentPubKey` field — every custody-commitment step failed
+`requireAgentKey` until `bash app/elohim-app/scripts/hc-mesh.sh fixture-refresh` was run by hand
+(this restamp is not wired into `start`/`wait`/`prologue`, only into `storage-restart`/`conductors-restart`
+— worth wiring in, not done here); (2) `join-peer`'s own incumbent-readiness probe (hc-mesh.sh, 2s curl
+per existing peer) has no retry, so `stageLateJoiner` now retries the whole `join-peer daniel` invocation
+up to 4× / 5s apart on an "incumbent … is not fully running" refusal (landed, compiles, and was observed
+retrying correctly). Even with that retry, matthew's `elohim-storage` climbed from ~65% to 100% CPU and
+`/health` went unresponsive for 10+ s across repeated runs in this session (load average 6.7→9.8 on a
+24-core host with an unrelated `cargo` pre-push gate concurrently claimed) — station 2 timed out waiting
+for custody replication within 120s (commitment step and the kill both passed; only the wait failed), and
+3b-ii's join-peer precondition never cleared within the retry budget, so its actual claims (Daniel holds
+nothing; one skipped-preauthorization counted) were never exercised. This reads as host/session resource
+contention compounding across this run's own repeated invocations, not a defect in the receiver-side gate
+(`elohim/elohim-storage/src/p2p/private_receive.rs::preauthorize_private_record`, called from
+`store_acquired_record` in `p2p/mod.rs`) — nothing that DID run contradicted it. `@wip` stays on
+`@station-3b-ii` (flips need evidence, not a partial run); recovery is independently healthy
+(`just mesh recovery warm james` → PASS in 49s). Receipts: sprint-report-household-20260907T224701Z-6bef71b8.{json,md}
+(the fullest attempt), recovery-timeline.jsonl. NEXT: rerun station 2 + 3b-ii on a quiet host (no
+concurrent cargo gate), and wire `refresh_fixture_pids` into `start`/`wait` so agentPubKey is never
+fixture-stale on a fresh mesh.
+
 DELTA 2026-09-05: `just gate elohim-ark` passes 120 tests; a readiness timeout now remains a ReadinessFailed state until death is witnessed and judged by the restart governor, instead of closing as an intentional successful stop. Kernel executable identity is a new explicit readiness rung; custody/attestation delivery remains outside this local proof.
 
 DELTA 2026-09-02 (BORN red — design canonized, nothing built; the census refuses `unwired` when a
