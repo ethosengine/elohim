@@ -17,7 +17,7 @@ import { strict as assert } from 'node:assert';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Given, Then, When } from '@cucumber/cucumber';
@@ -25,16 +25,25 @@ import { Given, Then, When } from '@cucumber/cucumber';
 const execute = promisify(execFile);
 const workspaceScript = resolve('../agentic/compute/workspace.mjs');
 
+// Manual dash-trim (no regex): sonarjs/slow-regex flags anchored `+` dash-trim patterns
+// even though they are linear here — a manual scan sidesteps the question entirely.
+const trimDashes = (value: string): string => {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charAt(start) === '-') start += 1;
+  while (end > start && value.charAt(end - 1) === '-') end -= 1;
+  return value.slice(start, end);
+};
+
 // Verbatim slug expression, design §3 D6 — duplicated deliberately rather than imported:
 // the requester and the generated guest script must each compute it independently
 // without communicating, so the two sides staying byte-identical IS the property proved.
-const slugify = (s: string): string =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 96)
-    .replace(/-+$/, '');
+// The transformation (lowercase, collapse non-alphanumerics to '-', trim both ends, cap at
+// 96 chars, trim a trailing dash newly exposed by truncation) is unchanged from the D6 text.
+const slugify = (s: string): string => {
+  const collapsed = s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return trimDashes(trimDashes(collapsed).slice(0, 96));
+};
 
 interface Artifact {
   cid: string;
@@ -56,7 +65,7 @@ interface Receipt {
   dna: Artifact;
   provider: string;
   status: string;
-  logs: Array<{ name: string; chunks?: Artifact[] }>;
+  logs: { name: string; chunks?: Artifact[] }[];
 }
 interface Status {
   requestActionHash: string;
@@ -79,7 +88,7 @@ interface Fixture {
 interface CucumberScenarioElement {
   type: string;
   name: string;
-  steps?: Array<{ result?: { status?: string } }>;
+  steps?: { result?: { status?: string } }[];
 }
 interface CucumberFeatureDoc {
   uri?: string;
@@ -103,7 +112,7 @@ interface State {
   reportFeature: CucumberFeatureDoc;
 }
 const states = new WeakMap<object, State>();
-const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const pause = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function assertLoopback(url: string, label: string) {
   const parsed = new URL(url);
@@ -113,7 +122,12 @@ function assertLoopback(url: string, label: string) {
   );
 }
 
-async function localRead(base: string, performer: string, token: string, reference: string): Promise<Status> {
+async function localRead(
+  base: string,
+  performer: string,
+  token: string,
+  reference: string
+): Promise<Status> {
   const response = await fetch(
     new URL(`/api/v1/compute/tasks/${encodeURIComponent(reference)}`, base),
     {
@@ -165,7 +179,11 @@ Given(
     if (!file) return 'pending';
     const config = JSON.parse(await readFile(file, 'utf8')) as Fixture;
     assert(
-      config.stageDir && config.requesterApi && config.providerApi && config.requesterKey && config.providerKey,
+      config.stageDir &&
+        config.requesterApi &&
+        config.providerApi &&
+        config.requesterKey &&
+        config.providerKey,
       'incomplete peer-stage fixture'
     );
     assertLoopback(config.requesterApi, 'requesterApi');
@@ -185,7 +203,7 @@ Given(
     ) as Envelope;
     state.taskJson = taskJson;
 
-    const executor = state.env.COMPUTE_EXECUTOR || 'compute-executor';
+    const executor = state.env.COMPUTE_EXECUTOR ?? 'compute-executor';
     const entries = await readdir(state.config.stageDir);
     const featureFileName = entries.find(name => name.endsWith('.feature'));
     assert(featureFileName, `no .feature file staged in ${state.config.stageDir}`);
@@ -194,12 +212,16 @@ Given(
     const runnerDescriptor = JSON.parse(
       (await execute(executor, ['artifact', join(state.config.stageDir, 'stage-runner.sh')])).stdout
     ) as Artifact;
-    assert.equal(runnerDescriptor.cid, taskJson.binary.cid, 'binary cid must match the staged runner');
+    assert.equal(
+      runnerDescriptor.cid,
+      taskJson.binary.cid,
+      'binary cid must match the staged runner'
+    );
     assert.equal(runnerDescriptor.sha256, taskJson.binary.sha256);
     assert.equal(runnerDescriptor.bytes, taskJson.binary.bytes);
 
     const dnaDescriptor = JSON.parse(
-      (await execute(executor, ['artifact', join(state.config.stageDir, featureFileName!)])).stdout
+      (await execute(executor, ['artifact', join(state.config.stageDir, featureFileName)])).stdout
     ) as Artifact;
     assert.equal(dnaDescriptor.cid, taskJson.dna.cid, 'dna cid must match the staged feature file');
     assert.equal(dnaDescriptor.sha256, taskJson.dna.sha256);
@@ -207,12 +229,17 @@ Given(
 
     // D6: feedback_signal::a2o::<feature-dir>::<feature-slug>::<scenario-slug>
     const parts = taskJson.expectedTests[0].split('::');
-    assert(parts[0] === 'feedback_signal' && parts[1] === 'a2o', 'unexpected expectedTests namespace');
+    assert(
+      parts[0] === 'feedback_signal' && parts[1] === 'a2o',
+      'unexpected expectedTests namespace'
+    );
     const featureDir = parts[2];
     const featureSlug = parts[3];
     state.featureRel = `features/${featureDir}/${featureSlug}.feature`;
     state.featureAbsPath = resolve('../a2o', state.featureRel);
-    state.scenarioSlugs = taskJson.expectedTests.map(entry => entry.split('::').slice(4).join('::'));
+    state.scenarioSlugs = taskJson.expectedTests.map(entry =>
+      entry.split('::').slice(4).join('::')
+    );
 
     const repoFeatureBytes = await readFile(state.featureAbsPath);
     const repoFeatureSha256 = createHash('sha256').update(repoFeatureBytes).digest('hex');
@@ -248,18 +275,22 @@ When('the requester submits the stage to the provider', { timeout: 300000 }, asy
   state.invocation = written.invocation!;
 });
 
-Then('the provider accepts the stage and runs it on its own substrate', { timeout: 300000 }, async function () {
-  const state = states.get(this)!;
-  const status = await waitFor(
-    state.config.requesterApi,
-    state.config.requesterKey,
-    state.env.ELOHIM_COMPUTE_LOCAL_TOKEN ?? '',
-    state.reference,
-    state.config.timeoutSeconds ?? 300,
-    value => Boolean(value.acceptance)
-  );
-  assert(status.acceptance, 'expected an acceptance before completion');
-});
+Then(
+  'the provider accepts the stage and runs it on its own substrate',
+  { timeout: 300000 },
+  async function () {
+    const state = states.get(this)!;
+    const status = await waitFor(
+      state.config.requesterApi,
+      state.config.requesterKey,
+      state.env.ELOHIM_COMPUTE_LOCAL_TOKEN ?? '',
+      state.reference,
+      state.config.timeoutSeconds ?? 300,
+      value => Boolean(value.acceptance)
+    );
+    assert(status.acceptance, 'expected an acceptance before completion');
+  }
+);
 
 Then(
   "the requester recovers the provider's signed completion for the pinned stage",
@@ -285,9 +316,9 @@ Then(
     const { completion } = status;
     assert(completion, 'completion must be present');
     assert.equal(status.taskCid, state.taskCid);
-    assert.deepEqual(completion!.receipt.binary, state.submitted.envelope.binary);
-    assert.deepEqual(completion!.receipt.dna, state.submitted.envelope.dna);
-    assert.equal(completion!.receipt.provider, state.config.providerKey);
+    assert.deepEqual(completion.receipt.binary, state.submitted.envelope.binary);
+    assert.deepEqual(completion.receipt.dna, state.submitted.envelope.dna);
+    assert.equal(completion.receipt.provider, state.config.providerKey);
   }
 );
 
@@ -296,7 +327,7 @@ Then(
   async function () {
     const state = states.get(this)!;
     const actionHash = state.status.completion!.actionHash;
-    const root = resolve(state.env.COMPUTE_INBOX_ROOT || 'genesis/a2o/reports/compute');
+    const root = resolve(state.env.COMPUTE_INBOX_ROOT ?? 'genesis/a2o/reports/compute');
     const directory = join(root, 'logs', createHash('sha256').update(actionHash).digest('hex'));
     const stdoutPath = join(directory, 'stdout.log');
     const stdout = await readFile(stdoutPath, 'utf8');
@@ -312,13 +343,14 @@ Then(
     state.reportFeature = matching[0];
 
     const seenSlugs = new Set(
-      (state.reportFeature.elements || [])
+      (state.reportFeature.elements ?? [])
         .filter(element => element.type === 'scenario')
         .map(element => slugify(element.name))
     );
+    const byLocale = (a: string, b: string) => a.localeCompare(b);
     assert.deepEqual(
-      [...seenSlugs].sort(),
-      [...state.scenarioSlugs].sort(),
+      [...seenSlugs].sort(byLocale),
+      [...state.scenarioSlugs].sort(byLocale),
       'the report must name exactly the declared scenario inventory, no more, no fewer'
     );
   }
@@ -328,12 +360,12 @@ Then('every declared scenario passed in the report, not merely in the receipt', 
   // D9: the verdict reads the decoded report, never receipt.status — a provider's
   // status: "passed" is a claim; this assertion checks the evidence the run left behind.
   const state = states.get(this)!;
-  const scenarios = (state.reportFeature.elements || []).filter(
+  const scenarios = (state.reportFeature.elements ?? []).filter(
     element => element.type === 'scenario'
   );
   assert(scenarios.length > 0, 'report must contain at least one scenario element');
   for (const scenario of scenarios) {
-    const steps = scenario.steps || [];
+    const steps = scenario.steps ?? [];
     assert(steps.length > 0, `scenario ${scenario.name} has no steps in the report`);
     for (const step of steps) {
       assert.equal(
@@ -380,21 +412,25 @@ Then('the completion is attested by an economic event naming the grant', async f
   );
 });
 
-When('the requester submits the identical stage a second time', { timeout: 300000 }, async function () {
-  const state = states.get(this)!;
-  const { stdout } = await execute(
-    process.execPath,
-    [
-      workspaceScript,
-      'submit',
-      join(state.config.stageDir, 'task.json'),
-      join(state.config.stageDir, 'stage-runner.sh'),
-      join(state.config.stageDir, state.featureFileName),
-    ],
-    { env: state.env, timeout: 300000, maxBuffer: 1024 * 1024 }
-  );
-  state.secondSubmitted = JSON.parse(stdout) as Status;
-});
+When(
+  'the requester submits the identical stage a second time',
+  { timeout: 300000 },
+  async function () {
+    const state = states.get(this)!;
+    const { stdout } = await execute(
+      process.execPath,
+      [
+        workspaceScript,
+        'submit',
+        join(state.config.stageDir, 'task.json'),
+        join(state.config.stageDir, 'stage-runner.sh'),
+        join(state.config.stageDir, state.featureFileName),
+      ],
+      { env: state.env, timeout: 300000, maxBuffer: 1024 * 1024 }
+    );
+    state.secondSubmitted = JSON.parse(stdout) as Status;
+  }
+);
 
 Then('the same request is recovered and the provider runs nothing new', async function () {
   const state = states.get(this)!;
@@ -404,7 +440,11 @@ Then('the same request is recovered and the provider runs nothing new', async fu
   const written = JSON.parse(
     await readFile(join(state.config.stageDir, 'task.json'), 'utf8')
   ) as Envelope;
-  assert.equal(written.invocation, state.invocation, 'invocation nonce must not change on plain resubmission');
+  assert.equal(
+    written.invocation,
+    state.invocation,
+    'invocation nonce must not change on plain resubmission'
+  );
 
   const status = await localRead(
     state.config.requesterApi,
@@ -430,7 +470,7 @@ Then('exactly one admission event exists for that stage', async function () {
     )
   );
   assert.equal(listed.status, 200);
-  const rows = (await listed.json()) as Array<{ id: string }>;
+  const rows = (await listed.json()) as { id: string }[];
   const matching = rows.filter(row => row.id === admissionId);
   assert.equal(matching.length, 1, `expected exactly one admission row for ${admissionId}`);
 });
