@@ -856,3 +856,320 @@ async fn pending_acceptance_retries_without_holding_a_database_connection() {
         2
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sweep heat — cold-retire, re-arm, ordering (backlog atom
+// `feedback-discovery-sweep-is-o-n-in-history.md`, cures (a) + (b))
+// ---------------------------------------------------------------------------
+
+/// Seed quiet content-target members and a projector on an ISOLATED scheduler.
+/// Quiet = the fake reader answers with no references at all, which is exactly
+/// the settled history the atom found the rotation spending its whole budget
+/// on.
+fn quiet_member_fixture(keys: &[&str]) -> (DbPool, Arc<FakeReader>, FeedbackProjector) {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        for k in keys {
+            sub_db::add_member(
+                &mut conn,
+                sub_db::KIND_CONTENT_TARGET,
+                k,
+                DNA,
+                sub_db::SOURCE_STEWARD,
+                "2026-09-06T00:00:00Z",
+            )
+            .unwrap();
+        }
+    }
+    let reader = Arc::new(FakeReader::new());
+    let projector = FeedbackProjector::with_scheduler(
+        pool.clone(),
+        reader.clone(),
+        key(0xE0),
+        PinnedPolicy::default(),
+        Arc::new(SweepScheduler::new()),
+    );
+    (pool, reader, projector)
+}
+
+fn act_ref(action_hash: &str, routing_key: &str) -> crate::p2p::feedback_signal::FeedbackActRef {
+    crate::p2p::feedback_signal::FeedbackActRef {
+        origin_dna_hash: DNA.to_string(),
+        action_hash: action_hash.to_string(),
+        routing_key: routing_key.to_string(),
+    }
+}
+
+/// (1) A member with nothing open retires after EXACTLY K clean sweeps, and the
+/// (K+1)th sweep does not pay a `get_links` for it.
+///
+/// This is the whole cost cure. The atom measured `ceil(N/8)` sweeps of
+/// acceptance→application lag over a set that had grown to 127 members of
+/// settled history, so what matters is not that a quiet member is swept less
+/// often but that it leaves the denominator entirely.
+#[tokio::test]
+async fn quiet_member_goes_cold_after_exactly_three_clean_sweeps() {
+    let (_pool, reader, projector) = quiet_member_fixture(&["target-quiet"]);
+    let scheduler = projector.scheduler();
+
+    for expected in [MemberHeat::Warm(1), MemberHeat::Warm(2), MemberHeat::Cold] {
+        let report = projector.tick().await.expect("tick");
+        assert_eq!(report.members_visited, 1, "report: {report:?}");
+        assert_eq!(
+            scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-quiet"),
+            expected
+        );
+    }
+    assert_eq!(
+        reader.visited().len(),
+        COLD_AFTER_CLEAN_SWEEPS as usize,
+        "exactly K enumerations before retirement, no more"
+    );
+
+    let fourth = projector.tick().await.expect("fourth tick");
+    assert_eq!(
+        fourth.members_visited, 0,
+        "a Cold member is absent from the sweep's member set"
+    );
+    assert_eq!(fourth.members_cold, 1);
+    assert_eq!(
+        reader.visited().len(),
+        COLD_AFTER_CLEAN_SWEEPS as usize,
+        "the fourth sweep must not spend a get_links on the retired member"
+    );
+}
+
+/// (2) A notification through the real ingress path re-arms a Cold member, and
+/// it is swept FIRST on the next rotation.
+///
+/// The peer relationship is what makes retirement safe: a target only stays
+/// cold while nobody says otherwise.
+#[tokio::test]
+async fn notification_re_arms_a_cold_member_to_the_front() {
+    let (pool, reader, projector) = quiet_member_fixture(&["target-a", "target-b", "target-cold"]);
+    let scheduler = projector.scheduler();
+
+    for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
+        projector.tick().await.expect("cooling tick");
+    }
+    assert!(scheduler
+        .heat(sub_db::KIND_CONTENT_TARGET, "target-cold")
+        .is_cold());
+    let swept_before = reader.visited().len();
+
+    {
+        let mut conn = pool.get().unwrap();
+        let admitted = admit_notified_signal_with(
+            &mut conn,
+            Some(&act_ref("corr-notified", "target-cold")),
+            Some(DNA),
+            Some(&scheduler),
+        )
+        .expect("notification admitted");
+        assert!(admitted);
+    }
+    assert_eq!(
+        scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-cold"),
+        MemberHeat::Hot,
+        "a notification naming the member re-arms it"
+    );
+
+    projector.tick().await.expect("post-notification tick");
+    let mut swept_after = reader.visited();
+    let swept_after: Vec<String> = swept_after.split_off(swept_before);
+    assert_eq!(
+        swept_after.first().map(String::as_str),
+        Some("target-cold"),
+        "the re-armed member leads the next rotation; swept: {swept_after:?}"
+    );
+}
+
+/// (3) A new act reference re-arms — the second path the atom names.
+///
+/// A correction action that was discovered, never accepted and then went quiet
+/// is retired; discovering the correction again puts it straight back at the
+/// front rather than behind every member the key order precedes it.
+#[tokio::test]
+async fn a_new_act_reference_re_arms_a_cold_member() {
+    let (pool, reader, projector) = quiet_member_fixture(&["content-target-1"]);
+    let scheduler = projector.scheduler();
+    {
+        let mut conn = pool.get().unwrap();
+        sub_db::add_member(
+            &mut conn,
+            sub_db::KIND_CORRECTION_ACTION,
+            "corr-1",
+            DNA,
+            sub_db::SOURCE_DISCOVERED,
+            "2026-09-06T00:00:00Z",
+        )
+        .unwrap();
+    }
+    for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
+        projector.tick().await.expect("cooling tick");
+    }
+    assert!(scheduler
+        .heat(sub_db::KIND_CORRECTION_ACTION, "corr-1")
+        .is_cold());
+
+    // The content target now carries the correction. Its own re-arm is the
+    // notification path (already covered); what this test is about is what that
+    // sweep then does to the RETIRED correction-action member.
+    scheduler.rearm(sub_db::KIND_CONTENT_TARGET, "content-target-1");
+    {
+        let mut s = reader.state.lock().unwrap();
+        s.refs
+            .insert("content-target-1".into(), vec![referenced("corr-1")]);
+        s.records.insert(
+            "corr-1".into(),
+            record(
+                "corr-1",
+                2,
+                100,
+                correction_entry("content-target-1", "ev-1", "debit-soft"),
+            ),
+        );
+    }
+    let report = projector.tick().await.expect("discovery tick");
+    assert_eq!(report.groups_applied, 1, "report: {report:?}");
+    assert_eq!(
+        scheduler.heat(sub_db::KIND_CORRECTION_ACTION, "corr-1"),
+        MemberHeat::Hot,
+        "a new act reference for a retired member re-arms it"
+    );
+}
+
+/// (4) The race: a notification for a member ALREADY SWEPT this round is not
+/// lost, in both of its shapes.
+///
+/// Shape one — the notification lands after the visit finished: the re-arm
+/// simply wins, and the member is Hot for the next round.
+///
+/// Shape two — the notification lands WHILE the member is being enumerated: the
+/// cooling that follows must not overwrite a re-arm it could not have seen.
+/// That is what the visit token is for; without it the sweep would silently
+/// swallow the one signal that makes retirement safe.
+#[tokio::test]
+async fn a_notification_racing_a_sweep_is_not_lost() {
+    let (pool, _reader, projector) = quiet_member_fixture(&["target-race"]);
+    let scheduler = projector.scheduler();
+    let member = (sub_db::KIND_CONTENT_TARGET, "target-race");
+
+    // Two clean sweeps: one more retires it.
+    projector.tick().await.expect("tick 1");
+    projector.tick().await.expect("tick 2");
+    assert_eq!(scheduler.heat(member.0, member.1), MemberHeat::Warm(2));
+
+    // Shape one: swept (going Cold), then notified.
+    projector.tick().await.expect("tick 3");
+    assert!(scheduler.heat(member.0, member.1).is_cold());
+    {
+        let mut conn = pool.get().unwrap();
+        admit_notified_signal_with(
+            &mut conn,
+            Some(&act_ref("corr-race", "target-race")),
+            Some(DNA),
+            Some(&scheduler),
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        scheduler.heat(member.0, member.1),
+        MemberHeat::Hot,
+        "a notification after the sweep re-arms rather than being swallowed"
+    );
+
+    // Shape two: the token is taken, the notification lands, THEN the sweep
+    // reports its clean visit. The clean visit must be discarded.
+    let token = scheduler.begin_visit(member.0, member.1);
+    scheduler.rearm(member.0, member.1);
+    scheduler.record_sweep(member.0, member.1, token, false);
+    assert_eq!(
+        scheduler.heat(member.0, member.1),
+        MemberHeat::Hot,
+        "a sweep may not cool a member that was re-armed under it"
+    );
+}
+
+/// (5) Two Hot members sort by last-new-act descending — the atom's cure (b),
+/// "hot targets rotate faster".
+#[test]
+fn hot_members_sort_by_last_new_act_descending() {
+    let scheduler = SweepScheduler::new();
+    let rows: Vec<sub_db::SubscriptionRow> = ["target-a", "target-b", "target-c"]
+        .iter()
+        .map(|k| sub_db::SubscriptionRow {
+            member_kind: sub_db::KIND_CONTENT_TARGET.to_string(),
+            member_key: (*k).to_string(),
+            origin_dna_hash: DNA.to_string(),
+            source: sub_db::SOURCE_STEWARD.to_string(),
+            added_at: "2026-09-06T00:00:00Z".to_string(),
+            last_visited_at: Some("2026-09-06T00:00:00Z".to_string()),
+            visit_count: 1,
+        })
+        .collect();
+
+    // Re-armed in an order that disagrees with the key order, so a passing
+    // assertion cannot be an accident of the alphabet.
+    scheduler.rearm(sub_db::KIND_CONTENT_TARGET, "target-a");
+    scheduler.rearm(sub_db::KIND_CONTENT_TARGET, "target-c");
+    scheduler.rearm(sub_db::KIND_CONTENT_TARGET, "target-b");
+
+    let ordered: Vec<String> = scheduler
+        .schedule(rows.clone(), 8)
+        .into_iter()
+        .map(|r| r.member_key)
+        .collect();
+    assert_eq!(ordered, vec!["target-b", "target-c", "target-a"]);
+
+    // And Hot outranks Warm regardless of arm stamp.
+    let token = scheduler.begin_visit(sub_db::KIND_CONTENT_TARGET, "target-b");
+    scheduler.record_sweep(sub_db::KIND_CONTENT_TARGET, "target-b", token, false);
+    assert_eq!(
+        scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-b"),
+        MemberHeat::Warm(1)
+    );
+    let ordered: Vec<String> = scheduler
+        .schedule(rows, 8)
+        .into_iter()
+        .map(|r| r.member_key)
+        .collect();
+    assert_eq!(ordered, vec!["target-c", "target-a", "target-b"]);
+}
+
+/// (6) `publish_generation` still fires on a clean sweep once members have gone
+/// Cold.
+///
+/// The invariant a Cold member rests on: retirement REQUIRES K completed visits
+/// that each found nothing open, so a Cold member has a non-null
+/// `last_visited_at` and no pending application member — it can never be the
+/// reason a generation stays unpublished. Cold counts as clean by construction.
+#[tokio::test]
+async fn publication_still_fires_when_members_have_retired() {
+    let (pool, _reader, projector) = quiet_member_fixture(&["target-p", "target-q"]);
+    let scheduler = projector.scheduler();
+
+    for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
+        projector.tick().await.expect("cooling tick");
+    }
+    assert_eq!(scheduler.cold_count(), 2);
+
+    let mut conn = pool.get().unwrap();
+    assert!(
+        gen_db::published_generation(&mut conn, &key(0xE0))
+            .unwrap()
+            .is_some(),
+        "a sweep that found nothing unvisited and nothing pending publishes, and Cold members \
+         do not hold it back"
+    );
+    let unvisited: i64 = {
+        use crate::db::diesel_schema::feedback_subscriptions::dsl as t;
+        t::feedback_subscriptions
+            .filter(t::last_visited_at.is_null())
+            .count()
+            .get_result(&mut conn)
+            .unwrap()
+    };
+    assert_eq!(unvisited, 0, "every Cold member has been visited K times");
+}

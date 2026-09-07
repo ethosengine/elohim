@@ -11,9 +11,13 @@
 //!
 //! 1. **Fair rotation, not `take(N)`.** `release_adoption/watch.rs` takes the
 //!    first N members of an unsorted set every tick, so the ninth member of a
-//!    nine-member set is never visited. The cursor here advances past whatever
-//!    was served — on FAILURE as well as success — so N members under a per-tick
-//!    budget of B are each visited within ceil(N/B) ticks.
+//!    nine-member set is never visited. Selection here is least-recently-visited
+//!    first — advancing on FAILURE as well as success — so N members under a
+//!    per-tick budget of B are each visited within ceil(N/B) ticks. Heat
+//!    ([`SweepScheduler`]) then keeps N proportional to LIVE targets rather than
+//!    to the peer's whole history: a member with nothing open retires after
+//!    [`COLD_AFTER_CLEAN_SWEEPS`] and returns the moment a notification or a new
+//!    act reference re-arms it.
 //!
 //! 2. **One transaction that PROPAGATES.** `db/economic_events.rs`'s per-item
 //!    loop swallows errors so a partial batch reads as success. The apply here
@@ -29,7 +33,9 @@
 //!    Only an ACCEPTED correction moves the aggregate, and it moves it against
 //!    the TARGET's root author, never against the signal's signer.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -79,6 +85,21 @@ pub const MAX_BYTES_PER_SWEEP: usize = 4 * 1024 * 1024;
 /// First retry delay for a PENDING group; doubles per attempt to the ceiling.
 pub const RETRY_BASE_SECS: i64 = 60;
 pub const RETRY_MAX_SECS: i64 = 3600;
+
+/// Consecutive clean sweeps before a member retires from the rotation.
+///
+/// Cites `genesis/data/timeline/backlog/feedback-discovery-sweep-is-o-n-in-history.md`:
+/// the subscription set as implemented IS the peer's whole history (14 → 44 →
+/// 127 members over one day of mesh rounds), so `ceil(N/MAX_MEMBERS_PER_SWEEP)`
+/// sweeps grew a single act's acceptance→application lag from 106.6 s to
+/// 332.8 s. K is the atom's cure (a): after K sweeps that found nothing open or
+/// unapplied for a member, that member costs nothing until something re-arms
+/// it. K = 3 is deliberately small — a re-arm is cheap and certain (a
+/// notification or a new act reference), while a needlessly-swept member costs
+/// a DHT `get_links` every rotation forever. Raising
+/// `MAX_MEMBERS_PER_SWEEP` instead is the refused cure: it multiplies
+/// `get_links` load rather than removing it.
+pub const COLD_AFTER_CLEAN_SWEEPS: u8 = 3;
 
 // ---------------------------------------------------------------------------
 // Wire mirrors of the coordinator's own types
@@ -137,6 +158,230 @@ pub struct ContentLineage {
 pub struct DiscoveredRef {
     pub action_hash: String,
     pub fetch_outcome: String,
+}
+
+// ---------------------------------------------------------------------------
+// Sweep heat — discovery cost follows LIVE targets, not history
+// ---------------------------------------------------------------------------
+
+/// How much attention one subscription member has earned.
+///
+/// The rotation's cost is `get_links` per member per sweep, and the atom's
+/// finding is that almost every member of a long-lived peer's set is settled
+/// history: nothing open, nothing unapplied, nothing that will ever change
+/// again unless someone acts. Heat is the distinction between "a target
+/// something is happening to" and "a target that has been quiet".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MemberHeat {
+    /// Something is open here, or something just re-armed it. Swept first.
+    #[default]
+    Hot,
+    /// `n` consecutive clean sweeps so far, `n < COLD_AFTER_CLEAN_SWEEPS`.
+    /// Still swept, after every Hot member.
+    Warm(u8),
+    /// Retired from the rotation. Costs nothing until a re-arm.
+    Cold,
+}
+
+impl MemberHeat {
+    /// Sort class. Hot before Warm; Cold never reaches a comparison because it
+    /// is filtered out before ordering.
+    fn rank(self) -> u8 {
+        match self {
+            MemberHeat::Hot => 0,
+            MemberHeat::Warm(_) => 1,
+            MemberHeat::Cold => 2,
+        }
+    }
+
+    pub fn is_cold(self) -> bool {
+        matches!(self, MemberHeat::Cold)
+    }
+}
+
+/// Per-member scheduling state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MemberSweepState {
+    pub heat: MemberHeat,
+    /// LOGICAL stamp of the last new act reference seen for this member — the
+    /// scheduler's own counter, not a wall clock. Two members re-armed inside
+    /// the same millisecond still order deterministically, which a timestamp
+    /// cannot promise and which the ordering test depends on. `0` = never.
+    pub last_new_act_seq: u64,
+}
+
+/// Ordering + retirement for the rotation (cures (a) and (b) of the atom).
+///
+/// **Deliberately in memory.** Heat is operational state, reconstructable by
+/// construction: a restart forgets it, every member starts Hot, and the peer
+/// degrades to exactly the pre-change rotation until the first clean sweeps
+/// re-cool the set. Losing it can therefore only cost a few sweeps of work,
+/// never correctness — which is the whole reason it does not earn a column.
+///
+/// **Publication invariant.** `publish_generation` still fires on a sweep that
+/// ends with nothing unvisited and nothing pending, and a Cold member can never
+/// be the reason it does not: going Cold REQUIRES
+/// [`COLD_AFTER_CLEAN_SWEEPS`] completed visits that each found nothing open,
+/// so a Cold member has a non-null `last_visited_at` and contributes no pending
+/// application member. Cold counts as clean by construction.
+#[derive(Debug, Default)]
+pub struct SweepScheduler {
+    states: Mutex<HashMap<(String, String), MemberSweepState>>,
+    seq: AtomicU64,
+}
+
+/// The scheduler the live sweep loop is using, so the notification ingress path
+/// can re-arm without a handle plumbed through every caller. Registered by
+/// [`spawn`]; `None` in tests that drive `tick()` directly, which each own an
+/// isolated scheduler instead (a shared global would let one test's cold-retire
+/// silence another's members).
+static LIVE_SCHEDULER: OnceLock<Arc<SweepScheduler>> = OnceLock::new();
+
+impl SweepScheduler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Re-arm a member: Hot, clean-sweep count reset, and stamped at the FRONT
+    /// of the order. Called from both re-arm paths the atom names — a
+    /// notification ([`admit_notified_signal`]) and the projector seeing a new
+    /// act reference for the target.
+    pub fn rearm(&self, member_kind: &str, member_key: &str) {
+        let seq = self.seq.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+        let mut states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        let state = states
+            .entry((member_kind.to_string(), member_key.to_string()))
+            .or_default();
+        state.heat = MemberHeat::Hot;
+        state.last_new_act_seq = seq;
+    }
+
+    /// Take the visit token for a member about to be swept.
+    ///
+    /// The token is the member's arm stamp at the moment the visit begins. It
+    /// is what makes the mid-sweep race safe: a notification that lands while
+    /// this member is being enumerated bumps the stamp, so the cooling that
+    /// follows the visit sees a token mismatch and declines to cool a member
+    /// that was re-armed under it. Without the token the re-arm would be
+    /// overwritten by the sweep that could not have seen it.
+    pub fn begin_visit(&self, member_kind: &str, member_key: &str) -> u64 {
+        let mut states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        states
+            .entry((member_kind.to_string(), member_key.to_string()))
+            .or_default()
+            .last_new_act_seq
+    }
+
+    /// Record what a completed visit found.
+    ///
+    /// `saw_open_act` = the member had at least one reference that was not
+    /// already settled in this generation. Callers must NOT call this for a
+    /// visit that failed enumeration or ran out of budget mid-member: a visit
+    /// that did not finish looking has not shown the member to be clean, and
+    /// counting it would retire a member on evidence nobody gathered.
+    pub fn record_sweep(
+        &self,
+        member_kind: &str,
+        member_key: &str,
+        token: u64,
+        saw_open_act: bool,
+    ) {
+        if saw_open_act {
+            self.rearm(member_kind, member_key);
+            return;
+        }
+        let mut states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        let state = states
+            .entry((member_kind.to_string(), member_key.to_string()))
+            .or_default();
+        if state.last_new_act_seq != token {
+            // Re-armed while this visit was in flight. The sweep cannot have
+            // seen what the re-arm is about, so it does not get to cool it.
+            return;
+        }
+        state.heat = match state.heat {
+            MemberHeat::Hot => {
+                if COLD_AFTER_CLEAN_SWEEPS <= 1 {
+                    MemberHeat::Cold
+                } else {
+                    MemberHeat::Warm(1)
+                }
+            }
+            MemberHeat::Warm(n) => {
+                let next = n.saturating_add(1);
+                if next >= COLD_AFTER_CLEAN_SWEEPS {
+                    MemberHeat::Cold
+                } else {
+                    MemberHeat::Warm(next)
+                }
+            }
+            MemberHeat::Cold => MemberHeat::Cold,
+        };
+    }
+
+    pub fn heat(&self, member_kind: &str, member_key: &str) -> MemberHeat {
+        self.states
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&(member_kind.to_string(), member_key.to_string()))
+            .map(|s| s.heat)
+            .unwrap_or_default()
+    }
+
+    /// Members currently retired from the rotation — the number the sweep is
+    /// no longer paying `get_links` for.
+    pub fn cold_count(&self) -> usize {
+        self.states
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .filter(|s| s.heat.is_cold())
+            .count()
+    }
+
+    /// Choose (and order) this sweep's members: Cold dropped, Hot first, each
+    /// class by last-new-act descending, then least-recently-visited.
+    ///
+    /// The last-visited tiebreak is what keeps the rotation FAIR when the whole
+    /// set is equally quiet — every member of a set with no acts at all has the
+    /// same (zero) arm stamp, so without it the same head of the set would be
+    /// swept forever and the tail would starve, which is the exact failure the
+    /// cursor rotation exists to prevent.
+    pub fn schedule(
+        &self,
+        candidates: Vec<sub_db::SubscriptionRow>,
+        budget: usize,
+    ) -> Vec<sub_db::SubscriptionRow> {
+        let states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        let mut live: Vec<(MemberSweepState, sub_db::SubscriptionRow)> = candidates
+            .into_iter()
+            .filter_map(|row| {
+                let state = states
+                    .get(&(row.member_kind.clone(), row.member_key.clone()))
+                    .copied()
+                    .unwrap_or_default();
+                if state.heat.is_cold() {
+                    None
+                } else {
+                    Some((state, row))
+                }
+            })
+            .collect();
+        drop(states);
+        live.sort_by(|(a, ar), (b, br)| {
+            a.heat
+                .rank()
+                .cmp(&b.heat.rank())
+                .then(b.last_new_act_seq.cmp(&a.last_new_act_seq))
+                // `None` = never visited, and a never-visited member outranks
+                // every visited one.
+                .then(ar.last_visited_at.cmp(&br.last_visited_at))
+                .then(ar.member_kind.cmp(&br.member_kind))
+                .then(ar.member_key.cmp(&br.member_key))
+        });
+        live.truncate(budget);
+        live.into_iter().map(|(_, row)| row).collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -725,6 +970,9 @@ pub struct TickReport {
     pub groups_applied: usize,
     pub groups_pending: usize,
     pub groups_rejected: usize,
+    /// Members retired from the rotation — the sweeps this tick did NOT pay
+    /// `get_links` for. The measure the atom asks the mesh round to show.
+    pub members_cold: usize,
 }
 
 pub struct FeedbackProjector {
@@ -732,6 +980,7 @@ pub struct FeedbackProjector {
     reader: Arc<dyn FeedbackDhtReader>,
     evaluator: Vec<u8>,
     policy: PinnedPolicy,
+    scheduler: Arc<SweepScheduler>,
 }
 
 impl FeedbackProjector {
@@ -741,12 +990,36 @@ impl FeedbackProjector {
         evaluator: Vec<u8>,
         policy: PinnedPolicy,
     ) -> Self {
+        Self::with_scheduler(
+            pool,
+            reader,
+            evaluator,
+            policy,
+            Arc::new(SweepScheduler::new()),
+        )
+    }
+
+    /// Build with an explicit scheduler. Every projector owns its own by
+    /// default; sharing one is only for a caller that must observe or drive the
+    /// same heat state the sweep sees.
+    pub fn with_scheduler(
+        pool: DbPool,
+        reader: Arc<dyn FeedbackDhtReader>,
+        evaluator: Vec<u8>,
+        policy: PinnedPolicy,
+        scheduler: Arc<SweepScheduler>,
+    ) -> Self {
         Self {
             pool,
             reader,
             evaluator: normalize_agent_key(&evaluator),
             policy,
+            scheduler,
         }
+    }
+
+    pub fn scheduler(&self) -> Arc<SweepScheduler> {
+        Arc::clone(&self.scheduler)
     }
 
     /// One sweep. Budgets are sized BEFORE any conductor call is made.
@@ -777,10 +1050,26 @@ impl FeedbackProjector {
             .bind::<diesel::sql_types::Text, _>(Utc::now().to_rfc3339())
             .execute(&mut conn)
             .map_err(|e| StorageError::Database(e.to_string()))?;
-            let members = sub_db::next_members(&mut conn, MAX_MEMBERS_PER_SWEEP)
-                .map_err(|e| StorageError::Database(e.to_string()))?;
+            // Selection is heat-ordered over the WHOLE set rather than the next
+            // page after the durable cursor: a Hot member is wherever the key
+            // order put it, and a page that happened to be all-Cold would spend
+            // the sweep on nothing. One local SQLite read of N rows is orders of
+            // magnitude cheaper than the `get_links` the rotation is rationing —
+            // the budget that matters is still MAX_MEMBERS_PER_SWEEP, unchanged.
+            let candidates: Vec<sub_db::SubscriptionRow> = {
+                use crate::db::diesel_schema::feedback_subscriptions::dsl as t;
+                t::feedback_subscriptions
+                    .select(sub_db::SubscriptionRow::as_select())
+                    .order_by((t::member_kind.asc(), t::member_key.asc()))
+                    .load(&mut conn)
+                    .map_err(|e| StorageError::Database(e.to_string()))?
+            };
+            let members = self
+                .scheduler
+                .schedule(candidates, MAX_MEMBERS_PER_SWEEP as usize);
             (generation_id, members)
         };
+        report.members_cold = self.scheduler.cold_count();
 
         let expected_dna = self.reader.origin_dna_hash();
         let mut last_visited: Option<(String, String)> = None;
@@ -843,6 +1132,11 @@ impl FeedbackProjector {
         for member in &members {
             report.members_visited += 1;
             last_visited = Some((member.member_kind.clone(), member.member_key.clone()));
+            // Taken BEFORE any await in this member's visit, so a notification
+            // that lands mid-enumeration is detected rather than overwritten.
+            let visit_token = self
+                .scheduler
+                .begin_visit(&member.member_kind, &member.member_key);
 
             // Mark the visit FIRST, and advance the cursor at the end of the
             // tick regardless of outcome: a member that keeps failing must
@@ -871,8 +1165,16 @@ impl FeedbackProjector {
             };
             report.refs_seen += refs.len();
 
+            // Did this visit find anything the peer has not already settled?
+            // That, and only that, is what keeps a member in the rotation.
+            let mut saw_open_act = false;
+            // A visit that ran out of budget has not FINISHED looking, so it is
+            // not evidence of a quiet member and must not cool it.
+            let mut examined_fully = true;
+
             for r in refs {
                 if records_budget == 0 || bytes_budget == 0 {
+                    examined_fully = false;
                     break;
                 }
                 // Settled history costs no record budget, so a late link behind
@@ -894,6 +1196,8 @@ impl FeedbackProjector {
                         continue;
                     }
                 }
+                // Unsettled: real work for this member this sweep.
+                saw_open_act = true;
                 records_budget -= 1;
                 match self
                     .handle_ref(generation_id, &expected_dna, member, &r, &mut bytes_budget)
@@ -927,6 +1231,15 @@ impl FeedbackProjector {
                             "act could not be projected this tick — held, not dropped");
                     }
                 }
+            }
+
+            if examined_fully {
+                self.scheduler.record_sweep(
+                    &member.member_kind,
+                    &member.member_key,
+                    visit_token,
+                    saw_open_act,
+                );
             }
         }
 
@@ -1093,6 +1406,13 @@ impl FeedbackProjector {
             &now,
         )
         .map_err(|e| StorageError::Database(e.to_string()))?;
+        // A new act reference for that member — the atom's second re-arm path.
+        // A correction action whose acceptance never came goes Cold like any
+        // other quiet member; discovering the correction again (or discovering
+        // it for the first time) puts it back at the front of the rotation
+        // rather than behind every member the key order happens to precede it.
+        self.scheduler
+            .rearm(sub_db::KIND_CORRECTION_ACTION, &act.action_hash);
 
         let existing = app_db::fetch_application(&mut conn, generation_id, &group_key)
             .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -1386,10 +1706,31 @@ pub fn cutover_standing_view(
 ///
 /// Returns `Ok(false)` when the notification carries no act reference — a
 /// pre-slice-1 peer's message, which is not projected and is not an error.
+///
+/// The notification is also the primary RE-ARM: it is a peer relationship, not
+/// a timer, that tells this peer a quiet target is live again. Both member
+/// keys the reference names go Hot and to the front of the rotation, so a Cold
+/// member converges on the next sweep instead of after `ceil(N/8)` of them.
 pub fn admit_notified_signal(
     conn: &mut SqliteConnection,
     act_ref: Option<&crate::p2p::feedback_signal::FeedbackActRef>,
     local_dna_hash: Option<&str>,
+) -> Result<bool, StorageError> {
+    admit_notified_signal_with(conn, act_ref, local_dna_hash, LIVE_SCHEDULER.get())
+}
+
+/// [`admit_notified_signal`] against an explicit scheduler.
+///
+/// The three-argument form re-arms whichever scheduler [`spawn`] registered,
+/// which is the one the live sweep is reading. This form exists so a test can
+/// exercise the same ingress path against an isolated scheduler — heat is
+/// process state, and a test that had to reach the live one would be ordering-
+/// dependent on every other test in the binary.
+pub fn admit_notified_signal_with(
+    conn: &mut SqliteConnection,
+    act_ref: Option<&crate::p2p::feedback_signal::FeedbackActRef>,
+    local_dna_hash: Option<&str>,
+    scheduler: Option<&Arc<SweepScheduler>>,
 ) -> Result<bool, StorageError> {
     let Some(act_ref) = act_ref else {
         return Ok(false);
@@ -1417,6 +1758,12 @@ pub fn admit_notified_signal(
             &now,
         )
         .map_err(|e| StorageError::Database(e.to_string()))?;
+        // Re-arm whether or not the member was new: an already-known member is
+        // exactly the one that may have gone Cold, and it is the one a
+        // notification is most worth spending a sweep slot on.
+        if let Some(scheduler) = scheduler {
+            scheduler.rearm(kind, key);
+        }
     }
     Ok(true)
 }
@@ -1427,6 +1774,10 @@ pub fn admit_notified_signal(
 /// so a stalled runtime coalesces missed ticks instead of catching up in a
 /// burst, and every per-tick cost capped by the budgets above.
 pub fn spawn(projector: FeedbackProjector) -> tokio::task::JoinHandle<()> {
+    // Publish this sweep's heat state so the notification ingress path can
+    // re-arm it. First registration wins: there is one live projector, and a
+    // second one would be an unnoticed split of the same state.
+    let _ = LIVE_SCHEDULER.set(projector.scheduler());
     let seconds = std::env::var("ELOHIM_FEEDBACK_SWEEP_SECONDS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
