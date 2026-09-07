@@ -141,7 +141,7 @@ When(
 
 Then(
   "Matthew's peer discovers James's correction within its next discovery scan, unnotified",
-  { timeout: 240_000 },
+  { timeout: 480_000 },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
     const subscriptions = rows(
@@ -168,7 +168,7 @@ Given(
 
 Given(
   "Matthew's peer has already applied the first correction it discovered",
-  { timeout: 240_000 },
+  { timeout: 480_000 },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
   }
@@ -198,7 +198,7 @@ Then(
 
 Then(
   "Matthew's peer still shows the first correction applied exactly once, undisturbed by the late arrival",
-  { timeout: 240_000 },
+  { timeout: 480_000 },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
   }
@@ -226,7 +226,7 @@ Then(
 
 Then(
   "Matthew's peer's applied correction matches the fetched, verified record James actually authored",
-  { timeout: 240_000 },
+  { timeout: 480_000 },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
     const r = await call(this, 'matthew', 'get_feedback_signal_record', raw(ctx(this).correction));

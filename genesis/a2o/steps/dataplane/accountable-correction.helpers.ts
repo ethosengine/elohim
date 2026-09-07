@@ -300,16 +300,31 @@ export async function amend(world: E2EWorld, predecessor: string, body: string):
   });
   return hash(result.action_hash);
 }
-export async function applied(world: E2EWorld, peer: Peer = 'jessica'): Promise<void> {
-  await until(`${peer} applies operation once`, () => {
-    const result = rows(
-      world,
-      peer,
-      `SELECT a.status, a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
-      [ctx(world).correction]
-    );
-    return result.length === 1 && result[0]['status'] === 'applied';
-  });
+// A peer that is NOT the author's own is the slowest path in this feature: the act has
+// to gossip to that peer's conductor, its durable scan has to come round to the target,
+// and only then does the application row land. Measured 2026-09-07 on the household mesh
+// that took ~2-3 minutes, which sat right on the old 210s poll and made station 1 flip
+// between pass and "deadline exceeded" run to run. Give the cross-peer assertion a budget
+// that reflects the path it is actually waiting on; the wrapping step timeout is raised to
+// match, or Cucumber would cut in first with a less informative error.
+export async function applied(
+  world: E2EWorld,
+  peer: Peer = 'jessica',
+  ms = 400_000
+): Promise<void> {
+  await until(
+    `${peer} applies operation once`,
+    () => {
+      const result = rows(
+        world,
+        peer,
+        `SELECT a.status, a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
+        [ctx(world).correction]
+      );
+      return result.length === 1 && result[0]['status'] === 'applied';
+    },
+    ms
+  );
 }
 export async function contribution(world: E2EWorld): Promise<void> {
   await until('one accepted contribution', () => {
