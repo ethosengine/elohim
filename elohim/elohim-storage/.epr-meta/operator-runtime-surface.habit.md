@@ -189,3 +189,48 @@ Cross-peer grant authority remains unmeasured and shares slice 1's household
 mesh receipt with `dataplane-convergence` when that run lands, with each
 concern citing its own station outcomes in the same receipt. No duplicate
 commissioning claim and no status change.
+
+DELTA 2026-09-07 (delegated-compute AUTHORITY leg — HOUSEHOLD STAND-IN, measured):
+the cross-peer signed-grant journey is measured for the first time on the 3-peer
+household mesh, with **jessica standing in for Adam as provider** — this is a
+household result and NOT a shem/Adam result; the shem leg stays unmeasured.
+Receipt: `genesis/a2o/reports/delegated-compute/mesh-20260907T094431Z/`
+(cucumber.json/html + run.log + task/grant/receipt JSON + worker log + inbox trees
++ env.txt, tokens redacted). Live keys: matthew (requester, :8090)
+`uhCAkOceT1mHsz3TNXGOQiT4w-SCOgT7iGpsxMVJhoC4tfBg8amFh`, jessica (provider, :8091)
+`uhCAk2Z2F7Bzoh_PNj7Zz2jqFOaMmYFJbZIi_0qU_hNvRYSygTYf8`, james (unauthorized, :8092)
+`uhCAkHPfTbVOUyPVWvYWGQoSW_iRZM89ZzVBhqW1hm67Flhg4z3UI`; grant issued on jessica's
+own loopback adapter, `grantActionHash uhCkk9_xOdVVtcTIYHzP30vgcFADzPB10GafKZnlfQgJPEe017GbE`
+(state active, recipient=matthew, rate_per_hour=8). `features/dataplane/delegated-sweettest.feature`
+ran via the a2o escape hatch with `ELOHIM_REMOTE_COMPUTE_STATUS=available`
+(NOT `just test mesh`, which forces the cap unavailable and skips the whole feature):
+**3 scenarios passed / 20 steps passed, 0 skipped, 0 pending, 0 failed.**
+(1) recover-completion-starts-review PASSED — submit → client exit → reconnect without
+notification → discovered jessica's signed completion (accept
+`uhCkk4BBkfzcr2N7epOEwrv3wd59yHPjgz0Qa4f0TUwG8dMsgF_Zo`, complete
+`uhCkkXOC6zZtSAocLxwhZLserjIMQYueHtQC4gl4Y2iYcx5RMBmvO`, status=passed exit=0,
+observedTests=[`feedback_signal_update_rejected`]) and the codex review saved.
+(2) unauthorized refusal PASSED — james's request
+`uhCkkJIbjTLTWzYUq9Xts_jQ4vKLoC3Yow7371qqVEQRdzvh8ttSd` refused
+`uhCkkVFUK_Ufne18aC3omnShSc8kZoO96pCpp-ILUy2TYY5ri5sbt` reason=`compute-grant-refused`,
+with acceptance and completion both absent (the 403 lands on `/accept`, not only on
+`/authorize-launch`). (3) receipt-after-expiry PASSED — request
+`uhCkkK72BPjaoTQEqxlFEqeAoVg7hpRc3s9_6L536hYLPs5RuYW17`, payload GET 410 after the
+60 s lease, compact receipt byte-identical before and after.
+Timings (scenario 1): submit 89.1 s (261×1 MiB chunk publish of the 269 MB suite +
+3.5 MB DNA); submit→acceptance ≤4.1 s; acceptance→completion ≈243 s (cross-peer blob
+fetch + 103 s suite execution, startedAt 09:48:34Z → completedAt 09:50:17Z);
+completion→review saved ≈62 s (report mtime 09:51:19Z). Environment notes: the
+conductors are the pinned 0.7 fork, storage runs the merged dev binary (compute API +
+p2p/p2p-iroh) so no binary staging and no coordinator hot-swap were needed — the
+installed DNAs already carry `compute_task` and mishpat's signed-author links;
+task descriptors were regenerated against `dna/elohim/workdir/lamad.dna` (09:04Z pack,
+sha256 `e18c9bb1…`) and the suite was re-proven locally against it (1 passed, 108.6 s).
+Review adapter is `codex` — `claude` print mode exits 1 with "Credit balance is too low".
+One substrate defect found and filed, not fixed:
+`genesis/data/timeline/backlog/compute-executor-cid-refuses-null-retention-field.md`
+(`rakia-executor/src/main.rs:59` + `contract.rs:142` CID a `serde_json::Value`, so an
+explicit `"maxRuns": null` dies in `ipld-core` `serialize_unit`; the expiry fixture used
+`maxRuns: 1` instead). Habit status unchanged (green): this measures the compute-authority
+station on owned household substrate; the shem/Adam leg and worker packaging remain
+unmeasured.
