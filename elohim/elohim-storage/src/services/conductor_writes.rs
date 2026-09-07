@@ -1634,6 +1634,9 @@ pub async fn get_commitment(
 /// already base64-encoded via HoloHash `Display`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CommitmentStateLink {
+    /// Signed CreateLink author; old coordinators fail closed for compute.
+    #[serde(default)]
+    pub author: String,
     /// The lifecycle state this transition records, e.g. `"active"` / `"revoked"`.
     pub state: String,
     /// The deterministic, caller-supplied signing time of the transition.
@@ -1668,6 +1671,20 @@ pub async fn get_commitment_state_links(
         ))
     })?;
     Ok(out)
+}
+
+/// Read signed lifecycle and successor-link evidence for execution authority.
+/// Older coordinators have no such function and therefore fail closed.
+pub async fn get_commitment_authority_links(
+    hc: &Arc<HcClient>,
+    cid: &str,
+) -> Result<Vec<CommitmentStateLink>, StorageError> {
+    let payload =
+        rmp_serde::to_vec_named(cid).map_err(|e| StorageError::Serialization(e.to_string()))?;
+    let bytes = hc
+        .call_zome_mishpat(MISHPAT_ZOME, "get_commitment_authority_links", payload)
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| StorageError::Serialization(e.to_string()))
 }
 
 /// Wire mirror of one `mishpat::commitments::LineageSuccessor` — a lineage

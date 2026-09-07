@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/v1/compute-task.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "taskKind": {
+      "const": "feedback_signal"
+    },
+    "requester": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtimeImage": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "binary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cid",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "cid": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1048576
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "cid",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "dna": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cid",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "cid": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1048576
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "cid",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "expectedTests": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "feedback_signal"
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpuMillis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memoryBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPayloadBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7200
+        }
+      },
+      "required": [
+        "cpuMillis",
+        "memoryBytes",
+        "maxPayloadBytes",
+        "timeoutSeconds"
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAgeSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "maxRuns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "expireWhen": {
+          "enum": [
+            "either",
+            "both"
+          ]
+        }
+      },
+      "required": [
+        "expireWhen"
+      ]
+    },
+    "invocation": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "taskKind",
+    "requester",
+    "provider",
+    "project",
+    "runtimeImage",
+    "binary",
+    "dna",
+    "expectedTests",
+    "resources"
+  ]
+}

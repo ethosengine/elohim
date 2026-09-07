@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/v1/compute-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "taskCid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestAction": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grantAction": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requester": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskKind": {
+      "const": "feedback_signal"
+    },
+    "runtimeImage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cid",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "cid": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1048576
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "cid",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "dna": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cid",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "cid": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1048576
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "cid",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "expectedTests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "observedTests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "interrupted",
+        "timedOut",
+        "invalidInventory",
+        "payloadLimit"
+      ]
+    },
+    "exitCode": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "startedAt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "completedAt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAgeSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "maxRuns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "expireWhen": {
+          "enum": [
+            "either",
+            "both"
+          ]
+        }
+      },
+      "required": [
+        "expireWhen"
+      ]
+    },
+    "logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "enum": [
+              "stdout.log",
+              "stderr.log",
+              "witness.json"
+            ]
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cid",
+                "sha256",
+                "bytes"
+              ],
+              "properties": {
+                "cid": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1048576
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "cid",
+          "sha256",
+          "bytes",
+          "name"
+        ]
+      }
+    },
+    "witness": {
+      "type": [
+        "object",
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "taskCid",
+    "requestAction",
+    "grantAction",
+    "requester",
+    "provider",
+    "project",
+    "taskKind",
+    "runtimeImage",
+    "binary",
+    "dna",
+    "expectedTests",
+    "observedTests",
+    "status",
+    "exitCode",
+    "startedAt",
+    "completedAt",
+    "retention",
+    "logs",
+    "witness"
+  ]
+}

@@ -138,6 +138,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 # Content-addressed storage
 sha2 = "0.10"
+subtle = "2.6"
 hex = "0.4"
 # Shamir Secret Sharing over GF(256) — Recovery M4 T21 share-reconstruction primitive.
 #

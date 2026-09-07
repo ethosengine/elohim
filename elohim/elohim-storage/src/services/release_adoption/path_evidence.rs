@@ -981,6 +981,7 @@ mod tests {
     /// conductor.
     fn link(state: &str, signed_at: &str) -> CommitmentStateLink {
         CommitmentStateLink {
+            author: String::new(),
             state: state.to_string(),
             signed_at: signed_at.to_string(),
             event_hash: "uhCkkLifecycleEvent".to_string(),

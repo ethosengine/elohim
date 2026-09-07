@@ -162,3 +162,30 @@ carries `/admin/adoption` with typed verdicts + attestation summaries.
 DELTA 2026-09-02: slot released — green with wired checks, so it holds no attention; the WIP-fence
 slot passes to runtime-death-witnessed (spec 2026-09-02-compute-envelope-tevah-design §12 item 22).
 Status unchanged; the checks still run.
+
+DELTA 2026-09-07: chain delegated-sweettest / between accepted → executed /
+missing node launch remains nonterminal: a signed refusal or completion prevents
+launch even when the attempt was previously accepted / measured locally by
+`api::compute_tasks::tests::accepted_attempt_cannot_launch_after_either_terminal_outcome`
+in the storage gate. Native grant and result publication, ark supervision, and
+age/count retention are implemented; the live Adam journey is not yet measured.
+No habit status change or attestation promotion.
+
+DELTA 2026-09-07 (delegated compute, local evidence): storage gate 4,419 passed,
+0 failed; Rakia gate 42 passed; real ark fixture covers execution, duplicate
+recovery, failure, timeout, interruption and expiry; real two-peer iroh test
+proves attachment transfer → lease release → not-found → independent new-owner
+reuse without renewing the old lease. Workspace recovery and review adapter
+checks pass. Evidence: `genesis/a2o/reports/compute/validation-2026-09-07/`.
+The signed-grant → real feedback suite → workspace review journey on Adam
+remains unmeasured; worker packaging is disabled pending its pinned image,
+actual identity and coordinator deployment. Status unchanged.
+
+DELTA 2026-09-07 (scope reshape): submission binding joins correction contract
+§8's operation-id/evidence/outbox and compute's task-file invocation under one
+act class in the reimplementation plan's slice-2 inventory handoff; convergence
+is deferred. The real two-peer test proves payload transfer/expiry only.
+Cross-peer grant authority remains unmeasured and shares slice 1's household
+mesh receipt with `dataplane-convergence` when that run lands, with each
+concern citing its own station outcomes in the same receipt. No duplicate
+commissioning claim and no status change.

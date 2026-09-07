@@ -2593,6 +2593,7 @@ dependencies = [
  "sharks",
  "shefa-types",
  "sled",
+ "subtle",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",

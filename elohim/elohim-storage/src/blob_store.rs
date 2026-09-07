@@ -83,6 +83,19 @@ impl BlobStore {
 
         info!(path = %root_dir.display(), "Initialized blob store");
 
+        if std::env::var("ELOHIM_COMPUTE_LOCAL_API").as_deref() == Ok("1") {
+            let payload_root = root_dir.clone();
+            tokio::spawn(async move {
+                let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+                loop {
+                    tick.tick().await;
+                    if let Err(error) = crate::compute_payload_store::cleanup(&payload_root).await {
+                        tracing::warn!(%error, "compute payload cleanup failed");
+                    }
+                }
+            });
+        }
+
         Ok(Self { root_dir })
     }
 
@@ -394,6 +407,7 @@ impl BlobStore {
     /// Check if a blob exists by legacy hash
     pub async fn exists(&self, hash: &str) -> bool {
         fs::metadata(self.blob_path(hash)).await.is_ok()
+            || crate::compute_payload_store::contains(&self.root_dir, hash).await
     }
 
     /// Check if a blob exists by CID or hash
@@ -440,6 +454,11 @@ impl BlobStore {
     /// Get blob size (without loading data)
     pub async fn size(&self, hash: &str) -> Result<u64, StorageError> {
         let blob_path = self.blob_path(hash);
+        if fs::metadata(&blob_path).await.is_err() {
+            return crate::compute_payload_store::get(&self.root_dir, hash)
+                .await
+                .map(|bytes| bytes.len() as u64);
+        }
         let metadata = fs::metadata(&blob_path).await?;
 
         // Check if chunked
@@ -463,7 +482,7 @@ impl BlobStore {
 
         // Check if file exists
         if fs::metadata(&blob_path).await.is_err() {
-            return Err(StorageError::NotFound(hash.to_string()));
+            return crate::compute_payload_store::get(&self.root_dir, hash).await;
         }
 
         // Check if chunked

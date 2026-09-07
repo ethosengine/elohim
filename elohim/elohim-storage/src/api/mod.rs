@@ -23,6 +23,8 @@ pub mod blob;
 pub mod cluster;
 pub mod comments;
 pub mod compute;
+pub mod compute_grants;
+pub mod compute_tasks;
 pub mod contributors;
 pub mod custodians;
 pub mod dashboard;

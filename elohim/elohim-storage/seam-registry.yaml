@@ -3648,3 +3648,40 @@ decisionPoints:
     - path: elohim/elohim-storage/src/services/commitment_record.rs
       testName: correctly_signed_malformed_commitment_content_is_refused
       kind: unit
+
+  - name: compute_local_admission
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/api/compute_tasks.rs
+      modulePath: api::compute_tasks::handle
+    summary: >
+      Opt-in node-local compute SDK adapter, absent from doorway manifest. Requires
+      a local capability secret and exact local cell actor. Native grant signature,
+      selected provider, requester, scope, bounds and observed DHT revocation are
+      checked before one-use launch accounting. CID verification binds task and receipt.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          Local mutation serialization and unique admission event refuse repeated launch.
+          A lost launch response is indeterminate and may not silently execute again.
+      - id: C9
+        status: answered
+        justification: >
+          Reuses get_authenticated_commitment_record with the exact grant action, entry
+          reference, and this runner's agent key. Never trusts claimed provider identity.
+      - id: C12
+        status: partial
+        justification: >
+          Current projection and locally observed native withdrawal links gate launch.
+          DHT partition freshness is not a globally synchronous revocation guarantee.
+    contractTests:
+      - path: elohim/elohim-storage/src/api/compute_tasks.rs
+        testName: local_capability_refuses_missing_short_and_different_tokens
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_tasks.rs
+        testName: writes_never_impersonate_requester_or_trust_a_transport_id
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_tasks.rs
+        testName: receipt_binding_rejects_wrong_actor_artifact_and_empty_pass
+        kind: unit

@@ -115,6 +115,9 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{header, Method, Request, Response, StatusCode};
 
+#[path = "http_compute_payloads.rs"]
+mod compute_payloads;
+
 /// Unified response body: Left for normal (buffered) responses, Right for SSE (streaming).
 pub type ApiBody = Either<Full<Bytes>, crate::sse::SseBody>;
 use hyper_util::rt::TokioIo;
@@ -2113,6 +2116,32 @@ impl HttpServer {
                         &self.self_cid,
                     )
                     .await
+                } else {
+                    Ok(response::service_unavailable("db pool not available"))
+                }
+            }
+
+            (method, path)
+                if matches!(method, Method::GET | Method::PUT | Method::DELETE)
+                    && path.starts_with("/api/v1/compute/payloads/") =>
+            {
+                self.handle_compute_payload(
+                    req,
+                    path.trim_start_matches("/api/v1/compute/payloads/"),
+                )
+                .await
+            }
+
+            // Local SDK facing only: compute records travel between peers on DHT.
+            // Deliberately absent from build_manifest; never doorway-proxied.
+            (method, path)
+                if matches!(method, Method::GET | Method::POST)
+                    && (path == "/api/v1/compute/grants"
+                        || path == "/api/v1/compute/tasks"
+                        || path.starts_with("/api/v1/compute/tasks/")) =>
+            {
+                if let Some(pool) = self.db_pool.as_ref() {
+                    crate::api::compute_tasks::handle(req, pool, self.hc_registry.as_ref()).await
                 } else {
                     Ok(response::service_unavailable("db pool not available"))
                 }

@@ -56,6 +56,7 @@ pub mod app_deliverability; // Pure deliverability verdict over a bundle's extra
 pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
 pub mod closed_chain_fence; // Task 32 (Holochain Evolution Epic MVP): the post-close write fence
+pub mod compute_payload_store;
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
 pub mod conductor_admission; // Capacity contract over the conductor's DB read pool
 pub mod conductor_bridge_health; // Observed liveness of the zome path (is the bridge actually alive?)
