@@ -35,4 +35,21 @@ export type FeedbackSignal = {
    * Base64-encoded ed25519 signature over canonical_bytes(targetCid || signalKind || evidenceCid? || standingImpact || signedBy).
    */
   signature: string;
+  /**
+   * OPTIONAL notification reference (accountable-correction contract §4). Carries the SIGNED ACT the semantic payload is about, so a receiver can fetch and verify rather than trust the claim. Identity is (originDnaHash, actionHash) — the signed act, not the entry hash: two authors' identical corrections share an entry hash and are two acts. Additive: absent on every pre-slice-1 message and ignored by a pre-slice-1 receiver, so no protocol-version bump is required and mixed-version peers never drop a correction.
+   */
+  actRef?: {
+    /**
+     * The content-cell DNA hash the act lives in. A receiver whose own content cell names a different DNA hash REJECTS the notification; cross-context evidence is not slice 1.
+     */
+    originDnaHash: string;
+    /**
+     * Base64 ActionHash of the FeedbackSignal action.
+     */
+    actionHash: string;
+    /**
+     * The back-propagation routing key, carried SEPARATELY from the act reference: back_prop's predecessor key is targetCid as a string, and resolving an action to its Content.id does not by itself yield that key.
+     */
+    routingKey: string;
+  };
 };
