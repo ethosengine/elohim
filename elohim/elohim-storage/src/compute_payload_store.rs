@@ -61,7 +61,9 @@ async fn with_frozen_clock<F: std::future::Future>(fut: F) -> F::Output {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    FROZEN_CLOCK.scope(std::cell::Cell::new(Some(pinned)), fut).await
+    FROZEN_CLOCK
+        .scope(std::cell::Cell::new(Some(pinned)), fut)
+        .await
 }
 
 /// Deterministically simulate real time elapsing (without sleeping) inside a
