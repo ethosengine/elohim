@@ -426,6 +426,7 @@ assert_launch_prerequisites() {
     return 0
   fi
   assert_toolchain_parity
+  assert_conductor_matches_dna
 }
 
 # The conductor binary an ark will pin, hash and execute. Identical selection to
@@ -1107,7 +1108,18 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
 # cargo — swapping the mesh's conductor on that evidence is the silent switch
 # this file already paid for once. Point HOLOCHAIN_BIN at it explicitly:
 #   HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release just mesh start
-MESH_FORK_BIN_DIRS="${MESH_FORK_BIN_DIRS:-$MESH_DIR/fork-bin:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin}"
+# The pinned fork build lives under the tools dir, keyed by the submodule pin
+# (elohim/holochain-conductor is `update = none`, so read the gitlink, never a
+# checkout): /projects/.claude-config/tools/hc-fork-<pin12>/bin. Deriving the
+# name from the pin means a stale fork build cannot be picked up silently after
+# a conductor bump — a missing dir falls through to the next candidate, and the
+# DNA-line guard below refuses stock 0.6 rather than warning about it.
+# (2026-09-07: the workspace image still ships stock 0.6.0 in /opt/holochain/bin
+# — the Dockerfile pin is 0.7.0 since 2026-09-03 but :latest predates it — so
+# `command -v holochain` is the WRONG default until that image is rebuilt.)
+MESH_CONDUCTOR_PIN12="$(git -C "$REPO_ROOT" ls-tree HEAD elohim/holochain-conductor 2>/dev/null | awk '{print substr($3,1,12)}')"
+MESH_TOOLS_DIR="${MESH_TOOLS_DIR:-/projects/.claude-config/tools}"
+MESH_FORK_BIN_DIRS="${MESH_FORK_BIN_DIRS:-$MESH_DIR/fork-bin:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin${MESH_CONDUCTOR_PIN12:+:$MESH_TOOLS_DIR/hc-fork-$MESH_CONDUCTOR_PIN12/bin}}"
 
 detect_fork_bin() { # -> prints the fork dir, or nothing
   local d
@@ -1220,6 +1232,37 @@ assert_toolchain_parity() {
   echo "" >&2
   [ "${MESH_ALLOW_TOOLCHAIN_SKEW:-0}" = "1" ] || exit 1
   echo "WARN: proceeding on a skewed pair because MESH_ALLOW_TOOLCHAIN_SKEW=1" >&2
+}
+
+# ---------------------------------------------------------------------------
+# REFUSE A CONDUCTOR FROM THE WRONG LINE FOR THE DNA.
+#
+# The DNA workspace pins `hdk = "=X.Y.Z"`; a conductor on a different X.Y
+# cannot load it (hdk 0.7 ⇄ holochain 0.7). Before 2026-09-07 a stock 0.6.0
+# conductor from the workspace image was only WARNED about ("NOT at parity")
+# and the start proceeded to three conductors that could never install the
+# hApp — the Prologue then failed far from the cause. A line mismatch is a
+# refusal, not a banner. MESH_ALLOW_TOOLCHAIN_SKEW=1 overrides deliberately.
+# ---------------------------------------------------------------------------
+dna_hdk_line() { # -> "X.Y" from the elohim DNA workspace Cargo.toml
+  sed -n 's/^hdk[[:space:]]*=[[:space:]]*"=\?\([0-9]*\.[0-9]*\)\..*/\1/p' "$REPO_ROOT/elohim/holochain/dna/elohim/Cargo.toml" | head -1
+}
+assert_conductor_matches_dna() {
+  local want have cv
+  want="$(dna_hdk_line)"; [ -n "$want" ] || return 0
+  cv="$(conductor_version)"; have="${cv%.*}"
+  [ "$have" = "$want" ] && return 0
+  echo "" >&2
+  echo "REFUSING TO START — the conductor line does not match the DNA's hdk line:" >&2
+  echo "  DNA (elohim/holochain/dna/elohim/Cargo.toml): hdk $want.x" >&2
+  echo "  conductor: $(if [ -n "$HOLOCHAIN_BIN" ]; then echo "$HOLOCHAIN_BIN"; else command -v holochain; fi) -> $cv" >&2
+  echo "  A $have conductor cannot install an hdk-$want hApp; the mesh would boot three dead cells." >&2
+  echo "  Point HOLOCHAIN_BIN at a $want.x build (the pinned fork: $MESH_TOOLS_DIR/hc-fork-${MESH_CONDUCTOR_PIN12:-<pin>}/bin," >&2
+  echo "  or stock: $MESH_TOOLS_DIR/hc-0.7), or rebuild the workspace image (Dockerfile pins HOLOCHAIN_VERSION=0.7.0)." >&2
+  echo "  (MESH_ALLOW_TOOLCHAIN_SKEW=1 to proceed anyway — deliberate skew only.)" >&2
+  echo "" >&2
+  [ "${MESH_ALLOW_TOOLCHAIN_SKEW:-0}" = "1" ] || exit 1
+  echo "WARN: proceeding on a conductor/DNA line mismatch because MESH_ALLOW_TOOLCHAIN_SKEW=1" >&2
 }
 
 # ---------------------------------------------------------------------------
@@ -1575,7 +1618,7 @@ status_all() {
   if [ -n "$HOLOCHAIN_BIN" ]; then
     _hc_desc="$HOLOCHAIN_BIN ($("$HOLOCHAIN_BIN" --version 2>&1 | head -1))$([ -n "$FORK_BIN_DIR" ] && printf ' [FORK, auto-detected]' || printf ' [explicit HOLOCHAIN_BIN]')"
   else
-    _hc_desc="$(command -v holochain) ($(holochain --version 2>&1 | head -1)) [STOCK — alpha runs the fork, so this mesh is NOT at parity]"
+    _hc_desc="$(command -v holochain) ($(holochain --version 2>&1 | head -1)) [STOCK — alpha runs the fork; start is REFUSED unless its line matches the DNA's hdk $(dna_hdk_line).x]"
   fi
   echo "conductor NEXT LAUNCH: $_hc_desc"
   # The CLI is half the boot: it writes the config the conductor must parse, so
