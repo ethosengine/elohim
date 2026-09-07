@@ -1487,6 +1487,12 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def outputFile = "genesis/orchestrator/manifests/humans/${humanConfig.resourcePrefix}-rendered.yaml"
     sh "sed ${sedArgs} ${sourceFile} > ${outputFile}"
 
+    // Optional sibling executor: shares only Adam's local storage interface;
+    // has its own compute cgroup and PVC. Disabled config is byte-identical.
+    if (humanConfig.name == 'adam') {
+        sh "node genesis/orchestrator/scripts/render-compute-worker.mjs '${outputFile}' genesis/orchestrator/data/adam-compute-worker.json"
+    }
+
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
     if (remaining != '0') {

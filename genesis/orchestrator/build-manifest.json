@@ -13,7 +13,8 @@
       "inputs": {
         "sources": [
           "**/Jenkinsfile*",
-          "genesis/orchestrator/**"
+          "genesis/orchestrator/**",
+          "genesis/agentic/compute/**"
         ],
         "buildProcess": []
       },
