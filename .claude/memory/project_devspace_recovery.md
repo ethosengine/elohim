@@ -54,3 +54,14 @@ re-runs `cargo install --path elohim/eprfs` (load ~20 for the first minutes).
 
 - [[project_workspace_berth_io_guard]] — folded (index: false); berth/io-guard detail subsumed by this umbrella.
 - [[reference_io_guard_berth_rails]] — folded (index: false); io-guard rails reference subsumed by this umbrella.
+
+**2026-09-06 (box reboot):** a workspace reboot reverts `/usr/local/lib/node_modules/@openai/codex` to the image's 0.149.1, and `gpt-6-astra` then refuses with "requires a newer version of Codex" — restore with `npm i -g @openai/codex@latest` (0.153.4 verified). `/tmp` is wiped too, so long gates must run `setsid nohup … > <log under /projects>` and any Codex review written to /tmp must be folded into a committed doc immediately.
+
+**2026-09-07 (plain workspace restart, image rebuilt to 0.7.0):** confirmed it is EVERY restart, not only a box
+reboot — both the global git config (`safe.directory`) and the codex global install revert to the image. First
+two commands after any restart: `git config --global --add safe.directory '*'` and
+`npm i -g @openai/codex@latest`. Mesh processes are gone too (`just mesh status` → all down); the stock
+`/opt/holochain/bin` now carries 0.7.0 and the mesh script auto-detects the fork with no env, so no
+`HOLOCHAIN_BIN` export is needed anymore.
+Operator 2026-09-07: do NOT pin codex/claude CLI versions in the image — "that version changes all the time";
+expect both CLIs to need an auto-update on every workspace restart, and treat that as routine, not a backlog item.

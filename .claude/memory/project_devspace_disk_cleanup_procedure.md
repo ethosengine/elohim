@@ -43,3 +43,11 @@ Related: [[multi-agent-pvc-pacing]], [[cargo-target-dir-for-native-builds]], [[p
 pruning old ones cannot affect a running binary: `find <slot>/debug/incremental -mindepth 1 -maxdepth 1 -type d -mtime +0
 -print0 | xargs -0 rm -rf` took the volume 89% → 78% (~97G) with the peer still running. Gap to close in policy: enforce's
 in-use guard should still GC stale incremental sessions inside an in-use slot.
+
+**2026-09-06 evening (verified, second pass at 80%):** eleven merged/superseded worktrees removed (git refuses
+`worktree remove` on trees containing submodules — `rm -rf <dir> && git worktree prune` is the route; verify merge
+state with `git merge-base --is-ancestor` and `git cherry dev HEAD` first). `cargo-pool enforce --yes` again freed 0B
+(dev keep-warm set alone exceeds the 60G cap). `cargo-pool prune --stale-incrementals --older-than-days 1 --yes`
+only walked the sweettest slot (2G); the hand prune of `-mtime +0` incremental dirs in the `elohim` (19G) and
+`steward__node` (3.4G) dev slots took the volume 80% → 77% with binaries still running from those slots. Never
+create ad-hoc `CARGO_TARGET_DIR`s outside the pool (I made `/projects/.cargo-pool/<name>`: 3.4G invisible to enforce).
