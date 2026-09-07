@@ -133,12 +133,15 @@ try {
     const installed = Object.values(info.cell_info).flat();
     if (installed.filter(c => c.type === 'provisioned').length !== 5)
       throw Error('Expected five provisioned cells');
-    for (const [index, cell] of (info.cell_info.lamad ?? [])
-      .filter(c => c.type === 'cloned')
-      .entries()) {
+    // appInfo does not guarantee clone ordering: derive the index from the name so the
+    // guard stays order-independent across repeated grow passes.
+    for (const cell of (info.cell_info.lamad ?? []).filter(c => c.type === 'cloned')) {
+      const name = cell.value.name;
+      const match = /^fixtures(?:-([1-9]\d*))?$/.exec(name ?? '');
+      const index = match ? Number(match[1] ?? 0) : NaN;
       if (
         !cell.value.enabled ||
-        cell.value.name !== (index === 0 ? 'fixtures' : `fixtures-${index}`) ||
+        !match ||
         cell.value.dna_modifiers.network_seed !== `${required('seed')}-fixtures-${index}`
       )
         throw Error('Existing clone does not belong to this experiment seed/sequence');

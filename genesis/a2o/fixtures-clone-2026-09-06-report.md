@@ -277,3 +277,67 @@ isolation. It does not repair clone coordinator hot-swaps. It does not establish
 a gossip cost or capacity recommendation. Bundle preparation is tested; live
 clone creation, inventory capture, and measurement commands remain unverified
 against the blocked three-peer mesh.
+
+## 2026-09-07 — both mesh legs RUN on the local household mesh
+
+Run 10:00–10:23Z from the main tree (`dev` @ 5b377eb8c, which carries the merged
+`sprint/fixtures-clone-harness` work), against the three-peer household mesh
+(matthew/jessica/james) on pinned-fork holochain 0.7.0, iroh-relay 1.0.3, storage in
+`dual` transport mode. Full evidence — before/before2/after inventories, DHT dumps, seeder
+log, network stats, measurement rows — in the gitignored receipt dir
+`genesis/a2o/reports/fixtures-clone/mesh-20260907T1000Z/` (`RECEIPT.md` is the index).
+The test bundle was prepared from the **workdir** happ the mesh actually installs, not the
+2026-09-06 deployed bundle, for DNA parity with today's storage binary; the sole manifest
+change was `lamad.dna.clone_limit: 0 → 15`, and the committed `workdir/happ.yaml` was not
+touched. The mesh was restarted with `MESH_HAPP_PATH` pointed at it.
+
+**Storage-instance model: one storage per mesh peer, shared across that peer's cells** — the
+`hc-mesh.sh` default, no separate instance and no context-qualified projection storage. The
+storage `content.db` and Automerge sync docs survived the restart (117 rows / 105 docs) while
+the conductor sandboxes were regenerated, so the base lamad cell started this run with an empty
+DHT and a non-empty projection.
+
+**Isolation leg — identity diff, split verdict.** Noise floor first: two baselines 20 s apart
+were byte-identical on every base inventory (only the just-created clone's own `lamad.0-ops`
+drifted), so the base cell was quiescent and any later delta is attributable. The clone
+(`lamad.0`, name `fixtures`, seed `<uuid>-fixtures-0`) was created on all three peers in
+128–191 ms. The **production seeder leg did not write**: its cell selector resolved correctly
+to the clone cell, but both `create_content` calls returned `WasmError Deserialize` because
+`seed-production.ts` sends nine fields and never sends `reach`, which
+`lamad_types::CreateContentInput` requires with no serde default — a pre-existing seeder↔DNA
+vocabulary drift, unrelated to cloning, and the same failure the base-corpus prologue seed
+hits. The probe records were therefore written directly against the clone cell with a correct
+payload. Result: **the DHT planes are isolated by identity — `base-actions`, `base-ops`,
+`base-content` and `targets` diffs are all EMPTY**, and both probe action hashes appear only in
+the clone's action inventory. **The projection and sync planes are NOT isolated**: two rows
+appeared in the peer's shared `content` table (`h_app_id: "lamad"`, `dht_anchor_hash` = the
+clone's action hash, no cell/DNA qualifier) and two docs
+(`node:fxclone-alpha-20260907`, `node:fxclone-beta-20260907`) in the `elohim` sync namespace.
+That **upgrades this report's earlier static finding to a measured collision**. One further
+observation, recorded but not diagnosed: `export_all_content` on the clone still returned `[]`
+at the after-capture while its ops were mid-integration.
+
+**Cost leg — per-cell cost with gossip, measured.** Gossip was live throughout (iroh backend,
+direct connections to both peers, send_message_count 1438 → 2591 → 3541 across the three
+points). Rows: 5 cells → RSS 892680 KiB / 704393216 B / 239 FDs / 108 threads; 10 cells →
+887188 / 715862016 / 369 / 170; 20 cells → 917488 / 737624064 / 557 / 254. Marginal per clone
+over 5→20 (n=15): **RSS +1.62 MiB, disk +2.11 MiB, FDs +21.2, threads +9.7**, with a linear
+disk slope across both intervals. Against the prior idle isolated run (0.26 MiB disk, 18.1
+FDs, 8.1 threads per clone) the **per-clone disk cost under gossip is ~8× the idle figure**,
+FDs +17% and threads +20%; RSS is not comparable across the two runs (different conductor
+build and happ), only the within-run slopes are. The idle-versus-gossip delta is therefore
+large and one-directional: an isolated measurement understates per-cell disk by nearly an order
+of magnitude, because peer-store/gossip state dominates it.
+
+**Harness fix.** `fixtures-clone.mjs`'s existing-clone guard matched `appInfo` clone order
+positionally against `fixtures-${index}`; `appInfo` does not guarantee clone ordering, so a
+second `grow` pass against the same peer threw
+`Existing clone does not belong to this experiment seed/sequence` and blocked the 20-cell row
+on the first attempt. The guard now derives the index from the clone name and is
+order-independent, with the network_seed check unchanged in strictness.
+
+**Still NOT RUN:** the seeder-mediated write into the clone (blocked by the `reach` drift); the
+storage `/import` API leg under `SEED_CELL_TARGET=lamad.fixtures`; cross-peer confirmation that
+the probes reached jessica's and james's corresponding clone DHTs (inventories were captured on
+matthew only). The `sync_coordinators` clone-enumeration gap remains a filed seam, untouched.
+This experiment still confers no architectural authority and makes no habit claim.
