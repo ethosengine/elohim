@@ -36,12 +36,33 @@ export function projectsForChanges(root, changedFiles) {
   });
 }
 
+// The rakia-validated manifest schema does not yet accept `run.cargo.env` (the
+// SOURCE schema lives in the pinned elohim/rakia submodule, operator-owned) — so
+// a per-project cargo resource cap declares in genesis/agentic/pool-policy.json's
+// `cargo_env_overrides` instead. Read once per call; a missing/malformed file is
+// not fatal to the gate.
+function loadPoolPolicy(root) {
+  try {
+    return JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 // `run.cargo.env` travels to run-local-gate.sh as ONE serialized variable, never
 // through argv: the positional contract is exactly four cargo args (workspace,
 // targetDir, profile, rustflags) and every caller of run-local-gate.sh depends on
 // that arity. The script parses this and exports each pair before `just`.
-export function gateChildEnv(project, baseEnv) {
-  const declared = (project.run.cargo || {}).env;
+//
+// Merge rule: the manifest's own `run.cargo.env` is the project's contract and
+// always wins; `pool-policy.cargo_env_overrides[project.name]` only fills keys the
+// manifest left undeclared. This lets pool-policy carry today's cap (schema-pinned
+// out of the manifest) without silently overriding a project that later declares
+// its own value once the rakia schema is widened.
+export function gateChildEnv(project, baseEnv, root = ROOT) {
+  const policy = loadPoolPolicy(root);
+  const override = (policy.cargo_env_overrides || {})[project.name] || {};
+  const declared = { ...override, ...((project.run.cargo || {}).env || {}) };
   const childEnv = { ...baseEnv };
   if (declared && Object.keys(declared).length > 0) {
     childEnv.GATE_CARGO_ENV = JSON.stringify(declared);
@@ -70,7 +91,12 @@ function runProject(project, printOnly, namesOnly) {
     return 0;
   }
   if (printOnly) {
-    process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, reasons: project.reasons || [] })}\n`);
+    // resolvedCargoEnv is the same manifest∪pool-policy merge gateChildEnv would send
+    // to run-local-gate.sh — a dry-run rail so `--print` proves the cap without
+    // claiming the cargo berth (no spawnSync).
+    const resolvedEnv = gateChildEnv(project, {}).GATE_CARGO_ENV;
+    const resolvedCargoEnv = resolvedEnv ? JSON.parse(resolvedEnv) : {};
+    process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, reasons: project.reasons || [] })}\n`);
     return 0;
   }
 

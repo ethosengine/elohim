@@ -87,3 +87,23 @@ widening a global.
 
 **Done when:** three consecutive `just gate elohim-storage` runs complete with peak tree RSS
 under 6 GB and zero new lines in the RAM-guard shed ledger — met on 2026-09-08 (v1–v3 above).
+
+**Amendment 2026-09-08 (later same day).** `pre-push`'s `rakia-validate` refused
+`elohim/holochain/build-manifest.json` — `/gate/projects/elohim-storage/run/cargo must NOT have
+additional properties` — once the SOURCE schema in the pinned `elohim/rakia` submodule (not the
+`genesis/orchestrator/manifest.schema.json` mirror this backlog item widened) was enforced
+against the committed manifest. That schema is operator-owned and could not be widened tonight,
+so the cap's declaration home moved: `genesis/agentic/pool-policy.json`'s new
+`cargo_env_overrides.elohim-storage` carries `{"CARGO_BUILD_JOBS": "1"}` (already the home of
+cargo parallelism policy — `default_jobs`, `max_concurrent_heavy`). `gate-runner.mjs`'s
+`gateChildEnv` now merges manifest `run.cargo.env` (if a project ever declares one) ∪
+pool-policy `cargo_env_overrides[project]`, manifest winning on a key conflict — so the exact
+mechanism this item built (`GATE_CARGO_ENV`, the printed `cargo env:` line) is unchanged; only
+where the cap is *declared* moved. `elohim/holochain/build-manifest.json`'s `env` key was
+removed to satisfy rakia-validate. The `run.cargo.env` schema key in
+`genesis/orchestrator/manifest.schema.json` (~:161-166) and the runner plumbing described above
+were deliberately left in place — the manifest key returns as the cap's home the moment the
+operator widens `elohim/rakia`'s `GateProject.run.cargo` to accept `env` (see
+`genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md` for that ask).
+Verified: `pnpm run rakia:schema:validate` passes (15/15 manifests); `node genesis/orchestrator/gate-runner.mjs --target elohim-storage --print` prints
+`"resolvedCargoEnv":{"CARGO_BUILD_JOBS":"1"}` with no `env` key present in the manifest itself.

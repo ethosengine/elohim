@@ -82,6 +82,13 @@
     "kill_after_s": 90,
     "_dont_restrain_by_accident": "Operator ruling 2026-09-03: manage carrying capacity as a VSM discipline, but never restrain ourselves on a number the disk does not feel. So: action_level is host PSI only (rate_action=false; the byte rate is advisory in status/ledger); no action unless OUR writes are >= write_min_actionable_mb_s (pausing our compile when someone else is the writer relieves nothing); pause before kill — kill only after kill_after_s of hard dwell when pausing did not relieve the host."
   },
+  "_cargo_env_overrides_comment": "genesis/orchestrator/gate-runner.mjs (gateChildEnv) reads cargo_env_overrides for a per-project cargo env, in place of declaring run.cargo.env on the project in build-manifest.json, because the rakia-validated manifest schema (source in the pinned elohim/rakia submodule, operator-owned) does not accept that key yet. Merge rule: a manifest run.cargo.env (once a project can declare one, after the schema widens) wins on a key conflict; an entry here only fills the gap until then. Move an entry back to its build-manifest.json once elohim/rakia's GateProject.run.cargo accepts `env` (mirror already lives in genesis/orchestrator/manifest.schema.json ~:161-166). NOTE: every key under a project entry here is exported verbatim as gate cargo env (run-local-gate.sh) — no `_`-prefixed comment keys inside an entry, only alongside it.",
+  "_cargo_env_overrides_evidence_elohim_storage": "T8, 2026-09-07: storage gate build phase measured 15.4 GB RSS at cargo's default job count — enough to trip the workspace RAM guard's shed line when the local mesh conductors are also up (~1.2G RSS each) — vs 5.4 GB at CARGO_BUILD_JOBS=1, for +12% wall-clock. Backlog atom: genesis/data/timeline/backlog/cargo-test-memory-shed-storage-gate.md.",
+  "cargo_env_overrides": {
+    "elohim-storage": {
+      "CARGO_BUILD_JOBS": "1"
+    }
+  },
   "berth": {
     "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued.",
     "resources": {

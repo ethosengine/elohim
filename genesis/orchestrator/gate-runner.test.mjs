@@ -121,6 +121,32 @@ describe('manifest-driven local gate registry', () => {
     assert.match(uncapped.stdout, /RUST_TEST_THREADS=\[<unset>\]/);
   });
 
+  test('cargo env merges the manifest with pool-policy overrides, manifest winning', () => {
+    // The rakia schema pins elohim/holochain/build-manifest.json's run.cargo shape
+    // (no `env` key yet), so the storage project's cargo cap declares in
+    // genesis/agentic/pool-policy.json's cargo_env_overrides instead. Merge rule:
+    // the manifest's own declaration always wins; the policy override only fills a
+    // gap the manifest leaves undeclared.
+    const noManifestEnv = { name: 'elohim-storage', run: { cargo: { workspace: 'elohim' } } };
+    const filled = gateChildEnv(noManifestEnv, {});
+    assert.ok(Object.hasOwn(filled, 'GATE_CARGO_ENV'), 'pool-policy override applies when the manifest declares no cargo.env');
+    assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1' });
+
+    const withManifestEnv = {
+      name: 'elohim-storage',
+      run: { cargo: { workspace: 'elohim', env: { CARGO_BUILD_JOBS: '3' } } },
+    };
+    const won = gateChildEnv(withManifestEnv, {});
+    assert.deepStrictEqual(
+      JSON.parse(won.GATE_CARGO_ENV),
+      { CARGO_BUILD_JOBS: '3' },
+      'a manifest-declared cargo.env value wins over the pool-policy override'
+    );
+
+    const neither = { name: 'not-a-real-project-xyz', run: { cargo: { workspace: 'x' } } };
+    assert.equal(Object.hasOwn(gateChildEnv(neither, {}), 'GATE_CARGO_ENV'), false);
+  });
+
   test('unknown targets fail instead of silently running the wrong gate', () => {
     assert.throws(() => selectGateProjects(registry, 'not-a-project'), /Unknown gate project/);
   });

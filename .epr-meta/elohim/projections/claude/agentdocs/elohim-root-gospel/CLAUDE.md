@@ -65,12 +65,16 @@ Pre-push carries a warn-only **T2 receipt** leg: a dataplane change (`elohim-sto
 execution. Both `just gate` and pre-push use
 `genesis/orchestrator/gate-runner.mjs`; do not add a grep detector or a second
 project-name command switch. Native gates resolve explicit cargo-pool slots and
-crate-specific `RUSTFLAGS`, and a project may declare `run.cargo.env` — a
-string→string map exported around its cargo run, never passed through argv — which
-is where a heavy crate caps its own resource use (`gate.elohim-storage` declares
+crate-specific `RUSTFLAGS`. A per-project cargo resource cap (`CARGO_BUILD_JOBS`,
+`RUST_TEST_THREADS`) lives today in `genesis/agentic/pool-policy.json`'s
+`cargo_env_overrides` — the gate-runner's `run.cargo.env` manifest key (and its
+`manifest.schema.json` mirror) is the schema-gated future home, live again once the
+operator widens the rakia-validated SOURCE schema (pinned `elohim/rakia` submodule)
+to accept it; until then the runner merges manifest `run.cargo.env` ∪ pool-policy
+`cargo_env_overrides`, manifest winning on conflict. `elohim-storage` is capped at
 `CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
 cargo's default parallelism and is shed by the workspace RAM guard; at one job it
-peaks at 5.4 GB for ~12% wall-clock). DNA/WASM workspaces remain plain Cargo because
+peaks at 5.4 GB for ~12% wall-clock. DNA/WASM workspaces remain plain Cargo because
 Holochain packing requires their in-tree `./target`.
 
 Focused escape hatches:
