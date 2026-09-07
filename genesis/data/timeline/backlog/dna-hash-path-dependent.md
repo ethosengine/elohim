@@ -91,8 +91,22 @@ independently moved every DNA hash before). Concretely:
 
 ## Remedy (held — do not implement this sprint, per D-F)
 
-`--remap-path-prefix=<checkout>=/elohim` (or an equivalent fixed, checkout-independent prefix)
-applied uniformly in **both** places that export `RUSTFLAGS` as env for this crate graph —
+**Correction (2026-09-08, from the measurement above):** the mechanism is the rustc
+stable-crate-id / `-C metadata` disambiguator, which Cargo derives from the package id of a
+*path* dependency — and that id carries the absolute checkout path. `--remap-path-prefix`
+rewrites paths embedded in debuginfo and panic locations; it does **not** change the
+`-C metadata` hash, so a remap alone leaves every mangled symbol different across checkouts
+and the DNA hash still moves. The remedy that actually pins the hash is a
+**checkout-independent package path for the DNA crate graph** at pack time — pack from one
+canonical path on every builder (a bind-mount or symlink such as `/elohim/dna` that the DNA
+justfile enters before `cargo build`, and that CI enters identically), so Cargo's package ids
+are byte-identical everywhere. A remap flag may still be added for the debuginfo strings, but
+it is secondary. The verification for any candidate remedy is the table above: pack from two
+different checkout paths and require identical wasm sha256 and DNA hash.
+
+The original remedy text is kept below as the record of the first hypothesis. Whatever the
+final shape, it must be applied uniformly in **both** places that export `RUSTFLAGS` as env
+for this crate graph —
 `elohim/holochain/dna/elohim/justfile:7` (local/worktree builds) **and**
 `elohim/holochain/dna/Jenkinsfile:154,857` (CI) — since a `.cargo/config.toml` `[build]
 rustflags` entry would never be read on either path (both set the env var directly, and env
