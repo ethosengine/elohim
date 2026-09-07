@@ -51,6 +51,8 @@ import { BlobManager, validateBlobReferences, ContentFile } from './blob-manager
 import { DoorwayClient, validateSeedingPrerequisites } from './doorway-client.js';
 import { StorageClient, validateStorageNode, ShardManifest } from './storage-client.js';
 import { validateContentFile, validateAllContent, printValidationReport } from './schema-validation.js';
+import { loadCorpusDeclaration } from './corpus-trust.js';
+import { resolveDnaCreateContentReach } from './reach-resolver.js';
 
 // =============================================================================
 // Configuration
@@ -382,6 +384,13 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
     console.log('PHASE 4: Seed Holochain DNA');
     console.log('─'.repeat(70));
 
+    // The corpus's declared default `reach` (corpus.json `reach:`, sibling of
+    // config.contentDir) for content rows that carry no authored `reach` of
+    // their own — create_content has no serde default for this field, so a
+    // row without one and a corpus without a declaration is a hard error, not
+    // a silent literal (see resolveDnaCreateContentReach).
+    const corpusDeclaredReach = loadCorpusDeclaration(path.dirname(config.contentDir))?.declaration.reach;
+
     if (config.dryRun) {
       console.log('\n[DRY RUN] Would seed to DNA:');
       console.log(`  - ${processedContents.length} content entries`);
@@ -439,6 +448,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
                 content_format: metadata.contentFormat || 'markdown',
                 tags: metadata.tags || [],
                 related_node_ids: metadata.relatedNodeIds || [],
+                reach: resolveDnaCreateContentReach(metadata.reach, corpusDeclaredReach, `content ${id}`),
                 metadata_json: JSON.stringify({
                   blob_hash: metadata.blob_hash,
                   blob_url: metadata.blob_url,

@@ -37,6 +37,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isReach } from './generated/schema-enums.js';
 
 /** Canonical filename of a corpus declaration, at the corpus directory root. */
 export const CORPUS_DECLARATION_FILE = 'corpus.json';
@@ -86,6 +87,15 @@ export interface CorpusDeclaration {
   realism: RealismDeclaration;
   /** Absent ⇒ nothing is minted (runtime fail-closed to `Bootstrap`). */
   trustBootstrap?: TrustBootstrapDeclaration;
+  /**
+   * Declared default `reach` for content rows in this corpus that carry no
+   * authored `reach` of their own. Read by direct-WASM `create_content`
+   * callers (see `reach-resolver.ts` `resolveDnaCreateContentReach`) whose
+   * DNA-side `CreateContentInput.reach` has no serde default. Absent ⇒ those
+   * callers HARD-FAIL on an ungraded row rather than guessing a literal.
+   * Must be a canonical reach value (`elohim/sdk/schemas/v1/enums/reach.schema.json`).
+   */
+  reach?: string;
 }
 
 /** A validated declaration plus where it came from (needed for provenance). */
@@ -189,6 +199,19 @@ export function parseCorpusDeclaration(text: string, sourcePath: string): Corpus
     environment: environment as EnvironmentTier,
     realism: { rung: rung as RealismRung, why: why.trim() },
   };
+
+  const reachRaw = raw['reach'];
+  if (reachRaw !== undefined && reachRaw !== null) {
+    if (typeof reachRaw !== 'string' || !isReach(reachRaw)) {
+      throw new CorpusDeclarationError(
+        sourcePath,
+        'reach',
+        `must be a canonical reach value when present (got ${JSON.stringify(reachRaw)}) — ` +
+          'see elohim/sdk/schemas/v1/enums/reach.schema.json',
+      );
+    }
+    declaration.reach = reachRaw;
+  }
 
   const trustRaw = raw['trustBootstrap'];
   if (trustRaw === undefined || trustRaw === null) {

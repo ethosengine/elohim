@@ -96,6 +96,42 @@ describe('parseCorpusDeclaration — valid declarations', () => {
 });
 
 // =============================================================================
+// PARSE — the optional `reach` declaration
+// =============================================================================
+
+describe('parseCorpusDeclaration — declared `reach`', () => {
+  it('leaves reach undefined when absent', () => {
+    const d = parseCorpusDeclaration(decl(), SRC);
+    expect(d.reach).toBeUndefined();
+  });
+
+  it('leaves reach undefined when explicitly null', () => {
+    const d = parseCorpusDeclaration(decl({ reach: null }), SRC);
+    expect(d.reach).toBeUndefined();
+  });
+
+  it('accepts a canonical reach value', () => {
+    const d = parseCorpusDeclaration(decl({ reach: 'commons' }), SRC);
+    expect(d.reach).toBe('commons');
+  });
+
+  it("rejects a non-canonical reach naming 'reach'", () => {
+    let thrown: unknown;
+    try {
+      parseCorpusDeclaration(decl({ reach: 'invited' }), SRC);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(CorpusDeclarationError);
+    expect((thrown as CorpusDeclarationError).field).toBe('reach');
+  });
+
+  it('rejects a non-string reach', () => {
+    expect(() => parseCorpusDeclaration(decl({ reach: 3 }), SRC)).toThrow(CorpusDeclarationError);
+  });
+});
+
+// =============================================================================
 // PARSE — fail-closed + hard errors
 // =============================================================================
 

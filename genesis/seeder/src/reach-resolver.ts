@@ -65,3 +65,43 @@ export function seedReach(json: { reach?: string; visibility?: string }): Reach 
   if (!authored) return UNAUTHORED_CORPUS_REACH;
   return assertReach(authored, 'authored reach');
 }
+
+/**
+ * Resolve the `reach` field for a create_content payload sent DIRECTLY to the
+ * content_store zome's `create_content` coordinator function (bypassing the
+ * `/db/content/bulk` HTTP wire, whose `CreateContentInputView.reach` is
+ * optional and defaulted server-side).
+ *
+ * `CreateContentInput.reach` (elohim/sdk/domains/lamad/types/src/lib.rs:39)
+ * has NO serde default — an omitted `reach` on this call path is a
+ * `WasmError Deserialize`, not a catchable validation error
+ * (genesis/data/timeline/backlog/prologue-seed-step-relationship-type-invalid.md
+ * "Root cause found" section). Every direct-WASM `create_content` caller must
+ * resolve a value before building the payload:
+ *
+ *   1. the row's own authored `reach`, if present and canonical;
+ *   2. otherwise the seed corpus's declared `reach` (`corpus.json` `reach:` —
+ *      see corpus-trust.ts `CorpusDeclaration.reach`), if present and
+ *      canonical;
+ *   3. otherwise HARD-FAIL, naming the content — never a hardcoded literal,
+ *      so a corpus that forgot to declare one is caught at seed time instead
+ *      of silently landing every row on a made-up default.
+ */
+export function resolveDnaCreateContentReach(
+  authored: unknown,
+  corpusDeclaredReach: string | undefined,
+  ctx: string,
+): Reach {
+  if (typeof authored === 'string' && authored.trim() !== '') {
+    return assertReach(authored, `authored reach (${ctx})`);
+  }
+  if (corpusDeclaredReach) {
+    return assertReach(corpusDeclaredReach, `corpus-declared reach (${ctx})`);
+  }
+  throw new Error(
+    `${ctx}: create_content requires \`reach\` but none was resolved — the row carries no ` +
+      'authored `reach` and the seed corpus declares none in `corpus.json` (`reach:`); ' +
+      'CreateContentInput.reach has no serde default, so this call would otherwise fail as ' +
+      'WasmError Deserialize',
+  );
+}
