@@ -43,6 +43,33 @@ export interface State {
   rebuilt?: number;
   crash: boolean;
 }
+// EVERY act this process has filed, across scenarios. The stations share three cell
+// agents and never reset state, so a scenario's baseline is only a fact once the PREVIOUS
+// scenario's acts have landed in the published generation. Six identical reads one second
+// apart is not that test: the sweep is 60 s, so a "stable" tally can simply be one nobody
+// has updated yet — measured 2026-09-07, a baseline read 2 low and the shortfall surfaced
+// later as "contribution 12 != 10". Quiescence is a fact about the acts, not about time.
+const filedActs: string[] = [];
+export function remember(action: string): void {
+  if (action && !filedActs.includes(action)) filedActs.push(action);
+}
+/** Every remembered act is settled (member or rejected — never pending) on this peer. */
+export function actsSettled(world: E2EWorld, peer: Peer = 'jessica'): boolean {
+  if (filedActs.length === 0) return true;
+  const marks = filedActs.map(() => '?').join(',');
+  const seen = rows(
+    world,
+    peer,
+    `SELECT action_hash, member_status FROM feedback_application_member
+    WHERE generation_id = (SELECT max(generation_id) FROM standing_generations WHERE status = 'published')
+    AND action_hash IN (${marks})`,
+    filedActs
+  );
+  const settled = new Set(
+    seen.filter(r => r['member_status'] !== 'pending').map(r => String(r['action_hash']))
+  );
+  return filedActs.every(a => settled.has(a));
+}
 const states = new WeakMap<E2EWorld, State>();
 export function ctx(world: E2EWorld): State {
   let s = states.get(world);
@@ -259,6 +286,7 @@ export async function file(world: E2EWorld, discard = false): Promise<void> {
   s.operation = (await response.json()) as Row;
   assert.equal(s.operation['status'], 'resolved', JSON.stringify(s.operation));
   s.correction = String(s.operation['feedbackActionHash']);
+  remember(s.correction);
 }
 export async function accept(world: E2EWorld): Promise<void> {
   const s = ctx(world);
@@ -291,6 +319,7 @@ export async function accept(world: E2EWorld): Promise<void> {
     }
   });
   if (refusal) throw refusal;
+  remember(s.acceptance);
 }
 export async function lineage(world: E2EWorld, peer: Peer = 'jessica'): Promise<LineageOutput> {
   return call(world, peer, 'get_content_lineage', {
@@ -312,11 +341,8 @@ export async function amend(world: E2EWorld, predecessor: string, body: string):
 // between pass and "deadline exceeded" run to run. Give the cross-peer assertion a budget
 // that reflects the path it is actually waiting on; the wrapping step timeout is raised to
 // match, or Cucumber would cut in first with a less informative error.
-export async function applied(
-  world: E2EWorld,
-  peer: Peer = 'jessica',
-  ms = 400_000
-): Promise<void> {
+export async function applied(world: E2EWorld, peer: Peer = 'jessica', ms = 0): Promise<void> {
+  const budget = ms || rotationBudgetMs(world, peer);
   await until(
     `${peer} applies operation once`,
     () => {
@@ -328,7 +354,7 @@ export async function applied(
       );
       return result.length === 1 && result[0]['status'] === 'applied';
     },
-    ms
+    budget
   );
 }
 // The aggregate was SAMPLED the instant the application row appeared, so this raced the
@@ -346,23 +372,45 @@ export async function applied(
 // and names them in the assertion message. Set the budget from the measurement, never
 // from a guess; A2O_CONTRIBUTION_BUDGET_MS raises the ceiling for a measurement round.
 //
-// MEASURED 2026-09-07 on the household mesh (3 peers, 14 subscription members,
-// ELOHIM_FEEDBACK_SWEEP_SECONDS at its 60 s product default), with the ceiling raised to
-// 600 s so the run reported the lag instead of a deadline. Acceptance to PUBLISHED TALLY:
-// 0.04 s (an already-settled replay), 106.6 s, 252.6 s, 272.5 s. The application row
-// itself landed at 0.04 / 106.6 / 212.5 / 252.6 s; station 7's old 210 s budget expired
-// TWO SECONDS before its row appeared, which is the whole of "8 expected, 6 observed".
-// The lag is quantised by the 60 s sweep and bounded by the rotation over the
-// subscription set plus the fully-clean sweep `publish_generation` waits for, so the
-// budget is 420 s — 1.5x the measured maximum, seven sweeps.
-export const CONTRIBUTION_BUDGET_MS = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? 420_000);
-// Cucumber must not cut in before the poll it wraps, or a timing measurement is replaced
-// by a less informative step timeout.
-export const CONTRIBUTION_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + 90_000;
+// THE BUDGET IS DERIVED, NOT GUESSED. Discovery is a rotation: the projector visits
+// MAX_MEMBERS_PER_SWEEP = 8 subscription members per SWEEP_INTERVAL_SECS = 60 s tick, and
+// `publish_generation` only republishes on a tick that ends with nothing unvisited and
+// nothing pending. So an act filed now is applied within ONE FULL ROTATION of the
+// subscription set — ceil(N/8) sweeps — plus a clean sweep to publish. N is not constant:
+// every content record and every discovered correction becomes a member, so it grows with
+// the mesh's whole history and the lag grows with it.
+//
+// MEASURED 2026-09-07 on the household mesh, sweep at its 60 s product default, ceiling
+// raised to 600 s so the runs reported lag instead of deadlines. Acceptance to APPLICATION
+// ROW: 0.04 s, 106.6 s, 212.5 s, 252.6 s at N≈14-30 members; 332.8 s at N=44, which is
+// exactly ceil(44/8) = 6 sweeps. Acceptance to PUBLISHED TALLY added one further sweep
+// (272.5 s against a 212.5 s row). Station 7's original 210 s budget expired TWO SECONDS
+// before its row appeared — the whole of "8 expected, 6 observed" was a budget shorter
+// than the rotation, not a wrong tally; station 4's crash arm (armed at the same commit,
+// `feedback_projector.rs:571`) had the same 210 s and the same cause.
+//
+// Hence: budget = 2 x (ceil(N/8) + 2) sweeps, read from the live subscription count. The
+// env override pins a fixed ceiling for a measurement round.
+export const SWEEP_MS = 60_000;
+export const MEMBERS_PER_SWEEP = 8;
+export function rotationBudgetMs(world: E2EWorld, peer: Peer = 'jessica'): number {
+  const fixed = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? Number.NaN);
+  if (Number.isFinite(fixed)) return fixed;
+  const n = Number(
+    rows(world, peer, 'SELECT count(*) n FROM feedback_subscriptions')[0]?.['n'] ?? 0
+  );
+  const sweeps = Math.ceil(n / MEMBERS_PER_SWEEP) + 2;
+  return Math.max(180_000, 2 * sweeps * SWEEP_MS);
+}
+// Cucumber step timeouts are fixed at registration while the budget above is derived per
+// call, so they are set to a ceiling the derived budget cannot exceed on this mesh. They
+// are spent only when something is genuinely wrong; the assertion names the numbers.
+export const CONTRIBUTION_STEP_TIMEOUT_MS = 1_200_000;
 // MEASURED in the same round: rebuild requested to generation published, 60.0 s — one
-// sweep. Four sweeps of headroom; a rebuild that needs seven is a finding, not a slow day.
+// sweep. A rebuild replays the retained set in place, so it does not pay the rotation;
+// four sweeps of headroom.
 export const REBUILD_BUDGET_MS = Number(process.env['A2O_REBUILD_BUDGET_MS'] ?? 240_000);
-export const REBUILD_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + REBUILD_BUDGET_MS + 120_000;
+export const REBUILD_STEP_TIMEOUT_MS = CONTRIBUTION_STEP_TIMEOUT_MS + REBUILD_BUDGET_MS + 120_000;
 
 export interface Lag {
   label: string;
@@ -376,6 +424,7 @@ export function attachLag(world: E2EWorld, lag: Lag): void {
 
 export async function contribution(world: E2EWorld): Promise<void> {
   const expected = Number(ctx(world).baseline['jessica']['debitWeightSum']) + 2;
+  const budget = rotationBudgetMs(world);
   const started = Date.now();
   let rowAt: number | null = null;
   let observed = Number.NaN;
@@ -394,14 +443,14 @@ export async function contribution(world: E2EWorld): Promise<void> {
         observed = Number((await standing(world))['debitWeightSum']);
         return observed === expected;
       },
-      CONTRIBUTION_BUDGET_MS
+      budget
     );
   } catch {
     // Fall through: the assertion below names the numbers, which a deadline cannot.
   }
   const lag: Lag = {
     label: 'acceptance to published tally',
-    budgetMs: CONTRIBUTION_BUDGET_MS,
+    budgetMs: budget,
     firstMarkMs: rowAt === null ? null : rowAt - started,
     settledMs: observed === expected ? Date.now() - started : null,
   };

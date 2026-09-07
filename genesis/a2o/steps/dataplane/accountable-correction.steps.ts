@@ -33,6 +33,8 @@ import {
   pending,
   key,
   attachLag,
+  actsSettled,
+  rotationBudgetMs,
   CONTRIBUTION_STEP_TIMEOUT_MS,
   REBUILD_BUDGET_MS,
   REBUILD_STEP_TIMEOUT_MS,
@@ -69,7 +71,7 @@ function canonicalRows(world: E2EWorld): Record<string, unknown>[] {
 
 Given(
   'Jessica has authored a content record visible to all three peers',
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const s = ctx(this);
     const created = await call(this, 'jessica', 'create_content', {
@@ -91,15 +93,16 @@ Given(
       });
       peerEnv(this, peer);
     }
-    // Every station shares the same three cell agents, so a PRIOR scenario's acceptance
-    // can still be in flight when this one starts. This loop used to return true on its
-    // first read, so a baseline captured mid-projection read LOW — and the shortfall
-    // surfaced later as an apparently DOUBLED contribution rather than as the stale
-    // baseline it was (measured 2026-09-07: stations 7 and 8 asserted debitWeightSum 2
-    // and saw 4, while jessica's projection was exactly right — three accepted
-    // corrections at 2 each, fourteen unaccepted allegations at 0). Require the tally to
-    // hold still across consecutive reads spanning more than one discovery sweep before
-    // trusting it, so a baseline is a settled fact rather than a snapshot of a race.
+    // Every station shares the same three cell agents, so a PRIOR scenario's acts can
+    // still be in flight when this one starts, and a baseline captured then reads LOW —
+    // surfacing later as an apparently doubled contribution rather than as the stale
+    // baseline it is (measured 2026-09-07: "contribution 12 != 10", while jessica's
+    // projection was exactly right). Holding still for six one-second reads does NOT
+    // establish that: the sweep is 60 s, so an unchanged tally is often just one nobody
+    // has updated yet. Wait on the ACTS instead — every correction and acceptance this
+    // process has filed is projected into the published generation — and only then read
+    // the tally. Quiescence is a fact about the acts, not a duration.
+    await until('previously filed acts settle', () => actsSettled(this), rotationBudgetMs(this));
     for (const subject of ['jessica', 'james'] as const) {
       let previous = '';
       let stable = 0;
@@ -146,7 +149,7 @@ When(
 
 Then(
   "Matthew's peer discovers James's correction within its next discovery scan, unnotified",
-  { timeout: 480_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
     const subscriptions = rows(
@@ -173,7 +176,7 @@ Given(
 
 Given(
   "Matthew's peer has already applied the first correction it discovered",
-  { timeout: 480_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
   }
@@ -203,7 +206,7 @@ Then(
 
 Then(
   "Matthew's peer still shows the first correction applied exactly once, undisturbed by the late arrival",
-  { timeout: 480_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
   }
@@ -231,7 +234,7 @@ Then(
 
 Then(
   "Matthew's peer's applied correction matches the fetched, verified record James actually authored",
-  { timeout: 480_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this, 'matthew');
     const r = await call(this, 'matthew', 'get_feedback_signal_record', raw(ctx(this).correction));
@@ -387,11 +390,14 @@ Then(
 
 When(
   "Jessica's peer's storage is restarted after the correction is marked applied but before her standing tally reflects it",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     assert.ok(destructiveAllowed(), 'mesh destructive opt-in required');
     const arm = resolve(peerEnv(this, 'jessica')['STORAGE_DIR'], 'feedback-crash-once');
-    await until('projector consumes crash arm', () => !existsSync(arm));
+    // The arm is consumed at the same commit the accepted contribution lands on
+    // (feedback_projector.rs:571), so it waits on the SAME rotation the tally does. A
+    // fixed 210 s here failed station 4 twice for the reason station 7 failed once.
+    await until('projector consumes crash arm', () => !existsSync(arm), rotationBudgetMs(this));
     const result = spawnSync(
       '/bin/bash',
       [resolve('../../app/elohim-app/scripts/hc-mesh.sh'), 'storage-restart', 'jessica'],
@@ -423,7 +429,7 @@ Then(
 
 When(
   "Jessica's peer's discovery resumes after the restart",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await applied(this);
   }
@@ -439,7 +445,7 @@ Then(
 
 When(
   "the same accepted correction is replayed against Jessica's peer after it was already settled",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     ctx(this).beforeStanding = await standing(this);
     const before = rows(
@@ -458,7 +464,9 @@ When(
             'SELECT visit_count FROM feedback_subscriptions WHERE member_key = ?',
             [ctx(this).correction]
           )[0]?.['visit_count']
-        ) > Number(before?.['visit_count'])
+        ) > Number(before?.['visit_count']),
+      // One more visit to this member is one more ROTATION of the subscription set.
+      rotationBudgetMs(this)
     );
   }
 );
@@ -557,13 +565,16 @@ Then(
   "Jessica's standing still reflects exactly one contribution",
   { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
-    await until('redundant acceptance observed', () =>
-      rows(
-        this,
-        'jessica',
-        'SELECT member_status FROM feedback_application_member WHERE action_hash = ?',
-        [ctx(this).acceptance]
-      ).some(r => r['member_status'] === 'member')
+    await until(
+      'redundant acceptance observed',
+      () =>
+        rows(
+          this,
+          'jessica',
+          'SELECT member_status FROM feedback_application_member WHERE action_hash = ?',
+          [ctx(this).acceptance]
+        ).some(r => r['member_status'] === 'member'),
+      rotationBudgetMs(this)
     );
     await contribution(this);
   }

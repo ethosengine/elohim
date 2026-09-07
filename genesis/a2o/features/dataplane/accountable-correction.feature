@@ -50,7 +50,9 @@ Feature: A correction reaches the person it names, only that person can settle i
   its acceptance are checked against the ONE predecessor action's own root, not the id in
   general. Every correction and every content record belongs to a shared network space,
   identified by a DNA HASH; a peer only trusts a notification that names its OWN space,
-  never a FOREIGN one belonging to some other network entirely. DISCOVERY is a peer's own
+  never a FOREIGN one belonging to some other network entirely; a peer's own running copy of
+  that space is its CELL, so "its content cell's DNA hash" is just "which space this peer is
+  in". DISCOVERY is a peer's own
   periodic re-scan of every correction that has been linked, on the shared ledger, to a
   record that peer stewards or already holds — it needs no message from anyone, which is
   what makes it durable; a NOTIFICATION is a direct, optional message that lets a peer
@@ -60,7 +62,10 @@ Feature: A correction reaches the person it names, only that person can settle i
   crash station opens. A peer's PROJECTION is the local read model those records live in:
   derived from the shared ledger, rebuildable from it, and never authoritative over it. The
   SERVED HEAD is the version of a record a peer hands to anyone who asks it for that
-  record. CONTESTED marks a record, visibly to any
+  record, and a DEPENDENT VIEW is anything that reads a record through that head and shows
+  it to a person, so that moving the head changes what the person sees. A PRESENTATION is
+  one such surface: the same underlying act read through two presentations — the filer's own
+  first-party view and an ordinary reader — must tell one story, not two. CONTESTED marks a record, visibly to any
   reader of it, as having two branches that both claim to follow the same prior version —
   a fact that stays true even after a deterministic tie-break has picked one branch to
   actually serve. A GENERATION is one complete, independently-built copy of the standing
@@ -172,7 +177,7 @@ Feature: A correction reaches the person it names, only that person can settle i
   # Station 5 — an allegation costs nobody; only acceptance moves standing (§7)
   # ---------------------------------------------------------------------------------
   @wip
-  Scenario: James is never debited for filing, and Jessica's standing is Unknown until her correction is accepted
+  Scenario: James is never debited for filing, and Jessica's standing is unchanged until her correction is accepted
     # Filing costs the FILER nothing — standing_impact is a proposal, never an effect (§5.1).
     Given James has filed a correction against Jessica's record
     Then James's own standing is unaffected by the correction he filed
