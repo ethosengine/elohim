@@ -32,9 +32,11 @@ Feature: A correction reaches the person it names, only that person can settle i
   bookkeeping behind it is ever rebuilt from scratch.
 
   Vocabulary. A CORRECTION is a witnessed claim (a `FeedbackSignal` of kind `correction`)
-  that a named record is wrong; filing one is an ALLEGATION, not a finding. ACCEPTANCE is
-  the root author's OWN vouch (`accept-correction`) naming that correction — the one act
-  that turns an allegation into something a reader may treat as settled. A SUCCESSOR is
+  that a named record is wrong; filing one is an ALLEGATION, not a finding. A VOUCH is a
+  signed record one peer authors ABOUT another peer's act; its kind names what it is for.
+  ACCEPTANCE is one vouch kind — the root author's OWN `accept-correction` vouch naming
+  that correction — and it is the one act that turns an allegation into something a reader
+  may treat as settled. A SUCCESSOR is
   the amended record the root author then publishes, naming the record it replaces by its
   exact predecessor action, not merely "the current head" (a head can move between the
   correction being filed and being accepted). STANDING is a durable tally kept PER AUTHOR
@@ -52,7 +54,13 @@ Feature: A correction reaches the person it names, only that person can settle i
   periodic re-scan of every correction that has been linked, on the shared ledger, to a
   record that peer stewards or already holds — it needs no message from anyone, which is
   what makes it durable; a NOTIFICATION is a direct, optional message that lets a peer
-  learn sooner than its next scan would have. CONTESTED marks a record, visibly to any
+  learn sooner than its next scan would have. A peer APPLIES an act when it has fetched and
+  verified the signed record and durably recorded, once, what that act contributes — which
+  is the step BEFORE, and separate from, the tally change it feeds; that is the gap the
+  crash station opens. A peer's PROJECTION is the local read model those records live in:
+  derived from the shared ledger, rebuildable from it, and never authoritative over it. The
+  SERVED HEAD is the version of a record a peer hands to anyone who asks it for that
+  record. CONTESTED marks a record, visibly to any
   reader of it, as having two branches that both claim to follow the same prior version —
   a fact that stays true even after a deterministic tie-break has picked one branch to
   actually serve. A GENERATION is one complete, independently-built copy of the standing
@@ -63,8 +71,8 @@ Feature: A correction reaches the person it names, only that person can settle i
   reward. An OPERATION ID is a value the filer's own device — their FIRST-PARTY VIEW, the
   one place that both files the correction and later has to explain to its own user what
   happened to it — mints before it ever asks a peer to file anything, so that filing the
-  SAME correction twice — because the first
-  answer never arrived — is still recognized as one attempt, not two.
+  SAME correction twice — because the first answer never arrived — is still recognized as
+  one attempt, not two.
 
   Roles held for every station below (see README-accountable-correction.md for why):
   Jessica is the root author of the record every station corrects. James files every

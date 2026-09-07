@@ -345,11 +345,23 @@ export async function applied(
 // APPLICATION ROW took to appear and how long the TALLY took to follow it, attaches both,
 // and names them in the assertion message. Set the budget from the measurement, never
 // from a guess; A2O_CONTRIBUTION_BUDGET_MS raises the ceiling for a measurement round.
-export const CONTRIBUTION_BUDGET_MS = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? 210_000);
+//
+// MEASURED 2026-09-07 on the household mesh (3 peers, 14 subscription members,
+// ELOHIM_FEEDBACK_SWEEP_SECONDS at its 60 s product default), with the ceiling raised to
+// 600 s so the run reported the lag instead of a deadline. Acceptance to PUBLISHED TALLY:
+// 0.04 s (an already-settled replay), 106.6 s, 252.6 s, 272.5 s. The application row
+// itself landed at 0.04 / 106.6 / 212.5 / 252.6 s; station 7's old 210 s budget expired
+// TWO SECONDS before its row appeared, which is the whole of "8 expected, 6 observed".
+// The lag is quantised by the 60 s sweep and bounded by the rotation over the
+// subscription set plus the fully-clean sweep `publish_generation` waits for, so the
+// budget is 420 s — 1.5x the measured maximum, seven sweeps.
+export const CONTRIBUTION_BUDGET_MS = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? 420_000);
 // Cucumber must not cut in before the poll it wraps, or a timing measurement is replaced
 // by a less informative step timeout.
 export const CONTRIBUTION_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + 90_000;
-export const REBUILD_BUDGET_MS = Number(process.env['A2O_REBUILD_BUDGET_MS'] ?? 210_000);
+// MEASURED in the same round: rebuild requested to generation published, 60.0 s — one
+// sweep. Four sweeps of headroom; a rebuild that needs seven is a finding, not a slow day.
+export const REBUILD_BUDGET_MS = Number(process.env['A2O_REBUILD_BUDGET_MS'] ?? 240_000);
 export const REBUILD_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + REBUILD_BUDGET_MS + 120_000;
 
 export interface Lag {
