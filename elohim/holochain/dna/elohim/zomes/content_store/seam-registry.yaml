@@ -709,3 +709,42 @@ decisionPoints:
     gapNote: >
       Wasm-context extern; covered transitively by select_election's bounded-work registration
       and owed sweettest coverage with the first multi-conductor carry-the-election scenario.
+
+  - name: compute_task
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/compute_task.rs
+      modulePath: content_store::compute_task::compute_task
+    summary: >
+      Existing REA Commitment and EconomicEvent entries carry a requester-authored
+      task and selected-runner-authored acceptance/completion. Exact ActionHash
+      references and signed record authors bind the lifecycle; ID lookup never
+      supplies mutable task status. No integrity change or content head per run.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Native DHT records and links are authoritative; local HTTP is only an SDK facing.
+      - id: C6a
+        status: partial
+        justification: >
+          Fifty requests/page, sixteen events/request, 4096-link provider index ceiling,
+          and two-second in-WASM loop deadlines bound v1 work. Host get_links collection
+          itself is not paginated; a larger runner history needs a sharded index.
+      - id: C6b
+        status: partial
+        justification: >
+          Immutable task and attempt references recover duplicate local calls. Conflicting
+          signed events fail closed. Single-runner execution journal owns effects; no
+          distributed CAS or multi-runner claim protocol is advertised.
+      - id: C9
+        status: answered
+        justification: Actual record author must equal requester or selected runner; no transport-key inference.
+      - id: C12
+        status: partial
+        justification: >
+          Coordinator proves who claimed work; storage separately authenticates the current
+          grant and admits one launch. Direct generic REA authoring confers no execution authority.
+    contractTests: null
+    gapNote: >
+      Requires a live two-conductor test for authoring, gossip discovery, conflicting events,
+      and missed-notification recovery. A successful cargo check is not that evidence.

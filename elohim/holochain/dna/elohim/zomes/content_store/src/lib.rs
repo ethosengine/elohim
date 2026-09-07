@@ -866,6 +866,7 @@ pub mod providers;
 // Gate check helpers — wisdom-as-auth seam for content_store coordinator.
 // Routes experience-moment content through AttestationWrite (multi-gate) and
 // all other content types through ContentPublish (content-safety-gate only).
+mod compute_task;
 mod gate;
 use gate::gate_check_for_content;
 

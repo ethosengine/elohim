@@ -520,6 +520,8 @@ pub fn create_commitment_state_link(
 /// link target (the graduating event's ActionHash) as base64.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CommitmentStateLink {
+    /// Author of the signed CreateLink, supplied by Holochain.
+    pub author: String,
     pub state: String,
     pub signed_at: String,
     pub event_hash: String,
@@ -535,6 +537,22 @@ pub struct CommitmentStateLink {
 #[hdk_extern]
 pub fn get_commitment_state_links(
     commitment_cid: String,
+) -> ExternResult<Vec<CommitmentStateLink>> {
+    read_commitment_state_links(commitment_cid, false)
+}
+
+/// Execution grants must observe both ordinary lifecycle withdrawal and
+/// signed successor links. The caller checks the CreateLink author.
+#[hdk_extern]
+pub fn get_commitment_authority_links(
+    commitment_cid: String,
+) -> ExternResult<Vec<CommitmentStateLink>> {
+    read_commitment_state_links(commitment_cid, true)
+}
+
+fn read_commitment_state_links(
+    commitment_cid: String,
+    include_successors: bool,
 ) -> ExternResult<Vec<CommitmentStateLink>> {
     let base = EntryHash::try_from(commitment_cid.clone()).map_err(|_| {
         wasm_error!(WasmErrorInner::Guest(format!(
@@ -555,7 +573,7 @@ pub fn get_commitment_state_links(
         // what keeps this reader — and every lifecycle ladder built on it —
         // exactly what it was before successors existed: a commitment's
         // `revoked_at` can never come back as a cid.
-        if is_successor_tag(&signed_at) {
+        if !include_successors && is_successor_tag(&signed_at) {
             continue;
         }
         // Target is the graduating event's ActionHash; render as base64.
@@ -563,6 +581,7 @@ pub fn get_commitment_state_links(
             .map(|h| h.to_string())
             .unwrap_or_default();
         out.push(CommitmentStateLink {
+            author: link.author.to_string(),
             state,
             signed_at,
             event_hash,

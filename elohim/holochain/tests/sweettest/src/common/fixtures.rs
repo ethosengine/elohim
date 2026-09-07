@@ -7,10 +7,16 @@ use std::path::PathBuf;
 
 /// Resolve the packaged `.dna` artifact for a given DNA name.
 ///
-/// Looks first in the DNA workdir (per-DNA convention), then in the shared
+/// If `SWEETTEST_DNA_DIR` is set, require `<dir>/<name>.dna` there. A supplied
+/// but missing bundle is an error, never a fallback to the original checkout.
+/// Otherwise looks first in the DNA workdir (per-DNA convention), then in the shared
 /// happ workdir. Returns an error if neither exists so tests skip gracefully
 /// when artifacts haven't been built.
 pub fn dna_path(dna_name: &str) -> Result<PathBuf> {
+    let supplied_root = std::env::var_os("SWEETTEST_DNA_DIR").map(PathBuf::from);
+    if let Some(path) = super::dna_artifacts::supplied_dna(supplied_root.as_deref(), dna_name)? {
+        return Ok(path);
+    }
     // Repo root is 3 parents up from `elohim/holochain/tests/sweettest/`.
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let holochain_dir = manifest_dir
