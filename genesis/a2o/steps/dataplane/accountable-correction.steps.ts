@@ -86,10 +86,25 @@ Given(
       });
       peerEnv(this, peer);
     }
+    // Every station shares the same three cell agents, so a PRIOR scenario's acceptance
+    // can still be in flight when this one starts. This loop used to return true on its
+    // first read, so a baseline captured mid-projection read LOW — and the shortfall
+    // surfaced later as an apparently DOUBLED contribution rather than as the stale
+    // baseline it was (measured 2026-09-07: stations 7 and 8 asserted debitWeightSum 2
+    // and saw 4, while jessica's projection was exactly right — three accepted
+    // corrections at 2 each, fourteen unaccepted allegations at 0). Require the tally to
+    // hold still across consecutive reads spanning more than one discovery sweep before
+    // trusting it, so a baseline is a settled fact rather than a snapshot of a race.
     for (const subject of ['jessica', 'james'] as const) {
-      await until(`${subject} standing ready`, async () => {
-        s.baseline[subject] = await standing(this, subject);
-        return true;
+      let previous = '';
+      let stable = 0;
+      await until(`${subject} standing settles`, async () => {
+        const value = await standing(this, subject);
+        const current = JSON.stringify(value);
+        stable = current === previous ? stable + 1 : 0;
+        previous = current;
+        s.baseline[subject] = value;
+        return stable >= 6;
       });
     }
     if (s.crash)
