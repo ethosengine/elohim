@@ -1606,7 +1606,7 @@ status_all() {
   if [ -n "$_running_bin" ]; then
     _running_desc="$_running_bin ($("$_running_bin" --version 2>&1 | head -1))"
     case "$_running_bin" in
-      *fork-bin*) _running_desc="$_running_desc [FORK]" ;;
+      *fork-bin*|*hc-fork-*) _running_desc="$_running_desc [FORK]" ;;
       *) _running_desc="$_running_desc [STOCK — alpha runs the fork, so this mesh is NOT at parity]" ;;
     esac
   else
