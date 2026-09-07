@@ -395,7 +395,23 @@ pub enum Verdict {
     Idle { note: String },
     /// The release passed the whole verify floor on this peer. In `observe`
     /// mode this is where a sweep ends.
-    Ok { release_cid: String },
+    ///
+    /// **T4 (2026-09-08), additive.** `runs_target` names the SAME by-bytes
+    /// exit `Applied.already_current` names for the apply/canary arms
+    /// ([`super::verify::already_runs_target`]) — this peer's installed
+    /// coordinator zomes already equal every role this release touches. An
+    /// `observe`-mode peer never calls `record_applied` (there is no vehicle
+    /// to run), so before this field the ONLY peer-adoption signal on this
+    /// surface was `appliedRelease`, which stays permanently `null` for a
+    /// release cut FOR a fleet this peer's own controller is not a member
+    /// of — even when this peer already runs the exact bytes it would
+    /// install. `release_cid` is the exact candidate this bit is about: a
+    /// reader MUST compare it to the head it cares about before trusting
+    /// `runs_target` — a stale row's bit says nothing about a newer head.
+    Ok {
+        release_cid: String,
+        runs_target: bool,
+    },
     /// **T4.** The release passed the floor AND this peer is converged on it.
     ///
     /// `already_current` distinguishes the two ways that is true: a fresh apply
@@ -436,10 +452,16 @@ impl Serialize for Verdict {
                 map.serialize_entry("state", "idle")?;
                 map.serialize_entry("note", note)?;
             }
-            Verdict::Ok { release_cid } => {
+            Verdict::Ok {
+                release_cid,
+                runs_target,
+            } => {
                 map.serialize_entry("state", "ok")?;
                 map.serialize_entry("ok", &true)?;
                 map.serialize_entry("releaseCid", release_cid)?;
+                // ADDITIVE (T4, 2026-09-08): "I have adopted" means "I run
+                // the target bytes" — see the field's doc comment.
+                map.serialize_entry("runsTarget", runs_target)?;
             }
             Verdict::Applied {
                 release_cid,
@@ -1382,7 +1404,8 @@ mod tests {
     fn verdicts_project_the_metric_reason_label() {
         assert_eq!(
             Verdict::Ok {
-                release_cid: "x".into()
+                release_cid: "x".into(),
+                runs_target: false,
             }
             .reason_label(),
             "ok"
@@ -1412,11 +1435,24 @@ mod tests {
     fn the_admin_adoption_verdict_shape_is_pinned_for_t6() {
         let ok = serde_json::to_value(Verdict::Ok {
             release_cid: "uhCkkWinner".to_string(),
+            runs_target: false,
         })
         .unwrap();
         assert_eq!(ok["state"], "ok");
         assert_eq!(ok["ok"], true);
         assert_eq!(ok["releaseCid"], "uhCkkWinner");
+        assert_eq!(ok["runsTarget"], false);
+
+        // T4 (2026-09-08): the by-bytes exit surfaced on an `observe`-mode
+        // peer — the ceremony's "runs the target bytes" adoption check reads
+        // exactly this bit.
+        let ok_runs_target = serde_json::to_value(Verdict::Ok {
+            release_cid: "uhCkkWinner".to_string(),
+            runs_target: true,
+        })
+        .unwrap();
+        assert_eq!(ok_runs_target["state"], "ok");
+        assert_eq!(ok_runs_target["runsTarget"], true);
 
         let refused = serde_json::to_value(Verdict::Refused {
             refusal: AdoptionRefusal::new(RefusalReason::DnaLineageMismatch, "role lamad"),
@@ -1519,7 +1555,8 @@ mod tests {
         );
         assert_eq!(
             state_tag(&Verdict::Ok {
-                release_cid: "c".to_string()
+                release_cid: "c".to_string(),
+                runs_target: false,
             }),
             "ok"
         );

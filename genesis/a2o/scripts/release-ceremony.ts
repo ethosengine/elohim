@@ -126,6 +126,7 @@
  * is never read as absent.
  */
 import { readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   AdminWebsocket,
@@ -153,7 +154,7 @@ const DEFAULT_CONDUCTORS = 'matthew=4444:4445,jessica=4454:4455,james=4464:4465'
  */
 const DEFAULT_STORAGE_HTTP_BASE_PORT = 8090;
 
-const ADOPTION_PATH = '/admin/adoption';
+export const ADOPTION_PATH = '/admin/adoption';
 
 const REACH_LEVELS = [
   'private',
@@ -190,13 +191,13 @@ Environment:
   RELEASE_ADOPTION_URL  default for --adoption-url
   E2E_STORAGE_<PEER>    per-peer storage base url (a2o mesh convention)`;
 
-interface PeerConfig {
+export interface PeerConfig {
   name: string;
   admin: number;
   app: number;
 }
 
-type Flags = Record<string, string>;
+export type Flags = Record<string, string>;
 
 function parseFlags(argv: string[]): { positionals: string[]; flags: Flags } {
   const positionals: string[] = [];
@@ -419,15 +420,56 @@ function resolveAdoptionUrl(flags: Flags, peers: PeerConfig[], actingPeer: PeerC
   return `http://127.0.0.1:${DEFAULT_STORAGE_HTTP_BASE_PORT + index}`;
 }
 
-interface AdoptionChannelRowLite {
+/**
+ * `channels[].verdict` is a hand-serialized tagged union
+ * (`elohim-storage/src/services/release_adoption/state.rs` `impl Serialize
+ * for Verdict`) — every state answers `ok: true|undefined` and a `state` tag;
+ * only the `ok` state (and, since T4 2026-09-08, `applied`) carries the
+ * by-bytes fields this ceremony reads. Typed loosely (not a full discriminated
+ * union) because this script only ever reads two fields off it.
+ */
+export interface AdoptionVerdictLite {
+  state?: string;
+  releaseCid?: string;
+  /** **T4 (2026-09-08).** `state: "ok"` only — this peer's installed
+   * coordinator zomes already equal `releaseCid`'s target for every role it
+   * touches (`already_runs_target`). An `observe`-mode peer never records
+   * `appliedRelease`, so this is the ONLY signal that peer ever adopted a
+   * release cut for a fleet it is not itself a member of. */
+  runsTarget?: boolean;
+  /** `state: "applied"` only — the apply-arm's own by-bytes flag, same
+   * underlying fact as `runsTarget` above for a peer whose mode DOES apply. */
+  alreadyCurrent?: boolean;
+}
+
+export interface AdoptionChannelRowLite {
   channelId: string;
   appliedRelease: { cid: string } | null;
   resolvedHead: { cid: string; tier: string } | null;
+  verdict?: AdoptionVerdictLite | null;
 }
 
-interface AdoptionReadResult {
+export interface AdoptionReadResult {
   /** The row's `appliedRelease.cid`, or null when the peer holds no row / has applied nothing. */
   appliedCid: string | null;
+  /**
+   * **T4 (2026-09-08).** The release cid this peer's runsTarget/alreadyCurrent
+   * bit is ABOUT — read alongside `runsTarget` and never trusted alone: a
+   * caller MUST check `verdictReleaseCid === <the cid it cares about>` before
+   * treating `runsTarget` as true for THAT release. A stale row (last swept
+   * against an older head) would otherwise let a peer look adopted for a
+   * release it was never checked against.
+   */
+  verdictReleaseCid: string | null;
+  /**
+   * True when `verdictReleaseCid`'s bytes are what this peer already runs —
+   * "I have adopted" means "I run the target bytes" (D-A). Combines the two
+   * wire spellings of the same underlying fact (`verdict.runsTarget` for an
+   * `observe`/`canary` peer that never applies, `verdict.alreadyCurrent` for
+   * an `apply` peer that already ran a fresh apply as a no-op) so a caller
+   * never has to know which mode produced the row.
+   */
+  runsTarget: boolean;
   /** Non-null when the surface itself could not be read — never conflated with "applied nothing". */
   error: string | null;
 }
@@ -438,7 +480,7 @@ interface AdoptionReadResult {
  * nothing" — the same unreachable-≠-absent rail `status` holds for the
  * conductor read.
  */
-async function readAdoptedRelease(
+export async function readAdoptedRelease(
   adoptionUrl: string,
   channelId: string,
   timeoutMs: number
@@ -451,12 +493,16 @@ async function readAdoptedRelease(
   } catch (e) {
     return {
       appliedCid: null,
+      verdictReleaseCid: null,
+      runsTarget: false,
       error: `could not reach ${adoptionUrl}${ADOPTION_PATH}: ${String(e).slice(0, 200)}`,
     };
   }
   if (!response.ok) {
     return {
       appliedCid: null,
+      verdictReleaseCid: null,
+      runsTarget: false,
       error: `GET ${adoptionUrl}${ADOPTION_PATH} returned ${response.status}`,
     };
   }
@@ -466,11 +512,19 @@ async function readAdoptedRelease(
   } catch (e) {
     return {
       appliedCid: null,
+      verdictReleaseCid: null,
+      runsTarget: false,
       error: `GET ${adoptionUrl}${ADOPTION_PATH} returned unparseable JSON: ${String(e).slice(0, 200)}`,
     };
   }
   const row = (body.channels ?? []).find(r => r.channelId === channelId);
-  return { appliedCid: row?.appliedRelease?.cid ?? null, error: null };
+  const verdict = row?.verdict ?? null;
+  return {
+    appliedCid: row?.appliedRelease?.cid ?? null,
+    verdictReleaseCid: verdict?.releaseCid ?? null,
+    runsTarget: verdict?.runsTarget === true || verdict?.alreadyCurrent === true,
+    error: null,
+  };
 }
 
 async function resolveElectionOnPeer(peer: PeerConfig, channelId: string, timeoutMs: number) {
@@ -580,7 +634,7 @@ interface AuthoredVersion {
  * Station 9 closes. It refuses on the SAME two facts the story names, and
  * says which one is missing rather than making the steward guess.
  */
-async function assertAdmissibleOverEarnedHead(
+export async function assertAdmissibleOverEarnedHead(
   channelId: string,
   earnedCid: string,
   manifest: any,
@@ -591,25 +645,45 @@ async function assertAdmissibleOverEarnedHead(
 ): Promise<void> {
   const adoptionUrl = resolveAdoptionUrl(flags, peers, actingPeer);
   const adoption = await readAdoptedRelease(adoptionUrl, channelId, timeoutMs);
-  const adopted = adoption.error === null && adoption.appliedCid === earnedCid;
+  const appliedMatches = adoption.error === null && adoption.appliedCid === earnedCid;
+  // D-A / T4 (2026-09-08): "I have adopted" means "I run the target bytes" —
+  // a release cut FOR the fleet binds coordinator roles to the fleet's
+  // running coordinators, so THIS peer's own controller can refuse it
+  // `coordinator_lineage_mismatch` (or simply never `record_applied`, since
+  // `observe` mode has no vehicle) even when it already runs every byte the
+  // release would install. `runsTarget` is trusted ONLY when it is reported
+  // FOR this exact earned head (`verdictReleaseCid === earnedCid`) — a bit
+  // computed for a different, older release says nothing about this one.
+  const runsTargetMatches =
+    adoption.error === null && adoption.runsTarget && adoption.verdictReleaseCid === earnedCid;
+  const adopted = appliedMatches || runsTargetMatches;
 
   const declaredParent: unknown = manifest?.envelope?.lineageParentCid;
   const lineageOk = typeof declaredParent === 'string' && declaredParent === earnedCid;
 
   if (adopted && lineageOk) {
+    const adoptionBasis = appliedMatches
+      ? 'it applied'
+      : "it already runs the release's target coordinator bytes (runsTarget)";
     console.error(
       `publish ADMITTED over earned head ${earnedCid} on channel '${channelId}': ` +
-        `${actingPeer.name}'s own runtime reports it applied (${adoptionUrl}${ADOPTION_PATH}) and ` +
+        `${actingPeer.name}'s own runtime reports ${adoptionBasis} (${adoptionUrl}${ADOPTION_PATH}) and ` +
         `the manifest declares envelope.lineageParentCid=${earnedCid} — the candidate is declared ` +
         `STAGING beneath the standing earned head, which only the promotion ceremony can move.`
     );
     return;
   }
 
+  // Names BOTH the controller row (appliedRelease — what a vehicle recorded)
+  // and runsTarget (what this peer's installed bytes already are) so a
+  // reader can tell "never applied anything" apart from "applied nothing but
+  // already runs different-but-equivalent bytes for a DIFFERENT release" —
+  // the two ways `adopted` above can still be false.
   const notAdoptedDetail = adoption.error
     ? `${actingPeer.name}'s adoption receipt could not be read (${adoption.error})`
-    : `${actingPeer.name}'s runtime reports appliedRelease=${adoption.appliedCid ?? 'none'} on ` +
-      `${adoptionUrl}${ADOPTION_PATH}`;
+    : `${actingPeer.name}'s runtime reports appliedRelease=${adoption.appliedCid ?? 'none'} and ` +
+      `runsTarget=${adoption.runsTarget} for verdict releaseCid=${adoption.verdictReleaseCid ?? 'none'} ` +
+      `(earned head is ${earnedCid}) on ${adoptionUrl}${ADOPTION_PATH}`;
 
   if (!adopted && !lineageOk) {
     // Neither condition holds — the original, un-narrowed refusal, with both
@@ -1157,7 +1231,14 @@ async function main() {
   }
 }
 
-main().catch(e => {
-  console.error(String(e?.stack ?? e).slice(0, 2000));
-  process.exit(1);
-});
+// Guarded the same way `look.ts` guards its CLI entry point: a unit test
+// imports this module for its pure helpers (`readAdoptedRelease`,
+// `assertAdmissibleOverEarnedHead`) and must not trigger a live `main()` run
+// (which parses `process.argv` and calls `process.exit`) as a side effect of
+// that import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(e => {
+    console.error(String(e?.stack ?? e).slice(0, 2000));
+    process.exit(1);
+  });
+}

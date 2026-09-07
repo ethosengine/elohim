@@ -1648,9 +1648,13 @@ impl AdoptionController {
                     // Observe records nothing and applies nothing — but "you
                     // already run this" is a PASS, not the
                     // `coordinator_lineage_mismatch` the supersedes check alone
-                    // would have reported.
+                    // would have reported. T4 (2026-09-08): `runs_target:
+                    // true` is what lets `/admin/adoption` say so — an
+                    // observe peer never calls `record_applied`, so this bit
+                    // is the ONLY place that fact reaches the wire.
                     PostVerifyAction::Observed => Verdict::Ok {
                         release_cid: release_cid.clone(),
+                        runs_target: true,
                     },
                     PostVerifyAction::Refused => unreachable!(
                         "verify::verify already enforced the threshold for tier {:?} before the \
@@ -1678,6 +1682,10 @@ impl AdoptionController {
                     },
                     PostVerifyAction::Observed => Verdict::Ok {
                         release_cid: verified.release_cid,
+                        // The by-bytes exit was NOT taken for this outcome
+                        // (`VerifyOutcome::Verified`, not `AlreadyCurrent`) —
+                        // this peer does not yet run the target bytes.
+                        runs_target: false,
                     },
                     PostVerifyAction::Refused => unreachable!(
                         "verify::verify already enforced the threshold for tier {:?} — \
@@ -2656,6 +2664,7 @@ mod tests {
             }),
             Verdict::Ok {
                 release_cid: "uhCkkHead".to_string(),
+                runs_target: false,
             },
             None,
         );
@@ -2718,7 +2727,8 @@ mod tests {
         );
         assert_eq!(
             verdict_arm(&Verdict::Ok {
-                release_cid: "c".to_string()
+                release_cid: "c".to_string(),
+                runs_target: false,
             }),
             DecisionArm::Watch
         );
