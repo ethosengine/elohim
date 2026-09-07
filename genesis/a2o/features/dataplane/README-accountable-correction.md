@@ -15,7 +15,7 @@ every section below cites it, e.g. "contract §3", by number). This file is appe
 whichever agent lands the matching Rust surface, in either direction (a2o first, Rust first) —
 never overwritten. Each section names who wrote it and when.
 
-The three coordinator calls (functions storage exposes for a conductor to invoke) this feature
+The three coordinator calls (functions hosted in the conductor’s DNA coordinator zome and invoked by storage or a signed client) this feature
 exercises: `create_feedback_signal` files a correction; `create_vouch` (with
 `vouch_kind = accept-correction`) is the root author's own act of accepting one — a "vouch" here
 means one signed record standing behind another; `amend_content` is the root author publishing the
@@ -85,7 +85,7 @@ registry** (`elohim/elohim-storage/src/runtime_config.rs`, `Key::FeedbackNotify`
 mechanism already armed on every mesh peer (`ELOHIM_RUNTIME_CONFIG_PATH=<mesh>/<peer>/runtime-config.toml`,
 set from boot by `hc-mesh.sh`). It is hot: the send path reads the registry per act.
 
-A scenario flips it on a RUNNING peer, two equivalent ways:
+A scenario flips it on a RUNNING peer, then verifies the change:
 
 - write `ELOHIM_FEEDBACK_NOTIFY=0` into that peer's `runtime-config.toml` and wait for the 10s
   poller, or force it immediately with `POST /admin/runtime-config/reload` on that peer;
@@ -162,5 +162,123 @@ group — a second act would be a group MEMBER, never a second contribution.
   `rebuilding` generation state. Standing is still read through the existing
   `GET /api/v1/standing/{agent_cid}`, whose semantics CHANGED at this cutover: a correction alone
   now contributes zero and leaves the subject's aggregate ABSENT (Unknown), where before it
-  debited the signal's SIGNER immediately. A station asserting "an allegation costs the filer
-  nothing" should assert Unknown/absent for the TARGET's root author, not a zero score.
+  debited the signal's SIGNER immediately. To prove filing costs James nothing, compare
+  James's standing before and after filing. Separately, to prove an unaccepted allegation
+  costs Jessica nothing, assert her standing remains Unknown/absent when she has no prior
+  accepted corrections; a present row with a zero score is not absence.
+
+## Live-loop and binding follow-up (Codex, 2026-09-06)
+
+The projector is now constructed from the running peer's content-cell client and spawned
+beside the release-adoption controller in `main.rs`. The production reader decodes typed
+Holochain hashes, verifies the signed action and entry binding, and checks the Correction
+EPR's immutable request. Held content anchors populate durable subscriptions. An allegation
+can transition from its zero contribution to an accepted contribution; a replay of that
+acceptance cannot debit it again. Standing reads normalize the content-cell public keys.
+
+For a mesh run, build this worktree's storage binary and pass its path explicitly as
+`STORAGE_BIN`; the harness's default is a **dev-family** pool slot and does not select this
+sprint branch's binary. The mesh also needs a matching Holochain conductor/CLI pair, a packed
+hApp, and its doorway binary. Use `just mesh status` to inspect the next launch before starting.
+Set `ELOHIM_FEEDBACK_SWEEP_SECONDS=5` on the launch command for a short scenario cadence;
+unset defaults to 60 seconds. `ELOHIM_FEEDBACK_NOTIFY` still uses the watched runtime-config
+registry, independently of the sweep. The bindings read `ELOHIM_RUNTIME_CONFIG_PATH` from
+that peer's running process, edit its file, reload, assert the effective value, and restore
+the original file after the scenario.
+
+### Station 4's deliberate crash
+
+Opt in at launch with `ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1`. The scenario arms Jessica alone by
+creating `<STORAGE_DIR>/feedback-crash-once` before acceptance. The projector consumes that
+file and aborts **inside** the transaction, after writing the application row and before
+writing the generation aggregate. The consumed file prevents a second abort after
+`hc-mesh.sh storage-restart jessica`. Without both the environment opt-in and the per-peer
+file, this hook does nothing. This is a storage crash test; it never restarts a conductor.
+
+### Station 7's rebuild trigger
+
+`POST /api/v1/feedback/generations/rebuild` returns `202` with `{ generationId, status:
+"rebuilding" }`. It retains the old generation and copies its retained action references into
+a new generation under the same pinned policy. A process-local writer lock serializes the
+request with projector ticks. Retained pending references receive service independently of
+fresh link discovery. Standing reads return `503` with a rebuilding explanation while an
+in-flight generation exists. Publication waits for pending members to settle; the fixture
+compares operation groups, acceptance dependencies, subjects, contributions and policy
+fingerprints, excluding operational timestamps.
+
+The bindings use read-only SQLite queries as local test witnesses for application rows and
+generations; these are not new product read endpoints. Station 8 discards the initial HTTP
+response body, independently checks that the server resolved the operation, then retries
+with the same client-minted operation id. This exercises lost-result recovery, not a proxy
+that cuts a TCP connection mid-response.
+
+### Remaining binding boundaries
+
+`genesis/a2o/steps/dataplane/accountable-correction.steps.ts` contains 53 step definitions. Eight remain explicitly pending, each with
+its reason attached to the Cucumber receipt:
+
+- Station 1 needs a fixture that withholds an **older** correction's discovery and releases it
+  later. Backdating a newly authored source-chain action is not a substitute.
+- Station 2 needs a notification-driven wake and an observable scheduled-scan deadline to
+  prove acceleration, plus a P2P fixture that injects a foreign-DNA envelope into the real
+  receiver. Filing through HTTP cannot prove transport rejection.
+- Station 3's dependent-view re-render needs a specified browser view and route. A successful
+  content HTTP read alone cannot establish that a dependent view re-rendered.
+
+Station 5's literal Unknown assertion needs an evaluator with no earlier accepted corrections.
+All scenarios use the same three cell agents, so prior stations can leave Jessica with standing;
+this fixture-isolation constraint must not be hidden by treating a pre-existing tally as Unknown.
+Station 6 checks that the sequential **edge** introduces no additional contested predecessor;
+the earlier fork remains contested, as the contract requires.
+
+Run `just test mesh genesis/a2o/features/dataplane/accountable-correction.feature` with
+`A2O_RUN_WIP=1` after `just mesh start` and `just mesh prologue`. Keep a scenario's `@wip` until
+its whole scenario passes, and always finish with `just mesh stop`. The mesh-attempt section below records the startup refusal. Its logs are separate from the
+registration receipts; no live scenario receipt exists.
+
+
+### First supported check: binding registration
+
+From this worktree's root, with workspace dependencies installed (`pnpm install`), run:
+
+```bash
+CUCUMBER_JSON_REPORT=reports/accountable-correction/bindings-dry-run.json \
+CUCUMBER_HTML_REPORT=reports/accountable-correction/bindings-dry-run.html \
+pnpm --dir genesis/a2o exec cucumber-js --dry-run --tags '@concern:accountable-correction'
+```
+
+Expected result: **8 scenarios / 91 steps skipped, zero undefined steps**. This confirms that
+the bindings load; it does not execute a station or establish product correctness. The JSON
+and HTML receipts are under `genesis/a2o/reports/accountable-correction/`.
+
+For live execution, `just gate elohim-storage` prints the target pool slot used by this
+branch. Build its executable with `CARGO_TARGET_DIR=<that-slot> cargo build --manifest-path
+elohim/elohim-storage/Cargo.toml`, retaining storage's existing `RUSTFLAGS`. Pass
+`STORAGE_BIN=<that-slot>/debug/elohim-storage`, `ELOHIM_FEEDBACK_SWEEP_SECONDS=5`, and
+`ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1` to `just mesh start`. Conductor/CLI selection, bundle
+packing, and doorway prerequisites are documented in the usage block and start preflight of
+`app/elohim-app/scripts/hc-mesh.sh`; `HOLOCHAIN_BIN` accepts a directory containing both
+matching binaries. This handoff does not supply a prebuilt 0.7 pair or all required DNAs.
+Until the mesh prerequisites are available and a station has passed, there is no claimed
+successful live station. A start failure is a stopping boundary, not permission to substitute
+an unrelated binary or another worktree's bundle.
+
+
+### Mesh attempt — 2026-09-07
+
+Receipt directory: genesis/a2o/reports/accountable-correction/mesh-20260907000336Z/.
+
+- "just mesh stop": EXIT=0.
+- "STORAGE_BIN=/projects/.cargo-target-pool/family/sprint/elohim__elohim-storage/dev/debug/elohim-storage ELOHIM_FEEDBACK_SWEEP_SECONDS=5 ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1 just mesh start": EXIT=1.
+- Exact refusal: "missing binary: /projects/.cargo-target-pool/family/dev/doorway__doorway-service/dev/debug/doorway (build it first — see CLAUDE.md pool-slot paths)".
+- Final "just mesh stop": EXIT=0.
+
+**Stations 1–8: NOT RUN. Zero stations passed; zero station assertions failed.** Startup
+failed before any peer launched or storage executable ran. The preflight selected stock
+Holochain/hc 0.6.0; no 0.7 pair was found in the inspected executable locations. This
+worktree has lamad.dna but no complete packed hApp. The missing doorway binary was the
+actual stopping error; the other prerequisites were not reached. Following the stopping
+rule, no prologue or live test was attempted and no @wip was removed. There is no live
+Cucumber JSON/HTML receipt to copy; bindings-dry-run.{json,html} is explicitly a separate
+registration check. The next operator must supply the mesh prerequisites before retrying
+this same worktree and feature.
