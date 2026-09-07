@@ -555,6 +555,38 @@ This is a proposed sequence serving existing habit boundaries, not a second work
 
 Cuts 1–2 produce the first complete loop using material already permitted on those peers, with a second isolated validation context in the test harness to prove the cross-scope seam. This is not permission to repartition the production fleet before continuity and recovery are proven. They **do not ship the private-note promise**; that acceptance boundary opens only after cut 3. Cut 4 may start its measurements earlier, but disruptive DNA migration waits for the loop to identify real boundaries. Cut 5 has household-testable portions and larger-hardware portions; scope them individually rather than blocking the whole plan on regional hardware.
 
+**Slice-2 inventory handoff (2026-09-07): submission binding is one act class.**
+Inventory both mechanisms below under **submission binding — one intended act survives a lost
+response**, using D0's authority, durable source, validation, rebuild and gap columns. The next
+slice chooses a common shape from these two mechanisms before adding another. This records the
+duplication; it does not migrate either mechanism in this slice.
+
+| Existing mechanism | Authority and durable binding | Validation and recovery | Gap to carry |
+|---|---|---|---|
+| Accountable correction, [contract §8](../../../superpowers/specs/2026-09-06-accountable-correction-contract.md#8-submission-binding--one-intended-act-survives-a-lost-response) | Submitting content-cell agent and origin DNA; operation id inside immutable content-addressed evidence; local storage outbox holds durable intent | Pins request bytes; single-flight and two-phase recovery; remote peers coalesce evidence-bound operation groups without the origin outbox | Implemented on `sprint/accountable-correction`; retain its explicit unresolved states and distinguish at-most-one contribution from at-most-one remote action |
+| Delegated compute, `genesis/agentic/compute/workspace.mjs` | Requester's signed native request; invocation nonce persisted back to `task.json` inside the content-addressed task envelope | Retrying unchanged submission recovers the native request; `--new-run` changes the invocation; worker admission separately guards execution | Implemented locally; file-backed submission binding duplicates the correction concern and has no shared storage-outbox shape yet |
+
+Read `sprint/accountable-correction` first when converging these shapes: contract §8,
+`elohim/elohim-storage/src/api/feedback_operations.rs`,
+`elohim/elohim-storage/src/db/feedback_operations.rs`, and
+`elohim/elohim-storage/migrations/2026-09-06-101000_feedback_operations/`.
+These are existing branch implementation, not a mechanism to re-derive. This handoff supplies
+inputs to the slice-2 inventory owner; that inventory folds in both implementations after the
+compute changes and correction mesh results land.
+
+**Shared household authority receipt.** Delegated compute's real two-peer iroh transfer/expiry
+test proves the payload leg. Grant issuance on Adam's own loopback adapter and local admission
+tests do not prove the cross-peer authority leg consumed by the requester. That unmeasured leg
+joins slice 1's household mesh authority/discovery stations in the same run receipt under
+`genesis/a2o/reports/`. When the pending run lands, both `dataplane-convergence` and
+`operator-runtime-surface` cite that actual receipt and their named station outcomes. Keep the
+correction-authority and compute-grant assertions distinct inside that shared receipt; a passing
+correction station alone cannot mark delegated authority passed. Do not mint a second commissioning
+claim from the same run. Until the relevant stations pass, cross-peer authority remains unmeasured.
+The household mesh is a shared, single-occupancy resource across worktrees (`/tmp/elohim-local-mesh`
+and its ports are not isolated by checkout), so the compute grant leg queues behind whichever run
+holds it; `genesis/agentic/compute/operations.md` carries the current occupancy.
+
 Reuse these scenario homes:
 
 - `genesis/a2o/features/elohim/content-reach-negotiation.feature`: add correction/referral/restart stations; currently WIP and lacks a concern tag. Bind new runnable coverage to its actual owning habit before claiming it as proof.
