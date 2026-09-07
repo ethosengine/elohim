@@ -77,6 +77,9 @@ fn flood_feedback_dual_publish_byte_identical() {
         standing_impact: StandingImpact::DebitSoft,
         signed_by: "A".repeat(43),
         signature: "B".repeat(88),
+        // Gossip carries the semantic claim only; the notification REFERENCE
+        // (contract §4) rides the direct plane, so a fan-out fixture has none.
+        act_ref: None,
     };
 
     let topic = "/elohim/feedback-signal/bafyrei_test_target_001";
@@ -184,6 +187,9 @@ fn all_wire_types_byte_parity_across_transports() {
         standing_impact: StandingImpact::DebitSoft,
         signed_by: "A".repeat(43),
         signature: "B".repeat(88),
+        // Gossip carries the semantic claim only; the notification REFERENCE
+        // (contract §4) rides the direct plane, so a fan-out fixture has none.
+        act_ref: None,
     };
     let sig_bytes = rmp_serde::to_vec_named(&signal).expect("signal encode");
     publisher

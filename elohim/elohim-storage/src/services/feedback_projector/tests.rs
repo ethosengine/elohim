@@ -1173,3 +1173,93 @@ async fn publication_still_fires_when_members_have_retired() {
     };
     assert_eq!(unvisited, 0, "every Cold member has been visited K times");
 }
+
+/// (T7a) The notification WAKE, both directions.
+///
+/// A reference takes BOTH member keys it names Hot — the correction action and
+/// the content target it routes to — and a notification carrying no reference
+/// changes nothing at all: not the heat, not the durable set, and not the
+/// return value into an error. A pre-slice-1 peer's message is a no-op, not a
+/// failure; discovery still finds the act.
+#[tokio::test]
+async fn an_act_reference_wakes_the_member_and_its_absence_changes_nothing() {
+    let (pool, _reader, projector) = quiet_member_fixture(&["target-wake"]);
+    let scheduler = projector.scheduler();
+    for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
+        projector.tick().await.expect("cooling tick");
+    }
+    assert!(scheduler
+        .heat(sub_db::KIND_CONTENT_TARGET, "target-wake")
+        .is_cold());
+
+    let mut conn = pool.get().unwrap();
+    let members_before = sub_db::count(&mut conn).expect("count");
+
+    // No reference: nothing happens, and that is not an error.
+    let admitted = admit_notified_signal_with(&mut conn, None, Some(DNA), Some(&scheduler))
+        .expect("a reference-less notification is not an error");
+    assert!(!admitted, "nothing was admitted");
+    assert!(
+        scheduler
+            .heat(sub_db::KIND_CONTENT_TARGET, "target-wake")
+            .is_cold(),
+        "heat is unchanged by a notification that names no act"
+    );
+    assert_eq!(
+        sub_db::count(&mut conn).expect("count"),
+        members_before,
+        "the durable set is unchanged"
+    );
+
+    // With one: both keys go Hot, and the act itself joins the durable set.
+    let admitted = admit_notified_signal_with(
+        &mut conn,
+        Some(&act_ref("corr-wake", "target-wake")),
+        Some(DNA),
+        Some(&scheduler),
+    )
+    .expect("admitted");
+    assert!(admitted);
+    assert_eq!(
+        scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-wake"),
+        MemberHeat::Hot,
+        "the routing key's target is re-armed"
+    );
+    assert_eq!(
+        scheduler.heat(sub_db::KIND_CORRECTION_ACTION, "corr-wake"),
+        MemberHeat::Hot,
+        "the act itself is re-armed"
+    );
+    assert_eq!(
+        sub_db::count(&mut conn).expect("count"),
+        members_before + 1,
+        "the correction action is the one new durable member"
+    );
+}
+
+/// (T7a) A reference naming a FOREIGN origin DNA is refused at the wake, and
+/// refusing costs the local durable set nothing (contract §1/§4).
+#[tokio::test]
+async fn a_foreign_origin_dna_reference_is_refused_at_the_wake() {
+    let (pool, _reader, projector) = quiet_member_fixture(&["target-foreign"]);
+    let scheduler = projector.scheduler();
+    let mut conn = pool.get().unwrap();
+    let members_before = sub_db::count(&mut conn).expect("count");
+
+    let foreign = crate::p2p::feedback_signal::FeedbackActRef {
+        origin_dna_hash: "uhC0kSOMEOTHERSPACE".to_string(),
+        action_hash: "corr-foreign".to_string(),
+        routing_key: "target-foreign".to_string(),
+    };
+    let err = admit_notified_signal_with(&mut conn, Some(&foreign), Some(DNA), Some(&scheduler))
+        .expect_err("a foreign space is refused, not admitted");
+    assert!(
+        matches!(err, StorageError::InvalidInput(ref m) if m.contains("foreign")),
+        "refusal names the foreign origin: {err}"
+    );
+    assert_eq!(
+        sub_db::count(&mut conn).expect("count"),
+        members_before,
+        "nothing from a foreign space enters the durable set"
+    );
+}

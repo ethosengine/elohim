@@ -8772,7 +8772,23 @@ impl P2PNode {
     /// [`Self::handle_epr_atom_request`] to delegate and by the iroh-mode
     /// adapter to share fetch/announce/dedup logic.
     pub(crate) fn epr_atom_service(&self) -> crate::epr_atom_service::EprAtomService {
-        crate::epr_atom_service::EprAtomService::new(self.db_pool.clone(), self.dedup.clone())
+        let service =
+            crate::epr_atom_service::EprAtomService::new(self.db_pool.clone(), self.dedup.clone());
+        // Bind this node's OWN content-cell DNA hash (accountable-correction
+        // §1/§4). Without it the service cannot scope an incoming act
+        // reference and REFUSES every `feedback-signal` notification — which
+        // is the honest default, but it also means the notification plane
+        // carries nothing. `hc_registry` is already held for view-federation's
+        // ContentHeadRecord; the same registry answers "which space am I in".
+        match self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|c| c.cell_id().dna_hash().to_string())
+        {
+            Some(dna) => service.with_origin_dna_hash(dna),
+            None => service,
+        }
     }
 
     /// Handle an incoming EPR atom federation request from a peer.

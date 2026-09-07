@@ -521,8 +521,6 @@ impl EprAtomService {
         peer_label: &str,
         payload_bytes: &[u8],
     ) -> EprAtomResponse {
-        use crate::db::feedback_subscriptions as sub_db;
-
         let signal: crate::p2p::feedback_signal::FeedbackSignal =
             match rmp_serde::from_slice(payload_bytes) {
                 Ok(s) => s,
@@ -612,32 +610,31 @@ impl EprAtomService {
                 };
             }
         };
-        let now = chrono::Utc::now().to_rfc3339();
-        // Subscribe to the ACT ITSELF and to its routing key. The act reference
-        // is what the projector fetches; the routing key is the content target
-        // whose OTHER acts (including this one's acceptance) hang off it.
-        for (kind, key) in [
-            (sub_db::KIND_CORRECTION_ACTION, act_ref.action_hash.as_str()),
-            (sub_db::KIND_CONTENT_TARGET, act_ref.routing_key.as_str()),
-        ] {
-            if let Err(e) = sub_db::add_member(
-                &mut conn,
-                kind,
-                key,
-                &act_ref.origin_dna_hash,
-                sub_db::SOURCE_NOTIFIED,
-                &now,
-            ) {
-                warn!(
-                    target: "elohim_storage::feedback",
-                    error = %e,
-                    key = %key,
-                    "feedback-signal notify: could not persist the subscription"
-                );
-                return EprAtomResponse::Error {
-                    message: "could not persist subscription".to_string(),
-                };
-            }
+        // Subscribe to the ACT ITSELF and to its routing key, and WAKE both.
+        // The act reference is what the projector fetches; the routing key is
+        // the content target whose OTHER acts (including this one's acceptance)
+        // hang off it. `admit_notified_signal` is the one ingress that does both
+        // — it adds the durable members AND re-arms them Hot in the live sweep
+        // scheduler, so a quiet target converges on the NEXT sweep instead of
+        // after `ceil(N / MAX_MEMBERS_PER_SWEEP)` of them. That is §4's
+        // "notification accelerates discovery": a peer relationship, not a
+        // timer, is what tells this peer a target is live again. Nothing here
+        // writes standing; the projector still fetches the signed record and
+        // verifies §1 for itself.
+        if let Err(e) = crate::services::feedback_projector::admit_notified_signal(
+            &mut conn,
+            signal.act_ref.as_ref(),
+            Some(local_dna),
+        ) {
+            warn!(
+                target: "elohim_storage::feedback",
+                error = %e,
+                action = %act_ref.action_hash,
+                "feedback-signal notify: could not admit the act reference"
+            );
+            return EprAtomResponse::Error {
+                message: "could not persist subscription".to_string(),
+            };
         }
 
         info!(
@@ -898,5 +895,157 @@ mod tests {
             }
             other => panic!("expected Announced, got {other:?}"),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The feedback-signal NOTIFY receive path (contract §4) — T7a.
+    //
+    // These pin the WAKE CALL SITE: this receiver is the one place a notified
+    // act enters the durable subscription set, and it does so through
+    // `feedback_projector::admit_notified_signal`, which is also what re-arms
+    // the member's heat in a running node. A refactor that dropped the call
+    // would silently return the notification plane to "enqueues nothing".
+    // -----------------------------------------------------------------------
+
+    const TEST_DNA: &str = "uhC0kTESTDNA";
+
+    fn pooled_service(dna: Option<&str>) -> (crate::db::DbPool, EprAtomService) {
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::sqlite::SqliteConnection;
+        let url = format!(
+            "file:epr_atom_notify_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        crate::db::run_migrations(&pool).expect("migrations");
+        let svc = EprAtomService::new(Some(pool.clone()), Arc::new(DedupLru::new()));
+        let svc = match dna {
+            Some(d) => svc.with_origin_dna_hash(d),
+            None => svc,
+        };
+        (pool, svc)
+    }
+
+    fn notify_bytes(origin_dna: &str) -> Vec<u8> {
+        use crate::p2p::feedback_signal::{
+            FeedbackActRef, FeedbackSignal, SignalKind, StandingImpact,
+        };
+        let signal = FeedbackSignal {
+            target_cid: "uhCkkTARGET".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("uhCkkEVIDENCE".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "key".to_string(),
+            signature: "sig".to_string(),
+            act_ref: Some(FeedbackActRef {
+                origin_dna_hash: origin_dna.to_string(),
+                action_hash: "uhCkkACT".to_string(),
+                routing_key: "uhCkkTARGET".to_string(),
+            }),
+        };
+        rmp_serde::to_vec_named(&signal).expect("encode")
+    }
+
+    fn deliver(svc: &EprAtomService, bytes: Vec<u8>) -> EprAtomResponse {
+        svc.handle(
+            "peer-sender",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "feedback-signal".into(),
+                payload_bytes: bytes,
+            },
+        )
+    }
+
+    /// An act reference in THIS space is admitted, and the act joins the
+    /// durable subscription set.
+    #[test]
+    fn feedback_notify_admits_the_act_into_the_durable_subscription_set() {
+        use crate::db::feedback_subscriptions as sub_db;
+        let (pool, svc) = pooled_service(Some(TEST_DNA));
+        match deliver(&svc, notify_bytes(TEST_DNA)) {
+            EprAtomResponse::IntegrityAck { received, reason } => {
+                assert!(received, "admitted; reason: {reason:?}");
+            }
+            other => panic!("expected IntegrityAck, got {other:?}"),
+        }
+        let mut conn = pool.get().unwrap();
+        assert!(
+            sub_db::count(&mut conn).expect("count") >= 2,
+            "the act and its routing key both became durable members"
+        );
+    }
+
+    /// A reference naming a DIFFERENT origin DNA is refused before anything is
+    /// persisted — carrying evidence from another space is not slice 1.
+    #[test]
+    fn feedback_notify_refuses_a_foreign_origin_dna() {
+        use crate::db::feedback_subscriptions as sub_db;
+        let (pool, svc) = pooled_service(Some(TEST_DNA));
+        match deliver(&svc, notify_bytes("uhC0kSOMEOTHERSPACE")) {
+            EprAtomResponse::IntegrityAck { received, reason } => {
+                assert!(!received);
+                assert!(
+                    reason.unwrap_or_default().contains("foreign origin DNA"),
+                    "the refusal names the foreign space"
+                );
+            }
+            other => panic!("expected IntegrityAck, got {other:?}"),
+        }
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            sub_db::count(&mut conn).expect("count"),
+            0,
+            "nothing from a foreign space was persisted"
+        );
+    }
+
+    /// A node that cannot name its own content space refuses rather than
+    /// guessing which space the reference belongs to.
+    #[test]
+    fn feedback_notify_refuses_when_this_node_has_no_content_dna_hash() {
+        let (_pool, svc) = pooled_service(None);
+        match deliver(&svc, notify_bytes(TEST_DNA)) {
+            EprAtomResponse::IntegrityAck { received, reason } => {
+                assert!(!received);
+                assert!(reason.unwrap_or_default().contains("no local content DNA"));
+            }
+            other => panic!("expected IntegrityAck, got {other:?}"),
+        }
+    }
+
+    /// A pre-slice-1 peer's message — semantic payload, no reference — is a
+    /// no-op the receiver states out loud, never a projected claim.
+    #[test]
+    fn feedback_notify_without_a_reference_projects_nothing() {
+        use crate::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
+        let (pool, svc) = pooled_service(Some(TEST_DNA));
+        let signal = FeedbackSignal {
+            target_cid: "uhCkkTARGET".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("uhCkkEVIDENCE".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "key".to_string(),
+            signature: "sig".to_string(),
+            act_ref: None,
+        };
+        let bytes = rmp_serde::to_vec_named(&signal).expect("encode");
+        match deliver(&svc, bytes) {
+            EprAtomResponse::IntegrityAck { received, reason } => {
+                assert!(!received);
+                assert!(reason.unwrap_or_default().contains("no act reference"));
+            }
+            other => panic!("expected IntegrityAck, got {other:?}"),
+        }
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            crate::db::feedback_subscriptions::count(&mut conn).expect("count"),
+            0
+        );
     }
 }

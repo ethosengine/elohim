@@ -2283,6 +2283,34 @@ impl HttpServer {
                 }
             }
 
+            // A SECOND INGRESS to the real `feedback-signal` notification
+            // receiver (contract §4) — armed only by
+            // ELOHIM_TEST_FEEDBACK_INGRESS=1, 404 otherwise. It hands
+            // MessagePack payload bytes to the SAME
+            // `EprAtomService::handle(IntegrityNotify { kind:
+            // "feedback-signal" })` both transports call, and returns that
+            // receiver's own verdict verbatim. It exists so a foreign-origin-DNA
+            // envelope can be DELIVERED and its refusal OBSERVED; a household
+            // mesh has no peer in another content space. Node-local, absent from
+            // build_manifest(), never proxied by a doorway.
+            (Method::GET, "/admin/test/feedback-notify") => {
+                crate::api::feedback_notify_ingress::report(self.hc_registry.as_ref())
+            }
+            (Method::POST, "/admin/test/feedback-notify") => {
+                if let Some(ref pool) = self.db_pool {
+                    crate::api::feedback_notify_ingress::handle(
+                        req,
+                        pool,
+                        self.hc_registry.as_ref(),
+                    )
+                    .await
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — /admin/test/feedback-notify unavailable",
+                    ))
+                }
+            }
+
             // Accountable-correction submission outbox (contract §8). Matched
             // before the /api/v1/ catch-all so the content-cell client is
             // injected directly. Two-phase, single-flight, immutable request.

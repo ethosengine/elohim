@@ -3486,14 +3486,28 @@ async fn async_main(
         // for tighter reach tiers (leak-free, matches libp2p semantics
         // for unauthenticated callers).
         let dedup = Arc::new(DedupLru::new());
-        let epr_atom_service = Arc::new(EprAtomService::new(
-            if args.enable_content_db {
-                db_pool.clone()
-            } else {
-                None
-            },
-            dedup,
-        ));
+        let epr_atom_service = {
+            let service = EprAtomService::new(
+                if args.enable_content_db {
+                    db_pool.clone()
+                } else {
+                    None
+                },
+                dedup,
+            );
+            // This node's OWN content-cell DNA hash (accountable-correction
+            // §1/§4) — the same binding the libp2p `epr_atom_service()` makes,
+            // so both stacks scope an incoming act reference identically. `None`
+            // on a node with no content cell, which REFUSES rather than guesses.
+            match hc_registry_for_http
+                .as_ref()
+                .and_then(|r| r.lamad_client())
+                .map(|c| c.cell_id().dna_hash().to_string())
+            {
+                Some(dna) => Arc::new(service.with_origin_dna_hash(dna)),
+                None => Arc::new(service),
+            }
+        };
         let epr_atom_backend: Arc<dyn elohim_storage::p2p_iroh::EprAtomBackend> =
             Arc::new(EprAtomServiceBackend::new(epr_atom_service));
         let epr_atom_handler = IrohEprAtomProtocol::new(epr_atom_backend);
