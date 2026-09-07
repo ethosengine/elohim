@@ -341,3 +341,29 @@ storage `/import` API leg under `SEED_CELL_TARGET=lamad.fixtures`; cross-peer co
 the probes reached jessica's and james's corresponding clone DHTs (inventories were captured on
 matthew only). The `sync_coordinators` clone-enumeration gap remains a filed seam, untouched.
 This experiment still confers no architectural authority and makes no habit claim.
+
+### 2026-09-07 addendum — the cross-peer leg, and a revised isolation verdict
+
+The cross-peer confirmation listed above as not-run was then run on jessica (admin 4454,
+storage 8091; `jessica-after/` in the same receipt dir). It changes the verdict, so it is
+recorded here rather than left as a gap.
+
+Eight minutes after the clone-targeted write, **jessica's DHT — her base cell and her own
+corresponding `lamad.0` clone alike — contained neither of matthew's probe action hashes**;
+clone-to-clone DHT gossip had not propagated in the window. But **jessica's storage projection
+did contain `fxclone-beta-20260907`, carrying a different `dht_anchor_hash` than matthew's
+clone action** — and that hash is present in jessica's **base** source-chain inventory and
+absent from her clone's. Jessica's storage re-authored the clone-originated content into her
+**base lamad cell**, minting a fresh DHT action there; james then carries the same row with
+jessica's anchor and a NULL anchor state. Both peers' sync inventories carry both probe docs,
+but only `beta` completed the projection/re-author path inside the window, so the propagation
+is partial and ordering-dependent rather than all-or-nothing.
+
+The revised verdict: **clone isolation holds only for the authoring peer's own DHT.** Content
+written into a clone escapes through that peer's single shared storage projection, crosses the
+storage sync plane, and is re-authored into a *receiving* peer's base cell — the precise
+commons pollution the clone was meant to prevent. The earlier static finding is therefore not
+just a local namespace collision; it is cross-peer write amplification into base DHTs. Fixture
+isolation via conductor clones is **not achieved on the current substrate** without a
+cell-qualified projection and sync identity. That missing node — projection/sync identity
+includes cell context — remains the blocking seam, and it is now measured rather than inferred.
