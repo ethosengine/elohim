@@ -402,6 +402,7 @@ codegen target="all" mode="verify":
 # `rustflags: ""` collapsing back to inherit can never regress silently.
 _gate-selftest-env:
     @echo "RUSTFLAGS=[${RUSTFLAGS-<unset>}] CARGO_TARGET_DIR=[${CARGO_TARGET_DIR-<unset>}]"
+    @echo "CARGO_BUILD_JOBS=[${CARGO_BUILD_JOBS-<unset>}] RUST_TEST_THREADS=[${RUST_TEST_THREADS-<unset>}] GATE_CARGO_ENV=[${GATE_CARGO_ENV-<unset>}]"
 
 _gate-elohim-library:
     cd app/elohim-library && pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src

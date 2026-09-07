@@ -36,6 +36,21 @@ export function projectsForChanges(root, changedFiles) {
   });
 }
 
+// `run.cargo.env` travels to run-local-gate.sh as ONE serialized variable, never
+// through argv: the positional contract is exactly four cargo args (workspace,
+// targetDir, profile, rustflags) and every caller of run-local-gate.sh depends on
+// that arity. The script parses this and exports each pair before `just`.
+export function gateChildEnv(project, baseEnv) {
+  const declared = (project.run.cargo || {}).env;
+  const childEnv = { ...baseEnv };
+  if (declared && Object.keys(declared).length > 0) {
+    childEnv.GATE_CARGO_ENV = JSON.stringify(declared);
+  } else {
+    delete childEnv.GATE_CARGO_ENV;
+  }
+  return childEnv;
+}
+
 function runProject(project, printOnly, namesOnly) {
   const cargo = project.run.cargo || {};
   const args = [
@@ -63,6 +78,7 @@ function runProject(project, printOnly, namesOnly) {
   const result = spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: ROOT,
     stdio: 'inherit',
+    env: gateChildEnv(project, process.env),
   });
   return result.status ?? 1;
 }

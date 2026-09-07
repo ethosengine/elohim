@@ -157,7 +157,13 @@
             "workspace": { "type": "string" },
             "targetDir": { "type": "string" },
             "profile": { "type": "string", "enum": ["dev", "release"], "default": "dev" },
-            "rustflags": { "type": "string" }
+            "rustflags": { "type": "string" },
+            "env": {
+              "type": "object",
+              "description": "Extra environment exported around this project's cargo run — never passed through argv. The declaration home for per-project resource caps (CARGO_BUILD_JOBS, RUST_TEST_THREADS) so a heavy crate's gate cannot cross the workspace RAM guard's shed line.",
+              "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "additionalProperties": { "type": "string" }
+            }
           },
           "oneOf": [
             { "required": ["workspace"], "not": { "required": ["targetDir"] } },

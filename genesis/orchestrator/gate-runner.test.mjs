@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { projectsForChanges, selectGateProjects } from './gate-runner.mjs';
+import { gateChildEnv, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -81,6 +81,44 @@ describe('manifest-driven local gate registry', () => {
     const clearing = [...registry.values()]
       .filter(project => project.run.cargo && project.run.cargo.rustflags === '');
     assert.ok(clearing.length >= 8, `expected native gates that clear RUSTFLAGS, got ${clearing.length}`);
+  });
+
+  test('a manifest cargo.env reaches the gate as environment, never as argv', () => {
+    // The positional contract is fixed at four cargo args; a fifth would break every
+    // caller of run-local-gate.sh. `run.cargo.env` therefore travels as ONE serialized
+    // variable that the script parses and exports before `just`.
+    const declared = { run: { cargo: { workspace: 'x', env: { CARGO_BUILD_JOBS: '2', RUST_TEST_THREADS: '2' } } } };
+    const bare = { run: { cargo: { workspace: 'x' } } };
+    const none = { run: {} };
+
+    assert.equal(
+      gateChildEnv(declared, {}).GATE_CARGO_ENV,
+      '{"CARGO_BUILD_JOBS":"2","RUST_TEST_THREADS":"2"}'
+    );
+    // A project without the key must be unchanged — and must not inherit a stale
+    // GATE_CARGO_ENV from the parent environment.
+    assert.equal(Object.hasOwn(gateChildEnv(bare, { GATE_CARGO_ENV: '{"X":"1"}' }), 'GATE_CARGO_ENV'), false);
+    assert.equal(Object.hasOwn(gateChildEnv(none, {}), 'GATE_CARGO_ENV'), false);
+    assert.equal(Object.hasOwn(gateChildEnv(declared, { cargoEnv: undefined, PATH: '/bin' }), 'PATH'), true);
+
+    const probe = (env) => spawnSync(
+      'bash',
+      [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
+        ROOT, 'selftest', '.', 'root-just', '_gate-selftest-env', '', '', 'dev', ''],
+      { encoding: 'utf8', env: { ...process.env, ...env } }
+    );
+
+    const capped = probe({ GATE_CARGO_ENV: '{"CARGO_BUILD_JOBS":"2","RUST_TEST_THREADS":"2"}' });
+    assert.equal(capped.status, 0, capped.stderr);
+    assert.match(capped.stdout, /CARGO_BUILD_JOBS=\[2\]/);
+    assert.match(capped.stdout, /RUST_TEST_THREADS=\[2\]/);
+    // The carrier itself is consumed, so a nested cargo run cannot re-apply it.
+    assert.match(capped.stdout, /GATE_CARGO_ENV=\[<unset>\]/);
+
+    const uncapped = probe({ GATE_CARGO_ENV: undefined, CARGO_BUILD_JOBS: undefined, RUST_TEST_THREADS: undefined });
+    assert.equal(uncapped.status, 0, uncapped.stderr);
+    assert.match(uncapped.stdout, /CARGO_BUILD_JOBS=\[<unset>\]/);
+    assert.match(uncapped.stdout, /RUST_TEST_THREADS=\[<unset>\]/);
   });
 
   test('unknown targets fail instead of silently running the wrong gate', () => {

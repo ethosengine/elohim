@@ -229,7 +229,10 @@
           "cargo": {
             "workspace": "elohim/elohim-storage",
             "profile": "dev",
-            "rustflags": "--cfg getrandom_backend=\"custom\""
+            "rustflags": "--cfg getrandom_backend=\"custom\"",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
           }
         }
       },

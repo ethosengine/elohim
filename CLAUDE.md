@@ -65,7 +65,12 @@ Pre-push carries a warn-only **T2 receipt** leg: a dataplane change (`elohim-sto
 execution. Both `just gate` and pre-push use
 `genesis/orchestrator/gate-runner.mjs`; do not add a grep detector or a second
 project-name command switch. Native gates resolve explicit cargo-pool slots and
-crate-specific `RUSTFLAGS`. DNA/WASM workspaces remain plain Cargo because
+crate-specific `RUSTFLAGS`, and a project may declare `run.cargo.env` — a
+string→string map exported around its cargo run, never passed through argv — which
+is where a heavy crate caps its own resource use (`gate.elohim-storage` declares
+`CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
+cargo's default parallelism and is shed by the workspace RAM guard; at one job it
+peaks at 5.4 GB for ~12% wall-clock). DNA/WASM workspaces remain plain Cargo because
 Holochain packing requires their in-tree `./target`.
 
 Focused escape hatches:

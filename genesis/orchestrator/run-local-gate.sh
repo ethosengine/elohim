@@ -43,6 +43,32 @@ if [[ "$rustflags" != "__inherit__" ]]; then
 fi
 export RUSTC_WRAPPER=""
 
+# Manifest-declared `run.cargo.env`, serialized as JSON by gate-runner.mjs into ONE
+# variable rather than added to the positional contract (which is fixed at four cargo
+# args and depended on by every caller). This is where a project declares its own
+# resource cap — CARGO_BUILD_JOBS / RUST_TEST_THREADS — so a heavy crate's gate peaks
+# below the workspace RAM guard's shed line instead of being killed at 80%.
+if [[ -n "${GATE_CARGO_ENV:-}" && "${GATE_CARGO_ENV}" != "{}" ]]; then
+  gate_cargo_exports="$(node <<'NODE'
+const map = JSON.parse(process.env.GATE_CARGO_ENV || "{}");
+const SQ = String.fromCharCode(39);
+const shellQuote = (value) => SQ + String(value).split(SQ).join(SQ + "\\" + SQ + SQ) + SQ;
+for (const [key, value] of Object.entries(map)) {
+  if (!/^[A-Z][A-Z0-9_]*$/.test(key)) {
+    console.error("gate: refusing malformed cargo.env key: " + key);
+    process.exit(2);
+  }
+  console.log("export " + key + "=" + shellQuote(value));
+}
+NODE
+  )"
+  eval "$gate_cargo_exports"
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && echo "  [$project_name] cargo env: ${line#export }"
+  done <<< "$gate_cargo_exports"
+  unset GATE_CARGO_ENV
+fi
+
 case "$kind" in
   just)
     exec just --justfile "$repo_root/$project_dir/justfile" \
