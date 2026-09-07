@@ -1152,6 +1152,32 @@ detect_fork_bin() { # -> prints the fork dir, or nothing
 }
 
 # ---------------------------------------------------------------------------
+# iroh-relay auto-detection under MESH_TOOLS_DIR — same tools dir the fork
+# conductor pair is keyed under (backlog-mesh-relay-binary-not-auto-detected,
+# 2026-09-07). Before this, MESH_RELAY_BIN fell back ONLY to `command -v
+# iroh-relay` (line ~251, before MESH_TOOLS_DIR even existed at script scope),
+# so a fresh shell with iroh-relay installed only under the tools dir (its
+# common install location, right next to the fork build) refused `start` with
+# "no iroh-relay binary" even though one was sitting right there — and
+# `preflight` inherited the exact same false refusal once it existed.
+# Newest version wins (`sort -V`) so a version bump doesn't need an env var.
+# ---------------------------------------------------------------------------
+detect_relay_bin() { # -> prints the newest $MESH_TOOLS_DIR/iroh-relay-*/bin/iroh-relay, or nothing
+  local d newest=""
+  for d in "$MESH_TOOLS_DIR"/iroh-relay-*/bin/iroh-relay; do
+    [ -x "$d" ] || continue
+    if [ -z "$newest" ] || [ "$(printf '%s\n%s\n' "$newest" "$d" | sort -V | tail -1)" = "$d" ]; then
+      newest="$d"
+    fi
+  done
+  [ -n "$newest" ] && { echo "$newest"; return 0; }
+  return 1
+}
+if [ -z "$MESH_RELAY_BIN" ]; then
+  MESH_RELAY_BIN="$(detect_relay_bin || true)"
+fi
+
+# ---------------------------------------------------------------------------
 # HOLOCHAIN_BIN accepts a BINARY or a DIRECTORY holding `holochain` + `hc`.
 #
 # A directory used to be rejected by the `[ -x ]` guard, and the start SILENTLY
@@ -2757,10 +2783,18 @@ preflight() {
     esac
   fi
   if [ "$relay_required" = "1" ]; then
-    if [ -n "$MESH_RELAY_BIN" ] && [ -x "$MESH_RELAY_BIN" ]; then
+    # Same reuse policy as the port check below: start_local_relay's own FIRST
+    # move is "is one already up on this port" — a live relay already serving
+    # this mesh is `ok` regardless of whether MESH_RELAY_BIN happens to resolve
+    # (it may have been launched by a prior process under a since-rotated env,
+    # or found via detect_relay_bin under a MESH_TOOLS_DIR this shell doesn't
+    # share) — never re-required, and never a REFUSED false-positive.
+    if curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/"; then
+      echo "ok iroh-relay: already up on :$MESH_RELAY_PORT (reusing)"
+    elif [ -n "$MESH_RELAY_BIN" ] && [ -x "$MESH_RELAY_BIN" ]; then
       echo "ok iroh-relay binary: $MESH_RELAY_BIN"
     else
-      echo "REFUSED iroh-relay binary: not executable (MESH_RELAY_BIN='${MESH_RELAY_BIN:-<unset>}') — a 0.7 conductor never connects without a reachable relay; set MESH_RELAY_BIN=<dir>/bin/iroh-relay or MESH_RELAY=0"
+      echo "REFUSED iroh-relay binary: not executable (MESH_RELAY_BIN='${MESH_RELAY_BIN:-<unset>}') — a 0.7 conductor never connects without a reachable relay; set MESH_RELAY_BIN=<dir>/bin/iroh-relay, or MESH_TOOLS_DIR/iroh-relay-*/bin/iroh-relay for auto-detect, or MESH_RELAY=0"
       fail=1
     fi
   else
