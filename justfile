@@ -226,10 +226,12 @@ dev action="status" profile="isolated" seed="false" build="false":
         ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
       stop)
-        pkill -x holochain 2>/dev/null || true
-        fuser -k 8888/tcp 8090/tcp 8095/tcp 2>/dev/null || true
-        find "{{ root }}/elohim/holochain/local-dev" -maxdepth 1 -name '.hc_live_*' -delete 2>/dev/null || true
-        echo "local stack stopped"
+        # Sprint 2026-09-08 follow-up: was `pkill -x holochain` + `fuser -k` on
+        # fixed ports — beside a running household mesh (hc-mesh.sh) that killed
+        # the mesh too (its conductors are also named `holochain`; its doorway A
+        # / storage matthew sit on exactly 8888/8090). hc-start.sh --stop reaps
+        # only the pids it recorded for THIS workspace stack's own sandbox.
+        exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
       *) echo "dev action must be start|conductor|app|stop|status" >&2; exit 2 ;;

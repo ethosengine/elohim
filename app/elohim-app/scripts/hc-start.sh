@@ -81,6 +81,86 @@ LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Scoped stop (sprint 2026-09-08 follow-up). `just dev stop` used to be
+# `pkill -x holochain` + `fuser -k 8888/tcp 8090/tcp 8095/tcp` — a name/port
+# match with NO idea whose conductor or storage it was about to kill. Beside a
+# running household mesh (hc-mesh.sh) that is catastrophic: the mesh's three
+# conductors are ALSO literally named `holochain`, and its doorway A / storage
+# matthew sit on exactly 8888/8090. This records the pid THIS script actually
+# started for each role, beside the sandbox (`$LOCAL_DEV_DIR/.hc-start-pids/`),
+# validated against `/proc/<pid>/stat`'s start-tick (the same pid-reuse guard
+# hc-mesh.sh's PID_DIR uses) so a stop only ever reaps a process this exact
+# script is still the same incarnation of — never a same-named process that
+# happened to land on a recycled pid, and never anything on someone else's
+# mesh.
+# ──────────────────────────────────────────────────────────────────────────────
+HC_START_PID_DIR="$LOCAL_DEV_DIR/.hc-start-pids"
+
+hc_start_pid_ticks() { # <pid> -> its /proc start-tick, or empty
+    sed 's/^[^)]*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'
+}
+
+hc_start_record_pid() { # <role> <pid> — write beside the sandbox, or drop silently if unresolvable
+    local role="$1" pid="$2" started
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    started="$(hc_start_pid_ticks "$pid")"
+    [ -n "$started" ] || return 1
+    mkdir -p "$HC_START_PID_DIR"
+    printf '%s %s\n' "$pid" "$started" > "$HC_START_PID_DIR/$role"
+}
+
+hc_start_live_pid() { # <role> -> prints the pid if still the same incarnation, else nothing
+    local file="$HC_START_PID_DIR/$1" pid="" started="" current
+    [ -f "$file" ] || return 1
+    read -r pid started < "$file" 2>/dev/null || return 1
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    [ -n "$started" ] || return 1
+    current="$(hc_start_pid_ticks "$pid")"
+    [ -n "$current" ] && [ "$current" = "$started" ] || return 1
+    echo "$pid"
+}
+
+# Find the pid of a process that owns a LISTENING port — used to record the
+# conductor's pid (launched via a detached socat/nohup wrapper, so `$!` names
+# the wrapper, not the conductor) and to re-derive storage/doorway's pid on a
+# "reuse" path (already healthy on that port from a prior run of this script,
+# so `$!` was never assigned in THIS process).
+hc_start_pid_for_port() { # <port>
+    ss -H -ltnp "sport = :$1" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2
+}
+
+hc_start_stop() {
+    echo "Stopping the workspace stack recorded at $HC_START_PID_DIR"
+    local role pid any=0
+    for role in conductor storage agent-sdk doorway; do
+        pid="$(hc_start_live_pid "$role" || true)"
+        if [ -n "$pid" ]; then
+            any=1
+            echo "  $role: pid $pid"
+            kill -TERM "$pid" 2>/dev/null || true
+        else
+            echo "  $role: not recorded / not live — skipped"
+        fi
+    done
+    if [ "$any" = 1 ]; then
+        sleep 2
+        for role in conductor storage agent-sdk doorway; do
+            pid="$(hc_start_live_pid "$role" || true)"
+            [ -n "$pid" ] && { echo "  $role: still up after TERM, sending KILL"; kill -KILL "$pid" 2>/dev/null || true; }
+        done
+    fi
+    rm -rf "$HC_START_PID_DIR"
+    rm -f "$HC_PORTS_FILE"
+    find "$LOCAL_DEV_DIR" -maxdepth 1 -name '.hc_live_*' -delete 2>/dev/null || true
+    echo "workspace stack stopped (household mesh, if any, untouched)"
+}
+
+if [ "${1:-}" = "--stop" ]; then
+    hc_start_stop
+    exit 0
+fi
+
 # Native binaries belong in the governed cargo pool. DNA/WASM builds below
 # deliberately remain in-tree because `hc dna pack` canonicalizes ./target.
 source "$REPO_ROOT/genesis/agentic/bin/pool-lib.sh"
@@ -153,6 +233,20 @@ fi
 : "${SEED_LIMIT:=200}"
 : "${NETWORK_PROFILE:=isolated}"
 : "${DOORWAY_AUTH:=auto}"
+# Conductor-ready wait, in seconds (was a hardcoded 45x1s loop, which is what
+# first failed a T3-beside-mesh join-alpha run in this same sprint — the loop
+# gave up while the conductor was still installing, though it kept running
+# undetached and did become ready moments later). Measured 2026-09-08 on this
+# exact box, this exact command (`just dev conductor alpha`, deployed 5-DNA
+# bundle already cache-fetched): 16s from `hc sandbox generate` launch to the
+# "admin_port" line landing in .sandbox_log, WHILE two other agents in this
+# shared worktree were running concurrent `cargo`/clippy gates — see the
+# T3-beside-mesh follow-up receipt for the exact run. 240s keeps real margin
+# above that measured floor for a genuinely cold bundle fetch+install or a
+# heavier-loaded box, without loosening the isolated case (still returns the
+# moment the admin_port line appears, typically low single digits of seconds
+# — this only raises the CEILING).
+: "${CONDUCTOR_READY_TIMEOUT:=240}"
 : "${MONGO_PORT:=27017}"
 MONGOD_BIN="${MONGOD_BIN-$(command -v mongod 2>/dev/null || { [ -x "$HOME/bin/mongod" ] && echo "$HOME/bin/mongod"; })}"
 MONGO_DIR="$LOCAL_DEV_DIR/mongo"
@@ -533,15 +627,16 @@ EOF
     #     use `grep -a` (see the admin_port wait loop below).
     nohup sh -c '(echo "test"; sleep infinity) | socat - EXEC:'"$HC_WRAPPER"',pty,setsid,ctty' > "$SANDBOX_LOG" 2>&1 &
 
-    echo -n "   ⏳ Waiting for conductor"
-    for i in {1..45}; do
+    echo -n "   ⏳ Waiting for conductor (up to ${CONDUCTOR_READY_TIMEOUT}s — CONDUCTOR_READY_TIMEOUT)"
+    _conductor_wait_start="$(date +%s)"
+    for ((_i = 0; _i < CONDUCTOR_READY_TIMEOUT; _i++)); do
         if grep -qa '"admin_port"' "$SANDBOX_LOG" 2>/dev/null; then
             ADMIN_PORT=$(grep -ao '"admin_port":[0-9]*' "$SANDBOX_LOG" | grep -o '[0-9]*' | head -1)
             if [ -n "$ADMIN_PORT" ]; then
                 echo "admin_port=$ADMIN_PORT" > "$HC_PORTS_FILE"
                 echo "app_port=$CONDUCTOR_APP_PORT" >> "$HC_PORTS_FILE"
                 echo ""
-                echo "   ✅ Conductor ready (admin: $ADMIN_PORT, app: $CONDUCTOR_APP_PORT)"
+                echo "   ✅ Conductor ready in $(( $(date +%s) - _conductor_wait_start ))s (admin: $ADMIN_PORT, app: $CONDUCTOR_APP_PORT)"
                 break
             fi
         fi
@@ -556,6 +651,10 @@ if [ -z "$ADMIN_PORT" ]; then
     echo "   ❌ Could not start conductor. Check $LOCAL_DEV_DIR/.sandbox_log"
     exit 1
 fi
+# Record whoever is actually listening on the admin port — covers both the
+# fresh-launch path (the socat/nohup wrapper's `$!` names the wrapper, not the
+# conductor) and the reuse path (this process never launched it at all).
+hc_start_record_pid conductor "$(hc_start_pid_for_port "$ADMIN_PORT")" || true
 
 # Wait for connections
 for i in {1..15}; do
@@ -654,6 +753,9 @@ else
         sleep 1
     done
 fi
+# Record whoever is listening on STORAGE_PORT now — covers both the
+# already-running reuse branch and the just-launched `&` branch uniformly.
+hc_start_record_pid storage "$(hc_start_pid_for_port "$STORAGE_PORT")" || true
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Step 2.5: Elohim Agent SDK (Inference Sidecar)
@@ -698,6 +800,7 @@ else
             sleep 1
         done
     fi
+    hc_start_record_pid agent-sdk "$(hc_start_pid_for_port "$AGENT_SDK_PORT")" || true
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -849,6 +952,9 @@ else
         sleep 1
     done
 fi
+# Record whoever is listening on DOORWAY_PORT now — covers the already-running
+# reuse branch and the just-launched `&` branch uniformly.
+hc_start_record_pid doorway "$(hc_start_pid_for_port "$DOORWAY_PORT")" || true
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Step 5: Optional seeding
