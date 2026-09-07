@@ -1,0 +1,32 @@
+---
+epr-meta-version: 1
+id: a2o-compute-peer-executed-stage
+covers: subtree
+purpose: >
+  The peer-executed CI stage a2o binding — one feature file proving a household compute
+  provider can run an a2o stage (a feature file, its declared scenario inventory, and a
+  verdict) as a delegated compute task, and that the requester reads back the provider's
+  signed completion and the report it actually produced rather than trusting the receipt's
+  claimed status. Design: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md.
+  Step definitions live in steps/compute/peer-executed-stage.steps.ts, owning their own
+  state (a private WeakMap, mirroring steps/dataplane/delegated-sweettest.steps.ts) rather
+  than reusing that file's phrasings or state.
+cites:
+  - genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md
+  - genesis/a2o/features/dataplane/delegated-sweettest.feature
+---
+# compute/ — peer-executed CI stage a2o binding
+
+One feature file: `peer-executed-stage.feature`. It exercises the same delegated-compute
+substrate `dataplane/delegated-sweettest.feature` measures, shaped as a CI stage (§3 D1-D2
+of the design doc) rather than a Holochain feedback sweettest — the `feedback_signal::`
+namespace token in the envelope's `expectedTests` is a pinned-executor requirement, not a
+claim about what kind of test this is (see design §3 D6).
+
+**Considered, no enforcing rule beyond the parent's.** This manifest exists to satisfy the
+parent `genesis/a2o/.epr-meta` no-orphan-subtree rule (`new-feature-subdir-needs-meta`) and
+to claim coverage (`covers: subtree`) so the coverage walk terminates here, following the
+precedent of `genesis/a2o/features/dataplane/resiliency-saga/.epr-meta`. The real authoring
+discipline (tag requirements, RED-FIRST assertions, step-definition placement) is the
+parent `CLAUDE.md`/`README.md`'s prose convention; no new drift has been observed in this
+one-file tree that a rule would catch better than review.
