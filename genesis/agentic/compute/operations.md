@@ -164,3 +164,91 @@ configured number of runs. The real-ark fixture harness is
 `elohim/rakia/scripts/compute-runtime-smoke.py --executor PATH --ark PATH`.
 It exercises supervision and expiry using a fixture executable; it does not
 claim that the Holochain feedback suite or live peer delegation passed.
+
+## Peer-executed a2o stage
+
+A **stage** — one scoped a2o run: a feature file, a declared scenario inventory, and a
+verdict — rides the exact envelope above, with no new field, no new HTTP route and no
+DNA change. Full design:
+`genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md`.
+
+`taskKind` stays `feedback_signal` (three independent pins — the executor, the DNA
+coordinator, the schema const — all require the literal, and one of them is
+operator-owned and unreadable here). The stage rides the fields that are already free:
+
+- **`project` carries the stage identity**, the envelope's only free-form string, one of
+  the six fields `verify_receipt` compares byte-for-byte, and already the retention
+  bucket key. Grammar (split on the first `@`):
+  `project = "a2o-stage:<stage-name>"` for a root stage, or
+  `project = "a2o-stage:<stage-name>@after=<upstreamTaskCid>"` for a stage with one
+  upstream. The `@after=` arm is reserved so a second stage never invents a second
+  grammar; nothing schedules on it yet.
+- **`expectedTests` is one entry per scenario**, namespaced
+  `feedback_signal::a2o::<feature-dir>::<feature-slug>::<scenario-slug>`. The
+  `feedback_signal::` prefix is a namespace token the pinned executor requires — not a
+  claim that the scenario is a Holochain feedback sweettest. Slug rule, used verbatim on
+  both the requester's builder and the generated guest script so the two computations
+  cannot drift:
+  `s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,96).replace(/-+$/,'')`.
+  One entry per scenario is load-bearing: a `passed` receipt is refused unless
+  `observedTests` is non-empty and exactly equals `expectedTests`, so a provider cannot
+  pass by running nothing and an upstream scenario addition changes the inventory rather
+  than silently widening the claim.
+- **`binary` is a generated, content-addressed shell script** speaking the executor's
+  libtest protocol (`--list` / run); its CID *is* the pinned definition of what the peer
+  will do. **`dna` carries the feature file's own bytes**, byte-identical — the slot is
+  misnamed for this use (an operator item, not a blocker), but filling it this way pins
+  the scenario *text*, content-addressed, so the runner can refuse when the repo copy has
+  drifted from the pinned copy.
+- **The cucumber report travels inside the `stdout.log` payload lease**, base64 on one
+  line between sentinels, rather than as a fourth named payload — the allowed receipt log
+  names are hardcoded to `stdout.log | stderr.log | witness.json` in two places this repo
+  owns (`worker.mjs`, `workspace.mjs`) and possibly a third the operator owns; widening
+  either allowlist alone fails at the provider with an unknown-name throw. Sentinels,
+  single line each:
+
+  ```
+  -----BEGIN ELOHIM STAGE REPORT-----
+  <base64 of the cucumber JSON, no wrapping>
+  -----END ELOHIM STAGE REPORT-----
+  ```
+
+  Base64 rather than raw JSON so a scenario name containing the substring `test ` can
+  never be mistaken for a libtest result line by any parser between the guest and the
+  requester.
+- **A stage that cannot meet its declared preconditions refuses; it does not report a
+  red.** The generated runner asserts, before invoking cucumber, that every declared
+  writable path is writable and that the repo's feature file hashes to the pinned
+  `dna.sha256`. On failure it prints `STAGE-PRECONDITION-UNMET: <what>` and exits `2`, so
+  the receipt records a `failed` run whose stdout names a missing capability rather than a
+  false claim about the scenario under test.
+- **The requester's verdict reads the decoded report, never the receipt's `status`.** A
+  `passed` receipt is a provider claim; the stage is green only when the decoded cucumber
+  report names the pinned feature file, contains exactly the declared scenarios, and every
+  one of them passed. The substrate makes a provider's claim attributable, immutable,
+  bounded and revocable — it does not make it true.
+
+**The capacity grant a provider must make.** The guest runs as UID 65534 and can write
+only what the filesystem lets 65534 write. The stage declares exactly which paths it
+needs, and the provider operator grants them explicitly (`chmod`, not an ACL — `setfacl`
+is unavailable in this container). On a household mesh sharing one host and one checkout,
+this landing's grant is:
+
+```
+chmod o+w <repo>/genesis/a2o/reports
+chmod o+w /tmp/elohim-local-mesh/<peer>/runtime-config.toml   # for each peer the inner
+                                                                # scenario writes/restores
+```
+
+On a real provider peer this grant is ordinary ownership — the peer runs its own checkout
+and its own mesh, and nothing is chmod-ed at all. It is enumerated here because on a
+shared host it is a real act with a real blast radius, and hiding it would misstate what
+"the peer ran it" cost.
+
+The stage builder is `genesis/agentic/compute/stage/build-stage-task.mjs` (template:
+`stage-runner.template.sh`); the a2o binding is
+`genesis/a2o/features/compute/peer-executed-stage.feature` with steps in
+`genesis/a2o/steps/compute/peer-executed-stage.steps.ts` (its own fixture,
+`PEER_STAGE_A2O_CONFIG`, mirroring `COMPUTE_A2O_CONFIG` above but never sharing state with
+it). A run's receipt lands under `genesis/a2o/reports/peer-stage/<date>/` (gitignored,
+durable), parallel to `genesis/a2o/reports/compute/`.
