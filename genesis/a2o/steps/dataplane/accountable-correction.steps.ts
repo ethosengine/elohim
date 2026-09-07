@@ -488,15 +488,28 @@ Then(
 // tally is exactly the sum of the accepted groups — which does not include it.
 Then(
   "Jessica's standing is exactly what it was before he filed, and the unaccepted correction adds no row and no weight of its own",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const evaluator = key((await rail(this, 'jessica')).agent);
+    // The aggregate republishes on a clean sweep, so it can trail the group table by a
+    // tick: poll the two into agreement rather than sampling them and calling a lagging
+    // republication a wrong tally.
+    let accepted = acceptedGroups(this, evaluator);
+    let served = Number.NaN;
+    await until(
+      'the served tally agrees with the accepted groups',
+      async () => {
+        accepted = acceptedGroups(this, evaluator);
+        served = Number((await standing(this))['debitWeightSum']);
+        return served === accepted.total;
+      },
+      rotationBudgetMs(this)
+    );
     const group = groupRow(this);
     if (group) {
       assert.equal(group['accepted'], 0, 'an unaccepted allegation must never read accepted');
       assert.equal(group['contribution'], 0, 'an allegation debits nobody');
     }
-    const accepted = acceptedGroups(this, evaluator);
     const aggregate = aggregateRows(this, evaluator, evaluator);
     assert.equal(
       aggregate.rows,
@@ -504,11 +517,7 @@ Then(
       'a subject whose only signal is an unaccepted correction has no aggregate row at all'
     );
     assert.equal(aggregate.total, accepted.total, 'the aggregate carries only accepted groups');
-    assert.equal(
-      Number((await standing(this))['debitWeightSum']),
-      accepted.total,
-      'the served tally carries only accepted groups'
-    );
+    assert.equal(served, accepted.total, 'the served tally carries only accepted groups');
   }
 );
 
