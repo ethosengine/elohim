@@ -742,26 +742,60 @@ pub fn verify_artifact_dna_line(
 /// can see is that james does not run the OLD bytes — which is precisely what
 /// having already adopted the new ones means.
 ///
-/// Three states, and only the first is an exit:
+/// # Scope (Opus review of 2529226 — two false-positive paths closed here)
 ///
-/// - every touched role's installed coordinator map equals the target's → the
-///   peer is CURRENT; applying would be a byte-for-byte no-op.
-/// - some touched role differs (including a role the target does not name) →
-///   NOT current: fall through to [`verify_coordinator_lineage`], which decides
-///   whether this peer is one this release was cut for.
+/// The comparison is over **every role in (bundle ∩ installed)**, not just the
+/// roles `manifest.applies_to.roles` names, and it now also requires the DNA
+/// line to agree:
+///
+/// 1. **ROLE SCOPE.** The apply vehicle
+///    (`happ_manager::sync_coordinators_for_app_info`) iterates EVERY role the
+///    bundle carries — `bundle_role_dna_files` walks the installed app's
+///    cells, not `appliesTo`'s keys. On alpha 2026-09-06 the bundle carried
+///    four roles beyond `appliesTo` whose coordinators diverged from what was
+///    installed; comparing only the named subset would have reported
+///    `runsTarget: true` for a peer the apply would still change. `target`
+///    (the by-bytes evidence) is read from the SAME unpack for every role the
+///    bundle resolves — `staged_bundle_evidence` populates it for the whole
+///    bundle, not just `appliesTo` — so it already carries the data this
+///    needs; no new evidence, just a wider comparison.
+/// 2. **THE INTEGRITY LINE.** [`verify_artifact_dna_line`] ties the bundle's
+///    DNA hash to installed reality for every artifact class BUT exempts
+///    `happ-lineage` — crossing the DNA line is the entire point of that
+///    class. That exemption leaves a hole here: a `happ-lineage` release whose
+///    coordinator wasm is unchanged across the crossing (an integrity-only
+///    change) would satisfy the coordinator comparison on a peer that has not
+///    crossed the DNA line at all. A lineage crossing is never "already
+///    running the bytes" until the DNA hash itself agrees, so this checks the
+///    bundle's DNA hash directly rather than leaning on a check that exempts
+///    exactly the class that needs it here.
+///
+/// Four states now, and only the first is an exit:
+///
+/// - every role in (bundle ∩ installed) has an equal coordinator map AND an
+///   equal DNA hash → the peer is CURRENT; applying would be a byte-for-byte
+///   no-op.
+/// - some role's coordinators differ (including a role `appliesTo` does not
+///   name) → NOT current: fall through to [`verify_coordinator_lineage`],
+///   which decides whether this peer is one this release was cut for.
+/// - some role's DNA hash differs from the bundle's → NOT current, same
+///   fall-through — a peer mid-crossing is not a peer already running the
+///   target.
 /// - the target is unknown (a non-bundle artifact class, unreadable bytes, or
 ///   an installed reality we could not read) → NOT current, same fall-through.
 ///   Absence of evidence never takes an exit that STOPS work.
 ///
 /// Exactness is the safety property: the comparison is the whole per-role zome
-/// map, which is the same drift unit `happ_manager::role_report` computes, so
-/// "already current" here means exactly "a hot-swap of this bundle would report
-/// zero drift for this role". A peer running NEITHER the superseded nor the
-/// target bytes fails it and is refused, as before.
+/// map (and, now, the per-role DNA hash), which is the same drift unit
+/// `happ_manager::role_report` computes, so "already current" here means
+/// exactly "a hot-swap of this bundle would report zero drift for this role".
+/// A peer running NEITHER the superseded nor the target bytes fails it and is
+/// refused, as before. No partial match, in either dimension.
 pub fn already_runs_target(
     manifest: &ReleaseManifest,
     installed: &Answer<InstalledReality>,
     target: &Answer<TargetCoordinators>,
+    bundle_dna_hashes: &Answer<BundleDnaHashes>,
 ) -> bool {
     let (Answer::Present(installed), Answer::Present(target)) = (installed, target) else {
         return false;
@@ -771,14 +805,59 @@ pub fn already_runs_target(
     if manifest.applies_to.roles.is_empty() {
         return false;
     }
-    manifest.applies_to.roles.keys().all(|role| {
+    // Every role the MANIFEST names must equal the target — unchanged from
+    // before this fix.
+    let named_roles_current = manifest.applies_to.roles.keys().all(|role| {
         match (installed.roles.get(role), target.get(role)) {
             // An empty target map is not equality evidence — it is a bundle
             // that resolved no coordinator zomes for the role at all.
             (Some(running), Some(want)) if !want.is_empty() => running.coordinator_zomes == *want,
             _ => false,
         }
-    })
+    });
+    if !named_roles_current {
+        return false;
+    }
+
+    // **ROLE SCOPE.** Every role the BUNDLE carries and this peer has
+    // installed must ALSO agree — see the doc comment above. A role the
+    // bundle resolved no coordinators for is not equality evidence either way
+    // (skipped, same convention as the named-role comparison above); a role
+    // this peer does not install is not this check's business (role presence
+    // is `verify_envelope`'s job, and only for roles `appliesTo` binds).
+    let bundle_roles_current = target.iter().all(|(role, want)| {
+        if want.is_empty() {
+            return true;
+        }
+        match installed.roles.get(role) {
+            Some(running) => running.coordinator_zomes == *want,
+            None => true,
+        }
+    });
+    if !bundle_roles_current {
+        return false;
+    }
+
+    // **THE INTEGRITY LINE.** Same scope as the coordinator comparison above
+    // — every role the bundle carries and this peer has installed — but over
+    // the DNA hash the bundle's own bytes carry, never the manifest's
+    // declaration of it. `Answer::Absent`/`Unreachable` (a non-bundle class,
+    // or unreadable bytes) establishes nothing and never blocks the exit —
+    // consistent with `verify_artifact_dna_line`'s own honest-absence rule.
+    if let Answer::Present(bundle_dna) = bundle_dna_hashes {
+        let dna_line_current =
+            bundle_dna
+                .iter()
+                .all(|(role, dna_hash)| match installed.roles.get(role) {
+                    Some(running) => &running.dna_hash == dna_hash,
+                    None => true,
+                });
+        if !dna_line_current {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// The coordinator-wasm leg of the envelope: **who this release was cut for.**
@@ -1451,7 +1530,12 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
     // ALREADY CURRENT BY BYTES — decided from bytes that just proved out, and
     // decided BEFORE the supersedes check that would otherwise refuse exactly
     // the peers this exit is about.
-    if already_runs_target(&manifest, input.installed, input.target_coordinators) {
+    if already_runs_target(
+        &manifest,
+        input.installed,
+        input.target_coordinators,
+        input.bundle_dna_hashes,
+    ) {
         return Ok(VerifyOutcome::AlreadyCurrent {
             roles: manifest.applies_to.roles.keys().cloned().collect(),
         });
@@ -2715,7 +2799,12 @@ mod tests {
         let installed = installed_from("lamad", &binding.dna_hash, "content_store", TARGET_WASM);
         let target = target_of("lamad", "content_store", TARGET_WASM);
 
-        assert!(already_runs_target(&manifest, &installed, &target));
+        assert!(already_runs_target(
+            &manifest,
+            &installed,
+            &target,
+            &Answer::Absent
+        ));
         // And the supersedes check ALONE would have refused exactly this peer.
         assert_eq!(
             verify_coordinator_lineage(&manifest, &installed)
@@ -2741,7 +2830,12 @@ mod tests {
         );
         let target = target_of("lamad", "content_store", TARGET_WASM);
 
-        assert!(!already_runs_target(&manifest, &installed, &target));
+        assert!(!already_runs_target(
+            &manifest,
+            &installed,
+            &target,
+            &Answer::Absent
+        ));
         verify_coordinator_lineage(&manifest, &installed)
             .expect("the peer this release was cut for");
     }
@@ -2756,7 +2850,12 @@ mod tests {
         let installed = installed_from("lamad", &binding.dna_hash, "content_store", THIRD_WASM);
         let target = target_of("lamad", "content_store", TARGET_WASM);
 
-        assert!(!already_runs_target(&manifest, &installed, &target));
+        assert!(!already_runs_target(
+            &manifest,
+            &installed,
+            &target,
+            &Answer::Absent
+        ));
         assert_eq!(
             verify_coordinator_lineage(&manifest, &installed)
                 .expect_err("runs neither")
@@ -2847,7 +2946,7 @@ mod tests {
         let target = target_of("lamad", "content_store", TARGET_WASM);
 
         assert!(
-            !already_runs_target(&manifest, &installed, &target),
+            !already_runs_target(&manifest, &installed, &target, &Answer::Absent),
             "a mixture can never take the convergence exit — imagodei is not at target"
         );
         let refusal = verify_coordinator_lineage(&manifest, &installed)
@@ -2875,16 +2974,23 @@ mod tests {
         let installed = installed_from("lamad", &binding.dna_hash, "content_store", TARGET_WASM);
         let target = target_of("lamad", "content_store", TARGET_WASM);
 
-        assert!(!already_runs_target(&manifest, &installed, &Answer::Absent));
         assert!(!already_runs_target(
             &manifest,
             &installed,
-            &Answer::Unreachable
+            &Answer::Absent,
+            &Answer::Absent
+        ));
+        assert!(!already_runs_target(
+            &manifest,
+            &installed,
+            &Answer::Unreachable,
+            &Answer::Absent
         ));
         assert!(!already_runs_target(
             &manifest,
             &Answer::Unreachable,
-            &target
+            &target,
+            &Answer::Absent
         ));
         // An empty per-role target map is not equality evidence either.
         let empty_role: Answer<TargetCoordinators> = Answer::Present(
@@ -2892,7 +2998,12 @@ mod tests {
                 .into_iter()
                 .collect(),
         );
-        assert!(!already_runs_target(&manifest, &installed, &empty_role));
+        assert!(!already_runs_target(
+            &manifest,
+            &installed,
+            &empty_role,
+            &Answer::Absent
+        ));
     }
 
     /// EVERY touched role must match. A release that touches two roles and
@@ -2958,8 +3069,120 @@ mod tests {
         );
 
         assert!(
-            !already_runs_target(&manifest, &installed, &target),
+            !already_runs_target(&manifest, &installed, &target, &Answer::Absent),
             "one drifted role means the release still has work to do"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ROLE SCOPE + INTEGRITY LINE (Opus review of 2529226) — two false-
+    // positive paths through `already_runs_target` itself, closed here.
+    // -----------------------------------------------------------------------
+
+    /// **ROLE SCOPE.** `appliesTo` names only `lamad`; the bundle also carries
+    /// `imagodei`, exactly as alpha 2026-09-06's four poisoned roles were
+    /// carried by the bundle without being named in `appliesTo` at all. The
+    /// named role matches the target byte-for-byte, but `imagodei`'s installed
+    /// coordinators diverge from what the bundle would install — so the apply
+    /// vehicle (`sync_coordinators_for_app_info`, which iterates every role
+    /// the bundle carries) would still change something. Comparing only the
+    /// named subset would have reported this peer current; it is not.
+    #[test]
+    fn a_bundle_role_beyond_applies_to_with_differing_coordinators_is_not_current() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_roles(&[
+            ("lamad", &binding.dna_hash, "content_store", TARGET_WASM),
+            ("imagodei", INSTALLED_IMAGODEI_DNA, "identity", THIRD_WASM),
+        ]);
+        let target: Answer<TargetCoordinators> = Answer::Present(
+            [
+                (
+                    "lamad".to_string(),
+                    [("content_store".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+                (
+                    "imagodei".to_string(),
+                    [("identity".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        assert!(
+            !already_runs_target(&manifest, &installed, &target, &Answer::Absent),
+            "appliesTo names only lamad, but the bundle also carries imagodei \
+             — its coordinators diverge, so applying would still change \
+             something"
+        );
+    }
+
+    /// Same shape as above, but the un-named bundle role ALSO already matches
+    /// — a true byte-for-byte no-op across the whole bundle, not just the
+    /// named subset.
+    #[test]
+    fn a_bundle_role_beyond_applies_to_with_matching_coordinators_is_current() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_roles(&[
+            ("lamad", &binding.dna_hash, "content_store", TARGET_WASM),
+            ("imagodei", INSTALLED_IMAGODEI_DNA, "identity", TARGET_WASM),
+        ]);
+        let target: Answer<TargetCoordinators> = Answer::Present(
+            [
+                (
+                    "lamad".to_string(),
+                    [("content_store".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+                (
+                    "imagodei".to_string(),
+                    [("identity".to_string(), TARGET_WASM.to_string())]
+                        .into_iter()
+                        .collect::<BTreeMap<String, String>>(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        assert!(
+            already_runs_target(&manifest, &installed, &target, &Answer::Absent),
+            "every role in (bundle ∩ installed) agrees — named or not, this \
+             peer is byte-for-byte current"
+        );
+    }
+
+    /// **THE INTEGRITY LINE.** Coordinators already match the target
+    /// byte-for-byte, but the STAGED BUNDLE carries a different DNA line for
+    /// that role — exactly the shape an integrity-only `happ-lineage`
+    /// crossing takes when its coordinator wasm did not change.
+    /// `verify_artifact_dna_line` exempts `happ-lineage` releases by design
+    /// (crossing the DNA line is the entire point of that class), so this is
+    /// the ONLY check standing between an uncrossed peer and a false "runs
+    /// the target bytes" verdict.
+    #[test]
+    fn an_integrity_only_crossing_with_matching_coordinators_is_not_current() {
+        let body = fixture("release-manifest-coordinator-bundle.json");
+        let manifest = verify_shape(&body).unwrap();
+        let binding = &manifest.applies_to.roles["lamad"];
+        let installed = installed_from("lamad", &binding.dna_hash, "content_store", TARGET_WASM);
+        let target = target_of("lamad", "content_store", TARGET_WASM);
+        let bundle_dna = bundle_dnas(&[("lamad", WORKSPACE_IMAGODEI_DNA)]);
+
+        assert!(
+            !already_runs_target(&manifest, &installed, &target, &bundle_dna),
+            "the installed DNA hash disagrees with the bundle's for 'lamad' \
+             — a lineage crossing is never 'already running the bytes', \
+             whatever the coordinator wasm says"
         );
     }
 

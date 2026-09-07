@@ -1568,7 +1568,12 @@ impl AdoptionController {
         // the lineage-mismatch re-read above uses, and only when the exit is
         // actually about to fire.
         if installed_age_secs >= REREAD_STALE_THRESHOLD_SECS
-            && verify::already_runs_target(&manifest, &installed, &target_coordinators)
+            && verify::already_runs_target(
+                &manifest,
+                &installed,
+                &target_coordinators,
+                &bundle_dna_hashes,
+            )
         {
             installed = self.installed_reality_refresh(now).await;
         }
