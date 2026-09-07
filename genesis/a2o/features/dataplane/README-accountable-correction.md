@@ -393,3 +393,86 @@ MESH_RESTART_ENV_OVERLAY="ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1 ELOHIM_FEEDBACK_SWEE
 - `just mesh prologue` was again NOT run. It needs built Angular dists, and this worktree has no
   `elohim-library` build (`elohim-core/register` unresolved by the app bundler). These stations
   author their own content and read peer HTTP, conductor calls and SQLite directly.
+
+## Stations 1 and 2 — the product surface that unblocked them (rust-architect, 2026-09-07)
+
+Both stations passed on the household mesh in one round. Receipt:
+`genesis/a2o/reports/accountable-correction/mesh-20260907T202913Z/` (`cucumber.json`,
+`cucumber.html`, `run.log`, `sprint-report.json`) — cucumber EXIT=0, 5 scenarios / 57 steps, all
+passed in 4m23s (stations 1, 2, 4, 6, 8; stations 3, 5 and 7 keep `@wip` and were not in the run).
+
+**Station 1 needed a coordinator surface, not a fixture.** `create_feedback_signal` committed the
+entry and both index links in one call, so a link could never be published later than the act.
+Two coordinator-only additions (DNA hash unmoved, commit `a2055c21c`):
+
+| Function | Input | Returns |
+|---|---|---|
+| `publish_feedback_signal_target_link` | `{ feedback_action_hash }` | `{ feedback_action_hash, target_action_hash, link_action_hash?, already_published }` |
+
+plus an additive, defaulted `defer_target_link: bool` on `create_feedback_signal`. The extern takes
+**no caller-supplied target** — it reads the act's own `target_cid`, so it can restore an index and
+can never forge one — and it is idempotent (`already_published: true` rather than a second edge).
+Its product case is index repair: delete-link validation is permissive, so an act whose edge is gone
+is still valid, still fetchable by reference, and invisible to every peer that does not already hold
+the reference.
+
+**Station 2's blocker was not timing — the notification plane had admitted nothing, ever.**
+`EprAtomService::with_origin_dna_hash` existed and was called from nowhere, so every peer refused
+every `feedback-signal` notification with `no local content DNA hash bound`. Both transports now
+bind it from the `HcClientRegistry` they already hold, and the receive path calls T6's
+`admit_notified_signal` (`epr_atom_service.rs:624`) instead of its own inline `add_member` — so a
+notified act joins the durable subscription set **and** goes Hot in the live `SweepScheduler`. What
+the station measures is that: a member whose `source` is `notified` is swept within two sweeps of
+admission, against the `ceil(N/8)` rotation it would otherwise have waited for (reported rather than
+asserted when the peer's whole set fits in one sweep).
+
+**`ELOHIM_TEST_FEEDBACK_INGRESS=1` — a second ingress to the real receiver.** `GET`/`POST`
+`/admin/test/feedback-notify` on a storage peer; 404 when unarmed. `GET` reports
+`{ armed, kind, originDnaHash }`. `POST` takes `{ signal: <semantic FeedbackSignal, camelCase, with
+actRef>, from? }`, encodes it with `rmp_serde::to_vec_named` (the encoder a real sender uses), hands
+it to the **same** `EprAtomService::handle(IntegrityNotify { kind: "feedback-signal" })` both
+transports call, and returns that receiver's own verdict verbatim plus `originDnaHash`. It exists
+because a household mesh has no peer in another content space: the foreign-DNA refusal has to be
+*delivered* and *observed*, not argued from an absent row.
+
+**Running this lane from a worktree needs a full mesh restart, not a coordswap.** The DNA hash is
+path-dependent, so `happ_manager::lineage_mismatch_error` refuses `update_coordinators` between a
+worktree-built bundle and a mesh installed from the main checkout — measured against the running
+peer: role `lamad` drifted with `dnaHashMismatch`
+(`installed=uhC0keuLMYBe0sj4ZqLvIyuVqCXcxPL3PbHyiqx40UGgBh-bTbBOl`,
+`bundle=uhC0k8pow3EM3IVN9lZhCBlgnwyKrReAAXLKTEKnEFcPJQxjPZLNm`), while the other four roles showed
+zero drift. Rung-1 coordswap is a main-tree vehicle. From a worktree:
+
+```bash
+STORAGE_BIN=<sprint pool slot>/debug/elohim-storage \
+MESH_HAPP_PATH=<worktree>/elohim/holochain/dna/elohim/workdir/elohim.happ \
+HOLOCHAIN_BIN=/projects/.claude-config/tools/hc-fork-25dd2d0be144/bin \
+MESH_RELAY_BIN=/projects/.claude-config/tools/iroh-relay-1.0.3/bin/iroh-relay \
+ELOHIM_FEEDBACK_SWEEP_SECONDS=5 ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1 \
+ELOHIM_TEST_FEEDBACK_INGRESS=1 just mesh start && just mesh wait --timeout 600
+```
+
+Pack that bundle by copying the four unchanged role DNAs beside your own `lamad.dna` in the
+worktree's `workdir/` and running `hc app pack .`. One trap that cost a mesh cycle: rebuilding the
+shared pool slot **without** `--features "p2p p2p-iroh"` makes `hc-mesh.sh` refuse every peer (it
+greps the binary for the `p2p_iroh` marker) — on a shared slot the feature set is not sticky.
+
+### Blind-reader findings on stations 1-2, deferred not fixed (2026-09-07)
+
+A context-blind reader (a2o-story profile) returned **REVISE (light)**, no blockers, on the
+station 1-2 Gherkin. Station 1 was called structurally sound. The findings, for whoever revises next:
+
+- **MAJOR.** Station 2's central claim — that a notification is a *reference* and the peer must
+  independently fetch and verify before applying — lives in a comment (feature lines 122-124), while
+  the step that should carry it reads as a data match (`matches the fetched, verified record`). The
+  binding does fetch through `get_feedback_signal_record` and does gate on `applied`, so the proof
+  runs; the Gherkin just does not say so. Repair: promote it to its own step. That changes a step
+  name and needs a re-run, so it was not taken in the round that made the station pass.
+- **MAJOR.** `TargetToFeedbackSignal` is named only in a comment (line 106); the vocabulary describes
+  discovery as scanning "corrections that have been linked" without naming the link type.
+- **MINOR.** "envelope" appears in station 2's title and one comment but is never defined (the
+  vocabulary defines NOTIFICATION); the "DNA hash is unchanged" assertion does not state the threat it
+  guards (a foreign envelope must never move which space this peer is in); "content record" is
+  undefined in an otherwise complete vocabulary; `E2E_STORAGE_*` is unexplained in the Background;
+  and each of these two scenarios carries two sub-claims with no structural marker between them.
+
