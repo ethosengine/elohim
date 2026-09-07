@@ -326,21 +326,32 @@ export async function applied(
     ms
   );
 }
+// The aggregate was SAMPLED the instant the application row appeared, so this raced the
+// projection in whichever direction the run happened to land: measured 2026-09-07 it read
+// 2 low (baseline captured mid-projection) and, once the baseline settled, 2 high (the row
+// present and the tally not yet republished). Both were reported as a wrong contribution.
+// An eventually-consistent projection is polled, never sampled — so wait for the row AND
+// the tally it feeds to agree, and keep a final assertion so a genuine mismatch reports
+// the two numbers rather than a bare deadline.
 export async function contribution(world: E2EWorld): Promise<void> {
-  await until('one accepted contribution', () => {
-    const result = rows(
-      world,
-      'jessica',
-      `SELECT a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
-      [ctx(world).correction]
-    );
-    return result[0]?.['accepted'] === 1 && result[0]?.['contribution'] === 2;
-  });
-  const value = await standing(world);
-  assert.equal(
-    value['debitWeightSum'],
-    Number(ctx(world).baseline['jessica']['debitWeightSum']) + 2
-  );
+  const expected = Number(ctx(world).baseline['jessica']['debitWeightSum']) + 2;
+  let observed = Number.NaN;
+  try {
+    await until('the accepted contribution reaches the tally', async () => {
+      const result = rows(
+        world,
+        'jessica',
+        `SELECT a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
+        [ctx(world).correction]
+      );
+      if (!(result[0]?.['accepted'] === 1 && result[0]?.['contribution'] === 2)) return false;
+      observed = Number((await standing(world))['debitWeightSum']);
+      return observed === expected;
+    });
+  } catch {
+    // Fall through: the assertion below names the numbers, which a deadline cannot.
+  }
+  assert.equal(observed, expected);
 }
 export async function served(world: E2EWorld, peer: Peer = 'jessica'): Promise<string> {
   return (await probeDeclaredHead(url(peer), ctx(world).id)).headActionHash;
