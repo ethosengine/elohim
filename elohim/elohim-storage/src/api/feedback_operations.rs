@@ -146,6 +146,28 @@ pub async fn handle(
     hc: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     match (&method, path) {
+        (&Method::POST, "/api/v1/feedback/generations/rebuild") => {
+            let Some(hc) = hc else {
+                return Ok(json_status(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &serde_json::json!({"error": "no content cell"}),
+                ));
+            };
+            let _writer = crate::services::feedback_projector::rebuild::WRITER
+                .lock()
+                .await;
+            let evaluator =
+                crate::services::feedback_projector::normalize_agent_key(&hc.agent_pub_key());
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            let generation =
+                crate::services::feedback_projector::rebuild::start(&mut conn, &evaluator)?;
+            Ok(json_status(
+                StatusCode::ACCEPTED,
+                &serde_json::json!({"generationId": generation, "status": "rebuilding"}),
+            ))
+        }
         (&Method::POST, "/api/v1/feedback/operations") => create(req, pool, hc).await,
         (&Method::GET, p) if p.starts_with("/api/v1/feedback/operations/") => {
             let id = p.trim_start_matches("/api/v1/feedback/operations/");

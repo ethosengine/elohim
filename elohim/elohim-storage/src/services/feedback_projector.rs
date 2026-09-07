@@ -60,7 +60,10 @@ use crate::services::standing_projector::{score_for_debit_sum, serialize_score};
 /// How often the projector sweeps. Discovery is not latency-critical: a
 /// correction is a deliberate act and a minute of projection latency costs
 /// nothing, while a tighter loop only spends conductor capacity.
-pub const SWEEP_INTERVAL_SECS: u64 = 45;
+pub const SWEEP_INTERVAL_SECS: u64 = 60;
+
+pub mod conductor;
+pub mod rebuild;
 
 /// Subscription members visited per tick. NOT a `take(N)` over an unsorted set
 /// — see the rotation note above.
@@ -514,7 +517,7 @@ pub fn commit_group(
         let existing = app_db::fetch_application(c, generation_id, &outcome.group_key)?;
         let already_applied = existing
             .as_ref()
-            .map(|r| r.status == STATUS_APPLIED)
+            .map(|r| r.status == STATUS_APPLIED && (r.accepted == 1 || !outcome.accepted))
             .unwrap_or(false);
 
         for m in &outcome.members {
@@ -565,6 +568,9 @@ pub fn commit_group(
             },
         )?;
 
+        if outcome.accepted && outcome.contribution != 0 {
+            rebuild::crash_once();
+        }
         // Only an APPLIED group with a real contribution and a subject moves an
         // aggregate. A zero-only correction leaves the subject's aggregate
         // ABSENT — readers see Unknown, not Neutral (§7).
@@ -667,14 +673,14 @@ pub fn resolve_generation(
 ) -> Result<i32, StorageError> {
     let now = Utc::now().to_rfc3339();
     let digest = policy.policy_digest();
-    if let Some(g) = gen_db::published_generation(conn, evaluator)
+    if let Some(g) = gen_db::in_flight_generation(conn, evaluator)
         .map_err(|e| StorageError::Database(e.to_string()))?
     {
         if g.policy_manifest_cid == digest {
             return Ok(g.generation_id);
         }
     }
-    if let Some(g) = gen_db::in_flight_generation(conn, evaluator)
+    if let Some(g) = gen_db::published_generation(conn, evaluator)
         .map_err(|e| StorageError::Database(e.to_string()))?
     {
         if g.policy_manifest_cid == digest {
@@ -745,6 +751,7 @@ impl FeedbackProjector {
 
     /// One sweep. Budgets are sized BEFORE any conductor call is made.
     pub async fn tick(&self) -> Result<TickReport, StorageError> {
+        let _writer = rebuild::WRITER.lock().await;
         let mut report = TickReport::default();
         let mut records_budget = MAX_RECORDS_PER_SWEEP;
         let mut bytes_budget = MAX_BYTES_PER_SWEEP;
@@ -755,6 +762,21 @@ impl FeedbackProjector {
                 .get()
                 .map_err(|e| StorageError::Database(e.to_string()))?;
             let generation_id = resolve_generation(&mut conn, &self.evaluator, &self.policy)?;
+            // Admit at most eight newly held content anchors per sweep. The anti-join
+            // makes progress across the whole set without a second history cursor.
+            diesel::sql_query(
+                "INSERT OR IGNORE INTO feedback_subscriptions
+                (member_kind, member_key, origin_dna_hash, source, added_at, visit_count)
+                SELECT 'content-target', c.dht_anchor_hash, ?, 'steward', ?, 0
+                FROM content c WHERE c.dht_anchor_hash IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM feedback_subscriptions s
+                    WHERE s.member_kind = 'content-target' AND s.member_key = c.dht_anchor_hash)
+                ORDER BY c.id LIMIT 8",
+            )
+            .bind::<diesel::sql_types::Text, _>(self.reader.origin_dna_hash())
+            .bind::<diesel::sql_types::Text, _>(Utc::now().to_rfc3339())
+            .execute(&mut conn)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
             let members = sub_db::next_members(&mut conn, MAX_MEMBERS_PER_SWEEP)
                 .map_err(|e| StorageError::Database(e.to_string()))?;
             (generation_id, members)
@@ -762,6 +784,61 @@ impl FeedbackProjector {
 
         let expected_dna = self.reader.origin_dna_hash();
         let mut last_visited: Option<(String, String)> = None;
+
+        let retained: Vec<MemberRow> = {
+            use crate::db::diesel_schema::feedback_application_member::dsl as m;
+            let mut conn = self
+                .pool
+                .get()
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            m::feedback_application_member
+                .filter(m::generation_id.eq(generation_id))
+                .filter(m::member_status.eq(MEMBER_STATUS_PENDING))
+                .order(m::discovered_at.asc())
+                .limit((MAX_RECORDS_PER_SWEEP / 2) as i64)
+                .load(&mut conn)
+                .map_err(|e| StorageError::Database(e.to_string()))?
+        };
+        for retained in retained {
+            records_budget -= 1;
+            let member = sub_db::SubscriptionRow {
+                member_kind: sub_db::KIND_CORRECTION_ACTION.into(),
+                member_key: retained.action_hash.clone(),
+                origin_dna_hash: retained.origin_dna_hash,
+                source: sub_db::SOURCE_DISCOVERED.into(),
+                added_at: retained.discovered_at,
+                last_visited_at: None,
+                visit_count: 0,
+            };
+            let reference = DiscoveredRef {
+                action_hash: retained.action_hash,
+                fetch_outcome: "retained".into(),
+            };
+            if let Err(e) = self
+                .handle_ref(
+                    generation_id,
+                    &expected_dna,
+                    &member,
+                    &reference,
+                    &mut bytes_budget,
+                )
+                .await
+            {
+                let status = if matches!(e, StorageError::InvalidInput(_)) {
+                    MEMBER_STATUS_REJECTED
+                } else {
+                    MEMBER_STATUS_PENDING
+                };
+                self.record_unsettled(
+                    generation_id,
+                    &member.origin_dna_hash,
+                    &reference.action_hash,
+                    status,
+                    &e.to_string(),
+                )?;
+                tracing::warn!(error = %e, "retained feedback could not be applied");
+            }
+        }
 
         for member in &members {
             report.members_visited += 1;
@@ -798,12 +875,31 @@ impl FeedbackProjector {
                 if records_budget == 0 || bytes_budget == 0 {
                     break;
                 }
+                // Settled history costs no record budget, so a late link behind
+                // many applied references can still be fetched this tick.
+                {
+                    let mut conn = self
+                        .pool
+                        .get()
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
+                    if app_db::fetch_member(
+                        &mut conn,
+                        generation_id,
+                        &member.origin_dna_hash,
+                        &r.action_hash,
+                    )
+                    .map_err(|e| StorageError::Database(e.to_string()))?
+                    .is_some_and(|m| m.member_status != MEMBER_STATUS_PENDING)
+                    {
+                        continue;
+                    }
+                }
+                records_budget -= 1;
                 match self
                     .handle_ref(generation_id, &expected_dna, member, &r, &mut bytes_budget)
                     .await
                 {
                     Ok(Some(status)) => {
-                        records_budget -= 1;
                         report.records_fetched += 1;
                         match status.as_str() {
                             STATUS_APPLIED => report.groups_applied += 1,
@@ -812,12 +908,24 @@ impl FeedbackProjector {
                         }
                     }
                     Ok(None) => {}
-                    Err(e) => tracing::warn!(
-                        target: "elohim_storage::feedback_projector",
-                        action = %r.action_hash,
-                        error = %e,
-                        "act could not be projected this tick — held, not dropped"
-                    ),
+                    Err(e) => {
+                        let status = if matches!(e, StorageError::InvalidInput(_)) {
+                            report.groups_rejected += 1;
+                            MEMBER_STATUS_REJECTED
+                        } else {
+                            report.groups_pending += 1;
+                            MEMBER_STATUS_PENDING
+                        };
+                        self.record_unsettled(
+                            generation_id,
+                            &member.origin_dna_hash,
+                            &r.action_hash,
+                            status,
+                            &e.to_string(),
+                        )?;
+                        tracing::warn!(action = %r.action_hash, error = %e,
+                            "act could not be projected this tick — held, not dropped");
+                    }
                 }
             }
         }
@@ -832,6 +940,34 @@ impl FeedbackProjector {
                 .map_err(|e| StorageError::Database(e.to_string()))?;
         }
 
+        {
+            let mut conn = self
+                .pool
+                .get()
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            use crate::db::diesel_schema::{
+                feedback_application_member as members, feedback_subscriptions as subs,
+            };
+            let unvisited: i64 = subs::table
+                .filter(subs::last_visited_at.is_null())
+                .count()
+                .get_result(&mut conn)
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            let pending: i64 = members::table
+                .filter(members::generation_id.eq(generation_id))
+                .filter(members::member_status.eq(MEMBER_STATUS_PENDING))
+                .count()
+                .get_result(&mut conn)
+                .map_err(|e| StorageError::Database(e.to_string()))?;
+            if unvisited == 0 && pending == 0 && report.groups_pending == 0 {
+                publish_generation(
+                    &mut conn,
+                    generation_id,
+                    &self.evaluator,
+                    &self.policy.policy_digest(),
+                )?;
+            }
+        }
         Ok(report)
     }
 
@@ -1051,13 +1187,12 @@ impl FeedbackProjector {
         };
 
         let now = Utc::now().to_rfc3339();
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| StorageError::Database(e.to_string()))?;
-
         match verdict {
             AcceptanceVerdict::Accepted { subject } => {
+                let mut conn = self
+                    .pool
+                    .get()
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
                 let contribution = self.policy.contribution(
                     &correction.entry.signal_kind,
                     true,
@@ -1291,9 +1426,14 @@ pub fn admit_notified_signal(
 /// bounded-work: one tick per [`SWEEP_INTERVAL_SECS`], `MissedTickBehavior::Skip`
 /// so a stalled runtime coalesces missed ticks instead of catching up in a
 /// burst, and every per-tick cost capped by the budgets above.
-pub fn spawn(projector: FeedbackProjector) {
+pub fn spawn(projector: FeedbackProjector) -> tokio::task::JoinHandle<()> {
+    let seconds = std::env::var("ELOHIM_FEEDBACK_SWEEP_SECONDS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(SWEEP_INTERVAL_SECS);
     tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(SWEEP_INTERVAL_SECS));
+        let mut ticker = tokio::time::interval(Duration::from_secs(seconds));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
@@ -1311,7 +1451,7 @@ pub fn spawn(projector: FeedbackProjector) {
                 ),
             }
         }
-    });
+    })
 }
 
 #[cfg(test)]

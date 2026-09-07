@@ -3832,3 +3832,35 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
         testName: crash_between_row_and_aggregate_rolls_both_back
         kind: unit
+
+  - name: feedback_generation_rebuild
+    kind: state-transition
+    sourceLocation:
+      file: src/services/feedback_projector/rebuild.rs
+      modulePath: services::feedback_projector::rebuild::start
+      line: 0
+    summary: >
+      Rebuild derived standing in a fresh generation under the published policy, retaining
+      the prior generation and its action references. The HTTP caller and tick share a writer
+      lock; readers see rebuilding until retained inputs settle and publication completes.
+    concernIds:
+      - { id: C0, status: answered, justification: "Only the SQLite standing projection changes; DHT acts remain authoritative." }
+      - { id: C1, status: n-a, justification: "Rebuild does not elect an author or head." }
+      - { id: C2, status: n-a, justification: "No content head is moved." }
+      - { id: C3, status: partial, justification: "Retained references replay without links; permanently unfetchable evidence holds publication pending." }
+      - { id: C4, status: answered, justification: "Standing HTTP reads expose rebuilding rather than a partial tally." }
+      - { id: C5, status: answered, justification: "Retained references are fetched and verified again, not treated as authority." }
+      - { id: C6a, status: partial, justification: "Replay shares tick budgets; full link enumeration and lineage queries retain their existing coordinator bounds and costs." }
+      - { id: C6b, status: answered, justification: "Concurrent rebuild requests serialize; an in-flight generation refuses another rebuild." }
+      - { id: C7, status: answered, justification: "The POST route is registered in build_manifest and handled by feedback_operations." }
+      - { id: C8, status: partial, justification: "POST names the generation and standing reports rebuilding; per-group diagnostics remain local test witnesses." }
+      - { id: C9, status: answered, justification: "Evaluator and policy pins carry from the published generation; references retain origin DNA and action identity." }
+      - { id: C10, status: answered, justification: "The trigger is additive and moves no integrity DNA." }
+      - { id: C11, status: answered, justification: "Generation creation and retained-reference copying are transactional; the published generation survives interruption." }
+      - { id: C12, status: partial, justification: "Manifest declares authenticated access; direct storage follows existing node-local API trust." }
+      - { id: C13, status: n-a, justification: "Rebuild grants no new authority or capability tier." }
+      - { id: C14, status: partial, justification: "Unit evidence exists; household execution remains required before any habit status change." }
+    contractTests:
+      - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
+        testName: fresh_rebuild_replays_retained_acts_after_links_disappear
+        kind: unit

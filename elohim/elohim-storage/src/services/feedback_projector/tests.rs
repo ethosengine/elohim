@@ -289,7 +289,7 @@ async fn accepted_correction_contributes_once_against_the_root_author() {
     assert_eq!(report.groups_applied, 1, "report: {report:?}");
 
     let mut conn = pool.get().unwrap();
-    let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
+    let gen = current_generation(&mut conn)
         .unwrap()
         .expect("generation opened");
     let row = app_db::fetch_application(&mut conn, gen.generation_id, "ev-1")
@@ -322,9 +322,7 @@ async fn replay_after_commit_is_a_no_op() {
     projector.tick().await.expect("tick 3");
 
     let mut conn = pool.get().unwrap();
-    let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
-        .unwrap()
-        .unwrap();
+    let gen = current_generation(&mut conn).unwrap().unwrap();
     let agg = gen_db::fetch_aggregate(&mut conn, gen.generation_id, &key(0xE0), &key(1))
         .unwrap()
         .expect("aggregate");
@@ -343,9 +341,7 @@ async fn two_members_of_one_group_contribute_once() {
     projector.tick().await.expect("tick");
 
     let mut conn = pool.get().unwrap();
-    let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
-        .unwrap()
-        .unwrap();
+    let gen = current_generation(&mut conn).unwrap().unwrap();
     let members = app_db::members_of_group(&mut conn, gen.generation_id, "ev-1").unwrap();
     assert_eq!(members.len(), 2, "the vouch and the correction it accepts");
     let agg = gen_db::fetch_aggregate(&mut conn, gen.generation_id, &key(0xE0), &key(1))
@@ -365,9 +361,7 @@ async fn late_arrival_after_apply_records_without_recontributing() {
         .expect("first tick applies the group");
 
     let mut conn = pool.get().unwrap();
-    let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
-        .unwrap()
-        .unwrap();
+    let gen = current_generation(&mut conn).unwrap().unwrap();
     // A second, OLDER correction under the same operation shows up now.
     let outcome = GroupOutcome {
         group_key: "ev-1".to_string(),
@@ -619,9 +613,7 @@ async fn correction_alone_leaves_the_subject_absent() {
     projector.tick().await.expect("tick");
 
     let mut conn = pool.get().unwrap();
-    let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
-        .unwrap()
-        .unwrap();
+    let gen = current_generation(&mut conn).unwrap().unwrap();
     let row = app_db::fetch_application(&mut conn, gen.generation_id, "ev-1")
         .unwrap()
         .expect("group opened");
@@ -654,9 +646,7 @@ async fn rebuild_reproduces_the_published_generation() {
 
     let (gen_id, before_apps, before_aggs) = {
         let mut conn = pool.get().unwrap();
-        let gen = gen_db::in_flight_generation(&mut conn, &key(0xE0))
-            .unwrap()
-            .unwrap();
+        let gen = current_generation(&mut conn).unwrap().unwrap();
         let apps = app_db::members_of_group(&mut conn, gen.generation_id, "ev-1").unwrap();
         let aggs = gen_db::list_aggregates(&mut conn, gen.generation_id).unwrap();
         publish_generation(&mut conn, gen.generation_id, &key(0xE0), "sha256:test").unwrap();
@@ -719,4 +709,150 @@ fn agent_display_round_trips() {
     // PANIC GUARD: an empty suffix must not reach the hash decoder.
     assert_eq!(decode_agent_display("u"), None);
     assert_eq!(decode_agent_display(""), None);
+}
+
+#[tokio::test]
+async fn spawned_loop_visits_subscription_on_first_tick() {
+    let pool = test_pool();
+    sub_db::add_member(
+        &mut pool.get().unwrap(),
+        sub_db::KIND_CONTENT_TARGET,
+        "target",
+        DNA,
+        sub_db::SOURCE_STEWARD,
+        "2026-09-06T00:00:00Z",
+    )
+    .unwrap();
+    let reader = Arc::new(FakeReader::new());
+    let task = spawn(FeedbackProjector::new(
+        pool,
+        reader.clone(),
+        key(0xE0),
+        PinnedPolicy::default(),
+    ));
+    let result = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if !reader.state.lock().unwrap().visited.is_empty() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    task.abort();
+    result.expect("registered loop must tick without waiting for its first interval");
+    assert_eq!(reader.state.lock().unwrap().visited, vec!["target"]);
+}
+
+fn current_generation(
+    conn: &mut SqliteConnection,
+) -> Result<Option<gen_db::GenerationRow>, diesel::result::Error> {
+    Ok(gen_db::published_generation(conn, &key(0xE0))?
+        .or(gen_db::in_flight_generation(conn, &key(0xE0))?))
+}
+
+#[tokio::test]
+async fn acceptance_after_zero_contribution_applies_once() {
+    let (pool, reader, projector) = accepted_group_fixture();
+    let acceptance_refs = reader.state.lock().unwrap().refs.remove("corr-1");
+    let generation = resolve_generation(
+        &mut pool.get().unwrap(),
+        &key(0xE0),
+        &PinnedPolicy::default(),
+    )
+    .unwrap();
+    projector
+        .project_correction(
+            generation,
+            &act(
+                "corr-1",
+                2,
+                100,
+                correction_entry("content-1", "ev-1", "debit-soft"),
+            ),
+        )
+        .unwrap();
+    projector.tick().await.unwrap();
+    if let Some(refs) = acceptance_refs {
+        reader
+            .state
+            .lock()
+            .unwrap()
+            .refs
+            .insert("corr-1".into(), refs);
+    }
+    projector.tick().await.unwrap();
+    projector.tick().await.unwrap();
+    let mut conn = pool.get().unwrap();
+    let gen = current_generation(&mut conn).unwrap().unwrap();
+    let aggregate = gen_db::fetch_aggregate(&mut conn, gen.generation_id, &key(0xE0), &key(1))
+        .unwrap()
+        .unwrap();
+    assert_eq!(aggregate.debit_weight_sum, 2);
+}
+
+#[tokio::test]
+async fn fresh_rebuild_replays_retained_acts_after_links_disappear() {
+    let (pool, reader, projector) = accepted_group_fixture();
+    projector.tick().await.unwrap();
+    let new_id = {
+        let mut conn = pool.get().unwrap();
+        rebuild::start(&mut conn, &key(0xE0)).unwrap()
+    };
+    reader.state.lock().unwrap().refs.clear();
+    projector.tick().await.unwrap();
+    let mut conn = pool.get().unwrap();
+    let generation = gen_db::published_generation(&mut conn, &key(0xE0))
+        .unwrap()
+        .unwrap();
+    assert_eq!(generation.generation_id, new_id);
+    assert_eq!(
+        gen_db::fetch_aggregate(&mut conn, new_id, &key(0xE0), &key(1))
+            .unwrap()
+            .unwrap()
+            .debit_weight_sum,
+        2
+    );
+    assert_eq!(
+        app_db::members_of_group(&mut conn, new_id, "ev-1")
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn pending_acceptance_retries_without_holding_a_database_connection() {
+    let (pool, reader, projector) = accepted_group_fixture();
+    let root = reader
+        .state
+        .lock()
+        .unwrap()
+        .lineages
+        .remove("content-1")
+        .unwrap();
+    projector.tick().await.unwrap();
+    assert!(
+        gen_db::published_generation(&mut pool.get().unwrap(), &key(0xE0))
+            .unwrap()
+            .is_none()
+    );
+    reader
+        .state
+        .lock()
+        .unwrap()
+        .lineages
+        .insert("content-1".into(), root);
+    projector.tick().await.unwrap();
+    let mut conn = pool.get().unwrap();
+    let generation = gen_db::published_generation(&mut conn, &key(0xE0))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        gen_db::fetch_aggregate(&mut conn, generation.generation_id, &key(0xE0), &key(1))
+            .unwrap()
+            .unwrap()
+            .debit_weight_sum,
+        2
+    );
 }

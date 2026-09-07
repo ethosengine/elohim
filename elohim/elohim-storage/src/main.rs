@@ -5933,6 +5933,28 @@ async fn async_main(
         }
     }
 
+    // Durable correction discovery runs independently of direct notifications.
+    // FeedbackNotify is read per send by back_prop::direct_notify_enabled;
+    // disabling that accelerant must never disable this bounded sweep.
+    if let (Some(pool), Some(hc)) = (
+        db_pool.as_ref(),
+        hc_registry_for_http.as_ref().and_then(|r| r.lamad_client()),
+    ) {
+        use elohim_storage::services::feedback_projector::{
+            self, conductor::ConductorReader, FeedbackProjector, PinnedPolicy,
+        };
+        let evaluator = hc.agent_pub_key();
+        let policy = PinnedPolicy::default();
+        feedback_projector::cutover_standing_view(&mut *pool.get()?, &evaluator, &policy)?;
+        feedback_projector::spawn(FeedbackProjector::new(
+            pool.clone(),
+            Arc::new(ConductorReader(hc)),
+            evaluator,
+            policy,
+        ));
+        info!("feedback projector spawned");
+    }
+
     // ── Station 6: the trailing lineage bridge sweep ──────────────────────────
     //
     // The apply vehicle above crosses THIS peer's own chain once, when a window

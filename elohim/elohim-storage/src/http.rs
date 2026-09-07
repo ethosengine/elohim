@@ -2286,7 +2286,10 @@ impl HttpServer {
             // Accountable-correction submission outbox (contract §8). Matched
             // before the /api/v1/ catch-all so the content-cell client is
             // injected directly. Two-phase, single-flight, immutable request.
-            (method, p) if p.starts_with("/api/v1/feedback/operations") => {
+            (method, p)
+                if p.starts_with("/api/v1/feedback/operations")
+                    || p == "/api/v1/feedback/generations/rebuild" =>
+            {
                 if let Some(ref pool) = self.db_pool {
                     let hc_lamad = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
                     crate::api::feedback_operations::handle(req, method, p, pool, hc_lamad.as_ref())
@@ -14851,6 +14854,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/api/v1/feedback/operations")
                 .handler("feedback_operation_create")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/feedback/generations/rebuild")
+                .handler("feedback_generation_rebuild")
                 .auth_required()
                 .build(),
         )

@@ -89,9 +89,25 @@ async fn get_agent_standing(
         }
     };
 
-    let evaluator_bytes = evaluator_cid.as_bytes().to_vec();
-    let subject_bytes = agent_cid.as_bytes().to_vec();
+    let evaluator_bytes = crate::services::feedback_projector::decode_agent_display(&evaluator_cid)
+        .unwrap_or_else(|| evaluator_cid.as_bytes().to_vec());
+    let subject_bytes = crate::services::feedback_projector::decode_agent_display(agent_cid)
+        .unwrap_or_else(|| agent_cid.as_bytes().to_vec());
+    let subject_cid = agent_cid.to_string();
 
+    {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+        if crate::db::standing_generations::in_flight_generation(&mut conn, &evaluator_bytes)
+            .map_err(|e| StorageError::Database(e.to_string()))?
+            .is_some()
+        {
+            return Ok(response::service_unavailable(
+                "standing generation rebuilding",
+            ));
+        }
+    }
     let pool = pool.clone();
     let view: StandingScoreView =
         tokio::task::spawn_blocking(move || -> Result<StandingScoreView, StorageError> {
@@ -115,8 +131,8 @@ async fn get_agent_standing(
             };
 
             Ok(StandingScoreView {
-                evaluator_cid: String::from_utf8(evaluator_bytes.clone()).unwrap_or_default(),
-                subject_cid: String::from_utf8(subject_bytes.clone()).unwrap_or_default(),
+                evaluator_cid,
+                subject_cid,
                 score: tier,
                 debit_weight_sum: row.as_ref().map(|r| r.debit_weight_sum).unwrap_or(0),
                 recent_breaches: Vec::<FeedbackSignalSummary>::new(),
