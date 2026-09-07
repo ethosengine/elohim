@@ -191,5 +191,24 @@
       "path",
       "epic"
     ]
+  },
+  "STEP": {
+    "description": "Sequential path membership — the source path's step N is the target content, with the step's position carried as `orderIndex` in the relationship's metadata. Distinct from CONTAINS: a step is a positioned entry in a linear learning sequence, not generic hierarchical containment.",
+    "sourceTypes": [
+      "path"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "assessment",
+      "exercise",
+      "reflection",
+      "discussion",
+      "article",
+      "scenario",
+      "quiz",
+      "simulation",
+      "path"
+    ]
   }
 }

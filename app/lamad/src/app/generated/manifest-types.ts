@@ -60,6 +60,7 @@ export const LAMAD_RELATIONSHIPS = [
   'REQUIRES',
   'FOLLOWS',
   'ATTACHED_TO',
+  'STEP',
 ] as const;
 export type LamadRelationship = (typeof LAMAD_RELATIONSHIPS)[number];
 

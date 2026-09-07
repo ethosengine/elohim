@@ -17,6 +17,22 @@ describe('canonicalRelationshipType', () => {
     expect(canonicalRelationshipType('FOLLOWUP')).toMatchObject({ type: 'FOLLOWS', via: 'alias' });
   });
 
+  // genesis/data/timeline/backlog/prologue-seed-step-relationship-type-invalid.md:
+  // seed.ts's pathToStepRelationships authored a bare lower-case 'step' literal
+  // straight onto the wire, which relationship_service.rs's (upper-case-only)
+  // VALID_RELATIONSHIP_TYPES rejected with HTTP 400 — dropping every path's
+  // step relationships on a fresh seed. 'STEP' is now a manifest id
+  // (elohim/sdk/domains/lamad/manifest/relationships.json) and this pins that
+  // the authored lower-case form canonicalizes onto it, `via: 'manifest'`
+  // (case-insensitive match), not a fallback.
+  it("canonicalizes the authored path-step literal 'step' onto the manifest id STEP", () => {
+    expect(canonicalRelationshipType('step')).toEqual({
+      type: 'STEP',
+      via: 'manifest',
+      authored: 'step',
+    });
+  });
+
   it('never emits a type outside the manifest — unknowns fall back to RELATES_TO and are counted', () => {
     const manifest = new Set<string>(LAMAD_RELATIONSHIPS as readonly string[]);
     const ledger = new RelationshipRemapLedger();

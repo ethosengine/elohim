@@ -1894,7 +1894,12 @@ async function seedViaDoorway(): Promise<SeedResult> {
       return stepRefs.map((ref, globalIndex) => ({
         sourceId: pathData.id,
         targetId: ref.resourceId,
-        relationshipType: 'step',
+        // 'step' is authored lower-case here; canonicalRelationshipType maps it
+        // onto the manifest's canonical 'STEP' id (elohim/sdk/domains/lamad/
+        // manifest/relationships.json) — relationship_service.rs rejects the
+        // lower-case literal (HTTP 400), which dropped every path's step
+        // relationships on a fresh seed.
+        relationshipType: canonicalRelationshipType('step').type,
         confidence: 1.0,
         inferenceSource: 'explicit',
         metadata: { orderIndex: globalIndex },

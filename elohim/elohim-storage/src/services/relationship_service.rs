@@ -16,8 +16,11 @@ use super::events::{EventBus, StorageEvent};
 /// The lamad manifest (`elohim/sdk/domains/lamad/manifest/relationships.json`)
 /// is the SOURCE OF TRUTH for this vocabulary — the seeder's extractor emits
 /// exactly its ids (generated `manifest-types.ts`). This list is the manifest's
-/// eleven ids PLUS the legacy ids rows already carry (kept so stored rows stay
-/// readable); the `manifest_relationship_vocabulary_is_accepted` test pins
+/// ids (twelve as of the `STEP` addition, see
+/// prologue-seed-step-relationship-type-invalid.md) PLUS the legacy ids rows
+/// already carry (kept so stored rows stay readable); this list is
+/// HAND-SYNCED to the manifest, not generated — the
+/// `manifest_relationship_vocabulary_is_accepted` test pins
 /// "manifest ⊆ accepted" so the two cannot drift apart silently again — until
 /// 2026-08-28 they had (5 of 11 in common) and every local `seed apply`
 /// dropped its whole relationship graph on `HTTP 400 relationship_type
@@ -35,6 +38,7 @@ pub const VALID_RELATIONSHIP_TYPES: &[&str] = &[
     "REQUIRES",
     "FOLLOWS",
     "ATTACHED_TO",
+    "STEP",
     // legacy ids already persisted by earlier seeders / migrations
     "PREREQUISITE",
     "FOLLOWUP",
