@@ -282,3 +282,57 @@ rule, no prologue or live test was attempted and no @wip was removed. There is n
 Cucumber JSON/HTML receipt to copy; bindings-dry-run.{json,html} is explicitly a separate
 registration check. The next operator must supply the mesh prerequisites before retrying
 this same worktree and feature.
+
+### Mesh run — 2026-09-07 (rust-architect)
+
+Supersedes the "Mesh attempt — 2026-09-07" section above: the prerequisites that
+blocked it were supplied and the stations ran live. Receipt directory:
+`genesis/a2o/reports/accountable-correction/mesh-20260907T025002Z/` (`cucumber.json`,
+`cucumber.html`, `run.log`). **8 scenarios / 91 steps: 3 passed, 3 pending, 2 failed,
+69 steps passed.** Cucumber exit code 1 (a pending or failing scenario is a red run).
+
+| Station | § | Verdict | One line |
+|---|---|---|---|
+| 1 — durable discovery | §3 | PENDING (13 steps ok) | Matthew's unnotified peer DOES discover and apply the correction on its own scan; stops at the late-arrival fixture, which cannot backdate a Holochain action. |
+| 2 — notification accelerates | §4 | PENDING (12 steps ok) | Stops at the acceleration proof: notifications enqueue subscriptions but there is no notification-driven wake or observable next-scan deadline to measure against. |
+| 3 — only the root author settles | §5.2/§5.3/§6 | PENDING (16 steps ok) | Acceptance, successor, three-peer head adoption and James's refusal all pass; stops at "a dependent view re-renders", which names no browser view or route. |
+| 4 — crash window | §7 | **PASSED** (18 steps) | Storage killed mid-transaction, restarted, reapplied exactly once; replay of a settled correction leaves the tally unchanged. |
+| 5 — an allegation costs nobody | §7 | FAILED (12 steps ok) | Honest refusal, not a product defect: the station asserts Jessica reads *Unknown*, and by the time it runs she carries standing from earlier stations. Its own guard says so ("requires a fresh evaluator with no prior accepted corrections"). Needs per-scenario evaluator isolation. |
+| 6 — contested fork | §6 | **PASSED** (18 steps) | Two updates naming one predecessor mark the record contested; the deterministic pick serves a head without clearing the marker; a sequential amendment is not contested. |
+| 7 — rebuilt generation | §7 | FAILED (12 steps ok) | The rebuild publishes, but this scenario's own acceptance had not reached the rebuilt generation's tally inside the poll (expected 8, observed 6). Rebuild-convergence budget, or a real lag between republication and the retained-member replay — not yet separated. |
+| 8 — lost response | §8 | **PASSED** (16 steps) | A discarded response plus a retry under the same client-minted operation id resolves to one correction and at most one contribution. |
+
+`@wip` removed from stations 4, 6 and 8 only. Stations 1, 2, 3, 5 and 7 keep it.
+
+**The projection itself was read directly and is correct.** Mid-run, jessica's peer held
+17 application rows, all `applied`: three with `accepted=1, contribution=2` and fourteen
+unaccepted allegations at `contribution=0`, with `standing_generation_aggregate.debit_weight_sum`
+exactly 6. That is §7's rule — an allegation debits nobody, only an accepted correction
+contributes, and it contributes once — observed on the mesh rather than argued.
+
+**Environment the run needed** (none of it is default; `just mesh status` shows the
+selection before you start):
+
+```bash
+STORAGE_BIN=/projects/.cargo-target-pool/family/sprint/elohim__elohim-storage/dev/debug/elohim-storage \
+HOLOCHAIN_BIN=/projects/.claude-config/tools/hc-fork-25dd2d0be144/bin \
+MESH_RELAY_BIN=/projects/.claude-config/tools/iroh-relay-1.0.3/bin/iroh-relay \
+ELOHIM_FEEDBACK_SWEEP_SECONDS=5 ELOHIM_TEST_FEEDBACK_CRASH_ONCE=1 just mesh start
+A2O_RUN_WIP=1 just test mesh features/dataplane/accountable-correction.feature
+```
+
+Notes for whoever runs it next:
+
+- The storage binary must be built `--features "p2p p2p-iroh"`. The mesh defaults to
+  `MESH_TRANSPORT_BACKEND=dual` and refuses to start a binary without the iroh marker.
+- `HOLOCHAIN_BIN` must be set explicitly. Stock on PATH is 0.6.0 and will not load an
+  hdk-0.7 DNA; auto-detect only looks in `fork-bin` directories, so the 0.7 pair has to be
+  named. `just mesh status` then still labels the running conductor "STOCK" — that label
+  compares against the fork-bin *path*, not the version, and is wrong here.
+- The scope positional is relative to `genesis/a2o`, not the repo root.
+- `just mesh prologue` needs built Angular dists and is NOT required by these stations:
+  the Background authors its own content and the helpers read peer HTTP, conductor calls
+  and SQLite directly. It was not run.
+- The stations share three cell agents and do not reset state between scenarios or between
+  runs. Station 5's assertion is the one that notices; treat a fresh mesh as part of its
+  fixture.

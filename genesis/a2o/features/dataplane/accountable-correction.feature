@@ -143,7 +143,6 @@ Feature: A correction reaches the person it names, only that person can settle i
   # ---------------------------------------------------------------------------------
   # Station 4 — a crash window never double-applies and never loses the correction (§7)
   # ---------------------------------------------------------------------------------
-  @wip
   Scenario: A storage restart between application and aggregate update rolls back and reapplies exactly once
     Given James has filed a correction against Jessica's record
     And Jessica has accepted James's correction with an accept-correction vouch
@@ -181,7 +180,6 @@ Feature: A correction reaches the person it names, only that person can settle i
   # ---------------------------------------------------------------------------------
   # Station 6 — same-root conflict is named, not silently resolved away (§6)
   # ---------------------------------------------------------------------------------
-  @wip
   Scenario: Two of Jessica's own updates naming the same predecessor leave a contested fork nobody's pick clears
     Given James has filed a correction against Jessica's record
     And Jessica has accepted James's correction with an accept-correction vouch
@@ -217,7 +215,6 @@ Feature: A correction reaches the person it names, only that person can settle i
   # ---------------------------------------------------------------------------------
   # Station 8 — one intended act survives a lost response (§8)
   # ---------------------------------------------------------------------------------
-  @wip
   Scenario: James's lost response and retried resubmission still produce at most one contribution
     # James's own device mints an OPERATION ID before it ever asks a peer to file anything
     # (§8) — the value that lets a retried filing be recognized as the same attempt.
