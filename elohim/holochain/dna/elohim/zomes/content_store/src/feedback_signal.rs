@@ -29,6 +29,12 @@
 //! - `LinkTypes::SignerToFeedbackSignal`: base = per-agent `StringAnchor`
 //!   keyed on `"feedback_signer/<agent_pubkey_b64>"`, target = new
 //!   FeedbackSignal action hash. Supports `list_feedback_signals_by_signer`.
+//!
+//! The target index is SEPARABLE from the act: `create_feedback_signal` may
+//! defer it (`defer_target_link`), and `publish_feedback_signal_target_link`
+//! publishes it afterwards from the act's own `target_cid`. The act's identity
+//! is `(origin DNA hash, action hash)`; the link is an unordered index over it,
+//! restorable by any peer holding a verified reference (contract §3).
 
 use content_store_integrity::{Content, EntryTypes, FeedbackSignal, LinkTypes, StringAnchor};
 use hdk::prelude::*;
@@ -60,6 +66,21 @@ pub struct CreateFeedbackSignalInput {
 
     /// One of: advisory / debit-soft / debit-firm.
     pub standing_impact: String,
+
+    /// Commit the act WITHOUT its `TargetToFeedbackSignal` index link, leaving
+    /// the index to a later [`publish_feedback_signal_target_link`] call
+    /// (contract §3).
+    ///
+    /// The act's identity is `(origin DNA hash, action hash)`; the link is an
+    /// unordered INDEX over it, not part of the act. Separating the two is what
+    /// makes "a late link is picked up on a later tick" an exercisable path
+    /// rather than an assertion: an act may exist, be fetchable by reference,
+    /// and become discoverable-by-enumeration afterwards.
+    ///
+    /// Additive and defaulted: an older caller that omits the field commits
+    /// entry and both index links in one flush exactly as before.
+    #[serde(default)]
+    pub defer_target_link: bool,
 }
 
 /// One FeedbackSignal record returned from query functions.
@@ -171,14 +192,21 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
     // ------------------------------------------------------------------
 
     // TargetToFeedbackSignal: base = target entry's action hash.
-    create_link(
-        input.target_action_hash.clone(),
-        action_hash.clone(),
-        LinkTypes::TargetToFeedbackSignal,
-        (),
-    )?;
+    // Deferred (§3): the act still commits and is still fetchable by reference;
+    // only its index publication moves to publish_feedback_signal_target_link.
+    if !input.defer_target_link {
+        create_link(
+            input.target_action_hash.clone(),
+            action_hash.clone(),
+            LinkTypes::TargetToFeedbackSignal,
+            (),
+        )?;
+    }
 
     // SignerToFeedbackSignal: base = per-agent StringAnchor.
+    // Always written: this is the SIGNER's own index over their own acts, and
+    // §8's phase-2 recovery enumerates it. Deferring the target index never
+    // costs an author the ability to find their own act again.
     // Anchor key: "feedback_signer/<pubkey_base64>"
     let signer_anchor_key = format!("feedback_signer/{}", agent_info()?.agent_initial_pubkey);
     let signer_anchor = StringAnchor::new("feedback_signer", &signer_anchor_key);
@@ -696,6 +724,122 @@ pub fn list_feedback_signal_refs_by_signer(
 #[hdk_extern]
 pub fn get_feedback_signal_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     get(action_hash, GetOptions::default())
+}
+
+// ---------------------------------------------------------------------------
+// Index publication — link-only, act-derived (contract §3)
+// ---------------------------------------------------------------------------
+
+/// Input for [`publish_feedback_signal_target_link`].
+///
+/// There is deliberately NO caller-supplied target. The index this extern
+/// publishes is derived from the act's own `target_cid`, so the extern can
+/// restore an index but can never forge one: no caller can point somebody
+/// else's act at a target that act never named.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct PublishFeedbackSignalTargetLinkInput {
+    pub feedback_action_hash: ActionHash,
+}
+
+/// Result of [`publish_feedback_signal_target_link`].
+///
+/// `already_published` is the idempotent answer, not a failure: the index is a
+/// set, and a second publication of the same edge would only inflate the
+/// `duplicate_links` counter that §3's honest reference query reports.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct PublishFeedbackSignalTargetLinkOutput {
+    pub feedback_action_hash: ActionHash,
+    pub target_action_hash: ActionHash,
+    /// The `CreateLink` action, or `None` when an equivalent edge already stood.
+    pub link_action_hash: Option<ActionHash>,
+    pub already_published: bool,
+}
+
+/// Publish the `TargetToFeedbackSignal` index edge for an act that already
+/// exists — link only, no entry (contract §3).
+///
+/// An act's identity is `(origin DNA hash, action hash)`; the target link is an
+/// unordered INDEX that makes the act discoverable by enumeration from the
+/// record it names. The two are separable, and the substrate has to be able to
+/// say so out loud for three reasons:
+///
+///   1. **Index repair.** Delete-link validation is permissive
+///      (`content_store_integrity/src/lib.rs`), so an index edge can be removed
+///      by anyone. An act whose edge is gone is still valid, still fetchable by
+///      reference, and invisible to every peer that does not already hold the
+///      reference. Any peer holding a verified reference can restore the edge —
+///      it is derived from the act, so restoring it is not a claim.
+///   2. **Deferred publication.** `create_feedback_signal { defer_target_link }`
+///      commits the act without its index; this extern completes it later. That
+///      makes "a late link is picked up on a later tick" (§3) an exercisable
+///      path, which is what station 1 of the accountable-correction feature
+///      measures — arrival order must never become order of effect.
+///   3. **Bounded cost.** Publishing an index is one `get_links` plus at most
+///      one `create_link`; it never re-creates the act, never re-runs
+///      admission, and never touches standing.
+///
+/// Refusals: the referenced action must resolve to a `FeedbackSignal` entry,
+/// and that entry's `target_cid` must parse as an `ActionHash`. Neither is
+/// retryable — both mean the caller named something that is not an act.
+#[hdk_extern]
+pub fn publish_feedback_signal_target_link(
+    input: PublishFeedbackSignalTargetLinkInput,
+) -> ExternResult<PublishFeedbackSignalTargetLinkOutput> {
+    let record = must_get_valid_record(input.feedback_action_hash.clone())?;
+    let signal: FeedbackSignal = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "feedback act decode failed: {e}"
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "feedback_action_hash does not point to a FeedbackSignal".to_string()
+            ))
+        })?;
+
+    // The target comes from the ACT, never from the caller.
+    let target_action_hash = ActionHash::try_from(signal.target_cid.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "feedback act target_cid '{}' does not parse as an ActionHash",
+            signal.target_cid
+        )))
+    })?;
+
+    // Idempotent: the index is a set.
+    let query = LinkQuery::try_new(
+        target_action_hash.clone(),
+        LinkTypes::TargetToFeedbackSignal,
+    )?;
+    let already_published = get_links(query, GetStrategy::default())?
+        .into_iter()
+        .filter_map(|l| ActionHash::try_from(l.target.clone()).ok())
+        .any(|ah| ah == input.feedback_action_hash);
+
+    if already_published {
+        return Ok(PublishFeedbackSignalTargetLinkOutput {
+            feedback_action_hash: input.feedback_action_hash,
+            target_action_hash,
+            link_action_hash: None,
+            already_published: true,
+        });
+    }
+
+    let link_action_hash = create_link(
+        target_action_hash.clone(),
+        input.feedback_action_hash.clone(),
+        LinkTypes::TargetToFeedbackSignal,
+        (),
+    )?;
+
+    Ok(PublishFeedbackSignalTargetLinkOutput {
+        feedback_action_hash: input.feedback_action_hash,
+        target_action_hash,
+        link_action_hash: Some(link_action_hash),
+        already_published: false,
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -33,9 +33,11 @@ pub mod feedback_signal;
 pub use feedback_signal::{
     create_feedback_signal, create_vouch, get_feedback_signal_record,
     get_feedback_signal_refs_for_target, get_feedback_signals_for_target,
-    list_feedback_signal_refs_by_signer, list_feedback_signals_by_signer, CorrectionRequest,
-    CreateFeedbackSignalInput, CreateVouchInput, FeedbackSignalRecord, FeedbackSignalRef,
-    FeedbackSignalRefs, FeedbackSignalRefsBySignerInput, FeedbackSignalRefsForTargetInput,
+    list_feedback_signal_refs_by_signer, list_feedback_signals_by_signer,
+    publish_feedback_signal_target_link, CorrectionRequest, CreateFeedbackSignalInput,
+    CreateVouchInput, FeedbackSignalRecord, FeedbackSignalRef, FeedbackSignalRefs,
+    FeedbackSignalRefsBySignerInput, FeedbackSignalRefsForTargetInput,
+    PublishFeedbackSignalTargetLinkInput, PublishFeedbackSignalTargetLinkOutput,
 };
 
 // Accountable correction (slice 1) — exact-root lineage, explicit-predecessor
