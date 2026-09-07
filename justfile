@@ -214,6 +214,9 @@ dev action="status" profile="isolated" seed="false" build="false":
         # alpha's network (sovereign peer). The profile mapping is the same as `start` — before
         # 2026-08-28 this arm ignored `profile`, so profile=alpha silently started an isolated node.
         # Usage: just dev conductor alpha [CONDUCTOR_RELEASE_CHANNELS=<channel>=observe]
+        # Sprint 2026-09-08 (T2): when the household mesh's own peers are live, hc-start.sh
+        # auto-offsets this peer's STORAGE_PORT/DOORWAY_PORT and sandbox name so it runs beside
+        # the mesh without a port collision — no flags needed here, straight passthrough.
         case "{{ profile }}" in
           isolated) export NETWORK_PROFILE=isolated ;;
           alpha) export NETWORK_PROFILE=join-alpha ;;
@@ -238,6 +241,11 @@ mesh action="status" *args:
     set -euo pipefail
     case "{{ action }}" in
       start|stop|status|probe|prologue) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
+      # preflight/wait (sprint 2026-09-08, T1): `start` already runs preflight itself and
+      # launches detached — these are for checking readiness/refusals independently (a fresh
+      # shell polling a `start` someone else kicked off, or a dry-run binary/port check).
+      preflight) exec "{{ app_dir }}/scripts/hc-mesh.sh" preflight ;;
+      wait) exec "{{ app_dir }}/scripts/hc-mesh.sh" wait {{ args }} ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
       matrix) exec "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
@@ -248,7 +256,7 @@ mesh action="status" *args:
       conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
       storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
       join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
-      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|join-peer <fresh-name>" >&2; exit 2 ;;
+      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.

@@ -17,7 +17,24 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|stop|status|probe|prologue|join-peer|conductors-restart|coordswap]
+#   ./hc-mesh.sh [start|preflight|wait|stop|status|probe|prologue|join-peer|conductors-restart|coordswap]
+#
+#   `start` now runs `preflight` first, then launches detached (`setsid nohup
+#   bash "$0" __start_all_inner`, its own session) and returns in seconds —
+#   `just mesh wait` polls the same readiness ladders start_all always used to
+#   block on inline. This exists because a `start` blocking in the CALLING
+#   shell/tool-task is exactly what let a 2026-09-07 background-task reap take
+#   the whole mesh down mid-measurement (see the git history around that
+#   date). `MESH_FOREGROUND=1` keeps the old inline/blocking behavior exactly.
+#
+#   `preflight` (also run automatically by `start`) checks every refusal
+#   `start_all` can hit — binaries, the fork-pair pin, transport capability,
+#   every port the mesh will bind — and prints one `ok`/`REFUSED` line per
+#   check, BEFORE anything is generated or launched.
+#
+#   `wait [--timeout N]` (default 900s) polls readiness and also tails
+#   start.log: the moment a line matches a refusal pattern it exits 1
+#   immediately instead of waiting out the full timeout.
 #
 #   `conductors-restart` restarts the N conductors IN PLACE against their
 #   EXISTING sandboxes — no generate, so agent keys, chains and DHT databases
@@ -1145,6 +1162,14 @@ detect_fork_bin() { # -> prints the fork dir, or nothing
 # against dead conductors. A directory is the shape a person naturally has (a
 # build output dir), so accept it — and take the matching `hc` with it.
 # ---------------------------------------------------------------------------
+# Captured BEFORE the auto-detect fallback below can populate HOLOCHAIN_BIN, so
+# `preflight`'s fork-pair-pin check can tell "operator deliberately pointed
+# HOLOCHAIN_BIN somewhere" from "nothing was set, the fork auto-detect filled
+# it in" — the two need different pin-mismatch handling (see MESH_ALLOW_
+# TOOLCHAIN_SKEW's own deliberate-override philosophy just below).
+MESH_HOLOCHAIN_BIN_EXPLICIT=0
+[ -n "${HOLOCHAIN_BIN:-}" ] && MESH_HOLOCHAIN_BIN_EXPLICIT=1
+
 if [ -n "${HOLOCHAIN_BIN:-}" ] && [ -d "$HOLOCHAIN_BIN" ]; then
   if [ -x "$HOLOCHAIN_BIN/holochain" ] && [ -x "$HOLOCHAIN_BIN/hc" ]; then
     HC_BIN_DIR="${HOLOCHAIN_BIN%/}"
@@ -2627,6 +2652,289 @@ join_peer() { # <fresh-peer-name>
   echo "JOINED_PEER name=$name index=$index http=http://localhost:$(http_port "$index") irohNodeId=$node_id"
 }
 
+# ---------------------------------------------------------------------------
+# preflight — every refusal `start_all` can hit, checked BEFORE anything is
+# launched, one line per check (`ok <what>` / `REFUSED <what>: <reason>`).
+#
+# Motivation (2026-09-07 fixtures-clone hand-off; see git log): a whole mesh
+# round was lost to a missing doorway binary discovered only after `start_all`
+# had already begun — mongod and the relay were up, three conductors had
+# generated fresh sandboxes (re-keying every peer), and THEN the doorway
+# binary check failed. preflight front-loads every such check so `start`
+# (below) can refuse in seconds, before anything stateful happens.
+#
+# Reuses the SAME detection/assertion helpers start_all calls — never a
+# second copy of the logic:
+#   - FORK_BIN_DIR / HOLOCHAIN_BIN / MESH_CONDUCTOR_PIN12 (already computed at
+#     script scope, same as `status`'s "conductor NEXT LAUNCH" line)
+#   - assert_storage_transport_capability (same iroh-feature-marker check
+#     start_all runs per peer)
+#   - assert_launch_prerequisites (toolchain parity + DNA hdk-line match, or
+#     the ark binary + jq pair) — subshelled so its `exit 1` (deliberate, on a
+#     genuine mismatch with MESH_ALLOW_TOOLCHAIN_SKEW unset) reports as a
+#     preflight REFUSED line instead of silently killing the whole process
+#     before the cheaper checks above got a chance to print.
+#   - mesh_owned_ports (same port list `stop` reaps)
+#
+# Port policy: a port already served by a LIVE, PID-recorded process of this
+# same mesh (MESH_DIR) is `ok ... (reusing)`, not a refusal — start_all itself
+# treats an already-healthy component as reuse (see the doorway/mongod/
+# conductor "already up" branches above), so a preflight that refused on that
+# state would break the ordinary idempotent `just mesh start` on an
+# already-running, healthy mesh. Only a port held by something NOT recorded
+# as one of this mesh's own processes is a genuine collision.
+# ---------------------------------------------------------------------------
+preflight() {
+  local fail=0 name port pid tmp
+
+  # 1. conductor binary: the fork pair (auto-detected as today), or an
+  #    operator's explicit HOLOCHAIN_BIN (deliberate override — same
+  #    philosophy as MESH_ALLOW_TOOLCHAIN_SKEW elsewhere in this file).
+  if [ "$MESH_HOLOCHAIN_BIN_EXPLICIT" = "1" ]; then
+    if [ -n "$HOLOCHAIN_BIN" ] && [ -x "$HOLOCHAIN_BIN" ]; then
+      echo "ok conductor binary: explicit HOLOCHAIN_BIN=$HOLOCHAIN_BIN"
+    else
+      echo "REFUSED conductor binary: HOLOCHAIN_BIN='$HOLOCHAIN_BIN' is not executable"
+      fail=1
+    fi
+  elif [ -n "$FORK_BIN_DIR" ] && [ -x "$FORK_BIN_DIR/holochain" ] && [ -x "$FORK_BIN_DIR/hc" ]; then
+    echo "ok fork holochain+hc pair: $FORK_BIN_DIR"
+  else
+    echo "REFUSED fork holochain+hc pair: none found under \$MESH_FORK_BIN_DIRS ($MESH_FORK_BIN_DIRS) — build it, or set HOLOCHAIN_BIN explicitly to accept stock"
+    fail=1
+  fi
+
+  # 2. fork-pair pin == the submodule pin12 this script already computes.
+  #    Only meaningful on the auto-detect path (an explicit HOLOCHAIN_BIN is a
+  #    deliberate choice, e.g. an A/B fork-vs-stock run — never second-guessed
+  #    here); only refuses when a fork WAS found but is not the pinned build
+  #    (a stale MESH_FORK_BIN_DIRS override, or the submodule pointer moved
+  #    since that dir was built).
+  if [ "$MESH_HOLOCHAIN_BIN_EXPLICIT" = "1" ]; then
+    echo "ok fork-pair pin: skipped (explicit HOLOCHAIN_BIN overrides auto-detection)"
+  elif [ -z "$MESH_CONDUCTOR_PIN12" ]; then
+    echo "ok fork-pair pin: skipped (no elohim/holochain-conductor submodule pin resolvable from HEAD)"
+  elif [ -z "$FORK_BIN_DIR" ]; then
+    echo "ok fork-pair pin: skipped (no fork found — already REFUSED above)"
+  else
+    local expected_pin_dir="$MESH_TOOLS_DIR/hc-fork-$MESH_CONDUCTOR_PIN12/bin"
+    if [ "$FORK_BIN_DIR" = "$expected_pin_dir" ]; then
+      echo "ok fork-pair pin matches submodule pin: $expected_pin_dir"
+    else
+      echo "REFUSED fork-pair pin: resolved fork bin dir '$FORK_BIN_DIR' is not the current submodule pin12 ($expected_pin_dir) — stale MESH_FORK_BIN_DIRS entry, or the pin moved since that dir was built"
+      fail=1
+    fi
+  fi
+
+  # 3. elohim-storage binary (debug slot, same STORAGE_BIN start_all requires).
+  if [ -x "$STORAGE_BIN" ]; then
+    echo "ok elohim-storage binary: $STORAGE_BIN"
+  else
+    echo "REFUSED elohim-storage binary: not executable ($STORAGE_BIN) — build it first, see CLAUDE.md pool-slot paths"
+    fail=1
+  fi
+
+  # 4. doorway binary (debug slot), only when this mesh shape launches one.
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    if [ -x "$DOORWAY_BIN" ]; then
+      echo "ok doorway binary: $DOORWAY_BIN"
+    else
+      echo "REFUSED doorway binary: not executable ($DOORWAY_BIN) — build it first, see CLAUDE.md pool-slot paths"
+      fail=1
+    fi
+  else
+    echo "ok doorway binary: skipped (MESH_DOORWAYS=0)"
+  fi
+
+  # 5. iroh-relay binary, only when start_local_relay would actually launch
+  #    one (same guard as that function: MESH_DOORWAYS=1, MESH_RELAY!=0, and
+  #    the relay URL is this script's own local default, not an external one).
+  local relay_url relay_required=0
+  relay_url="$(mesh_relay_url)"
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] && [ "${MESH_RELAY:-1}" = "1" ]; then
+    case "$relay_url" in
+      "http://localhost:$MESH_RELAY_PORT/"|"http://127.0.0.1:$MESH_RELAY_PORT/") relay_required=1 ;;
+    esac
+  fi
+  if [ "$relay_required" = "1" ]; then
+    if [ -n "$MESH_RELAY_BIN" ] && [ -x "$MESH_RELAY_BIN" ]; then
+      echo "ok iroh-relay binary: $MESH_RELAY_BIN"
+    else
+      echo "REFUSED iroh-relay binary: not executable (MESH_RELAY_BIN='${MESH_RELAY_BIN:-<unset>}') — a 0.7 conductor never connects without a reachable relay; set MESH_RELAY_BIN=<dir>/bin/iroh-relay or MESH_RELAY=0"
+      fail=1
+    fi
+  else
+    echo "ok iroh-relay binary: skipped (relay_url=$relay_url MESH_RELAY=${MESH_RELAY:-1} MESH_DOORWAYS=$MESH_DOORWAYS_EFFECTIVE)"
+  fi
+
+  # 6. storage transport/iroh capability marker per peer — the exact check
+  #    start_all runs before generating a single sandbox.
+  for name in "${PEERS[@]}"; do
+    tmp="$(mktemp)"
+    if assert_storage_transport_capability "$STORAGE_BIN" "$(peer_transport "$name")" >"$tmp" 2>&1; then
+      echo "ok storage transport capability: $name ($(peer_transport "$name"))"
+    else
+      echo "REFUSED storage transport capability: $name ($(peer_transport "$name")) — $(tr '\n' ' ' < "$tmp" | sed 's/  */ /g')"
+      fail=1
+    fi
+    rm -f "$tmp"
+  done
+
+  # 7. every port the mesh will bind is free, or already served by a live,
+  #    PID-recorded process of THIS mesh (see the port-policy note above).
+  while IFS= read -r port; do
+    if ! ss -H -ltn "sport = :$port" 2>/dev/null | grep -q . && ! ss -H -lun "sport = :$port" 2>/dev/null | grep -q .; then
+      echo "ok port $port: free"
+      continue
+    fi
+    pid="$(listener_pids_for_ports "$port" | head -1)"
+    if [ -n "$pid" ] && [ -d "$PID_DIR" ] && grep -qs "^$pid " "$PID_DIR"/* 2>/dev/null; then
+      echo "ok port $port: already serving this mesh (pid $pid, will be reused)"
+    else
+      echo "REFUSED port $port: occupied by pid ${pid:-?}, not a recorded process of this mesh ($MESH_DIR)"
+      fail=1
+    fi
+  done < <(mesh_owned_ports)
+
+  if [ "$fail" -ne 0 ]; then
+    echo "preflight: REFUSED — see the REFUSED line(s) above"
+    return 1
+  fi
+
+  # 8. toolchain parity + DNA hdk-line match (or the ark binary + jq pair) —
+  #    exactly what start_all calls first, subshelled per the note above.
+  tmp="$(mktemp)"
+  if ( assert_launch_prerequisites ) >"$tmp" 2>&1; then
+    if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ]; then
+      echo "ok launch prerequisites: ark binary + jq ($ARK_BIN)"
+    else
+      echo "ok launch prerequisites: $(tail -1 "$tmp")"
+    fi
+    rm -f "$tmp"
+  else
+    echo "REFUSED launch prerequisites:"
+    sed 's/^/  /' "$tmp" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+
+  echo "preflight: ok — all checks passed"
+}
+
+# ---------------------------------------------------------------------------
+# start — preflight, then a DETACHED re-exec of start_all in its own session,
+# returning in seconds. Before this, `start_all` blocked inline on every
+# readiness ladder (mongod/doorways/conductors/storage) from the CALLING
+# shell — a foreground tool call that exceeds its own timeout gets
+# auto-backgrounded, and when THAT background task is later reaped its whole
+# process group (every conductor, storage, doorway, the portal, the relay)
+# goes down with it (measured 2026-09-07, fixtures-clone hand-off note). A
+# `setsid nohup` launch here puts the mesh in its OWN session up front, so
+# nothing the caller's shell/tool-task does afterward can take it down.
+#
+# `bash "$0" __start_all_inner` re-execs this same script as a plain child
+# process; the internal verb is dispatched at the bottom of this file and
+# calls start_all() directly (preflight already ran, in THIS process, above).
+# Every env var start_all honors is inherited automatically — nothing here
+# re-lists them — because a script child process inherits its parent's
+# exported environment, and every MESH_*/HOLOCHAIN_BIN/etc. knob this file
+# reads was already in the environment (or exported by this file itself, e.g.
+# `export MESH_TRANSPORT_BACKEND` above) before this function runs.
+#
+# MESH_FOREGROUND=1 skips preflight AND detaching entirely — today's exact
+# behavior, for callers that already manage their own backgrounding/timeout.
+# ---------------------------------------------------------------------------
+start_detached() {
+  if [ "${MESH_FOREGROUND:-0}" = "1" ]; then
+    start_all
+    return $?
+  fi
+  preflight || return 1
+  mkdir -p "$MESH_DIR" "$LOGDIR"
+  local logfile="$LOGDIR/start.log"
+  : > "$logfile"
+  setsid nohup bash "$0" __start_all_inner >> "$logfile" 2>&1 < /dev/null &
+  disown "$!" 2>/dev/null || true
+  echo "mesh starting detached (own session) — log: $logfile"
+  echo "next: just mesh wait"
+}
+
+# ---------------------------------------------------------------------------
+# wait — poll the SAME readiness ladders start_all blocks on inline (mongod,
+# relay, both doorways, conductor admin ports, storage /health), AND tail
+# start.log for an early refusal so a launch that is going to fail doesn't
+# make the caller sit through the full timeout to find out. The moment a log
+# line matches REFUSED|exit 1|missing|not found|refus(ing/ed), exit 1
+# immediately, printing that line.
+# ---------------------------------------------------------------------------
+wait_all() { # [--timeout N]
+  local timeout=900
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --timeout) timeout="$2"; shift 2 ;;
+      --timeout=*) timeout="${1#--timeout=}"; shift ;;
+      *) shift ;;
+    esac
+  done
+  local logfile="$LOGDIR/start.log"
+  local start_ts; start_ts="$(date +%s)"
+  local seen_bytes=0
+  while :; do
+    local now; now="$(date +%s)"
+    local elapsed=$((now - start_ts))
+    if [ -f "$logfile" ]; then
+      local new_bytes; new_bytes="$(wc -c < "$logfile" 2>/dev/null || echo 0)"
+      if [ "$new_bytes" -gt "$seen_bytes" ]; then
+        local hit
+        hit="$(tail -c "+$((seen_bytes + 1))" "$logfile" 2>/dev/null \
+          | grep -Ei 'REFUSED|exit 1|missing|not found|refus' | head -1)"
+        seen_bytes="$new_bytes"
+        if [ -n "$hit" ]; then
+          echo "wait: refused after ${elapsed}s — $hit" >&2
+          return 1
+        fi
+      fi
+    fi
+
+    local mongo_ok=1 relay_ok=1 doorway_a_ok=1 doorway_b_ok=1
+    if [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+      (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null || mongo_ok=0
+    fi
+    curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/" || relay_ok=0
+    if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+      curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null || doorway_a_ok=0
+      curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null || doorway_b_ok=0
+    fi
+    local portal_ok=1
+    if [ "$MESH_PORTAL" = "1" ]; then
+      curl -s -m 2 -o /dev/null "http://127.0.0.1:$THRESHOLD_PORT/threshold/" || portal_ok=0
+    fi
+    local conductors_ok=1 i=0
+    for _n in "${PEERS[@]}"; do
+      ss -H -ltn "sport = :$(admin_port "$i")" 2>/dev/null | grep -q . || conductors_ok=0
+      i=$((i+1))
+    done
+    local storage_ok=1 j=0
+    for _n in "${PEERS[@]}"; do
+      curl -s -m 2 "http://localhost:$(http_port "$j")/health" >/dev/null || storage_ok=0
+      j=$((j+1))
+    done
+
+    if [ "$mongo_ok" = 1 ] && [ "$relay_ok" = 1 ] && [ "$doorway_a_ok" = 1 ] \
+      && [ "$doorway_b_ok" = 1 ] && [ "$portal_ok" = 1 ] && [ "$conductors_ok" = 1 ] \
+      && [ "$storage_ok" = 1 ]; then
+      echo "ready in ${elapsed}s"
+      return 0
+    fi
+
+    if [ "$elapsed" -ge "$timeout" ]; then
+      echo "wait: timed out after ${elapsed}s (mongo=$mongo_ok relay=$relay_ok doorwayA=$doorway_a_ok doorwayB=$doorway_b_ok portal=$portal_ok conductors=$conductors_ok storage=$storage_ok)" >&2
+      return 1
+    fi
+    sleep 2
+  done
+}
+
 start_all() {
   guard_conductor_data_roots start || return 1
   # The CLI writes the config the conductor must parse — refuse a mismatched
@@ -3086,7 +3394,10 @@ mesh_blocks() {
 # accidental start/stop of a live mesh (a storage agent may be using it).
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   case "${1:-start}" in
-    start)    start_all ;;
+    start)    start_detached ;;
+    __start_all_inner) start_all ;; # internal: the detached re-exec target of `start` — never call directly
+    preflight) preflight ;;
+    wait)     shift; wait_all "$@" ;;
     stop)     stop_all ;;
     status)   status_all ;;
     probe)    probe_all ;;
@@ -3099,6 +3410,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     lineage-reset) lineage_reset_all ;;
     blocks)   shift; mesh_blocks "$@" ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|preflight|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi
