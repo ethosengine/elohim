@@ -367,3 +367,24 @@ just a local namespace collision; it is cross-peer write amplification into base
 isolation via conductor clones is **not achieved on the current substrate** without a
 cell-qualified projection and sync identity. That missing node — projection/sync identity
 includes cell context — remains the blocking seam, and it is now measured rather than inferred.
+
+### 2026-09-07 hand-off note — mesh teardown by background-task reaping
+
+For anyone repeating these legs: the `just mesh start` that installed the test bundle exceeded
+the 600 s foreground tool timeout and was auto-backgrounded by the harness. It returned exit 0
+at 10:28:24Z, and when that background task was reaped **its entire process group went with
+it** — all three conductors and storages, both doorways, the portal and the relay went down
+together, about two minutes after the last measurement. All results above were already captured
+and are unaffected. This is the known "never start mesh processes inside a background tool
+task" trap arrived at indirectly, by foreground timeout rather than by an explicit background
+launch, so the mitigation is to `setsid`-detach a mesh restart up front rather than run it in
+the foreground and let the timeout move it.
+
+The mesh was relaunched detached (`setsid nohup just mesh start &`, its own session) and
+deliberately **without `MESH_HAPP_PATH`** — back on the committed workdir bundle with
+`lamad.clone_limit: 0` and no experiment clones, i.e. pre-experiment configuration. Verified up
+at 10:31:48Z. One residue remains by design: the storage `content.db` files under
+`/tmp/elohim-local-mesh/*/` survive mesh restarts, so the fixture probe rows are still present
+on all three peers (matthew: alpha and beta; jessica and james: beta). That residue is itself
+the finding — clone-authored content sitting in three peers' base-namespace projections — and
+deleting those db files is the only way to clear it.
