@@ -88,14 +88,16 @@ Feature: A correction reaches the person it names, only that person can settle i
     Given James's peer has peer-to-peer feedback notifications disabled
     When James files a correction against Jessica's record with no notification sent
     Then Matthew's peer discovers James's correction within its next discovery scan, unnotified
-    # The late arrival: an OLDER correction (by action timestamp) surfaces on a LATER
-    # discovery scan than one Matthew's peer already applied. §3's fair rotation across
-    # scans and §7's exactly-once application together mean order of arrival never
-    # becomes order of effect, and nothing is counted twice.
-    Given James has filed a second, differently-timestamped correction that predates the first by action timestamp
+    # The late arrival. A Holochain action cannot be backdated, so "older" is not staged
+    # by timestamp: it is staged by PUBLICATION ORDER — an earlier correction whose
+    # TargetToFeedbackSignal link only surfaces after a later correction has already been
+    # discovered and applied. §3's fair rotation across scans and §7's exactly-once
+    # application together mean order of arrival never becomes order of effect, and
+    # nothing is counted twice.
+    Given James has filed an earlier correction whose target link is not published until after the later one has been applied
     And Matthew's peer has already applied the first correction it discovered
-    When the older correction becomes discoverable to Matthew's peer on a later scan
-    Then Matthew's peer applies the older correction exactly once
+    When the earlier correction's link surfaces to Matthew's peer on a later scan
+    Then Matthew's peer applies the earlier correction exactly once
     And Matthew's peer still shows the first correction applied exactly once, undisturbed by the late arrival
 
   # ---------------------------------------------------------------------------------
@@ -166,10 +168,16 @@ Feature: A correction reaches the person it names, only that person can settle i
     # Filing costs the FILER nothing — standing_impact is a proposal, never an effect (§5.1).
     Given James has filed a correction against Jessica's record
     Then James's own standing is unaffected by the correction he filed
-    # Before acceptance, Jessica's standing is UNKNOWN — no row for her exists yet at all,
-    # never a row that exists and reads zero or negative (§7). An unaccepted allegation
-    # must be indistinguishable, to a reader, from no allegation ever having been filed.
-    And Jessica's standing reads as Unknown, with no row for her at all, while the correction is unaccepted
+    # And it costs the SUBJECT nothing either: an unaccepted allegation must be
+    # indistinguishable, to a reader, from no allegation ever having been filed (§7).
+    # Read exactly: her tally is what it was before he filed, this correction's own group
+    # carries a zero contribution, and it creates no aggregate row of its own — so a
+    # subject whose only signal is an unaccepted correction stays Unknown, with no row at
+    # all. Standing is kept PER AUTHOR, so Jessica also carries whatever earlier stations
+    # settled against her; "unchanged" is the claim that survives every run order, and a
+    # per-scenario generation cannot manufacture a cleaner one (a generation is
+    # (evaluator, policy)-scoped and its replay covers all retained history).
+    And Jessica's standing is exactly what it was before he filed, and the unaccepted correction adds no row and no weight of its own
     When Jessica accepts James's correction with an accept-correction vouch
     # Only NOW does a row exist, reflecting exactly the one accepted contribution — repeated
     # acceptances of the SAME correction still count once (§7).

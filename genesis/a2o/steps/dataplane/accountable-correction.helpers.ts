@@ -69,6 +69,11 @@ export function ctx(world: E2EWorld): State {
 export const hash = (value: unknown): string =>
   typeof value === 'string' ? value : encodeHashToBase64(value as Uint8Array);
 export const raw = decodeHashFromBase64;
+// Storage normalises a 39-byte AgentPubKey to its 32-byte ed25519 core before it
+// writes any (evaluator, subject) row (`feedback_projector::normalize_agent_key`).
+// A witness reading those tables has to normalise the same way or it joins nothing.
+export const key = (agent: string): string =>
+  Buffer.from(raw(agent).slice(3, 35)).toString('hex').toUpperCase();
 export const url = (peer: Peer): string => resolvePeerUrl(`E2E_STORAGE_${peer.toUpperCase()}`);
 export async function rail(world: E2EWorld, peer: Peer): Promise<CarriedElectionRail> {
   const s = ctx(world);
@@ -333,25 +338,67 @@ export async function applied(
 // An eventually-consistent projection is polled, never sampled — so wait for the row AND
 // the tally it feeds to agree, and keep a final assertion so a genuine mismatch reports
 // the two numbers rather than a bare deadline.
+//
+// REBUILD BUDGET VS REPLAY LAG. Station 7 then failed as "8 expected, 6 observed" — which
+// reads like a wrong tally and was in fact a poll budget shorter than the lag it was
+// waiting on. The two are only separable by measuring: this helper records how long the
+// APPLICATION ROW took to appear and how long the TALLY took to follow it, attaches both,
+// and names them in the assertion message. Set the budget from the measurement, never
+// from a guess; A2O_CONTRIBUTION_BUDGET_MS raises the ceiling for a measurement round.
+export const CONTRIBUTION_BUDGET_MS = Number(process.env['A2O_CONTRIBUTION_BUDGET_MS'] ?? 210_000);
+// Cucumber must not cut in before the poll it wraps, or a timing measurement is replaced
+// by a less informative step timeout.
+export const CONTRIBUTION_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + 90_000;
+export const REBUILD_BUDGET_MS = Number(process.env['A2O_REBUILD_BUDGET_MS'] ?? 210_000);
+export const REBUILD_STEP_TIMEOUT_MS = CONTRIBUTION_BUDGET_MS + REBUILD_BUDGET_MS + 120_000;
+
+export interface Lag {
+  label: string;
+  budgetMs: number;
+  firstMarkMs: number | null;
+  settledMs: number | null;
+}
+export function attachLag(world: E2EWorld, lag: Lag): void {
+  world.attach(JSON.stringify(lag), 'application/json');
+}
+
 export async function contribution(world: E2EWorld): Promise<void> {
   const expected = Number(ctx(world).baseline['jessica']['debitWeightSum']) + 2;
+  const started = Date.now();
+  let rowAt: number | null = null;
   let observed = Number.NaN;
   try {
-    await until('the accepted contribution reaches the tally', async () => {
-      const result = rows(
-        world,
-        'jessica',
-        `SELECT a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
-        [ctx(world).correction]
-      );
-      if (!(result[0]?.['accepted'] === 1 && result[0]?.['contribution'] === 2)) return false;
-      observed = Number((await standing(world))['debitWeightSum']);
-      return observed === expected;
-    });
+    await until(
+      'the accepted contribution reaches the tally',
+      async () => {
+        const result = rows(
+          world,
+          'jessica',
+          `SELECT a.accepted, a.contribution FROM feedback_application a JOIN feedback_application_member m USING (generation_id, group_key) JOIN standing_generations g USING (generation_id) WHERE m.action_hash = ? AND g.status = 'published' ORDER BY g.generation_id DESC LIMIT 1`,
+          [ctx(world).correction]
+        );
+        if (!(result[0]?.['accepted'] === 1 && result[0]?.['contribution'] === 2)) return false;
+        rowAt ??= Date.now();
+        observed = Number((await standing(world))['debitWeightSum']);
+        return observed === expected;
+      },
+      CONTRIBUTION_BUDGET_MS
+    );
   } catch {
     // Fall through: the assertion below names the numbers, which a deadline cannot.
   }
-  assert.equal(observed, expected);
+  const lag: Lag = {
+    label: 'acceptance to published tally',
+    budgetMs: CONTRIBUTION_BUDGET_MS,
+    firstMarkMs: rowAt === null ? null : rowAt - started,
+    settledMs: observed === expected ? Date.now() - started : null,
+  };
+  attachLag(world, lag);
+  assert.equal(
+    observed,
+    expected,
+    `contribution ${observed} != ${expected}; application row and tally lag: ${JSON.stringify(lag)}`
+  );
 }
 export async function served(world: E2EWorld, peer: Peer = 'jessica'): Promise<string> {
   return (await probeDeclaredHead(url(peer), ctx(world).id)).headActionHash;

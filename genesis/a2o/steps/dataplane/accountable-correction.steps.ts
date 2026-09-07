@@ -31,6 +31,11 @@ import {
   contribution,
   served,
   pending,
+  key,
+  attachLag,
+  CONTRIBUTION_STEP_TIMEOUT_MS,
+  REBUILD_BUDGET_MS,
+  REBUILD_STEP_TIMEOUT_MS,
 } from './accountable-correction.helpers.js';
 
 Before({ tags: '@concern:accountable-correction' }, function (this: E2EWorld, { pickle }) {
@@ -156,12 +161,12 @@ Then(
 );
 
 Given(
-  'James has filed a second, differently-timestamped correction that predates the first by action timestamp',
+  'James has filed an earlier correction whose target link is not published until after the later one has been applied',
   { timeout: 240_000 },
   function (this: E2EWorld) {
     return pending(
       this,
-      'No fixture can withhold an older action/link from Matthew and release it later. A newly authored Holochain action cannot be backdated; a delayed-discovery fixture is needed.'
+      "create_feedback_signal commits the entry and BOTH index links in one extern call (content_store/src/feedback_signal.rs:168-192: create_entry, then create_link TargetToFeedbackSignal, then create_link SignerToFeedbackSignal); there is no link-only extern, so an act's link cannot be published later than the act. Delaying it needs a new coordinator extern authored for the product, not for this fixture."
     );
   }
 );
@@ -175,23 +180,23 @@ Given(
 );
 
 When(
-  "the older correction becomes discoverable to Matthew's peer on a later scan",
+  "the earlier correction's link surfaces to Matthew's peer on a later scan",
   { timeout: 240_000 },
   function (this: E2EWorld) {
     return pending(
       this,
-      'The older-action delayed-discovery fixture in the preceding Given does not exist.'
+      'The delayed-link fixture in the preceding Given does not exist: link creation is bound to entry creation in create_feedback_signal.'
     );
   }
 );
 
 Then(
-  "Matthew's peer applies the older correction exactly once",
+  "Matthew's peer applies the earlier correction exactly once",
   { timeout: 240_000 },
   function (this: E2EWorld) {
     return pending(
       this,
-      'No older delayed action was staged; asserting exactly-once would be vacuous.'
+      'No delayed-link act was staged; asserting exactly-once against an act that arrived in order would be vacuous.'
     );
   }
 );
@@ -426,7 +431,7 @@ When(
 
 Then(
   "the accepted correction is applied exactly once to Jessica's standing tally",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await contribution(this);
   }
@@ -474,23 +479,67 @@ Then(
   }
 );
 
+// A GENERATION is (evaluator, pinned policy) — not (evaluator, scenario). Opening a
+// fresh one does not isolate a scenario: `FeedbackProjector::tick` replays every
+// RETAINED subscription member into whichever generation `resolve_generation` returns,
+// so a rebuilt or newly-opened generation lands on the same subject aggregate it
+// started from. And a fresh evaluator IDENTITY is worse than useless here: no projector
+// runs for a key nobody evaluates with, so it reads Unknown whether or not the
+// correction is ever accepted, and the acceptance half of this station could never
+// pass. Standing is kept PER AUTHOR, so Jessica accumulates across every station that
+// corrects a record of hers, and "no row at all" is only observable for a subject with
+// no accepted correction anywhere. Assert what is true in every order instead: the
+// unaccepted correction changed NOTHING — same tally, zero contribution from its own
+// group, and no aggregate row created by it (which IS "no row at all" for a subject
+// that had none).
 Then(
-  "Jessica's standing reads as Unknown, with no row for her at all, while the correction is unaccepted",
+  "Jessica's standing is exactly what it was before he filed, and the unaccepted correction adds no row and no weight of its own",
   { timeout: 240_000 },
   async function (this: E2EWorld) {
-    const value = await standing(this);
-    assert.equal(
-      value['score'],
-      'unknown',
-      'This station requires a fresh evaluator with no prior accepted corrections'
+    const before = ctx(this).baseline['jessica'];
+    assert.deepEqual(
+      await standing(this),
+      before,
+      'an allegation must leave the subject reading exactly as it did before'
     );
-    assert.equal(value['debitWeightSum'], 0);
+    for (const row of rows(
+      this,
+      'jessica',
+      `SELECT a.accepted, a.contribution FROM feedback_application a
+    JOIN feedback_application_member m USING (generation_id, group_key)
+    JOIN standing_generations g USING (generation_id)
+    WHERE m.action_hash = ? AND g.status = 'published'`,
+      [ctx(this).correction]
+    )) {
+      assert.equal(row['accepted'], 0, 'an unaccepted allegation must never read accepted');
+      assert.equal(row['contribution'], 0, 'an allegation debits nobody');
+    }
+    const agent = key((await rail(this, 'jessica')).agent);
+    const aggregate = rows(
+      this,
+      'jessica',
+      `SELECT count(*) n, coalesce(sum(debit_weight_sum), 0) total
+    FROM standing_generation_aggregate
+    WHERE generation_id = (SELECT max(generation_id) FROM standing_generations WHERE status = 'published')
+    AND hex(evaluator_pubkey) = ? AND hex(subject_pubkey) = ?`,
+      [agent, agent]
+    )[0];
+    assert.equal(
+      Number(aggregate['n']),
+      before['score'] === 'unknown' ? 0 : 1,
+      'a subject whose only signal is an unaccepted correction has no aggregate row at all'
+    );
+    assert.equal(
+      Number(aggregate['total']),
+      Number(before['debitWeightSum']),
+      'the unaccepted correction added weight to the aggregate'
+    );
   }
 );
 
 Then(
   "Jessica's standing now exists and reflects exactly one contribution",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await contribution(this);
   }
@@ -506,7 +555,7 @@ When(
 
 Then(
   "Jessica's standing still reflects exactly one contribution",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await until('redundant acceptance observed', () =>
       rows(
@@ -585,9 +634,13 @@ Then(
   }
 );
 
+// This step spends TWO independent budgets and used to hide both behind one: the
+// acceptance had to reach the live tally BEFORE a rebuild could be compared against it,
+// and then the rebuild itself had to finish. Measured separately (see the attached lag
+// records) so a slow replay can never again be reported as a wrong tally.
 When(
   'a fresh standing generation is built from scratch from every retained correction and acceptance, then published',
-  { timeout: 240_000 },
+  { timeout: REBUILD_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await contribution(this);
     const s = ctx(this);
@@ -600,13 +653,32 @@ When(
     );
     assert.equal(read.status, 503, 'readers must see rebuilding');
     assert.match(await read.text(), /rebuilding/);
-    await until(
-      'rebuild publishes',
-      () =>
-        rows(this, 'jessica', 'SELECT status FROM standing_generations WHERE generation_id = ?', [
-          s.rebuilt,
-        ])[0]?.['status'] === 'published'
-    );
+    const started = Date.now();
+    let settled: number | null = null;
+    try {
+      await until(
+        'rebuild publishes',
+        () => {
+          const published =
+            rows(
+              this,
+              'jessica',
+              'SELECT status FROM standing_generations WHERE generation_id = ?',
+              [s.rebuilt]
+            )[0]?.['status'] === 'published';
+          if (published) settled = Date.now() - started;
+          return published;
+        },
+        REBUILD_BUDGET_MS
+      );
+    } finally {
+      attachLag(this, {
+        label: 'rebuild requested to generation published',
+        budgetMs: REBUILD_BUDGET_MS,
+        firstMarkMs: null,
+        settledMs: settled,
+      });
+    }
   }
 );
 
@@ -681,7 +753,7 @@ Then(
 
 Then(
   "the retried filing produces at most one contribution toward Jessica's eventual standing change",
-  { timeout: 240_000 },
+  { timeout: CONTRIBUTION_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await accept(this);
     await contribution(this);
