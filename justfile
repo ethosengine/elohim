@@ -133,6 +133,15 @@ test target="changed" scope="":
             'export default function () {' \
             '  const name = process.env.A2O_PROFILE || "mesh";' \
             '  const { paths: _paths, ...profile } = profiles()[name];' \
+            '  // A2O_RUN_WIP=1 must reach the SCENARIO FILTER, not just the step hook in' \
+            '  // steps/common.steps.ts. cucumber ANDs a CLI --tags with the profile tags, so' \
+            '  // the profile`s own `not @wip` survived every override and a scoped @wip run' \
+            '  // reported "0 scenarios" as a GREEN no-op (measured 2026-09-07 on the' \
+            '  // accountable-correction feature). Drop the clause here, at the one place the' \
+            '  // profile is rewritten, so the documented local red loop can actually run.' \
+            '  if (process.env.A2O_RUN_WIP === "1" && typeof profile.tags === "string") {' \
+            '    profile.tags = profile.tags.split(" and not @wip").join("");' \
+            '  }' \
             '  return { [name]: profile };' \
             '}' > "$cfg"
           cfg_rel="$(realpath --relative-to="{{ a2o_dir }}" "$cfg")"

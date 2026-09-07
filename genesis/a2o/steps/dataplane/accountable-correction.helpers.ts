@@ -148,8 +148,23 @@ export function peerEnv(world: E2EWorld, peer: Peer): Record<string, string> {
   // The household harness owns this directory; PID and env paths come from its live peer.
   // eslint-disable-next-line sonarjs/publicly-writable-directories
   const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
-  const pid = readFileSync(resolve(mesh, 'pids', `storage-${peer}`), 'utf8').trim();
+  // hc-mesh.sh's `record_mesh_pid` writes "<pid> <start-ticks>", NOT a bare pid: the
+  // second field is /proc/<pid>/stat's starttime, the harness's own PID-REUSE guard.
+  // Reading the file as one number matched nothing and failed every scenario in the
+  // Background (measured 2026-09-07). Take the pid to reach /proc, and spend the guard
+  // it was written for — this helper is about to trust that process's ENVIRONMENT, so
+  // "same pid" is not good enough; it has to be the same process the mesh launched.
+  const [pid, launchTicks] = readFileSync(resolve(mesh, 'pids', `storage-${peer}`), 'utf8')
+    .trim()
+    .split(/\s+/);
   assert.match(pid, /^\d+$/);
+  if (launchTicks !== undefined) {
+    // Mirror hc-mesh.sh's parse: `comm` may contain spaces, so strip pid+comm through
+    // the final ')' first; starttime is field 20 of what remains.
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const started = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\s+/)[19];
+    assert.equal(started, launchTicks, `${peer}: pid ${pid} is not the process the mesh launched`);
+  }
   const entries = readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0');
   const selected: Record<string, string> = {};
   for (const entry of entries) {
