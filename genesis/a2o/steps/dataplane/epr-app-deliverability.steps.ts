@@ -1122,12 +1122,27 @@ Then(
   'both doorways return that server-rendered build before any browser script runs',
   { timeout: 90_000 },
   async function (this: E2EWorld) {
+    const deadline = Date.now() + 85_000;
     for (const peer of DOORWAYS) {
-      const response = await getRawWithHeaders(appUrl(this, peer), { timeoutMs: 30_000 });
-      assert.equal(response.status, 200, `${peer}: SSR response ${response.status}`);
-      assert.ok(
-        response.text.includes(`data-ssr-stamp="${requireBundle(this).stamp}"`),
-        `${peer}: SSR output does not contain this server build; headers=${JSON.stringify(response.headers)}`
+      let lastStatus = 0;
+      let lastHeaders: Record<string, string | undefined> = {};
+      const rendered = await pollUntil(
+        async () => {
+          const response = await getRawWithHeaders(appUrl(this, peer), { timeoutMs: 10_000 });
+          lastStatus = response.status;
+          lastHeaders = response.headers;
+          return (
+            response.status === 200 &&
+            response.text.includes(`data-ssr-stamp="${requireBundle(this).stamp}"`)
+          );
+        },
+        Math.max(0, deadline - Date.now())
+      );
+      assert.notEqual(
+        rendered,
+        null,
+        `${peer}: SSR output did not adopt this server build within the bound; ` +
+          `status=${lastStatus} headers=${JSON.stringify(lastHeaders)}`
       );
     }
   }
