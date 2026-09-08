@@ -288,6 +288,12 @@ pub struct RendererRegistry {
     reconcile_ctx: Option<ReconcileCtx>,
     /// Off-runtime teardown queue for renderers displaced by a hot-swap.
     graveyard: Graveyard,
+    /// The ONE table of storage-declared heads. The registry owns it and the
+    /// `BundleHeadsReconciler` writes it, so the adoption pass reads the same
+    /// server head the 30s reconcile observed instead of spending its own GET.
+    /// Owned here (not injected later) because `AppState` is `Arc`-wrapped
+    /// before the reconciler exists — one table, no post-construction mutation.
+    bundle_heads: Arc<crate::render::bundle_heads::BundleHeadStore>,
 }
 
 impl RendererRegistry {
@@ -304,6 +310,7 @@ impl RendererRegistry {
             })),
             reconcile_ctx: None,
             graveyard: Graveyard::new(),
+            bundle_heads: Arc::new(crate::render::bundle_heads::BundleHeadStore::new()),
         }
     }
 
@@ -328,6 +335,7 @@ impl RendererRegistry {
             })),
             reconcile_ctx: None,
             graveyard: Graveyard::new(),
+            bundle_heads: Arc::new(crate::render::bundle_heads::BundleHeadStore::new()),
         }
     }
 
@@ -614,6 +622,7 @@ impl RendererRegistry {
             })),
             reconcile_ctx,
             graveyard: Graveyard::new(),
+            bundle_heads: Arc::new(crate::render::bundle_heads::BundleHeadStore::new()),
         }
     }
 
@@ -698,6 +707,48 @@ impl RendererRegistry {
         self.reconcile_ctx.as_ref().map(|c| c.storage_url.clone())
     }
 
+    /// The shared storage-declared head table. The `BundleHeadsReconciler`
+    /// writes it; [`Self::reconcile`] reads the server head from it.
+    pub fn bundle_heads(&self) -> Arc<crate::render::bundle_heads::BundleHeadStore> {
+        Arc::clone(&self.bundle_heads)
+    }
+
+    /// The CONFIGURED slug list (`SSR_BUNDLE_SLUGS`), ordered, first = default.
+    /// The bundle-heads reconciler unions this with the EPR router's mounts so
+    /// a slug configured for SSR but not yet EPR-mounted still gets its server
+    /// head reconciled.
+    pub fn configured_slugs(&self) -> Vec<String> {
+        self.reconcile_ctx
+            .as_ref()
+            .map(|c| c.slugs.clone())
+            .unwrap_or_default()
+    }
+
+    /// The declared SERVER head for `slug`, preferring the reconciled table.
+    ///
+    /// `allow_reconciled` is the TOCTOU switch, not a performance knob: the
+    /// pre-materialize read may use the reconciled value (it was observed by
+    /// the same bounded read this would make, at most one tick ago), but the
+    /// POST-materialize attestation read must go live — attesting a head
+    /// against a value that only changes on a tick would make the guard prove
+    /// itself.
+    async fn declared_server_head(
+        &self,
+        storage_url: &str,
+        slug: &str,
+        allow_reconciled: bool,
+    ) -> std::result::Result<String, String> {
+        if allow_reconciled {
+            let max_age = std::time::Duration::from_secs(
+                crate::render::bundle_heads::BUNDLE_HEADS_TICK_SECS * 2,
+            );
+            if let Some(head) = self.bundle_heads.server_head_fresh(slug, max_age) {
+                return Ok(head);
+            }
+        }
+        resolve_declared(storage_url, slug).await
+    }
+
     /// True while at least one CONFIGURED slug has no served head — i.e. the
     /// adoption pass still has work (a boot-time materialize failed, typically
     /// because the head was not yet declared). The tick loop polls faster in
@@ -749,7 +800,9 @@ impl RendererRegistry {
 
         let mut outcomes = Vec::new();
         for (slug, materialized_hash, is_default) in targets {
-            let declared = resolve_declared(&ctx.storage_url, &slug).await;
+            let declared = self
+                .declared_server_head(&ctx.storage_url, &slug, true)
+                .await;
             let decision = decide_reconcile(&materialized_hash, declared);
             // The `outcome` string for the two terminal arms comes from the typed
             // vocabulary rather than a literal — byte-identical today
@@ -961,7 +1014,9 @@ impl RendererRegistry {
         };
         for slug in adoption_targets(&ctx.slugs, &served) {
             let is_default = ctx.slugs.first() == Some(&slug);
-            let declared = resolve_declared(&ctx.storage_url, &slug).await;
+            let declared = self
+                .declared_server_head(&ctx.storage_url, &slug, true)
+                .await;
             let declared_hash = match declared {
                 Err(err) => {
                     // Honest absence: still undeclared (or storage unreachable).

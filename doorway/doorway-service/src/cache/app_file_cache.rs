@@ -404,6 +404,90 @@ impl AppFileCacheService {
         None
     }
 
+    /// Declare `blob_hash` as this doorway's head for `slug` in the in-memory
+    /// index — the fast path `resolve_blob_hash` reads first.
+    ///
+    /// The write-through half of the bundle-heads reconciler. Distinct from
+    /// [`Self::refresh_app`] on purpose: dropping the entry only sends the next
+    /// request back to the SAME stale projection it was already reading, which
+    /// is exactly why the storage `content.updated` bridge never moved the
+    /// declared head (2026-09-08).
+    pub async fn set_slug_head(&self, slug: &str, blob_hash: &str) {
+        if blob_hash.is_empty() {
+            return;
+        }
+        let mut index = self.slug_index.write().await;
+        index.insert(slug.to_string(), blob_hash.to_string());
+        debug!(slug = %slug, blob_hash = %blob_hash, "Slug head declared in the index");
+    }
+
+    /// Write the reconciled heads through to the DURABLE projected entry, so a
+    /// restart (or an index eviction) re-resolves to the reconciled head rather
+    /// than the stale one the boot-time bulk pull left behind.
+    ///
+    /// Narrow by construction: it `$set`s only the two head fields on the one
+    /// matching bundled-app document. Returns whether a document was updated.
+    pub async fn write_projected_heads(
+        &self,
+        slug: &str,
+        browser: Option<&str>,
+        server: Option<&str>,
+    ) -> bool {
+        let mut set = bson::Document::new();
+        if let Some(h) = browser.filter(|h| !h.is_empty()) {
+            set.insert("data.blobHash", h);
+        }
+        if let Some(h) = server.filter(|h| !h.is_empty()) {
+            set.insert("data.serverBlobHash", h);
+        }
+        if set.is_empty() {
+            return false;
+        }
+
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
+        let filter = doc! {
+            "doc_type": "Content",
+            "data.contentFormat": { "$in": ["html5-app", "spa-bundle"] },
+            "metadata.is_deleted": { "$ne": true },
+        };
+        let mut cursor = match collection.find(filter).await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(slug = %slug, error = %e, "write_projected_heads: projection query failed");
+                return false;
+            }
+        };
+
+        // The app's slug lives inside contentBody (a JSON string), which Mongo
+        // cannot filter on — the same scan `resolve_blob_hash`'s slow path does.
+        while let Ok(Some(document)) = cursor.try_next().await {
+            let matches = document
+                .get("data")
+                .and_then(|v| v.as_document())
+                .and_then(extract_app_slug_from_data)
+                .as_deref()
+                == Some(slug);
+            if !matches {
+                continue;
+            }
+            let Some(id) = document.get("_id").cloned() else {
+                continue;
+            };
+            return match collection
+                .update_one(doc! { "_id": id }, doc! { "$set": set })
+                .await
+            {
+                Ok(r) => r.matched_count > 0,
+                Err(e) => {
+                    error!(slug = %slug, error = %e, "write_projected_heads: update failed");
+                    false
+                }
+            };
+        }
+        false
+    }
+
     /// Remove a slug from the index so the next request re-resolves
     /// with a fresh blob_hash from MongoDB.
     ///
@@ -594,6 +678,28 @@ fn extract_app_slug_from_data(data: &bson::Document) -> Option<String> {
 
     // Last resort: content id
     data.get_str("id").ok().map(|s| s.to_string())
+}
+
+/// The doorway's own projection IS the write-through target for a reconciled
+/// bundle head: the in-memory slug index (what the shell path reads first) plus
+/// the durable projected entry (what a restart reads).
+#[async_trait::async_trait]
+impl crate::render::bundle_heads::HeadProjection for AppFileCacheService {
+    async fn write_heads(&self, slug: &str, browser: Option<&str>, server: Option<&str>) {
+        if let Some(head) = browser {
+            self.set_slug_head(slug, head).await;
+        }
+        let persisted = self.write_projected_heads(slug, browser, server).await;
+        if !persisted {
+            // Honest, non-fatal: the in-memory declaration still moved, so this
+            // pod converges; the next restart re-reads whatever the bulk pull
+            // left and the tick moves it again.
+            debug!(
+                slug = %slug,
+                "Reconciled head not persisted — no projected entry matched this slug"
+            );
+        }
+    }
 }
 
 /// Spawn a background task that watches the projection store's update channel

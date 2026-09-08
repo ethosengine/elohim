@@ -6,7 +6,12 @@
 //!
 //! **Content events** (`content.created` / `content.updated` / `content.deleted`):
 //! Evicts the matching entry from doorway's app file cache so the next
-//! `/apps/{slug}` request re-resolves against storage's now-fresh slug_index.
+//! `/apps/{slug}` request re-resolves against storage's now-fresh slug_index —
+//! AND, for a bundled app, reconciles its declared heads through the
+//! `BundleHeadsReconciler`. The eviction alone was the 2026-09-08 hole: it sent
+//! the next request back to the doorway's OWN projection, which is the stale
+//! thing, so the declared head never moved and a shell from a previous bundle
+//! era served for 15 hours.
 //!
 //! **Projection events** (`projection.registered` / `projection.revoked`):
 //! Re-fetches the full set of active project-epr commitments from storage and
@@ -52,6 +57,7 @@ use tracing::{debug, info, warn};
 
 use crate::cache::AppFileCacheService;
 use crate::projection::{fetch_projections_from_storage, EprRouter};
+use crate::render::bundle_heads::BundleHeadsReconciler;
 
 /// Spawn the long-running storage-events subscriber.
 ///
@@ -68,6 +74,7 @@ pub fn spawn_subscriber_task(
     doorway_id: String,
     app_file_cache: Option<Arc<AppFileCacheService>>,
     epr_router: Arc<EprRouter>,
+    bundle_heads: Option<Arc<BundleHeadsReconciler>>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         if storage_url.is_empty() {
@@ -93,6 +100,7 @@ pub fn spawn_subscriber_task(
                 &doorway_id,
                 app_file_cache.as_ref(),
                 &epr_router,
+                bundle_heads.as_ref(),
                 &http,
             )
             .await;
@@ -133,6 +141,7 @@ async fn run_subscriber(
     doorway_id: &str,
     app_file_cache: Option<&Arc<AppFileCacheService>>,
     epr_router: &EprRouter,
+    bundle_heads: Option<&Arc<BundleHeadsReconciler>>,
     http: &reqwest::Client,
 ) -> Result<(), String> {
     // No top-level timeout — this is a long-lived stream. The reqwest body
@@ -190,6 +199,7 @@ async fn run_subscriber(
                         doorway_id,
                         app_file_cache,
                         epr_router,
+                        bundle_heads,
                         http,
                     )
                     .await;
@@ -256,6 +266,7 @@ async fn handle_event(
     doorway_id: &str,
     app_file_cache: Option<&Arc<AppFileCacheService>>,
     epr_router: &EprRouter,
+    bundle_heads: Option<&Arc<BundleHeadsReconciler>>,
     http: &reqwest::Client,
 ) {
     match event_type {
@@ -286,11 +297,27 @@ async fn handle_event(
                 // to /apps/{slug}/{file} will re-resolve through resolve_blob_hash's
                 // slow path (MongoDB query), then cache miss → fetch from storage.
                 //
-                // Known follow-up gap (Pattern Z.D scope): doorway's MongoDB
-                // projection store (projected_entries) is not refreshed by this
-                // event — only the app_file_cache. See the Pattern Z spec for the
-                // full tightening plan (stageSpaBlob → PUT /api/v1/epr/{cid}).
+                // The projected_entries gap this comment used to only NAME is
+                // closed below by the bundle-heads reconciler: `clear_slug`
+                // drops the per-file cache + the index entry, and the reconcile
+                // then RE-DECLARES the head from storage rather than letting the
+                // next request re-resolve out of the same stale projection.
                 let _ = cache.clear_slug(&id).await;
+            }
+
+            // Event arm of D1: a content.{created,updated} for a bundled app is
+            // the earliest possible signal that its head moved. Reconciling here
+            // converges in the event's latency instead of waiting up to one
+            // BUNDLE_HEADS_TICK_SECS. A no-op for any other content row.
+            if event_type != "content.deleted" {
+                if let Some(reconciler) = bundle_heads {
+                    if let Some(mv) = reconciler.on_content_event(&id).await {
+                        info!(
+                            slug = %mv.slug,
+                            "storage_events_subscriber: bundle head reconciled from a content event"
+                        );
+                    }
+                }
             }
         }
 
@@ -353,7 +380,13 @@ mod tests {
         // The spawned task should return without panicking when storage_url
         // is empty — covers the "no peer configured" startup case.
         let router = Arc::new(EprRouter::new());
-        let handle = spawn_subscriber_task(String::new(), "doorway:test".to_string(), None, router);
+        let handle = spawn_subscriber_task(
+            String::new(),
+            "doorway:test".to_string(),
+            None,
+            router,
+            None,
+        );
         // Task should complete (return) — give it a generous timeout in
         // case the runtime is slow.
         let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
@@ -450,6 +483,7 @@ mod tests {
             "doorway:test",
             None,
             &router,
+            None,
             &http,
         )
         .await;

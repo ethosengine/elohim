@@ -1417,6 +1417,72 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // silent to the projection caches until next restart.
     //
     // See: genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md
+    // Bundle-heads reconciler (D1, 2026-09-08). The doorway's declared app head
+    // is storage-authoritative, reconciled on a tick AND on every content event
+    // — never left to `post_commit` signals, which are cell-local and so can
+    // only ever reach the doorway subscribed to the AUTHORING conductor. Built
+    // here because it needs the composed state: the head source (storage), the
+    // write-through target (the app-file projection), the warm shell to evict,
+    // the head table the SSR registry reads, and the target list.
+    let bundle_heads: Option<Arc<doorway::render::bundle_heads::BundleHeadsReconciler>> =
+        args.storage_url.as_ref().map(|storage_url| {
+            use doorway::render::bundle_heads::{
+                BundleHeadsReconciler, BundleTarget, HeadProjection, HeadSource, HttpHeadSource,
+            };
+            // The targets are the apps this doorway declares a head for: every
+            // EPR-mounted bundle (the same derivation the warm-shell hydration
+            // uses — the ONE source of "which apps does `/` serve"), unioned
+            // with slugs configured for SSR but not yet mounted, whose SERVER
+            // head still has to reconcile.
+            let router = Arc::clone(&state.epr_router);
+            // The SSR slug list is fixed at boot (`SSR_BUNDLE_SLUGS`), so it is
+            // captured by value; the EPR mounts are re-read each pass because
+            // the router self-heals and a mount can appear after boot.
+            let configured_slugs = state.renderer_registry.configured_slugs();
+            let targets: doorway::render::bundle_heads::TargetSource = Arc::new(move || {
+                let mut out: Vec<BundleTarget> = router
+                    .mount_url_paths()
+                    .into_iter()
+                    .filter_map(|p| router.dispatch(&p))
+                    .map(|projection| BundleTarget {
+                        slug: projection.epr_id,
+                        entry_file: Some(projection.entry_file),
+                    })
+                    .collect();
+                for slug in configured_slugs.iter().cloned() {
+                    if !out.iter().any(|t| t.slug == slug) {
+                        out.push(BundleTarget {
+                            slug,
+                            entry_file: None,
+                        });
+                    }
+                }
+                out
+            });
+            Arc::new(BundleHeadsReconciler::new(
+                Arc::new(HttpHeadSource::new(storage_url.clone())) as Arc<dyn HeadSource>,
+                state
+                    .app_file_cache
+                    .clone()
+                    .map(|c| c as Arc<dyn HeadProjection>),
+                Arc::clone(&state.warm_shell),
+                state.renderer_registry.bundle_heads(),
+                targets,
+            ))
+        });
+
+    if let (Some(reconciler), Some(period)) = (
+        bundle_heads.clone(),
+        doorway::render::bundle_heads::configured_tick_period(),
+    ) {
+        let _heads_handle =
+            doorway::render::bundle_heads::spawn_bundle_heads_task(reconciler, period);
+        info!(
+            tick_secs = period.as_secs(),
+            "Bundle-heads reconciler spawned (storage-authoritative declared heads)"
+        );
+    }
+
     if let Some(ref storage_url) = args.storage_url {
         let node_id_str = state.args.node_id.to_string();
         let doorway_id = state
@@ -1430,6 +1496,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             doorway_id,
             state.app_file_cache.clone(),
             Arc::clone(&state.epr_router),
+            bundle_heads.clone(),
         );
         info!(
             storage_url = %storage_url,
