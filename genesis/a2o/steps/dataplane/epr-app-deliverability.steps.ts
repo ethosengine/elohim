@@ -171,10 +171,11 @@ async function assertRootCommitmentIsUnclaimed(
     const response = await fetch(
       `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}`
     );
-    assert.ok(
-      response.ok,
-      `${peerName}: could not inspect project-epr commitments: ${response.status} ${await response.text()}`
-    );
+    if (!response.ok) {
+      assert.fail(
+        `${peerName}: could not inspect project-epr commitments: ${response.status} ${await response.text()}`
+      );
+    }
     const rows = (await response.json()) as RootCommitmentRow[];
     assert.ok(Array.isArray(rows), `${peerName}: commitments response is not a list`);
     assert.ok(
