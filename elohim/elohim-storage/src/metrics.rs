@@ -2544,7 +2544,9 @@ pub fn register_all() {
         // Pre-touch every decision so a branch that has never fired reads as a
         // measured zero rather than an absent series.
         for decision in ["fired", "backoff", "exhausted", "untracked"] {
-            CUSTODY_KICK_ADMISSION.with_label_values(&[decision]).inc_by(0);
+            CUSTODY_KICK_ADMISSION
+                .with_label_values(&[decision])
+                .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(CUSTODY_PASS_SKIPPED_OVERLAP.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_SNAPSHOT_REBUILDS.clone()));
@@ -4298,6 +4300,12 @@ pub fn custody_kick_admission_count(decision: &str) -> u64 {
 /// Record one custody reconcile pass skipped by the single-flight guard.
 pub fn inc_custody_pass_skipped_overlap() {
     CUSTODY_PASS_SKIPPED_OVERLAP.inc();
+}
+
+/// Current value of `storage_custody_pass_skipped_overlap_total`. Process-wide,
+/// so callers compare a before/after delta rather than an absolute.
+pub fn custody_pass_skipped_overlap_count() -> u64 {
+    CUSTODY_PASS_SKIPPED_OVERLAP.get()
 }
 
 /// Record one full pantry walk for the custody-sweep blob snapshot.

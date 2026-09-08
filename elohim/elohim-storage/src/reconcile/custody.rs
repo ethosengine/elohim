@@ -194,6 +194,273 @@ impl SnapshotCache {
     }
 }
 
+/// Whether a missing-blob target may be kicked on this pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KickAdmission {
+    /// Kick now.
+    Fire,
+    /// An earlier attempt's backoff window is still open.
+    Backoff,
+    /// Terminal until re-armed: the configured number of consecutive
+    /// inventory-blind attempts produced no bytes, so no reachable peer is
+    /// known to hold this blob. `first` is true exactly once per exhaustion so
+    /// the caller emits the honest placement-gap signal once, not per pass.
+    Exhausted { first: bool },
+    /// The ledger is at capacity and declined to track this hash; the caller
+    /// degrades to the pre-ledger behaviour (always kick).
+    Untracked,
+}
+
+/// Backoff / exhaustion policy for [`CustodyKickLedger`].
+#[derive(Debug, Clone, Copy)]
+pub struct KickPolicy {
+    /// Backoff after the first non-hit attempt; doubles per attempt.
+    pub base_backoff_seconds: u64,
+    /// Ceiling for the doubling.
+    pub max_backoff_seconds: u64,
+    /// Consecutive inventory-blind attempts before a target is declared
+    /// unsatisfiable.
+    pub blind_attempt_limit: u32,
+    /// Hard bound on tracked hashes so the ledger cannot grow without limit.
+    pub max_tracked: usize,
+}
+
+impl Default for KickPolicy {
+    fn default() -> Self {
+        Self {
+            base_backoff_seconds: 30,
+            max_backoff_seconds: 300,
+            blind_attempt_limit: 5,
+            max_tracked: 4096,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct KickRecord {
+    /// Consecutive attempts since the last hit (drives the backoff curve).
+    attempts: u32,
+    /// Consecutive attempts made with ZERO named holders in the gossip
+    /// inventory (drives exhaustion).
+    blind_attempts: u32,
+    next_eligible_at: Option<DateTime<Utc>>,
+    exhausted: bool,
+    gap_signalled: bool,
+}
+
+/// The missing convergence condition, made explicit.
+///
+/// Before this ledger the sweep had a *satisfied* state (bytes present) and a
+/// *malformed* state (`FetchOutcome::InvalidAddress`) but **no exhausted
+/// state**: a custody-blob commitment whose bytes no reachable peer holds was
+/// re-kicked every pass forever — 502 kicks in 11 minutes for the same 5
+/// commitments on the 2026-09-07 household mesh, at full fan-out, while the
+/// substrate never said "this obligation cannot be met right now."
+///
+/// The ledger is deliberately in-memory (a `DashMap`) and need not survive
+/// restart: a restart genuinely changes the peer set, which is one of the two
+/// re-arm conditions anyway.
+///
+/// **Failure is the default.** An attempt increments the counters at admission
+/// time; only [`CustodyKickLedger::record_hit`] clears them. A kick is
+/// scheduled asynchronously, so the pass cannot know its outcome — treating
+/// "attempted and not since cleared" as a non-hit keeps the whole decision
+/// synchronous and deterministic, and the backoff window (30 s and doubling) is
+/// wider than the fetch timeout, so a slow success still clears before the next
+/// admission.
+pub struct CustodyKickLedger {
+    entries: dashmap::DashMap<String, KickRecord>,
+    policy: KickPolicy,
+}
+
+impl Default for CustodyKickLedger {
+    fn default() -> Self {
+        Self::new(KickPolicy::default())
+    }
+}
+
+impl CustodyKickLedger {
+    pub fn new(policy: KickPolicy) -> Self {
+        Self {
+            entries: dashmap::DashMap::new(),
+            policy,
+        }
+    }
+
+    fn backoff_for(&self, attempts: u32) -> chrono::Duration {
+        let shift = attempts.saturating_sub(1).min(16);
+        let secs = self
+            .policy
+            .base_backoff_seconds
+            .saturating_mul(1u64 << shift)
+            .min(self.policy.max_backoff_seconds);
+        chrono::Duration::seconds(secs as i64)
+    }
+
+    /// Decide whether `blob_hash` may be kicked now, and record the attempt.
+    ///
+    /// `named_candidates` is true when the gossip inventory named at least one
+    /// holder for this hash. A named holder is evidence the mesh has the bytes,
+    /// so it RE-ARMS an exhausted target — this is re-arm condition (a) from
+    /// the cure design, and it needs no external hook because the pass already
+    /// queries the inventory on every examination.
+    pub fn admit(
+        &self,
+        blob_hash: &str,
+        named_candidates: bool,
+        now: DateTime<Utc>,
+    ) -> KickAdmission {
+        if !self.entries.contains_key(blob_hash) && self.entries.len() >= self.policy.max_tracked {
+            return KickAdmission::Untracked;
+        }
+        let mut entry = self.entries.entry(blob_hash.to_string()).or_default();
+
+        if named_candidates && (entry.exhausted || entry.blind_attempts > 0) {
+            // Re-arm (a): the inventory now names a holder.
+            entry.exhausted = false;
+            entry.gap_signalled = false;
+            entry.blind_attempts = 0;
+        }
+
+        if entry.exhausted {
+            let first = !entry.gap_signalled;
+            entry.gap_signalled = true;
+            return KickAdmission::Exhausted { first };
+        }
+
+        if let Some(next) = entry.next_eligible_at {
+            if now < next {
+                return KickAdmission::Backoff;
+            }
+        }
+
+        entry.attempts = entry.attempts.saturating_add(1);
+        if !named_candidates {
+            entry.blind_attempts = entry.blind_attempts.saturating_add(1);
+        }
+        entry.next_eligible_at = Some(now + self.backoff_for(entry.attempts));
+        if !named_candidates && entry.blind_attempts >= self.policy.blind_attempt_limit {
+            entry.exhausted = true;
+        }
+        KickAdmission::Fire
+    }
+
+    /// The bytes landed: forget everything about this hash.
+    pub fn record_hit(&self, blob_hash: &str) {
+        self.entries.remove(blob_hash);
+    }
+
+    /// Re-arm condition (b): a new peer connected, so the candidate set this
+    /// node can reach genuinely changed. Clears exhaustion and the backoff
+    /// window for every tracked hash — the next pass gets a fresh try.
+    pub fn rearm_all(&self) {
+        for mut entry in self.entries.iter_mut() {
+            entry.exhausted = false;
+            entry.gap_signalled = false;
+            entry.blind_attempts = 0;
+            entry.next_eligible_at = None;
+        }
+    }
+
+    /// Number of hashes currently tracked. Test + tracing hook.
+    pub fn tracked(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+/// Cross-pass state for the custody reconcile sweep, owned by the node.
+///
+/// Three things that must NOT be rebuilt per pass live here together: the kick
+/// ledger (backoff + exhaustion), the cached pantry snapshot, and the rotating
+/// commitment-scan cursor.
+#[derive(Default)]
+pub struct CustodySweepState {
+    pub ledger: CustodyKickLedger,
+    pub snapshot: SnapshotCache,
+    /// Rows examined per pass; `<= 0` means unbounded.
+    scan_limit: i64,
+    scan_cursor: std::sync::atomic::AtomicI64,
+    pass_guard: PassGuard,
+}
+
+/// One-permit single-flight lane for the custody reconcile pass.
+///
+/// The sweep is driven from BOTH a timer arm and a `ConnectionEstablished`
+/// trigger. On the 2026-09-07 household mesh those stacked: passes were logged
+/// 0.54 s apart while two runtime threads sat at 82-95 % CPU on a 2-worker
+/// server runtime. One permit means a second trigger is COUNTED and dropped
+/// rather than doubling the pass cost — and the sweep can never occupy more
+/// than one of those two threads.
+pub struct PassGuard {
+    sem: std::sync::Arc<tokio::sync::Semaphore>,
+}
+
+impl Default for PassGuard {
+    fn default() -> Self {
+        Self {
+            sem: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        }
+    }
+}
+
+impl PassGuard {
+    /// Enter the lane. `None` means a pass is already in flight; the overlap is
+    /// recorded on `storage_custody_pass_skipped_overlap_total`. The returned
+    /// permit must be held for the whole pass.
+    pub fn try_enter(&self) -> Option<tokio::sync::OwnedSemaphorePermit> {
+        match self.sem.clone().try_acquire_owned() {
+            Ok(permit) => Some(permit),
+            Err(_) => {
+                crate::metrics::inc_custody_pass_skipped_overlap();
+                None
+            }
+        }
+    }
+}
+
+impl CustodySweepState {
+    /// Bound each pass to `scan_limit` custody-blob rows, rotating the window
+    /// so every row is still examined across passes. `0` (or negative) keeps
+    /// the pre-existing unbounded scan.
+    pub fn with_scan_limit(scan_limit: i64) -> Self {
+        Self {
+            scan_limit,
+            ..Default::default()
+        }
+    }
+
+    /// Single-flight lane for the reconcile pass.
+    pub fn pass_guard(&self) -> &PassGuard {
+        &self.pass_guard
+    }
+
+    /// Offset for this pass, advanced (and wrapped) by the caller via
+    /// [`CustodySweepState::advance_cursor`].
+    fn scan_window(&self) -> Option<(i64, i64)> {
+        if self.scan_limit <= 0 {
+            return None;
+        }
+        Some((
+            self.scan_limit,
+            self.scan_cursor
+                .load(std::sync::atomic::Ordering::Relaxed)
+                .max(0),
+        ))
+    }
+
+    /// Advance the rotating cursor. A short page means we reached the end of
+    /// the table, so the next pass starts over at 0 — correct without needing a
+    /// separate `COUNT(*)`.
+    fn advance_cursor(&self, offset: i64, limit: i64, returned: usize) {
+        let next = if (returned as i64) < limit {
+            0
+        } else {
+            offset.saturating_add(limit)
+        };
+        self.scan_cursor
+            .store(next, std::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 /// Outcome of a single reconcile pass; useful for tests + metrics.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -211,6 +478,17 @@ pub struct ReconcileOutcome {
     /// (the T21 rejection drumbeat). The count is the honest failure record
     /// — a non-zero value means rows need healing, not more retries.
     pub invalid_markers: u32,
+    /// Missing own-provider targets NOT kicked this pass because an earlier
+    /// attempt's backoff window was still open. Deferred, not abandoned.
+    pub kicks_deferred: u32,
+    /// Missing own-provider targets refused because they are EXHAUSTED — the
+    /// configured number of consecutive inventory-blind attempts produced no
+    /// bytes, so no reachable peer is known to hold them. This is the
+    /// convergence signal the sweep previously lacked entirely.
+    pub kicks_exhausted: u32,
+    /// Kicks fired without ledger tracking because the ledger was at capacity
+    /// (honest degradation to the pre-ledger always-kick behaviour).
+    pub kicks_untracked: u32,
 }
 
 /// Timing parameters for a reconcile pass.
@@ -257,8 +535,13 @@ pub fn resolve_self_agent_cid(
 }
 
 /// then degrades to transport-only (the pre-existing behavior — no regression).
+///
+/// `state` carries the cross-pass memory the sweep needs to CONVERGE: the kick
+/// ledger (backoff + exhaustion) and the rotating commitment-scan cursor.
+/// Without it every pass is amnesiac and an unsatisfiable custody obligation is
+/// re-kicked forever.
 #[allow(clippy::too_many_arguments)]
-pub fn reconcile_pass(
+pub fn reconcile_pass_with_state(
     conn: &mut SqliteConnection,
     self_cid: &str,
     self_agent_cid: Option<&str>,
@@ -267,6 +550,7 @@ pub fn reconcile_pass(
     cfg: ReconcileConfig,
     now: DateTime<Utc>,
     connected_peers: &[String],
+    state: &CustodySweepState,
 ) -> Result<ReconcileOutcome, StorageError> {
     // Does `s` name THIS node in either identity namespace (transport OR agent)?
     let is_self = |s: &str| s == self_cid || self_agent_cid == Some(s);
@@ -275,10 +559,29 @@ pub fn reconcile_pass(
     let inventory_freshness_seconds = cfg.inventory_freshness_seconds;
     let mut outcome = ReconcileOutcome::default();
 
-    let custody_rows = rea_commitments::table
-        .filter(rea_commitments::action.eq("custody-blob"))
-        .load::<ReaCommitment>(conn)
-        .map_err(|e| StorageError::Database(format!("load custody-blob commitments: {e}")))?;
+    // Bounded + rotating scan: a pass costs O(batch), not O(corpus). A short
+    // page wraps the cursor back to 0, so every row is still examined across
+    // passes without a separate COUNT(*). `scan_limit <= 0` keeps the
+    // pre-existing unbounded read.
+    let custody_rows = match state.scan_window() {
+        Some((limit, offset)) => {
+            let rows = rea_commitments::table
+                .filter(rea_commitments::action.eq("custody-blob"))
+                .order(rea_commitments::id.asc())
+                .limit(limit)
+                .offset(offset)
+                .load::<ReaCommitment>(conn)
+                .map_err(|e| {
+                    StorageError::Database(format!("load custody-blob commitments: {e}"))
+                })?;
+            state.advance_cursor(offset, limit, rows.len());
+            rows
+        }
+        None => rea_commitments::table
+            .filter(rea_commitments::action.eq("custody-blob"))
+            .load::<ReaCommitment>(conn)
+            .map_err(|e| StorageError::Database(format!("load custody-blob commitments: {e}")))?,
+    };
 
     let stale_before = (now - chrono::Duration::seconds(inventory_freshness_seconds as i64))
         .format("%Y-%m-%dT%H:%M:%SZ")
@@ -349,7 +652,53 @@ pub fn reconcile_pass(
             if !local_store.has(&blob_hash) {
                 let candidates =
                     crate::db::peer_blob_inventory::lookup_hosts(conn, &blob_hash, &stale_before)?;
-                if !candidates.is_empty() {
+                let named = !candidates.is_empty();
+                // Nothing raceable at all — neither a named holder nor a
+                // connected peer. Don't spend a ledger attempt on a pass that
+                // could not have kicked anything.
+                if !named && connected_peers.is_empty() {
+                    continue;
+                }
+                match state.ledger.admit(&blob_hash, named, now) {
+                    KickAdmission::Backoff => {
+                        outcome.kicks_deferred += 1;
+                        continue;
+                    }
+                    KickAdmission::Exhausted { first } => {
+                        // The honest signal the blind fallback kick used to
+                        // consume: this node is the provider and no reachable
+                        // peer holds the bytes. Emitted ONCE per exhaustion
+                        // (and still subject to the placement-gap cooldown),
+                        // never per pass.
+                        outcome.kicks_exhausted += 1;
+                        if first {
+                            tracing::warn!(
+                                target: "elohim_storage::reconcile",
+                                commitment_id = %commitment.id,
+                                hash = %blob_hash,
+                                "T23: custody obligation UNSATISFIABLE — no reachable peer \
+                                 holds these bytes; kicking stops until a named holder \
+                                 appears or a new peer connects"
+                            );
+                            if emit_placement_gap(
+                                conn,
+                                &commitment,
+                                &blob_hash,
+                                now,
+                                &cooldown_after,
+                                Some("custody-fetch-exhausted"),
+                            )? {
+                                outcome.placement_gaps_emitted += 1;
+                            }
+                        }
+                        continue;
+                    }
+                    KickAdmission::Untracked => {
+                        outcome.kicks_untracked += 1;
+                    }
+                    KickAdmission::Fire => {}
+                }
+                if named {
                     let inventory: Vec<String> =
                         candidates.into_iter().map(|c| c.peer_id).collect();
 
@@ -393,12 +742,16 @@ pub fn reconcile_pass(
 
                     fetch_kicker.kick(&blob_hash, candidate_peers);
                     outcome.kicks_fired += 1;
-                } else if !connected_peers.is_empty() {
+                } else {
                     // Inventory-blind fallback: gossip inventory publish dies
                     // on every pod restart (InsufficientPeers), so an empty
                     // candidate set is NOT evidence the mesh lacks the blob.
                     // Race the connected peers, capped — the same fallback
                     // that makes heal-on-read pass the CI cross-pod fetch.
+                    // Now BOUNDED by the kick ledger: after
+                    // `KickPolicy::blind_attempt_limit` consecutive blind
+                    // attempts the target is declared unsatisfiable above and
+                    // this branch is never reached again until a re-arm.
                     let fallback: Vec<String> = connected_peers
                         .iter()
                         .take(FALLBACK_CANDIDATE_CAP)
@@ -430,65 +783,111 @@ pub fn reconcile_pass(
                 continue;
             }
 
-            // Cooldown: don't re-emit if a recent placement-gap event for the
-            // same commitment exists.
-            let recent_gap = economic_events::table
-                .filter(economic_events::action.eq("placement-gap"))
-                .filter(economic_events::output_of.eq(&commitment.id))
-                .filter(economic_events::has_point_in_time.gt(&cooldown_after))
-                .count()
-                .get_result::<i64>(conn)
-                .map_err(|e| StorageError::Database(format!("count recent placement-gap: {e}")))?;
-
-            if recent_gap > 0 {
-                continue;
+            if emit_placement_gap(conn, &commitment, &blob_hash, now, &cooldown_after, None)? {
+                outcome.placement_gaps_emitted += 1;
             }
-
-            // Emit placement-gap event.
-            // Bind owned strings so we can borrow them into NewEconomicEvent<'_>.
-            let event_id = uuid::Uuid::new_v4().to_string();
-            let has_point = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let new_event = NewEconomicEvent {
-                id: &event_id,
-                h_app_id: &commitment.h_app_id,
-                action: "placement-gap",
-                provider: &commitment.provider,
-                receiver: &commitment.receiver,
-                resource_conforms_to: commitment.resource_conforms_to.as_deref(),
-                resource_inventoried_as: Some(blob_hash.as_str()),
-                resource_classified_as_json: None,
-                resource_quantity_value: None,
-                resource_quantity_unit: None,
-                effort_quantity_value: None,
-                effort_quantity_unit: None,
-                has_point_in_time: &has_point,
-                has_duration: None,
-                input_of: None,
-                output_of: Some(commitment.id.as_str()),
-                lamad_event_type: None,
-                content_id: None,
-                contributor_presence_id: None,
-                path_id: None,
-                triggered_by: None,
-                state: "observed",
-                note: None,
-                metadata_json: None,
-                dht_anchor_hash: None,
-                at_location: None,
-                verified_at: None,
-                scope_collab_cid: None,
-                bounded_by: None,
-                substrate_signal: None,
-            };
-            diesel::insert_into(economic_events::table)
-                .values(&new_event)
-                .execute(conn)
-                .map_err(|e| StorageError::Database(format!("insert placement-gap event: {e}")))?;
-            outcome.placement_gaps_emitted += 1;
         }
     }
 
     Ok(outcome)
+}
+
+/// Emit a `placement-gap` REA economic event for `commitment`, honoring the
+/// cooldown. Returns `true` when an event was actually inserted.
+///
+/// Two callers, one semantic: an obligation that is not being met. The receiver
+/// arm fires it when a provider this node depends on has gone quiet; the
+/// provider arm fires it when THIS node committed to hold bytes it cannot
+/// obtain from any reachable peer (`note = "custody-fetch-exhausted"`).
+fn emit_placement_gap(
+    conn: &mut SqliteConnection,
+    commitment: &ReaCommitment,
+    blob_hash: &str,
+    now: DateTime<Utc>,
+    cooldown_after: &str,
+    note: Option<&str>,
+) -> Result<bool, StorageError> {
+    let recent_gap = economic_events::table
+        .filter(economic_events::action.eq("placement-gap"))
+        .filter(economic_events::output_of.eq(&commitment.id))
+        .filter(economic_events::has_point_in_time.gt(cooldown_after))
+        .count()
+        .get_result::<i64>(conn)
+        .map_err(|e| StorageError::Database(format!("count recent placement-gap: {e}")))?;
+    if recent_gap > 0 {
+        return Ok(false);
+    }
+
+    // Bind owned strings so we can borrow them into NewEconomicEvent<'_>.
+    let event_id = uuid::Uuid::new_v4().to_string();
+    let has_point = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let new_event = NewEconomicEvent {
+        id: &event_id,
+        h_app_id: &commitment.h_app_id,
+        action: "placement-gap",
+        provider: &commitment.provider,
+        receiver: &commitment.receiver,
+        resource_conforms_to: commitment.resource_conforms_to.as_deref(),
+        resource_inventoried_as: Some(blob_hash),
+        resource_classified_as_json: None,
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_point_in_time: &has_point,
+        has_duration: None,
+        input_of: None,
+        output_of: Some(commitment.id.as_str()),
+        lamad_event_type: None,
+        content_id: None,
+        contributor_presence_id: None,
+        path_id: None,
+        triggered_by: None,
+        state: "observed",
+        note,
+        metadata_json: None,
+        dht_anchor_hash: None,
+        at_location: None,
+        verified_at: None,
+        scope_collab_cid: None,
+        bounded_by: None,
+        substrate_signal: None,
+    };
+    diesel::insert_into(economic_events::table)
+        .values(&new_event)
+        .execute(conn)
+        .map_err(|e| StorageError::Database(format!("insert placement-gap event: {e}")))?;
+    Ok(true)
+}
+
+/// Back-compat shim for the pre-ledger behavioural tests: a fresh, permissive
+/// [`CustodySweepState`] per call, so each call behaves exactly as the amnesiac
+/// pass did. `#[cfg(test)]` on purpose — production MUST go through
+/// [`reconcile_pass_with_state`] with node-owned state, or the convergence
+/// condition is silently bypassed.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+pub fn reconcile_pass(
+    conn: &mut SqliteConnection,
+    self_cid: &str,
+    self_agent_cid: Option<&str>,
+    local_store: &dyn LocalBlobStore,
+    fetch_kicker: &dyn FetchKicker,
+    cfg: ReconcileConfig,
+    now: DateTime<Utc>,
+    connected_peers: &[String],
+) -> Result<ReconcileOutcome, StorageError> {
+    reconcile_pass_with_state(
+        conn,
+        self_cid,
+        self_agent_cid,
+        local_store,
+        fetch_kicker,
+        cfg,
+        now,
+        connected_peers,
+        &CustodySweepState::default(),
+    )
 }
 
 /// Whether this node offers salvage custody, and the target replication level.
@@ -1060,7 +1459,6 @@ mod tests {
         }
     }
 
-
     // ── Station A: the pantry snapshot is cached, not rebuilt every pass ──
 
     /// Write a blob file directly into the two-level pantry tree so
@@ -1085,12 +1483,16 @@ mod tests {
         plant_blob(&store, &format!("sha256-{}", "a".repeat(64)));
 
         // Inside the TTL the cached snapshot is reused — no second walk.
-        let second = cache.get(&store, t0 + std::time::Duration::from_secs(59)).unwrap();
+        let second = cache
+            .get(&store, t0 + std::time::Duration::from_secs(59))
+            .unwrap();
         assert_eq!(second.len(), 0, "cached snapshot is served, not rebuilt");
         assert_eq!(cache.rebuilds(), 1, "no rebuild inside the TTL");
 
         // Past the TTL it rebuilds and sees the new blob.
-        let third = cache.get(&store, t0 + std::time::Duration::from_secs(61)).unwrap();
+        let third = cache
+            .get(&store, t0 + std::time::Duration::from_secs(61))
+            .unwrap();
         assert_eq!(third.len(), 1);
         assert_eq!(cache.rebuilds(), 2, "one rebuild after the TTL expires");
     }
@@ -1110,6 +1512,255 @@ mod tests {
              otherwise the sweep re-kicks a hash it already holds"
         );
         assert_eq!(cache.rebuilds(), 1, "note_stored must not trigger a walk");
+    }
+
+    // ── Station B: the sweep has an exhausted state ──
+    //
+    // Before the kick ledger the sweep had a *satisfied* state (bytes present)
+    // and a *malformed* state (InvalidAddress) but no *exhausted* state, so a
+    // custody-blob commitment whose bytes no reachable peer holds was re-kicked
+    // every pass forever — 502 kicks in 11 minutes for the same 5 commitments
+    // on the 2026-09-07 household mesh.
+
+    fn blind_pass(
+        conn: &mut SqliteConnection,
+        kicker: &RecordingKicker,
+        state: &CustodySweepState,
+        now: DateTime<Utc>,
+    ) -> ReconcileOutcome {
+        reconcile_pass_with_state(
+            conn,
+            "self_cid",
+            None,
+            &StaticStore(vec![]),
+            kicker,
+            default_cfg(),
+            now,
+            std::slice::from_ref(&String::from("peer-A")),
+            state,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn the_pass_guard_admits_one_pass_at_a_time() {
+        let state = CustodySweepState::default();
+        let before = crate::metrics::custody_pass_skipped_overlap_count();
+
+        let first = state.pass_guard().try_enter().expect("first pass enters");
+        assert!(
+            state.pass_guard().try_enter().is_none(),
+            "a second trigger must be refused while a pass is in flight — \
+             overlapping passes were observed 0.54 s apart on the household mesh"
+        );
+        assert_eq!(
+            crate::metrics::custody_pass_skipped_overlap_count(),
+            before + 1,
+            "the refused trigger is counted, not silently dropped"
+        );
+
+        drop(first);
+        assert!(
+            state.pass_guard().try_enter().is_some(),
+            "the lane reopens once the in-flight pass finishes"
+        );
+    }
+
+    #[test]
+    fn blind_kicks_exhaust_and_emit_one_placement_gap() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let blob_hash = "c".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "steward_cid", &blob_hash);
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let state = CustodySweepState::default();
+
+        // Five inventory-blind attempts fire, each once its backoff window opens.
+        let mut now = chrono::Utc::now();
+        for i in 0..5 {
+            let o = blind_pass(&mut conn, &kicker, &state, now);
+            assert_eq!(o.kicks_fired, 1, "blind attempt {i} must fire");
+            assert_eq!(o.fallback_kicks, 1);
+            now += chrono::Duration::seconds(600);
+        }
+
+        // The sixth is refused: no reachable peer is known to hold these bytes.
+        let o = blind_pass(&mut conn, &kicker, &state, now);
+        assert_eq!(
+            o.kicks_fired, 0,
+            "an unsatisfiable custody target must stop being kicked"
+        );
+        assert_eq!(o.kicks_exhausted, 1);
+        assert_eq!(
+            o.placement_gaps_emitted, 1,
+            "the honest placement-gap signal replaces the blind fallback kick"
+        );
+
+        // It stays refused, and the gap is not re-emitted every pass.
+        now += chrono::Duration::seconds(600);
+        let o = blind_pass(&mut conn, &kicker, &state, now);
+        assert_eq!(o.kicks_fired, 0);
+        assert_eq!(o.kicks_exhausted, 1);
+        assert_eq!(o.placement_gaps_emitted, 0);
+        assert_eq!(
+            kicker.kicks.lock().unwrap().len(),
+            5,
+            "exactly five kicks for this target, ever — not ~8/min forever"
+        );
+    }
+
+    #[test]
+    fn backoff_suppresses_a_second_kick_inside_the_window() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "steward_cid", &"d".repeat(64));
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let state = CustodySweepState::default();
+        let now = chrono::Utc::now();
+
+        assert_eq!(blind_pass(&mut conn, &kicker, &state, now).kicks_fired, 1);
+        // Overlapping / back-to-back passes (observed 0.54 s apart) must not
+        // each fire their own kick.
+        let o = blind_pass(
+            &mut conn,
+            &kicker,
+            &state,
+            now + chrono::Duration::seconds(1),
+        );
+        assert_eq!(o.kicks_fired, 0);
+        assert_eq!(o.kicks_deferred, 1);
+        assert_eq!(kicker.kicks.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_named_inventory_holder_rearms_an_exhausted_target() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let blob_hash = "e".repeat(64);
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "steward_cid", &blob_hash);
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let state = CustodySweepState::default();
+
+        let mut now = chrono::Utc::now();
+        for _ in 0..5 {
+            blind_pass(&mut conn, &kicker, &state, now);
+            now += chrono::Duration::seconds(600);
+        }
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).kicks_exhausted,
+            1
+        );
+
+        // Gossip now names a holder — evidence the mesh HAS the bytes.
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let o = blind_pass(&mut conn, &kicker, &state, now);
+        assert_eq!(
+            o.kicks_fired, 1,
+            "a named holder re-arms an exhausted target"
+        );
+        assert_eq!(o.fallback_kicks, 0, "named holders are not a blind kick");
+    }
+
+    #[test]
+    fn a_new_peer_connection_rearms_every_exhausted_target() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "steward_cid", &"f".repeat(64));
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let state = CustodySweepState::default();
+
+        let mut now = chrono::Utc::now();
+        for _ in 0..5 {
+            blind_pass(&mut conn, &kicker, &state, now);
+            now += chrono::Duration::seconds(600);
+        }
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).kicks_exhausted,
+            1
+        );
+
+        state.ledger.rearm_all();
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).kicks_fired,
+            1,
+            "a new peer changes the reachable candidate set, so re-arm"
+        );
+    }
+
+    #[test]
+    fn a_hit_clears_the_kick_ledger() {
+        let ledger = CustodyKickLedger::default();
+        let now = chrono::Utc::now();
+        let hash = "sha256-deadbeef";
+        for i in 0..5 {
+            assert_eq!(
+                ledger.admit(hash, false, now + chrono::Duration::seconds(600 * i)),
+                KickAdmission::Fire
+            );
+        }
+        assert_eq!(
+            ledger.admit(hash, false, now + chrono::Duration::seconds(9999)),
+            KickAdmission::Exhausted { first: true }
+        );
+        ledger.record_hit(hash);
+        assert_eq!(ledger.tracked(), 0);
+        assert_eq!(
+            ledger.admit(hash, false, now + chrono::Duration::seconds(9999)),
+            KickAdmission::Fire,
+            "the bytes landed once; the target is a fresh subject again"
+        );
+    }
+
+    #[test]
+    fn the_commitment_scan_is_bounded_and_rotates() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        for i in 0..3 {
+            insert_custody_commitment(
+                &mut conn,
+                &format!("c{i}"),
+                "other_cid",
+                "another_cid",
+                &format!("{i}{}", "a".repeat(63)),
+            );
+        }
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let state = CustodySweepState::with_scan_limit(2);
+        let now = chrono::Utc::now();
+
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).commitments_examined,
+            2
+        );
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).commitments_examined,
+            1,
+            "the window rotates rather than re-reading the same head"
+        );
+        assert_eq!(
+            blind_pass(&mut conn, &kicker, &state, now).commitments_examined,
+            2,
+            "a short page wraps the cursor back to the start"
+        );
     }
 
     fn insert_custody_commitment(

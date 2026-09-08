@@ -931,6 +931,13 @@ pub struct P2PNode {
     pending_shamir_shares: PendingShamirShareMap,
     /// T16: custody reconciliation counters — incremented by reconcile_pass.
     pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
+    /// T23 convergence: cross-pass state for the custody sweep — the kick
+    /// ledger (backoff + exhaustion), the cached pantry snapshot, and the
+    /// rotating commitment-scan cursor. Node-owned on purpose: a per-pass
+    /// instance is amnesiac, and an amnesiac sweep re-kicks an unsatisfiable
+    /// custody obligation forever (502 kicks / 11 min / 5 commitments,
+    /// 2026-09-07 household mesh).
+    pub(crate) custody_sweep_state: Arc<crate::reconcile::custody::CustodySweepState>,
     /// T18: shared cache of last gossiped inventory hashes.
     /// Stage 2 broadcaster timer will write here; the parity diagnostic HTTP
     /// endpoint reads via `P2PHandle::last_gossiped_inventory()`.
@@ -1023,6 +1030,12 @@ pub struct PeerMetrics {
     /// Ring buffer of RTT samples from ping (max 8)
     pub(crate) rtt_samples: std::collections::VecDeque<Duration>,
 }
+
+/// Custody-blob commitment rows examined per reconcile pass. The scan rotates,
+/// so every row is still reached across passes, but ONE pass costs O(batch)
+/// rather than O(corpus). Sized well above the observed live commitment count
+/// (50-66 on the household mesh) so it is a ceiling, not a throttle.
+pub const CUSTODY_SCAN_LIMIT: i64 = 512;
 
 /// Atomic counters for custody reconciliation — incremented each pass.
 #[derive(Debug, Default)]
@@ -3058,6 +3071,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
+            custody_sweep_state: Arc::new(
+                crate::reconcile::custody::CustodySweepState::with_scan_limit(CUSTODY_SCAN_LIMIT),
+            ),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Station 1 of the sync-state contract: sequences carry this
             // process's boot epoch in their high 32 bits, so a restart is
@@ -3351,9 +3367,22 @@ impl P2PNode {
     /// **Lock contract:** does NOT acquire the swarm lock. Callers from the
     /// `run()` select! arms must drop their swarm guard before invoking.
     pub(crate) async fn run_custody_reconcile(&self) {
-        use crate::reconcile::custody::{reconcile_pass, BlobStoreSnapshot, ReconcileConfig};
+        use crate::reconcile::custody::{reconcile_pass_with_state, ReconcileConfig};
         use crate::reconcile::custody_sweep::RaceFetchKicker;
         use std::sync::atomic::Ordering;
+
+        // Single-flight: a pass already in flight owns the lane. The timer arm
+        // and the ConnectionEstablished trigger both land here, and a reconnect
+        // burst used to stack passes on top of each other (0.54 s apart on the
+        // large-corpus peer). Held for the whole pass, so the sweep occupies at
+        // most one thread of the 2-worker server runtime.
+        let Some(_pass_permit) = self.custody_sweep_state.pass_guard().try_enter() else {
+            debug!(
+                target: "elohim_storage::reconcile",
+                "T23: a custody reconcile pass is already in flight; skipping this trigger"
+            );
+            return;
+        };
 
         let Some(self_cid) = self.config.self_cid.clone() else {
             debug!(
@@ -3395,7 +3424,15 @@ impl P2PNode {
             self.config.self_cellkey_agent_cid.as_deref(),
         );
 
-        let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
+        // Cached: the full pantry walk (read_dir + a stat per file) runs on its
+        // own slow cadence, not once per pass. Blobs that land in between are
+        // folded in by `SnapshotCache::note_stored` from the kicker's Hit arm,
+        // so a just-fetched blob is never re-kicked.
+        let snapshot = match self
+            .custody_sweep_state
+            .snapshot
+            .get(&self.blob_store, std::time::Instant::now())
+        {
             Ok(s) => s,
             Err(e) => {
                 warn!(
@@ -3444,6 +3481,7 @@ impl P2PNode {
             fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
             metrics: self.reconciliation_metrics.clone(),
             kick_semaphore: Arc::new(tokio::sync::Semaphore::new(kick_concurrency)),
+            sweep_state: self.custody_sweep_state.clone(),
         };
 
         let cfg = ReconcileConfig {
@@ -3467,15 +3505,16 @@ impl P2PNode {
             })
             .collect();
 
-        match reconcile_pass(
+        match reconcile_pass_with_state(
             &mut conn,
             &self_cid,
             self_agent_cid.as_deref(),
-            &snapshot,
+            snapshot.as_ref(),
             &kicker,
             cfg,
             chrono::Utc::now(),
             &connected_peers,
+            &self.custody_sweep_state,
         ) {
             Ok(outcome) => {
                 self.reconciliation_metrics
@@ -3489,15 +3528,31 @@ impl P2PNode {
                 // INFO, not debug: per-pass evidence must reach Loki — the
                 // 2026-06-10 Phase-0 read found zero pass lines in 953k lines
                 // and could not tell a dead sweep from a quiet one.
+                crate::metrics::inc_custody_kick_admission("fired", outcome.kicks_fired as u64);
+                crate::metrics::inc_custody_kick_admission(
+                    "backoff",
+                    outcome.kicks_deferred as u64,
+                );
+                crate::metrics::inc_custody_kick_admission(
+                    "exhausted",
+                    outcome.kicks_exhausted as u64,
+                );
+                crate::metrics::inc_custody_kick_admission(
+                    "untracked",
+                    outcome.kicks_untracked as u64,
+                );
                 tracing::info!(
                     target: "elohim_storage::reconcile",
                     snapshot_size = snapshot.len(),
                     commitments_examined = outcome.commitments_examined,
                     kicks_fired = outcome.kicks_fired,
                     fallback_kicks = outcome.fallback_kicks,
+                    kicks_deferred = outcome.kicks_deferred,
+                    kicks_exhausted = outcome.kicks_exhausted,
                     placement_gaps = outcome.placement_gaps_emitted,
                     invalid_markers = outcome.invalid_markers,
                     connected_peers = connected_peers.len(),
+                    tracked_targets = self.custody_sweep_state.ledger.tracked(),
                     "T23: custody reconcile pass completed"
                 );
             }
@@ -5515,6 +5570,10 @@ impl P2PNode {
                 // very peers that just connected. `try_send` is
                 // non-blocking — when the queue is full (extreme overload),
                 // the trigger is dropped and the timer tick recovers.
+                // Re-arm condition (b) for the kick ledger: a NEW peer changes
+                // the set of holders this node can actually reach, so every
+                // target previously declared unsatisfiable deserves a fresh try.
+                self.custody_sweep_state.ledger.rearm_all();
                 if let Err(e) = self
                     .command_tx
                     .try_send(P2PCommand::TriggerCustodyReconcile)

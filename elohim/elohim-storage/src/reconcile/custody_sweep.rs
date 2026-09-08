@@ -1,5 +1,5 @@
 //! T23: Custody reconcile sweep — tokio orchestration around
-//! [`crate::reconcile::custody::reconcile_pass`].
+//! [`crate::reconcile::custody::reconcile_pass_with_state`].
 //!
 //! The reconcile pass itself is sync and trait-driven (`LocalBlobStore`,
 //! `FetchKicker`) so it stays unit-testable. Production wiring happens here:
@@ -9,10 +9,13 @@
 //!   tokio task that races the candidate set, persists bytes on `Hit` via
 //!   `finalize_fetch_success`, and otherwise drops the result.
 //! - The driving timer arm + `ConnectionEstablished` trigger live on
-//!   [`crate::p2p::P2PNode::run_custody_reconcile`], which builds a
-//!   [`super::custody::BlobStoreSnapshot`] + a `RaceFetchKicker`, calls
-//!   `reconcile_pass`, and folds the [`super::custody::ReconcileOutcome`]
-//!   into [`crate::p2p::ReconciliationMetrics`].
+//!   [`crate::p2p::P2PNode::run_custody_reconcile`], which takes the node's
+//!   single-flight pass permit, reads the CACHED
+//!   [`super::custody::BlobStoreSnapshot`], builds a `RaceFetchKicker`, calls
+//!   `reconcile_pass_with_state`, and folds the
+//!   [`super::custody::ReconcileOutcome`] into
+//!   [`crate::p2p::ReconciliationMetrics`] and the
+//!   `storage_custody_kick_admission_total` series.
 //!
 //! The `kicks_fired_total` atomic is incremented synchronously _before_
 //! `tokio::spawn` is called. This counts work _scheduled_ at kick time,
@@ -89,6 +92,13 @@ pub struct RaceFetchKicker {
     /// serialized on a single execution lane, so in-pass-only bounding
     /// is the correct shape.
     pub kick_semaphore: Arc<tokio::sync::Semaphore>,
+    /// Node-owned cross-pass sweep state. Two things are recorded here when a
+    /// kicked fetch HITS: the kick ledger forgets the hash (so its backoff and
+    /// exhaustion counters reset), and the cached pantry snapshot folds the
+    /// hash in (so the very next pass sees the bytes without an O(corpus)
+    /// walk). Without the second, a cached snapshot would keep reporting a
+    /// just-landed blob as missing and the sweep would re-kick what it holds.
+    pub sweep_state: Arc<crate::reconcile::custody::CustodySweepState>,
 }
 
 impl FetchKicker for RaceFetchKicker {
@@ -126,6 +136,7 @@ impl FetchKicker for RaceFetchKicker {
         let parallelism = self.fetch_blob_parallelism.max(1);
         let timeout = Duration::from_secs(self.fetch_blob_timeout_seconds.max(1));
         let metrics = self.metrics.clone();
+        let sweep_state = self.sweep_state.clone();
         let hash_owned = blob_hash.to_string();
 
         // The kick atomic is incremented before scheduling so a saturated
@@ -198,6 +209,10 @@ impl FetchKicker for RaceFetchKicker {
                             "T23: finalize_fetch_success failed for kicked fetch"
                         );
                     } else {
+                        // Satisfied: clear the ledger and make the bytes
+                        // visible to the next pass without a pantry walk.
+                        sweep_state.ledger.record_hit(&hash_owned);
+                        sweep_state.snapshot.note_stored(&hash_owned);
                         debug!(
                             target: "elohim_storage::reconcile",
                             hash = %hash_owned,
@@ -325,6 +340,7 @@ mod tests {
             fetch_blob_timeout_seconds: 1,
             metrics: metrics.clone(),
             kick_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
+            sweep_state: Arc::new(crate::reconcile::custody::CustodySweepState::default()),
         };
 
         kicker.kick(
@@ -364,6 +380,7 @@ mod tests {
             metrics: metrics.clone(),
             // Zero permits: every try_acquire_owned() fails immediately.
             kick_semaphore: Arc::new(tokio::sync::Semaphore::new(0)),
+            sweep_state: Arc::new(crate::reconcile::custody::CustodySweepState::default()),
         };
 
         kicker.kick(
