@@ -21,6 +21,8 @@ overrides:
   playwright-core: 1.59.1
   qs: ^6.15.2
 
+packageExtensionsChecksum: sha256-s+M7SbNZuMEyEW4eEI+KqVAH13fbtLAgBhpwgk33/84=
+
 patchedDependencies:
   '@angular/build@22.1.0':
     hash: a65795dba048a8eb169bd4793cdf5c1ac19b94e8a262aecead1e06ac8c3cf490
@@ -14252,6 +14254,7 @@ snapshots:
       oxc-parser: 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
       tinyglobby: 0.2.15
       ts-morph: 21.0.1
+      typescript: 6.0.3
     optionalDependencies:
       '@angular-devkit/build-angular': 19.2.22(492b478778e6a23477f973d739b0bcb7)
       '@angular/build': 22.1.0(patch_hash=a65795dba048a8eb169bd4793cdf5c1ac19b94e8a262aecead1e06ac8c3cf490)(0642c08608a2021208e0ae2057559362)
@@ -14267,6 +14270,7 @@ snapshots:
       oxc-parser: 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
       tinyglobby: 0.2.15
       ts-morph: 21.0.1
+      typescript: 6.0.3
     optionalDependencies:
       '@angular-devkit/build-angular': 19.2.22(4ee8c4f0bed77853db88ec2d8b80ae8d)
       '@angular/build': 22.1.0(patch_hash=a65795dba048a8eb169bd4793cdf5c1ac19b94e8a262aecead1e06ac8c3cf490)(fe0411dc3eb949409a72f6e1e0118efd)
@@ -14282,6 +14286,7 @@ snapshots:
       oxc-parser: 0.121.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
       tinyglobby: 0.2.15
       ts-morph: 21.0.1
+      typescript: 6.0.3
     optionalDependencies:
       '@angular-devkit/build-angular': 19.2.22(5c2d3ff3f3aa330295ae167bcdf7000f)
       '@angular/build': 22.1.0(patch_hash=a65795dba048a8eb169bd4793cdf5c1ac19b94e8a262aecead1e06ac8c3cf490)(0642c08608a2021208e0ae2057559362)

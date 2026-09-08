@@ -3,10 +3,8 @@
 # (spec ratchet-to-delivery-dataplane-sdk-lanes, lane D rung D2; evidence-ladder-push-left §3
 # "ascend-only": a dataplane change is pushed only after the household mesh has seen it).
 #
-# WARN-ONLY by default: prints a NO-T2-RECEIPT banner when the push touches a dataplane path and
-# no household sprint-report is newer than the newest changed file. T2_RECEIPT=strict (or --strict)
-# turns the banner into a refusal. It never blocks a push the container cannot prove — the mesh may
-# be down; the banner names the command that produces the receipt.
+# Serving changes require every deliverability station on the current source.
+# Other dataplane changes retain the advisory recency receipt unless --strict.
 #
 # usage: t2-receipt.sh --changed <file: one repo-relative path per line> [--reports <dir>] [--strict]
 set -u
@@ -25,16 +23,18 @@ REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
 
 # The paths whose behaviour only the household mesh can witness (T2 in the ladder).
 DATAPLANE_RE='^(elohim/elohim-storage/src/(p2p|sync|reconcile|p2p_iroh)/|doorway/doorway-service/src/)'
-# The SERVING paths: a change here is refused without a household receipt that EXERCISED
-# @concern:doorway-failover (the boot-through-doorway lane), regardless of T2_RECEIPT — spec
-# 2026-09-08 epr-app-deliverability-through-doorway D4a. A newer report that skipped the concern
-# is not a receipt for it.
-SERVING_RE='^(doorway/doorway-service/src/(render|projection)/|doorway/doorway-service/src/routes/apps\.rs|elohim/elohim-storage/src/services/content_service\.rs)'
-SERVING_CONCERN='doorway-failover'
-touched=$(grep -E "$DATAPLANE_RE" "$CHANGED_FILE" || true)
+SERVING_RE='^(app/scripts/lint-ssr-entry\.mjs|elohim/sdk/scripts/|scripts/ci/(stage-spa-blob|verify-served-shell|verify-projected-head|same-doorway-curl)|doorway/doorway-service/src/|elohim/elohim-storage/src/(services/content_service\.rs|services/head_adoption\.rs|db/content|routes/apps|http|ssr|app_deliverability|sync/|p2p/(projection_reconcile|blob|view|content)|p2p_iroh/|reconcile/)|genesis/a2o/(features/dataplane/(epr-app-deliverability|served-shell-boots)|steps/dataplane/epr-app-deliverability|scripts/(browser-shell|verify-served-shell|lib/sut)|src/framework/served-shell-boot))'
+touched=$(grep -E "$DATAPLANE_RE|$SERVING_RE" "$CHANGED_FILE" || true)
 [ -n "$touched" ] || exit 0
 serving_touched=$(grep -E "$SERVING_RE" "$CHANGED_FILE" || true)
-if [ -n "$serving_touched" ]; then STRICT=strict; fi
+if [ -n "$serving_touched" ]; then
+  if node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR"; then
+    exit 0
+  fi
+  echo '[pre-push] NO-SERVING-RECEIPT (refused): every browser, SSR and recovery station must pass on the current source.' >&2
+  echo '[pre-push] Produce the receipt: just test mesh features/dataplane/epr-app-deliverability.feature' >&2
+  exit 1
+fi
 
 newest_change=0
 while IFS= read -r f; do
@@ -51,26 +51,6 @@ for r in "$REPORTS_DIR"/sprint-report-household-*.json; do
 done
 
 if [ -n "$newest_report" ] && [ "$newest_report_m" -ge "$newest_change" ]; then
-  if [ -n "$serving_touched" ]; then
-    # The receipt must have EXERCISED the serving concern, not merely postdate the change.
-    if python3 - "$newest_report" "$SERVING_CONCERN" <<'PY'
-import json, sys
-d = json.load(open(sys.argv[1])); c = sys.argv[2]
-ex = set((d.get("declared") or {}).get("exercised") or [])
-byc = (d.get("summary") or {}).get("byConcern") or {}
-ok = c in ex and (byc.get(c, {}).get("failed", 0) == 0) and (byc.get(c, {}).get("passed", 0) > 0)
-sys.exit(0 if ok else 1)
-PY
-    then
-      echo "[pre-push] T2 receipt: $(basename "$newest_report") exercised @concern:$SERVING_CONCERN green and is newer than the serving-path changes."
-      exit 0
-    fi
-    echo "[pre-push] ── NO-SERVING-RECEIPT (refused) ─────────────────────────────────────" >&2
-    echo "[pre-push]   serving paths changed but the newest household report did not exercise @concern:$SERVING_CONCERN green:" >&2
-    echo "$serving_touched" | sed 's/^/[pre-push]     /' >&2
-    echo "[pre-push]   produce one: just test mesh features/dataplane/epr-app-deliverability.feature   (household mesh up: just mesh start && just mesh wait)" >&2
-    rm -f "$CHANGED_FILE" 2>/dev/null; exit 1
-  fi
   echo "[pre-push] T2 receipt: $(basename "$newest_report") is newer than the dataplane changes it covers."
   exit 0
 fi

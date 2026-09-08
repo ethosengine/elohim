@@ -14512,13 +14512,16 @@ impl HttpServer {
 /// tags) stay on the legacy diesel path.
 /// Note: `p2p_published_at` is deliberately excluded — it is a provenance stamp,
 /// not a DHT entry field, so its diesel write is not subject to reconciliation-controller reversion.
-/// `server_blob_hash` is likewise excluded — it is the SSR *server* bundle hash, a deploy-time
-/// projection artifact (not part of the notarized content entry, whose content address is
-/// `blob_cid`). Routing a serverBlobHash-only PATCH through the conductor would 503 on
-/// household/local stacks with no conductor bridge; the diesel-direct write is correct and is
-/// not reverted by the reconciliation controller.
+/// Server bundle identity lives in the notarized Content metadata snapshot.
+/// Reserved-key metadata patches require the conductor so they cannot bypass it.
 fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
-    view.blob_hash.is_some() || view.reach.is_some()
+    view.blob_hash.is_some()
+        || view.reach.is_some()
+        || view.server_blob_hash.is_some()
+        || view
+            .metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.0.get("serverBlobHash").is_some())
 }
 
 /// Map a DB `AcquisitionPin` model to its wire view.
@@ -17406,17 +17409,24 @@ mod tests {
             "title-only PATCH can use diesel"
         );
 
-        // A serverBlobHash-only PATCH (the SSR deploy path) must NOT route to the
-        // conductor — server_blob_hash is a deploy-projection artifact, not a
-        // DNA-notarized content-entry field. Routing it through the conductor
-        // would 503 on household/local stacks with no conductor bridge.
+        // Server code selection must be witnessed, including server-only deploys.
         let ssr = UpdateContentInputView {
             server_blob_hash: Some("sha256-ssrserver".into()),
             ..patch_view(None, None)
         };
         assert!(
-            !patch_needs_conductor(&ssr),
-            "serverBlobHash-only PATCH must stay on the diesel-direct path"
+            patch_needs_conductor(&ssr),
+            "serverBlobHash-only PATCH must author a witnessed Content snapshot"
+        );
+        let metadata = UpdateContentInputView {
+            metadata: Some(crate::views::JsonVal(
+                serde_json::json!({"serverBlobHash":"sha256-server"}),
+            )),
+            ..patch_view(None, None)
+        };
+        assert!(
+            patch_needs_conductor(&metadata),
+            "reserved metadata cannot bypass the conductor"
         );
     }
 

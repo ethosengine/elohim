@@ -3075,40 +3075,59 @@ async fn stock_warm_shell(
     declared: Option<String>,
     bytes: Vec<u8>,
     content_type: &str,
-) {
-    match declared {
-        Some(hash) => {
-            state
-                .warm_shell
-                .stock(
-                    &projection.epr_id,
-                    &projection.entry_file,
-                    &hash,
-                    content_type,
-                    bytes,
-                )
-                .await;
-        }
-        None => {
-            // No content address to archive under — but the HOT entry must
-            // still take these bytes, or the next SHELL_UPGRADE_RETRY_SECS of
-            // requests re-serve the stale shell this read just replaced and
-            // convergence never sticks.
-            tracing::debug!(
-                target: "doorway::ssr",
-                epr_id = %projection.epr_id,
-                "warm shell stocked hot-only — the projection declares no blob hash for this app"
-            );
-            state
-                .warm_shell
-                .stock_unbound(
-                    &projection.epr_id,
-                    &projection.entry_file,
-                    content_type,
-                    bytes,
-                )
-                .await;
-        }
+) -> crate::render::warm_shell::ShellOutcome {
+    crate::render::warm_shell::stock_and_return(
+        &state.warm_shell,
+        &projection.epr_id,
+        &projection.entry_file,
+        declared,
+        crate::render::warm_shell::FetchedShell {
+            bytes,
+            content_type: content_type.to_string(),
+        },
+        true,
+    )
+    .await
+}
+
+fn judged_shell_response(
+    outcome: crate::render::warm_shell::ShellOutcome,
+    chrome_context_json: &str,
+) -> Response<Full<Bytes>> {
+    if let crate::render::warm_shell::ShellOutcome::Converging(reason) = &outcome {
+        return converging_shell_response(CONVERGING_SHELL_RETRY_AFTER_SECS, reason);
+    }
+    let provenance = outcome.provenance();
+    match (outcome.shell(), provenance) {
+        (Some(shell), Some(provenance)) => projected_shell_response(
+            shell.bytes.clone(),
+            &shell.content_type,
+            chrome_context_json,
+            provenance,
+        ),
+        _ => converging_shell_response(
+            CONVERGING_SHELL_RETRY_AFTER_SECS,
+            &crate::render::coherence::BehindReason::StorageUnreachable,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod judged_shell_tests {
+    #[test]
+    fn missing_asset_reason_survives_the_converging_http_response() {
+        let response = super::judged_shell_response(
+            crate::render::warm_shell::ShellOutcome::Converging(
+                crate::render::coherence::BehindReason::MissingAsset("main-MISSING.js".into()),
+            ),
+            "{}",
+        );
+        assert_eq!(response.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response.headers()["x-elohim-bundle"],
+            "behind;missing-asset:main-MISSING.js"
+        );
+        assert!(response.headers().contains_key("retry-after"));
     }
 }
 
@@ -3261,31 +3280,14 @@ async fn dispatch_to_projected_epr(
         shell_head = decision.declared.clone();
         match decision.plan {
             ShellPlan::ServeWarm => {
-                if let Some(shell) = decision.warm {
-                    // `incoherence` is what makes a stale serve VISIBLE. Before
-                    // 2026-09-08 this arm always said `last-reconciled`, so a
-                    // shell naming a script that 404s and a healthy one were the
-                    // same response to every reader.
-                    let provenance = match decision.incoherence.clone() {
-                        None => ShellProvenance::LastReconciled,
-                        Some(reason) => {
-                            tracing::info!(
-                                request_path = %request_path,
-                                epr_id = %projection.epr_id,
-                                head = %shell.blob_hash,
-                                reason = %reason.class(),
-                                "EPR router: shell served BEHIND — head not confirmed deliverable"
-                            );
-                            ShellProvenance::Behind(reason)
-                        }
-                    };
-                    return projected_shell_response(
-                        shell.bytes,
-                        &shell.content_type,
-                        chrome_context_json,
-                        provenance,
-                    );
-                }
+                let outcome = crate::render::warm_shell::serve_held(
+                    &state.warm_shell,
+                    decision.warm,
+                    decision.incoherence,
+                    upstream_available,
+                )
+                .await;
+                return judged_shell_response(outcome, chrome_context_json);
             }
             ShellPlan::UpgradeThenWarm => {
                 // We already hold a serviceable answer, so this read gets the
@@ -3303,45 +3305,28 @@ async fn dispatch_to_projected_epr(
                     FetchBudget::Upgrade,
                 )
                 .await;
-                match (upgraded, decision.warm) {
-                    (Some(fresh), _) => {
+                let outcome = match upgraded {
+                    Some(fresh) => {
                         stock_warm_shell(
                             state,
                             &projection,
                             shell_head.clone(),
-                            fresh.bytes.clone(),
-                            &fresh.content_type,
-                        )
-                        .await;
-                        return projected_shell_response(
                             fresh.bytes,
                             &fresh.content_type,
-                            chrome_context_json,
-                            ShellProvenance::for_fresh(shell_head.is_some()),
-                        );
+                        )
+                        .await
                     }
-                    (None, Some(shell)) => {
-                        tracing::debug!(
-                            request_path = %request_path,
-                            epr_id = %projection.epr_id,
-                            head = %shell.blob_hash,
-                            "EPR router: shell upgrade did not land — serving the bytes in hand"
-                        );
-                        let provenance = match decision.incoherence.clone() {
-                            None => ShellProvenance::LastReconciled,
-                            Some(reason) => ShellProvenance::Behind(reason),
-                        };
-                        return projected_shell_response(
-                            shell.bytes,
-                            &shell.content_type,
-                            chrome_context_json,
-                            provenance,
-                        );
+                    None => {
+                        crate::render::warm_shell::serve_held(
+                            &state.warm_shell,
+                            decision.warm,
+                            decision.incoherence,
+                            upstream_available,
+                        )
+                        .await
                     }
-                    // Unreachable by construction (UpgradeThenWarm only follows
-                    // a hit); fall through rather than unwrap on the hot path.
-                    (None, None) => {}
-                }
+                };
+                return judged_shell_response(outcome, chrome_context_json);
             }
             // COLD + upstream unavailable: this doorway holds NOTHING for an
             // app it is mounted to serve, and cannot read one. Say so now with
@@ -3463,7 +3448,7 @@ async fn dispatch_to_projected_epr(
                     // yet, say) stocks NOTHING — never invent a shell for a
                     // head we could not read.
                     if status.is_success() && sub_path == projection.entry_file {
-                        stock_warm_shell(
+                        let outcome = stock_warm_shell(
                             state,
                             &projection,
                             shell_head.clone(),
@@ -3471,6 +3456,7 @@ async fn dispatch_to_projected_epr(
                             &content_type,
                         )
                         .await;
+                        return judged_shell_response(outcome, chrome_context_json);
                     }
                     // Native runtime chrome: an HTML page served via this proxy is
                     // an EPR-router HTML serve (the landing `/`, a pillar mount),
@@ -4428,7 +4414,8 @@ async fn resolve_projected_shell(
             let provenance = ShellProvenance::for_fresh(shell.head_bound);
             Ok((shell.html(), provenance))
         }
-        crate::render::warm_shell::ShellOutcome::Unavailable => {
+        crate::render::warm_shell::ShellOutcome::Unavailable
+        | crate::render::warm_shell::ShellOutcome::Converging(_) => {
             // Cold cache AND no upstream answer. Name which one so the shed
             // accounting keeps distinguishing "circuit already open" (no attempt
             // made) from "the attempt failed".

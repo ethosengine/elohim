@@ -1079,7 +1079,14 @@ Then(
       `${peerName}: the page served at "${page.urlPath}" names no script or stylesheet at all — there is nothing for a browser to boot`
     );
 
-    const unresolved = await findUnresolvedAssets(refs, page.url);
+    const baseHref = /<base\b[^>]*href=["']([^"']+)["']/i.exec(page.text)?.[1];
+    const documentBase = baseHref ? new URL(baseHref, page.url).toString() : page.url;
+    assert.equal(
+      new URL(documentBase).origin,
+      new URL(page.url).origin,
+      `${peerName}: document base sends the app's assets to another doorway: ${documentBase}`
+    );
+    const unresolved = await findUnresolvedAssets(refs, documentBase);
     if (unresolved.length > 0) {
       assert.fail(
         `${peerName}: the page served at "${page.urlPath}" names ${unresolved.length} asset(s) this doorway does not hold — ` +

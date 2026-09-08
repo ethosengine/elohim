@@ -225,6 +225,14 @@ dev action="status" profile="isolated" seed="false" build="false":
         exec "{{ app_dir }}/scripts/hc-start.sh" --conductor
         ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
+      package)
+        package_app="{{ profile }}"
+        [[ "$package_app" == "isolated" ]] && package_app="{{ app_dir }}"
+        package_args=("$package_app" --build)
+        [[ -n "${EPR_APP_ADAPTER:-}" ]] && package_args+=(--adapter "$EPR_APP_ADAPTER")
+        [[ -n "${EPR_APP_TARGET:-}" ]] && package_args+=(--target "$EPR_APP_TARGET")
+        exec node "{{ root }}/elohim/sdk/scripts/package-app.mjs" "${package_args[@]}"
+        ;;
       stop)
         # Sprint 2026-09-08 follow-up: was `pkill -x holochain` + `fuser -k` on
         # fixed ports — beside a running household mesh (hc-mesh.sh) that killed
@@ -234,7 +242,7 @@ dev action="status" profile="isolated" seed="false" build="false":
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be start|conductor|app|package|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
@@ -508,3 +516,8 @@ _gate-cargo-coverage:
 _gate-pipeline-list-fresh:
     node genesis/orchestrator/scripts/generate-pipeline-list.mjs
     git diff --exit-code -- genesis/orchestrator/pipeline-list.json
+
+# SDK archive checks shared by local EPR-app packaging and CI staging.
+[private]
+_gate-epr-app-package:
+    node --test "{{ root }}/elohim/sdk/scripts/package-app.test.mjs"

@@ -3,9 +3,15 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { AppComponent } from './app/app.component';
 import { appConfig } from './app/app.config';
 
-bootstrapApplication(AppComponent, appConfig).catch((err: unknown) =>
-  console.error('Application bootstrap failed:', err)
-);
+bootstrapApplication(AppComponent, appConfig)
+  .then(app => {
+    // Browser-only proof: server-rendered HTML cannot certify client bootstrap.
+    for (const component of app.components) {
+      const root = component.location.nativeElement as HTMLElement;
+      root.setAttribute('data-app-ready', 'true');
+    }
+  })
+  .catch((err: unknown) => console.error('Application bootstrap failed:', err));
 
 // Register apps Service Worker for offline HTML5 app delivery.
 // main.ts is the BROWSER entry point -- SSR boots through main.server.ts and

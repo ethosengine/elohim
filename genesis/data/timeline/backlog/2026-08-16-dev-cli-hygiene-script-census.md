@@ -173,3 +173,9 @@ hints were copy-pasteable no-ops that read as success. Fixed in `genesis/seeder/
 a managed surface that wants a cite-tooling pass. A hint naming a filter that matches nothing is
 exactly the "out-of-date instructions are cognitive load" this census exists to burn down —
 worth a grep sweep for other `--filter` names that no longer resolve.
+
+## 2026-09-08 — EPR-app packaging in the existing dev verb
+
+`just dev package <app-directory>` builds an Angular app and exposes the SDK pack/check operation. CI staging calls the same implementation; the command adds no npm alias or top-level verb. It produces archives without publishing. Household delivery remains `just test mesh`, so packaging checks cannot be mistaken for propagation or doorway boot evidence.
+
+`EPR_APP_ADAPTER=<local-module>` selects a supplied adapter through the same `dev package` arm. Framework-specific build/layout/check/launch behavior stays in adapters; Angular is the first built-in. This adds no global client-kind enum or mandatory SSR requirement.

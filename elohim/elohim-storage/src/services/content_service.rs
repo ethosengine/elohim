@@ -21,6 +21,40 @@ pub struct ContentService {
     events: Arc<EventBus>,
 }
 
+/// Merge into canonical metadata without importing the denormalized server column.
+fn merge_server_bundle_metadata(
+    existing: Option<&str>,
+    patch: Option<&serde_json::Value>,
+    server_hash: Option<&str>,
+) -> Result<Option<String>, StorageError> {
+    if patch.is_none() && server_hash.is_none() {
+        return Ok(None);
+    }
+    let base = existing
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    let mut merged = match (base, patch) {
+        (serde_json::Value::Object(mut base), Some(serde_json::Value::Object(patch))) => {
+            base.extend(patch.clone());
+            serde_json::Value::Object(base)
+        }
+        (_, Some(patch)) => patch.clone(),
+        (base, None) => base,
+    };
+    if let Some(hash) = server_hash {
+        let object = merged.as_object_mut().ok_or_else(|| {
+            StorageError::Validation("SSR bundle metadata must be an object".into())
+        })?;
+        object.insert(
+            "serverBlobHash".into(),
+            serde_json::Value::String(hash.into()),
+        );
+    }
+    Ok(Some(
+        serde_json::to_string(&merged).map_err(|e| StorageError::Internal(e.to_string()))?,
+    ))
+}
+
 impl ContentService {
     /// Create a new content service
     pub fn new(pool: DbPool, ctx: AppContext, events: Arc<EventBus>) -> Self {
@@ -179,6 +213,16 @@ impl ContentService {
         id: &str,
         view: crate::views::UpdateContentInputView,
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        if view.server_blob_hash.is_some()
+            || view
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.0.get("serverBlobHash").is_some())
+        {
+            return Err(StorageError::Validation(
+                "serverBlobHash requires the conductor-backed Content update".into(),
+            ));
+        }
         let mut conn = self.conn()?;
 
         // Compute merged metadata_json before entering the DB layer
@@ -199,6 +243,12 @@ impl ContentService {
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
                 let patch_value = patch_meta.0.clone();
+                if existing_meta.get("serverBlobHash").is_some() && !patch_value.is_object() {
+                    return Err(StorageError::Validation(
+                    "replacing SSR bundle metadata requires the conductor-backed Content update"
+                        .into(),
+                ));
+                }
                 let merged = match (existing_meta, patch_value) {
                     (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
                         for (k, v) in patch {
@@ -303,31 +353,13 @@ impl ContentService {
             return Err(refusal);
         }
 
-        // Merge metadata (same logic as the legacy `update` method above).
-        let merged_metadata_json =
-            if let Some(patch_meta) = &view.metadata {
-                let existing_meta: serde_json::Value = existing
-                    .content
-                    .metadata_json
-                    .as_deref()
-                    .and_then(|s| serde_json::from_str(s).ok())
-                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
-                let patch_value = patch_meta.0.clone();
-                let merged = match (existing_meta, patch_value) {
-                    (serde_json::Value::Object(mut base), serde_json::Value::Object(patch)) => {
-                        for (k, v) in patch {
-                            base.insert(k, v);
-                        }
-                        serde_json::Value::Object(base)
-                    }
-                    (_, patch) => patch,
-                };
-                Some(serde_json::to_string(&merged).map_err(|e| {
-                    StorageError::Internal(format!("Metadata serialize error: {}", e))
-                })?)
-            } else {
-                None
-            };
+        // Both executable hashes belong to the same Content snapshot. Never
+        // bootstrap from the mutable SQL server column (an unverified hint).
+        let merged_metadata_json = merge_server_bundle_metadata(
+            existing.content.metadata_json.as_deref(),
+            view.metadata.as_ref().map(|value| &value.0),
+            view.server_blob_hash.as_deref(),
+        )?;
 
         // The DNA target field is `blob_cid`. View carries `blob_hash`.
         let new_blob_cid = view.blob_hash.clone();
@@ -474,23 +506,6 @@ impl ContentService {
                 &action_hash_str,
                 election,
             )?;
-        }
-
-        // `server_blob_hash` is a deploy-projection field, not part of the
-        // notarized content entry — the conductor round-trip + ContentProjectionPatch
-        // above do not carry it. If this PATCH also set serverBlobHash (e.g. a
-        // combined {blobHash, serverBlobHash} body that routed here via
-        // patch_needs_conductor), persist it diesel-direct so it isn't dropped.
-        // No-clobber: only server_blob_hash is set; update_content preserves all
-        // other fields (the just-projected anchor/blob_cid included).
-        if view.server_blob_hash.is_some() {
-            let mut conn = self.conn()?;
-            let server_patch = content_diesel::UpdateContentInput {
-                id: id.to_string(),
-                server_blob_hash: view.server_blob_hash.clone(),
-                ..Default::default()
-            };
-            content_diesel::update_content(&mut conn, &self.ctx, server_patch)?;
         }
 
         // Mirror the COMMITTED reach into SQL when the re-publish carried a
@@ -917,16 +932,6 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------
-    // D3 (epr-app-deliverability-through-doorway.md) — `serverBlobHash`
-    // converges peer to peer. The diesel-direct server-head write in
-    // `ContentService::update` (the diesel-only PATCH path
-    // `patch_needs_conductor` routes a serverBlobHash-only body to) must emit
-    // `content.updated` on the storage event bus exactly as the browser-head
-    // path (`update_via_conductor`) does — that emission is what feeds the
-    // content-projection listener that (re)projects the sync doc so every
-    // peer converges within one sync round.
-    // ---------------------------------------------------------------------
-
     /// Build an all-`None` PATCH view (mirrors `http.rs`'s `patch_view` test
     /// helper — `UpdateContentInputView` deliberately does not derive
     /// `Default`, a shared ts-rs-anchored view).
@@ -945,61 +950,90 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn server_blob_hash_only_patch_emits_content_updated_bus_event() {
-        use crate::db::content_diesel::{self, CreateContentInput};
-        use crate::db::context::AppContext;
+    #[test]
+    fn server_blob_hash_only_patch_requires_conductor() {
+        let service = ContentService::new(
+            crate::test_util::test_pool(),
+            AppContext::default_lamad(),
+            Arc::new(EventBus::new()),
+        );
+        let view = crate::views::UpdateContentInputView {
+            server_blob_hash: Some("sha256-server".into()),
+            ..empty_patch_view()
+        };
+        assert!(matches!(
+            service.update("app", view),
+            Err(StorageError::Validation(_))
+        ));
+    }
 
+    #[test]
+    fn legacy_metadata_replacement_cannot_erase_canonical_server_identity() {
         let pool = crate::test_util::test_pool();
         let ctx = AppContext::default_lamad();
         {
             let mut conn = pool.get().unwrap();
-            content_diesel::create_content(
-                &mut conn,
-                &ctx,
-                CreateContentInput {
-                    id: "d3-server-head".to_string(),
-                    title: "t".to_string(),
-                    description: None,
-                    content_type: "epr-composite".to_string(),
-                    content_format: "html".to_string(),
-                    blob_hash: Some("sha256-browser-1".to_string()),
-                    blob_cid: None,
-                    content_size_bytes: None,
-                    metadata_json: None,
-                    reach: "commons".to_string(),
-                    created_by: None,
-                    tags: vec![],
-                    content_body: None,
-                    dht_anchor_hash: None,
-                },
-            )
-            .unwrap();
+            for (id, metadata) in [
+                ("ssr-app", r#"{"serverBlobHash":"sha256-server","keep":1}"#),
+                ("plain", "{}"),
+            ] {
+                content_diesel::upsert_with_anchor(
+                    &mut conn,
+                    &ctx,
+                    id,
+                    content_diesel::ContentProjectionPatch {
+                        metadata_json: Some(metadata.into()),
+                        ..Default::default()
+                    },
+                    "head",
+                    content_diesel::HeadElection::Declare,
+                )
+                .unwrap();
+            }
         }
-
-        let events = Arc::new(EventBus::new());
-        // Subscribe BEFORE the write — the bus has no replay, so a receiver
-        // created after emit would miss the event and the test would hang.
-        let mut rx = events.subscribe();
-        let service = ContentService::new(pool, ctx, events);
-
-        let view = crate::views::UpdateContentInputView {
-            server_blob_hash: Some("sha256-server-head-1".to_string()),
+        let service = ContentService::new(pool, ctx, Arc::new(EventBus::new()));
+        let patch = |metadata| crate::views::UpdateContentInputView {
+            metadata: Some(crate::views::JsonVal(metadata)),
             ..empty_patch_view()
         };
-        service
-            .update("d3-server-head", view)
-            .expect("serverBlobHash-only PATCH must succeed on the diesel-direct path");
+        assert!(matches!(
+            service.update("ssr-app", patch(serde_json::json!([]))),
+            Err(StorageError::Validation(_))
+        ));
+        let updated = service
+            .update("ssr-app", patch(serde_json::json!({"other":2})))
+            .unwrap();
+        assert_eq!(
+            updated.content.server_blob_hash.as_deref(),
+            Some("sha256-server")
+        );
+        let metadata: serde_json::Value =
+            serde_json::from_str(updated.content.metadata_json.as_deref().unwrap()).unwrap();
+        assert_eq!(metadata["serverBlobHash"], "sha256-server");
+        assert_eq!(metadata["keep"], 1);
+        assert_eq!(metadata["other"], 2);
+        assert!(service
+            .update("plain", patch(serde_json::json!([])))
+            .is_ok());
+    }
 
-        let event = tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv())
-            .await
-            .expect("content.updated bus event never arrived for the serverBlobHash PATCH")
-            .expect("bus recv error");
-        match event {
-            StorageEvent::ContentUpdated { id } => {
-                assert_eq!(id, "d3-server-head");
-            }
-            other => panic!("expected ContentUpdated, got {other:?}"),
-        }
+    #[test]
+    fn server_bundle_metadata_preserves_other_fields_and_never_imports_a_sql_hint() {
+        let patch = serde_json::json!({"newField": true});
+        let merged = merge_server_bundle_metadata(
+            Some(r#"{"keep":42,"serverBlobHash":"old"}"#),
+            Some(&patch),
+            Some("new"),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&merged).unwrap(),
+            serde_json::json!({"keep":42,"newField":true,"serverBlobHash":"new"})
+        );
+        assert_eq!(
+            merge_server_bundle_metadata(Some("{}"), None, None).unwrap(),
+            None
+        );
     }
 }

@@ -252,6 +252,7 @@ pub struct BundleHeadsReconciler {
     warm_shell: Arc<WarmShellStore>,
     heads: Arc<BundleHeadStore>,
     targets: TargetSource,
+    reconcile_lock: tokio::sync::Mutex<()>,
 }
 
 impl BundleHeadsReconciler {
@@ -272,6 +273,7 @@ impl BundleHeadsReconciler {
             warm_shell,
             heads,
             targets,
+            reconcile_lock: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -290,6 +292,8 @@ impl BundleHeadsReconciler {
     /// `entry_file` is only used to name the shell being evicted; eviction is
     /// slug-scoped, so `None` still evicts correctly.
     pub async fn reconcile_slug(&self, slug: &str, entry_file: Option<&str>) -> Option<HeadMove> {
+        // Tick and SSE reconciliation must not interleave old reads with newer writes.
+        let _guard = self.reconcile_lock.lock().await;
         let doc = match self.source.fetch(slug).await {
             Ok(doc) => doc,
             Err(e) => {
@@ -305,6 +309,14 @@ impl BundleHeadsReconciler {
             }
         };
 
+        // Re-assert storage truth even when its head did not move. A Mongo outage,
+        // late bulk projection, or slug-index eviction can undo a previous write.
+        // Observing a head is not evidence that its projection still holds it.
+        if let Some(projection) = self.projection.as_ref() {
+            projection
+                .write_heads(slug, doc.browser.as_deref(), doc.server.as_deref())
+                .await;
+        }
         let mv = self.heads.record(slug, &doc);
         if !mv.moved() {
             return None;
@@ -321,14 +333,6 @@ impl BundleHeadsReconciler {
             head12(mv.server_from.as_deref()),
             head12(mv.server_to.as_deref()),
         );
-
-        // Write-through FIRST, so a request racing the eviction below
-        // re-resolves against the new declaration rather than the old one.
-        if let Some(projection) = self.projection.as_ref() {
-            projection
-                .write_heads(slug, mv.browser_to.as_deref(), mv.server_to.as_deref())
-                .await;
-        }
 
         if mv.browser_moved() {
             // The hot map is consulted BEFORE the archive, so without this the
@@ -489,7 +493,7 @@ mod tests {
 
     fn reconciler(
         source: Arc<FakeSource>,
-        projection: Arc<FakeProjection>,
+        projection: Arc<dyn HeadProjection>,
         warm: Arc<WarmShellStore>,
     ) -> BundleHeadsReconciler {
         BundleHeadsReconciler::new(
@@ -537,7 +541,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_steady_head_writes_nothing_and_logs_nothing() {
+    async fn a_steady_head_repairs_projection_without_reporting_a_head_move() {
         let source = FakeSource::declaring(Some("sha256-aaaa1111"), None);
         let projection = Arc::new(FakeProjection::default());
         let r = reconciler(
@@ -556,8 +560,49 @@ mod tests {
         }
         assert_eq!(
             projection.writes.lock().unwrap().len(),
-            after_first,
-            "a steady head must not re-write the projection every 30s"
+            after_first + 3,
+            "a steady head must repair projection drift on every tick"
+        );
+    }
+
+    #[tokio::test]
+    async fn transient_projection_failure_is_retried_without_another_head_move() {
+        struct UnavailableOnce {
+            calls: std::sync::atomic::AtomicUsize,
+            persisted: Mutex<Option<String>>,
+        }
+        #[async_trait::async_trait]
+        impl HeadProjection for UnavailableOnce {
+            async fn write_heads(&self, _slug: &str, browser: Option<&str>, _server: Option<&str>) {
+                if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    return; // Mongo is unavailable on the first observation.
+                }
+                *self.persisted.lock().unwrap() = browser.map(str::to_string);
+            }
+        }
+        let source = FakeSource::declaring(Some("sha256-current"), None);
+        let projection = Arc::new(UnavailableOnce {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            persisted: Mutex::new(None),
+        });
+        let r = reconciler(
+            source,
+            projection.clone(),
+            Arc::new(WarmShellStore::inert()),
+        );
+        assert_eq!(r.tick().await.len(), 1);
+        assert!(projection.persisted.lock().unwrap().is_none());
+        assert!(r.tick().await.is_empty());
+        assert_eq!(
+            projection.persisted.lock().unwrap().as_deref(),
+            Some("sha256-current")
+        );
+        // A late stale projection must heal too, even after a successful write.
+        *projection.persisted.lock().unwrap() = Some("sha256-stale".into());
+        assert!(r.tick().await.is_empty());
+        assert_eq!(
+            projection.persisted.lock().unwrap().as_deref(),
+            Some("sha256-current")
         );
     }
 

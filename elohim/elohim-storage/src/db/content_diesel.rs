@@ -937,6 +937,17 @@ pub struct ContentProjectionPatch {
     pub metadata_json: Option<String>,
 }
 
+/// Derive only from conductor-verified Content metadata. An absent key clears
+/// obsolete executable identity; CRDT reverse projection never calls this.
+fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(metadata)
+        .ok()?
+        .get("serverBlobHash")?
+        .as_str()
+        .filter(|hash| !hash.is_empty())
+        .map(str::to_owned)
+}
+
 /// Apply the present fields of a `ContentProjectionPatch` to an EXISTING content
 /// row via targeted per-field UPDATEs (`None` fields preserve the existing
 /// column). Mirrors `blob_cid` into the legacy `blob_hash` column so downstream
@@ -997,7 +1008,10 @@ fn apply_content_patch_fields(
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id)),
         )
-        .set(content::metadata_json.eq(v))
+        .set((
+            content::metadata_json.eq(v),
+            content::server_blob_hash.eq(server_bundle_from_metadata(v)),
+        ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
     }
@@ -1088,6 +1102,21 @@ pub fn upsert_with_anchor(
     dht_anchor_hash: &str,
     election: HeadElection,
 ) -> Result<(), StorageError> {
+    // Keep the declaration read and serving-field writes in one transaction.
+    // A concurrent declaration cannot land between the guard and the patch.
+    conn.transaction(|conn| {
+        upsert_with_anchor_transaction(conn, ctx, id, patch, dht_anchor_hash, election)
+    })
+}
+
+fn upsert_with_anchor_transaction(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    mut patch: ContentProjectionPatch,
+    dht_anchor_hash: &str,
+    election: HeadElection,
+) -> Result<(), StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
@@ -1100,6 +1129,23 @@ pub fn upsert_with_anchor(
         .unwrap_or(false);
 
     if existing {
+        let declared: Option<String> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .select(content::declared_head_action_hash)
+            .first(conn)
+            .map_err(|e| StorageError::Internal(format!("Read declaration failed: {e}")))?;
+        if election == HeadElection::PreserveExistingDeclaration
+            && declared
+                .as_deref()
+                .is_some_and(|head| head != dht_anchor_hash)
+        {
+            // A late local snapshot is provenance, not permission to choose a
+            // different browser or server executable under the preserved head.
+            patch.blob_cid = None;
+            patch.content_size_bytes = None;
+            patch.metadata_json = None;
+        }
         // Build a single UPDATE that touches anchor + whichever patch fields
         // are present. Diesel doesn't generate dynamic SET clauses cleanly,
         // so we run targeted updates per field. Each diesel::update is
@@ -1164,6 +1210,10 @@ pub fn upsert_with_anchor(
         let content_type = patch.content_type.as_deref().unwrap_or(&default_ct);
         let content_format = patch.content_format.as_deref().unwrap_or(&default_cf);
         let reach = patch.reach.as_deref().unwrap_or(&default_re);
+        let server_blob_hash = patch
+            .metadata_json
+            .as_deref()
+            .and_then(server_bundle_from_metadata);
         let new_content = NewContent {
             id,
             h_app_id: &ctx.h_app_id,
@@ -1179,9 +1229,7 @@ pub fn upsert_with_anchor(
             created_by: None,
             content_body: None,
             dht_anchor_hash: None,
-            // SSR server bundle hash is deploy-PATCH populated, not set on this
-            // defensive DHT-projection insert path.
-            server_blob_hash: None,
+            server_blob_hash: server_blob_hash.as_deref(),
         };
 
         diesel::insert_into(content::table)
@@ -4174,6 +4222,54 @@ mod tests {
     /// This is the regression guard for the DELIBERATE channels (the HTTP
     /// re-notarize PATCH); the adopt-before-author fix must not disarm them.
     #[test]
+    fn accepted_content_snapshot_projects_both_bundle_heads() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        for id in ["new-app", "existing-app"] {
+            if id == "existing-app" {
+                create_content(&mut conn, &ctx, mk_plain(id)).unwrap();
+            }
+            upsert_with_anchor(
+                &mut conn,
+                &ctx,
+                id,
+                ContentProjectionPatch {
+                    blob_cid: Some("sha256-browser".into()),
+                    metadata_json: Some(r#"{"serverBlobHash":"sha256-server","keep":1}"#.into()),
+                    ..Default::default()
+                },
+                "uhCkk-canonical",
+                HeadElection::Declare,
+            )
+            .unwrap();
+            let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+            assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser"));
+            assert_eq!(row.server_blob_hash.as_deref(), Some("sha256-server"));
+            upsert_with_anchor(
+                &mut conn,
+                &ctx,
+                id,
+                ContentProjectionPatch {
+                    metadata_json: Some("{}".into()),
+                    ..Default::default()
+                },
+                "uhCkk-next",
+                HeadElection::Declare,
+            )
+            .unwrap();
+            let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                row.server_blob_hash, None,
+                "canonical removal clears obsolete server code"
+            );
+        }
+    }
+
+    #[test]
     fn upsert_with_anchor_sets_declared_head() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
@@ -4273,6 +4369,69 @@ mod tests {
              every later heal-monotonicity check"
         );
         assert_eq!(row.title, "Re-authored on boot", "value fields still patch");
+    }
+
+    #[test]
+    fn late_preserved_snapshot_cannot_replace_canonical_browser_or_server() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let patch = |browser: &str, server: &str| ContentProjectionPatch {
+            blob_cid: Some(browser.into()),
+            metadata_json: Some(format!(r#"{{"serverBlobHash":"{server}"}}"#)),
+            ..Default::default()
+        };
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "app",
+            patch("browser-new", "server-new"),
+            "head-new",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "app",
+            patch("browser-old", "server-old"),
+            "head-old",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "app", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("head-new"));
+        assert_eq!(row.blob_hash.as_deref(), Some("browser-new"));
+        assert_eq!(row.server_blob_hash.as_deref(), Some("server-new"));
+        assert!(row.metadata_json.unwrap().contains("server-new"));
+
+        // Re-delivery of the elected snapshot may repair its projection.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "app",
+            patch("browser-new", "server-new"),
+            "head-new",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        // An undeclared row still accepts its first witnessed snapshot.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "fresh",
+            patch("browser-first", "server-first"),
+            "head-first",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let fresh = get_content(&mut conn, &ctx, "fresh", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(fresh.server_blob_hash.as_deref(), Some("server-first"));
+        assert_eq!(fresh.blob_hash.as_deref(), Some("browser-first"));
+        assert!(fresh.declared_head_action_hash.is_none());
     }
 
     /// Adopt-before-author (b): `PreserveExistingDeclaration` on an UNDECLARED
@@ -4591,7 +4750,10 @@ mod tests {
             "cid-mono",
             "uhCkk-new",
             Some(2_000),
-            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some(r#"{"serverBlobHash":"sha256-new"}"#.into()),
+                ..Default::default()
+            }),
             StampMode::HealCanonical,
             Some((2_000, false)),
         )
@@ -4607,7 +4769,10 @@ mod tests {
             "cid-mono",
             "uhCkk-old",
             Some(1_000),
-            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some(r#"{"serverBlobHash":"sha256-old"}"#.into()),
+                ..Default::default()
+            }),
             StampMode::HealCanonical,
             Some((1_000, false)),
         )
@@ -4621,6 +4786,12 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-new"));
+
+        assert_eq!(
+            row.server_blob_hash.as_deref(),
+            Some("sha256-new"),
+            "refused stale metadata cannot select an older server executable"
+        );
 
         // An answer carrying NO election cannot displace a row that carries one:
         // an un-elected claim never outranks an elected declaration.

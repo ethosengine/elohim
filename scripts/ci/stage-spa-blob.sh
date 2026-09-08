@@ -193,27 +193,25 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     exit 1
 fi
 
-cd "${DIST_DIR}"
-
-# Angular 19 SSR mode emits index.csr.html (Client-Side Rendered fallback)
-# instead of index.html. For static SPA delivery through the protocol's
-# /apps/{slug}/index.html route we need a literal index.html (storage's /apps
-# handler is literal-path, doesn't fall back to index.csr.html). Pure SPAs
-# (app/lamad) pass through unchanged. Server bundles have no index.html at
-# all — skip this step entirely for KIND=server.
-if [ "$KIND" = "browser" ]; then
-    if [ ! -f index.html ] && [ -f index.csr.html ]; then
-        cp index.csr.html index.html
-        echo "  [${SLUG}] materialized index.html from index.csr.html (Angular SSR-mode dist)"
-    fi
+# Package locally through the SDK's checked archive operation. The source dist
+# is immutable; every retry uploads the exact same checked archive bytes.
+SDK_PACKAGE="$(cd "$(dirname "$0")/../.." && pwd)/elohim/sdk/scripts/package-app.mjs"
+package_dir=$(mktemp -d)
+trap 'rm -rf "$package_dir"' EXIT
+app_dir=$(cd "$DIST_DIR/../../.." && pwd)
+package_args=(--adapter "$(dirname "$SDK_PACKAGE")/package-angular.mjs" --dist "$DIST_DIR" --kind "$KIND" --out "$package_dir" --app-dir "$app_dir")
+# Server/browser artifacts are published separately, but their build context is
+# checked together. The actual server build must carry the same build stamp.
+if [ "$KIND" = server ] && [ -f "$DIST_DIR/../browser/version.json" ]; then
+    package_args+=(--version "$DIST_DIR/../browser/version.json")
 fi
-
-# Local + deterministic — done ONCE, not retried (a zip/sha failure is not a
-# transient network blip and re-zipping yields the identical content-addressed
-# hash anyway).
-zip -r spa-bundle.zip .
-SPA_HASH="sha256-$(sha256sum spa-bundle.zip | awk '{print $1}')"
-SPA_SIZE="$(du -h spa-bundle.zip | cut -f1)"
+if ! node "$SDK_PACKAGE" "${package_args[@]}"; then
+    echo "ERROR: [$SLUG] local package checks failed before upload" >&2
+    exit 2
+fi
+SPA_ARCHIVE="$package_dir/$KIND.zip"
+SPA_HASH="sha256-$(sha256sum "$SPA_ARCHIVE" | awk '{print $1}')"
+SPA_SIZE="$(du -h "$SPA_ARCHIVE" | cut -f1)"
 echo "[${SLUG}] blob hash: ${SPA_HASH}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 
@@ -309,7 +307,7 @@ stage_once() {
         -H 'Content-Type: application/zip' \
         -H "X-Blob-Hash: ${SPA_HASH}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
-        --data-binary @spa-bundle.zip \
+        --data-binary "@$SPA_ARCHIVE" \
         "${DOORWAY_EPR_URL}/admin/seed/blob")" || put_rc=$?
     [ -n "${put_response}" ] && echo "${put_response}"
     if [ "${put_rc}" -eq 0 ]; then
@@ -359,12 +357,15 @@ stage_once() {
     fi
 
     if [ "${DO_PATCH}" = "1" ]; then
-        curl -fSs -X PATCH \
+        local patch_response
+        if ! patch_response=$(curl --fail-with-body -sS -X PATCH \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
             -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
-            "${DOORWAY_EPR_URL}${PATCH_PATH}" \
-            >/dev/null || return 1
+            "${DOORWAY_EPR_URL}${PATCH_PATH}"); then
+            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed: ${patch_response}" >&2
+            return 1
+        fi
         echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
 
         local actual
@@ -490,12 +491,10 @@ while true; do
     # already answered. Terminal, immediately, never counted against ATTEMPTS.
     if [ "${rc}" -eq 2 ]; then
         echo "ERROR: [${SLUG}] the peer judged ${SPA_HASH} BROKEN — not retrying a deterministic verdict" >&2
-        rm -f spa-bundle.zip
         exit 2
     fi
     if [ "${attempt}" -ge "${ATTEMPTS}" ]; then
         echo "ERROR: [${SLUG}] stage failed after ${ATTEMPTS} attempt(s) against ${DOORWAY_EPR_URL} — host left STALE" >&2
-        rm -f spa-bundle.zip
         exit 1
     fi
     backoff=$(( attempt * 5 ))
@@ -503,5 +502,3 @@ while true; do
     attempt=$(( attempt + 1 ))
     sleep "${backoff}"
 done
-
-rm -f spa-bundle.zip

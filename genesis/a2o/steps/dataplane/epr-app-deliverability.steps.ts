@@ -20,6 +20,7 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
@@ -35,11 +36,17 @@ import { recordServedPage } from '../dataplane.steps.js';
 
 import {
   buildFixtureBundle,
+  buildServerFixture,
+  doorwayIncarnations,
+  doorwayRestartLog,
+  meshControl,
   CONVERGENCE_BOUND_MS,
   pollUntil,
+  postFixtureCommitment,
   removeFixtureBundle,
   sameOrigin,
   stageBundle,
+  stageInvalidFixture,
   visitInBrowser,
   type BrowserVisit,
   type FixtureBundle,
@@ -57,6 +64,16 @@ interface PublishedApp {
   brokenBundle?: FixtureBundle;
   /** `sha256-…` of the coherent bundle, once staged. */
   blobHash?: string;
+  serverBlobHash?: string;
+  serverDeclarations?: number;
+  browserDeclaredAt?: number;
+  serverDeclaredAt?: number;
+  rendererAdoptionAt?: number;
+  recoveredAt?: number;
+  forcedDeclaredAt?: number;
+  upgradeIncarnations?: string[];
+  restarts?: number;
+  heldPeers?: Set<string>;
   /** `sha256-…` of the incoherent bundle, once its bytes were uploaded. */
   brokenBlobHash?: string;
   /** Every doorway URL this run PATCHed a head onto, in order. */
@@ -73,6 +90,8 @@ interface HouseholdTopology {
   /** doorway name → the storage peer it reads from. */
   behind: Record<string, string>;
 }
+
+const DOORWAYS = ['alpha-A', 'elohim.host'];
 
 const householdPeers = new WeakMap<E2EWorld, HouseholdTopology>();
 const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
@@ -113,7 +132,7 @@ function requireVisit(world: E2EWorld, peerName: string): BrowserVisit {
 
 /** The address the app this run published answers at on one doorway. */
 function appUrl(world: E2EWorld, peerName: string): string {
-  return `${resolvePeerUrl(peerName)}/apps/${encodeURIComponent(app(world).slug)}/index.html`;
+  return `${resolvePeerUrl(peerName)}/lamad/concept/${encodeURIComponent(app(world).slug)}`;
 }
 
 /** The `commit` field of a version.json body, or '' when it carries none. */
@@ -168,19 +187,28 @@ Given(
   }
 );
 
-Given('a coherent EPR app bundle this run just built', function (this: E2EWorld) {
+function buildNextFixture(this: E2EWorld): void {
   const existing = publishedApps.get(this);
-  const bundle = buildFixtureBundle({ coherent: true });
-  this.onCleanup(() => {
+  const slug =
+    existing?.slug ??
+    `epr-app-deliverability-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
+  const bundle = buildFixtureBundle({ coherent: true, baseHref: `/lamad/concept/${slug}/` });
+  this.onCleanup(async () => {
     removeFixtureBundle(bundle);
     return Promise.resolve();
   });
   publishedApps.set(this, {
-    slug: existing?.slug ?? `epr-app-deliverability-${Date.now().toString(36)}`,
+    slug,
     ...existing,
     bundle,
     declaredThrough: existing?.declaredThrough ?? [],
   });
+}
+
+Given('a coherent EPR app bundle this run just built', buildNextFixture);
+When('this run builds a next coherent browser and server version', function (this: E2EWorld) {
+  buildNextFixture.call(this);
+  app(this).upgradeIncarnations = doorwayIncarnations();
 });
 
 /**
@@ -191,7 +219,7 @@ Given('a coherent EPR app bundle this run just built', function (this: E2EWorld)
  * declaration guard would refuse the write anyway (measured 2026-09-05 —
  * declare_earned_canonical_head is restricted to a page's root author).
  */
-Given('an EPR record this run owns for it', { timeout: 60_000 }, async function (this: E2EWorld) {
+Given('an EPR record this run owns for it', { timeout: 180_000 }, async function (this: E2EWorld) {
   const record = app(this);
   const storageUrl = resolveStorageUrl('alpha-A');
   assert.ok(
@@ -217,6 +245,87 @@ Given('an EPR record this run owns for it', { timeout: 60_000 }, async function 
     response.ok,
     `could not author the EPR record "${record.slug}" on ${storageUrl}: ${response.status} ${await response.text()}`
   );
+  // Mount the run-owned site through the same EPR router as the public landing.
+  // These are hosting commitments, not extra writes of the app's head.
+  for (const peerName of DOORWAYS) {
+    const base = resolvePeerUrl(peerName);
+    const coherenceResponse = await fetch(`${base}/api/v1/federation/coherence`);
+    const coherence = (await coherenceResponse.json()) as {
+      doorwayId: string;
+    };
+    assert.ok(coherence.doorwayId, `${peerName} exposes no doorway identity`);
+    const metadata = {
+      urlPath: `/lamad/concept/${record.slug}`,
+      baseHref: `/lamad/concept/${record.slug}/`,
+      mode: 'cached',
+      reach: 'commons',
+      entryFile: 'index.html',
+    };
+    const mounted = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+      },
+      body: JSON.stringify({
+        id: `${record.slug}-${coherence.doorwayId}`,
+        action: 'project-epr',
+        provider: 'human-matthew-manager',
+        receiver: 'human-matthew-manager',
+        inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
+        metadataJson: JSON.stringify(metadata),
+        metadata,
+      }),
+    });
+    const mountResult = mounted.text;
+    if (!mounted.ok && mountResult.includes('UNIQUE constraint failed: rea_commitments.id')) {
+      // The canonical signal can project this very creation before the eager
+      // HTTP projection inserts it. Only exact anchored readback satisfies setup.
+      const id = `${record.slug}-${coherence.doorwayId}`;
+      const readback: Response = await fetch(`${storageUrl}/api/v1/commitments/${id}`);
+      assert.equal(readback.status, 200, `mount race readback ${id}`);
+      const existing = (await readback.json()) as {
+        id: string;
+        action: string;
+        provider: string;
+        receiver: string;
+        inScopeOf: string[];
+        metadata: unknown;
+        dhtAnchorHash?: string;
+      };
+      assert.deepEqual(
+        {
+          id: existing.id,
+          action: existing.action,
+          provider: existing.provider,
+          receiver: existing.receiver,
+          inScopeOf: existing.inScopeOf,
+          metadata: existing.metadata,
+        },
+        {
+          id,
+          action: 'project-epr',
+          provider: 'human-matthew-manager',
+          receiver: 'human-matthew-manager',
+          inScopeOf: [`doorway:${coherence.doorwayId}|epr:${record.slug}`],
+          metadata,
+        }
+      );
+      assert.ok(existing.dhtAnchorHash, 'mount race readback is not anchored');
+    } else {
+      assert.ok(mounted.ok, `mount ${peerName}: ${mounted.status} ${mountResult}`);
+    }
+  }
+  // Head reconciliation targets configured apps, including CSR fallbacks.
+  for (const doorway of ['a', 'b']) await meshControl('doorway-restart', doorway, record.slug);
+  for (const doorway of DOORWAYS) {
+    const ready = await pollUntil(
+      async () =>
+        (await getRaw(`${resolvePeerUrl(doorway)}/health`, { timeoutMs: 2000 })).status === 200,
+      60_000
+    );
+    assert.notEqual(ready, null, `${doorway}: configured fixture doorway did not become ready`);
+  }
 });
 
 When(
@@ -225,7 +334,7 @@ When(
   async function (this: E2EWorld) {
     const record = app(this);
     const bundle = requireBundle(this);
-    for (const peerName of ['alpha-A', 'elohim.host']) {
+    for (const peerName of DOORWAYS) {
       const outcome = await stageBundle({
         bundle,
         slug: record.slug,
@@ -257,6 +366,7 @@ When(
       `declaring the head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
     );
     record.blobHash = outcome.blobHash;
+    record.browserDeclaredAt = Date.now();
     record.declaredThrough.push(doorwayUrl);
   }
 );
@@ -266,7 +376,11 @@ When(
   { timeout: 300_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
-    const bundle = requireBundle(this);
+    const bundle = buildServerFixture(requireBundle(this));
+    this.onCleanup(async () => {
+      removeFixtureBundle(bundle);
+      return Promise.resolve();
+    });
     const doorwayUrl = resolvePeerUrl(peerName);
     const outcome = await stageBundle({
       bundle,
@@ -280,7 +394,10 @@ When(
       0,
       `declaring the server head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
     );
-    record.blobHash = outcome.blobHash;
+    record.serverBlobHash = outcome.blobHash;
+    record.serverDeclaredAt = Date.now();
+    record.rendererAdoptionAt = record.serverDeclaredAt;
+    record.serverDeclarations = (record.serverDeclarations ?? 0) + 1;
     record.declaredThrough.push(doorwayUrl);
   }
 );
@@ -296,21 +413,38 @@ Then(
     const record = app(this);
     const bundle = requireBundle(this);
     const url = appUrl(this, peerName);
+    const anchor = record.recoveredAt ?? record.browserDeclaredAt;
+    assert.ok(
+      anchor,
+      'no browser publication or observed peer recovery starts the readiness deadline'
+    );
     let last = { status: 0, text: '' };
-    const elapsed = await pollUntil(async () => {
-      last = await getRaw(url, { timeoutMs: 20_000 });
-      return last.status === 200 && last.text.includes(bundle.entryScript);
-    }, bound * 1000);
+    const elapsed = await pollUntil(
+      async () => {
+        last = await getRaw(url, { timeoutMs: 10_000 });
+        if (last.status !== 200 || !last.text.includes(bundle.entryScript)) return false;
+        // A fresh mount's shell and its slug asset route can converge on separate
+        // ticks. Spend the same bounded readiness window on both; the strict
+        // static and browser assertions run only after the whole bundle is ready.
+        const assets = await Promise.all(
+          [bundle.entryScript, bundle.styleSheet].map(async file =>
+            getRaw(`${url}/${file}`, { timeoutMs: 5000 })
+          )
+        );
+        return assets.every(asset => asset.status === 200);
+      },
+      bound * 1000 - (Date.now() - anchor)
+    );
     assert.ok(
       elapsed !== null,
       `${peerName} did not serve the published bundle within ${bound}s: GET ${url} answered ${last.status} ` +
-        `and the page never named "${bundle.entryScript}" (declared through ${record.declaredThrough.join(', ') || 'nobody'}). ` +
+        `and the page plus "${bundle.entryScript}" / "${bundle.styleSheet}" never became servable together (declared through ${record.declaredThrough.join(', ') || 'nobody'}). ` +
         'A doorway still behind after two of its own head-reconcile ticks is not slow, it is stuck.'
     );
     // Hand the page to the static-clause assertions in steps/dataplane.steps.ts,
     // so this story asserts through the SAME implementation the fleet story uses.
     recordServedPage(this, peerName, {
-      urlPath: `/apps/${record.slug}/index.html`,
+      urlPath: `/lamad/concept/${record.slug}/`,
       url,
       status: last.status,
       text: last.text,
@@ -324,7 +458,10 @@ Then(
   { timeout: CONVERGENCE_BOUND_MS + 60_000 },
   async function (this: E2EWorld, bound: number) {
     const record = app(this);
-    assert.ok(record.blobHash, 'no server bundle was staged, so there is no pointer to converge');
+    assert.ok(
+      record.serverBlobHash,
+      'no server bundle was staged, so there is no pointer to converge'
+    );
     const topology = householdPeers.get(this);
     assert.ok(
       topology,
@@ -335,33 +472,37 @@ Then(
       name,
       url: fixture.storagePeers?.[name]?.url ?? '',
     }));
+    assert.ok(record.serverDeclaredAt, 'no server declaration starts the propagation deadline');
     const seen = new Map<string, string>();
-    const elapsed = await pollUntil(async () => {
-      let all = true;
-      for (const peer of peers) {
-        const { status, text } = await getRaw(`${peer.url}/db/content/${record.slug}`, {
-          timeoutMs: 20_000,
-        });
-        let pointer = '';
-        if (status === 200) {
-          try {
-            pointer = String(
-              (JSON.parse(text) as { serverBlobHash?: unknown }).serverBlobHash ?? ''
-            );
-          } catch {
-            pointer = '';
+    const elapsed = await pollUntil(
+      async () => {
+        let all = true;
+        for (const peer of peers) {
+          const { status, text } = await getRaw(`${peer.url}/db/content/${record.slug}`, {
+            timeoutMs: 20_000,
+          });
+          let pointer = '';
+          if (status === 200) {
+            try {
+              pointer = String(
+                (JSON.parse(text) as { serverBlobHash?: unknown }).serverBlobHash ?? ''
+              );
+            } catch {
+              pointer = '';
+            }
           }
+          seen.set(peer.name, pointer || `<${status}>`);
+          if (pointer !== record.serverBlobHash) all = false;
         }
-        seen.set(peer.name, pointer || `<${status}>`);
-        if (pointer !== record.blobHash) all = false;
-      }
-      return all;
-    }, bound * 1000);
+        return all;
+      },
+      bound * 1000 - (Date.now() - record.serverDeclaredAt)
+    );
     const answered = [...seen].map(([name, value]) => `${name}=${value}`).join(', ');
     assert.ok(
       elapsed !== null,
       `the server pointer declared once on one peer did not reach every peer within ${bound}s. ` +
-        `Declared ${record.blobHash}; peers answered ${answered}. ` +
+        `Declared ${record.serverBlobHash}; peers answered ${answered}. ` +
         "A pointer written straight into one peer's own database and told to nobody is the 2026-09-08 shape."
     );
   }
@@ -371,8 +512,9 @@ Then(
   'no peer other than the one that was told was written to by this run',
   function (this: E2EWorld) {
     const record = app(this);
+    assert.equal(record.serverDeclarations, 1, 'the server head must be declared exactly once');
     assert.strictEqual(
-      record.declaredThrough.length,
+      new Set(record.declaredThrough).size,
       1,
       `this run declared a head through ${record.declaredThrough.length} doorways ` +
         `(${record.declaredThrough.join(', ')}); the claim under test is that ONE declaration reaches every peer, ` +
@@ -382,55 +524,102 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
-// Restart-while-peer-is-down (Act I only) — fixture not yet available
+// Restart while a primary peer is down. Cleanup always restores the held peer.
 // ---------------------------------------------------------------------------
 
 Given(
   'doorway {string} can be restarted while peer {string} is held down',
-  function (this: E2EWorld, doorwayName: string, storagePeer: string) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `  PENDING: this run cannot restart doorway "${doorwayName}" while holding peer "${storagePeer}" down. ` +
-        'app/elohim-app/scripts/hc-mesh.sh exposes `storage-restart <peer>` and `conductors-restart`, ' +
-        'but no arm that (a) stops one storage peer and LEAVES it stopped, or (b) restarts a single ' +
-        'doorway. Both doorways are launched inline by start_doorways and are only stopped by ' +
-        '`hc-mesh.sh stop`, which takes the whole mesh with them. Needed: `hc-mesh.sh doorway-restart b` ' +
-        'plus a hold-down form of storage-restart (or a documented SIGSTOP/SIGCONT pair on the peer, ' +
-        'which is NOT the same fault — a paused peer completes the TCP handshake and a dead one refuses ' +
-        'the connection, and this station is about the refused connection). Until one exists this ' +
-        'scenario measures nothing and says so.'
-    );
-    return 'pending';
+  function (this: E2EWorld, doorway: string, peer: string) {
+    assert.ok(DOORWAYS.includes(doorway));
+    assert.ok(loadHouseholdMeshFixture().storagePeers?.[peer]?.url, `no owned peer ${peer}`);
   }
 );
 
 When(
   'doorway {string} restarts while peer {string} is down',
-  function (this: E2EWorld, doorwayName: string, storagePeer: string) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `  PENDING: no restart arm for doorway "${doorwayName}", and peer "${storagePeer}" was never ` +
-        'held down — see the Given above.'
+  { timeout: 180_000 },
+  async function (this: E2EWorld, doorway: string, peer: string) {
+    const record = app(this);
+    record.heldPeers ??= new Set();
+    record.heldPeers.add(peer);
+    this.onCleanup(async () => {
+      if (record.heldPeers?.has(peer)) await meshControl('storage-restart', peer);
+    });
+    const learned = await pollUntil(
+      async () => {
+        const row = await fetch(
+          `${loadHouseholdMeshFixture().storagePeers![peer].url}/db/content/${record.slug}`
+        );
+        return ((await row.json()) as { blobHash?: string }).blobHash === record.blobHash;
+      },
+      Math.max(0, CONVERGENCE_BOUND_MS - (Date.now() - record.browserDeclaredAt!))
     );
-    return 'pending';
+    assert.notEqual(learned, null, `${peer} never learned the new head before the outage`);
+    await meshControl('storage-stop', peer);
+    const url = loadHouseholdMeshFixture().storagePeers![peer].url;
+    const alive = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) }).then(
+      () => true,
+      () => false
+    );
+    assert.equal(alive, false, `${peer} must refuse connections before doorway restarts`);
+    const name = doorway === 'alpha-A' ? 'a' : 'b';
+    const logOffset = doorwayRestartLog(name).length;
+    await meshControl('doorway-restart', name);
+    record.restarts = (record.restarts ?? 0) + 1;
+    const ready = await pollUntil(
+      async () =>
+        (await getRaw(`${resolvePeerUrl(doorway)}/health`, { timeoutMs: 2000 })).status === 200,
+      60_000
+    );
+    assert.notEqual(ready, null, `${doorway} did not boot while ${peer} was down`);
+    const failedLookup = await pollUntil(
+      async () =>
+        await Promise.resolve(
+          doorwayRestartLog(name)
+            .slice(logOffset)
+            .split('\n')
+            .some(line => line.includes(record.slug) && line.includes('content GET failed'))
+        ),
+      30_000
+    );
+    assert.notEqual(
+      failedLookup,
+      null,
+      `${doorway} did not attempt its initial head lookup during the outage`
+    );
   }
 );
 
-When('peer {string} comes back', function (this: E2EWorld, storagePeer: string) {
-  // eslint-disable-next-line no-console
-  console.log(
-    `  PENDING: peer "${storagePeer}" was never held down, so nothing can come back — see the Given above.`
-  );
-  return 'pending';
-});
+When(
+  'peer {string} comes back',
+  { timeout: 180_000 },
+  async function (this: E2EWorld, peer: string) {
+    assert.ok(app(this).heldPeers?.has(peer), `${peer} was not held down`);
+    const restart = meshControl('storage-restart', peer).then(
+      () => null,
+      error => error as Error
+    );
+    const storageUrl = loadHouseholdMeshFixture().storagePeers?.[peer]?.url;
+    assert.ok(storageUrl);
+    const reachable = await pollUntil(async () => {
+      const response = await fetch(`${storageUrl}/health`, { signal: AbortSignal.timeout(2000) });
+      return response.ok;
+    }, 60_000);
+    app(this).recoveredAt = Date.now();
+    const restartError = await restart;
+    assert.equal(restartError, null, `peer restart failed: ${String(restartError)}`);
+    assert.notEqual(reachable, null, `${peer} did not become reachable`);
+    app(this).heldPeers!.delete(peer);
+  }
+);
 
 Then('nobody cleared a cache or restarted anything to make that happen', function (this: E2EWorld) {
-  // eslint-disable-next-line no-console
-  console.log(
-    '  PENDING: this run performs no cache clear and no second restart, but with the restart fixture ' +
-      'absent there is no convergence to attribute — see the Given above.'
+  assert.equal(
+    app(this).restarts,
+    1,
+    'recovery must use exactly one doorway restart and no cache-clear request'
   );
-  return 'pending';
+  assert.equal(app(this).heldPeers?.size, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -439,8 +628,11 @@ Then('nobody cleared a cache or restarted anything to make that happen', functio
 
 When('this run builds a second bundle with its entry script removed', function (this: E2EWorld) {
   const record = app(this);
-  const broken = buildFixtureBundle({ coherent: false });
-  this.onCleanup(() => {
+  const broken = buildFixtureBundle({
+    coherent: false,
+    baseHref: `/lamad/concept/${record.slug}/`,
+  });
+  this.onCleanup(async () => {
     removeFixtureBundle(broken);
     return Promise.resolve();
   });
@@ -460,8 +652,8 @@ When(
       declare: true,
     });
     record.refusal = { code: outcome.code, output: outcome.output };
-    // The bytes reach the peer BEFORE it judges them, which is what lets the
-    // next step force the head past the judgement the way an older peer would.
+    // The SDK may reject before upload. The next step explicitly injects an
+    // unchecked archive only for the old-publisher defense test.
     record.brokenBlobHash = outcome.blobHash;
   }
 );
@@ -489,10 +681,13 @@ When(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const record = app(this);
-    assert.ok(
-      record.brokenBlobHash,
-      'the incoherent bundle never reached the peer, so there are no bytes to declare'
-    );
+    if (!record.brokenBlobHash) {
+      assert.ok(record.brokenBundle, 'no deliberately broken fixture was built');
+      record.brokenBlobHash = await stageInvalidFixture(
+        record.brokenBundle,
+        resolvePeerUrl('alpha-A')
+      );
+    }
     const storageUrl = resolveStorageUrl('alpha-A');
     assert.ok(storageUrl, 'no direct storage URL for peer "alpha-A" — set E2E_STORAGE_URL');
     const response = await fetch(`${storageUrl}/db/content/${record.slug}`, {
@@ -507,6 +702,21 @@ When(
       response.ok,
       `could not force the incoherent head onto "${record.slug}": ${response.status} ${await response.text()}`
     );
+    // Match the publisher's canonical declaration too. A projection-only PATCH
+    // is correctly healed back to the prior canonical head and proves nothing.
+    const rowResponse = await fetch(`${storageUrl}/db/content/${record.slug}`);
+    const row = (await rowResponse.json()) as { dhtAnchorHash?: string };
+    assert.ok(row.dhtAnchorHash, 'the forced head has no notarized action to declare');
+    const canonical = await fetch(`${storageUrl}/db/content/${record.slug}/canonical-head`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
+      },
+      body: JSON.stringify({ headActionHash: row.dhtAnchorHash }),
+    });
+    assert.ok(canonical.ok, `forced canonical head: ${canonical.status} ${await canonical.text()}`);
+    record.forcedDeclaredAt = Date.now();
   }
 );
 
@@ -545,28 +755,58 @@ Then(
       `${peerName} served neither the incoherent page nor the last version that worked (which names ` +
         `"${bundle.entryScript}"). A visitor was handed something, and this run cannot say it boots.`
     );
+    const visit = await visitInBrowser(url);
+    assert.ok(
+      visit.bootstrapReady && visit.rootPresent && visit.rootText.trim().length > 0,
+      'Previous shell did not complete bootstrap'
+    );
+    assert.deepEqual(visit.pageErrors, [], 'Previous shell raised browser errors');
+    assert.deepEqual(
+      visit.httpErrors.filter(entry => sameOrigin(url, entry.url)),
+      [],
+      'Fallback asset HTTP errors'
+    );
+    assert.deepEqual(
+      visit.failedRequests.filter(entry => sameOrigin(url, entry.url)),
+      [],
+      'Fallback asset failures'
+    );
+    assert.ok(
+      visit.rootText.includes(bundle.stamp.replace(/^fixture-/, '')),
+      'Fallback did not boot the previous build'
+    );
   }
 );
 
 Then(
   'doorway {string} says on the wire that it is behind and names the missing file',
-  { timeout: 60_000 },
+  { timeout: CONVERGENCE_BOUND_MS + 30_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
     const broken = record.brokenBundle;
     assert.ok(broken, 'no incoherent bundle was built');
     const url = appUrl(this, peerName);
-    const { headers } = await getRawWithHeaders(url, { timeoutMs: 30_000 });
-    const marker = headers['x-elohim-bundle'] ?? '';
+    let marker = '';
+    assert.ok(record.forcedDeclaredAt);
+    const observed = await pollUntil(
+      async () => {
+        const { headers } = await getRawWithHeaders(url, { timeoutMs: 10_000 });
+        marker = headers['x-elohim-bundle'] ?? '';
+        return marker.startsWith('behind') && marker.includes(broken.entryScript);
+      },
+      Math.max(0, CONVERGENCE_BOUND_MS - (Date.now() - record.forcedDeclaredAt))
+    );
+    assert.notEqual(observed, null, 'Doorway did not judge the forced head within 75 seconds');
+    const declared = await fetch(`${resolveStorageUrl('alpha-A')}/db/content/${record.slug}`);
+    assert.equal(
+      ((await declared.json()) as { blobHash?: string }).blobHash,
+      record.brokenBlobHash
+    );
     assert.ok(
       marker.startsWith('behind'),
       `${peerName} served this app with x-elohim-bundle "${marker || 'absent'}". A doorway serving an ` +
         'older version because the current one cannot boot must say so on the wire, or the only way to ' +
-        'discover it is for a person to notice the page is old. SCOPE NOTE before triaging this red: ' +
-        'the behind-marker is written by the warm-shell path, which serves EPR mounts projected by the ' +
-        'EprRouter (a project-epr commitment binding a url_path). A site published only at its own ' +
-        '/apps/{slug} address is proxied straight to storage and never reaches that path, so a red here ' +
-        'may be a scope decision about the never-blank promise rather than a doorway defect.'
+        'discover it is for a person to notice the page is old.'
     );
     assert.ok(
       marker.includes(broken.entryScript),
@@ -697,15 +937,11 @@ Then(
       `${peerUrl}/apps/${encodeURIComponent(declaredHead)}/version.json`,
       { timeoutMs: 30_000 }
     );
-    if (declared.status !== 200) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  NOTE: ${peerName} — the declared head ${declaredHead} carries no version.json ` +
-          `(GET /apps/${declaredHead}/version.json answered ${declared.status}), so the served stamp cannot ` +
-          `be tied to the head. Asserted only that the served stamp exists and is well-formed ("${servedStamp}").`
-      );
-      return;
-    }
+    assert.equal(
+      declared.status,
+      200,
+      `${peerName}: declared head ${declaredHead} has no version.json; cannot prove head consistency`
+    );
     assert.strictEqual(
       servedStamp,
       stampOf(declared.text),
@@ -722,7 +958,7 @@ Then(
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
     const bundle = requireBundle(this);
-    const url = `${resolvePeerUrl(peerName)}/apps/${encodeURIComponent(record.slug)}/version.json`;
+    const url = `${resolvePeerUrl(peerName)}/lamad/concept/${encodeURIComponent(record.slug)}/version.json`;
     const { status, text } = await getRaw(url, { timeoutMs: 30_000 });
     assert.strictEqual(
       status,
@@ -738,18 +974,210 @@ Then(
   }
 );
 
-// STATION 2b — peer-to-doorway trip of the server-rendered version. The renderer adopts
-// CONFIGURED slugs only (doorway render/registry.rs: adoption targets = ctx.slugs), so a
-// run-owned slug is never materialized and the comparison cannot be made honestly here.
-// Pending with the precondition named; the fleet-side twin is served-projected-head.feature.
+// Each trip is measured independently: pointer, bytes, adopted renderer, HTTP output.
+Then(
+  'every household peer serves the declared server bundle bytes by their content address',
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    const hash = app(this).serverBlobHash;
+    assert.ok(hash);
+    const fixture = loadHouseholdMeshFixture();
+    for (const peer of householdPeers.get(this)!.all) {
+      const response: Response = await fetch(`${fixture.storagePeers![peer].url}/blob/${hash}`, {
+        signal: AbortSignal.timeout(60_000),
+      });
+      assert.equal(response.status, 200, `${peer}: cannot serve server bundle ${hash}`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      assert.equal(
+        `sha256-${createHash('sha256').update(bytes).digest('hex')}`,
+        hash,
+        `${peer}: server bundle bytes do not match declared content address`
+      );
+    }
+  }
+);
+
+Given(
+  'both doorways are configured to render this run-owned site',
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    for (const doorway of ['a', 'b']) await meshControl('doorway-restart', doorway, app(this).slug);
+    app(this).rendererAdoptionAt = Date.now();
+  }
+);
+
 Then(
   'within {int} seconds both doorways attest they materialized that server pointer for this app',
-  async function (this: E2EWorld, _seconds: number) {
-    console.log(
-      '  PENDING: the doorway renderer materializes configured SSR slugs only — a run-owned slug is not one. ' +
-        'Needs a mesh arm that mounts this run\'s slug as a rendered site (project-epr commitment + SSR_BUNDLE_SLUGS), ' +
-        'then compare /health/startup servedBundleHeads[slug].serverBlobHash on doorways A and B to the declared pointer.'
+  { timeout: 360_000 },
+  async function (this: E2EWorld, seconds: number) {
+    const record = app(this);
+    assert.ok(record.rendererAdoptionAt, 'no publication/configuration starts renderer adoption');
+    const deadline = record.rendererAdoptionAt + seconds * 1000;
+    await Promise.all(
+      DOORWAYS.map(async peer => {
+        let last = '';
+        const elapsed = await pollUntil(async () => {
+          const response = await getRaw(`${resolvePeerUrl(peer)}/health/startup`, {
+            timeoutMs: 5000,
+          });
+          last = response.text;
+          if (response.status !== 200) return false;
+          const heads = (
+            JSON.parse(last) as {
+              servedBundleHeads: { slug: string; serverBlobHash: string; status: string }[];
+            }
+          ).servedBundleHeads;
+          return heads.some(
+            head =>
+              head.slug === record.slug &&
+              head.serverBlobHash === record.serverBlobHash &&
+              head.status === 'current'
+          );
+        }, deadline - Date.now());
+        assert.notEqual(
+          elapsed,
+          null,
+          `${peer}: expected renderer ${record.serverBlobHash}; health=${last}`
+        );
+      })
     );
-    return 'pending';
+  }
+);
+
+Then(
+  'both doorways return that server-rendered build before any browser script runs',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    for (const peer of DOORWAYS) {
+      const response = await getRawWithHeaders(appUrl(this, peer), { timeoutMs: 30_000 });
+      assert.equal(response.status, 200, `${peer}: SSR response ${response.status}`);
+      assert.ok(
+        response.text.includes(`data-ssr-stamp="${requireBundle(this).stamp}"`),
+        `${peer}: SSR output does not contain this server build; headers=${JSON.stringify(response.headers)}`
+      );
+    }
+  }
+);
+
+Then(
+  'both warm doorways keep serving that rendered build while all storage peers are down',
+  { timeout: 600_000 },
+  async function (this: E2EWorld) {
+    const held: string[] = [];
+    try {
+      for (const peer of householdPeers.get(this)!.all) {
+        held.push(peer);
+        await meshControl('storage-stop', peer);
+        const storageUrl = loadHouseholdMeshFixture().storagePeers?.[peer]?.url;
+        assert.ok(storageUrl, `no address for ${peer}`);
+        const alive = await fetch(`${storageUrl}/health`, {
+          signal: AbortSignal.timeout(2000),
+        }).then(
+          () => true,
+          () => false
+        );
+        assert.equal(alive, false, `${peer} still accepts requests; outage not established`);
+      }
+      const visitorsStarted = Date.now();
+      for (const peer of DOORWAYS) {
+        for (let visitor = 0; visitor < 3; visitor++) {
+          const response = await getRawWithHeaders(appUrl(this, peer), {
+            timeoutMs: Math.max(1, 10_000 - (Date.now() - visitorsStarted)),
+          });
+          assert.ok(
+            Date.now() - visitorsStarted <= 10_000,
+            'Six cached requests exceeded ten seconds'
+          );
+          assert.equal(response.status, 200, `${peer}: warm page stopped serving without peers`);
+          assert.equal(
+            response.headers['x-render-cache'],
+            'HIT',
+            `${peer}: repeated visitor was not served from the doorway render cache`
+          );
+          assert.ok(
+            response.text.includes(`data-ssr-stamp="${requireBundle(this).stamp}"`),
+            `${peer}: warm visitor did not receive the adopted SSR build`
+          );
+        }
+      }
+    } finally {
+      // Attempt every restore even if a preceding peer fails to start.
+      const restores = await Promise.allSettled(
+        held.map(async peer => meshControl('storage-restart', peer))
+      );
+      assert.ok(
+        restores.every(result => result.status === 'fulfilled'),
+        `storage restore failures: ${restores
+          .filter(result => result.status === 'rejected')
+          .map(result => String(result.reason))
+          .join('; ')}`
+      );
+    }
+  }
+);
+
+Then(
+  'the browser on peer {string} completed client bootstrap',
+  function (this: E2EWorld, peer: string) {
+    assert.equal(
+      requireVisit(this, peer).bootstrapReady,
+      true,
+      `${peer}: client bootstrap marker was absent; SSR text alone cannot pass`
+    );
+  }
+);
+
+Then(
+  'neither doorway restarted while adopting the next rendered version',
+  function (this: E2EWorld) {
+    assert.ok(app(this).upgradeIncarnations, 'no running-renderer baseline was captured');
+    assert.deepEqual(
+      doorwayIncarnations(),
+      app(this).upgradeIncarnations,
+      'renderer upgrade must happen in the same doorway process incarnation'
+    );
+  }
+);
+
+Then(
+  'within {int} seconds both doorways serve the new browser bundle by content address',
+  { timeout: 105_000 },
+  async function (this: E2EWorld, seconds: number) {
+    const record = app(this);
+    const bundle = requireBundle(this);
+    assert.ok(record.browserDeclaredAt && record.blobHash);
+    const deadline = record.browserDeclaredAt + seconds * 1000;
+    await Promise.all(
+      DOORWAYS.map(async peer => {
+        const ready = await pollUntil(
+          async () => {
+            const base = resolvePeerUrl(peer);
+            const row = await getRaw(`${base}/db/content/${record.slug}`, { timeoutMs: 5000 });
+            if (
+              row.status !== 200 ||
+              (JSON.parse(row.text) as { blobHash?: string }).blobHash !== record.blobHash
+            )
+              return false;
+            const paths = ['index.html', bundle.entryScript, bundle.styleSheet, 'version.json'];
+            const files = await Promise.all(
+              paths.map(async path =>
+                getRaw(`${base}/apps/${record.blobHash}/${path}`, { timeoutMs: 5000 })
+              )
+            );
+            return (
+              files.every(file => file.status === 200) &&
+              files[0].text.includes(bundle.entryScript) &&
+              files[3].text.includes(bundle.stamp)
+            );
+          },
+          Math.max(0, deadline - Date.now())
+        );
+        assert.notEqual(
+          ready,
+          null,
+          `${peer}: next browser declaration and immutable bytes did not converge within ${seconds}s`
+        );
+      })
+    );
   }
 );

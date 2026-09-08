@@ -362,6 +362,8 @@ pub enum ShellOutcome {
     /// Nothing to serve and no upstream to ask — the caller sheds via the
     /// existing catching-up contract.
     Unavailable,
+    /// No safe shell exists; retain the measured cause for the converging response.
+    Converging(BehindReason),
 }
 
 impl ShellOutcome {
@@ -370,7 +372,7 @@ impl ShellOutcome {
             ShellOutcome::Warm(_) => Some(ShellProvenance::LastReconciled),
             ShellOutcome::Behind { reason, .. } => Some(ShellProvenance::Behind(reason.clone())),
             ShellOutcome::Fresh(shell) => Some(ShellProvenance::for_fresh(shell.head_bound)),
-            ShellOutcome::Unavailable => None,
+            ShellOutcome::Unavailable | ShellOutcome::Converging(_) => None,
         }
     }
 
@@ -380,7 +382,7 @@ impl ShellOutcome {
             ShellOutcome::Warm(shell)
             | ShellOutcome::Behind { shell, .. }
             | ShellOutcome::Fresh(shell) => Some(shell),
-            ShellOutcome::Unavailable => None,
+            ShellOutcome::Unavailable | ShellOutcome::Converging(_) => None,
         }
     }
 }
@@ -893,7 +895,7 @@ where
         incoherence,
     } = plan_shell_serve(store, slug, entry_file, upstream_available).await;
     match plan {
-        ShellPlan::ServeWarm => serve_held(warm, incoherence),
+        ShellPlan::ServeWarm => serve_held(store, warm, incoherence, upstream_available).await,
         ShellPlan::UpgradeThenWarm => {
             match fetch(FetchBudget::Upgrade, declared.clone()).await {
                 Some(fresh) => {
@@ -903,7 +905,7 @@ where
                 // The upgrade could not land — keep serving the one-behind shell.
                 // Strictly better than today, which shed to a bundle fallback that
                 // then paid the SAME doomed fetch again.
-                None => serve_held(warm, incoherence),
+                None => serve_held(store, warm, incoherence, upstream_available).await,
             }
         }
         ShellPlan::Fetch => match fetch(FetchBudget::Full, declared.clone()).await {
@@ -920,17 +922,37 @@ where
 /// are not. `None` bytes is unreachable by construction on both callers (a
 /// serve-warm plan only follows a hit); an honest shed beats an unwrap on the
 /// hot path.
-fn serve_held(warm: Option<WarmShell>, incoherence: Option<BehindReason>) -> ShellOutcome {
+pub(crate) async fn serve_held(
+    store: &WarmShellStore,
+    warm: Option<WarmShell>,
+    incoherence: Option<BehindReason>,
+    upstream_available: bool,
+) -> ShellOutcome {
+    if let Some(shell) = warm.as_ref() {
+        if store.is_coherence_judging() {
+            let rejected = if shell.blob_hash.is_empty() {
+                Some(BehindReason::HeadUnknown)
+            } else {
+                store
+                    .judge_coherence(Some(&shell.blob_hash), shell, upstream_available)
+                    .await
+            };
+            if let Some(reason) = rejected {
+                return ShellOutcome::Converging(incoherence.unwrap_or(reason));
+            }
+        }
+    }
     match (warm, incoherence) {
         (Some(shell), Some(reason)) => ShellOutcome::Behind { shell, reason },
         (Some(shell), None) => ShellOutcome::Warm(shell),
-        (None, _) => ShellOutcome::Unavailable,
+        (None, Some(reason)) => ShellOutcome::Converging(reason),
+        (None, None) => ShellOutcome::Unavailable,
     }
 }
 
 /// Stock a freshly-read shell under the head the local projection declared when
 /// the fetch was decided, then hand it back as `Fresh`.
-async fn stock_and_return(
+pub(crate) async fn stock_and_return(
     store: &WarmShellStore,
     slug: &str,
     entry_file: &str,
@@ -942,14 +964,35 @@ async fn stock_and_return(
     // under it is a content-addressed truth, not a label. It is never
     // re-resolved here: a projection advance during the fetch would otherwise
     // relabel bytes proven for the old head as the new one. With no declared
-    // head the fetch was necessarily slug-addressed — serve the bytes hot, but
-    // never archive them and never mark them head-bound.
+    // head the fetch was necessarily slug-addressed; a coherence-judging store
+    // keeps its last proven shell until a head can be verified.
     let shell = WarmShell {
         blob_hash: declared.clone().unwrap_or_default(),
         content_type: fresh.content_type.clone(),
         bytes: fresh.bytes.clone(),
         head_bound: declared.is_some(),
     };
+    if shell.blob_hash.is_empty() && store.is_coherence_judging() {
+        let (_, previous, _) = store.lookup_with_declared(slug, entry_file).await;
+        return serve_held(
+            store,
+            previous,
+            Some(BehindReason::HeadUnknown),
+            upstream_available,
+        )
+        .await;
+    }
+    // Judge before replacing either the hot shell or the archive's latest entry.
+    // A broken new head must never erase the last version that actually worked.
+    if !shell.blob_hash.is_empty() {
+        if let Some(reason) = store
+            .judge_coherence(Some(&shell.blob_hash), &shell, upstream_available)
+            .await
+        {
+            let (_, previous, _) = store.lookup_with_declared(slug, entry_file).await;
+            return serve_held(store, previous, Some(reason), upstream_available).await;
+        }
+    }
     match declared {
         Some(hash) => {
             store
@@ -962,22 +1005,7 @@ async fn stock_and_return(
                 .await;
         }
     }
-    // Fresh bytes are not exempt from the coherence gate — the 2026-09-08 head
-    // was fetchable and still unbootable. Bytes with NO declared head keep the
-    // `slug-resolved` vocabulary they have always carried: nothing was claimed
-    // about a head, so nothing is demoted.
-    match shell.blob_hash.is_empty() {
-        true => ShellOutcome::Fresh(shell),
-        false => {
-            match store
-                .judge_coherence(Some(&shell.blob_hash.clone()), &shell, upstream_available)
-                .await
-            {
-                None => ShellOutcome::Fresh(shell),
-                Some(reason) => ShellOutcome::Behind { shell, reason },
-            }
-        }
-    }
+    ShellOutcome::Fresh(shell)
 }
 
 #[cfg(test)]
@@ -1255,7 +1283,7 @@ mod tests {
     /// serve must be distinguishable from a healthy one — on 2026-09-08 it was
     /// not, which is why the blank page went unnoticed for 15 hours.
     #[tokio::test]
-    async fn an_incoherent_head_serves_the_bytes_in_hand_and_says_why_on_the_wire() {
+    async fn an_incoherent_archived_head_is_unavailable_without_a_working_fallback() {
         let archive = FakeArchive::with_shell(
             "sha256-6899",
             "<html><script src=\"main-AVSOD6V6.js\"></script></html>",
@@ -1284,28 +1312,133 @@ mod tests {
             "an unproven head buys exactly one rate-limited upgrade read"
         );
 
-        match &outcome {
-            ShellOutcome::Behind { shell, reason } => {
-                assert!(shell.html().contains("main-AVSOD6V6.js"));
-                assert_eq!(
-                    reason,
-                    &BehindReason::MissingAsset("main-AVSOD6V6.js".into())
-                );
-            }
-            other => panic!("expected a Behind serve, got {other:?}"),
-        }
-        assert_eq!(
-            outcome
-                .provenance()
-                .and_then(|p| p.header_value())
-                .as_deref(),
-            Some("behind;missing-asset:main-AVSOD6V6.js"),
-            "the exact value the served-shell scenario reads"
-        );
+        assert!(matches!(
+            outcome,
+            ShellOutcome::Converging(BehindReason::MissingAsset(_))
+        ));
         assert!(
-            outcome.shell().is_some(),
-            "a page that boots one release behind still beats a blank one"
+            outcome.shell().is_none(),
+            "known broken HTML must not reach the visitor"
         );
+    }
+
+    #[tokio::test]
+    async fn broken_fresh_head_preserves_last_working_shell_and_archive() {
+        let archive = FakeArchive::with_shell("sha256-good", "working");
+        *archive.declared.lock().unwrap() = Some("sha256-broken".into());
+        let oracle = FakeOracle::saying(
+            "sha256-broken",
+            CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main.js".into())),
+        );
+        let store = WarmShellStore::with_oracle(Some(archive.clone()), Some(oracle));
+        let outcome = stock_and_return(
+            &store,
+            "landing",
+            "index.html",
+            Some("sha256-broken".into()),
+            FetchedShell {
+                bytes: b"broken".to_vec(),
+                content_type: "text/html".into(),
+            },
+            true,
+        )
+        .await;
+        assert_eq!(outcome.shell().unwrap().blob_hash, "sha256-good");
+        assert_eq!(archive.files.lock().unwrap().len(), 1);
+        assert!(matches!(
+            outcome,
+            ShellOutcome::Behind {
+                reason: BehindReason::MissingAsset(_),
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn unknown_fresh_head_cannot_replace_a_working_shell() {
+        let archive = FakeArchive::with_shell("sha256-good", "working");
+        *archive.declared.lock().unwrap() = None;
+        let store = WarmShellStore::with_oracle(
+            Some(archive.clone()),
+            Some(Arc::new(FakeOracle::default())),
+        );
+        let outcome = stock_and_return(
+            &store,
+            "landing",
+            "index.html",
+            None,
+            FetchedShell {
+                bytes: b"unproven".to_vec(),
+                content_type: "text/html".into(),
+            },
+            true,
+        )
+        .await;
+        assert_eq!(outcome.shell().unwrap().blob_hash, "sha256-good");
+        assert!(matches!(
+            outcome,
+            ShellOutcome::Behind {
+                reason: BehindReason::HeadUnknown,
+                ..
+            }
+        ));
+        assert_eq!(archive.files.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn unknown_first_head_is_unavailable_without_stocking() {
+        let archive = Arc::new(FakeArchive::default());
+        let store = WarmShellStore::with_oracle(
+            Some(archive.clone()),
+            Some(Arc::new(FakeOracle::default())),
+        );
+        let outcome = stock_and_return(
+            &store,
+            "landing",
+            "index.html",
+            None,
+            FetchedShell {
+                bytes: b"unproven".to_vec(),
+                content_type: "text/html".into(),
+            },
+            true,
+        )
+        .await;
+        assert!(matches!(
+            outcome,
+            ShellOutcome::Converging(BehindReason::HeadUnknown)
+        ));
+        assert!(archive.files.lock().unwrap().is_empty());
+        assert!(store.hot_get("landing", "index.html").is_none());
+    }
+
+    #[tokio::test]
+    async fn broken_first_head_is_not_stocked_and_is_unavailable() {
+        let archive = Arc::new(FakeArchive::default());
+        *archive.declared.lock().unwrap() = Some("sha256-broken".into());
+        let oracle = FakeOracle::saying(
+            "sha256-broken",
+            CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main.js".into())),
+        );
+        let store = WarmShellStore::with_oracle(Some(archive.clone()), Some(oracle));
+        let outcome = stock_and_return(
+            &store,
+            "landing",
+            "index.html",
+            Some("sha256-broken".into()),
+            FetchedShell {
+                bytes: b"broken".to_vec(),
+                content_type: "text/html".into(),
+            },
+            true,
+        )
+        .await;
+        assert!(matches!(
+            outcome,
+            ShellOutcome::Converging(BehindReason::MissingAsset(_))
+        ));
+        assert!(archive.files.lock().unwrap().is_empty());
+        assert!(store.hot_get("landing", "index.html").is_none());
     }
 
     /// A confirmed head stays confirmed with NO further probes: a head is

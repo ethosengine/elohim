@@ -114,6 +114,8 @@ just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
 just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped)
 just dev start                # isolated conductor + storage + doorway
+just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
+# EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; a stock tx5 join is refused); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
 just mesh status              # local multi-peer mesh
 just mesh storage-restart <peer…> | conductors-restart   # restart arms (export MESH_TRANSPORT_BACKEND for the run; MESH_HAPP_PATH installs the deployed bundle)

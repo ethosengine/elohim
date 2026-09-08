@@ -11,12 +11,9 @@
 # Spec: genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md
 # (decisions D1–D4). Habit: doorway/doorway-service/.epr-meta/doorway-failover.habit.md.
 #
-# HOW TO RUN THIS FILE — it takes TWO lanes, and neither one covers the other:
-#   just test mesh         features/dataplane/epr-app-deliverability.feature
-#   just test mesh-browser features/dataplane/epr-app-deliverability.feature
-# The `mesh` cucumber profile excludes @browser-only by construction, so the first
-# command silently omits the one scenario that opens a browser. Run both, or the
-# station that proves an app actually STARTS never ran.
+# Run every station, including the self-contained headless browser, with:
+#   just test mesh features/dataplane/epr-app-deliverability.feature
+# This fault-injection lane needs exclusive use of its owned household mesh.
 #
 # Provenance of every station below: measured 2026-09-04 and again 2026-09-08 on the
 # deployed fleet. Both apex names served a page from a previous bundle era while storage
@@ -25,6 +22,9 @@
 # success. Nothing in the pipeline objected. A person found it by looking at the page.
 @e2e @dataplane @concern:doorway-failover @requires:multi-node @act:i
 Feature: An app a doorway serves reaches a visitor able to run
+
+  This is the web/Angular adapter contract, with SSR only when declared; native and Wasm
+  apps do not inherit browser bootstrap markers or server rendering requirements.
 
   A steward publishes a new version of a site. Some minutes later a visitor types the
   address, and whichever door they happen to reach hands them the new version — and it
@@ -53,17 +53,30 @@ Feature: An app a doorway serves reaches a visitor able to run
 
   A page BOOTS when a browser that loaded it reports no uncaught error, every file it
   asked that doorway for was answered, and the app's root element — the one empty tag the
-  page leaves for the framework to fill — has content in it afterwards. An empty root
-  element after load is the blank page, in the form a person actually sees. A page that
+  page leaves for the framework to fill — has visible content and data-app-ready="true"
+  afterwards. Only browser bootstrap writes that marker: server-rendered text alone
+  cannot prove the JavaScript ran. An empty root or missing marker fails the visit.
+  Each browser visit has its own forty-five-second completion deadline. A page that
   merely answers 200 has proved that the door opened, not that anyone got in.
 
   A bundle is COHERENT when the files its index page names are all present in it. A
   bundle missing its entry script is INCOHERENT: it will answer 200 and boot nothing.
 
-  THE BOUND, used by three of the four stations below: seventy-five seconds. Each doorway
+  THE BOUND, used by the convergence stations below: seventy-five seconds. Each doorway
   re-reads the head its peer declares on a fixed tick — BUNDLE_HEADS_TICK_SECS, thirty
   seconds (spec D1) — so two ticks is sixty, and fifteen seconds of slack covers the read
-  itself. A convergence that needs longer than that is not slow, it is stuck: nothing in
+  itself. Readiness includes the page and its entry script and stylesheet answering
+  through the same doorway; the browser starts after those routes converge together.
+  Both doorway readiness checks share one clock, starting when browser publication
+  confirms its declaration; the second doorway gets no extra seventy-five seconds.
+  Recovery instead starts at the first successful health response from the restored
+  storage peer. Server-pointer propagation starts when server publication confirms
+  its declaration. Initial renderer adoption starts when configuration completes;
+  a running renderer's 330-second upgrade clock starts at the next server declaration.
+  During an upgrade both heads are published back-to-back. Browser declarations and
+  immutable bytes must arrive within the browser's seventy-five-second bound; the
+  public rendered page must match the pair after server adoption within 330 seconds.
+  A convergence that needs longer than that is not slow, it is stuck: nothing in
   this path waits on a human, and the doorway that has not caught up by then is not going
   to without one.
 
@@ -113,7 +126,8 @@ Feature: An app a doorway serves reaches a visitor able to run
   # signs and witnesses the declaration, and which not every doorway can reach. The other
   # doorway is told nothing and has to find out. Declaring through both would hide the
   # entire defect.
-  @browser-only @requires:owned-substrate
+  @requires:owned-substrate
+  @deliverability-browser
   Scenario: a steward publishes through one door and a visitor arrives able to run at either
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
@@ -127,11 +141,13 @@ Feature: An app a doorway serves reaches a visitor able to run
     # The dynamic clause: a browser opens each page and the app actually starts.
     When a visitor opens the app this run published on peer "alpha-A" in a browser
     Then the browser on peer "alpha-A" reported no uncaught error
+    And the browser on peer "alpha-A" completed client bootstrap
     And every asset the browser asked peer "alpha-A" for arrived
     And the app root on the page from peer "alpha-A" has content
     And the build stamp peer "alpha-A" serves for this app is the one the published bundle carries
     When a visitor opens the app this run published on peer "elohim.host" in a browser
     Then the browser on peer "elohim.host" reported no uncaught error
+    And the browser on peer "elohim.host" completed client bootstrap
     And every asset the browser asked peer "elohim.host" for arrived
     And the app root on the page from peer "elohim.host" has content
     And the build stamp peer "elohim.host" serves for this app is the one the published bundle carries
@@ -159,10 +175,12 @@ Feature: An app a doorway serves reaches a visitor able to run
   Scenario: a server pointer declared on one peer is the pointer every peer answers with
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
-    When only doorway "alpha-A" is told this bundle is the new server-rendered version
+    When only doorway "alpha-A" is told this bundle is the new version
+    And only doorway "alpha-A" is told this bundle is the new server-rendered version
     Then within 75 seconds every household peer answers with the same server pointer for this app
+    And every household peer serves the declared server bundle bytes by their content address
     # The negative is observed, not assumed: this run records every declaration it issues
-    # and the last line asserts that ledger holds exactly one.
+    # and the last line asserts exactly one server declaration, with every head write through the same door.
     And no peer other than the one that was told was written to by this run
 
   # STATION 2b — the server-rendered leg has TWO trips, and each is its own proof.
@@ -173,19 +191,54 @@ Feature: An app a doorway serves reaches a visitor able to run
   # only the slugs it is configured to render, on its own tick, after its peer declared the
   # pointer. The second trip — peer to doorway — is what a visitor actually receives.
   #
-  # A doorway attests what it has materialized on its health surface (servedBundleHeads);
-  # the Act II story served-projected-head.feature compares that attestation to the declared
-  # pointer on the deployed fleet. This run cannot yet make the same comparison on the
-  # household mesh for a bundle it owns: the renderer materializes configured slugs only, and
-  # a run-owned slug is not one. Until the mesh can mount a run-owned slug as a rendered
-  # site, this station stays pending — measured nowhere is said plainly, never shown green.
+  # A doorway attests its adopted server bundle on /health/startup. This run mounts
+  # its own slug at /lamad/concept/<run-slug>, an existing manifest SSR route,
+  # and adds it to the renderer configuration, then requires the stamp
+  # in raw HTML before any JavaScript runs. After warming both doorways it holds
+  # every storage peer down and verifies each refuses health connections: three requests
+  # per doorway, all six within ten seconds, must return cache HIT and that
+  # rendered version. Rendering and caching belong to the doorway; visitor volume
+  # must not become per-request rendering work on peers. Peers hold and converge
+  # the declared identity and bundle bytes. Public anonymous output is the scope
+  # here; request-dependent/private SSR needs its own cache-isolation contract.
   @requires:owned-substrate
   Scenario: the doorway in front of the peers renders the server version every peer agreed on
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
-    When only doorway "alpha-A" is told this bundle is the new server-rendered version
+    When each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    And only doorway "alpha-A" is told this bundle is the new server-rendered version
     And within 75 seconds every household peer answers with the same server pointer for this app
+    And every household peer serves the declared server bundle bytes by their content address
+    And both doorways are configured to render this run-owned site
     Then within 75 seconds both doorways attest they materialized that server pointer for this app
+    And both doorways return that server-rendered build before any browser script runs
+    # A running renderer must replace N with N+1, without another restart.
+    # Its normal adoption tick is 300 seconds; thirty seconds covers the fetch.
+    When this run builds a next coherent browser and server version
+    And each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    And only doorway "alpha-A" is told this bundle is the new server-rendered version
+    # Browser bytes converge independently; public SSR waits for the paired server.
+    And within 75 seconds both doorways serve the new browser bundle by content address
+    Then within 75 seconds every household peer answers with the same server pointer for this app
+    And every household peer serves the declared server bundle bytes by their content address
+    And within 330 seconds both doorways attest they materialized that server pointer for this app
+    And both doorways return that server-rendered build before any browser script runs
+    And neither doorway restarted while adopting the next rendered version
+    When a visitor opens the app this run published on peer "alpha-A" in a browser
+    Then the browser on peer "alpha-A" reported no uncaught error
+    And the browser on peer "alpha-A" completed client bootstrap
+    And every asset the browser asked peer "alpha-A" for arrived
+    And the app root on the page from peer "alpha-A" has content
+    And the build stamp peer "alpha-A" serves for this app is the one the published bundle carries
+    When a visitor opens the app this run published on peer "elohim.host" in a browser
+    Then the browser on peer "elohim.host" reported no uncaught error
+    And the browser on peer "elohim.host" completed client bootstrap
+    And every asset the browser asked peer "elohim.host" for arrived
+    And the app root on the page from peer "elohim.host" has content
+    And the build stamp peer "elohim.host" serves for this app is the one the published bundle carries
+    And both warm doorways keep serving that rendered build while all storage peers are down
 
   # STATION 3 — the doorway that comes back before its peer does.
   #
@@ -200,15 +253,26 @@ Feature: An app a doorway serves reaches a visitor able to run
   # restarts anything a second time, nobody notices. It converges on the tick, or it is
   # broken.
   @requires:owned-substrate
+  @deliverability-restart
   Scenario: a doorway that restarts while its peer is down catches up on its own
     Given doorway "elohim.host" can be restarted while peer "jessica" is held down
     And a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
     When each doorway is handed the bundle's bytes
     And only doorway "alpha-A" is told this bundle is the new version
+    # First Jessica must carry the new head within the publication bound.
+    # Before restoring it, witness the restarted doorway logging its failed
+    # initial lookup for this exact app while Jessica remains unreachable.
     And doorway "elohim.host" restarts while peer "jessica" is down
     And peer "jessica" comes back
     Then within 75 seconds doorway "elohim.host" serves a page naming that bundle's entry script
+    And every script and stylesheet the page from peer "elohim.host" names is one that peer serves
+    When a visitor opens the app this run published on peer "elohim.host" in a browser
+    Then the browser on peer "elohim.host" reported no uncaught error
+    And the browser on peer "elohim.host" completed client bootstrap
+    And every asset the browser asked peer "elohim.host" for arrived
+    And the app root on the page from peer "elohim.host" has content
+    And the build stamp peer "elohim.host" serves for this app is the one the published bundle carries
     # Structural, not observed after the fact: this run never calls a cache-clear route and
     # never restarts anything twice, so the last line asserts a property of its own script.
     And nobody cleared a cache or restarted anything to make that happen
@@ -222,45 +286,42 @@ Feature: An app a doorway serves reaches a visitor able to run
   #
   # Two things must be true, and they are different things. First, the deploy path itself
   # refuses to declare a bundle it can see is incoherent, and says which file is missing —
-  # the peer judges the bytes when it first unpacks them, before any head is minted.
+  # the SDK packager checks the files locally before uploading any bytes or minting a head.
+  # Storage also judges extracted bundles, so an older publisher cannot avoid the peer's check.
   # Second, if such a head is declared anyway — by an older peer, by a hand, by any route
-  # that skipped the judgement — the visitor is still never handed a blank page: they get
-  # the last version that worked, with the doorway saying on the wire that it is behind and
-  # naming the file that is missing. A blank 200 is the one response that is never
+  # that skipped the judgement — the visitor is still never handed a blank page: either
+  # the previous version actually boots, or a 503 with Retry-After asks them to return.
+  # Having published a good version does not guarantee a usable local fallback remains.
+  # In both cases the doorway says it is behind and names the missing file. A blank 200 is never
   # acceptable, because it is the only one a person cannot act on.
   #
   # THE SUB-CASE THIS STATION DOES NOT PROVE, named so its absence is a decision rather
   # than an oversight: a site whose FIRST published version is incoherent has no last
-  # working version to fall back to, and the promise there is a "still converging" answer
-  # that tells the visitor when to come back. This station always publishes a working
-  # version first, so it never reaches that branch. It is a station of its own and has not
-  # been written.
+  # working version to fall back to. This station always publishes a working version
+  # first, even though it permits an honest 503 if that fallback cannot be served.
+  # First-publication failure needs a separate station and has not been written.
   #
-  # AN OPEN SEAM THIS STATION WILL EXPOSE, named here so a red is read correctly. Two more
-  # terms, needed only for this paragraph. A PUBLIC MOUNT is a short path a doorway binds to
-  # a site so a person can just type it — "/" for the landing page, "/lamad" for the learning
-  # app — as opposed to the site's own long address, which every published site has. The WARM
-  # SHELL is the copy of a mounted site's index page the doorway keeps in memory so it can
-  # answer instantly, and it is the code path that classifies a head as current or behind.
-  # A site this run publishes has no public mount, only its own address. The "behind, and
-  # here is the missing file" answer is written by the warm-shell path. So if
-  # this station reds on the last line while the one above it passes, the finding is not
-  # "the doorway lied" — it is that the never-blank promise is currently kept only for
-  # sites with a public mount, and a site reached at its own address is outside it. That is
-  # a decision about scope, and it belongs to whoever owns the doorway, not to this file.
+  # The run-owned site has a public mount, so this exercises the warm-shell
+  # decision used by deployed sites, including its diagnostic response header.
   @requires:owned-substrate
+  @deliverability-refusal
   Scenario: a bundle that cannot boot is refused, and never reaches a visitor as a blank page
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
     When each doorway is handed the bundle's bytes
     And only doorway "alpha-A" is told this bundle is the new version
+    And within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
     And this run builds a second bundle with its entry script removed
     And the steward tries to publish the second bundle through doorway "alpha-A"
     Then the deploy path refuses it and names the missing file
-    # The head is now forced past that judgement, exactly as a peer predating it would.
+    # The negative test deliberately uploads an unchecked archive and declares it,
+    # exactly as an older publisher could. Normal developer packaging cannot do this.
     When the incoherent bundle is declared the new version anyway
-    Then a visitor asking doorway "alpha-A" for this app is never handed a blank page
+    # Within 75 seconds of forced declaration, this missing-file header proves
+    # the doorway judged the broken head; storage must still declare it.
+    Then doorway "alpha-A" says on the wire that it is behind and names the missing file
+    # Accept previous-build browser bootstrap within 45 seconds, or 503 + Retry-After.
+    And a visitor asking doorway "alpha-A" for this app is never handed a blank page
     # "On the wire" is the x-elohim-bundle response header, whose value reads
     # `behind;missing-asset:<file>` — machine-readable, and present on every response so a
     # monitor sees it without anyone opening the page.
-    And doorway "alpha-A" says on the wire that it is behind and names the missing file

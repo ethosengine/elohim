@@ -58,7 +58,7 @@ interface ScoredPeer {
 type DeliveryPeerResponse = DeliveryPeer;
 
 function extractIpFromMultiaddrSw(addr: string): string {
-  const match = addr.match(/\/ip4\/([^/]+)/);
+  const match = /\/ip4\/([^/]+)/.exec(addr);
   return match ? match[1] : '';
 }
 

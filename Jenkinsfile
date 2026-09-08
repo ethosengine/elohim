@@ -448,21 +448,25 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
 // scripts/ci/verify-projected-head.sh (CPS 64KB limit — see stageSpaBlobs
 // note; helpers stay heredoc-free).
 def verifyProjectedHeads(List<String> doorwayEprUrls, List<Map> bundles, String gitCommitHash, Map outcomes) {
+    def failures = []
     for (bundle in bundles) {
         def kind = bundle.kind ?: 'browser'
         if (kind != 'server') { continue }
         def expectedHash = outcomes["hash|${bundle.slug}|${kind}".toString()]
         if (!expectedHash) {
-            echo "verifyProjectedHeads: no authored hash recorded for ${bundle.slug} (${kind}) — skipping probe (author leg did not succeed)"
+            failures << "${bundle.slug}: server head was not authored"
             continue
         }
+        if (!bundle.ssrPath) { failures << "${bundle.slug}: SSR render route was not declared"; continue }
         for (doorwayEprUrl in doorwayEprUrls) {
             def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
             def rc = sh(returnStatus: true,
-                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}'")
+                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}' '${bundle.ssrPath}'")
             outcomes["projhead|${host}|${bundle.slug}|${kind}".toString()] = (rc == 0)
+            if (rc != 0) { failures << "${host}/${bundle.slug}: SSR head not served" }
         }
     }
+    if (!failures.isEmpty()) { error("SSR delivery refused: ${failures.join('; ')}") }
 }
 
 // The three helpers below carry the Upload-SPA-Blob stage's script-block body.
@@ -565,9 +569,9 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
     //     that minted divergent, un-witnessed heads (the per-host stranding class).
     def bundles = [
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server"],
+        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server", ssrPath: "/"],
         [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server", ssrPath: "/lamad/concept/elohim-host-landing"],
     ]
     def outcomes = [:]
 
@@ -620,16 +624,18 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         // not merely a 200'ing mount over a stale materialization? Skipped on
         // STORAGE_URL override for the same reason verifyEprMounts is (a raw
         // storage backend has no health-surface EPR attestation either).
-        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-            verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
-        }
+        verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
 
         // Phase 5 — the boot-through-doorway gate (spec 2026-09-08
         // epr-app-deliverability-through-doorway, D4b). HARD FAILURE: an EPR app
         // that cannot boot through a doorway does not ship. Not catchError'd —
         // the orchestrator reads UNSTABLE as success, which is how the 2026-09-04
         // and 2026-09-08 blank pages reached visitors with green builds.
-        verifyServedShells(doorwayEprUrls, bundles)
+        try {
+            verifyServedShells(doorwayEprUrls, bundles, outcomes)
+        } finally {
+            archiveArtifacts artifacts: 'genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
+        }
     }
 
     // Moved to the END (was previously emitted before verifyEprMounts/
@@ -640,15 +646,14 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
 
 // Phase 5 helper — one call per (doorway, browser bundle). Bash body lives in
 // scripts/ci/verify-served-shell.sh (CPS 64KB rule: no heredoc here). Reads the
-// head this build authored from the stage-spa-blob hand-off file; a bundle with
-// no authored head was already refused/named upstream, so it is skipped here.
-def verifyServedShells(List<String> doorwayEprUrls, List<Map> bundles) {
+// head this build actually authored from its outcomes. Missing author evidence
+// fails closed; a stale hand-off file cannot certify a previous build.
+def verifyServedShells(List<String> doorwayEprUrls, List<Map> bundles, Map outcomes) {
     def failures = []
     for (bundle in bundles) {
         if ((bundle.kind ?: 'browser') != 'browser') { continue }
-        def hashFile = "${env.WORKSPACE}/.ci-authored-hash-${bundle.slug}-browser.txt"
-        if (!fileExists(hashFile)) { echo "verifyServedShells: no authored head for ${bundle.slug} — skipped"; continue }
-        def head = readFile(hashFile).trim()
+        def head = outcomes["hash|${bundle.slug}|browser".toString()]
+        if (!head) { failures << "${bundle.slug}: browser head was not authored"; continue }
         def mount = bundle.slug == 'elohim-host-landing' ? '/' : "/${bundle.slug.replaceFirst(/-spa$/, '')}"
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
             def rc = sh(returnStatus: true,
@@ -694,9 +699,8 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     }
     // Projected-head legs (Track-4 T4-2): one per (host, server-bundle). Passed
     // => this host's health surface (/health/startup or /health) served the
-    // just-authored serverBlobHash, OR the T4-1 attestation isn't deployed
-    // there yet (verify-projected-head.sh's FIELD-ABSENT reads as exit 0 —
-    // an honest skip, not a failure). Only server-kind bundles carry a
+    // just-authored serverBlobHash AND the declared SSR route rendered it.
+    // Missing attestation is a failed proof. Only server-kind bundles carry a
     // servedBundleHeads entry in the contract; a leg is only emitted when the
     // author leg actually recorded a hash to check against (outcomes["hash|…"]).
     doorwayEprUrls.each { url ->
@@ -721,7 +725,7 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
             if (c.kind == 'author') {
                 msg = "Head author '${c.name}' failed: NO doorway in the fabric reached a live conductor bridge to author (witness) this bundle's single notarized head. The head cannot green or converge until a conductor bridge is live. Check the alpha peers' conductor health (storage /health, conductor app-WS)."
             } else if (c.kind == 'projhead') {
-                msg = "Projected-head probe '${c.name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The running doorway PROCESS has not materialized the current SSR bundle (a stale-but-200 host) — check its logs / trigger a restart to pick up the hot-swap. (T4-1 attestation absence alone never fails this leg — see scripts/ci/verify-projected-head.sh.)"
+                msg = "Projected-head probe '${c.name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
             } else {
                 msg = "Blob byte-seed '${c.name}' failed after retries (PUT /admin/seed/blob): this backend did not receive the bundle bytes. A transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the backend is down. Re-run the App pipeline, or check the host storage /health."
             }
@@ -1244,6 +1248,7 @@ cat > dist/elohim-app/browser/version.json << VEOF
 }
 VEOF
 """
+                                sh 'cp dist/elohim-app/browser/version.json dist/elohim-app/server/version.json'
                                 sh 'ls -la dist/'
                             }
                         }
@@ -1271,6 +1276,8 @@ VEOF
                 container('builder') {
                     dir('app/lamad') {
                         sh 'pnpm run build'
+                        sh 'cp ../elohim-app/dist/elohim-app/browser/version.json dist/lamad/browser/version.json'
+                        sh 'cp dist/lamad/browser/version.json dist/lamad/server/version.json'
                         sh 'ls -la dist/lamad/browser/ | head -20'
                         sh 'ls -la dist/lamad/server/ | head -20'
                     }

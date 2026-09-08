@@ -14,8 +14,8 @@
  */
 
 import { execFile } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -70,7 +70,7 @@ export interface FixtureBundle {
  * does not write the script. That is the 2026-09-04 outage in miniature: every
  * other file resolves, and the app never starts.
  */
-export function buildFixtureBundle(opts: { coherent: boolean }): FixtureBundle {
+export function buildFixtureBundle(opts: { coherent: boolean; baseHref?: string }): FixtureBundle {
   // Content-addressed names, so two bundles built in the same millisecond are still
   // distinguishable — a collision here would make "the PREVIOUS era" unobservable.
   const token = `${Date.now().toString(36)}${randomBytes(4).toString('hex')}`.toUpperCase();
@@ -87,7 +87,7 @@ export function buildFixtureBundle(opts: { coherent: boolean }): FixtureBundle {
       '  <head>',
       '    <meta charset="utf-8" />',
       `    <title>EPR app deliverability fixture ${token}</title>`,
-      '    <base href="./" />',
+      `    <base href="${opts.baseHref ?? './'}" />`,
       `    <link rel="stylesheet" href="${styleSheet}" />`,
       '  </head>',
       '  <body>',
@@ -108,7 +108,8 @@ export function buildFixtureBundle(opts: { coherent: boolean }): FixtureBundle {
         '// The whole app: fill the root element the page left empty.',
         "const root = document.querySelector('app-root');",
         `root.textContent = 'EPR app deliverability fixture ${token} is running.';`,
-        `root.setAttribute('data-fixture-stamp', ${JSON.stringify(stamp)});`,
+        `root.setAttribute('data-fixture-stamp', ${JSON.stringify(stamp)});
+root.setAttribute('data-app-ready', 'true');`,
         '',
       ].join('\n')
     );
@@ -162,9 +163,8 @@ export async function stageBundle(opts: {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     DO_PATCH: opts.declare ? '1' : '0',
-    // One attempt: a household mesh this run owns has no cluster churn to ride
-    // out, and a retry ladder would only blur which leg actually failed.
-    STAGE_BLOB_ATTEMPTS: '1',
+    // Use the publisher's bounded retry policy. Canonical concurrent writers
+    // can conflict after the deliberately induced peer restart; verdict2 stays terminal.
   };
   let code = 0;
   let output = '';
@@ -196,6 +196,7 @@ export interface BrowserVisit {
   rootText: string;
   /** True when an `<app-root>` element was present at all. */
   rootPresent: boolean;
+  bootstrapReady: boolean;
 }
 
 /**
@@ -208,44 +209,12 @@ export interface BrowserVisit {
  * 404'd entry script never appears as a network FAILURE.
  */
 export async function visitInBrowser(url: string, timeoutMs = 30_000): Promise<BrowserVisit> {
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
-  const visit: BrowserVisit = {
-    url,
-    pageErrors: [],
-    failedRequests: [],
-    httpErrors: [],
-    rootText: '',
-    rootPresent: false,
-  };
-  try {
-    const page = await browser.newPage();
-    page.on('pageerror', error => visit.pageErrors.push(error.message));
-    page.on('requestfailed', request =>
-      visit.failedRequests.push({
-        url: request.url(),
-        failure: request.failure()?.errorText ?? 'unknown',
-      })
-    );
-    page.on('response', response => {
-      if (response.status() >= 400) {
-        visit.httpErrors.push({ url: response.url(), status: response.status() });
-      }
-    });
-    await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs }).catch(() => undefined);
-    const root = await page.evaluate(() => {
-      const el = document.querySelector('app-root');
-      return { present: el !== null, text: (el?.textContent ?? '').trim() };
-    });
-    visit.rootPresent = root.present;
-    visit.rootText = root.text;
-  } finally {
-    await browser.close().catch(() => undefined);
-  }
-  return visit;
+  const { captureBrowserShell } = await import('../../scripts/browser-shell.js');
+  const started = Date.now();
+  const capture = await captureBrowserShell(url, timeoutMs);
+  if (Date.now() - started > 45_000)
+    capture.pageErrors.push('Browser visit exceeded its 45-second deadline');
+  return capture;
 }
 
 /** Poll `check` until it returns true or the bound expires; returns the elapsed ms or null. */
@@ -254,10 +223,12 @@ export async function pollUntil(
   boundMs: number,
   intervalMs = 3_000
 ): Promise<number | null> {
+  if (boundMs <= 0) return null;
   const started = Date.now();
   for (;;) {
-    if (await check()) return Date.now() - started;
+    const ready = await check().catch(() => false);
     if (Date.now() - started >= boundMs) return null;
+    if (ready) return Date.now() - started;
     await new Promise(done => setTimeout(done, intervalMs));
   }
 }
@@ -268,5 +239,109 @@ export function sameOrigin(entryUrl: string, candidate: string): boolean {
     return new URL(candidate).origin === new URL(entryUrl).origin;
   } catch {
     return false;
+  }
+}
+
+/** Server fixture implements the same export contract AngularRenderer loads. */
+export function buildServerFixture(browser: FixtureBundle): FixtureBundle {
+  const dir = mkdtempSync(join(fixtureRoot(), 'epr-server-'));
+  writeFileSync(join(dir, 'version.json'), readFileSync(join(browser.dir, 'version.json')));
+  const html = readFileSync(join(browser.dir, 'index.html'), 'utf8').replace(
+    '<app-root></app-root>',
+    `<app-root data-ssr-stamp="${browser.stamp}">SSR ${browser.stamp}</app-root>`
+  );
+  writeFileSync(
+    join(dir, 'main.server.mjs'),
+    `export default function bootstrap() {}\nexport async function renderApplication() { return ${JSON.stringify(html)}; }\n`
+  );
+  return { ...browser, dir };
+}
+
+export async function meshControl(action: string, ...args: string[]): Promise<void> {
+  await execFileAsync(
+    'bash',
+    [join(REPO_ROOT, 'app/elohim-app/scripts/hc-mesh.sh'), action, ...args],
+    {
+      cwd: REPO_ROOT,
+      env: process.env,
+      timeout: 180_000,
+      maxBuffer: 4 * 1024 * 1024,
+    }
+  );
+}
+
+/** Deliberate fault injection after the normal package/publish path refused. */
+export async function stageInvalidFixture(
+  bundle: FixtureBundle,
+  doorwayUrl: string
+): Promise<string> {
+  if (bundle.coherent)
+    throw new Error('fault injector accepts only a deliberately incoherent fixture');
+  const archiveDir = mkdtempSync(join(fixtureRoot(), 'invalid-package-'));
+  try {
+    const archive = join(archiveDir, 'invalid.zip');
+    await execFileAsync('zip', ['-X', '-qr', archive, '.'], { cwd: bundle.dir });
+    const bytes = readFileSync(archive);
+    const hash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const response = await fetch(`${doorwayUrl}/admin/seed/blob`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/zip',
+        'X-Blob-Hash': hash,
+        'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
+      },
+      body: new Uint8Array(bytes),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = await response.text();
+    if (
+      !response.ok ||
+      !(JSON.parse(body) as { forwarded_to_storage?: boolean }).forwarded_to_storage
+    ) {
+      throw new Error(`fault fixture did not reach storage: ${response.status} ${body}`);
+    }
+    return hash;
+  } finally {
+    rmSync(archiveDir, { recursive: true, force: true });
+  }
+}
+
+/** Recorded PID plus start tick: PID reuse cannot disguise a renderer restart. */
+export function doorwayIncarnations(): string[] {
+  // eslint-disable-next-line sonarjs/publicly-writable-directories -- Read-only owned-mesh PID receipts; no temporary file creation.
+  const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+  return ['a', 'b'].map(name => readFileSync(join(mesh, 'pids', `doorway-${name}`), 'utf8').trim());
+}
+
+/** Read only the owned doorway's restart log; offsets distinguish this incarnation. */
+export function doorwayRestartLog(name: string): string {
+  // eslint-disable-next-line sonarjs/publicly-writable-directories -- read-only owned mesh receipt
+  const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+  try {
+    return readFileSync(join(mesh, 'logs', `doorway-restart-${name}.log`), 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+/** Fixture authoring retries only the conductor's explicit optimistic-write conflict. */
+export async function postFixtureCommitment(url: string, init: RequestInit) {
+  const deadline = Date.now() + 60_000;
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+    });
+    const text = await response.text();
+    if (
+      response.status !== 503 ||
+      !text.includes('source chain head has moved since the bundle began') ||
+      Date.now() >= deadline
+    ) {
+      return { ok: response.ok, status: response.status, text };
+    }
+    await new Promise(resolve =>
+      setTimeout(resolve, Math.min(5000, 1000 * (attempt + 1), Math.max(1, deadline - Date.now())))
+    );
   }
 }

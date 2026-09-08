@@ -370,6 +370,9 @@ def runDataplaneValidation() {
         def rc = sh(returnStatus: true,
                     script: "bash '${env.WORKSPACE}/scripts/ci/verify-served-shell.sh' '${doorway}' '/' 'elohim-host-landing' 'auto'")
         if (rc != 0) { shellFailures << doorway }
+        def ssrRc = sh(returnStatus: true,
+                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorway}' 'elohim-host-landing' 'auto'")
+        if (ssrRc != 0) { shellFailures << "${doorway} (SSR)".toString() }
     }
     if (!shellFailures.isEmpty()) {
         error("Served shell does not boot through ${shellFailures.join(', ')} — see the ✗ lines above (doorway, declared head, asset, x-elohim-bundle marker).")
@@ -2797,7 +2800,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*,genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
                 }
             }
         }

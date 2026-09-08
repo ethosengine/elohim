@@ -8,8 +8,8 @@ Feature: The shell a doorway serves can boot
   BROWSER HEAD is the bundle hash (blobHash) its EPR record declares — the code
   a browser downloads and runs. This is the browser-shell clause of the
   doorway-failover invariant: whichever doorway answers the root, the page it
-  hands a person must name only assets from that declared browser head, so the
-  app can boot. The sibling concern served-projected-head compares the SSR
+  hands a person must name an entry script from that declared browser head,
+  and its scripts and stylesheets must resolve through the same doorway. The sibling concern served-projected-head compares the SSR
   SERVER head instead and never sees these bytes. A 200 at the mount proves the
   door opened; it does not prove anyone got in.
 
@@ -25,7 +25,7 @@ Feature: The shell a doorway serves can boot
   # polyfills all resolved; only the entry script 404'd, so nothing booted and
   # every visitor got a blank page.
   @regression @requires:doorway
-  Scenario: A visitor asking for the site root is handed a page that can boot
+  Scenario: The site root names the declared entry script and reachable assets
     When a visitor asks peer "alpha-A" for the page at "/"
     And a visitor asks peer "elohim.host" for the page at "/"
     Then every script and stylesheet the page from peer "alpha-A" names is one that peer serves
@@ -43,25 +43,30 @@ Feature: The shell a doorway serves can boot
   #
   # BOOTS, precisely: the browser reported no uncaught error, every request it
   # made to this same doorway was answered (nothing 4xx, 5xx or aborted), and
-  # the app's own root element — <app-root>, the single tag the served page puts
-  # in <body> for the framework to fill — has content in it afterwards. An empty
-  # <app-root> after load IS the blank page, in the one form a person sees.
+  # the app's own root element has visible content and data-app-ready="true".
+  # That marker is written only after the browser bootstrap succeeds. SSR may
+  # supply visible text before JavaScript starts; that text alone is not proof.
+  # An empty root or a missing bootstrap marker fails the visit. Navigation and
+  # redirecting asset requests must remain on the doorway being tested; a healthy
+  # second doorway cannot supply the first doorway's proof. External third-party
+  # requests are outside the same-doorway asset assertion.
   #
   # THE BUILD STAMP is the fourth line. Every browser bundle carries a
   # version.json written by the app job (commit, version, buildTime,
   # environment, service). It records the COMMIT, not the bundle's content
   # hash, so it cannot be compared against a blobHash directly; what it CAN be
   # compared against is the copy of version.json inside the declared browser
-  # head's own bundle, reached at /apps/{slug}/version.json — the same
+  # head's own bundle, reached at /apps/{blobHash}/version.json — the same
   # projection the entry-point comparison above reads index.html through. Equal
   # stamps mean the file a visitor is served and the file the declared head
   # holds came out of one build. Born red on the fleet 2026-09-06: both apex
   # names render an intact landing whose /version.json 404s, which is the
   # stale-shell shape one notch down — assets 200, stamp absent.
-  @browser-only @regression @requires:doorway
-  Scenario Outline: A visitor's browser actually starts the app it was handed
+  @regression @requires:doorway
+  Scenario Outline: Client bootstrap completes and renders through each doorway
     When a visitor opens the page at "/" on peer "<peer>" in a browser
     Then the browser on peer "<peer>" reported no uncaught error
+    And the browser on peer "<peer>" completed client bootstrap
     And every asset the browser asked peer "<peer>" for arrived
     And the app root on the page from peer "<peer>" has content
     And the build stamp peer "<peer>" serves is the one the declared browser head of EPR "elohim-host-landing" carries

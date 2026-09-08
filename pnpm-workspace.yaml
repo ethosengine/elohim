@@ -65,6 +65,14 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
 
+packageExtensions:
+  # Analog imports TypeScript's named ESM exports but omits its dependency.
+  # Bind the existing app compiler instead of inheriting hoisted TypeScript 5.4,
+  # whose CJS namespace has no createPrinter export (Vitest dies at startup).
+  '@analogjs/vite-plugin-angular@2.6.4':
+    dependencies:
+      typescript: 6.0.3
+
 # Vitest-JIT resource-transformer workaround (re-cut for Angular 22, 2026-07-30).
 # @angular/build's createJitResourceTransformer relies on ts.visitEachChild, which
 # no-ops on the synthetic source files Vitest's JIT pipeline hands it, so component

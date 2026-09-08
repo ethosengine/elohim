@@ -5,7 +5,7 @@
   "manualOnly": false,
   "triggersGenesis": true,
   "dependsOn": ["elohim-sophia"],
-  "description": "Elohim Angular app — build, service worker, site image",
+  "description": "Elohim Angular app \u2014 build, service worker, site image",
   "steps": {
     "build-angular": {
       "description": "Build Angular production bundle (includes service worker compilation via pnpm run build:sw)",
@@ -41,10 +41,7 @@
     "build-site-image": {
       "description": "Package app into container image",
       "inputs": {
-        "sources": [
-          "app/elohim-app/images/Dockerfile",
-          "app/elohim-app/images/nginx.conf"
-        ],
+        "sources": ["app/elohim-app/images/Dockerfile", "app/elohim-app/images/nginx.conf"],
         "buildProcess": ["Jenkinsfile"]
       },
       "outputs": {
@@ -79,12 +76,18 @@
       "elohim-app": {
         "dir": "app/elohim-app",
         "steps": ["build-angular", "build-site-image"],
-        "run": { "kind": "just", "recipe": "gate" }
+        "run": {
+          "kind": "just",
+          "recipe": "gate"
+        }
       },
       "elohim-library": {
         "dir": "app/elohim-library",
         "steps": ["lint-library"],
-        "run": { "kind": "root-just", "recipe": "_gate-elohim-library" }
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-library"
+        }
       },
       "elements-codegen": {
         "dir": ".",
@@ -95,14 +98,36 @@
           ],
           "buildProcess": ["tools/check-cem-fresh.mjs"]
         },
-        "run": { "kind": "root-just", "recipe": "_gate-elements-codegen" }
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elements-codegen"
+        }
+      },
+      "epr-app-package": {
+        "dir": "elohim/sdk",
+        "inputs": {
+          "sources": [
+            "elohim/sdk/scripts/**",
+            "scripts/ci/stage-spa-blob.sh",
+            "app/scripts/lint-ssr-entry.mjs"
+          ],
+          "buildProcess": ["justfile"]
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-epr-app-package"
+        }
       }
     }
   },
   "deployment": {
     "targets": {
-      "alpha": { "healthCheck": "https://alpha.elohim.host/version" },
-      "staging": { "healthCheck": "https://staging.elohim.host/version" }
+      "alpha": {
+        "healthCheck": "https://alpha.elohim.host/version"
+      },
+      "staging": {
+        "healthCheck": "https://staging.elohim.host/version"
+      }
     }
   }
 }

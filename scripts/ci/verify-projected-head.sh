@@ -20,29 +20,19 @@
 #         "declaredServerBlobHash": "..." }
 #     ]
 #   }
-# Until T4-1 ships on a given host, `servedBundleHeads` (or the slug's entry in
-# it) is simply absent — that reads as SKIP (attestation not yet deployed), not
-# FAIL, so this probe can be wired into CI before T4-1 lands everywhere without
-# turning every build red.
+# Missing attestation enters the same bounded convergence window as a stale
+# head. Absence is a failed proof, never a successful skip.
 #
-# BROWSER-BUNDLE LIMITATION: the contract above only carries `serverBlobHash`
-# (the SSR/server bundle). There is no equivalent served-bytes content-hash
-# marker for the browser (CSR) bundle: version.json (Jenkinsfile ~1020-1030)
-# embeds GIT_COMMIT_HASH, not the zip's content-addressed SPA_HASH, and is
-# emitted once per elohim-app build — not once per pillar-EPR slug (lamad-spa
-# gets its own browser bundle with no matching version.json of its own). So it
-# cannot stand in for a slug-scoped content hash. This script optionally fetches
-# <host>/version.json and logs whether its "commit" field matches the current
-# build's commit as a CHEAP, NON-GATING liveness signal only (see the tail of
-# this script) — it never affects the exit code. Closing the browser-bundle gap
-# for real needs a browser-bundle content marker added to the same T4-1 health
-# contract (tracked as follow-up; not built here).
+# The health contract describes the server bundle. Browser boot and build-stamp
+# identity are checked separately by verify-served-shell.sh through the browser
+# mount. The optional /version.json commit log below is informational only; it
+# cannot replace either executable-hash or browser-boot proof.
 #
-# Usage: verify-projected-head.sh <doorway-base-url> <slug> <expected-server-blob-hash> [expected-git-commit]
+# Usage: verify-projected-head.sh <doorway-base-url> <slug> <expected-server-blob-hash> [expected-git-commit] [ssr-path=/]
+# ssr-path must be a declared SSR-renderable route; a browser mount need not render.
 # Exit codes:
 #   0 = MATCH (served serverBlobHash == expected, either immediately or after
-#       convergence retries) or FIELD-ABSENT (attestation not deployed on this
-#       host yet — forward-compatible skip)
+#       convergence retries)
 #   1 = STILL-DIVERGENT (served serverBlobHash != expected after the full
 #       convergence window) or UNREACHABLE (neither /health/startup nor
 #       /health answered 200 after retries)
@@ -61,6 +51,16 @@ BASE_URL="$1"
 SLUG="$2"
 EXPECTED_HASH="$3"
 EXPECTED_COMMIT="${4:-}"
+SSR_PATH="${5:-/}"
+case "$SSR_PATH" in
+    //*) echo "ERROR: SSR probe path must be local to the doorway" >&2; exit 2 ;;
+    /*) ;;
+    *) echo "ERROR: SSR probe path must start with /" >&2; exit 2 ;;
+esac
+if [ "$EXPECTED_HASH" = auto ]; then
+    EXPECTED_HASH=$(curl -fsS --max-time 20 "$BASE_URL/db/content/$SLUG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("serverBlobHash") or "")')
+    [ -n "$EXPECTED_HASH" ] || { echo "ERROR: $BASE_URL/$SLUG declares no SSR head" >&2; exit 1; }
+fi
 
 HOST="${BASE_URL#http://}"
 HOST="${HOST#https://}"
@@ -103,7 +103,7 @@ else:
     slug = os.environ['SLUG']
     for entry in data.get('servedBundleHeads') or []:
         if isinstance(entry, dict) and entry.get('slug') == slug:
-            print(entry.get('serverBlobHash') or '')
+            print((entry.get('serverBlobHash') or '') if entry.get('status') == 'current' else '')
             break
     else:
         print('')
@@ -150,16 +150,6 @@ done
 if [ "${reached}" = "0" ]; then
     echo "ERROR: ${HOST} unreachable on both /health/startup and /health after retries" >&2
     exit 1
-fi
-
-if [ "${found_key}" != "yes" ]; then
-    echo "⚠ attestation not deployed on ${HOST} — skipping (servedBundleHeads absent from health surface; T4-1 not yet live here)"
-    exit 0
-fi
-
-if [ -z "${served_hash}" ]; then
-    echo "⚠ attestation not deployed on ${HOST} — skipping (no servedBundleHeads entry for slug '${SLUG}')"
-    exit 0
 fi
 
 if [ "${served_hash}" = "${EXPECTED_HASH}" ]; then
@@ -229,6 +219,17 @@ else
         exit 1
     fi
 fi
+
+# A live registry alone cannot prove that requests take the SSR path.
+mount="$SSR_PATH"
+render_headers=$(mktemp)
+if ! curl -fsS --max-time 60 -D "$render_headers" -o /dev/null -w '%{http_code}' "$BASE_URL$mount" | grep -q '^200$' || ! tr -d '\r' < "$render_headers" | grep -qi '^x-ssr-rendered: 1$'; then
+    echo "ERROR: $BASE_URL$mount did not return SSR output at attested head $EXPECTED_HASH" >&2
+    cat "$render_headers" >&2
+    rm -f "$render_headers"
+    exit 1
+fi
+rm -f "$render_headers"
 
 # Cheap, NON-GATING browser-bundle liveness signal (see header LIMITATION).
 # This never touches the exit code — it is informational only.

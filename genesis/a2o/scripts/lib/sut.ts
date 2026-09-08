@@ -74,6 +74,13 @@ export interface SutComponent {
  * reports a moved pointer as dirty.
  */
 export const DEFAULT_SUT_COMPONENTS: readonly SutComponent[] = [
+  { name: 'a2o', path: 'genesis/a2o' },
+  { name: 'appPackaging', path: 'elohim/sdk' },
+  { name: 'appStaging', path: 'scripts/ci' },
+  { name: 'appContracts', path: 'app/scripts' },
+  { name: 'dependencies', path: 'pnpm-lock.yaml' },
+  { name: 'workspace', path: 'pnpm-workspace.yaml' },
+  { name: 'meshLauncher', path: 'app/elohim-app/scripts/hc-mesh.sh' },
   { name: 'storage', path: 'elohim/elohim-storage' },
   { name: 'doorway', path: 'doorway/doorway-service' },
   { name: 'conductor', path: 'elohim/holochain-conductor' },

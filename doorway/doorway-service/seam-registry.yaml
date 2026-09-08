@@ -764,9 +764,10 @@ decisionPoints:
       modulePath: render::warm_shell::ShellOutcome
       line: 240
     summary: >
-      Warm(WarmShell) / Fresh(WarmShell) / Unavailable — the terminal answer of resolve_shell,
-      consumed by http.rs to choose between a composed SSR serve, a warm bundle serve, and the
-      existing catching-up shed.
+      Warm / Fresh / Behind / Unavailable / Converging — the terminal answer of resolve_shell.
+      Behind carries a safe older shell and the current head's diagnosis. Converging carries
+      that diagnosis without HTML when no safe shell exists; the HTTP response is 503 and
+      preserves the reason in x-elohim-bundle rather than inventing a storage outage.
     concernIds:
       - id: C4
         status: answered
@@ -2319,6 +2320,24 @@ decisionPoints:
         testName: a_head_whose_entry_script_is_missing_is_never_at_head
         kind: unit
       - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_incoherent_archived_head_is_unavailable_without_a_working_fallback
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: broken_fresh_head_preserves_last_working_shell_and_archive
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: unknown_fresh_head_cannot_replace_a_working_shell
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: unknown_first_head_is_unavailable_without_stocking
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: missing_asset_reason_survives_the_converging_http_response
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: broken_first_head_is_not_stocked_and_is_unavailable
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
         testName: a_confirmed_head_costs_exactly_one_probe_ever
         kind: unit
       - path: doorway/doorway-service/src/render/warm_shell.rs
@@ -2442,10 +2461,10 @@ decisionPoints:
       - id: C6b
         status: answered
         justification: >
-          Replay against settled state is a no-op: an unmoved head produces no HeadMove, no
-          projection write and no eviction, so the 30s tick against a steady fleet costs one
-          bounded GET per slug and changes nothing
-          (a_steady_head_writes_nothing_and_logs_nothing).
+          Replay reasserts storage truth in the projection without a HeadMove or shell eviction.
+          A failed Mongo write or later stale projection heals on the next 30s tick,
+          without requiring the storage head to move again
+          (a_steady_head_repairs_projection_without_reporting_a_head_move).
       - id: C8
         status: answered
         justification: >
@@ -2457,7 +2476,7 @@ decisionPoints:
         testName: a_moved_storage_head_advances_the_doorways_declaration_in_one_tick
         kind: unit
       - path: doorway/doorway-service/src/render/bundle_heads.rs
-        testName: a_steady_head_writes_nothing_and_logs_nothing
+        testName: a_steady_head_repairs_projection_without_reporting_a_head_move
         kind: unit
       - path: doorway/doorway-service/src/render/bundle_heads.rs
         testName: an_unreachable_storage_keeps_the_last_declared_head

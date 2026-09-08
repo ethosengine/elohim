@@ -3091,6 +3091,7 @@ EOF
     DOORWAY_MEMBRANE_SHAPE_THRESHOLD="${DOORWAY_MEMBRANE_SHAPE_THRESHOLD:-100000}" \
     DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
     DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
+    SSR_STORAGE_URL="$primary" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -3126,6 +3127,7 @@ EOF
     DOORWAY_MEMBRANE_SHAPE_THRESHOLD="${DOORWAY_MEMBRANE_SHAPE_THRESHOLD:-100000}" \
     DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
     DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
+    SSR_STORAGE_URL="http://127.0.0.1:$(http_port 1)" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -3422,6 +3424,56 @@ mesh_blocks() {
   return "$rc"
 }
 
+# Fault controls retain the exact running environment and argv. Never select a
+# process by name: the recorded start tick must still match before signalling it.
+stop_storage() { # <peer>
+  local name="$1" pid
+  pid="$(live_recorded_pid storage "$name")" || { echo "REFUSED: no owned storage $name" >&2; return 1; }
+  capture_storage_environ "$name" "$pid" "$(resolve_exe "$pid" "$STORAGE_BIN")"
+  kill "$pid"
+  local t=30
+  while [ "$t" -gt 0 ] && live_recorded_pid storage "$name" >/dev/null; do sleep 1; t=$((t-1)); done
+  if live_recorded_pid storage "$name" >/dev/null; then kill -9 "$pid"; fi
+}
+
+restart_doorway() { # <a|b> [extra SSR slug]
+  local name="$1" slug="${2:-}" pid next
+  case "$name" in a|b) ;; *) echo 'REFUSED: doorway must be a or b' >&2; return 1 ;; esac
+  pid="$(live_recorded_pid doorway "$name")" || { echo "REFUSED: no owned doorway $name" >&2; return 1; }
+  next="$(python3 - "$pid" "$slug" "$LOGDIR/doorway-restart-$name.log" <<'PYRESTART'
+import os, signal, subprocess, sys, time
+pid, slug, log = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+with open(f'/proc/{pid}/environ', 'rb') as f:
+    env = dict(item.decode().split('=', 1) for item in f.read().split(b'\0') if b'=' in item)
+with open(f'/proc/{pid}/cmdline', 'rb') as f:
+    argv = [part.decode() for part in f.read().split(b'\0') if part]
+cwd = os.readlink(f'/proc/{pid}/cwd')
+exe = os.readlink(f'/proc/{pid}/exe').removesuffix(' (deleted)')
+if not os.path.isfile(exe) or not os.access(exe, os.X_OK):
+    raise RuntimeError(f'cannot restart doorway: executable absent: {exe}')
+# The SSR source must be this doorway's primary, not the default :8090.
+if '--storage-url' in argv:
+    env['SSR_STORAGE_URL'] = argv[argv.index('--storage-url') + 1]
+if slug:
+    slugs = env.get('SSR_BUNDLE_SLUGS', env.get('SSR_BUNDLE_SLUG', '')).split(',')
+    env['SSR_BUNDLE_SLUGS'] = ','.join(dict.fromkeys([s for s in slugs if s and not s.startswith('epr-app-deliverability-')] + [slug]))
+os.kill(pid, signal.SIGTERM)
+for _ in range(100):
+    if not os.path.exists(f'/proc/{pid}'):
+        break
+    time.sleep(.1)
+else:
+    os.kill(pid, signal.SIGKILL)
+with open(log, 'ab', buffering=0) as out:
+    child = subprocess.Popen([exe, *argv[1:]], env=env, cwd=cwd,
+                             stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True)
+print(child.pid)
+PYRESTART
+)" || return 1
+  record_mesh_pid doorway "$name" "$next"
+  echo "doorway $name restarted pid=$next"
+}
+
 # Dispatch guard: only run the action switch when this file is EXECUTED, not
 # when it is SOURCED. hc-mesh-prologue.sh (and an operator's shell) source
 # this script to reuse conductor_csv/peer_csv/mesh_seed_env without risking an
@@ -3439,6 +3491,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     conductors-restart) restart_conductors ;;
     coordswap) shift; mesh_coordswap "$@" ;;
     storage-restart) shift; restart_storage "$@" ;;
+    storage-stop) shift; stop_storage "$@" ;;
+    doorway-restart) shift; restart_doorway "$@" ;;
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
     lineage-reset) lineage_reset_all ;;
