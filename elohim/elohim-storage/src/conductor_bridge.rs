@@ -50,11 +50,47 @@ use crate::hc_client::HcClient;
 /// **There is exactly one reconnect strategy in this crate and it is the
 /// supervisor's.** An implementation here re-READS a handle; it must never
 /// mint one.
+/// Which concrete leg backs a [`ConductorBridge`] — a cheap introspection
+/// hook composition tests use to assert a production boot site wires the
+/// re-reading REGISTRY leg, not a fixed handle.
+///
+/// # Why this exists
+///
+/// Measured live on the household mesh 2026-09-08: the spool-custody boot
+/// site read `registry.lamad_client()` only to gate readiness, then handed
+/// the captured `Arc<HcClient>` to `SpoolCustodyAuthor::new`, which wraps a
+/// [`StaticConductorBridge`] — the SAME shape the other five converted sites
+/// (the provide loop, salvage, rotation, membership, feedback projector) had
+/// just been fixed to avoid. `handle()`'s type erases this: a `Static`
+/// bridge and a `Registry` bridge both type-check as `Arc<dyn
+/// ConductorBridge>` at every call site, so nothing short of running the
+/// process past a conductor roll caught the omission — 78 dead-handle
+/// `Websocket closed: No connection` failures over 6.5 minutes while the
+/// other five healed inside the first ~15 s. `bridge_kind()` makes "is this
+/// the re-reading leg?" a value a test can assert on the object main.rs
+/// actually constructs, without waiting for a roll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BridgeKind {
+    /// [`RegistryConductorBridge`] — re-reads the registry slot per use.
+    Registry,
+    /// [`StaticConductorBridge`] — one fixed handle for the life of the bridge.
+    Static,
+    /// [`NoConductorBridge`] — no conductor at all.
+    None,
+}
+
 #[async_trait::async_trait]
 pub trait ConductorBridge: Send + Sync {
     /// The handle to use RIGHT NOW. `None` while the bridge is being re-minted
     /// — honest backpressure, and the next sweep asks again.
     fn handle(&self) -> Option<Arc<HcClient>>;
+
+    /// Which concrete leg this is. Defaulted to [`BridgeKind::Static`]
+    /// because most non-production implementors (bespoke test fakes) hold a
+    /// fixed answer; the three production legs each override this.
+    fn bridge_kind(&self) -> BridgeKind {
+        BridgeKind::Static
+    }
 
     /// One zome call at the CALLER's admission class, through [`Self::handle`].
     ///
@@ -204,6 +240,10 @@ impl ConductorBridge for RegistryConductorBridge {
         }
         Some(hc)
     }
+
+    fn bridge_kind(&self) -> BridgeKind {
+        BridgeKind::Registry
+    }
 }
 
 /// A bridge with no conductor at all. Every sweep reports `Unavailable` —
@@ -215,6 +255,10 @@ pub struct NoConductorBridge;
 impl ConductorBridge for NoConductorBridge {
     fn handle(&self) -> Option<Arc<HcClient>> {
         None
+    }
+
+    fn bridge_kind(&self) -> BridgeKind {
+        BridgeKind::None
     }
 }
 

@@ -247,6 +247,44 @@ struct Args {
     peer_policy_path: Option<PathBuf>,
 }
 
+/// The conductor leg every periodic author in the boot path below shares for
+/// the `lamad`/`content_store` cell — ONE construction site instead of six
+/// hand-copied ones, so "does this call the re-reading REGISTRY leg?" is a
+/// property this one function can be tested for, rather than an invariant
+/// six separate call sites each have to uphold independently.
+///
+/// # Why this function exists at all
+///
+/// Measured live on the household mesh 2026-09-08: the spool-custody boot
+/// site read `registry.lamad_client()` only to gate readiness, then handed
+/// the captured `Arc<HcClient>` straight to `SpoolCustodyAuthor::new`
+/// (wrapping a `StaticConductorBridge`) — the exact shape the other five
+/// converted sites had just been fixed to avoid. `Arc<dyn ConductorBridge>`
+/// type-checks identically whichever concrete leg backs it, so nothing short
+/// of a live conductor roll caught the omission: 78 `Websocket closed: No
+/// connection` failures over 6.5 minutes on the spool-custody tick while the
+/// other five healed within ~15 s of the same roll.
+/// `conductor_bridge_composition_tests` asserts this function's OWN output
+/// is `BridgeKind::Registry`, which is now the only thing every call site
+/// needs to inherit correctly.
+fn lamad_conductor_bridge(
+    registry: &std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
+) -> std::sync::Arc<dyn elohim_storage::conductor_bridge::ConductorBridge> {
+    std::sync::Arc::new(
+        elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(registry.clone()),
+    )
+}
+
+/// Same as [`lamad_conductor_bridge`], for the `imagodei`/qahal cell
+/// (`membership_identity_reconcile`'s boot site).
+fn imagodei_conductor_bridge(
+    registry: &std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
+) -> std::sync::Arc<dyn elohim_storage::conductor_bridge::ConductorBridge> {
+    std::sync::Arc::new(
+        elohim_storage::conductor_bridge::RegistryConductorBridge::imagodei(registry.clone()),
+    )
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initialize tracing BEFORE creating runtimes.
     // JSON output so Grafana Loki can `| json`-extract message/level/target/fields.
@@ -2133,11 +2171,7 @@ async fn async_main(
                         // process. See `conductor_bridge::RegistryConductorBridge`.
                         let author = std::sync::Arc::new(
                             elohim_storage::services::conductor_commitment_author::ConductorCommitmentAuthor::from_bridge(
-                                std::sync::Arc::new(
-                                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
-                                        registry.clone(),
-                                    ),
-                                ),
+                                lamad_conductor_bridge(&registry),
                                 self_cid.clone(),
                                 provide_pool.clone(),
                             ),
@@ -2295,11 +2329,7 @@ async fn async_main(
                         // author above.
                         let salvage_author = std::sync::Arc::new(
                             elohim_storage::services::salvage_commitment_author::SalvageCommitmentAuthor::from_bridge(
-                                std::sync::Arc::new(
-                                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
-                                        registry.clone(),
-                                    ),
-                                ),
+                                lamad_conductor_bridge(&registry),
                             ),
                         );
                         let salvage_target_replicas = config.salvage_target_replicas;
@@ -2392,10 +2422,12 @@ async fn async_main(
                 // sweep cadence so the per-tick atom budget the pass derives from
                 // `bounds.atomsPerHour` matches the sweep that fetches the bytes.
                 match (registry.lamad_client(), db_pool.clone()) {
-                    (Some(spool_hc), Some(spool_pool)) => {
+                    (Some(_spool_hc), Some(spool_pool)) => {
+                        // A SOURCE, not a captured handle — see the provide-loop
+                        // author above.
                         let spool_author = std::sync::Arc::new(
-                            elohim_storage::services::spool_custody_author::SpoolCustodyAuthor::new(
-                                spool_hc,
+                            elohim_storage::services::spool_custody_author::SpoolCustodyAuthor::from_bridge(
+                                lamad_conductor_bridge(&registry),
                             ),
                         );
                         let spool_cfg =
@@ -2487,13 +2519,7 @@ async fn async_main(
                         // SAME bridge (re-read per tick) rather than the
                         // boot-time `_rotation_hc` clone the readiness check
                         // above used only to gate spawning.
-                        let rotation_bridge: std::sync::Arc<
-                            dyn elohim_storage::conductor_bridge::ConductorBridge,
-                        > = std::sync::Arc::new(
-                            elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
-                                registry.clone(),
-                            ),
-                        );
+                        let rotation_bridge = lamad_conductor_bridge(&registry);
                         let rotation_author = std::sync::Arc::new(
                             elohim_storage::services::custody_rotation::ConductorRotationAuthor::from_bridge(
                                 rotation_bridge.clone(),
@@ -4858,11 +4884,7 @@ async fn async_main(
         if registry.imagodei_client().is_some() {
             elohim_storage::services::membership_identity_reconcile::spawn_periodic(
                 pool.clone(),
-                std::sync::Arc::new(
-                    elohim_storage::conductor_bridge::RegistryConductorBridge::imagodei(
-                        registry.clone(),
-                    ),
-                ),
+                imagodei_conductor_bridge(registry),
                 shutdown_tx.subscribe(),
                 elohim_storage::services::membership_identity_reconcile::reconcile_secs_from_env(),
             );
@@ -6084,11 +6106,7 @@ async fn async_main(
         // never a corpse held for the life of the process.
         let feedback_bridge: Arc<dyn elohim_storage::conductor_bridge::ConductorBridge> =
             match hc_registry_for_http.as_ref() {
-                Some(registry) => Arc::new(
-                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
-                        registry.clone(),
-                    ),
-                ),
+                Some(registry) => lamad_conductor_bridge(registry),
                 None => Arc::new(elohim_storage::conductor_bridge::StaticConductorBridge(hc)),
             };
         feedback_projector::spawn(FeedbackProjector::new(
@@ -6273,6 +6291,55 @@ mod heal_flag_tests {
         assert!(
             !flag.load(Ordering::Acquire),
             "panic-unwind must release the single-flight flag via Drop"
+        );
+    }
+}
+
+#[cfg(test)]
+mod conductor_bridge_composition_tests {
+    //! **The class this catches:** a boot site that gates spawning on
+    //! `registry.lamad_client().is_some()` but then hands the CAPTURED
+    //! `Arc<HcClient>` to an author's `::new` constructor (which wraps a
+    //! fixed `StaticConductorBridge`) instead of calling
+    //! [`super::lamad_conductor_bridge`]/[`super::imagodei_conductor_bridge`].
+    //! `Arc<dyn ConductorBridge>` type-checks identically either way, so this
+    //! drifted silently — measured live 2026-09-08 (spool-custody: 78
+    //! `Websocket closed: No connection` failures over 6.5 minutes after a
+    //! conductor roll while the other five sites healed within ~15 s of the
+    //! same roll, because they all called the shared helper).
+    //!
+    //! Every author-construction call site in the boot path now goes through
+    //! ONE of these two functions (`lamad_conductor_bridge` /
+    //! `imagodei_conductor_bridge` — grep confirms no other
+    //! `RegistryConductorBridge::lamad`/`::imagodei` construction remains in
+    //! this file outside them and the two pre-existing sites this pass did
+    //! not touch), so asserting the helpers' OWN output is `BridgeKind::Registry`
+    //! is the smallest honest shape: it is no longer possible for a NEW
+    //! author site to silently reintroduce a `Static` wrapper without either
+    //! calling a helper that is tested, or visibly NOT calling it.
+
+    use elohim_storage::conductor_bridge::BridgeKind;
+    use elohim_storage::hc_client_registry::HcClientRegistry;
+    use std::sync::Arc;
+
+    #[test]
+    fn lamad_and_imagodei_boot_bridges_are_registry_backed_not_static() {
+        let registry = Arc::new(HcClientRegistry::empty());
+
+        let lamad = super::lamad_conductor_bridge(&registry);
+        assert_eq!(
+            lamad.bridge_kind(),
+            BridgeKind::Registry,
+            "the lamad boot bridge must re-read the registry slot per use, never wrap one \
+             captured Arc<HcClient>"
+        );
+
+        let imagodei = super::imagodei_conductor_bridge(&registry);
+        assert_eq!(
+            imagodei.bridge_kind(),
+            BridgeKind::Registry,
+            "the imagodei boot bridge must re-read the registry slot per use, never wrap one \
+             captured Arc<HcClient>"
         );
     }
 }
