@@ -225,6 +225,66 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
 // create_vouch — T6 addition (Light Up the Graph sprint)
 // ---------------------------------------------------------------------------
 
+/// The vouch kind that CONFERS acceptance on a correction (contract §5.2).
+/// Whitelisted by the integrity validator's `VOUCH_KINDS`, so a case variant
+/// never reaches this gate — it is refused as an unknown vouch kind first.
+pub const VOUCH_KIND_ACCEPT_CORRECTION: &str = "accept-correction";
+
+// Named refusal reasons for `create_vouch`. Strings, not an enum, for the same
+// reason `correction.rs` uses `OUTCOME_*` strings: a storage or a2o consumer
+// built against an older coordinator reads an unfamiliar reason as data rather
+// than failing to decode. Every refusal below carries EXACTLY ONE of these
+// tokens, so a caller classifies the refusal without parsing prose.
+
+/// The caller is the author of the act they are vouching on. Non-retryable.
+pub const REFUSAL_SELF_VOUCH: &str = "self_vouch";
+
+/// The caller is not the EXACT root-Create author of the record the correction
+/// names. Non-retryable — a positive mismatch, never a fetch failure (§6).
+pub const REFUSAL_NOT_ROOT_AUTHOR: &str = "not_root_author";
+
+/// The correction's `target_cid` does not parse as an `ActionHash`, so no root
+/// author can be derived from it. Non-retryable.
+pub const REFUSAL_TARGET_NOT_ADDRESSABLE: &str = "target_not_addressable";
+
+/// The act being accepted is not a `correction`. Acceptance is defined over a
+/// correction (§5.2); over anything else the root-author lookup would answer a
+/// different question. Non-retryable.
+pub const REFUSAL_TARGET_NOT_CORRECTION: &str = "target_not_correction";
+
+/// The correction's target resolves to a root that carries no `Content` entry.
+/// Slice 1 governs one record kind — a content EPR with a declared head — so a
+/// non-content lineage is refused, not gated on whatever author it names.
+/// Non-retryable.
+pub const REFUSAL_CORRECTED_RECORD_NOT_CONTENT: &str = "corrected_record_not_content";
+
+/// The root Create of the corrected record is not retrievable from this peer's
+/// DHT view. PENDING, not a rejection (§6) — the caller may retry.
+pub const REFUSAL_ROOT_UNRESOLVABLE: &str = "root_unresolvable";
+
+/// **Pure.** Is this caller admitted to confer acceptance on a correction?
+///
+/// Both arguments are raw 39-byte `AgentPubKey` representations: the caller's
+/// `agent_initial_pubkey` and the EXACT root-Create author of the record the
+/// correction names. Equality is the whole rule — contract §5.2 admits the root
+/// author and nobody else in slice 1 (`HeadDelegation` is a named gap).
+///
+/// Separated from the host calls so the authority rule itself is unit-testable
+/// without a conductor; the resolution path around it is covered by sweettests.
+pub fn check_accept_correction_authority(
+    caller_pubkey: &[u8],
+    root_author_pubkey: &[u8],
+) -> Result<(), String> {
+    if caller_pubkey == root_author_pubkey {
+        return Ok(());
+    }
+    Err(format!(
+        "create_vouch: refused {REFUSAL_NOT_ROOT_AUTHOR} — an accept-correction vouch is \
+         admitted from the root author of the corrected record only (contract §5.2); this \
+         caller is a third party to that record"
+    ))
+}
+
 /// Input for `create_vouch`.
 ///
 /// The vouching agent's pubkey is derived from `agent_info()` and cannot be
@@ -250,6 +310,17 @@ pub struct CreateVouchInput {
 /// agent's signal. The vouching agent MUST differ from the original signer
 /// (no-self-vouch). This guard is enforced both here (returns a clean error
 /// to the caller) and in the integrity validator (validator backstop).
+///
+/// **Acceptance authority (contract §5.2).** A `vouch_kind` of
+/// `accept-correction` additionally requires the caller to be the EXACT
+/// root-Create author of the record the target correction names. No-self-vouch
+/// and root-authorship are different properties: without the second gate a
+/// THIRD peer's accept-correction vouch is admitted by the coordinator, and
+/// "only the root author settles it" holds nowhere but in consumers. Refusals
+/// carry exactly one named reason token: [`REFUSAL_SELF_VOUCH`],
+/// [`REFUSAL_NOT_ROOT_AUTHOR`], [`REFUSAL_TARGET_NOT_CORRECTION`],
+/// [`REFUSAL_TARGET_NOT_ADDRESSABLE`], [`REFUSAL_CORRECTED_RECORD_NOT_CONTENT`]
+/// or [`REFUSAL_ROOT_UNRESOLVABLE`] (the last is PENDING, retryable — §6).
 ///
 /// On success:
 /// - Derives `signer_pubkey` from `agent_info()?.agent_initial_pubkey`.
@@ -290,9 +361,106 @@ pub fn create_vouch(input: CreateVouchInput) -> ExternResult<ActionHash> {
     // (Integrity validator backstops this; coordinator provides caller UX.)
     // ------------------------------------------------------------------
     if signer_pubkey == target_signal.signer_pubkey {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "self-vouch forbidden: vouch signer must differ from target signal signer".to_string()
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{REFUSAL_SELF_VOUCH}: self-vouch forbidden — vouch signer must differ from target \
+             signal signer"
+        ))));
+    }
+
+    // ------------------------------------------------------------------
+    // Acceptance authority gate (contract §5.2).
+    //
+    // The no-self-vouch guard above answers "did the caller vouch for their own
+    // act?" — a DIFFERENT question from "may this caller confer acceptance?".
+    // Without this gate a THIRD peer's accept-correction vouch is admitted, so
+    // §5.2's claim ("the root author's OWN vouch, nobody else's") holds only in
+    // consumers and never at the coordinator. Slice 1 admits the root author of
+    // the corrected record and nobody else; delegates are a named gap (§5.2).
+    //
+    // Coordinator-only, deliberately. Integrity admits any vouch by anyone
+    // (`content_store_integrity/src/feedback_signal.rs` validates shape, not
+    // authority) and moving that would move the DNA hash. This gate is the
+    // honest-peer refusal; the guarantee against a patched coordinator stays
+    // where §5.2 puts it — every consumer re-derives the root author
+    // (`elohim-storage/src/services/feedback_projector.rs::verify_acceptance`).
+    // ------------------------------------------------------------------
+    if input.vouch_kind == VOUCH_KIND_ACCEPT_CORRECTION {
+        // Acceptance is defined over a CORRECTION (§5.2). Admitting one over a
+        // squelch, a quarantine or another vouch would make the root-author
+        // lookup walk a lineage that is not the corrected record's, so the gate
+        // would compute a real answer to the wrong question.
+        if target_signal.signal_kind != "correction" {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: refused {REFUSAL_TARGET_NOT_CORRECTION} — an accept-correction \
+                 vouch settles a correction, but the target act is a '{}' (contract §5.2)",
+                target_signal.signal_kind
+            ))));
+        }
+
+        // The corrected record comes from the ACT, never from the caller: no
+        // caller can point somebody else's correction at a record it never
+        // named, so no caller can choose which root author gates them.
+        let corrected_action_hash = ActionHash::try_from(target_signal.target_cid.clone())
+            .map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "create_vouch: refused {REFUSAL_TARGET_NOT_ADDRESSABLE} — the target act's \
+                     target_cid '{}' does not parse as an ActionHash, so its root author cannot \
+                     be derived",
+                    target_signal.target_cid
+                )))
+            })?;
+
+        // WRITE PATH → Network, the same reason `amend_content` uses it: a cold
+        // local view would refuse a legitimate root author.
+        let root = crate::correction::resolve_root_create(
+            corrected_action_hash.clone(),
+            GetStrategy::Network,
+        )?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: {REFUSAL_ROOT_UNRESOLVABLE} — the root Create of corrected record \
+                 {corrected_action_hash:?} is not retrievable from this peer; acceptance is \
+                 PENDING, not refused (contract §6) — retry once the record resolves"
+            )))
+        })?;
+
+        // `resolve_root_create` returns the first non-Update action it reaches,
+        // which is not necessarily a Content Create. Slice 1 governs ONE record
+        // kind — a content EPR with a declared head (contract boundary) — so a
+        // root that carries no Content entry is refused rather than gated on an
+        // author derived from something else entirely. Absent entry BYTES are a
+        // different condition: that is this peer's view, so it stays PENDING.
+        if !matches!(root.action().data, ActionData::Create(_)) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: refused {REFUSAL_CORRECTED_RECORD_NOT_CONTENT} — the lineage of \
+                 {corrected_action_hash:?} bottoms out in a {} action, not a Create; there is no \
+                 root author to gate on",
+                root.action().action_type()
+            ))));
+        }
+        if root.entry().as_option().is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: {REFUSAL_ROOT_UNRESOLVABLE} — the root Create of corrected record \
+                 {corrected_action_hash:?} resolved without entry bytes on this peer; acceptance \
+                 is PENDING, not refused (contract §6)"
+            ))));
+        }
+        let corrected_content: Option<Content> = root.entry().to_app_option().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: refused {REFUSAL_CORRECTED_RECORD_NOT_CONTENT} — the root Create \
+                 of {corrected_action_hash:?} does not decode as a Content entry: {e}"
+            )))
+        })?;
+        if corrected_content.is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "create_vouch: refused {REFUSAL_CORRECTED_RECORD_NOT_CONTENT} — the root of \
+                 {corrected_action_hash:?} carries no Content entry; slice 1 settles corrections \
+                 against a content EPR only"
+            ))));
+        }
+
+        check_accept_correction_authority(&signer_pubkey, root.action().author().get_raw_39())
+            .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
     }
 
     // ------------------------------------------------------------------
@@ -649,8 +817,7 @@ fn refs_from_link_set(links: Vec<Link>, resolve: bool) -> ExternResult<FeedbackS
                 entry: None,
             }),
             Some(record) => {
-                let decoded: Option<FeedbackSignal> =
-                    record.entry().to_app_option().ok().flatten();
+                let decoded: Option<FeedbackSignal> = record.entry().to_app_option().ok().flatten();
                 match decoded {
                     Some(entry) => refs.push(FeedbackSignalRef {
                         action_hash: ah,
@@ -902,6 +1069,39 @@ mod correction_admission_tests {
             check_correction_request(&req, "uhCkkTARGET", "correction", "debit-firm").is_err(),
             "standing_impact mismatch must be refused"
         );
+    }
+
+    /// §5.2: the authority rule is EQUALITY with the root author — not
+    /// "different from the correction's signer", which is the separate
+    /// no-self-vouch property.
+    #[test]
+    fn accept_correction_authority_admits_only_the_root_author() {
+        let root = vec![0x84u8; 39];
+        let third_party = vec![0x84u8; 38]
+            .into_iter()
+            .chain([0x21u8])
+            .collect::<Vec<_>>();
+
+        check_accept_correction_authority(&root, &root).expect("root author is admitted");
+
+        let err = check_accept_correction_authority(&third_party, &root)
+            .expect_err("a third party must be refused");
+        assert!(err.contains(REFUSAL_NOT_ROOT_AUTHOR), "got: {err}");
+        // The two refusals must stay distinguishable: the a2o refusal step for
+        // the self-vouch case matches /self|own|same|signer/i, so a
+        // not_root_author refusal that used any of those words would let a
+        // third-party admission pass as a self-vouch refusal.
+        for word in ["self", "own", "same", "signer"] {
+            assert!(
+                !err.to_lowercase().contains(word),
+                "not_root_author refusal must not read as a self-vouch refusal ({word}): {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn accept_correction_vouch_kind_matches_the_integrity_whitelist_spelling() {
+        assert_eq!(VOUCH_KIND_ACCEPT_CORRECTION, "accept-correction");
     }
 
     #[test]

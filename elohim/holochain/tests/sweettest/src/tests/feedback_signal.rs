@@ -17,14 +17,22 @@
 //!      cites a non-existent evidence hash; rejected.
 //!   6. `feedback_signal_update_rejected` — Any attempt to update a committed
 //!      FeedbackSignal entry is rejected (T4 immutability holds end-to-end).
+//!   7. `accept_correction_by_root_author_succeeds` /
+//!      `create_vouch_rejects_self_vouch` /
+//!      `accept_correction_by_third_party_rejected` — the three sides of
+//!      contract §5.2's acceptance authority: the corrected record's root
+//!      author is admitted, the correction's own author is refused by the
+//!      no-self-vouch guard, and a third party is refused `not_root_author`.
 
 use anyhow::Result;
 use elohim_sweettest::common::{
-    conductors::{load_dna, single_agent_conductor, two_agent_conductors},
+    conductors::{
+        load_dna, single_agent_conductor, single_agent_conductor_with, two_agent_conductors,
+    },
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain::sweettest::{await_consistency_s, SweetConductor};
+use holochain::sweettest::{await_consistency_s, SweetConductor, SweetLocalRendezvous};
 use hdk::prelude::Timestamp;
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -645,14 +653,22 @@ async fn quarantine_by_third_party_succeeds() -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario 8 (T7): Alice vouches on Bob's correction — succeeds.
+// Scenario 8 (T7 / contract §5.2): the ROOT AUTHOR accepts Bob's correction.
+//
+// Rewritten 2026-09-08. This scenario used to have Bob author BOTH the content
+// and the correction, with Alice — a third party to that record — conferring
+// acceptance. That combination is exactly the authority hole `create_vouch` now
+// closes: an accept-correction vouch is admitted from the root author of the
+// corrected record only. Alice is therefore the record's author here, which is
+// also the shape station 3 of the accountable-correction feature asserts
+// (Jessica's record, James's correction, Jessica's acceptance).
 // ---------------------------------------------------------------------------
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires packed DNA from Jenkins pipeline"]
-async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
-    // Bob creates a correction. Alice vouches on it.
-    // Alice and Bob have different agent keys → no-self-vouch guard allows this.
+async fn accept_correction_by_root_author_succeeds() -> Result<()> {
+    // Alice authors the record. Bob corrects it. Alice accepts.
+    // Different agent keys (no-self-vouch) AND caller == root author (§5.2).
     let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
 
@@ -665,10 +681,10 @@ async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
     let cell_a = app_a.cells().first().expect("cell A").clone();
     let cell_b = app_b.cells().first().expect("cell B").clone();
 
-    // Bob creates a content item and a correction signal against it.
-    let content_output: ContentOutput = cb
+    // Alice creates the content item Bob will correct — she is its root author.
+    let content_output: ContentOutput = ca
         .call(
-            &cell_b.zome("content_store"),
+            &cell_a.zome("content_store"),
             "create_content",
             make_content("t7-s8-target"),
         )
@@ -847,8 +863,177 @@ async fn create_vouch_rejects_self_vouch() -> Result<()> {
         err_str.contains("self-vouch forbidden") || err_str.contains("forbidden"),
         "error message must mention self-vouch or forbidden: {err_str}"
     );
+    // The self-vouch guard must stay FIRST. Bob is the root author here, so if
+    // the acceptance-authority gate ran first he would be ADMITTED and this
+    // scenario would silently stop testing anything.
+    assert!(
+        err_str.contains("self_vouch"),
+        "self-vouch must be refused by the no-self-vouch guard, not another gate: {err_str}"
+    );
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 8b (contract §5.2): a THIRD party cannot confer acceptance.
+//
+// The authority hole this closes: no-self-vouch answers "did the caller vouch
+// for their own act?", which is a DIFFERENT property from "may this caller
+// settle this record?". Carol is neither the correction's author (so the
+// no-self-vouch guard never fires) nor the corrected record's root author. Her
+// accept-correction vouch passed the coordinator before 2026-09-08, so
+// "only the root author settles it" (§5.2) was asserted nowhere at the zome.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn accept_correction_by_third_party_rejected() -> Result<()> {
+    // ONE rendezvous shared by all three conductors: at 0.7 a per-conductor
+    // rendezvous is a per-conductor RELAY, and peers on different relays never
+    // connect (see common::conductors::two_agent_conductors).
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let (mut ca, a1) = single_agent_conductor_with(rendezvous.clone()).await?;
+    let (mut cb, a2) = single_agent_conductor_with(rendezvous.clone()).await?;
+    let (mut cc, a3) = single_agent_conductor_with(rendezvous).await?;
+
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app_a = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna.clone()])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("elohim-app-b", a2.clone(), &[dna.clone()])
+        .await?;
+    let app_c = cc
+        .setup_app_for_agent("elohim-app-c", a3.clone(), &[dna])
+        .await?;
+    let cell_a = app_a.cells().first().expect("cell A").clone();
+    let cell_b = app_b.cells().first().expect("cell B").clone();
+    let cell_c = app_c.cells().first().expect("cell C").clone();
+
+    // Alice authors the record — she alone may settle a correction against it.
+    let target_id = unique_id("t7-s8b-target");
+    let content_output: ContentOutput = ca
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content(&target_id),
+        )
+        .await;
+    let content_ah = content_output.action_hash;
+
+    // Bob files the correction.
+    let evidence_id = unique_id("t7-s8b-evidence");
+    let operation_id = unique_id("t7-s8b-op");
+    let evidence_output: ContentOutput = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_content",
+            make_correction_evidence(
+                &evidence_id,
+                &operation_id,
+                &content_ah,
+                "correction",
+                "debit-soft",
+            ),
+        )
+        .await;
+
+    let correction_input = CreateFeedbackSignalInput {
+        target_action_hash: content_ah.clone(),
+        signal_kind: "correction".to_string(),
+        evidence_action_hash: Some(evidence_output.action_hash),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let bob_correction_hash: ActionHash = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            correction_input,
+        )
+        .await;
+
+    // Carol must be able to resolve BOTH Bob's correction (must_get_valid_record)
+    // and Alice's root Create (the authority lookup) before the gate can give a
+    // definite answer; without convergence the refusal would be the retryable
+    // root_unresolvable, not the positive mismatch this scenario asserts.
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb, &cc]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+
+    await_consistency_s(30, [&cell_a, &cell_b, &cell_c])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
+    // Carol accepts a correction against a record that is not hers — REFUSED.
+    let third_party_vouch = CreateVouchInput {
+        target_action_hash: bob_correction_hash.clone(),
+        vouch_kind: "accept-correction".to_string(),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let result = cc
+        .call_fallible::<_, ActionHash>(
+            &cell_c.zome("content_store"),
+            "create_vouch",
+            third_party_vouch,
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "a third party's accept-correction vouch must be refused, got: {result:?}"
+    );
+    let err_str = format!("{:?}", result.unwrap_err());
+    assert!(
+        err_str.contains("not_root_author"),
+        "refusal must name the typed reason not_root_author, got: {err_str}"
+    );
+
+    // Nothing was written: a refused acceptance leaves no act behind.
+    let by_signer: Vec<FeedbackSignalRecord> = cc
+        .call(
+            &cell_c.zome("content_store"),
+            "list_feedback_signals_by_signer",
+            a3.clone(),
+        )
+        .await;
+    assert!(
+        by_signer.is_empty(),
+        "a refused vouch must not commit an act: {by_signer:?}"
+    );
+
+    // A `restitution` vouch is a DIFFERENT act with different authority: it is a
+    // third party attesting reparative work, so the root-author gate must NOT
+    // apply to it. Carol's restitution vouch still stands.
+    let restitution = CreateVouchInput {
+        target_action_hash: bob_correction_hash,
+        vouch_kind: "restitution".to_string(),
+        standing_impact: "advisory".to_string(),
+    };
+    let restitution_result = cc
+        .call_fallible::<_, ActionHash>(&cell_c.zome("content_store"), "create_vouch", restitution)
+        .await;
+    assert!(
+        restitution_result.is_ok(),
+        "the acceptance gate must not leak onto restitution vouches: {restitution_result:?}"
+    );
+
+    Ok(())
+}
+
+/// Epoch-nanos-suffixed ids: a nextest RETRY re-joins the first attempt's DHT
+/// residue through the process-global kitsune2 mem-bootstrap store, and a fixed
+/// id makes `create_content` refuse with "already exists" on every retry
+/// (dna #1357). Mirrors `tests/lamad.rs::unique_id`.
+fn unique_id(base: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock before UNIX_EPOCH")
+        .as_nanos();
+    format!("{base}-{nanos}")
 }
 
 // ===========================================================================
