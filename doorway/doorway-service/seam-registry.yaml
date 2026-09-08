@@ -702,7 +702,11 @@ decisionPoints:
       AtHead only when its bytes were FETCHED by the declared head (head_bound), never when they
       were merely stocked under it, and an UNKNOWN declared head is Behind rather than AtHead.
       That closes the moving-pointer defect where a slug-addressed fetch archived old-era bytes
-      at the new head and served them AtHead forever.
+      at the new head and served them AtHead forever. Since 2026-09-08 the AtHead classification
+      also requires DELIVERABILITY, judged one level up in plan_shell_serve: `head_bound` proves
+      only WHERE bytes came from, and the shell both fleet doorways served for 15 hours was
+      provably fetched by its declared head while naming a `main-*.js` that 404s. An unproven
+      head demotes to Behind (which buys the rate-limited upgrade read) and names its reason.
     concernIds:
       - id: C4
         status: answered
@@ -2272,4 +2276,198 @@ decisionPoints:
         kind: integration
       - path: doorway/doorway-service/src/routes/auth_discovery.rs
         testName: the_document_carries_the_endpoints_a_client_cannot_guess
+        kind: unit
+
+  - name: judge_coherence
+    kind: verdict-fn
+    sourceLocation:
+      file: src/render/warm_shell.rs
+      modulePath: render::warm_shell::WarmShellStore::judge_coherence
+    summary: >
+      The second proof behind AtHead (2026-09-08): is the head this doorway is about to serve as
+      current actually DELIVERABLE through this doorway? Returns None (nothing here says
+      otherwise) or Some(BehindReason). Consults a per-head memo first, asks the CoherenceOracle
+      only on a miss with a readable upstream, and never probes a peer already judged unable to
+      answer. A store with no oracle returns None — byte-for-byte the 2026-09-04 behaviour, so
+      an unwired doorway is never worse than today.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          "the head cannot boot" (MissingAsset), "there is no head to judge" (HeadUnknown), "the
+          bytes are not proof of the head" (StaleProjection) and "we could not ask" 
+          (StorageUnreachable) are four DISTINCT answers, none of which reads as confirmed.
+          a_never_confirmed_head_with_a_dark_upstream_is_behind_storage_unreachable and
+          an_unreachable_upstream_cannot_un_prove_a_confirmed_head pin the two halves: an
+          unreachable peer is honest absence, and it can never un-prove what it already proved.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded on both axes: COHERENCE_PROBE_TIMEOUT_SECS (2s) per probe, and the asymmetric
+          memo caps a confirmed head at ONE probe for the life of the pod
+          (a_confirmed_head_costs_exactly_one_probe_ever) while a negative verdict stands for
+          COHERENCE_RECHECK_SECS before it is re-asked — so an incoherent head can never buy a
+          probe per request.
+      - id: C8
+        status: partial
+        justification: >
+          Every non-confirmed arm is logged with its bounded reason CLASS and rides the wire as
+          `x-elohim-bundle: behind;<reason>`, so it is observable per request. No labeled
+          Prometheus counter increments per arm yet — the same gap decide_shell_serve carries.
+    contractTests:
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: a_head_whose_entry_script_is_missing_is_never_at_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: a_confirmed_head_costs_exactly_one_probe_ever
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unreachable_upstream_cannot_un_prove_a_confirmed_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: a_never_confirmed_head_with_a_dark_upstream_is_behind_storage_unreachable
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unknown_declared_head_is_behind_head_unknown
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_unmarked_doc_at_the_declared_head_is_behind_stale_projection
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: without_an_oracle_at_head_is_unchanged
+        kind: unit
+
+  - name: BehindReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/render/coherence.rs
+      modulePath: render::coherence::BehindReason
+    summary: >
+      Why a served shell is not confirmed at the declared head:
+      MissingAsset(file) / HeadUnknown / StorageUnreachable / StaleProjection. Rendered on the
+      wire as `x-elohim-bundle: behind;<reason>`, ADDITIVELY beside the existing
+      `last-reconciled` (coherent but unconfirmed this request) and `slug-resolved` values, both
+      of which keep their exact 2026-09-04 meanings because a2o reads them.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The enum EXISTS to keep the four non-confirmed conditions distinguishable on the wire.
+          Before it, a shell naming a 404'd script and a healthy one were the same 200 with the
+          same header for 15 hours — that indistinguishability is what let the incident run.
+      - id: C8
+        status: answered
+        justification: >
+          `class()` is the bounded metrics/log label (the segment before the first `:`), so a
+          reason carrying an unbounded build-time asset name can be counted without unbounded
+          label cardinality — the same discipline elohim-storage's deliverability counter uses.
+    contractTests:
+      - path: doorway/doorway-service/src/render/coherence.rs
+        testName: reason_tokens_are_the_declared_vocabulary
+        kind: unit
+      - path: doorway/doorway-service/src/render/coherence.rs
+        testName: storages_own_reason_is_carried_through_not_re_derived
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: an_unconfirmed_head_names_its_reason_on_the_wire
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: no_coherent_shell_answers_503_with_a_converging_page_never_a_blank_200
+        kind: unit
+
+  - name: CoherenceVerdict
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/render/coherence.rs
+      modulePath: render::coherence::CoherenceVerdict
+    summary: >
+      The CoherenceOracle's answer for one head: Coherent, or Incoherent(BehindReason). Its
+      `is_permanent()` predicate is what makes the memo asymmetric — a head is content-addressed,
+      so a confirmation holds forever, while a missing asset can still be extracted and an
+      unreachable peer can return.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The verdict is EVIDENCE about a head, never an authority over it. A confirmation is
+          permanent because it is a statement about immutable content-addressed bytes; every
+          negative is provisional and re-asked, so an unreachable peer's silence never hardens
+          into a permanent judgement about the head.
+      - id: C14
+        status: answered
+        justification: >
+          The outcome set closes: anything the oracle cannot positively confirm falls into an
+          Incoherent arm carrying a witnessed reason — there is no silent pass-through, which is
+          exactly the arm 2026-09-08 lacked.
+    contractTests:
+      - path: doorway/doorway-service/src/render/coherence.rs
+        testName: only_a_confirmation_may_be_memoised_forever
+        kind: unit
+      - path: doorway/doorway-service/src/render/coherence.rs
+        testName: the_entry_script_is_the_main_bundle_not_merely_the_first_script
+        kind: unit
+      - path: doorway/doorway-service/src/render/coherence.rs
+        testName: assets_exclude_cross_origin_and_escaping_references
+        kind: unit
+
+  - name: HeadMove
+    kind: state-transition
+    sourceLocation:
+      file: src/render/bundle_heads.rs
+      modulePath: render::bundle_heads::HeadMove
+    summary: >
+      How one app's storage-declared heads changed across a reconcile pass:
+      {slug, browser_from -> browser_to, server_from -> server_to}, with browser_moved() /
+      server_moved() / moved(). Produced by BundleHeadsReconciler::reconcile_slug, which returns
+      None both when nothing moved AND when the upstream could not be read — the two are
+      distinguished by the head table, which keeps its last state rather than un-declaring it.
+      A browser move evicts the warm shell; both moves write through to the doorway's own
+      projection (in-memory slug index + durable projected entry).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          An unreachable storage peer keeps the last declared head and writes nothing — it never
+          reads as "no head" or as "no change".
+          an_unreachable_storage_keeps_the_last_declared_head pins it, and
+          an_absent_server_head_is_absence_not_an_error pins that a null serverBlobHash (adam's
+          row on 2026-09-08) is absence rather than failure.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded per read (BUNDLE_HEADS_READ_TIMEOUT_SECS = 2s) and per pass (the configured
+          target list), on a declared BUNDLE_HEADS_TICK_SECS cadence that env can tune or
+          disable. The event arm spends NO upstream read for a content row this doorway
+          declares no head for (a_content_event_reconciles_only_a_slug_this_doorway_declares).
+      - id: C6b
+        status: answered
+        justification: >
+          Replay against settled state is a no-op: an unmoved head produces no HeadMove, no
+          projection write and no eviction, so the 30s tick against a steady fleet costs one
+          bounded GET per slug and changes nothing
+          (a_steady_head_writes_nothing_and_logs_nothing).
+      - id: C8
+        status: answered
+        justification: >
+          Every move emits one INFO line naming the slug and both head transitions in 12-char
+          form; a non-move is silent by design, so the log carries signal rather than a 30s
+          heartbeat.
+    contractTests:
+      - path: doorway/doorway-service/src/render/bundle_heads.rs
+        testName: a_moved_storage_head_advances_the_doorways_declaration_in_one_tick
+        kind: unit
+      - path: doorway/doorway-service/src/render/bundle_heads.rs
+        testName: a_steady_head_writes_nothing_and_logs_nothing
+        kind: unit
+      - path: doorway/doorway-service/src/render/bundle_heads.rs
+        testName: an_unreachable_storage_keeps_the_last_declared_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/bundle_heads.rs
+        testName: a_content_event_reconciles_only_a_slug_this_doorway_declares
+        kind: unit
+      - path: doorway/doorway-service/src/render/bundle_heads.rs
+        testName: the_shared_head_table_publishes_the_server_head_with_a_freshness_bound
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: once_the_head_moves_and_the_shell_is_evicted_the_fetch_is_addressed_by_the_new_head
         kind: unit
