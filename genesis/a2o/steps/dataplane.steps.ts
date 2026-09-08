@@ -999,6 +999,21 @@ function getServedPageMap(world: E2EWorld): Map<string, ServedPage> {
 }
 
 /**
+ * Hand a page fetched elsewhere to the assertion steps above.
+ *
+ * The Act I deliverability story
+ * (steps/dataplane/epr-app-deliverability.steps.ts) polls a doorway until it
+ * serves the bundle that run just published, at an address only that run knows.
+ * It then asserts the SAME static clause this file implements — every script
+ * and stylesheet the page names is one that peer serves — and it must do so
+ * against the exact bytes it already read, never a second fetch. Exported for
+ * that one purpose; the visitor step above remains the only other writer.
+ */
+export function recordServedPage(world: E2EWorld, peerName: string, page: ServedPage): void {
+  getServedPageMap(world).set(peerName, page);
+}
+
+/**
  * Fetch the page a visitor is handed at a path on one peer, and keep it for the
  * assertion step. Plain HTTP, exactly what a browser's FIRST request gets: the
  * question this pair answers is whether those bytes can go on to boot an app,

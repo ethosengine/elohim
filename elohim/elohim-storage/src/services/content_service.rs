@@ -915,4 +915,91 @@ mod tests {
     fn patch_without_reach_is_never_refused() {
         assert!(reach_patch_refusal("c1", Some(ANCHOR), "public", None).is_none());
     }
+
+    // ---------------------------------------------------------------------
+    // D3 (epr-app-deliverability-through-doorway.md) — `serverBlobHash`
+    // converges peer to peer. The diesel-direct server-head write in
+    // `ContentService::update` (the diesel-only PATCH path
+    // `patch_needs_conductor` routes a serverBlobHash-only body to) must emit
+    // `content.updated` on the storage event bus exactly as the browser-head
+    // path (`update_via_conductor`) does — that emission is what feeds the
+    // content-projection listener that (re)projects the sync doc so every
+    // peer converges within one sync round.
+    // ---------------------------------------------------------------------
+
+    /// Build an all-`None` PATCH view (mirrors `http.rs`'s `patch_view` test
+    /// helper — `UpdateContentInputView` deliberately does not derive
+    /// `Default`, a shared ts-rs-anchored view).
+    fn empty_patch_view() -> crate::views::UpdateContentInputView {
+        crate::views::UpdateContentInputView {
+            title: None,
+            description: None,
+            content_body: None,
+            content_format: None,
+            metadata: None,
+            tags: None,
+            reach: None,
+            blob_hash: None,
+            server_blob_hash: None,
+            p2p_published_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn server_blob_hash_only_patch_emits_content_updated_bus_event() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "d3-server-head".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "epr-composite".to_string(),
+                    content_format: "html".to_string(),
+                    blob_hash: Some("sha256-browser-1".to_string()),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let events = Arc::new(EventBus::new());
+        // Subscribe BEFORE the write — the bus has no replay, so a receiver
+        // created after emit would miss the event and the test would hang.
+        let mut rx = events.subscribe();
+        let service = ContentService::new(pool, ctx, events);
+
+        let view = crate::views::UpdateContentInputView {
+            server_blob_hash: Some("sha256-server-head-1".to_string()),
+            ..empty_patch_view()
+        };
+        service
+            .update("d3-server-head", view)
+            .expect("serverBlobHash-only PATCH must succeed on the diesel-direct path");
+
+        let event = tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv())
+            .await
+            .expect("content.updated bus event never arrived for the serverBlobHash PATCH")
+            .expect("bus recv error");
+        match event {
+            StorageEvent::ContentUpdated { id } => {
+                assert_eq!(id, "d3-server-head");
+            }
+            other => panic!("expected ContentUpdated, got {other:?}"),
+        }
+    }
 }

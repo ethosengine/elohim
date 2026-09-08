@@ -32,3 +32,41 @@ Feature: The shell a doorway serves can boot
     And the page from peer "alpha-A" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
     And every script and stylesheet the page from peer "elohim.host" names is one that peer serves
     And the page from peer "elohim.host" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+
+  # THE DYNAMIC CLAUSE (2026-09-08, spec 2026-09-08-epr-app-deliverability-through-doorway
+  # D4). The two assertions above are read off the page's TEXT: they prove the
+  # page names assets this doorway holds, and names the right era's entry
+  # script. Neither of them runs a line of that script. A bundle can pass both
+  # and still hand a person a white rectangle — the script 200s, and then
+  # throws on its first statement, or reaches for a file the page never named.
+  # Only a browser settles it, so this scenario opens one.
+  #
+  # BOOTS, precisely: the browser reported no uncaught error, every request it
+  # made to this same doorway was answered (nothing 4xx, 5xx or aborted), and
+  # the app's own root element — <app-root>, the single tag the served page puts
+  # in <body> for the framework to fill — has content in it afterwards. An empty
+  # <app-root> after load IS the blank page, in the one form a person sees.
+  #
+  # THE BUILD STAMP is the fourth line. Every browser bundle carries a
+  # version.json written by the app job (commit, version, buildTime,
+  # environment, service). It records the COMMIT, not the bundle's content
+  # hash, so it cannot be compared against a blobHash directly; what it CAN be
+  # compared against is the copy of version.json inside the declared browser
+  # head's own bundle, reached at /apps/{slug}/version.json — the same
+  # projection the entry-point comparison above reads index.html through. Equal
+  # stamps mean the file a visitor is served and the file the declared head
+  # holds came out of one build. Born red on the fleet 2026-09-06: both apex
+  # names render an intact landing whose /version.json 404s, which is the
+  # stale-shell shape one notch down — assets 200, stamp absent.
+  @browser-only @regression @requires:doorway
+  Scenario Outline: A visitor's browser actually starts the app it was handed
+    When a visitor opens the page at "/" on peer "<peer>" in a browser
+    Then the browser on peer "<peer>" reported no uncaught error
+    And every asset the browser asked peer "<peer>" for arrived
+    And the app root on the page from peer "<peer>" has content
+    And the build stamp peer "<peer>" serves is the one the declared browser head of EPR "elohim-host-landing" carries
+
+    Examples:
+      | peer        |
+      | alpha-A     |
+      | elohim.host |

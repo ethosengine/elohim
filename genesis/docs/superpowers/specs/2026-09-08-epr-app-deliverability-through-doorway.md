@@ -37,7 +37,7 @@ success. Nothing blocked the push; the operator found it by looking at the page.
 ## Sealed decisions
 
 **D1 — Storage-authoritative bundle heads, reconciled on a tick.** The doorway owns one
-`BundleHeadsReconciler` (`render/bundle_heads.rs`): for every configured app slug it reads
+`BundleHeadsReconciler` (`render/bundle_heads.rs`; targets = the EPR-router mounts ∪ configured SSR slugs): for every app slug it reads
 `GET {storage}/db/content/{slug}` (a) every `BUNDLE_HEADS_TICK_SECS` (30) and (b) on every
 `content.created|updated` event for that slug, and writes `blobHash` + `serverBlobHash`
 through to the projected entry (`projected_entries`) and the in-memory slug index. When a head
@@ -47,16 +47,25 @@ conductor subscription is dead, or that booted while storage was down, converges
 after storage answers.
 
 **D2 — Deliverability is judged through the doorway before a shell is served, and the verdict is
-readable in the headers the test already sees.** A shell is classified `AtHead` only when (i) it
-was fetched by that head (existing `head_bound`) AND (ii) the head's entry script resolves through
-this doorway (`HEAD /apps/{head}/{entry-script}` → 200, or storage's `X-Deliverability: boots` for
-the head, memoised per head). An incoherent head is never served as current; the last coherent
-shell serves with `x-elohim-bundle: behind;<reason>`; if no coherent shell exists at all the
-doorway answers **503 with a one-line converging page** and `Retry-After`, never a blank 200.
-Diagnostics stay on the wire (`x-elohim-bundle`, `x-elohim-freshness`, storage's
-`X-Deliverability`/`-Reason`), extended with the reason vocabulary; a typed admin view is NOT in
-this slice — it is added only if the integration test's failure output proves to need more than
-the headers carry.
+readable in the headers the test already sees.** A shell classifies `AtHead` only if (i) it was
+fetched by that head (existing `head_bound`) AND (ii) the head is coherent through this doorway:
+primary probe `HEAD /apps/{head}/_capability` reading storage's `X-Deliverability`/`-Reason`
+(the `/apps/{id}/{file}` route is GET-only, so a HEAD on the entry script cannot be the probe);
+fallback `GET /apps/{head}/{entry}` with `Range: bytes=0-0`. Memo keyed by head (the entry is
+derived from that head's bytes): a confirmation is PERMANENT — an unreachable peer can never
+un-prove a content-addressed head it already proved, which is what keeps a storage blip from
+flipping a proven shell to `behind` (load-bearing, not an optimisation); a negative verdict is
+re-checked after 30 s; no probe is made at an upstream already judged unavailable. On a head move
+the warm shell is evicted and the declaration written through; the archive is NOT purged (its
+docs are keyed by head, and the last-reconciled bytes are exactly what the `behind` path must
+serve). The bytes in hand serve with `x-elohim-bundle: behind;<reason>` (`missing-asset:<file>`,
+`head-unknown`, `storage-unreachable`, `stale-projection`) and `x-elohim-freshness: amber`;
+**503** with a one-line converging page and `Retry-After: 20` only when the doorway holds no
+shell at all — never a blank 200. `last-reconciled` (coherent, unconfirmed this request) and
+`slug-resolved` keep their meaning; the vocabulary is additive. A typed admin view is NOT in this
+slice — it is added only if the integration test's failure output proves to need more than the
+headers carry. (Implemented 2026-09-08: `render/bundle_heads.rs`, `render/coherence.rs`;
+doorway lib 1200/0.)
 
 **D3 — `serverBlobHash` converges peer to peer.** The diesel-direct server-head write in
 `content_service::patch_content` emits `content.updated` on the storage event bus and bumps the

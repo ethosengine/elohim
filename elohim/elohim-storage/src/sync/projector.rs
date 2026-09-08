@@ -590,18 +590,28 @@ pub async fn backfill_content_docs(
 /// Reverse-project a converged content doc back into the SQL content projection —
 /// the CONSUMER heal leg (the missing other half of the sync plane; today
 /// `apply_changes` writes the sled DocStore ONLY). When a peer's content doc
-/// converges into our DocStore, re-derive the serving-critical `blob_hash` into the
-/// local SQL row at the **amber** tier, so SERVING (which reads SQL, not the
-/// DocStore) heals WITHOUT the notary. Returns `true` if a heal was written.
+/// converges into our DocStore, re-derive the serving-critical `blob_hash` AND
+/// the deploy-projection `server_blob_hash` into the local SQL row, so SERVING
+/// (which reads SQL, not the DocStore) heals WITHOUT the notary. Returns `true`
+/// if either field was healed.
+///
+/// `blob_hash` heals at the **amber** tier (guarded by green-inviolable, below).
+/// `server_blob_hash` heals unconditionally on a value-differs basis — it carries
+/// NO notarization (D3, `epr-app-deliverability-through-doorway.md`: it is a
+/// deploy-projection field, never part of the DHT-notarized Content entry, so
+/// there is no green row to protect it from and no amber marker to stamp for
+/// it). The two fields heal independently: a doc missing one still heals the
+/// other.
 ///
 /// Division of labor (spec §5.5): the shard/replication plane heals ABSENCE (a
 /// missing row/bytes, via `bulk_create_content`); this heals DRIFT — a stale/null
-/// `blob_hash` on a row that already EXISTS locally. An absent row is skipped
-/// (`Ok(false)`) — that is the shard plane's job, not the drift-heal's.
+/// `blob_hash`/`server_blob_hash` on a row that already EXISTS locally. An absent
+/// row is skipped (`Ok(false)`) — that is the shard plane's job, not the
+/// drift-heal's.
 ///
-/// Guards: (1) **empty-never-wins** — only heals when the converged `blob_hash` is
+/// Guards: (1) **empty-never-wins** — only heals when the converged value is
 /// non-empty (a peer holding `""` never marks us amber or clobbers us); (2)
-/// **green-inviolable** — the write rides `update_content`'s amber path
+/// **green-inviolable** (blob_hash only) — the write rides `update_content`'s amber path
 /// (`crdt_converged_at` set), which never overwrites a notarized (`dht_anchor_hash`)
 /// `blob_hash` but DOES replace a non-green one, so amber rows converge set→set
 /// instead of freezing on their first heal (A3 precedence: green > amber);
@@ -636,9 +646,10 @@ pub async fn backfill_content_docs(
 /// converged doc value is unauthenticated peer input: any peer can put any
 /// bytes into a CRDT doc, so consuming it into either column would launder
 /// gossip into notarization provenance — an amber-tier hint silently promoted
-/// to authority. This function heals `blobHash` ONLY (amber, `crdt_converged_at`
-/// marker). If you are about to plumb another doc field into a SQL write,
-/// stop: route it through a conductor-verified path instead.
+/// to authority. This function heals `blobHash` (amber, `crdt_converged_at`
+/// marker) and `serverBlobHash` (no marker — see the D3 note above) ONLY. If
+/// you are about to plumb another doc field into a SQL write, stop: route it
+/// through a conductor-verified path instead.
 /// Guard test: `converged_head_hint_is_never_stamped`.
 pub async fn reverse_project_content_doc(
     sync: &SyncManager,
@@ -648,45 +659,94 @@ pub async fn reverse_project_content_doc(
     let Some(id) = doc_id.strip_prefix("node:") else {
         return Ok(false); // not a content-node doc
     };
-    // Empty-never-wins: read the converged blob_hash; skip if absent/empty.
-    let blob_hash = match sync
+    // Empty-never-wins: read each converged field independently; a field
+    // absent/empty in the doc simply does not participate in this heal — it is
+    // NOT treated as "erase the local value" (no-clobber).
+    let doc_blob_hash = match sync
         .get_doc_field(PROJECTION_NAMESPACE, doc_id, "blobHash")
         .await
     {
-        Ok(h) if !h.is_empty() => h,
-        _ => return Ok(false),
+        Ok(h) if !h.is_empty() => Some(h),
+        _ => None,
     };
+    let doc_server_blob_hash = match sync
+        .get_doc_field(PROJECTION_NAMESPACE, doc_id, "serverBlobHash")
+        .await
+    {
+        Ok(h) if !h.is_empty() => Some(h),
+        _ => None,
+    };
+    if doc_blob_hash.is_none() && doc_server_blob_hash.is_none() {
+        return Ok(false);
+    }
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
     let ctx = AppContext::default_lamad();
-    // Idempotent: a row already naming the converged value is left untouched
-    // (no `updated_at` churn per sync round), and a row that DIFFERS is named
-    // at INFO before the amber write — the 2026-08-29 `bafkrei…`→`sha256-…`
-    // drift on a recovering iroh peer had no log line naming its writer.
     let existing =
         content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)?;
     let Some(existing) = existing else {
         return Ok(false); // absent row → the shard/replication plane's job
     };
-    if existing.blob_hash.as_deref() == Some(blob_hash.as_str()) {
+
+    // Idempotent per-field: a row already naming the converged value leaves
+    // that field untouched (no `updated_at` churn per sync round from a field
+    // that never moved), and a field that DIFFERS is named at INFO before the
+    // write — the 2026-08-29 `bafkrei…`→`sha256-…` drift on a recovering iroh
+    // peer had no log line naming its writer.
+    let blob_hash_changed = doc_blob_hash
+        .as_deref()
+        .is_some_and(|h| existing.blob_hash.as_deref() != Some(h));
+    let server_blob_hash_changed = doc_server_blob_hash
+        .as_deref()
+        .is_some_and(|h| existing.server_blob_hash.as_deref() != Some(h));
+    if !blob_hash_changed && !server_blob_hash_changed {
         return Ok(false);
     }
-    tracing::info!(
-        target: "elohim_storage::sync_heal",
-        content_id = %id,
-        doc_id = %doc_id,
-        from = ?existing.blob_hash,
-        to = %blob_hash,
-        green = existing.dht_anchor_hash.is_some(),
-        "reverse projection: converged blobHash differs from the local row (amber heal; a green row keeps its own)"
-    );
+
+    if blob_hash_changed {
+        tracing::info!(
+            target: "elohim_storage::sync_heal",
+            content_id = %id,
+            doc_id = %doc_id,
+            from = ?existing.blob_hash,
+            to = ?doc_blob_hash,
+            green = existing.dht_anchor_hash.is_some(),
+            "reverse projection: converged blobHash differs from the local row (amber heal; a green row keeps its own)"
+        );
+    }
+    if server_blob_hash_changed {
+        tracing::info!(
+            target: "elohim_storage::sync_heal",
+            content_id = %id,
+            doc_id = %doc_id,
+            from = ?existing.server_blob_hash,
+            to = ?doc_server_blob_hash,
+            "reverse projection: converged serverBlobHash differs from the local row (deploy-projection heal — not notarized, not gated by dht_anchor_hash)"
+        );
+    }
+
     let input = content_diesel::UpdateContentInput {
         id: id.to_string(),
-        blob_hash: Some(blob_hash),
-        // The amber marker: switches update_content into the no-clobber amber path
-        // (stamps crdt_converged_at, NEVER dht_anchor_hash).
-        crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
+        blob_hash: if blob_hash_changed {
+            doc_blob_hash
+        } else {
+            None
+        },
+        // The amber marker guards blob_hash ONLY (green-inviolable inside
+        // update_content); it must not be stamped for a server_blob_hash-only
+        // heal, or a deploy-projection convergence would spuriously flip a
+        // green row's amber marker.
+        crdt_converged_at: if blob_hash_changed {
+            Some(chrono::Utc::now().to_rfc3339())
+        } else {
+            None
+        },
+        server_blob_hash: if server_blob_hash_changed {
+            doc_server_blob_hash
+        } else {
+            None
+        },
         ..Default::default()
     };
     match content_diesel::update_content(&mut conn, &ctx, input) {
@@ -1543,6 +1603,232 @@ mod tests {
             Some("sha256-existing"),
             "empty never clobbers a real hash"
         );
+    }
+
+    /// D3 (epr-app-deliverability-through-doorway.md) proof — the consumer
+    /// heal leg also converges `server_blob_hash`, independently of
+    /// `blob_hash`: a converged real `serverBlobHash` re-derives into a NULL
+    /// local row; a doc that never carried `serverBlobHash` (never
+    /// projected — absent, not empty-string) never clobbers a present real
+    /// value. This is the "browser head crossed peers, server head did not"
+    /// gap (matthew PATCHed serverBlobHash 2026-09-08; adam's row stayed
+    /// null 15h later) as a red→green, without any notary — serverBlobHash
+    /// carries no notarization to begin with.
+    #[tokio::test]
+    async fn reverse_project_heals_server_blob_hash_and_absence_never_wins() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // Local rows: server-heal-null (server_blob_hash NULL — the adam
+        // case); server-heal-real (a present real server_blob_hash that an
+        // absent doc field must never clobber).
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, sbh) in [
+                ("server-heal-null", None::<String>),
+                (
+                    "server-heal-real",
+                    Some("sha256-existing-server".to_string()),
+                ),
+            ] {
+                content_diesel::create_content(
+                    &mut conn,
+                    &ctx,
+                    CreateContentInput {
+                        id: id.to_string(),
+                        title: "t".to_string(),
+                        description: None,
+                        content_type: "concept".to_string(),
+                        content_format: "markdown".to_string(),
+                        blob_hash: Some("sha256-browser-unchanged".to_string()),
+                        blob_cid: None,
+                        content_size_bytes: None,
+                        metadata_json: None,
+                        reach: "commons".to_string(),
+                        created_by: None,
+                        tags: vec![],
+                        content_body: Some("b".to_string()),
+                        dht_anchor_hash: None,
+                    },
+                )
+                .unwrap();
+                if let Some(v) = sbh {
+                    content_diesel::update_content(
+                        &mut conn,
+                        &ctx,
+                        content_diesel::UpdateContentInput {
+                            id: id.to_string(),
+                            server_blob_hash: Some(v),
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                }
+            }
+        }
+
+        // Peer A's converged doc for server-heal-null carries a REAL
+        // serverBlobHash (and the SAME blobHash the row already has, so this
+        // heal isolates the serverBlobHash leg — blob_hash must not move).
+        let mut peer_a = sample_content("server-heal-null", "t");
+        peer_a.blob_hash = Some("sha256-browser-unchanged".to_string());
+        peer_a.server_blob_hash = Some("sha256-server-converged".to_string());
+        super::project_content_doc(&sync, &peer_a).await.unwrap();
+
+        // Peer B's converged doc for server-heal-real never set serverBlobHash
+        // (absent from the doc entirely — `projected_fields` never emits an
+        // empty string for it).
+        let mut peer_b = sample_content("server-heal-real", "t");
+        peer_b.blob_hash = Some("sha256-browser-unchanged".to_string());
+        super::project_content_doc(&sync, &peer_b).await.unwrap();
+
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:server-heal-null")
+                .await
+                .unwrap(),
+            "null local serverBlobHash + real converged → heals"
+        );
+        assert!(
+            !super::reverse_project_content_doc(&sync, &pool, "node:server-heal-real")
+                .await
+                .unwrap(),
+            "absent converged serverBlobHash → skipped (no-clobber)"
+        );
+
+        let mut conn = pool.get().unwrap();
+        let healed = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "server-heal-null",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            healed.server_blob_hash.as_deref(),
+            Some("sha256-server-converged"),
+            "serverBlobHash converges from the doc"
+        );
+        assert_eq!(
+            healed.blob_hash.as_deref(),
+            Some("sha256-browser-unchanged"),
+            "a serverBlobHash-only heal must not move blob_hash"
+        );
+        assert!(
+            healed.crdt_converged_at.is_none(),
+            "serverBlobHash carries no notarization — it must not stamp the amber marker"
+        );
+
+        let untouched = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "server-heal-real",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            untouched.server_blob_hash.as_deref(),
+            Some("sha256-existing-server"),
+            "no-clobber: an absent doc field must never erase an existing serverBlobHash"
+        );
+    }
+
+    /// D3 end-to-end: a serverBlobHash-only PATCH through `ContentService::update`
+    /// (the diesel-direct path for a deploy-projection field) drives the SAME
+    /// producer path the browser-head PATCH does — the emitted `content.updated`
+    /// bus event feeds `spawn_content_projection_listener`, which (re)projects
+    /// the row's sync doc, and the projected doc carries `serverBlobHash`. This
+    /// is the OTHER falsifier half of D3 (the producer side); the consumer-side
+    /// convergence into a PEER's row is `reverse_project_heals_server_blob_hash_and_absence_never_wins`.
+    #[tokio::test]
+    async fn server_blob_hash_patch_projects_into_sync_doc_via_listener() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+        use crate::services::content_service::ContentService;
+        use crate::services::events::EventBus;
+
+        let events = Arc::new(EventBus::new());
+        let (sync, _temp) = test_sync_manager().await;
+        let sync = Arc::new(sync);
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "d3-listener-head".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "epr-composite".to_string(),
+                    content_format: "html".to_string(),
+                    blob_hash: Some("sha256-browser-listener".to_string()),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        // `subscribe()` runs synchronously inside spawn_content_projection_listener
+        // (mirrors `listener_converges_multichunk_bulk_and_concurrent_single`), so
+        // the receiver exists before the PATCH emits — no subscribe/emit race.
+        let handle = super::spawn_content_projection_listener(
+            Arc::clone(&events),
+            Arc::clone(&sync),
+            pool.clone(),
+            None,
+        );
+
+        let service = ContentService::new(pool.clone(), ctx.clone(), Arc::clone(&events));
+        let view = crate::views::UpdateContentInputView {
+            title: None,
+            description: None,
+            content_body: None,
+            content_format: None,
+            metadata: None,
+            tags: None,
+            reach: None,
+            blob_hash: None,
+            server_blob_hash: Some("sha256-listener-server-1".to_string()),
+            p2p_published_at: None,
+        };
+        service
+            .update("d3-listener-head", view)
+            .expect("serverBlobHash-only PATCH must succeed");
+
+        // Poll for the listener to (re)project the sync doc with serverBlobHash —
+        // bounded so a broken wire (event never emitted, or projector never
+        // includes the field) fails the test instead of hanging.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if let Ok(v) = sync
+                .get_doc_field("elohim", "node:d3-listener-head", "serverBlobHash")
+                .await
+            {
+                assert_eq!(v, "sha256-listener-server-1");
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "serverBlobHash never converged into the sync doc via the listener"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        handle.abort();
     }
 
     /// Empty serving-critical fields are NOT projected into the doc at all —
