@@ -298,7 +298,7 @@ a long-lived task/service — must resolve per use.
 | 1565, 1567 | comment + `set_client("infrastructure", …)` | (a) | a writer, not an acquisition |
 | 2121 | provide `ConductorCommitmentAuthor` | **(b) CURED** | `190c7e077` — `ConductorCommitmentAuthor::from_bridge`, `RegistryConductorBridge::lamad`, re-read per tick |
 | 2277 | `SalvageCommitmentAuthor` | **(b) CURED** | `190c7e077` — `SalvageCommitmentAuthor::from_bridge`, same bridge |
-| 2378 | `SpoolCustodyAuthor` | **(b) CURED** | `190c7e077` — `SpoolCustodyAuthor::from_bridge`, same bridge |
+| 2378 | `SpoolCustodyAuthor` | **(b) CURED** | `190c7e077` (author converted) — but main.rs:2394 still passed the CAPTURED `Arc<HcClient>` to `::new`, wrapping a `StaticConductorBridge`; `5fc2981dc` wires the boot site through the (new, shared) `lamad_conductor_bridge()` helper instead |
 | 2464 | `ConductorRotationAuthor` | **(b) CURED** | `190c7e077` — `ConductorRotationAuthor::from_bridge`; the tick's `resolve_self_agent_cid` now shares the SAME bridge instead of the boot-time client it used to close over |
 | 2577 | `reanchor_lamad_boot` | (a) | one-shot boot sweep; the task returns after one run. Its **periodic** re-runs ride projection-reconcile's heal leg, converted below |
 | 2676 | `lamad_client().is_none()` | (a) | boot-time predicate; the task it guards stores the late client into the registry |
@@ -420,3 +420,18 @@ tests use:
   entirely through `call_zome_classed`, which a fake can override directly
   (mirroring `release_attestation`'s cured test); plus
   `origin_dna_hash_is_empty_with_no_bridge_ever_live_never_a_guess`.
+
+**Measured 2026-09-08 06:44** (household mesh, `kill -9` of jessica's
+conductor at 06:44:11, re-minted at 06:44:24): reanchor_backfill (2),
+election-obey (2), peer_status (2), discovery (2), identity_fill (1), and
+the humans replayer (1) all recovered inside the ~13 s dead window — EXCEPT
+the spool-custody tick, which was still on the `StaticConductorBridge` wrap
+(main.rs:2394 passed a captured handle to `::new` despite the readiness
+predicate reading the registry) and failed `Websocket closed: No
+connection` 78 times over 6.5 minutes, still failing every 5 s at 06:50:59.
+Fixed in `5fc2981dc`, which also converts all six author-construction sites
+to two shared `lamad_conductor_bridge()`/`imagodei_conductor_bridge()`
+helpers and adds `ConductorBridge::bridge_kind()` so a composition test
+(`main::conductor_bridge_composition_tests`) asserts what main.rs actually
+constructs is `BridgeKind::Registry` — not measured against a live roll
+again yet.
