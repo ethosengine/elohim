@@ -25,8 +25,16 @@ REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
 
 # The paths whose behaviour only the household mesh can witness (T2 in the ladder).
 DATAPLANE_RE='^(elohim/elohim-storage/src/(p2p|sync|reconcile|p2p_iroh)/|doorway/doorway-service/src/)'
+# The SERVING paths: a change here is refused without a household receipt that EXERCISED
+# @concern:doorway-failover (the boot-through-doorway lane), regardless of T2_RECEIPT — spec
+# 2026-09-08 epr-app-deliverability-through-doorway D4a. A newer report that skipped the concern
+# is not a receipt for it.
+SERVING_RE='^(doorway/doorway-service/src/(render|projection)/|doorway/doorway-service/src/routes/apps\.rs|elohim/elohim-storage/src/services/content_service\.rs)'
+SERVING_CONCERN='doorway-failover'
 touched=$(grep -E "$DATAPLANE_RE" "$CHANGED_FILE" || true)
 [ -n "$touched" ] || exit 0
+serving_touched=$(grep -E "$SERVING_RE" "$CHANGED_FILE" || true)
+if [ -n "$serving_touched" ]; then STRICT=strict; fi
 
 newest_change=0
 while IFS= read -r f; do
@@ -43,6 +51,26 @@ for r in "$REPORTS_DIR"/sprint-report-household-*.json; do
 done
 
 if [ -n "$newest_report" ] && [ "$newest_report_m" -ge "$newest_change" ]; then
+  if [ -n "$serving_touched" ]; then
+    # The receipt must have EXERCISED the serving concern, not merely postdate the change.
+    if python3 - "$newest_report" "$SERVING_CONCERN" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); c = sys.argv[2]
+ex = set((d.get("declared") or {}).get("exercised") or [])
+byc = (d.get("summary") or {}).get("byConcern") or {}
+ok = c in ex and (byc.get(c, {}).get("failed", 0) == 0) and (byc.get(c, {}).get("passed", 0) > 0)
+sys.exit(0 if ok else 1)
+PY
+    then
+      echo "[pre-push] T2 receipt: $(basename "$newest_report") exercised @concern:$SERVING_CONCERN green and is newer than the serving-path changes."
+      exit 0
+    fi
+    echo "[pre-push] ── NO-SERVING-RECEIPT (refused) ─────────────────────────────────────" >&2
+    echo "[pre-push]   serving paths changed but the newest household report did not exercise @concern:$SERVING_CONCERN green:" >&2
+    echo "$serving_touched" | sed 's/^/[pre-push]     /' >&2
+    echo "[pre-push]   produce one: just test mesh features/dataplane/epr-app-deliverability.feature   (household mesh up: just mesh start && just mesh wait)" >&2
+    rm -f "$CHANGED_FILE" 2>/dev/null; exit 1
+  fi
   echo "[pre-push] T2 receipt: $(basename "$newest_report") is newer than the dataplane changes it covers."
   exit 0
 fi
@@ -50,7 +78,7 @@ fi
 scope_hint='@dataplane'
 echo "$touched" | grep -q '^doorway/' && scope_hint='@dataplane or @doorway'
 cat <<BANNER
-[pre-push] ── NO-T2-RECEIPT (warn-only; T2_RECEIPT=strict to refuse) ─────────────
+[pre-push] ── NO-T2-RECEIPT ($( [ "$STRICT" = strict ] && echo "REFUSED${serving_touched:+ — serving paths changed: the boot-through-doorway lane must run}" || echo "warn-only; T2_RECEIPT=strict to refuse")) ──
 [pre-push]   dataplane paths changed with no household sprint-report newer than them:
 $(echo "$touched" | sed 's/^/[pre-push]     /')
 [pre-push]   the household mesh is the authority for these paths (evidence ladder T2).

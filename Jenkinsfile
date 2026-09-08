@@ -623,12 +623,42 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
             verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
         }
+
+        // Phase 5 — the boot-through-doorway gate (spec 2026-09-08
+        // epr-app-deliverability-through-doorway, D4b). HARD FAILURE: an EPR app
+        // that cannot boot through a doorway does not ship. Not catchError'd —
+        // the orchestrator reads UNSTABLE as success, which is how the 2026-09-04
+        // and 2026-09-08 blank pages reached visitors with green builds.
+        verifyServedShells(doorwayEprUrls, bundles)
     }
 
     // Moved to the END (was previously emitted before verifyEprMounts/
     // verifyProjectedHeads ran): both later legs now feed named outcomes into
     // this report, so it must run after every leg has populated `outcomes`.
     emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
+}
+
+// Phase 5 helper — one call per (doorway, browser bundle). Bash body lives in
+// scripts/ci/verify-served-shell.sh (CPS 64KB rule: no heredoc here). Reads the
+// head this build authored from the stage-spa-blob hand-off file; a bundle with
+// no authored head was already refused/named upstream, so it is skipped here.
+def verifyServedShells(List<String> doorwayEprUrls, List<Map> bundles) {
+    def failures = []
+    for (bundle in bundles) {
+        if ((bundle.kind ?: 'browser') != 'browser') { continue }
+        def hashFile = "${env.WORKSPACE}/.ci-authored-hash-${bundle.slug}-browser.txt"
+        if (!fileExists(hashFile)) { echo "verifyServedShells: no authored head for ${bundle.slug} — skipped"; continue }
+        def head = readFile(hashFile).trim()
+        def mount = bundle.slug == 'elohim-host-landing' ? '/' : "/${bundle.slug.replaceFirst(/-spa$/, '')}"
+        for (int i = 0; i < doorwayEprUrls.size(); i++) {
+            def rc = sh(returnStatus: true,
+                        script: "bash '${env.WORKSPACE}/scripts/ci/verify-served-shell.sh' '${doorwayEprUrls[i]}' '${mount}' '${bundle.slug}' '${head}'")
+            if (rc != 0) { failures << "${doorwayEprUrls[i]}${mount} (${bundle.slug} @ ${head.take(19)}…)".toString() }
+        }
+    }
+    if (!failures.isEmpty()) {
+        error("Deploy refused: the served shell does not boot through ${failures.size()} doorway/mount(s) — ${failures.join('; ')}. See the ✗ lines above for the asset and the x-elohim-bundle marker.")
+    }
 }
 
 // Emit a junit-style report for the per-(host,slug) SPA-blob deploy (Part B,
