@@ -1,7 +1,7 @@
 ---
 title: "Cell-qualified projection and sync — the contract that stops clone-authored content from being re-authored into a peer's base cell"
 id: cell-qualified-projection-and-sync-contract
-status: Draft
+status: Active
 class: protocol-canonical
 context-tier: disclosed
 steward: rust-architect
@@ -9,6 +9,7 @@ graduation-trigger: "Draft→Active when the adversarial read and a second p2p-d
 actor: agent:rust-architect@fable-5.1
 written: 2026-09-08
 revised: 2026-09-08
+graduated: 2026-09-08
 domain: D6
 habits: [dataplane-convergence, happ-lineage-migration]
 boundary: "Design only. This contract governs ONE qualifier (the cell a projected row or sync doc came from), the FOUR records that must carry or verify it (the storage `content` projection row, the Automerge content-sync doc, the shard/replication plane's ingested record, and the re-author path's fresh DHT action), and the refusal rule between them. It does not decide whether group clone spaces ship (D6), which spaces an operator selects, or whether storage runs one instance per cell."
