@@ -18,6 +18,14 @@ cites:
   - elohim/elohim-storage/src/hc_client_registry.rs
   - elohim/elohim-storage/src/main.rs
   - elohim/elohim-storage/src/metrics.rs
+  - elohim/elohim-storage/src/conductor_bridge.rs
+  - elohim/elohim-storage/src/services/conductor_commitment_author.rs
+  - elohim/elohim-storage/src/services/salvage_commitment_author.rs
+  - elohim/elohim-storage/src/services/spool_custody_author.rs
+  - elohim/elohim-storage/src/services/custody_rotation.rs
+  - elohim/elohim-storage/src/services/holochain_humans_replayer.rs
+  - elohim/elohim-storage/src/services/membership_identity_reconcile.rs
+  - elohim/elohim-storage/src/services/feedback_projector/conductor.rs
 ---
 
 # A conductor roll kills the adoption controller for the life of the process
@@ -288,10 +296,10 @@ a long-lived task/service — must resolve per use.
 |---|---|---|---|
 | 1498 | `infrastructure_client()` boot probe | (a) | predicate only; the task inside acquires via `connect_role_forever`, and the heartbeat's `ZomeCallPublisher`/`DefaultProbe` already hold the **registry** and resolve per tick |
 | 1565, 1567 | comment + `set_client("infrastructure", …)` | (a) | a writer, not an acquisition |
-| 2121 | provide `ConductorCommitmentAuthor` | **(b) OPEN** | 60 s ticker holding a captured `Arc<HcClient>` inside the author |
-| 2277 | `SalvageCommitmentAuthor` | **(b) OPEN** | `salvage_recheck_seconds` ticker, same shape |
-| 2378 | `SpoolCustodyAuthor` | **(b) OPEN** | `spool_cfg.tick_seconds` ticker, same shape |
-| 2464 | `ConductorRotationAuthor` | **(b) OPEN** | rotation ticker, same shape |
+| 2121 | provide `ConductorCommitmentAuthor` | **(b) CURED** | `190c7e077` — `ConductorCommitmentAuthor::from_bridge`, `RegistryConductorBridge::lamad`, re-read per tick |
+| 2277 | `SalvageCommitmentAuthor` | **(b) CURED** | `190c7e077` — `SalvageCommitmentAuthor::from_bridge`, same bridge |
+| 2378 | `SpoolCustodyAuthor` | **(b) CURED** | `190c7e077` — `SpoolCustodyAuthor::from_bridge`, same bridge |
+| 2464 | `ConductorRotationAuthor` | **(b) CURED** | `190c7e077` — `ConductorRotationAuthor::from_bridge`; the tick's `resolve_self_agent_cid` now shares the SAME bridge instead of the boot-time client it used to close over |
 | 2577 | `reanchor_lamad_boot` | (a) | one-shot boot sweep; the task returns after one run. Its **periodic** re-runs ride projection-reconcile's heal leg, converted below |
 | 2676 | `lamad_client().is_none()` | (a) | boot-time predicate; the task it guards stores the late client into the registry |
 | 2731 | self-agent-cid resolver closure | (a) | already resolves `lamad_client()` **inside** the closure, per call |
@@ -302,11 +310,11 @@ a long-lived task/service — must resolve per use.
 | 3504 | `cell_id().dna_hash()` | (a) | value extraction |
 | 3800 | `agent_key_uhcak()` announce | (a) | value extraction |
 | 4781 | `cell_id().dna_hash()` | (a) | value extraction |
-| 4820 | `membership_identity_reconcile::spawn_periodic` | **(b) OPEN** | periodic imagodei sweep holding a captured client |
+| 4820 | `membership_identity_reconcile::spawn_periodic` | **(b) CURED** | `190c7e077` — takes `Arc<dyn ConductorBridge>` (`RegistryConductorBridge::imagodei`, new constructor), builds `ConductorMembershipReader` fresh inside the loop each pass |
 | 5300 | `lamad_hc_boot` → projection-reconcile heal leg | **(b) CURED** | `RegistryConductorBridge::lamad`, re-read every tick via `conductor_bridge::sweep_leg` |
 | 5337 | `agent_key_uhcak()` iroh agent_cid | (a) | value extraction |
 | 5734 | `hc_for_adoption` | **(b) CURED** | `80354948d` (controller) + `1416b9b27` (attestation rail) |
-| 5977 | feedback projector `ConductorReader` | **(b) OPEN** | spawned projector holding a captured client |
+| 5977 | feedback projector `ConductorReader` | **(b) CURED** | `190c7e077` — `ConductorReader::from_bridge`, reads route through `ConductorBridge::call_zome_classed` at `Interactive`; `origin_dna_hash` memoized on first live resolve |
 
 Sites **outside** `main.rs` were audited and are already correct: `http.rs`,
 `api/*`, `p2p/view_federation.rs` and `p2p/mod.rs` all hold the **registry** and
@@ -350,13 +358,65 @@ a set-once cell handles plain *late-connect* correctly and only breaks on a
 - `services::reanchor_backfill::tests::a_conductor_rolled_between_two_sweeps_reanchors_on_the_second`
   — RED: *"no handle is honest backpressure; the next sweep asks again"*.
 
-## Still open — the four periodic authors, membership, and the feedback projector
+## Cured this pass (`190c7e077`) — the four periodic authors, membership, and the feedback projector
 
-Six class-(b) sites remain (2121, 2277, 2378, 2464, 4820, 5977). They share one
-shape: a ticker that builds an author/projector **once** from a captured
-`Arc<HcClient>` and reuses it. The cure is the same and is mechanical — either
-construct the author inside the tick from `bridge.handle()`, or change the
-service constructor to take `Arc<dyn ConductorBridge>` — but each touches a
-service module and its tests, so it is a separate bounded pass rather than a
-tail bolted onto a measured one. None of them is on the 3b-ii path; they cost
-their own sweep's work for one roll window.
+The six remaining class-(b) sites (2121, 2277, 2378, 2464, 4820, 5977) shared
+one shape: a ticker that built an author/projector **once**, outside its loop,
+from a captured `Arc<HcClient>` (or `Arc<HcClient>`-returning
+`registry.*_client()` clone), and reused it for the life of the process. Each
+now holds `Arc<dyn ConductorBridge>`, resolved fresh per tick/call:
+
+- `ConductorCommitmentAuthor`, `SalvageCommitmentAuthor`, `SpoolCustodyAuthor`
+  gained `from_bridge` constructors (`new(Arc<HcClient>)` survives wrapping a
+  `StaticConductorBridge`, unchanged for any caller/test that holds a client
+  directly); the sync `CommitmentAuthor` trait impls resolve
+  `self.bridge.handle()` at the top of `author_custody_blob`/`author_commons`,
+  returning an honest `Err` (skip this tick) on `None` before any conductor
+  write is attempted.
+- `ConductorRotationAuthor` — same shape. Its main.rs ticker ALSO used to
+  resolve `resolve_self_agent_cid` against the same boot-time captured
+  handle; that call now reads through the SAME bridge the author uses, so
+  identity resolution and authoring heal together rather than the identity
+  half staying stale.
+- `ConductorMembershipReader` (`services::holochain_humans_replayer`) gained
+  `from_bridge`/`new`; `membership_identity_reconcile::spawn_periodic` now
+  takes `Arc<dyn ConductorBridge>` and builds the reader fresh INSIDE the
+  loop each pass, rather than once outside it. New
+  `RegistryConductorBridge::imagodei` constructor (the identity/qahal role
+  slot) — `RegistryConductorBridge::lamad` was the only one that existed.
+- `feedback_projector::conductor::ConductorReader` gained `from_bridge`/`new`;
+  its `call` helper now goes through `ConductorBridge::call_zome_classed` at
+  `AdmissionClass::Interactive` (pinned explicitly — the trait's `call_zome`
+  convenience defaults to `Background`, which would have silently re-classed
+  every feedback read). `origin_dna_hash()` (a sync trait method with no
+  handle to await) memoizes the DNA hash on first successful resolve: the
+  hash is a property of the DNA, not the connection, so it survives a roll,
+  and a `""` fallback during a mid-remint window would otherwise misclassify
+  every envelope as foreign-DNA rather than honestly pending.
+
+**No zome call's behaviour changed** — same zome names, same fn names, same
+admission classes, same cell targets (mishpat/imagodei-cell calls still go
+through `HcClient::call_zome_mishpat`/`call_zome_imagodei` on the
+bridge-resolved handle, not through the bridge's own default-cell
+`call_zome`).
+
+**Tests** (`just gate elohim-storage`, `EXIT=0`): each site gets a fake
+`ConductorBridge` counting `handle()`/`call_zome_classed` reads across two
+calls, proving per-tick resolution rather than a captured handle —
+`Arc<HcClient>` cannot be constructed in a unit test (real
+`AdminWebsocket`/`AppWebsocket` required), so most of these assert the
+DECISION surface (a `None` handle refuses honestly; a second call re-reads),
+the same technique `projection_reconcile`'s and `reanchor_backfill`'s cured
+tests use:
+
+- `conductor_commitment_author::tests::author_commons_re_reads_the_conductor_bridge_every_tick_never_a_captured_handle`
+- `salvage_commitment_author::tests::author_custody_blob_re_reads_the_conductor_bridge_every_call_never_a_captured_handle`
+- `spool_custody_author::tests::author_custody_blob_re_reads_the_conductor_bridge_every_call_never_a_captured_handle`
+- `custody_rotation::tests::author_rotation_successor_re_reads_the_conductor_bridge_every_call_never_a_captured_handle`
+- `holochain_humans_replayer::tests::list_memberships_re_reads_the_conductor_bridge_every_call_never_a_captured_handle`
+- `feedback_projector::conductor::tests::refs_for_target_lands_after_the_conductor_rolled_between_two_sweeps` — this one
+  DOES round-trip a full "refused while dead, lands once re-minted" cycle
+  without a real `Arc<HcClient>`, because `ConductorReader`'s reads go
+  entirely through `call_zome_classed`, which a fake can override directly
+  (mirroring `release_attestation`'s cured test); plus
+  `origin_dna_hash_is_empty_with_no_bridge_ever_live_never_a_guess`.
