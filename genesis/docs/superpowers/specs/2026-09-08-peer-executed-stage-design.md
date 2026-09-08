@@ -340,8 +340,8 @@ Every value below is what the builder of §8 task 1 emits.
     "feedback_signal::a2o::dataplane::federation-version-convergence::two-doorways-that-disagree-about-a-page-converge-on-the-elected-version-without-anyone-re-upload"
   ],
   "resources": {
-    "cpuMillis": 8000,
-    "memoryBytes": 8589934592,
+    "cpuMillis": 10500,
+    "memoryBytes": 33285996544,
     "maxPayloadBytes": 8388608,
     "timeoutSeconds": 2400
   },
@@ -364,10 +364,13 @@ Field notes that are not obvious:
   sweep; `PROJECTION_RECONCILE_SECS` defaults to 300s and the 2026-08-31 proof budgeted
   6 minutes (`federation-deploy.steps.ts:121-127`). The worker allows
   `timeoutSeconds * 1000 + 120000` (`worker.mjs:161`).
-- `resources.cpuMillis` / `memoryBytes` must not be *under*-declared relative to the
-  provider's real cgroup ceiling — the executor refuses with
-  `actual cgroup ceiling exceeds offered task bound`. If that error appears, raise these
-  to match `/sys/fs/cgroup/cpu.max` and `/sys/fs/cgroup/memory.max` on the provider.
+- `resources.cpuMillis` / `memoryBytes` must be **at least** the provider's actual cgroup
+  ceiling, not merely within it — the executor refuses `authorize-launch` with
+  `actual cgroup ceiling exceeds offered task bound` if the offer is lower; read the real
+  ceiling with `cat /sys/fs/cgroup/cpu.max` (`<quota> <period>`, so millicores =
+  `1000 * quota / period`) and `cat /sys/fs/cgroup/memory.max` on the provider process's
+  own cgroup path, and offer at least that — the `10500` / `33285996544` above are this
+  host's measured ceiling, 2026-09-08, not a portable default.
 - Envelope size: the whole object must stay under 64 KiB (`workspace.mjs:217-220`, and
   again `compute_task.rs:202`). At one scenario it is under 2 KiB.
 
