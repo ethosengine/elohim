@@ -510,6 +510,37 @@ Then(
   }
 );
 
+// The step that separates the two properties. James's refusal exercises
+// no-self-vouch; Matthew is a third party to BOTH the correction and the record,
+// so only this attempt reaches the acceptance-authority gate. A refusal is not
+// enough — it must carry the typed reason, or a transient fetch failure would
+// read as a proven guarantee. `root_unresolvable` IS that transient (contract
+// §6: a dependency that cannot be fetched is pending, never a rejection), so it
+// is retried rather than accepted as the answer.
+Then(
+  "Matthew's attempt to accept it is refused as not the root author",
+  { timeout: DHT_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    let refusal = '';
+    await until('Matthew is refused by name', async () => {
+      try {
+        await call(this, 'matthew', 'create_vouch', {
+          target_action_hash: raw(ctx(this).correction),
+          vouch_kind: 'accept-correction',
+          standing_impact: 'debit-soft',
+        });
+        refusal = '';
+        return true;
+      } catch (e) {
+        refusal = String(e);
+        return !(refusal.includes('Failed to get Record') || refusal.includes('root_unresolvable'));
+      }
+    });
+    assert.ok(refusal, "Matthew is not the record's root author and must be refused");
+    assert.match(refusal, /not_root_author/);
+  }
+);
+
 Then(
   "Jessica's earlier acceptance and successor are unaffected by James's refused attempt",
   { timeout: DHT_STEP_TIMEOUT_MS },

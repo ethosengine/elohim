@@ -81,8 +81,11 @@ Feature: A correction reaches the person it names, only that person can settle i
 
   Roles held for every station below (see README-accountable-correction.md for why):
   Jessica is the root author of the record every station corrects. James files every
-  correction and, once, wrongly tries to accept one. Matthew never authors, corrects, or
-  accepts anything here — he is the durable-discovery witness, the peer nothing notifies.
+  correction and, once, wrongly tries to accept one. Matthew never authors or corrects
+  anything here, and never successfully accepts: he is the durable-discovery witness, the
+  peer nothing notifies — and once, in station 3, the uninvolved third party whose refused
+  acceptance is what separates "may not vouch for your own act" from "only the root author
+  settles it".
 
   Background:
     Given peer "matthew" at "E2E_STORAGE_MATTHEW"
@@ -151,6 +154,12 @@ Feature: A correction reaches the person it names, only that person can settle i
     # his OWN correction must be refused, not silently accepted by a permissive integrity rule.
     When James attempts to accept his own correction with an accept-correction vouch
     Then James's acceptance attempt is refused because he is not the record's root author
+    # James's refusal alone does NOT prove §5.2's claim: the guard it hits is
+    # no-self-vouch, which any THIRD peer walks straight past. Matthew is neither
+    # the correction's author nor the record's root author, so his attempt is the
+    # one that separates "may not vouch for your own act" from "only the root
+    # author settles it" — and it must be refused by name, not by accident.
+    And Matthew's attempt to accept it is refused as not the root author
     And Jessica's earlier acceptance and successor are unaffected by James's refused attempt
 
   # ---------------------------------------------------------------------------------
