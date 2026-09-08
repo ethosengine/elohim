@@ -1796,7 +1796,13 @@ pub fn bounded_soak_wait(declared_secs: u64) -> u64 {
 /// an instantaneous soak would reopen the same hole one step further down. So
 /// the observer waits the declared window and attests what it actually saw.
 pub struct SoakAttestor {
-    hc: Arc<crate::hc_client::HcClient>,
+    /// A SOURCE, never a captured handle. The observer below is spawned at
+    /// apply time and makes its one call `soakSecs` later — a window a
+    /// conductor roll fits inside comfortably, and rung 5's receipt is adoption
+    /// AND attestation, so a captured handle fails the second half of the
+    /// measure while the first half looks healthy. See
+    /// [`crate::conductor_bridge`].
+    bridge: Arc<dyn crate::conductor_bridge::ConductorBridge>,
     device_id: String,
     device_archetype: String,
     capability_level: i32,
@@ -1809,14 +1815,14 @@ pub struct SoakAttestor {
 impl SoakAttestor {
     /// Populate from the same runtime sources boot registration reads.
     pub fn from_runtime(
-        hc: Arc<crate::hc_client::HcClient>,
+        bridge: Arc<dyn crate::conductor_bridge::ConductorBridge>,
         config: &crate::config::Config,
         device_id: impl Into<String>,
         capability_level: i32,
         build: &elohim_compute::BuildInfo,
     ) -> Self {
         Self {
-            hc,
+            bridge,
             device_id: device_id.into(),
             device_archetype: config
                 .device_archetype
@@ -1917,8 +1923,12 @@ pub fn spawn_soak_observer(
             crate::services::release_attestation::SoakOutcome::pass(probes)
         };
 
-        let ctx =
-            crate::services::release_attestation::ReleaseAttestationCtx::new(attestor.hc.clone());
+        // Built HERE, after the sleep, from the bridge — not captured when the
+        // observer was spawned. The whole point: the conductor may have rolled
+        // during the soak window, and the attestation must still land.
+        let ctx = crate::services::release_attestation::ReleaseAttestationCtx::from_bridge(
+            attestor.bridge.clone(),
+        );
         let soak = attestor.context(&channel_id, window_start, super::state::now_unix());
         match crate::services::release_attestation::author_soak_attestation(
             &ctx,

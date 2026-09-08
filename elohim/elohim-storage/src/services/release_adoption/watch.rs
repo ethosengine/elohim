@@ -52,8 +52,13 @@ use super::{
     AdoptionRefusal, Artifact, ArtifactClass, DecisionArm, RefusalReason, RELEASE_MANIFEST_KIND,
 };
 use crate::blob_store::BlobStore;
-use crate::conductor_admission::AdmissionClass;
-use crate::error::StorageError;
+// The conductor leg. Defined in `crate::conductor_bridge` because it is a
+// conductor-leg concern with two consumers (this controller and the attestation
+// rail), not a release-adoption detail — re-exported here so `watch::…` paths
+// and the wiring in `main.rs` read the same as before the move.
+pub use crate::conductor_bridge::{
+    ConductorBridge, RegistryConductorBridge, StaticConductorBridge,
+};
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::ContentHeadWire;
 use crate::services::release_attestation::{self, ReleaseAttestationCtx};
@@ -502,124 +507,6 @@ impl InstalledRealitySource for PassportInstalledReality {
         )
         .await;
         InstalledReality::from_happ_passport(&response.passport.happ)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// The conductor leg — a LIVE handle source, never a captured one
-// ---------------------------------------------------------------------------
-
-/// Where the controller gets a conductor handle, **re-read on every use**.
-///
-/// # Why this is a trait and not an `Arc<HcClient>` field
-///
-/// `holochain_client` 0.8 has no reconnect, and a conductor restart both closes
-/// the sockets AND invalidates the in-memory app-auth token, so recovery is a
-/// full re-mint rather than a socket-level reconnect. That re-mint already
-/// exists exactly once in this crate:
-/// [`crate::hc_client_registry::HcClientRegistry::spawn_bridge_supervisor`]
-/// probes each supervised role every [`crate::hc_client_registry::BRIDGE_PROBE_INTERVAL`],
-/// and on a failed ping clears the registry slot and re-runs
-/// `connect_role_forever`, storing a FRESH `Arc<HcClient>` in the slot.
-///
-/// That supervisor's own doc names this defect: *"Anything holding an Arc clone
-/// keeps failing until it re-reads."* The adoption controller held an
-/// `Arc<HcClient>` cloned out of the registry at boot
-/// (`main.rs`: `hc_registry_for_http…lamad_client()` → `with_conductor`) and
-/// never re-read it, so every sweep after the first conductor roll called a
-/// corpse and reported `conductor_unavailable` forever — while the projector
-/// path, which re-reads the same slot, kept working. This trait makes
-/// "re-read" the shape of the type rather than a remembered step.
-///
-/// **There is exactly one reconnect strategy in this crate and it is the
-/// supervisor's.** An implementation here re-READS a handle; it must never
-/// mint one.
-#[async_trait::async_trait]
-pub trait ConductorBridge: Send + Sync {
-    /// The handle to use RIGHT NOW. `None` while the bridge is being re-minted
-    /// — honest backpressure, and the next sweep asks again.
-    fn handle(&self) -> Option<Arc<HcClient>>;
-
-    /// One `Background`-classed zome call through [`Self::handle`].
-    ///
-    /// Defaulted rather than duplicated: every implementation gets the same
-    /// admission class and the same "no handle is `Connection`, not a decode
-    /// failure" mapping, and a test fake overrides only this method.
-    async fn call_zome(
-        &self,
-        zome: &str,
-        fn_name: &str,
-        payload: Vec<u8>,
-    ) -> Result<Vec<u8>, StorageError> {
-        let Some(hc) = self.handle() else {
-            return Err(StorageError::Connection(
-                "release-adoption: no conductor bridge (being re-minted)".to_string(),
-            ));
-        };
-        hc.call_zome_timed(zome, fn_name, payload, AdmissionClass::Background)
-            .await
-            .map(|(bytes, _timing)| bytes)
-    }
-}
-
-/// The production bridge: the registry slot the bridge supervisor owns.
-///
-/// Holds the registry, never a client — so a conductor roll is ordinary churn
-/// and the controller's next sweep resolves through the re-minted handle.
-pub struct RegistryConductorBridge {
-    registry: Arc<crate::hc_client_registry::HcClientRegistry>,
-    role: &'static str,
-    /// Identity of the last handle this bridge handed out, as a raw pointer
-    /// value. Only ever compared, never dereferenced.
-    last_seen: std::sync::atomic::AtomicUsize,
-}
-
-impl RegistryConductorBridge {
-    /// The `lamad` role — the registry slot that carries the `content_store`
-    /// zome this controller resolves heads through.
-    pub fn lamad(registry: Arc<crate::hc_client_registry::HcClientRegistry>) -> Self {
-        Self {
-            registry,
-            role: "lamad",
-            last_seen: std::sync::atomic::AtomicUsize::new(0),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl ConductorBridge for RegistryConductorBridge {
-    fn handle(&self) -> Option<Arc<HcClient>> {
-        let hc = self.registry.client(self.role)?;
-        // Count the moment this controller picks up a DIFFERENT handle than the
-        // one it last used — i.e. the supervisor re-minted the bridge under us
-        // and we followed it. Counted here rather than in the supervisor
-        // because the supervisor's own reconnect counter cannot say whether the
-        // adoption controller ever noticed, which is precisely what was wrong.
-        let ptr = Arc::as_ptr(&hc) as usize;
-        let previous = self
-            .last_seen
-            .swap(ptr, std::sync::atomic::Ordering::Relaxed);
-        if previous != 0 && previous != ptr {
-            crate::metrics::RELEASE_CHANNEL_CONDUCTOR_RECONNECT.inc();
-            tracing::info!(
-                role = self.role,
-                "release-adoption: picked up a RE-MINTED conductor bridge — a conductor roll is \
-                 ordinary churn, and this sweep resolves through the fresh handle"
-            );
-        }
-        Some(hc)
-    }
-}
-
-/// A bridge over one fixed handle. Correct only for a process that outlives no
-/// conductor restart — kept for callers (and tests) that hold a client
-/// directly. Production wires [`RegistryConductorBridge`].
-pub struct StaticConductorBridge(pub Arc<HcClient>);
-
-#[async_trait::async_trait]
-impl ConductorBridge for StaticConductorBridge {
-    fn handle(&self) -> Option<Arc<HcClient>> {
-        Some(self.0.clone())
     }
 }
 
@@ -2721,6 +2608,8 @@ mod tests {
     #[tokio::test]
     async fn a_rolled_conductor_is_re_resolved_and_the_next_read_answers() {
         use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use crate::error::StorageError;
 
         /// A bridge that is dead for its first `dead_reads` calls — the
         /// conductor pod rolling — and answers from a re-minted handle after.

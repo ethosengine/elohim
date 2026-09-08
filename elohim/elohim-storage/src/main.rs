@@ -5897,18 +5897,27 @@ async fn async_main(
             // moment that roll happens (alpha, 2026-09-08: seven channels stuck
             // on `conductor_unavailable` for 3+ hours after an ordinary roll).
             // `with_conductor` is kept only as the no-registry fallback.
-            controller = match hc_registry_for_http.as_ref() {
-                Some(registry) => controller.with_conductor_bridge(std::sync::Arc::new(
-                    watch::RegistryConductorBridge::lamad(registry.clone()),
-                )),
-                None => controller.with_conductor(hc.clone()),
-            };
+            //
+            // ONE bridge, shared by both rungs: the controller's sweep AND the
+            // soak-attestation rail. Rung 5 is measured by adoption AND
+            // attestation, so a peer that adopts through a re-read handle and
+            // attests through a captured one still fails the receipt.
+            let bridge: std::sync::Arc<dyn elohim_storage::conductor_bridge::ConductorBridge> =
+                match hc_registry_for_http.as_ref() {
+                    Some(registry) => {
+                        std::sync::Arc::new(watch::RegistryConductorBridge::lamad(registry.clone()))
+                    }
+                    // No registry: nothing can re-mint, so a fixed handle is the
+                    // honest shape rather than a source that can never change.
+                    None => std::sync::Arc::new(watch::StaticConductorBridge(hc.clone())),
+                };
+            controller = controller.with_conductor_bridge(bridge.clone());
             // T5's rail. Requires a conductor to author through, so it is
             // wired here and nowhere else; without it an apply is un-attested
             // rather than falsely attested.
             controller = controller.with_soak_attestor(std::sync::Arc::new(
                 apply::SoakAttestor::from_runtime(
-                    hc.clone(),
+                    bridge.clone(),
                     &config,
                     args.agent_pubkey
                         .clone()

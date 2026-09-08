@@ -59,6 +59,7 @@ pub mod closed_chain_fence; // Task 32 (Holochain Evolution Epic MVP): the post-
 pub mod compute_payload_store;
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
 pub mod conductor_admission; // Capacity contract over the conductor's DB read pool
+pub mod conductor_bridge; // A LIVE conductor-handle source (re-read per use) — never a captured Arc
 pub mod conductor_bridge_health; // Observed liveness of the zome path (is the bridge actually alive?)
 pub mod conductor_client; // Legacy: kept for backward compatibility during migration
 pub mod config;

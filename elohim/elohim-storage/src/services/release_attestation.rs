@@ -113,6 +113,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::conductor_admission::AdmissionClass;
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::hc_client::HcClient;
 
 /// Zome hosting the attestation coordinator (the `lamad` role's cell — the same
@@ -183,17 +184,40 @@ pub enum TypedRefusal {
 // Context
 // ---------------------------------------------------------------------------
 
-/// Handles the two public functions need. T3/T4 already hold an [`HcClient`];
-/// both halves of this module are conductor-sourced (see the module docs on why
-/// the local projection is not the reader's source), so this carries nothing
-/// else.
+/// Handles the two public functions need. Both halves of this module are
+/// conductor-sourced (see the module docs on why the local projection is not
+/// the reader's source), so this carries nothing else.
+///
+/// # Why a bridge and not an `Arc<HcClient>`
+///
+/// This rail is **long-lived across a conductor roll**: the soak observer is
+/// spawned at apply time and makes its one call `soakSecs` later, and the
+/// threshold reader runs on every controller sweep. A handle captured when the
+/// context was built is a corpse from the first conductor restart onward, and
+/// `holochain_client` 0.8 cannot heal it (the app-auth token is invalidated,
+/// so recovery is a full re-mint — see [`crate::conductor_bridge`]).
+///
+/// The 2026-09-08 alpha exhaustion was exactly this defect on the adoption
+/// controller. This rail held the same shape, and it is the leg rung 5 is
+/// measured by *after* adoption: a peer that adopts through a re-read handle
+/// and attests through a captured one still fails the receipt.
 pub struct ReleaseAttestationCtx {
-    pub hc: Arc<HcClient>,
+    bridge: Arc<dyn ConductorBridge>,
 }
 
 impl ReleaseAttestationCtx {
+    /// From a live bridge — the production wiring. Re-read on every call.
+    pub fn from_bridge(bridge: Arc<dyn ConductorBridge>) -> Self {
+        Self { bridge }
+    }
+
+    /// From one fixed client. Correct only where no conductor restart can
+    /// intervene between construction and use; kept for callers (and tests)
+    /// that hold a client directly.
     pub fn new(hc: Arc<HcClient>) -> Self {
-        Self { hc }
+        Self {
+            bridge: Arc::new(StaticConductorBridge(hc)),
+        }
     }
 }
 
@@ -705,9 +729,17 @@ pub async fn author_soak_attestation(
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
         TypedRefusal::WireDecodeFailed(format!("encode IssueAttestationInput: {e}"))
     })?;
+    // `Interactive` verbatim: this is the class `HcClient::call_zome` applied
+    // before the bridge move, and moving to a live handle must not silently
+    // re-class an authoring write.
     let bytes = ctx
-        .hc
-        .call_zome(ZOME_NAME, "issue_attestation", payload)
+        .bridge
+        .call_zome_classed(
+            ZOME_NAME,
+            "issue_attestation",
+            payload,
+            AdmissionClass::Interactive,
+        )
         .await
         .map_err(|e| TypedRefusal::ConductorRefused(e.to_string()))?;
     let out: AttestationOutputWire = rmp_serde::from_slice(&bytes)
@@ -916,15 +948,14 @@ pub async fn count_qualifying_attestations(
     let payload = rmp_serde::to_vec_named(&release_cid.to_string())
         .map_err(|e| TypedRefusal::WireDecodeFailed(format!("encode subject_cid: {e}")))?;
     let bytes = ctx
-        .hc
-        .call_zome_timed(
+        .bridge
+        .call_zome_classed(
             ZOME_NAME,
             "get_attestations_for_subject",
             payload,
             AdmissionClass::Background,
         )
         .await
-        .map(|(b, _timing)| b)
         .map_err(|e| TypedRefusal::ConductorUnavailable(e.to_string()))?;
     let linked: Vec<SubjectAttestationWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
         TypedRefusal::WireDecodeFailed(format!("decode Vec<AttestationOutput>: {e}"))
@@ -954,31 +985,43 @@ pub async fn count_qualifying_attestations(
         (issuers.clone(), 0)
     };
 
+    // Re-read ONCE for the resolve loop rather than per issuer: the loop is
+    // already bounded by `MAX_RESOLVES_PER_SWEEP`, and splitting one sweep's
+    // evidence across two handles would buy nothing. A roll BETWEEN sweeps is
+    // what the bridge is about, and the next sweep re-reads.
+    //
+    // `None` (the bridge is mid-re-mint) deflates the count exactly like a
+    // single unreadable entry — never fails the whole sweep, which is the same
+    // degrade rule the per-issuer arm below already applies.
+    let hc = ctx.bridge.handle();
     let mut verdicts = Vec::with_capacity(issuers.len());
     for _ in 0..deferred {
         verdicts.push(Verdict::Unresolved);
     }
     for issuer in &resolvable {
+        let Some(hc) = hc.as_ref() else {
+            verdicts.push(Verdict::Unresolved);
+            continue;
+        };
         let id = attestation_content_id(RIDDEN_ATTESTATION_KIND, issuer, release_cid);
-        let resolved =
-            match crate::services::conductor_writes::get_content_by_id(&ctx.hc, &id).await {
-                Ok(Some(out)) => Some(ResolvedEntry::from_metadata(
-                    out.content.author_id.clone(),
-                    &out.content.metadata_json,
-                )),
-                Ok(None) => None,
-                Err(e) => {
-                    // A single unreadable entry deflates the count; it must never
-                    // fail the whole sweep, or one cold entry blocks every release.
-                    tracing::warn!(
-                        release_cid = %release_cid,
-                        issuer = %issuer,
-                        error = %e,
-                        "release attestation entry unreadable — counted as unresolved"
-                    );
-                    None
-                }
-            };
+        let resolved = match crate::services::conductor_writes::get_content_by_id(hc, &id).await {
+            Ok(Some(out)) => Some(ResolvedEntry::from_metadata(
+                out.content.author_id.clone(),
+                &out.content.metadata_json,
+            )),
+            Ok(None) => None,
+            Err(e) => {
+                // A single unreadable entry deflates the count; it must never
+                // fail the whole sweep, or one cold entry blocks every release.
+                tracing::warn!(
+                    release_cid = %release_cid,
+                    issuer = %issuer,
+                    error = %e,
+                    "release attestation entry unreadable — counted as unresolved"
+                );
+                None
+            }
+        };
         verdicts.push(classify(issuer, resolved.as_ref(), release_cid, discipline));
     }
 
@@ -1004,6 +1047,115 @@ pub async fn count_qualifying_attestations(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **The conductor rolled between adoption and attestation** — the second
+    /// half of the 2026-09-08 defect class (the first half was the adoption
+    /// controller; see
+    /// `genesis/data/timeline/backlog/self-heal-release-controller-dead-after-conductor-roll.md`).
+    ///
+    /// The window this reproduces is structural, not rare: the soak observer is
+    /// spawned at apply time and makes its ONE call `soakSecs` later — james
+    /// attested ~+86 s after adopting, and an alpha conductor pod rolled 6-31
+    /// minutes after its storage pod. A context that captured its handle when
+    /// the observer was spawned attests through a corpse.
+    ///
+    /// The load-bearing assertion is that the SAME `ReleaseAttestationCtx`
+    /// gives both answers: refused while the bridge is mid-re-mint, and a
+    /// landed attestation once the supervisor has re-minted it. A context
+    /// holding an `Arc<HcClient>` cannot express that — there is nothing to
+    /// flip.
+    #[tokio::test]
+    async fn an_attestation_lands_after_the_conductor_rolled_during_the_soak_window() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        #[derive(serde::Serialize)]
+        struct AttestationOutputEcho {
+            cid: String,
+            attestation_kind: String,
+            subject_cid: String,
+            issuer_cid: String,
+        }
+
+        /// A bridge that is dead until the supervisor re-mints it.
+        struct RollingBridge {
+            alive: AtomicBool,
+            handle_reads: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl ConductorBridge for RollingBridge {
+            fn handle(&self) -> Option<Arc<HcClient>> {
+                // A fake holds no real client; `call_zome_classed` stands in for
+                // the whole leg and counts the re-read this trait exists for.
+                None
+            }
+
+            async fn call_zome_classed(
+                &self,
+                _zome: &str,
+                _fn_name: &str,
+                _payload: Vec<u8>,
+                class: AdmissionClass,
+            ) -> Result<Vec<u8>, crate::error::StorageError> {
+                self.handle_reads.fetch_add(1, Ordering::SeqCst);
+                // The authoring write keeps the class it had before the bridge
+                // move — pinned here so a silent re-class cannot pass.
+                assert!(
+                    matches!(class, AdmissionClass::Interactive),
+                    "authoring a soak attestation is an Interactive write"
+                );
+                if !self.alive.load(Ordering::SeqCst) {
+                    return Err(crate::error::StorageError::Connection(
+                        "Websocket closed: No connection".to_string(),
+                    ));
+                }
+                Ok(rmp_serde::to_vec_named(&AttestationOutputEcho {
+                    cid: "uhCkk-attestation".to_string(),
+                    attestation_kind: RIDDEN_ATTESTATION_KIND.to_string(),
+                    subject_cid: "uhCkk-release".to_string(),
+                    issuer_cid: "uhCAk-device".to_string(),
+                })
+                .unwrap())
+            }
+        }
+
+        let bridge = Arc::new(RollingBridge {
+            alive: AtomicBool::new(false),
+            handle_reads: AtomicUsize::new(0),
+        });
+        // Built ONCE — as the soak observer builds it, before the window runs.
+        let ctx = ReleaseAttestationCtx::from_bridge(bridge.clone() as Arc<dyn ConductorBridge>);
+        let outcome = SoakOutcome::pass(vec![ProbeResult::green("process-survived-window")]);
+
+        // During the roll: refused honestly, nothing invented.
+        let refused = author_soak_attestation(
+            &ctx,
+            "uhCkk-release",
+            ctx_for("household-node"),
+            outcome.clone(),
+        )
+        .await
+        .expect_err("a rolled conductor cannot be attested through");
+        assert!(
+            matches!(refused, TypedRefusal::ConductorRefused(_)),
+            "got {refused:?}"
+        );
+
+        // The supervisor re-minted the bridge. The SAME ctx must follow it.
+        bridge.alive.store(true, Ordering::SeqCst);
+        let landed =
+            author_soak_attestation(&ctx, "uhCkk-release", ctx_for("household-node"), outcome)
+                .await
+                .expect("the re-minted conductor authored the attestation");
+        assert_eq!(landed.cid, "uhCkk-attestation");
+        assert_eq!(
+            bridge.handle_reads.load(Ordering::SeqCst),
+            2,
+            "the attestation rail re-reads its conductor leg per use; a handle \
+             captured when the soak observer was spawned is asked once and is a \
+             corpse from the first roll onward"
+        );
+    }
 
     fn ctx_for(archetype: &str) -> SoakContext {
         SoakContext {
