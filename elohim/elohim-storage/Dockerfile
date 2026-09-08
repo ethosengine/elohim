@@ -254,6 +254,7 @@ RUN sed -i \
     -e 's|tokio = { workspace = true }|tokio = { version = "1.43", features = ["full", "sync"] }|' \
     -e 's|deno_core.workspace = true|deno_core = "0.339.0"|' \
     -e 's|deno_error.workspace = true|deno_error = "0.5.7"|' \
+    -e 's|reqwest.workspace = true|reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }|' \
     elohim-render/Cargo.toml
 
 # elohim-chrome-asset uses workspace inheritance too — inline the values since
