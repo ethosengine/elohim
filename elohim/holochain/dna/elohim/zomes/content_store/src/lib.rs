@@ -2835,8 +2835,10 @@ fn resolve_root_author(
     // ONE walk, not two. `correction::resolve_root_create` returns the root
     // RECORD (a superset of what this needed) and adds a depth bound, so an
     // adversarial or cyclic lineage can no longer spin here forever.
-    Ok(correction::resolve_root_create(action_hash, strategy)?
-        .map(|r| r.action().author().clone()))
+    Ok(
+        correction::resolve_root_create(action_hash, strategy)?
+            .map(|r| r.action().author().clone()),
+    )
 }
 
 /// Gather the retrievable IdToContent link-target records for an id plus the

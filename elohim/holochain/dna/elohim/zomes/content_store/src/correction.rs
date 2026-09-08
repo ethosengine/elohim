@@ -219,13 +219,14 @@ pub fn get_content_lineage(input: GetContentLineageInput) -> ExternResult<Conten
 
     // 1. The referenced action itself must be retrievable AND carry a Content
     //    entry. A signed header alone is never enough (§1).
-    let referenced = get(input.action_hash.clone(), GetOptions::from(strategy))?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "get_content_lineage: referenced action {:?} is not retrievable — PENDING, not a \
+    let referenced =
+        get(input.action_hash.clone(), GetOptions::from(strategy))?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "get_content_lineage: referenced action {:?} is not retrievable — PENDING, not a \
              rejection",
-            input.action_hash
-        )))
-    })?;
+                input.action_hash
+            )))
+        })?;
     let referenced_content: Content = referenced
         .entry()
         .to_app_option()
@@ -487,13 +488,16 @@ pub fn amend_content(input: AmendContentInput) -> ExternResult<ContentOutput> {
     // reject a legitimate author.
     let strategy = GetStrategy::Network;
 
-    let predecessor = get(input.predecessor_action_hash.clone(), GetOptions::from(strategy))?
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "amend_content: predecessor {:?} is not retrievable",
-                input.predecessor_action_hash
-            )))
-        })?;
+    let predecessor = get(
+        input.predecessor_action_hash.clone(),
+        GetOptions::from(strategy),
+    )?
+    .ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "amend_content: predecessor {:?} is not retrievable",
+            input.predecessor_action_hash
+        )))
+    })?;
     let mut content: Content = predecessor
         .entry()
         .to_app_option()
@@ -509,13 +513,12 @@ pub fn amend_content(input: AmendContentInput) -> ExternResult<ContentOutput> {
         })?;
 
     // Root Create identity — the ONLY source of the amendment authority.
-    let root = resolve_root_create(input.predecessor_action_hash.clone(), strategy)?.ok_or_else(
-        || {
+    let root =
+        resolve_root_create(input.predecessor_action_hash.clone(), strategy)?.ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
                 "amend_content: root Create of the predecessor is not retrievable".to_string()
             ))
-        },
-    )?;
+        })?;
     let root_author = root.action().author().clone();
     let root_content: Content = root
         .entry()
@@ -721,14 +724,13 @@ mod correction_order_tests {
             clock: Timestamp::from_micros(t),
             tiebreak: h,
         };
-        let winner = select_arbitrated_winner(vec![key(10, ah(9)), key(20, ah(1))], |k| {
-            ArbitrationKey {
+        let winner =
+            select_arbitrated_winner(vec![key(10, ah(9)), key(20, ah(1))], |k| ArbitrationKey {
                 tier: k.tier,
                 clock: k.clock,
                 tiebreak: k.tiebreak.clone(),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
         assert_eq!(winner.clock, Timestamp::from_micros(20));
     }
 }
