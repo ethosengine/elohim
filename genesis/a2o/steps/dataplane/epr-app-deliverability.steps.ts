@@ -242,7 +242,7 @@ function buildNextFixture(this: E2EWorld, root = false): void {
   const slug =
     existing?.slug ??
     `epr-app-deliverability-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
-  const mountPath = existing?.mountPath ?? (root ? '/' : `/learning/content/${slug}`);
+  const mountPath = existing?.mountPath ?? (root ? '/' : `/lamad/concept/${slug}`);
   const bundle = buildFixtureBundle({
     coherent: true,
     baseHref: `${mountPath.replace(/\/$/, '')}/`,
