@@ -22,7 +22,7 @@
 import { strict as assert } from 'node:assert';
 import { createHash, randomBytes } from 'node:crypto';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { Given, When, Then, After } from '@cucumber/cucumber';
 
 import {
   getRaw,
@@ -59,6 +59,8 @@ import {
 interface PublishedApp {
   /** The EPR id this run authored — fresh per scenario, never a seeded page. */
   slug: string;
+  mountPath: string;
+  rootCommitments?: string[];
   bundle?: FixtureBundle;
   /** The bundle deliberately built without its entry script (station 4). */
   brokenBundle?: FixtureBundle;
@@ -92,6 +94,8 @@ interface HouseholdTopology {
 }
 
 const DOORWAYS = ['alpha-A', 'elohim.host'];
+const COMMITMENT_PAGE_SIZE = 100;
+const MAX_COMMITMENT_PAGES = 10;
 
 const householdPeers = new WeakMap<E2EWorld, HouseholdTopology>();
 const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
@@ -132,7 +136,7 @@ function requireVisit(world: E2EWorld, peerName: string): BrowserVisit {
 
 /** The address the app this run published answers at on one doorway. */
 function appUrl(world: E2EWorld, peerName: string): string {
-  return `${resolvePeerUrl(peerName)}/lamad/concept/${encodeURIComponent(app(world).slug)}`;
+  return `${resolvePeerUrl(peerName)}${app(world).mountPath}`;
 }
 
 /** The `commit` field of a version.json body, or '' when it carries none. */
@@ -143,6 +147,51 @@ function stampOf(text: string): string {
   } catch {
     return '';
   }
+}
+
+interface RootCommitmentRow {
+  state: string;
+  inScopeOf: string[];
+  metadata?: { urlPath?: string };
+}
+
+/**
+ * Refuse to borrow `/` unless every matching commitment has been inspected.
+ * The API returns a plain array with no total, so a full last page is
+ * ambiguous. Bound the walk and fail closed rather than treating a truncated
+ * result as proof that no root claim exists.
+ */
+async function assertRootCommitmentIsUnclaimed(
+  storageUrl: string,
+  peerName: string,
+  doorwayId: string
+): Promise<void> {
+  for (let page = 0; page < MAX_COMMITMENT_PAGES; page += 1) {
+    const offset = page * COMMITMENT_PAGE_SIZE;
+    const response = await fetch(
+      `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}`
+    );
+    assert.ok(
+      response.ok,
+      `${peerName}: could not inspect project-epr commitments: ${response.status} ${await response.text()}`
+    );
+    const rows = (await response.json()) as RootCommitmentRow[];
+    assert.ok(Array.isArray(rows), `${peerName}: commitments response is not a list`);
+    assert.ok(
+      !rows.some(
+        row =>
+          !['cancelled', 'superseded'].includes(row.state) &&
+          row.metadata?.urlPath === '/' &&
+          row.inScopeOf.some(scope => scope.startsWith(`doorway:${doorwayId}|`))
+      ),
+      `${peerName}: a root commitment already exists; fixture refuses to replace it`
+    );
+    if (rows.length < COMMITMENT_PAGE_SIZE) return;
+  }
+  assert.fail(
+    `${peerName}: project-epr commitment scan reached ${MAX_COMMITMENT_PAGES * COMMITMENT_PAGE_SIZE} rows; ` +
+      'cannot prove the root is unclaimed within the bounded precondition'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -187,25 +236,38 @@ Given(
   }
 );
 
-function buildNextFixture(this: E2EWorld): void {
+function buildNextFixture(this: E2EWorld, root = false): void {
   const existing = publishedApps.get(this);
   const slug =
     existing?.slug ??
     `epr-app-deliverability-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
-  const bundle = buildFixtureBundle({ coherent: true, baseHref: `/lamad/concept/${slug}/` });
+  const mountPath = existing?.mountPath ?? (root ? '/' : `/learning/content/${slug}`);
+  const bundle = buildFixtureBundle({
+    coherent: true,
+    baseHref: `${mountPath.replace(/\/$/, '')}/`,
+  });
   this.onCleanup(async () => {
     removeFixtureBundle(bundle);
     return Promise.resolve();
   });
   publishedApps.set(this, {
     slug,
+    mountPath,
     ...existing,
     bundle,
     declaredThrough: existing?.declaredThrough ?? [],
   });
 }
 
-Given('a coherent EPR app bundle this run just built', buildNextFixture);
+Given('a coherent EPR app bundle this run just built', function (this: E2EWorld) {
+  buildNextFixture.call(this);
+});
+Given(
+  'a coherent EPR app bundle this run just built for the root address',
+  function (this: E2EWorld) {
+    buildNextFixture.call(this, true);
+  }
+);
 When('this run builds a next coherent browser and server version', function (this: E2EWorld) {
   buildNextFixture.call(this);
   app(this).upgradeIncarnations = doorwayIncarnations();
@@ -254,9 +316,20 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
       doorwayId: string;
     };
     assert.ok(coherence.doorwayId, `${peerName} exposes no doorway identity`);
+    if (record.mountPath === '/') {
+      const routes = await fetch(`${base}/api/v1/federation/coherence`);
+      const projected = (await routes.json()) as { heads: { urlPath: string }[] };
+      assert.ok(
+        !projected.heads.some(head => head.urlPath === '/'),
+        `${peerName}: root is already claimed; cannot borrow it for this fixture`
+      );
+      await assertRootCommitmentIsUnclaimed(storageUrl, peerName, coherence.doorwayId);
+      record.rootCommitments ??= [];
+      record.rootCommitments.push(`${record.slug}-${coherence.doorwayId}`);
+    }
     const metadata = {
-      urlPath: `/lamad/concept/${record.slug}`,
-      baseHref: `/lamad/concept/${record.slug}/`,
+      urlPath: record.mountPath,
+      baseHref: `${record.mountPath.replace(/\/$/, '')}/`,
       mode: 'cached',
       reach: 'commons',
       entryFile: 'index.html',
@@ -444,7 +517,7 @@ Then(
     // Hand the page to the static-clause assertions in steps/dataplane.steps.ts,
     // so this story asserts through the SAME implementation the fleet story uses.
     recordServedPage(this, peerName, {
-      urlPath: `/lamad/concept/${record.slug}/`,
+      urlPath: `${record.mountPath.replace(/\/$/, '')}/`,
       url,
       status: last.status,
       text: last.text,
@@ -630,7 +703,7 @@ When('this run builds a second bundle with its entry script removed', function (
   const record = app(this);
   const broken = buildFixtureBundle({
     coherent: false,
-    baseHref: `/lamad/concept/${record.slug}/`,
+    baseHref: `${record.mountPath.replace(/\/$/, '')}/`,
   });
   this.onCleanup(async () => {
     removeFixtureBundle(broken);
@@ -958,7 +1031,7 @@ Then(
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
     const bundle = requireBundle(this);
-    const url = `${resolvePeerUrl(peerName)}/lamad/concept/${encodeURIComponent(record.slug)}/version.json`;
+    const url = `${resolvePeerUrl(peerName)}${record.mountPath.replace(/\/$/, '')}/version.json`;
     const { status, text } = await getRaw(url, { timeoutMs: 30_000 });
     assert.strictEqual(
       status,
@@ -1181,3 +1254,62 @@ Then(
     );
   }
 );
+
+// This After hook must fail the scenario if restoration fails; world's generic
+// cleanup callbacks are best-effort and cannot attest ownership restoration.
+After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (this: E2EWorld) {
+  const record = publishedApps.get(this);
+  if (!record?.rootCommitments?.length) return;
+  const restores = await Promise.allSettled(
+    householdPeers.get(this)!.all.map(async peer => {
+      const storageUrl = loadHouseholdMeshFixture().storagePeers![peer].url;
+      for (const id of record.rootCommitments!) {
+        const response = await postFixtureCommitment(`${storageUrl}/api/v1/commitments/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'content-type': 'application/json',
+            'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+          },
+          body: JSON.stringify({ state: 'cancelled', finished: true }),
+        });
+        assert.ok(
+          response.ok || response.status === 404,
+          `${peer}: could not cancel owned root mount ${id}: ${response.status} ${response.text}`
+        );
+        if (response.ok) {
+          const readback = await fetch(`${storageUrl}/api/v1/commitments/${id}`);
+          assert.equal(
+            ((await readback.json()) as { state: string }).state,
+            'cancelled',
+            `${peer}: owned root commitment remains live`
+          );
+        }
+      }
+    })
+  );
+  assert.ok(
+    restores.every(result => result.status === 'fulfilled'),
+    `owned root cleanup failed: ${restores
+      .filter(result => result.status === 'rejected')
+      .map(result => String(result.reason))
+      .join('; ')}`
+  );
+  const deadline = Date.now() + 45_000;
+  await Promise.all(
+    DOORWAYS.map(async peer => {
+      const restored = await pollUntil(
+        async () => {
+          const response = await fetch(`${resolvePeerUrl(peer)}/api/v1/federation/coherence`);
+          const state = (await response.json()) as { heads: { urlPath: string }[] };
+          return !state.heads.some(head => head.urlPath === '/');
+        },
+        Math.max(0, deadline - Date.now())
+      );
+      assert.notEqual(
+        restored,
+        null,
+        `${peer}: temporary root mount still projected after cleanup`
+      );
+    })
+  );
+});

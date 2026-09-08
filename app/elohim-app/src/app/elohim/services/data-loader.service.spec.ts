@@ -6,7 +6,7 @@ import { ContentNode } from '@app/lamad/models/content-node.model';
 import { PathView } from '@app/lamad/models/learning-path.model';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { DataLoaderService } from './data-loader.service';
-import { GOVERNANCE } from '@elohim/service';
+import { GOVERNANCE, ELOHIM_ENV } from '@elohim/service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';
@@ -126,6 +126,14 @@ describe('DataLoaderService', () => {
 
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  it.each([false, true])('uses the consuming bundle WASM preference (%s)', async preferWasm => {
+    // Lamad imports this service transitively. Its host configuration must win
+    // over this service's source-workspace development environment.
+    TestBed.inject(ELOHIM_ENV).cache = { preferWasm };
+    await (service as unknown as { initCaches(): Promise<void> }).initCaches();
+    expect(contentResolverMock.initialize).toHaveBeenCalledWith({ preferWasm });
   });
 
   it('should have getPath method', () => {

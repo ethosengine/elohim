@@ -129,7 +129,7 @@ Feature: An app a doorway serves reaches a visitor able to run
   @requires:owned-substrate
   @deliverability-browser
   Scenario: a steward publishes through one door and a visitor arrives able to run at either
-    Given a coherent EPR app bundle this run just built
+    Given a coherent EPR app bundle this run just built for the root address
     And an EPR record this run owns for it
     When each doorway is handed the bundle's bytes
     And only doorway "alpha-A" is told this bundle is the new version
@@ -151,6 +151,15 @@ Feature: An app a doorway serves reaches a visitor able to run
     And every asset the browser asked peer "elohim.host" for arrived
     And the app root on the page from peer "elohim.host" has content
     And the build stamp peer "elohim.host" serves for this app is the one the published bundle carries
+
+  # The first station borrows the unclaimed / mount on both owned doorways, with
+  # base href /. Its visits therefore request the real /version.json route,
+  # catching service-prefix collisions that a nested mount cannot expose.
+  # An existing root projection/commitment refuses setup, never gets replaced.
+  # After success or failure, cleanup explicitly cancels its own commitments through
+  # the existing canonical API on every owned peer and checks each returned state.
+  # This cleanup is not a test of revocation gossip. After cancellation completes,
+  # both root projections must disappear within 45 seconds; cleanup failure fails.
 
   # STATION 2 — the server-rendered half of the same record, which travelled by a different
   # road and never arrived.

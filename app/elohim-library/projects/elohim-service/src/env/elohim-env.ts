@@ -17,6 +17,10 @@ export interface ElohimEnv {
   production: boolean;
   /** Doorway API base URL (defaults to same origin if not set) */
   doorwayUrl?: string;
+  /** Cache implementation supported by this host bundle's shipped assets. */
+  cache?: {
+    preferWasm?: boolean;
+  };
   /** Holochain connection config subset needed by StorageClientService */
   holochain?: {
     adminUrl: string;

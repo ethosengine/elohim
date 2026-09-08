@@ -2424,7 +2424,6 @@ fn is_service_path(path: &str) -> bool {
         "/health",
         "/ready",
         "/readyz",
-        "/version",
         // /metrics has an explicit arm; without this the EPR router (GET +
         // !is_service_path) would shadow it whenever a root projection is
         // registered — the /auth/portal incident shape.
@@ -2483,6 +2482,9 @@ fn is_service_path(path: &str) -> bool {
     matches!(
         path,
         "/admin"
+            // The runtime owns /version exactly. /version.json is an app
+            // artifact and must reach the root EPR projection.
+            | "/version"
             | "/status.json"
             | "/epr"
             | "/epr-head"
@@ -2682,6 +2684,14 @@ mod shakeout_tests {
     #[test]
     fn shakeout_auth_owned_strips_query() {
         assert!(is_auth_owned_path("/auth/login?redirect=/lamad"));
+    }
+
+    #[test]
+    fn app_version_stamp_is_not_the_runtime_version_endpoint() {
+        assert!(is_service_path("/version"));
+        assert!(is_reserved_url_path("/version"));
+        assert!(!is_service_path("/version.json"));
+        assert!(!is_reserved_url_path("/version.json"));
     }
 
     // ── is_service_path — unowned /auth must not block the EPR router ─────────

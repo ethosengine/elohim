@@ -41,7 +41,7 @@ import {
   ExtensionStats,
 } from '@app/lamad/models/path-extension.model';
 
-import { GOVERNANCE } from '@elohim/service';
+import { GOVERNANCE, ELOHIM_ENV } from '@elohim/service';
 import { Agent, AgentProgress, AgentAttestation } from '@elohim/service/angular/models/agent.model';
 
 import { environment } from '../../../environments/environment';
@@ -249,6 +249,7 @@ export class DataLoaderService {
   private readonly logger = inject(LoggerService).createChild('DataLoader');
 
   private readonly governance = inject(GOVERNANCE);
+  private readonly hostEnvironment = inject(ELOHIM_ENV);
   private readonly idbCache = inject(IndexedDBCacheService);
 
   constructor() {
@@ -275,7 +276,11 @@ export class DataLoaderService {
       // /wasm/elohim-cache-core fetch entirely (the asset is Harbor-published
       // per-happVersion and 404s when unbuilt). undefined → createContentResolver
       // defaults preferWasm:true, preserving dev's WASM path.
-      await this.contentResolver.initialize({ preferWasm: environment.cache?.preferWasm });
+      // Imported services must obey the consuming bundle: Lamad does not ship
+      // this source workspace's development WASM assets or file replacements.
+      await this.contentResolver.initialize({
+        preferWasm: this.hostEnvironment.cache?.preferWasm ?? environment.cache?.preferWasm,
+      });
       this.contentResolver.registerStandardSource('indexeddb');
       if (this.projectionApi.enabled) {
         this.contentResolver.registerStandardSource('projection');

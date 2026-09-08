@@ -110,6 +110,7 @@ export const appConfig: ApplicationConfig = {
       provide: ELOHIM_ENV,
       useValue: {
         production: environment.production,
+        cache: environment.cache,
         doorwayUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
       },
     },

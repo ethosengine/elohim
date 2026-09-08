@@ -162,3 +162,19 @@ SSR is optional web behavior, never an EPR-app-wide requirement. Native desktop 
 Wasm clients may retrieve artifacts through peers and validate their own host capabilities and
 readiness signals; those adapters are future work. Browser bootstrap and SSR assertions in D4
 apply to the web adapter covered here.
+
+## Delivery evidence — 2026-09-08
+
+The spec remains **Active** while fleet proof is outstanding. Household run
+`20260908T192233Z-0e89181b` passed the root-address browser station (1 scenario,
+23 steps) and restored both borrowed root projections. The station now scans
+the filtered `project-epr` commitment relation page by page, with a fixed upper
+bound and a fail-closed result if the API cannot prove exhaustion. Running the
+real root exposed a route collision that nested fixtures missed: runtime
+`/version` ownership also captured the app artifact `/version.json`; the route
+classifier now owns only the exact runtime endpoint. Separately, an actual
+rebuilt Lamad browser rendered Learning Paths with zero page errors and zero
+WASM requests after host cache capability moved into `ELOHIM_ENV`. These checks
+prove the local corrections. The complete committed-source five-scenario
+household receipt and a fleet build carrying the commit still own the remaining
+graduation evidence.
