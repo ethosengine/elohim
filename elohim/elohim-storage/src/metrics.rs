@@ -899,6 +899,47 @@ lazy_static! {
     /// both missed). Before the push-side resolver, distribution errored on EVERY
     /// peer (an `agent_cid` never parses as a libp2p PeerId); this counter surfaces
     /// the remaining, honest gap — a peer we selected but cannot dial yet.
+    /// Custody-sweep kick admissions, by decision. The convergence instrument
+    /// for the 2026-09-07 kick storm: before the kick ledger the sweep had no
+    /// exhausted state, so an unsatisfiable custody-blob commitment was
+    /// re-kicked every pass forever (502 kicks / 11 min / 5 commitments on the
+    /// household mesh) and nothing distinguished "healing" from "hopeless".
+    ///
+    /// decision = "fired" (a kick was scheduled) | "backoff" (an earlier
+    /// attempt's window is still open) | "exhausted" (no reachable peer is
+    /// known to hold the bytes; kicking stopped until re-arm) | "untracked"
+    /// (ledger at capacity, degraded to always-kick).
+    ///
+    /// Decided by [`crate::reconcile::custody::CustodyKickLedger::admit`].
+    pub static ref CUSTODY_KICK_ADMISSION: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "storage_custody_kick_admission_total",
+            "Custody-sweep kick admissions by decision (fired | backoff | exhausted | untracked).",
+        ),
+        &["decision"],
+    )
+    .unwrap();
+
+    /// Custody reconcile passes SKIPPED because a previous pass was still
+    /// running. Passes were observed overlapping 0.54 s apart on the
+    /// large-corpus household peer while two runtime threads sat at 82-95 %
+    /// CPU; the single-flight guard makes the overlap countable instead of
+    /// silently doubling the pass cost.
+    pub static ref CUSTODY_PASS_SKIPPED_OVERLAP: IntCounter = IntCounter::new(
+        "storage_custody_pass_skipped_overlap_total",
+        "Custody reconcile passes skipped because a previous pass was still in flight.",
+    )
+    .unwrap();
+
+    /// Full `O(corpus)` pantry walks performed to rebuild the custody sweep's
+    /// blob snapshot. Was once per pass (~8/min); should now track the
+    /// snapshot cache TTL.
+    pub static ref CUSTODY_SNAPSHOT_REBUILDS: IntCounter = IntCounter::new(
+        "storage_custody_snapshot_rebuilds_total",
+        "Full pantry walks performed to rebuild the custody-sweep blob snapshot.",
+    )
+    .unwrap();
+
     pub static ref SHARD_PUSH_PEER_UNRESOLVED: IntCounter = IntCounter::new(
         "elohim_shard_push_peer_unresolved_total",
         "Shard-push targets skipped because the selected agent_cid had no libp2p transport binding.",
@@ -2499,6 +2540,14 @@ pub fn register_all() {
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
+        let _ = REGISTRY.register(Box::new(CUSTODY_KICK_ADMISSION.clone()));
+        // Pre-touch every decision so a branch that has never fired reads as a
+        // measured zero rather than an absent series.
+        for decision in ["fired", "backoff", "exhausted", "untracked"] {
+            CUSTODY_KICK_ADMISSION.with_label_values(&[decision]).inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(CUSTODY_PASS_SKIPPED_OVERLAP.clone()));
+        let _ = REGISTRY.register(Box::new(CUSTODY_SNAPSHOT_REBUILDS.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
         // Pre-touch every (stream, outcome) combination — 3 streams x 13
@@ -4230,6 +4279,30 @@ pub fn private_withheld_count(site: &str, reason: crate::private_reach::Withhold
     PRIVATE_WITHHELD
         .with_label_values(&[site, reason.label()])
         .get()
+}
+
+/// Record one custody-sweep kick admission decision.
+pub fn inc_custody_kick_admission(decision: &str, count: u64) {
+    if count > 0 {
+        CUSTODY_KICK_ADMISSION
+            .with_label_values(&[decision])
+            .inc_by(count);
+    }
+}
+
+/// Current value of one `storage_custody_kick_admission_total` series.
+pub fn custody_kick_admission_count(decision: &str) -> u64 {
+    CUSTODY_KICK_ADMISSION.with_label_values(&[decision]).get()
+}
+
+/// Record one custody reconcile pass skipped by the single-flight guard.
+pub fn inc_custody_pass_skipped_overlap() {
+    CUSTODY_PASS_SKIPPED_OVERLAP.inc();
+}
+
+/// Record one full pantry walk for the custody-sweep blob snapshot.
+pub fn inc_custody_snapshot_rebuild() {
+    CUSTODY_SNAPSHOT_REBUILDS.inc();
 }
 
 /// Record one private record this peer was handed and did NOT persist.

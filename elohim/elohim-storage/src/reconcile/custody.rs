@@ -78,6 +78,16 @@ impl BlobStoreSnapshot {
     pub fn is_empty(&self) -> bool {
         self.hashes.is_empty()
     }
+
+    /// Copy-on-write: a new snapshot that also contains `blob_hash`.
+    ///
+    /// Used by [`SnapshotCache::note_stored`] so a blob that just landed is
+    /// visible to the very next pass without a fresh `O(corpus)` pantry walk.
+    pub fn inserted(&self, blob_hash: &str) -> Self {
+        let mut hashes = self.hashes.clone();
+        hashes.insert(blob_hash.to_string());
+        Self { hashes }
+    }
 }
 
 impl LocalBlobStore for BlobStoreSnapshot {
@@ -89,6 +99,101 @@ impl LocalBlobStore for BlobStoreSnapshot {
 /// Cap on connected peers raced by an inventory-blind fallback kick.
 /// Mirrors the `get_blob_or_heal` connected-fallback cap in `http.rs`.
 pub const FALLBACK_CANDIDATE_CAP: usize = 8;
+
+/// TTL for the cached pantry snapshot. The reconcile sweep ticks every
+/// `custody_sweep_seconds` (and again on every `ConnectionEstablished`), but a
+/// full `list_hashes` walk is `O(corpus)` — ~3 590 `read_dir` entries plus a
+/// `metadata()` stat each on the large-corpus household peer. Rebuilding that
+/// per pass at ~8 passes/min is the CPU floor the 2026-09-07 diagnosis measured
+/// (1 345 MB RSS / ~150-195 % CPU against 330 MB / 9 % siblings on the same
+/// binary). The walk now runs at most once per TTL; blobs that land in between
+/// are folded in by [`SnapshotCache::note_stored`], so freshness does not
+/// depend on the TTL for the one case that matters (a kicked fetch hitting).
+pub const SNAPSHOT_CACHE_TTL_SECONDS: u64 = 60;
+
+/// Cached [`BlobStoreSnapshot`], rebuilt on its own slow cadence rather than
+/// once per reconcile pass.
+///
+/// `now` is a caller-supplied [`std::time::Instant`] so the cadence is
+/// deterministic under test. Interior mutability (one `Mutex` around an
+/// `Option`) keeps the cache shareable behind an `Arc` without making the
+/// reconcile pass async.
+pub struct SnapshotCache {
+    ttl: std::time::Duration,
+    state: std::sync::Mutex<Option<CachedSnapshot>>,
+    rebuilds: std::sync::atomic::AtomicU64,
+}
+
+struct CachedSnapshot {
+    built_at: std::time::Instant,
+    snapshot: std::sync::Arc<BlobStoreSnapshot>,
+}
+
+impl Default for SnapshotCache {
+    fn default() -> Self {
+        Self::new(std::time::Duration::from_secs(SNAPSHOT_CACHE_TTL_SECONDS))
+    }
+}
+
+impl SnapshotCache {
+    pub fn new(ttl: std::time::Duration) -> Self {
+        Self {
+            ttl,
+            state: std::sync::Mutex::new(None),
+            rebuilds: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    /// Return the cached snapshot, walking the pantry only when there is none
+    /// or the cached one is older than the TTL.
+    pub fn get(
+        &self,
+        store: &crate::blob_store::BlobStore,
+        now: std::time::Instant,
+    ) -> Result<std::sync::Arc<BlobStoreSnapshot>, StorageError> {
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(cached) = guard.as_ref() {
+            if now.saturating_duration_since(cached.built_at) < self.ttl {
+                return Ok(cached.snapshot.clone());
+            }
+        }
+        let snapshot = std::sync::Arc::new(BlobStoreSnapshot::from_store(store)?);
+        self.rebuilds
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        crate::metrics::inc_custody_snapshot_rebuild();
+        *guard = Some(CachedSnapshot {
+            built_at: now,
+            snapshot: snapshot.clone(),
+        });
+        Ok(snapshot)
+    }
+
+    /// Drop the cached snapshot; the next [`SnapshotCache::get`] walks the
+    /// pantry again.
+    pub fn invalidate(&self) {
+        *self.state.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    /// Fold a blob that just landed into the cached snapshot WITHOUT a walk.
+    ///
+    /// Called on every `FetchOutcome::Hit`. Without it a cached snapshot would
+    /// keep reporting the hash as missing until the TTL expired, and the sweep
+    /// would re-kick a blob it already holds — the storm this cache is meant to
+    /// end. Copy-on-write: the shared `Arc` is replaced, never mutated, so
+    /// in-flight passes keep a consistent view.
+    pub fn note_stored(&self, blob_hash: &str) {
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(cached) = guard.as_mut() {
+            cached.snapshot = std::sync::Arc::new(cached.snapshot.inserted(blob_hash));
+        }
+    }
+
+    /// Number of full pantry walks performed. Test + tracing hook.
+    pub fn rebuilds(&self) -> u64 {
+        self.rebuilds.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
 
 /// Outcome of a single reconcile pass; useful for tests + metrics.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -953,6 +1058,58 @@ mod tests {
                 .unwrap()
                 .push((blob_hash.to_string(), candidates));
         }
+    }
+
+
+    // ── Station A: the pantry snapshot is cached, not rebuilt every pass ──
+
+    /// Write a blob file directly into the two-level pantry tree so
+    /// `list_hashes` sees it without going through the async store path.
+    fn plant_blob(store: &crate::blob_store::BlobStore, hash: &str) {
+        let dir = store.root_dir().join("blobs").join(&hash[..4]);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(hash), b"payload").unwrap();
+    }
+
+    #[test]
+    fn snapshot_cache_serves_within_ttl_and_rebuilds_after() {
+        let store = crate::blob_store::BlobStore::new_memory();
+        let cache = SnapshotCache::new(std::time::Duration::from_secs(60));
+        let t0 = std::time::Instant::now();
+
+        let first = cache.get(&store, t0).unwrap();
+        assert_eq!(first.len(), 0);
+        assert_eq!(cache.rebuilds(), 1, "first get builds once");
+
+        // A blob lands on disk AFTER the snapshot was taken.
+        plant_blob(&store, &format!("sha256-{}", "a".repeat(64)));
+
+        // Inside the TTL the cached snapshot is reused — no second walk.
+        let second = cache.get(&store, t0 + std::time::Duration::from_secs(59)).unwrap();
+        assert_eq!(second.len(), 0, "cached snapshot is served, not rebuilt");
+        assert_eq!(cache.rebuilds(), 1, "no rebuild inside the TTL");
+
+        // Past the TTL it rebuilds and sees the new blob.
+        let third = cache.get(&store, t0 + std::time::Duration::from_secs(61)).unwrap();
+        assert_eq!(third.len(), 1);
+        assert_eq!(cache.rebuilds(), 2, "one rebuild after the TTL expires");
+    }
+
+    #[test]
+    fn snapshot_cache_note_stored_makes_a_landed_blob_visible_without_a_walk() {
+        let store = crate::blob_store::BlobStore::new_memory();
+        let cache = SnapshotCache::new(std::time::Duration::from_secs(60));
+        let t0 = std::time::Instant::now();
+        let hash = format!("sha256-{}", "b".repeat(64));
+
+        assert!(!cache.get(&store, t0).unwrap().has(&hash));
+        cache.note_stored(&hash);
+        assert!(
+            cache.get(&store, t0).unwrap().has(&hash),
+            "a blob that just landed must be visible to the very next pass, \
+             otherwise the sweep re-kicks a hash it already holds"
+        );
+        assert_eq!(cache.rebuilds(), 1, "note_stored must not trigger a walk");
     }
 
     fn insert_custody_commitment(
