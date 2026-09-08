@@ -102,6 +102,25 @@ independently moved every DNA hash before). Concretely:
   packing before/after from ONE path (`uhC0kEZTgq…` identical, only `content_store.wasm`
   moved) — the comparison discipline this atom prescribes.
 
+## Live corroboration (2026-09-08, after edge #1443 deployed 6bef71b8)
+
+Three more hashes for the same `lamad` integrity source, read from CI and the fleet, not
+from a workspace:
+
+| Where | `lamad` DNA hash | Evidence |
+|---|---|---|
+| CI pack, holochain #1433 and #1434 (identical — T7a's coordinator extern moved nothing) | `uhC0ka1Tpt-_mtrGKILPnCAWTINwdtoRlYreoQM9GWsdVnbDgshr9` | Jenkins console `DNA-HASH lamad …` line 830 in both builds |
+| alpha fleet installed reality (james, matthew), read at 1788825248 | `uhC0kZezl4k2nZa5ZyU5O5H-5vH5LYpvwkSwkVx4G1wS_sHB4GTOt` | `GET doorway-alpha/db/p2p/adoption?peer=james` → `installedReality.roles.lamad.dnaHash`; the live DHT space `Zezl4k2n…` in `/db/p2p/conductor-diagnostics` matches |
+
+So the fleet runs a hash that no current build path produces, and CI's own hash differs from
+both workspaces. The coordinator hot-swap is designed to run across integrity drift
+(`happ_manager::sync_coordinators`, `coordinator_drift_is_visible_when_dna_hash_is_not`), so
+this does not by itself block coordinator propagation — but it means a `dnaHashMismatch`
+refusal is the *expected* answer to any workspace-cut candidate against the fleet, and the
+only path-independent identity for "the same integrity source" today is the source commit,
+not the hash. Confirming that the T7a bytes actually hot-swapped on the fleet is pending
+(Loki 502 during this read; no pre-deploy `content_store` wasm-hash snapshot to diff).
+
 ## Remedy (held — do not implement this sprint, per D-F)
 
 **Correction (2026-09-08, from the measurement above):** the mechanism is the rustc
