@@ -169,6 +169,41 @@ test("completion publication retries use durable receipt without executing again
   assert.ok(calls.some((path) => path.endsWith("/authorize-launch")));
 });
 
+test("worker poll loop never re-POSTs /complete for a task already marked completed", async (t) => {
+  // Regression for the tail (receipt save + /complete POST + cleanup) sitting outside
+  // the `if (!state.receipt)` guard: the background 15s poll loop calls executeTask
+  // again for any task still returned by GET /api/v1/compute/tasks?provider=…, and
+  // without a completed-state guard that re-touches state.json and re-POSTs /complete
+  // on every cycle even though nothing needs reporting.
+  const root = await mkdtemp(join(tmpdir(), "compute-worker-repoll-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let completions = 0;
+  const options = {
+    root,
+    artifactBase: "http://localhost",
+    status: {
+      requestActionHash: "request",
+      taskCid: "task-cid",
+      grantActionHash: "grant",
+      envelope: {},
+    },
+    fetchInput: async () => {},
+    execute: async (_program, args) => {
+      if (args[0] === "run") return '{"status":"passed"}';
+      if (args[0] === "cleanup") return "";
+      return args[1].endsWith("task.json") ? "task-cid" : "receipt-cid";
+    },
+    request: async (path) => {
+      if (path.endsWith("/complete")) completions++;
+      return {};
+    },
+  };
+  await executeTask(options); // first poll cycle: executes and reports completion once
+  assert.equal(completions, 1);
+  await executeTask(options); // simulated next 15s poll cycle for the same task
+  assert.equal(completions, 1, "/complete must not be re-POSTed once state.completed is true");
+});
+
 test("attachment leases preserve count-only and combined retention", () => {
   assert.equal(
     leaseSeconds({ maxAgeSeconds: 432000, maxRuns: 5, expireWhen: "either" }),

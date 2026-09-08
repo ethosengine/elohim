@@ -165,51 +165,58 @@ export async function executeTask({
     await save(stateFile, state);
     await Promise.all([rm(binary, { force: true }), rm(dna, { force: true })]);
   }
-  if (!state.logsPublished && state.receipt.logs?.length) {
-    const runtimeReceipt = (
-      await execute(
-        executor,
-        ["receipt-path", "--root", join(root, "runs"), "--request-action", ref],
-        { env: guestEnvironment(env) },
-      )
-    ).trim();
-    const payload = payloadClient(artifactBase);
-    for (let index = 0; index < state.receipt.logs.length; index++) {
-      const log = state.receipt.logs[index];
-      if (!["stdout.log", "stderr.log", "witness.json"].includes(log.name))
-        throw new Error("Invalid runtime log name");
-      state.receipt.logs[index] = await publishFile(
-        join(dirname(runtimeReceipt), "payload", log.name),
-        log,
-        {
-          payload,
+  // Everything below reports a receipt that already exists (freshly produced above, or
+  // recovered earlier in this function) to the requester exactly once. Without this guard
+  // a task the requester has already recorded as complete gets its state.json re-touched
+  // and /complete re-POSTed on every poll cycle for as long as the task keeps appearing in
+  // GET /api/v1/compute/tasks?provider=… — the tail ran unconditionally on every call.
+  if (!state.completed) {
+    if (!state.logsPublished && state.receipt.logs?.length) {
+      const runtimeReceipt = (
+        await execute(
           executor,
-          retention: leaseSeconds(task.retention),
-          execute,
-          owner: status.taskCid,
-        },
-      );
+          ["receipt-path", "--root", join(root, "runs"), "--request-action", ref],
+          { env: guestEnvironment(env) },
+        )
+      ).trim();
+      const payload = payloadClient(artifactBase);
+      for (let index = 0; index < state.receipt.logs.length; index++) {
+        const log = state.receipt.logs[index];
+        if (!["stdout.log", "stderr.log", "witness.json"].includes(log.name))
+          throw new Error("Invalid runtime log name");
+        state.receipt.logs[index] = await publishFile(
+          join(dirname(runtimeReceipt), "payload", log.name),
+          log,
+          {
+            payload,
+            executor,
+            retention: leaseSeconds(task.retention),
+            execute,
+            owner: status.taskCid,
+          },
+        );
+      }
+      state.logsPublished = true;
+      await save(stateFile, state);
     }
-    state.logsPublished = true;
+    const receiptFile = join(dir, "receipt.json");
+    await save(receiptFile, state.receipt);
+    const receiptCid = (
+      await execute(executor, ["cid", receiptFile], {
+        env: guestEnvironment(env),
+      })
+    ).trim();
+    await request(`/api/v1/compute/tasks/${encodeURIComponent(ref)}/complete`, {
+      attemptId: state.attemptId,
+      receiptCid,
+      receipt: state.receipt,
+    });
+    state.completed = true;
     await save(stateFile, state);
-  }
-  const receiptFile = join(dir, "receipt.json");
-  await save(receiptFile, state.receipt);
-  const receiptCid = (
-    await execute(executor, ["cid", receiptFile], {
+    await execute(executor, ["cleanup", "--root", join(root, "runs")], {
       env: guestEnvironment(env),
-    })
-  ).trim();
-  await request(`/api/v1/compute/tasks/${encodeURIComponent(ref)}/complete`, {
-    attemptId: state.attemptId,
-    receiptCid,
-    receipt: state.receipt,
-  });
-  state.completed = true;
-  await save(stateFile, state);
-  await execute(executor, ["cleanup", "--root", join(root, "runs")], {
-    env: guestEnvironment(env),
-  });
+    });
+  }
 }
 
 export async function main() {
