@@ -10,7 +10,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   createSutProbe,
   resolveComponent,
@@ -86,9 +87,8 @@ test("refuses different source, unknown source, and fleet receipts", () => {
   assert.equal(validateReceipt(report, expected, names), false);
 });
 test("storage service alone cannot bypass mandatory receipt; caller file survives", () => {
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-  }).trim();
+  // Hook git environment may make a relative GIT_WORK_TREE follow the gate cwd.
+  const root = fileURLToPath(new URL("../../", import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), "serving-receipt-"));
   try {
     const changed = join(dir, "changed");
@@ -138,9 +138,8 @@ test("storage service alone cannot bypass mandatory receipt; caller file survive
 });
 
 test("default producer source identities accept a complete report despite newer unrelated reports", () => {
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-  }).trim();
+  // Hook git environment may make a relative GIT_WORK_TREE follow the gate cwd.
+  const root = fileURLToPath(new URL("../../", import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), "serving-valid-"));
   try {
     const feature = readFileSync(
@@ -180,9 +179,8 @@ test("default producer source identities accept a complete report despite newer 
 });
 
 test("actual pre-push caller propagates mandatory refusal in default and strict modes", () => {
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-  }).trim();
+  // Hook git environment may make a relative GIT_WORK_TREE follow the gate cwd.
+  const root = fileURLToPath(new URL("../../", import.meta.url));
   const hook = readFileSync(join(root, ".husky/pre-push.bash"), "utf8");
   const start = hook.indexOf("# ── T2 receipt");
   const end = hook.indexOf("# ── Project filter", start);
@@ -228,6 +226,55 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
           "caller cleans its temporary list on every outcome",
         );
       }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("actual hook anchors Git identity before nested gates change directory", () => {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const hook = readFileSync(join(root, ".husky/pre-push.bash"), "utf8");
+  const start = hook.indexOf("# ── Anchor Git context");
+  const end = hook.indexOf("# ── Git context anchored", start);
+  assert.ok(start >= 0 && end > start);
+  const block = hook.slice(start, end);
+  const dir = mkdtempSync(join(tmpdir(), "hook-git-context-"));
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  );
+  try {
+    const initialized = spawnSync("git", ["init", "--quiet", dir], {
+      env: cleanEnv,
+    });
+    assert.equal(initialized.status, 0);
+    mkdirSync(join(dir, "nested"));
+    for (const gitEnv of [
+      { GIT_DIR: join(dir, ".git") },
+      { GIT_DIR: ".git", GIT_WORK_TREE: "." },
+      {},
+    ]) {
+      const result = spawnSync(
+        "bash",
+        [
+          "-c",
+          `${block}
+cd nested || exit 1
+git rev-parse --show-toplevel
+git rev-parse --absolute-git-dir
+`,
+        ],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          env: { ...cleanEnv, ...gitEnv },
+        },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(result.stdout.trim().split("\n"), [
+        dir,
+        join(dir, ".git"),
+      ]);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });

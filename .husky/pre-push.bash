@@ -29,6 +29,15 @@
 # patterns; -u is unsafe given the optional toolchain vars (NVM_DIR etc.).
 set -o pipefail
 
+# ── Anchor Git context before gates change directory ────────────
+# Git exports GIT_DIR to hooks without necessarily exporting GIT_WORK_TREE.
+# With an explicit GIT_DIR, Git otherwise treats each gate's cwd as its worktree.
+HOOK_WORK_TREE=$(git rev-parse --show-toplevel) || exit 1
+HOOK_GIT_DIR=$(git rev-parse --absolute-git-dir) || exit 1
+export GIT_WORK_TREE="$HOOK_WORK_TREE"
+export GIT_DIR="$HOOK_GIT_DIR"
+# ── Git context anchored ────────────────────────────────────────
+
 # Detects projects and executes typed gate recipes from build-manifest.json.
 # The shared runner supplies cargo-pool/RUSTFLAGS context for native workspaces.
 # Representative projects:
