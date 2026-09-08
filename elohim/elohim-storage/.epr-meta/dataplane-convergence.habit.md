@@ -72,6 +72,36 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-09-08 (T23 custody-sweep exhausted state + cached pantry snapshot, sprint
+2026-09-08; NO status flip): the custody reconcile sweep had a *satisfied* state and a
+*malformed* state but no *exhausted* one, so a custody-blob commitment whose bytes no
+reachable peer holds was re-kicked every pass forever — 502 kicks in 11 min for the same 5
+commitments on the 2026-09-07 household mesh, `fallback_kicks == kicks_fired` and
+`placement_gaps: 0` on all 432 logged passes — while `BlobStoreSnapshot::from_store` rebuilt
+the full O(corpus) pantry index (~3 590 read_dir entries + a stat each) on EVERY pass at ~8
+passes/min, passes overlapping 0.54 s apart. Landed (1fae41754, 358ca97bd): `SnapshotCache`
+rebuilds on a 60 s cadence with a copy-on-write `note_stored` from the kicker's Hit arm (so a
+just-fetched blob is never re-kicked); `CustodyKickLedger` backs off 30 s→5 min and declares a
+target unsatisfiable after 5 consecutive zero-named-holder attempts, re-arming on a named
+inventory holder (checked in-pass) or a new peer connection, and emitting the honest
+`placement-gap` event ONCE at exhaustion instead of another blind kick; `PassGuard` is a
+one-permit single-flight lane so the sweep can never occupy more than one thread of the
+2-worker server runtime; the commitment scan is bounded at 512 with a rotating cursor.
+`reconcile_pass_with_state` is the production entry point and the amnesiac `reconcile_pass`
+survives only as a `#[cfg(test)]` shim, so production cannot bypass the ledger. New series:
+`storage_custody_kick_admission_total{decision}`, `..._pass_skipped_overlap_total`,
+`..._snapshot_rebuilds_total`. Verified LOCAL ONLY: `just gate elohim-storage` EXIT=0 (lib
+3663/0, 170 green test binaries, fmt + clippy -D warnings clean); 7 new unit tests pin the
+stations (exactly 5 kicks then exhaustion with one placement-gap; backoff suppressing an
+overlapping pass; re-arm by named holder and by new peer; Hit clearing the ledger; rotating
+scan; one-pass-at-a-time). **The mesh measurement is PENDING** — another agent held the mesh
+berth, so no peer was restarted and the binary lives only in the pool slot; the owed run is
+`just mesh storage-restart matthew` then watching kick admissions go flat, overlap skips
+become countable, snapshot rebuilds fall to ~1/min, and matthew's RSS/CPU converge on its
+small-corpus siblings. Atom: backlog/self-heal-custody-reconcile-kick-storm-after-death-witness
+(§Cure landed 2026-09-08). Habit stays red: this removes one convergence hole locally and
+measures nothing on any mesh or fleet.
+---
 DELTA 2026-09-07 (T6 feedback-discovery cold-retire, sprint 2026-09-08 batch 2; NO status
 flip): the feedback projector's rotation now retires a subscription member after
 COLD_AFTER_CLEAN_SWEEPS = 3 sweeps that found nothing open or unapplied, and re-arms it

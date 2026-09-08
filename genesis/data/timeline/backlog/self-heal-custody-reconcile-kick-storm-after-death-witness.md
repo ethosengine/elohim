@@ -250,3 +250,78 @@ traffic (POST a compute task, poll status) works with generous timeouts. Any leg
 that needs **matthew to serve blob bytes over libp2p within 30 s** should be
 expected to time out. A mesh restart clears the CPU but **not** the loop — the
 storm survived the 22:58 restart and re-established within ~7 minutes.
+
+## Cure landed (2026-09-08)
+
+All three cures from the design above are in the tree, TDD'd station by station,
+on the sprint-0908 worktree:
+
+- **`1fae41754`** — *stop rebuilding the whole pantry index every pass.*
+  `SnapshotCache` (`reconcile/custody.rs`) rebuilds the `BlobStoreSnapshot` on
+  its own slow cadence (`SNAPSHOT_CACHE_TTL_SECONDS = 60`) instead of once per
+  pass, with `now` supplied by the caller so the cadence is deterministic under
+  test. `note_stored` folds a just-landed blob into the cached set
+  copy-on-write from the kicker's `Hit` arm, so freshness for the one case that
+  matters does not wait for the TTL — without it a cached snapshot would report
+  a blob we already hold as missing and re-kick it. New counters:
+  `storage_custody_snapshot_rebuilds_total`,
+  `storage_custody_kick_admission_total{decision}`,
+  `storage_custody_pass_skipped_overlap_total`.
+- **`358ca97bd`** — *the exhausted state, plus the single-flight guard and the
+  bounded scan.* `CustodyKickLedger` carries `{attempts, blind_attempts,
+  next_eligible_at, exhausted, gap_signalled}` per blob hash in an in-memory
+  `DashMap`; non-hit attempts back off 30 s doubling to a 5 min cap; after
+  `KickPolicy::blind_attempt_limit` (5) consecutive attempts made with ZERO
+  named holders the target is declared unsatisfiable and stops being kicked.
+  Re-arm is (a) the gossip inventory naming a holder — checked in-pass, so no
+  external hook was needed — or (b) a new peer connecting (`rearm_all` from the
+  `ConnectionEstablished` arm). A `Hit` clears the record. At exhaustion the
+  pass emits the honest `placement-gap` economic event once (note
+  `custody-fetch-exhausted`, under the existing cooldown) — the signal the
+  blind fallback kick used to consume. `PassGuard` is a one-permit single-flight
+  lane held for the whole pass, so the two overlapping passes observed 0.54 s
+  apart become one pass plus a counted skip, and the sweep can never occupy more
+  than one thread of the 2-worker server runtime. The commitment scan is bounded
+  by `CUSTODY_SCAN_LIMIT = 512` with a rotating cursor that wraps on a short
+  page.
+
+`reconcile_pass_with_state` is the production entry point; the old amnesiac
+`reconcile_pass` survives only as a `#[cfg(test)]` shim, so production cannot
+bypass the ledger by accident.
+
+### Deliberately NOT done
+
+**Cure 2 was implemented as a gate on the fallback, not as its removal.** The
+design says "emit the placement gap INSTEAD of the blind fallback kick" whenever
+the inventory names zero holders. The blind fallback is load-bearing for the
+restart window — gossip inventory publish dies on every pod restart
+(`InsufficientPeers`), so an empty candidate set is genuinely not evidence the
+mesh lacks the blob, and this is the same fallback that makes the CI cross-pod
+fetch pass. Removing it on the first empty-inventory pass would trade a kick
+storm for a healing regression. Instead the blind fallback still fires, but at
+most `blind_attempt_limit` times on a backoff curve, and the placement-gap is
+emitted at exhaustion — which is exactly when "the inventory is merely stale"
+has been falsified by evidence rather than assumed.
+
+**The pprof gate default was not changed.** Out of scope for this cure; still a
+one-line win and still worth taking.
+
+### Pending measurement
+
+Nothing here is fleet- or mesh-proven yet. The binary is built into the pool
+slot only; the mesh berth was held by another agent for a separate measurement,
+so no peer was restarted. The measured re-run is owed:
+
+```
+just mesh storage-restart matthew        # from the new pool-slot binary
+watch: storage_custody_kick_admission_total{decision="exhausted"} rising then
+       {decision="fired"} going FLAT (Done-when 1 + 2; /p2p/status kicksFiredTotal
+       stops climbing ~45/min)
+watch: storage_custody_pass_skipped_overlap_total (overlap now counted, not silent)
+watch: storage_custody_snapshot_rebuilds_total ~1/min, not ~8/min
+watch: matthew RSS + CPU against jessica/james on the same binary (Done-when 3)
+watch: `time curl -s localhost:8090/db/content/<cid>` p99 < 250 ms
+```
+
+Done-when 4 (the re-arm test) and Done-when 5 (the regression scenario carrying
+the 3 589-blob / 502-kick parameters) remain open.
