@@ -165,6 +165,28 @@ Feature: An app a doorway serves reaches a visitor able to run
     # and the last line asserts that ledger holds exactly one.
     And no peer other than the one that was told was written to by this run
 
+  # STATION 2b — the server-rendered leg has TWO trips, and each is its own proof.
+  #
+  # Station 2 proves peer-to-peer: the server pointer a steward declared on one peer is the
+  # pointer every peer answers with. That says nothing about the doorway in front of those
+  # peers: a doorway renders pages from a server bundle it MATERIALIZED, and it materializes
+  # only the slugs it is configured to render, on its own tick, after its peer declared the
+  # pointer. The second trip — peer to doorway — is what a visitor actually receives.
+  #
+  # A doorway attests what it has materialized on its health surface (servedBundleHeads);
+  # the Act II story served-projected-head.feature compares that attestation to the declared
+  # pointer on the deployed fleet. This run cannot yet make the same comparison on the
+  # household mesh for a bundle it owns: the renderer materializes configured slugs only, and
+  # a run-owned slug is not one. Until the mesh can mount a run-owned slug as a rendered
+  # site, this station stays pending — measured nowhere is said plainly, never shown green.
+  @requires:owned-substrate
+  Scenario: the doorway in front of the peers renders the server version every peer agreed on
+    Given a coherent EPR app bundle this run just built
+    And an EPR record this run owns for it
+    When only doorway "alpha-A" is told this bundle is the new server-rendered version
+    And within 75 seconds every household peer answers with the same server pointer for this app
+    Then within 75 seconds both doorways attest they materialized that server pointer for this app
+
   # STATION 3 — the doorway that comes back before its peer does.
   #
   # A doorway learns the current head two ways: it asks its storage peer at boot, and it is

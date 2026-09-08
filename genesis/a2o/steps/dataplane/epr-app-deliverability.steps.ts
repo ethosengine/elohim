@@ -737,3 +737,19 @@ Then(
     );
   }
 );
+
+// STATION 2b — peer-to-doorway trip of the server-rendered version. The renderer adopts
+// CONFIGURED slugs only (doorway render/registry.rs: adoption targets = ctx.slugs), so a
+// run-owned slug is never materialized and the comparison cannot be made honestly here.
+// Pending with the precondition named; the fleet-side twin is served-projected-head.feature.
+Then(
+  'within {int} seconds both doorways attest they materialized that server pointer for this app',
+  async function (this: E2EWorld, _seconds: number) {
+    console.log(
+      '  PENDING: the doorway renderer materializes configured SSR slugs only — a run-owned slug is not one. ' +
+        'Needs a mesh arm that mounts this run\'s slug as a rendered site (project-epr commitment + SSR_BUNDLE_SLUGS), ' +
+        'then compare /health/startup servedBundleHeads[slug].serverBlobHash on doorways A and B to the declared pointer.'
+    );
+    return 'pending';
+  }
+);
