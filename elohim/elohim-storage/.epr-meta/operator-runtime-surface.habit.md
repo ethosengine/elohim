@@ -234,3 +234,24 @@ explicit `"maxRuns": null` dies in `ipld-core` `serialize_unit`; the expiry fixt
 `maxRuns: 1` instead). Habit status unchanged (green): this measures the compute-authority
 station on owned household substrate; the shem/Adam leg and worker packaging remain
 unmeasured.
+
+DELTA 2026-09-08 (first peer-executed CI stage, mechanism demonstrated, scenario verdict
+reported not chased): a Jenkins-style a2o stage
+(`features/dataplane/federation-version-convergence.feature`, one scenario) ran as a
+delegated compute task on the household mesh — matthew requester, jessica provider, same
+substrate as the 2026-09-07 DELTA. Mechanism proven: submit → jessica accepts → executes
+on its own substrate → attests a signed completion (`observedTests == expectedTests`) →
+matthew reads the completion, receipt and payload back; idempotent resubmission recovered
+the existing request/completion (identical `attemptId`/`receiptCid`, 9s round trip) rather
+than re-executing. Receipt: `genesis/a2o/reports/peer-stage/2026-09-08/README.md`. The
+stage's own receipt reads `status: failed, exitCode: 101` and is reported exactly as
+returned — chasing it to green was explicitly declined. The underlying scenario itself
+in fact passed (10m22s, 15/15 steps) per the plain-text cucumber summary in stdout.log; the
+stage's post-processing crashed afterward on an unexported `REPORT` env var
+(`stage-runner.template.sh:47`), so the requester-facing framed report block never
+emitted and the run cannot be honestly certified green by the a2o rule (D9: verdict from
+the decoded report, never the receipt's `status`). A named substrate refusal was also
+hit and fixed forward: the executor's cgroup-ceiling check refused the design's literal
+`resources` example (8 cores/8 GiB) against this host's real ceiling (10500m/~31 GiB).
+Habit status unchanged (green): this is a household result with jessica standing in as
+provider, not a shem/Adam result, exactly as the 2026-09-07 DELTA says of its own leg.
