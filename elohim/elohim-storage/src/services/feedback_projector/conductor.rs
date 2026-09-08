@@ -3,22 +3,64 @@ use holochain_types::prelude::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::*;
+use crate::conductor_admission::AdmissionClass;
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::hc_client::HcClient;
 
-pub struct ConductorReader(pub Arc<HcClient>);
+/// Reads the content cell through a [`ConductorBridge`], re-read on every
+/// call — never a captured `Arc<HcClient>`. The feedback projector is a
+/// long-lived durable-correction sweep (spawned once at boot); a conductor
+/// pod roll used to leave it calling a corpse for the life of the process
+/// (the defect class cured for the release-adoption controller — see
+/// `crate::conductor_bridge` and
+/// `genesis/data/timeline/backlog/self-heal-release-controller-dead-after-conductor-roll.md`).
+pub struct ConductorReader {
+    bridge: Arc<dyn ConductorBridge>,
+    /// The origin DNA hash, memoized on first successful resolve. It is a
+    /// property of the DNA the cell belongs to, not of any one connection —
+    /// unchanged by a conductor restart — so caching it is correct, and
+    /// necessary: `origin_dna_hash()` is sync and used as an EQUALITY key
+    /// (`verify_record`'s foreign-DNA check), so a `""` fallback during a
+    /// mid-remint window would misclassify every envelope as foreign rather
+    /// than honestly pending.
+    dna_hash: std::sync::OnceLock<String>,
+}
 
 fn invalid(e: impl std::fmt::Display) -> StorageError {
     StorageError::InvalidInput(format!("feedback record: {e}"))
 }
 
 impl ConductorReader {
+    /// Construct with one fixed conductor handle. Correct only where no
+    /// conductor restart can intervene between construction and use; kept for
+    /// callers (and tests) that hold a client directly. Production wires
+    /// [`Self::from_bridge`].
+    pub fn new(hc: Arc<HcClient>) -> Self {
+        Self::from_bridge(Arc::new(StaticConductorBridge(hc)))
+    }
+
+    /// The conductor leg as a LIVE source — production's wiring.
+    pub fn from_bridge(bridge: Arc<dyn ConductorBridge>) -> Self {
+        Self {
+            bridge,
+            dna_hash: std::sync::OnceLock::new(),
+        }
+    }
+
     async fn call<I: Serialize, O: DeserializeOwned>(
         &self,
         name: &str,
         input: I,
     ) -> Result<O, StorageError> {
         let payload = rmp_serde::to_vec_named(&input).map_err(invalid)?;
-        let bytes = self.0.call_zome("content_store", name, payload).await?;
+        // `Interactive` verbatim: this is the class `HcClient::call_zome`
+        // applied before the bridge move ([`ConductorBridge::call_zome`]'s
+        // convenience default is `Background`, which would silently re-class
+        // every feedback read).
+        let bytes = self
+            .bridge
+            .call_zome_classed("content_store", name, payload, AdmissionClass::Interactive)
+            .await?;
         if bytes.len() > MAX_BYTES_PER_SWEEP {
             return Err(invalid("response exceeds sweep byte budget"));
         }
@@ -27,10 +69,12 @@ impl ConductorReader {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 struct Refs {
     refs: Vec<Reference>,
 }
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 struct Reference {
     action_hash: ActionHash,
     fetch_outcome: String,
@@ -59,7 +103,19 @@ struct Candidate {
 #[async_trait::async_trait]
 impl FeedbackDhtReader for ConductorReader {
     fn origin_dna_hash(&self) -> String {
-        self.0.cell_id().dna_hash().to_string()
+        if let Some(cached) = self.dna_hash.get() {
+            return cached.clone();
+        }
+        // The DNA hash is a property of the DNA, not of this connection — it
+        // does not change across a conductor restart — so resolving it once
+        // and memoizing is correct, and necessary: this is the sync method a
+        // `None` handle (mid-remint) has no honest non-empty answer for.
+        let Some(hc) = self.bridge.handle() else {
+            return String::new();
+        };
+        let hash = hc.cell_id().dna_hash().to_string();
+        let _ = self.dna_hash.set(hash.clone());
+        hash
     }
 
     async fn refs_for_target(&self, target: &str) -> Result<Vec<DiscoveredRef>, StorageError> {
@@ -236,4 +292,112 @@ fn parse_action(value: &str) -> Result<ActionHash, StorageError> {
         .decode(encoded)
         .map_err(invalid)?;
     ActionHash::try_from_raw_39(raw).map_err(invalid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    /// **The conductor rolled between two sweeps.** `ConductorReader` used to
+    /// hold `Arc<HcClient>` directly, captured once at spawn time by the
+    /// feedback-projector's boot wiring — the same defect class as the
+    /// release-adoption controller and the soak-attestation rail. This bridge
+    /// fake is dead until "the supervisor re-mints it" (`alive` flips), and
+    /// asserts every read stays `Interactive`-classed (the class
+    /// `HcClient::call_zome` applied before the bridge move).
+    struct RollingBridge {
+        alive: AtomicBool,
+        handle_reads: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl ConductorBridge for RollingBridge {
+        fn handle(&self) -> Option<Arc<HcClient>> {
+            // A fake holds no real client; `call_zome_classed` stands in for
+            // the whole leg and counts the re-read this trait exists for.
+            None
+        }
+
+        async fn call_zome_classed(
+            &self,
+            _zome: &str,
+            _fn_name: &str,
+            _payload: Vec<u8>,
+            class: AdmissionClass,
+        ) -> Result<Vec<u8>, StorageError> {
+            self.handle_reads.fetch_add(1, Ordering::SeqCst);
+            assert!(
+                matches!(class, AdmissionClass::Interactive),
+                "feedback reads keep the Interactive class they had before the bridge move"
+            );
+            if !self.alive.load(Ordering::SeqCst) {
+                return Err(StorageError::Connection(
+                    "Websocket closed: No connection".to_string(),
+                ));
+            }
+            let refs = Refs {
+                refs: vec![Reference {
+                    action_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+                    fetch_outcome: "found".to_string(),
+                }],
+            };
+            Ok(rmp_serde::to_vec_named(&refs).unwrap())
+        }
+    }
+
+    #[tokio::test]
+    async fn refs_for_target_lands_after_the_conductor_rolled_between_two_sweeps() {
+        let bridge = Arc::new(RollingBridge {
+            alive: AtomicBool::new(false),
+            handle_reads: AtomicUsize::new(0),
+        });
+        // Built ONCE — as the feedback-projector's boot wiring builds it.
+        let reader = ConductorReader::from_bridge(bridge.clone() as Arc<dyn ConductorBridge>);
+        let target = ActionHash::from_raw_36(vec![0x11; 36]).to_string();
+
+        // During the roll: refused honestly, nothing invented.
+        let refused = reader
+            .refs_for_target(&target)
+            .await
+            .expect_err("a rolled conductor cannot be read through");
+        assert!(
+            matches!(refused, StorageError::Connection(_)),
+            "got {refused:?}"
+        );
+
+        // The supervisor re-minted the bridge. The SAME reader must follow it.
+        bridge.alive.store(true, Ordering::SeqCst);
+        let refs = reader
+            .refs_for_target(&target)
+            .await
+            .expect("the re-minted conductor answered");
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].fetch_outcome, "found");
+        assert_eq!(
+            bridge.handle_reads.load(Ordering::SeqCst),
+            2,
+            "the feedback reader re-reads its conductor leg per call; a handle captured at \
+             spawn time is asked once and is a corpse from the first roll onward"
+        );
+    }
+
+    /// `origin_dna_hash` cannot be resolved with no live handle EVER — the
+    /// honest `""`, never a guess that would misclassify every envelope as
+    /// foreign-DNA (see the field doc). Once resolved it survives a roll
+    /// (memoized): the DNA hash does not change when the conductor restarts.
+    #[test]
+    fn origin_dna_hash_is_empty_with_no_bridge_ever_live_never_a_guess() {
+        struct NeverAlive;
+        #[async_trait::async_trait]
+        impl ConductorBridge for NeverAlive {
+            fn handle(&self) -> Option<Arc<HcClient>> {
+                None
+            }
+        }
+        let reader = ConductorReader::from_bridge(Arc::new(NeverAlive) as Arc<dyn ConductorBridge>);
+        assert_eq!(reader.origin_dna_hash(), "");
+        // Calling again must not panic or diverge — still honestly empty.
+        assert_eq!(reader.origin_dna_hash(), "");
+    }
 }

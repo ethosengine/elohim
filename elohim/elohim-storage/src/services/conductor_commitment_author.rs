@@ -39,6 +39,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
@@ -63,8 +64,16 @@ pub const DEFAULT_VALIDITY_DAYS: i64 = 365;
 
 /// Production [`CommitmentAuthor`]: writes through the local conductor (Mishpat
 /// `create_commitment`) and emits the bounds-validated ProvideAnnounce.
+///
+/// Holds the conductor leg as a [`ConductorBridge`], re-read on every author
+/// call — never a captured `Arc<HcClient>`. The provide-loop tick used to build
+/// this author ONCE, outside its ticker, from a boot-time `registry.lamad_client()`
+/// clone; a conductor pod roll left every subsequent tick calling a corpse for
+/// the life of the process (the same defect class cured for the release-adoption
+/// controller — see `crate::conductor_bridge` and
+/// `genesis/data/timeline/backlog/self-heal-release-controller-dead-after-conductor-roll.md`).
 pub struct ConductorCommitmentAuthor {
-    hc: Arc<HcClient>,
+    bridge: Arc<dyn ConductorBridge>,
     self_cid: String,
     /// Shared process pool — backs the production `CommitmentFetcher`
     /// (projection-table read) and `RateHistory` the emit step's bounds check
@@ -73,8 +82,33 @@ pub struct ConductorCommitmentAuthor {
 }
 
 impl ConductorCommitmentAuthor {
+    /// Construct with one fixed conductor handle. Correct only where no
+    /// conductor restart can intervene between construction and use; kept for
+    /// callers (and tests) that hold a client directly. Production wires
+    /// [`Self::from_bridge`].
     pub fn new(hc: Arc<HcClient>, self_cid: String, pool: crate::db::DbPool) -> Self {
-        Self { hc, self_cid, pool }
+        Self::from_bridge(Arc::new(StaticConductorBridge(hc)), self_cid, pool)
+    }
+
+    /// The conductor leg as a LIVE source — production's wiring. A conductor
+    /// roll costs one refused tick (the reconciler rolls the per-key latch
+    /// back to `NeedsCommitment` and retries) rather than parking the provide
+    /// loop until the process restarts.
+    pub fn from_bridge(
+        bridge: Arc<dyn ConductorBridge>,
+        self_cid: String,
+        pool: crate::db::DbPool,
+    ) -> Self {
+        Self {
+            bridge,
+            self_cid,
+            pool,
+        }
+    }
+
+    /// The handle for THIS call, re-resolved every time — see [`ConductorBridge`].
+    fn conductor(&self) -> Option<Arc<HcClient>> {
+        self.bridge.handle()
     }
 }
 
@@ -280,6 +314,18 @@ fn validity_until(valid_from_iso: &str) -> Result<String, StorageError> {
 #[async_trait]
 impl CommitmentAuthor for ConductorCommitmentAuthor {
     async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
+        // Re-resolved every tick — a conductor roll must never be able to park
+        // this author on a corpse handle. `None` means the bridge is mid-remint;
+        // returning Err here rolls the reconciler's per-key latch back to
+        // `NeedsCommitment` (see the caller), which is the honest "ask again
+        // next tick" this crate's conductor legs all converge on.
+        let Some(hc) = self.conductor() else {
+            return Err(StorageError::Internal(format!(
+                "provide author: no conductor bridge available (being re-minted); skipping \
+                 author for {} this tick",
+                req.head_ref
+            )));
+        };
         let now = chrono::Utc::now();
         let valid_from = deterministic_valid_from(now);
         let valid_until = validity_until(&valid_from)?;
@@ -305,7 +351,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
                 .flatten()
                 .map(|s| s.agent_pub_key)
         };
-        let cell_key = self.hc.agent_key_uhcak();
+        let cell_key = hc.agent_key_uhcak();
         let provider = match resolve_provider(&[session_cid.as_deref(), Some(cell_key.as_str())]) {
             Some(p) => p,
             None => {
@@ -342,7 +388,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
             DEFAULT_RATE_PER_MINUTE,
         );
         let new_cid = conductor_writes::create_commitment_returning_cid(
-            &self.hc,
+            &hc,
             CreateMishpatCommitmentInput {
                 action: "replicates-commons".to_string(),
                 payload_json,
@@ -372,7 +418,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // correct for third-party (read-path) bounds checks elsewhere; only this
         // self-referential, just-authored case needs the conductor read.
         let fetcher = ConductorCommitmentFetcher {
-            hc_client: self.hc.clone(),
+            hc_client: hc.clone(),
         };
         let rate = DieselRateHistory {
             pool: self.pool.clone(),
@@ -389,7 +435,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // failure so the reconciler rolls the latch back and retries next tick.
         // The commitment IS notarised regardless — the next tick finds it live
         // in the projection and does NOT re-author (logical-key dedup).
-        economic_event_emit_service::emit(&emit_input, &self.hc, &fetcher, &rate)
+        economic_event_emit_service::emit(&emit_input, &hc, &fetcher, &rate)
             .await
             .map_err(|e| {
                 StorageError::Internal(format!(
@@ -402,10 +448,17 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
     }
 
     async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
+        let Some(hc) = self.conductor() else {
+            return Err(StorageError::Internal(format!(
+                "provide author: no conductor bridge available (being re-minted); skipping \
+                 revoke for {} this tick",
+                req.target_cid
+            )));
+        };
         let signed_at = chrono::Utc::now().to_rfc3339();
         let payload_json = build_revoke_payload(&req.target_cid, &signed_at);
         conductor_writes::call_create_commitment(
-            &self.hc,
+            &hc,
             CreateMishpatCommitmentInput {
                 action: "revokes-commitment".to_string(),
                 payload_json,
@@ -661,5 +714,93 @@ mod tests {
         let start = chrono::DateTime::parse_from_rfc3339(&vf).unwrap();
         let end = chrono::DateTime::parse_from_rfc3339(&vu).unwrap();
         assert_eq!((end - start).num_days(), DEFAULT_VALIDITY_DAYS);
+    }
+
+    // -----------------------------------------------------------------------
+    // The conductor-bridge conversion (2026-09-08 systemic pass) — the
+    // provide-loop tick used to build this author ONCE, outside its ticker,
+    // from a boot-time `registry.lamad_client()` clone. A conductor roll left
+    // every following tick calling a corpse for the life of the process.
+    //
+    // `ConductorCommitmentAuthor::new`/`self.hc` held that captured clone
+    // directly, so no test could distinguish "asked once" from "asked every
+    // tick". The bridge makes that a type-level question: `author_commons`
+    // must re-resolve `self.bridge.handle()` on EVERY call, never cache it —
+    // proven here by a fake bridge that counts reads. A live post-roll
+    // round-trip cannot be constructed in a unit test (`HcClient` requires a
+    // real `AdminWebsocket`/`AppWebsocket`, same wall the release-adoption and
+    // projection-reconcile cures hit — those tests assert on the DECISION
+    // surface, not a real zome call, and this one follows suit).
+    #[tokio::test]
+    async fn author_commons_re_reads_the_conductor_bridge_every_tick_never_a_captured_handle() {
+        use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+        /// A bridge with no conductor at all, counting how many times a caller
+        /// asked. Mirrors `NoConductorBridge` but observable.
+        struct CountingNoBridge {
+            reads: AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl ConductorBridge for CountingNoBridge {
+            fn handle(&self) -> Option<Arc<HcClient>> {
+                self.reads.fetch_add(1, AtomicOrdering::SeqCst);
+                None
+            }
+        }
+
+        let bridge = Arc::new(CountingNoBridge {
+            reads: AtomicUsize::new(0),
+        });
+        let author = ConductorCommitmentAuthor::from_bridge(
+            bridge.clone() as Arc<dyn ConductorBridge>,
+            "12D3KooSelf".to_string(),
+            crate::test_util::test_pool(),
+        );
+
+        // Tick 1 — no conductor bridge at all: an honest, retry-next-tick Err,
+        // never a panic and never a silent success.
+        let req = ProvideAuthorRequest {
+            provider: "uhCAkProvider".to_string(),
+            head_ref: "epr:content-1".to_string(),
+            reach: "commons".to_string(),
+        };
+        let err1 = author
+            .author_commons(&req)
+            .await
+            .expect_err("no conductor bridge must refuse, never fabricate a commitment cid");
+        assert!(
+            err1.to_string().contains("no conductor bridge available"),
+            "got {err1}"
+        );
+
+        // Tick 2 — a NEW invocation. The pre-cure shape (`self.hc: Arc<HcClient>`
+        // captured at construction) would never call the bridge a second time at
+        // all; the cured shape re-resolves on every call.
+        let err2 = author.author_commons(&req).await.expect_err("still down");
+        assert!(err2.to_string().contains("no conductor bridge available"));
+
+        assert_eq!(
+            bridge.reads.load(AtomicOrdering::SeqCst),
+            2,
+            "the conductor leg is re-read per tick; a captured handle is read once (at \
+             construction, via `Arc<HcClient>`) and never again"
+        );
+
+        // `revoke_commons` shares the same bridge field and must follow the
+        // same discipline.
+        let revoke_req = ProvideRevokeRequest {
+            target_cid: "uhCkk-target".to_string(),
+            head_ref: "epr:content-1".to_string(),
+        };
+        author
+            .revoke_commons(&revoke_req)
+            .await
+            .expect_err("revoke also refuses honestly with no bridge");
+        assert_eq!(
+            bridge.reads.load(AtomicOrdering::SeqCst),
+            3,
+            "revoke_commons re-reads the bridge too, independently of author_commons"
+        );
     }
 }

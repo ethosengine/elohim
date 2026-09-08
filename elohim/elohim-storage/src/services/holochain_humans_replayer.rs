@@ -43,6 +43,7 @@ use async_trait::async_trait;
 use holochain_types::prelude::{Entry, Record};
 use serde::Deserialize;
 
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::db::collectives::{list_collectives, CollectiveQuery};
 use crate::db::models::governance_layers;
 use crate::db::{AppContext, DbPool};
@@ -97,20 +98,55 @@ pub trait MembershipReader: Send + Sync {
 }
 
 /// Production reader: calls the imagodei coordinator via the conductor client.
+///
+/// Holds the conductor leg as a [`ConductorBridge`], re-read on every call —
+/// never a captured `Arc<HcClient>`. The membership-truth reconcile used to
+/// build this reader ONCE, outside its ticker, from a boot-time
+/// `registry.imagodei_client()` clone; a conductor pod roll left every
+/// following tick calling a corpse for the life of the process (the defect
+/// class cured for the release-adoption controller — see
+/// `crate::conductor_bridge` and
+/// `genesis/data/timeline/backlog/self-heal-release-controller-dead-after-conductor-roll.md`).
 pub struct ConductorMembershipReader {
-    pub hc_client: Arc<HcClient>,
+    bridge: Arc<dyn ConductorBridge>,
+}
+
+impl ConductorMembershipReader {
+    /// Construct with one fixed conductor handle. Correct only where no
+    /// conductor restart can intervene between construction and use; kept for
+    /// callers (and tests) that hold a client directly. Production wires
+    /// [`Self::from_bridge`].
+    pub fn new(hc_client: Arc<HcClient>) -> Self {
+        Self::from_bridge(Arc::new(StaticConductorBridge(hc_client)))
+    }
+
+    /// The conductor leg as a LIVE source — production's wiring. A conductor
+    /// roll costs one skipped tick rather than parking the reconcile on a
+    /// corpse until the process restarts.
+    pub fn from_bridge(bridge: Arc<dyn ConductorBridge>) -> Self {
+        Self { bridge }
+    }
 }
 
 #[async_trait]
 impl MembershipReader for ConductorMembershipReader {
     async fn list_memberships(&self, collective_cid: &str) -> Result<Vec<Record>, StorageError> {
+        // Re-resolved every call — a conductor roll must never park this
+        // reader on a corpse handle. `None` degrades to the same
+        // best-effort "smaller mapping, never a startup failure" the module
+        // docs already promise for an unreachable conductor.
+        let Some(hc) = self.bridge.handle() else {
+            return Err(StorageError::Internal(
+                "holochain_humans_replayer: no conductor bridge available (being re-minted)"
+                    .to_string(),
+            ));
+        };
         let payload = rmp_serde::to_vec_named(&collective_cid.to_string()).map_err(|e| {
             StorageError::Internal(format!(
                 "holochain_humans_replayer: encode collective_cid: {e}"
             ))
         })?;
-        let bytes = self
-            .hc_client
+        let bytes = hc
             .call_zome_imagodei(IMAGODEI_ZOME, LIST_MEMBERSHIPS_FN, payload)
             .await?;
         // `Vec<Record>` decodes through the typed Record deserializer — the
@@ -825,5 +861,73 @@ mod tests {
             .expect("snapshot");
         assert!(snap.pairs.is_empty());
         assert!(snap.incomplete_households.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // The conductor-bridge conversion (2026-09-08 systemic pass) —
+    // `membership_identity_reconcile::spawn_periodic` used to build ONE
+    // `ConductorMembershipReader` outside its loop, from a boot-time
+    // `registry.imagodei_client()` clone. A conductor pod roll left every
+    // following pass calling a corpse for the life of the process.
+    // `list_memberships` calls `HcClient::call_zome_imagodei` directly (a
+    // specific-cell call, not routable through `ConductorBridge::call_zome`'s
+    // default-cell convenience), so a live post-roll round-trip cannot be
+    // constructed in a unit test (`HcClient` requires a real
+    // `AdminWebsocket`/`AppWebsocket`) — this asserts the DECISION surface
+    // instead, the same technique the release-adoption and
+    // projection-reconcile cures' tests use.
+    // -----------------------------------------------------------------------
+
+    /// A bridge with no conductor at all, counting how many times a caller
+    /// asked. Mirrors `crate::conductor_bridge::NoConductorBridge` but
+    /// observable.
+    struct CountingNoBridge {
+        reads: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::conductor_bridge::ConductorBridge for CountingNoBridge {
+        fn handle(&self) -> Option<Arc<HcClient>> {
+            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }
+    }
+
+    #[tokio::test]
+    async fn list_memberships_re_reads_the_conductor_bridge_every_call_never_a_captured_handle() {
+        let bridge = Arc::new(CountingNoBridge {
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let reader = ConductorMembershipReader::from_bridge(
+            bridge.clone() as Arc<dyn crate::conductor_bridge::ConductorBridge>
+        );
+
+        // Call 1 — no conductor bridge at all: an honest Err (the module's
+        // own "best-effort, never a startup failure" contract is enforced by
+        // the caller, `snapshot_household_ids`, which degrades this to a
+        // warning and a smaller mapping).
+        let err1 = reader
+            .list_memberships("collective:uhCkkHousehold1")
+            .await
+            .expect_err("no conductor bridge must refuse, never fabricate memberships");
+        assert!(
+            err1.to_string().contains("no conductor bridge available"),
+            "got {err1}"
+        );
+
+        // Call 2 — the pre-cure shape (`hc_client: Arc<HcClient>` captured at
+        // construction) would never touch the bridge again; the cured shape
+        // re-resolves on every call.
+        reader
+            .list_memberships("collective:uhCkkHousehold1")
+            .await
+            .expect_err("still down");
+
+        assert_eq!(
+            bridge.reads.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "the conductor leg is re-read per call; a captured handle is read once (at \
+             construction, via `Arc<HcClient>`) and never again"
+        );
     }
 }

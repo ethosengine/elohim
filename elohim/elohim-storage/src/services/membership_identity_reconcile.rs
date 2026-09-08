@@ -76,8 +76,8 @@ use std::sync::Arc;
 
 use diesel::prelude::*;
 
+use crate::conductor_bridge::ConductorBridge;
 use crate::db::{AppContext, DbPool};
-use crate::hc_client::HcClient;
 use crate::services::holochain_humans_replayer::{
     snapshot_household_ids, ConductorMembershipReader, MembershipReader,
 };
@@ -218,9 +218,18 @@ pub async fn run_membership_pass(pool: &DbPool, ctx: &AppContext, reader: &dyn M
 ///
 /// `humans`/`collectives` projections are lamad-app-scoped (the reconcile
 /// controller's `default_lamad` ctx is the same junction).
+///
+/// Takes the conductor leg as a [`ConductorBridge`], re-read on every pass —
+/// never a captured `Arc<HcClient>`. This task used to build ONE
+/// `ConductorMembershipReader` outside the loop, from a boot-time
+/// `registry.imagodei_client()` clone; a conductor pod roll left every
+/// following pass calling a corpse for the life of the process (the defect
+/// class cured for the release-adoption controller — see
+/// `crate::conductor_bridge` and
+/// `genesis/data/timeline/backlog/self-heal-release-controller-dead-after-conductor-roll.md`).
 pub fn spawn_periodic(
     pool: DbPool,
-    imagodei: Arc<HcClient>,
+    imagodei_bridge: Arc<dyn ConductorBridge>,
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
     reconcile_secs: u64,
 ) -> tokio::task::JoinHandle<()> {
@@ -230,11 +239,22 @@ pub fn spawn_periodic(
     );
     tokio::spawn(async move {
         let ctx = AppContext::default_lamad();
-        let reader = ConductorMembershipReader {
-            hc_client: imagodei,
-        };
         loop {
-            run_membership_pass(&pool, &ctx, &reader).await;
+            // Re-resolved every pass — a conductor roll must never park this
+            // reconcile on a corpse handle. `None` degrades to a skipped pass,
+            // exactly as an unreachable conductor already does.
+            match imagodei_bridge.handle() {
+                Some(hc) => {
+                    let reader = ConductorMembershipReader::new(hc);
+                    run_membership_pass(&pool, &ctx, &reader).await;
+                }
+                None => {
+                    tracing::debug!(
+                        "membership_identity_reconcile: no conductor bridge available (being \
+                         re-minted) — skipping this pass"
+                    );
+                }
+            }
             if reconcile_secs == 0 {
                 break;
             }

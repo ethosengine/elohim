@@ -568,9 +568,7 @@ impl ConductorMembershipKeySource {
 #[async_trait]
 impl MembershipKeySource for ConductorMembershipKeySource {
     async fn fetch_pairs(&self) -> Result<Vec<(String, String)>, StorageError> {
-        let reader = ConductorMembershipReader {
-            hc_client: self.hc.clone(),
-        };
+        let reader = ConductorMembershipReader::new(self.hc.clone());
         let self_cids = ConductorSelfHouseholdCids {
             hc: self.hc.clone(),
         };

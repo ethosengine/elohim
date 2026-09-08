@@ -58,6 +58,7 @@
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::db::context::AppContext;
 use crate::db::models::ReaCommitment;
 use crate::error::StorageError;
@@ -488,12 +489,25 @@ pub fn run_rotation_pass(
 /// `block_in_place` + `Handle::block_on`, so the detection pass stays sync and
 /// unit-testable. Must be called from a tokio runtime.
 pub struct ConductorRotationAuthor {
-    hc: std::sync::Arc<crate::hc_client::HcClient>,
+    bridge: std::sync::Arc<dyn ConductorBridge>,
 }
 
 impl ConductorRotationAuthor {
+    /// Construct with one fixed conductor handle. Correct only where no
+    /// conductor restart can intervene between construction and use; kept for
+    /// callers (and tests) that hold a client directly. Production wires
+    /// [`Self::from_bridge`].
     pub fn new(hc: std::sync::Arc<crate::hc_client::HcClient>) -> Self {
-        Self { hc }
+        Self::from_bridge(std::sync::Arc::new(StaticConductorBridge(hc)))
+    }
+
+    /// The conductor leg as a LIVE source — production's wiring. The rotation
+    /// tick used to build this author ONCE, outside its ticker, from a
+    /// boot-time `registry.lamad_client()` clone; a conductor roll left every
+    /// following tick calling a corpse for the life of the process. Re-reading
+    /// the bridge per call costs one skipped tick instead.
+    pub fn from_bridge(bridge: std::sync::Arc<dyn ConductorBridge>) -> Self {
+        Self { bridge }
     }
 }
 
@@ -506,6 +520,16 @@ impl RotationAuthor for ConductorRotationAuthor {
     ) -> Result<(), StorageError> {
         use crate::db::rea_commitments::{CreateReaCommitmentInput, UpdateReaCommitmentState};
         use crate::services::rea_commitment_service::ReaCommitmentService;
+
+        // Re-resolved every call — a conductor roll must never park this
+        // author on a corpse handle.
+        let Some(hc) = self.bridge.handle() else {
+            return Err(StorageError::Internal(
+                "custody rotation author: no conductor bridge available (being re-minted); \
+                 skipping this tick"
+                    .to_string(),
+            ));
+        };
 
         let input = CreateReaCommitmentInput {
             id: Some(candidate.successor_id.clone()),
@@ -533,7 +557,7 @@ impl RotationAuthor for ConductorRotationAuthor {
                     .to_string(),
             )
         })?;
-        let hc = self.hc.clone();
+        let hc = hc.clone();
         let successor_id = candidate.successor_id.clone();
 
         // Idempotent by state, so a crash between create and activate converges
@@ -1312,6 +1336,82 @@ mod tests {
         assert!(
             after.stocked >= 1,
             "rotation + witnessed possession must fold to stocked, got {after:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // The conductor-bridge conversion (2026-09-08 systemic pass) — the
+    // rotation tick used to build `ConductorRotationAuthor` ONCE, outside its
+    // ticker, from a boot-time `registry.lamad_client()` clone. A conductor
+    // pod roll left every following tick calling a corpse for the life of the
+    // process. A live post-roll round-trip cannot be constructed in a unit
+    // test (`HcClient` requires a real `AdminWebsocket`/`AppWebsocket`); this
+    // asserts the DECISION surface instead — the same technique the
+    // release-adoption and projection-reconcile cures' tests use.
+    // -----------------------------------------------------------------------
+
+    /// A bridge with no conductor at all, counting how many times a caller
+    /// asked. Mirrors `crate::conductor_bridge::NoConductorBridge` but
+    /// observable.
+    struct CountingNoBridge {
+        reads: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::conductor_bridge::ConductorBridge for CountingNoBridge {
+        fn handle(&self) -> Option<std::sync::Arc<crate::hc_client::HcClient>> {
+            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }
+    }
+
+    #[test]
+    fn author_rotation_successor_re_reads_the_conductor_bridge_every_call_never_a_captured_handle()
+    {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = ctx();
+        let bridge = std::sync::Arc::new(CountingNoBridge {
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let author = super::ConductorRotationAuthor::from_bridge(
+            bridge.clone() as std::sync::Arc<dyn crate::conductor_bridge::ConductorBridge>
+        );
+        let candidate = RotationCandidate {
+            old_commitment_id: "commit-old".to_string(),
+            content_id: "content-1".to_string(),
+            provider: SELF.to_string(),
+            receiver: STEWARD.to_string(),
+            current_blob_hash: NEW_BLOB.to_string(),
+            superseded_blob_markers: vec![OLD_BLOB.to_string()],
+            artifact_role: ArtifactRole::Content,
+            successor_id: "commit-successor".to_string(),
+            author_needed: true,
+        };
+
+        // No tokio runtime is required to observe the refusal: the bridge
+        // check runs BEFORE `Handle::try_current()` is consulted, so a dead
+        // bridge is reported honestly without ever touching the async bridge.
+        let err1 = author
+            .author_rotation_successor(&mut conn, &ctx, &candidate)
+            .expect_err("no conductor bridge must refuse, never fabricate a successor");
+        assert!(
+            err1.to_string().contains("no conductor bridge available"),
+            "got {err1}"
+        );
+
+        // A second call — the pre-cure shape (`self.hc: Arc<HcClient>`
+        // captured at construction) would never touch the bridge again; the
+        // cured shape re-resolves on every call.
+        author
+            .author_rotation_successor(&mut conn, &ctx, &candidate)
+            .expect_err("still down");
+
+        assert_eq!(
+            bridge.reads.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "the conductor leg is re-read per call; a captured handle is read once (at \
+             construction, via `Arc<HcClient>`) and never again"
         );
     }
 }

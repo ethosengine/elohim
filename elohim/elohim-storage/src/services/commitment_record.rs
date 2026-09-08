@@ -238,7 +238,7 @@ mod tests {
             let (mut record, mut pins) = fixture(1).await;
             let action = &mut record.signed_action.hashed.content;
             match mutation {
-                0 | 1 | 2 => {
+                0..=2 => {
                     if let ActionData::Create(c) = &mut action.data {
                         c.entry_type = EntryType::App(AppEntryDef::new(
                             EntryDefIndex(if mutation == 0 { 7 } else { 8 }),

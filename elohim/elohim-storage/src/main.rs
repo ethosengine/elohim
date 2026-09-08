@@ -2122,12 +2122,22 @@ async fn async_main(
                     db_pool.clone(),
                     config.self_cid.clone(),
                 ) {
-                    (Some(lamad_hc), Some(provide_pool), Some(self_cid))
+                    (Some(_lamad_hc), Some(provide_pool), Some(self_cid))
                         if !self_cid.is_empty() =>
                     {
+                        // A SOURCE, not a captured handle: the registry slot the
+                        // bridge supervisor re-mints, so a conductor roll costs
+                        // one refused tick (the reconciler rolls the per-key
+                        // latch back to `NeedsCommitment`) rather than parking
+                        // the provide loop on a corpse for the life of the
+                        // process. See `conductor_bridge::RegistryConductorBridge`.
                         let author = std::sync::Arc::new(
-                            elohim_storage::services::conductor_commitment_author::ConductorCommitmentAuthor::new(
-                                lamad_hc,
+                            elohim_storage::services::conductor_commitment_author::ConductorCommitmentAuthor::from_bridge(
+                                std::sync::Arc::new(
+                                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
+                                        registry.clone(),
+                                    ),
+                                ),
                                 self_cid.clone(),
                                 provide_pool.clone(),
                             ),
@@ -2278,12 +2288,18 @@ async fn async_main(
                     db_pool.clone(),
                     config.self_cid.clone(),
                 ) {
-                    (true, Some(salvage_hc), Some(salvage_pool), Some(salvage_self_cid))
+                    (true, Some(_salvage_hc), Some(salvage_pool), Some(salvage_self_cid))
                         if !salvage_self_cid.is_empty() =>
                     {
+                        // A SOURCE, not a captured handle — see the provide-loop
+                        // author above.
                         let salvage_author = std::sync::Arc::new(
-                            elohim_storage::services::salvage_commitment_author::SalvageCommitmentAuthor::new(
-                                salvage_hc,
+                            elohim_storage::services::salvage_commitment_author::SalvageCommitmentAuthor::from_bridge(
+                                std::sync::Arc::new(
+                                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
+                                        registry.clone(),
+                                    ),
+                                ),
                             ),
                         );
                         let salvage_target_replicas = config.salvage_target_replicas;
@@ -2464,11 +2480,23 @@ async fn async_main(
                     registry.lamad_client(),
                     db_pool.clone(),
                 ) {
-                    (true, Some(rotation_hc), Some(rotation_pool)) => {
+                    (true, Some(_rotation_hc), Some(rotation_pool)) => {
                         let rotation_blob_store = blob_store.clone();
+                        // A SOURCE, not a captured handle — see the provide-loop
+                        // author above. The identity resolve below shares this
+                        // SAME bridge (re-read per tick) rather than the
+                        // boot-time `_rotation_hc` clone the readiness check
+                        // above used only to gate spawning.
+                        let rotation_bridge: std::sync::Arc<
+                            dyn elohim_storage::conductor_bridge::ConductorBridge,
+                        > = std::sync::Arc::new(
+                            elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
+                                registry.clone(),
+                            ),
+                        );
                         let rotation_author = std::sync::Arc::new(
-                            elohim_storage::services::custody_rotation::ConductorRotationAuthor::new(
-                                rotation_hc.clone(),
+                            elohim_storage::services::custody_rotation::ConductorRotationAuthor::from_bridge(
+                                rotation_bridge.clone(),
                             ),
                         );
                         let mut rotation_shutdown = shutdown_tx.subscribe();
@@ -2493,8 +2521,16 @@ async fn async_main(
                                         // applies: the provider we WRITE must be a truthful
                                         // agent_cid, never a transport id — a junk provider
                                         // could never join the custody fold's holder key.
-                                        // Re-resolved each tick so a session that logs in
-                                        // after boot is picked up.
+                                        // Re-resolved each tick — through the SAME bridge the
+                                        // author uses — so a session that logs in after boot,
+                                        // or a conductor that rolls, is both picked up.
+                                        let Some(rotation_hc) = rotation_bridge.handle() else {
+                                            tracing::debug!(
+                                                target: "custody_rotation",
+                                                "custody rotation tick: no conductor bridge available (being re-minted) — skipping this tick"
+                                            );
+                                            continue;
+                                        };
                                         let Some(self_agent_cid) =
                                             elohim_storage::services::salvage_commitment_author::resolve_self_agent_cid(
                                                 &mut conn,
@@ -4813,18 +4849,28 @@ async fn async_main(
     // Cadence from MEMBERSHIP_RECONCILE_SECS (default 300; `0` = boot-only).
     // Best-effort: no imagodei client degrades to a debug line, never a startup
     // failure. The loop itself lives with the pass it drives.
-    if let (Some(pool), Some(imagodei)) = (
-        db_pool.as_ref(),
-        hc_registry_for_http
-            .as_ref()
-            .and_then(|r| r.imagodei_client()),
-    ) {
-        elohim_storage::services::membership_identity_reconcile::spawn_periodic(
-            pool.clone(),
-            imagodei,
-            shutdown_tx.subscribe(),
-            elohim_storage::services::membership_identity_reconcile::reconcile_secs_from_env(),
-        );
+    if let (Some(pool), Some(registry)) = (db_pool.as_ref(), hc_registry_for_http.as_ref()) {
+        // A SOURCE, not a captured handle — see the provide-loop author
+        // above. The readiness check below still gates on a live client at
+        // spawn time (so a peer with no imagodei cell at all never spawns the
+        // task); the bridge is what makes a LATER conductor roll heal instead
+        // of parking every pass on a corpse.
+        if registry.imagodei_client().is_some() {
+            elohim_storage::services::membership_identity_reconcile::spawn_periodic(
+                pool.clone(),
+                std::sync::Arc::new(
+                    elohim_storage::conductor_bridge::RegistryConductorBridge::imagodei(
+                        registry.clone(),
+                    ),
+                ),
+                shutdown_tx.subscribe(),
+                elohim_storage::services::membership_identity_reconcile::reconcile_secs_from_env(),
+            );
+        } else {
+            tracing::debug!(
+                "membership_identity_reconcile skipped: imagodei conductor client unavailable"
+            );
+        }
     } else {
         tracing::debug!(
             "membership_identity_reconcile skipped: db pool or imagodei conductor client unavailable"
@@ -6032,9 +6078,22 @@ async fn async_main(
         let evaluator = hc.agent_pub_key();
         let policy = PinnedPolicy::default();
         feedback_projector::cutover_standing_view(&mut *pool.get()?, &evaluator, &policy)?;
+        // A SOURCE, not a captured handle — see the provide-loop author above.
+        // The feedback projector is a long-lived durable-correction sweep
+        // spawned once at boot; a conductor roll must cost one refused sweep,
+        // never a corpse held for the life of the process.
+        let feedback_bridge: Arc<dyn elohim_storage::conductor_bridge::ConductorBridge> =
+            match hc_registry_for_http.as_ref() {
+                Some(registry) => Arc::new(
+                    elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
+                        registry.clone(),
+                    ),
+                ),
+                None => Arc::new(elohim_storage::conductor_bridge::StaticConductorBridge(hc)),
+            };
         feedback_projector::spawn(FeedbackProjector::new(
             pool.clone(),
-            Arc::new(ConductorReader(hc)),
+            Arc::new(ConductorReader::from_bridge(feedback_bridge)),
             evaluator,
             policy,
         ));

@@ -54,6 +54,7 @@ use diesel::SqliteConnection;
 use tracing::{info, warn};
 
 use crate::blob_store::BlobStore;
+use crate::conductor_bridge::{ConductorBridge, StaticConductorBridge};
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::reconcile::custody::CommitmentAuthor;
@@ -538,18 +539,31 @@ pub fn run_spool_custody_pass(
 /// (`block_in_place` + `Handle::block_on`), same self-identity resolver — and
 /// differs only in the commitment's provenance metadata (`origin: spool-custody`).
 pub struct SpoolCustodyAuthor {
-    hc: Arc<HcClient>,
+    bridge: Arc<dyn ConductorBridge>,
 }
 
 impl SpoolCustodyAuthor {
-    /// Construct with a live conductor handle (the `lamad`/`content_store` cell).
+    /// Construct with one fixed conductor handle. Correct only where no
+    /// conductor restart can intervene between construction and use; kept for
+    /// callers (and tests) that hold a client directly. Production wires
+    /// [`Self::from_bridge`].
     pub fn new(hc: Arc<HcClient>) -> Self {
-        Self { hc }
+        Self::from_bridge(Arc::new(StaticConductorBridge(hc)))
     }
 
-    /// This peer's `agent_cid` to WRITE as `provider`, or `None` (skip the tick).
+    /// The conductor leg as a LIVE source — production's wiring. Same
+    /// discipline as [`crate::services::salvage_commitment_author::SalvageCommitmentAuthor`]:
+    /// a conductor roll costs one skipped tick, never a corpse held for the
+    /// life of the process.
+    pub fn from_bridge(bridge: Arc<dyn ConductorBridge>) -> Self {
+        Self { bridge }
+    }
+
+    /// This peer's `agent_cid` to WRITE as `provider`, or `None` (skip the
+    /// tick — also the honest answer while the bridge is mid-re-mint).
     pub fn resolve_self_agent_cid(&self, conn: &mut SqliteConnection) -> Option<String> {
-        crate::services::salvage_commitment_author::resolve_self_agent_cid(conn, &self.hc)
+        let hc = self.bridge.handle()?;
+        crate::services::salvage_commitment_author::resolve_self_agent_cid(conn, &hc)
     }
 
     /// One tick on THIS peer, authoring through its own conductor.
@@ -571,6 +585,16 @@ impl CommitmentAuthor for SpoolCustodyAuthor {
         provider: &str,
         receiver: &str,
     ) -> Result<(), StorageError> {
+        // Re-resolved every call — a conductor roll must never park this
+        // author on a corpse handle. `None` means the bridge is mid-remint;
+        // the caller already treats any `Err` here as "retry next tick".
+        let Some(hc) = self.bridge.handle() else {
+            return Err(StorageError::Internal(
+                "spool custody author: no conductor bridge available (being re-minted); \
+                 skipping this tick"
+                    .to_string(),
+            ));
+        };
         let input = shefa_types::CreateReaCommitmentInput {
             id: deterministic_custody_id(provider, receiver, blob_marker),
             action: "custody-blob".to_string(),
@@ -605,7 +629,7 @@ impl CommitmentAuthor for SpoolCustodyAuthor {
                     .to_string(),
             )
         })?;
-        let hc = self.hc.clone();
+        let hc = hc.clone();
         tokio::task::block_in_place(|| {
             handle.block_on(async move {
                 conductor_writes::call_create_rea_commitment(&hc, &input).await
@@ -1224,5 +1248,86 @@ mod tests {
         assert_eq!(parsed.max_bytes, Some(4096));
         assert_eq!(parsed.atoms_per_hour, 7);
         assert_eq!(parsed.retention_days, Some(30));
+    }
+
+    // -----------------------------------------------------------------------
+    // The conductor-bridge conversion (2026-09-08 systemic pass) — the
+    // spool-custody tick used to build `SpoolCustodyAuthor` ONCE, outside its
+    // ticker, from a boot-time `registry.lamad_client()` clone. A conductor
+    // pod roll left every following tick calling a corpse for the life of the
+    // process. A live post-roll round-trip cannot be constructed in a unit
+    // test (`HcClient` requires a real `AdminWebsocket`/`AppWebsocket`); this
+    // asserts the DECISION surface instead — the same technique the
+    // release-adoption and projection-reconcile cures' tests use.
+    // -----------------------------------------------------------------------
+
+    /// A bridge with no conductor at all, counting how many times a caller
+    /// asked. Mirrors `crate::conductor_bridge::NoConductorBridge` but
+    /// observable.
+    struct CountingNoBridge {
+        reads: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::conductor_bridge::ConductorBridge for CountingNoBridge {
+        fn handle(&self) -> Option<Arc<HcClient>> {
+            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            None
+        }
+    }
+
+    #[test]
+    fn author_custody_blob_re_reads_the_conductor_bridge_every_call_never_a_captured_handle() {
+        let bridge = Arc::new(CountingNoBridge {
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let author = super::SpoolCustodyAuthor::from_bridge(
+            bridge.clone() as Arc<dyn crate::conductor_bridge::ConductorBridge>
+        );
+
+        let err1 = crate::reconcile::custody::CommitmentAuthor::author_custody_blob(
+            &author,
+            "sha256-witness",
+            "uhCAkCustodian",
+            "uhCAkWard",
+        )
+        .expect_err("no conductor bridge must refuse, never fabricate a commitment");
+        assert!(
+            err1.to_string().contains("no conductor bridge available"),
+            "got {err1}"
+        );
+
+        // A second call — the pre-cure shape (`self.hc: Arc<HcClient>`
+        // captured at construction) would never touch the bridge again; the
+        // cured shape re-resolves on every call.
+        crate::reconcile::custody::CommitmentAuthor::author_custody_blob(
+            &author,
+            "sha256-witness",
+            "uhCAkCustodian",
+            "uhCAkWard",
+        )
+        .expect_err("still down");
+
+        assert_eq!(
+            bridge.reads.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "the conductor leg is re-read per call; a captured handle is read once (at \
+             construction, via `Arc<HcClient>`) and never again"
+        );
+    }
+
+    #[test]
+    fn resolve_self_agent_cid_also_re_reads_the_bridge_and_degrades_honestly_with_none() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let bridge = Arc::new(CountingNoBridge {
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let author = super::SpoolCustodyAuthor::from_bridge(
+            bridge.clone() as Arc<dyn crate::conductor_bridge::ConductorBridge>
+        );
+
+        assert_eq!(author.resolve_self_agent_cid(&mut conn), None);
+        assert_eq!(bridge.reads.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

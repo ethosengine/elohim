@@ -166,6 +166,19 @@ impl RegistryConductorBridge {
             last_seen: std::sync::atomic::AtomicUsize::new(0),
         }
     }
+
+    /// The `imagodei` role — the registry slot the membership-truth reconcile
+    /// resolves identity/qahal reads through. Same re-read discipline as
+    /// [`Self::lamad`]; a separate constructor because the role string is the
+    /// registry KEY (`HcClientRegistry::client(role)`), never a parameter a
+    /// caller could get wrong.
+    pub fn imagodei(registry: Arc<crate::hc_client_registry::HcClientRegistry>) -> Self {
+        Self {
+            registry,
+            role: "imagodei",
+            last_seen: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
 }
 
 #[async_trait::async_trait]
