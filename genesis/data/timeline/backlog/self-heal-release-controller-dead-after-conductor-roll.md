@@ -254,3 +254,109 @@ Test (RED first — pre-cure shape panics
 — one `ReleaseAttestationCtx`, refused while the bridge is mid-re-mint, landing
 once the supervisor re-minted it, `handle_reads == 2`. A ctx holding an
 `Arc<HcClient>` cannot express that: there is nothing to flip.
+
+---
+
+# Systemic pass (2026-09-08)
+
+Third leg of the same defect class, and the one with a **measured consequence on
+the ward**. Household mesh, `/tmp/elohim-local-mesh/logs/jessica.log`, receipts in
+`/projects/.claude-config/jobs/a41a0b08/tmp/t11c-mesh.log`:
+
+- 04:27:18 — jessica's conductor SIGKILLed.
+- 04:27:23 — `conductor bridge RE-MINTED after a conductor restart` (supervisor).
+- 04:27:27 — `HcClient bridge connected (late)` for lamad and imagodei.
+- 04:27:25 → 04:33:15 — **812 lines** of `ELECTION READ FAILED … Zome call
+  failed: Websocket`, `reanchor_backfill: row not healed this sweep`,
+  `projection-reconcile: conductor get failed; retry next sweep`, the spool
+  custody tick, `record_peer_status`, and the household replayer — all against
+  a handle latched **before** the kill, for ~6 minutes after the substrate was
+  healthy again.
+- Consequence: the death witness authored inside that window never anchored on
+  jessica and never replicated to matthew, so **death-witness station 3b-ii**
+  fails on "matthew holds a copy within 120 s" while james (which received it by
+  another path) passes. The same pattern appears 2026-09-07 22:40–22:58 after an
+  earlier kill.
+
+## The 21 sites, classified
+
+Class **(a)** = one-shot boot use that completes before any conductor could roll,
+or a site that already resolves per use — leave it. Class **(b)** = captured into
+a long-lived task/service — must resolve per use.
+
+| main.rs | site | class | what resolves it now |
+|---|---|---|---|
+| 1498 | `infrastructure_client()` boot probe | (a) | predicate only; the task inside acquires via `connect_role_forever`, and the heartbeat's `ZomeCallPublisher`/`DefaultProbe` already hold the **registry** and resolve per tick |
+| 1565, 1567 | comment + `set_client("infrastructure", …)` | (a) | a writer, not an acquisition |
+| 2121 | provide `ConductorCommitmentAuthor` | **(b) OPEN** | 60 s ticker holding a captured `Arc<HcClient>` inside the author |
+| 2277 | `SalvageCommitmentAuthor` | **(b) OPEN** | `salvage_recheck_seconds` ticker, same shape |
+| 2378 | `SpoolCustodyAuthor` | **(b) OPEN** | `spool_cfg.tick_seconds` ticker, same shape |
+| 2464 | `ConductorRotationAuthor` | **(b) OPEN** | rotation ticker, same shape |
+| 2577 | `reanchor_lamad_boot` | (a) | one-shot boot sweep; the task returns after one run. Its **periodic** re-runs ride projection-reconcile's heal leg, converted below |
+| 2676 | `lamad_client().is_none()` | (a) | boot-time predicate; the task it guards stores the late client into the registry |
+| 2731 | self-agent-cid resolver closure | (a) | already resolves `lamad_client()` **inside** the closure, per call |
+| 2966 | `agent_key_uhcak()` | (a) | extracts a value; no handle retained |
+| 3058 | `agent_key_uhcak()` cell-key snapshot | (a) | same |
+| 3134 | comment | (a) | — |
+| 3272 | `binding_mint` imagodei | (a) | one-shot idempotent task; no loop |
+| 3504 | `cell_id().dna_hash()` | (a) | value extraction |
+| 3800 | `agent_key_uhcak()` announce | (a) | value extraction |
+| 4781 | `cell_id().dna_hash()` | (a) | value extraction |
+| 4820 | `membership_identity_reconcile::spawn_periodic` | **(b) OPEN** | periodic imagodei sweep holding a captured client |
+| 5300 | `lamad_hc_boot` → projection-reconcile heal leg | **(b) CURED** | `RegistryConductorBridge::lamad`, re-read every tick via `conductor_bridge::sweep_leg` |
+| 5337 | `agent_key_uhcak()` iroh agent_cid | (a) | value extraction |
+| 5734 | `hc_for_adoption` | **(b) CURED** | `80354948d` (controller) + `1416b9b27` (attestation rail) |
+| 5977 | feedback projector `ConductorReader` | **(b) OPEN** | spawned projector holding a captured client |
+
+Sites **outside** `main.rs` were audited and are already correct: `http.rs`,
+`api/*`, `p2p/view_federation.rs` and `p2p/mod.rs` all hold the **registry** and
+resolve `lamad_client()` / `imagodei_client()` inside the handler or per call —
+`view_federation.rs:319` even says so in a comment. The defect is confined to
+`main.rs` composition sites that clone a handle into a long-lived task.
+
+## Cured this pass (`e1a62ce52`)
+
+The projection-reconcile heal leg — the home of election-obey, the re-anchor
+sweep and the commitment heal, i.e. three of the six loops the 04:27 window
+names, and the one the 3b-ii failure runs through.
+
+Its conductor leg was `StdArc<OnceLock<Arc<HcClient>>>`: seeded once, read
+forever. `bridge_up = hc_cell.get().is_some()` therefore stayed `true` across a
+roll, so every tick spawned a heal against a corpse instead of reporting an
+unavailable leg and retrying. It is now
+`StdArc<dyn ConductorBridge>` = `RegistryConductorBridge::lamad`, read per tick
+through the new `conductor_bridge::sweep_leg` → `SweepLeg::{Unavailable, Live{generation}}`,
+and re-resolved a second time inside the single-flight CAS (the window is small,
+but "we asked once and kept the answer" is the whole defect class). The
+off-ticker late-connect now stores into the **registry** rather than a private
+cell, so the bridge sees it — and cannot re-introduce the capture.
+
+`NoConductorBridge` was added for the honest third case: a node wired with
+neither a registry nor a boot client reports `Unavailable` forever, which is
+different from a bridge whose handle merely happens to be re-minting.
+
+**No call's behaviour changed** — only who resolves the handle and when.
+`heal_decision`, `run_heal`, `run_discovery`, `reanchor_backfill::run_once` and
+every `head_adoption` entry point keep their `&Arc<HcClient>` signatures.
+
+**Tests, both RED first** (verified by swapping the fake's leg to set-once
+semantics; the discriminating sequence is `healthy → SIGKILL → re-mint`, because
+a set-once cell handles plain *late-connect* correctly and only breaks on a
+**roll**):
+
+- `p2p::projection_reconcile::tests::a_conductor_rolled_between_two_sweeps_heals_on_the_second`
+  — RED: *"a set-once cell still reports the pre-kill handle here — 812 log
+  lines' worth"*.
+- `services::reanchor_backfill::tests::a_conductor_rolled_between_two_sweeps_reanchors_on_the_second`
+  — RED: *"no handle is honest backpressure; the next sweep asks again"*.
+
+## Still open — the four periodic authors, membership, and the feedback projector
+
+Six class-(b) sites remain (2121, 2277, 2378, 2464, 4820, 5977). They share one
+shape: a ticker that builds an author/projector **once** from a captured
+`Arc<HcClient>` and reuses it. The cure is the same and is mechanical — either
+construct the author inside the tick from `bridge.handle()`, or change the
+service constructor to take `Arc<dyn ConductorBridge>` — but each touches a
+service module and its tests, so it is a separate bounded pass rather than a
+tail bolted onto a measured one. None of them is on the 3b-ii path; they cost
+their own sweep's work for one roll window.
