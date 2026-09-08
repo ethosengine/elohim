@@ -1253,13 +1253,25 @@ impl AppState {
     /// silently disables the warm-boot shell cache, which is exactly what
     /// happened for the whole of Task 3.4's deployed life.
     pub fn bind_warm_shell_to_archive(&mut self) {
-        self.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(
+        // The coherence oracle is bound HERE for the same reason the archive is:
+        // it needs the configured storage upstream, which exists on `args` from
+        // construction, and every path that installs an archive must produce a
+        // store that can judge BOTH provenance and deliverability. A doorway
+        // with no storage URL keeps the 2026-09-04 provenance-only behaviour.
+        let oracle = self
+            .args
+            .storage_url
+            .as_ref()
+            .map(|url| crate::render::coherence::StorageCoherenceProbe::shared(url.clone()));
+        self.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::with_oracle(
             self.app_file_cache
                 .clone()
                 .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
+            oracle,
         ));
         info!(
             archive_backed = self.warm_shell.is_archive_backed(),
+            coherence_judging = self.warm_shell.is_coherence_judging(),
             "warm-boot shell cache bound to the app-file archive"
         );
     }
@@ -3009,6 +3021,46 @@ fn epr_dispatch_shed_response(
     routes::catching_up::shed_response(wants_html, retry_after_secs, cause)
 }
 
+/// The answer when this doorway holds NO servable shell for an app it is
+/// mounted to serve: no warm bytes, no archive copy, and an upstream that
+/// cannot be read. **A 503 with a page, never a blank 200** — the 2026-09-08
+/// failure was indistinguishable from success to every automated reader,
+/// because a shell that references a 404'd script is still a 200.
+///
+/// One line of HTML on purpose: the doorway holds no bundle to style it with,
+/// and the visitor's next move is to wait, which `Retry-After` already says.
+/// Pure, so the contract is unit-testable without a runtime.
+fn converging_shell_response(
+    retry_after_secs: u64,
+    reason: &crate::render::coherence::BehindReason,
+) -> Response<Full<Bytes>> {
+    let body = format!(
+        "<!doctype html><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" \
+         content=\"{retry_after_secs}\"><title>Converging</title>\
+         <p>This page is converging on its current release. Retrying in {retry_after_secs}s.</p>"
+    );
+    let mut builder = Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("content-type", "text/html; charset=utf-8")
+        .header("Retry-After", retry_after_secs.to_string())
+        .header("Cache-Control", "no-store")
+        .header("x-epr-router", "dispatched");
+    if let Ok(header) =
+        hyper::header::HeaderValue::from_str(&format!("behind;{}", reason.as_wire()))
+    {
+        builder = builder.header("x-elohim-bundle", header);
+    }
+    builder
+        .header(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS, "amber")
+        .body(Full::new(Bytes::from(body)))
+        .expect("infallible converging response")
+}
+
+/// `Retry-After` for [`converging_shell_response`] — one bundle-heads tick plus
+/// slack, so a client that honours it comes back after the doorway has had a
+/// chance to converge rather than during the same window.
+const CONVERGING_SHELL_RETRY_AFTER_SECS: u64 = 20;
+
 /// Stock a freshly-proxied shell document into the warm-boot cache under the
 /// head the fetch was ADDRESSED by. Best-effort and non-fatal: with no declared
 /// head the read was necessarily slug-addressed, so there is no content address
@@ -3210,18 +3262,28 @@ async fn dispatch_to_projected_epr(
         match decision.plan {
             ShellPlan::ServeWarm => {
                 if let Some(shell) = decision.warm {
-                    tracing::debug!(
-                        request_path = %request_path,
-                        epr_id = %projection.epr_id,
-                        head = %shell.blob_hash,
-                        upstream_available,
-                        "EPR router: shell served from the warm-boot cache — no upstream fetch"
-                    );
+                    // `incoherence` is what makes a stale serve VISIBLE. Before
+                    // 2026-09-08 this arm always said `last-reconciled`, so a
+                    // shell naming a script that 404s and a healthy one were the
+                    // same response to every reader.
+                    let provenance = match decision.incoherence.clone() {
+                        None => ShellProvenance::LastReconciled,
+                        Some(reason) => {
+                            tracing::info!(
+                                request_path = %request_path,
+                                epr_id = %projection.epr_id,
+                                head = %shell.blob_hash,
+                                reason = %reason.class(),
+                                "EPR router: shell served BEHIND — head not confirmed deliverable"
+                            );
+                            ShellProvenance::Behind(reason)
+                        }
+                    };
                     return projected_shell_response(
                         shell.bytes,
                         &shell.content_type,
                         chrome_context_json,
-                        ShellProvenance::LastReconciled,
+                        provenance,
                     );
                 }
             }
@@ -3265,11 +3327,15 @@ async fn dispatch_to_projected_epr(
                             head = %shell.blob_hash,
                             "EPR router: shell upgrade did not land — serving the bytes in hand"
                         );
+                        let provenance = match decision.incoherence.clone() {
+                            None => ShellProvenance::LastReconciled,
+                            Some(reason) => ShellProvenance::Behind(reason),
+                        };
                         return projected_shell_response(
                             shell.bytes,
                             &shell.content_type,
                             chrome_context_json,
-                            ShellProvenance::LastReconciled,
+                            provenance,
                         );
                     }
                     // Unreachable by construction (UpgradeThenWarm only follows
@@ -3277,10 +3343,29 @@ async fn dispatch_to_projected_epr(
                     (None, None) => {}
                 }
             }
-            // COLD only. Keeps the existing full-budget proxy below, whose
-            // status pass-through is what lets a genuine 404 reach the browser
-            // as a 404 instead of a shed.
-            ShellPlan::Fetch | ShellPlan::Shed => {}
+            // COLD + upstream unavailable: this doorway holds NOTHING for an
+            // app it is mounted to serve, and cannot read one. Say so now with
+            // a converging page — falling through to the proxy below spends a
+            // breaker trial to arrive at the same 503, and on the arm where the
+            // breaker is closed but the archive empty it could hand a visitor a
+            // 200 whose shell nothing has judged.
+            ShellPlan::Shed => {
+                let reason = decision
+                    .incoherence
+                    .clone()
+                    .unwrap_or(crate::render::coherence::BehindReason::StorageUnreachable);
+                tracing::warn!(
+                    request_path = %request_path,
+                    epr_id = %projection.epr_id,
+                    reason = %reason.class(),
+                    "EPR router: no coherent shell to serve — converging 503"
+                );
+                return converging_shell_response(CONVERGING_SHELL_RETRY_AFTER_SECS, &reason);
+            }
+            // COLD with a readable upstream. Keeps the existing full-budget
+            // proxy below, whose status pass-through is what lets a genuine 404
+            // reach the browser as a 404 instead of a shed.
+            ShellPlan::Fetch => {}
         }
     }
 
@@ -4006,10 +4091,13 @@ fn with_bundle_provenance_header(
     provenance: ShellProvenance,
 ) -> Response<Full<Bytes>> {
     if let Some(value) = provenance.header_value() {
-        resp.headers_mut().insert(
-            "x-elohim-bundle",
-            hyper::header::HeaderValue::from_static(value),
-        );
+        // `from_str` rather than `from_static`: `behind;<reason>` carries a
+        // build-time asset name, so the value is no longer a fixed set. An
+        // unencodable value drops the marker rather than failing the serve — a
+        // diagnostic must never be the reason a visitor gets no page.
+        if let Ok(header) = hyper::header::HeaderValue::from_str(value.as_ref()) {
+            resp.headers_mut().insert("x-elohim-bundle", header);
+        }
         // The same fact in the freshness vocabulary, ALONGSIDE the existing
         // marker (never replacing it — `x-elohim-bundle` is its own contract
         // and a2o reads it). A warm shell IS amber by the definition the
@@ -4321,6 +4409,19 @@ async fn resolve_projected_shell(
                 "SSR shell served from the warm-boot cache — no upstream fetch"
             );
             Ok((shell.html(), ShellProvenance::LastReconciled))
+        }
+        crate::render::warm_shell::ShellOutcome::Behind { shell, reason } => {
+            // Bytes in hand, but the head they name is not confirmed current
+            // AND deliverable. Serve them — a possibly-stale page that boots
+            // beats the blank one 2026-09-08 produced — and say exactly why.
+            tracing::info!(
+                target: "doorway::ssr",
+                app = %projection.epr_id,
+                head = %shell.blob_hash,
+                reason = %reason.class(),
+                "SSR shell served BEHIND — head not confirmed deliverable"
+            );
+            Ok((shell.html(), ShellProvenance::Behind(reason)))
         }
         crate::render::warm_shell::ShellOutcome::Fresh(shell) => {
             // A slug-addressed read confirmed no head — say so on the wire.
@@ -7575,6 +7676,86 @@ mod ssr_session_tests {
             "amber",
             "any non-confirmed shell is amber in the shared freshness vocabulary"
         );
+    }
+
+    /// The FOURTH word (2026-09-08), and the one the blank-page incident needed:
+    /// a shell whose head this doorway could not confirm DELIVERABLE. Additive —
+    /// `last-reconciled` and `slug-resolved` above are untouched, so every a2o
+    /// reader of those keeps reading them.
+    #[test]
+    fn an_unconfirmed_head_names_its_reason_on_the_wire() {
+        use crate::render::coherence::BehindReason;
+        let body = || {
+            Response::builder()
+                .status(200)
+                .header("content-type", "text/html; charset=utf-8")
+                .body(Full::new(Bytes::from_static(b"<app-root></app-root>")))
+                .unwrap()
+        };
+
+        let behind = with_bundle_provenance_header(
+            body(),
+            ShellProvenance::Behind(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
+        );
+        assert_eq!(
+            behind.headers().get("x-elohim-bundle").unwrap(),
+            "behind;missing-asset:main-AVSOD6V6.js",
+            "the 2026-09-08 page named exactly this script and 404'd it — say so"
+        );
+        assert_eq!(
+            behind
+                .headers()
+                .get(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS)
+                .unwrap(),
+            "amber",
+            "the existing freshness marker stays alongside the new vocabulary"
+        );
+        assert_eq!(behind.status(), 200, "the bytes in hand still serve");
+
+        for (reason, wire) in [
+            (BehindReason::HeadUnknown, "behind;head-unknown"),
+            (
+                BehindReason::StorageUnreachable,
+                "behind;storage-unreachable",
+            ),
+            (BehindReason::StaleProjection, "behind;stale-projection"),
+        ] {
+            let resp = with_bundle_provenance_header(body(), ShellProvenance::Behind(reason));
+            assert_eq!(resp.headers().get("x-elohim-bundle").unwrap(), wire);
+        }
+    }
+
+    /// No warm bytes, no archive, no readable upstream: the honest answer is a
+    /// 503 with a page, NEVER a blank 200. A shell referencing a 404'd script is
+    /// still a 200, which is why 2026-09-08 read as success to every automated
+    /// reader for 15 hours.
+    #[tokio::test]
+    async fn no_coherent_shell_answers_503_with_a_converging_page_never_a_blank_200() {
+        use crate::render::coherence::BehindReason;
+        let resp = converging_shell_response(
+            CONVERGING_SHELL_RETRY_AFTER_SECS,
+            &BehindReason::StorageUnreachable,
+        );
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers().get("Retry-After").unwrap(), "20");
+        assert_eq!(CONVERGING_SHELL_RETRY_AFTER_SECS, 20);
+        assert_eq!(
+            resp.headers().get("content-type").unwrap(),
+            "text/html; charset=utf-8",
+            "a browser navigation gets a page, not a JSON body"
+        );
+        assert_eq!(
+            resp.headers().get("x-elohim-bundle").unwrap(),
+            "behind;storage-unreachable",
+            "the shed names WHY there was nothing coherent to serve"
+        );
+        assert_eq!(resp.headers().get("Cache-Control").unwrap(), "no-store");
+
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(!body.is_empty(), "never a blank response");
+        assert!(body.to_lowercase().contains("converging"));
     }
 
     #[test]

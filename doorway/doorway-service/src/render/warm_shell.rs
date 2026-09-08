@@ -71,8 +71,27 @@
 //! Spec: Task 3.4 of
 //! `genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md`.
 
+//! ## The third defect: provenance is not deliverability (2026-09-08)
+//!
+//! Every rail above held on the fleet and `/` was still blank for 15 hours.
+//! Both doorways served a warm shell at browser head `sha256-6899…` while
+//! storage had moved to `sha256-e0e2f7…`; the page named `main-AVSOD6V6.js`,
+//! which 404s through the doorway, while the new head's `main-SQRMM2WZ.js`
+//! served 200. `head_bound` proves WHERE bytes came from, never that the head
+//! they name can BOOT.
+//!
+//! So `AtHead` now takes a second proof — the entry script the shell names
+//! resolves through this doorway for that head ([`crate::render::coherence`],
+//! memoised per head). An unconfirmed head is `Behind` and says why on the
+//! wire (`x-elohim-bundle: behind;<reason>`); the bytes in hand still serve,
+//! because a possibly-stale page that boots beats a blank one. The head itself
+//! is moved by [`crate::render::bundle_heads`], not by this module — this
+//! module only refuses to call an unproven head current.
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+use crate::render::coherence::{BehindReason, CoherenceOracle, CoherenceVerdict};
 
 /// A shell document read out of the persistent archive.
 #[derive(Debug, Clone)]
@@ -192,11 +211,17 @@ impl WarmShell {
 
 /// Where a served shell came from — the provenance behind the
 /// `x-elohim-bundle` staleness marker.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShellProvenance {
     /// Served from the doorway's own projection of the last reconciled bundle,
-    /// with NO upstream read in this request. Marked on the wire.
+    /// with NO upstream read in this request — and COHERENT: the head it names
+    /// was confirmed deliverable through this doorway. Marked on the wire.
     LastReconciled,
+    /// Served, but the head could not be confirmed current AND deliverable.
+    /// Carries the reason so the page a visitor got is diagnosable from the
+    /// response alone — the 2026-09-08 stale shell was indistinguishable from a
+    /// healthy one on the wire.
+    Behind(BehindReason),
     /// Read from the upstream in this request — the declared head, confirmed.
     /// Carries no staleness marker.
     DeclaredHead,
@@ -210,10 +235,18 @@ pub enum ShellProvenance {
 impl ShellProvenance {
     /// The `x-elohim-bundle` header value, or `None` when the serve confirmed
     /// the declared head this request (no marker).
-    pub fn header_value(&self) -> Option<&'static str> {
+    ///
+    /// The vocabulary is ADDITIVE: `last-reconciled` and `slug-resolved` keep
+    /// their exact 2026-09-04 meanings (a2o reads them), and `behind;<reason>`
+    /// is the new value for a shell whose head this doorway could not confirm.
+    pub fn header_value(&self) -> Option<std::borrow::Cow<'static, str>> {
         match self {
-            ShellProvenance::LastReconciled => Some("last-reconciled"),
-            ShellProvenance::SlugResolved => Some("slug-resolved"),
+            ShellProvenance::LastReconciled => Some(std::borrow::Cow::Borrowed("last-reconciled")),
+            ShellProvenance::SlugResolved => Some(std::borrow::Cow::Borrowed("slug-resolved")),
+            ShellProvenance::Behind(reason) => Some(std::borrow::Cow::Owned(format!(
+                "behind;{}",
+                reason.as_wire()
+            ))),
             ShellProvenance::DeclaredHead => None,
         }
     }
@@ -314,8 +347,16 @@ pub struct FetchedShell {
 /// The terminal answer for one shell request.
 #[derive(Debug)]
 pub enum ShellOutcome {
-    /// Served from the doorway's projection — no upstream read this request.
+    /// Served from the doorway's projection — no upstream read this request,
+    /// and the head it names was confirmed deliverable.
     Warm(WarmShell),
+    /// Served, but the head could not be confirmed current AND deliverable.
+    /// The bytes still go out: a possibly-stale page that boots beats the blank
+    /// one 2026-09-08 produced. The reason rides the wire.
+    Behind {
+        shell: WarmShell,
+        reason: BehindReason,
+    },
     /// Read from the upstream this request.
     Fresh(WarmShell),
     /// Nothing to serve and no upstream to ask — the caller sheds via the
@@ -327,7 +368,18 @@ impl ShellOutcome {
     pub fn provenance(&self) -> Option<ShellProvenance> {
         match self {
             ShellOutcome::Warm(_) => Some(ShellProvenance::LastReconciled),
+            ShellOutcome::Behind { reason, .. } => Some(ShellProvenance::Behind(reason.clone())),
             ShellOutcome::Fresh(shell) => Some(ShellProvenance::for_fresh(shell.head_bound)),
+            ShellOutcome::Unavailable => None,
+        }
+    }
+
+    /// The bytes this outcome would serve, if any.
+    pub fn shell(&self) -> Option<&WarmShell> {
+        match self {
+            ShellOutcome::Warm(shell)
+            | ShellOutcome::Behind { shell, .. }
+            | ShellOutcome::Fresh(shell) => Some(shell),
             ShellOutcome::Unavailable => None,
         }
     }
@@ -345,6 +397,15 @@ pub struct WarmShellStore {
     /// Last upstream upgrade attempt per `{slug}:{file_path}` — the
     /// [`SHELL_UPGRADE_RETRY_SECS`] rate limit's only state.
     upgrade_attempts: RwLock<HashMap<String, std::time::Instant>>,
+    /// Judges whether a head is DELIVERABLE through this doorway. `None` keeps
+    /// byte-for-byte the 2026-09-04 behaviour (provenance-only `AtHead`), so an
+    /// unwired store is never worse than today.
+    oracle: Option<Arc<dyn CoherenceOracle>>,
+    /// Coherence verdicts keyed by HEAD (a head is content-addressed, so the
+    /// verdict belongs to the hash, not to the slug). A confirmation is
+    /// permanent; everything else carries the instant it was recorded and is
+    /// re-probed after [`crate::render::coherence::COHERENCE_RECHECK_SECS`].
+    coherence: RwLock<HashMap<String, (CoherenceVerdict, std::time::Instant)>>,
 }
 
 impl WarmShellStore {
@@ -353,6 +414,96 @@ impl WarmShellStore {
             hot: RwLock::new(HashMap::new()),
             archive,
             upgrade_attempts: RwLock::new(HashMap::new()),
+            oracle: None,
+            coherence: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// A store that judges deliverability as well as provenance.
+    pub fn with_oracle(
+        archive: Option<Arc<dyn ShellArchive>>,
+        oracle: Option<Arc<dyn CoherenceOracle>>,
+    ) -> Self {
+        Self {
+            oracle,
+            ..Self::new(archive)
+        }
+    }
+
+    /// True when this store can judge deliverability, not merely provenance.
+    pub fn is_coherence_judging(&self) -> bool {
+        self.oracle.is_some()
+    }
+
+    /// The memoised verdict for `head`, honouring the asymmetric TTL.
+    fn remembered_verdict(&self, head: &str) -> Option<CoherenceVerdict> {
+        let memo = self.coherence.read().unwrap_or_else(|e| e.into_inner());
+        let (verdict, at) = memo.get(head)?;
+        if verdict.is_permanent()
+            || at.elapsed().as_secs() < crate::render::coherence::COHERENCE_RECHECK_SECS
+        {
+            Some(verdict.clone())
+        } else {
+            None
+        }
+    }
+
+    fn remember_verdict(&self, head: &str, verdict: CoherenceVerdict) {
+        let mut memo = self.coherence.write().unwrap_or_else(|e| e.into_inner());
+        // Bound the map on a long-lived pod: expired non-permanent entries for
+        // heads nobody asks about any more are dropped on every write.
+        memo.retain(|k, (v, at)| {
+            k == head
+                || v.is_permanent()
+                || at.elapsed().as_secs() < crate::render::coherence::COHERENCE_RECHECK_SECS
+        });
+        memo.insert(head.to_string(), (verdict, std::time::Instant::now()));
+    }
+
+    /// Live coherence-memo size — the bound this map is asserted against.
+    pub fn coherence_memo_len(&self) -> usize {
+        self.coherence
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .len()
+    }
+
+    /// Is this shell's head deliverable through this doorway? `None` = yes (or
+    /// nothing here can say otherwise); `Some(reason)` = it must not be served
+    /// as current.
+    ///
+    /// Costs at most ONE upstream probe per head: a confirmation is remembered
+    /// forever (a head is content-addressed, so it cannot stop booting), and a
+    /// negative verdict stands for `COHERENCE_RECHECK_SECS` before it is
+    /// re-probed — so an incoherent head never buys a probe per request.
+    pub async fn judge_coherence(
+        &self,
+        head: Option<&str>,
+        shell: &WarmShell,
+        upstream_available: bool,
+    ) -> Option<BehindReason> {
+        let oracle = self.oracle.as_ref()?;
+        // No declared head: nothing to confirm against. The caller classifies
+        // this arm itself, so reaching here means the head IS declared.
+        let head = head?;
+        if let Some(verdict) = self.remembered_verdict(head) {
+            return match verdict {
+                CoherenceVerdict::Coherent => None,
+                CoherenceVerdict::Incoherent(reason) => Some(reason),
+            };
+        }
+        if !upstream_available {
+            // Never probe a peer we have already judged unable to answer, and
+            // never memoise the non-answer: this is a statement about the
+            // doorway's reach, not about the head.
+            return Some(BehindReason::StorageUnreachable);
+        }
+        let entry = crate::render::coherence::entry_script(&shell.html());
+        let verdict = oracle.judge(head, entry.as_deref()).await;
+        self.remember_verdict(head, verdict.clone());
+        match verdict {
+            CoherenceVerdict::Coherent => None,
+            CoherenceVerdict::Incoherent(reason) => Some(reason),
         }
     }
 
@@ -652,6 +803,10 @@ pub struct ShellDecision {
     pub plan: ShellPlan,
     pub warm: Option<WarmShell>,
     pub declared: Option<String>,
+    /// Why this shell is not confirmed at the declared head, when it is not.
+    /// `None` on an `AtHead` serve (confirmed current AND deliverable) and on a
+    /// cold cache (nothing to be behind WITH).
+    pub incoherence: Option<BehindReason>,
 }
 
 /// Classify the shell and decide the plan, claiming the upgrade slot atomically
@@ -663,6 +818,38 @@ pub async fn plan_shell_serve(
     upstream_available: bool,
 ) -> ShellDecision {
     let (class, warm, declared) = store.lookup_with_declared(slug, entry_file).await;
+
+    // COHERENCE GATE (2026-09-08). `lookup_with_declared` answers a provenance
+    // question — were these bytes fetched by the declared head. That was true
+    // of the shell both fleet doorways served for 15 hours while every visitor
+    // got a blank page. `AtHead` therefore takes a second proof here: the head
+    // must also be DELIVERABLE through this doorway. A head that cannot be
+    // proven is demoted to `Behind`, which is exactly the state that buys one
+    // rate-limited upgrade read per interval — so an incoherent head converges
+    // on its own instead of pinning.
+    let (class, incoherence) = match (class, warm.as_ref()) {
+        (WarmClass::AtHead, Some(shell)) => {
+            match store
+                .judge_coherence(declared.as_deref(), shell, upstream_available)
+                .await
+            {
+                None => (WarmClass::AtHead, None),
+                Some(reason) => (WarmClass::Behind, Some(reason)),
+            }
+        }
+        (WarmClass::Behind, Some(_)) => {
+            // Already behind, for one of the two LOCAL reasons — no probe
+            // needed to know which.
+            let reason = if declared.is_none() {
+                BehindReason::HeadUnknown
+            } else {
+                BehindReason::StaleProjection
+            };
+            (WarmClass::Behind, Some(reason))
+        }
+        (other, _) => (other, None),
+    };
+
     // Claim ONLY on the arm that would spend it — an at-head or cold request
     // must not consume the interval an upgrade is waiting for.
     let upgrade_claimed = class == WarmClass::Behind
@@ -672,6 +859,7 @@ pub async fn plan_shell_serve(
         plan: decide_shell_serve(class, upstream_available, upgrade_claimed),
         warm,
         declared,
+        incoherence,
     }
 }
 
@@ -702,31 +890,41 @@ where
         plan,
         warm,
         declared,
+        incoherence,
     } = plan_shell_serve(store, slug, entry_file, upstream_available).await;
     match plan {
-        ShellPlan::ServeWarm => match warm {
-            Some(shell) => ShellOutcome::Warm(shell),
-            // Unreachable by construction (ServeWarm only follows a hit); an
-            // honest shed beats an unwrap on the hot path.
-            None => ShellOutcome::Unavailable,
-        },
+        ShellPlan::ServeWarm => serve_held(warm, incoherence),
         ShellPlan::UpgradeThenWarm => {
             match fetch(FetchBudget::Upgrade, declared.clone()).await {
-                Some(fresh) => stock_and_return(store, slug, entry_file, declared, fresh).await,
+                Some(fresh) => {
+                    stock_and_return(store, slug, entry_file, declared, fresh, upstream_available)
+                        .await
+                }
                 // The upgrade could not land — keep serving the one-behind shell.
                 // Strictly better than today, which shed to a bundle fallback that
                 // then paid the SAME doomed fetch again.
-                None => match warm {
-                    Some(shell) => ShellOutcome::Warm(shell),
-                    None => ShellOutcome::Unavailable,
-                },
+                None => serve_held(warm, incoherence),
             }
         }
         ShellPlan::Fetch => match fetch(FetchBudget::Full, declared.clone()).await {
-            Some(fresh) => stock_and_return(store, slug, entry_file, declared, fresh).await,
+            Some(fresh) => {
+                stock_and_return(store, slug, entry_file, declared, fresh, upstream_available).await
+            }
             None => ShellOutcome::Unavailable,
         },
         ShellPlan::Shed => ShellOutcome::Unavailable,
+    }
+}
+
+/// Serve the bytes in hand, naming why they are not confirmed current when they
+/// are not. `None` bytes is unreachable by construction on both callers (a
+/// serve-warm plan only follows a hit); an honest shed beats an unwrap on the
+/// hot path.
+fn serve_held(warm: Option<WarmShell>, incoherence: Option<BehindReason>) -> ShellOutcome {
+    match (warm, incoherence) {
+        (Some(shell), Some(reason)) => ShellOutcome::Behind { shell, reason },
+        (Some(shell), None) => ShellOutcome::Warm(shell),
+        (None, _) => ShellOutcome::Unavailable,
     }
 }
 
@@ -738,6 +936,7 @@ async fn stock_and_return(
     entry_file: &str,
     declared: Option<String>,
     fresh: FetchedShell,
+    upstream_available: bool,
 ) -> ShellOutcome {
     // The fetch was ADDRESSED by `declared` (see `resolve_shell`), so stocking
     // under it is a content-addressed truth, not a label. It is never
@@ -763,7 +962,22 @@ async fn stock_and_return(
                 .await;
         }
     }
-    ShellOutcome::Fresh(shell)
+    // Fresh bytes are not exempt from the coherence gate — the 2026-09-08 head
+    // was fetchable and still unbootable. Bytes with NO declared head keep the
+    // `slug-resolved` vocabulary they have always carried: nothing was claimed
+    // about a head, so nothing is demoted.
+    match shell.blob_hash.is_empty() {
+        true => ShellOutcome::Fresh(shell),
+        false => {
+            match store
+                .judge_coherence(Some(&shell.blob_hash.clone()), &shell, upstream_available)
+                .await
+            {
+                None => ShellOutcome::Fresh(shell),
+                Some(reason) => ShellOutcome::Behind { shell, reason },
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -954,6 +1168,314 @@ mod tests {
                 })
             })
         }
+    }
+
+    // ── the deliverability defect (2026-09-08) ───────────────────────────────
+
+    /// A coherence oracle whose verdicts are dictated per head.
+    #[derive(Default)]
+    struct FakeOracle {
+        verdicts: Mutex<HashMap<String, CoherenceVerdict>>,
+        probes: AtomicUsize,
+        entries_seen: Mutex<Vec<Option<String>>>,
+    }
+
+    impl FakeOracle {
+        fn saying(head: &str, verdict: CoherenceVerdict) -> Arc<Self> {
+            let o = Arc::new(FakeOracle::default());
+            o.say(head, verdict);
+            o
+        }
+
+        fn say(&self, head: &str, verdict: CoherenceVerdict) {
+            self.verdicts
+                .lock()
+                .unwrap()
+                .insert(head.to_string(), verdict);
+        }
+
+        fn probes(&self) -> usize {
+            self.probes.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl CoherenceOracle for FakeOracle {
+        async fn judge(&self, head: &str, entry: Option<&str>) -> CoherenceVerdict {
+            self.probes.fetch_add(1, Ordering::SeqCst);
+            self.entries_seen
+                .lock()
+                .unwrap()
+                .push(entry.map(str::to_string));
+            self.verdicts
+                .lock()
+                .unwrap()
+                .get(head)
+                .cloned()
+                .unwrap_or(CoherenceVerdict::Coherent)
+        }
+    }
+
+    /// THE 2026-09-08 DEFECT. Every provenance rail held — the bytes really were
+    /// fetched by the declared head — and the page was still blank, because the
+    /// `main-*.js` it names 404s through this doorway. Provenance is not
+    /// deliverability, so this must never classify `AtHead`.
+    #[tokio::test]
+    async fn a_head_whose_entry_script_is_missing_is_never_at_head() {
+        let archive = FakeArchive::with_shell(
+            "sha256-6899",
+            "<html><head><script src=\"main-AVSOD6V6.js\"></script></head><body></body></html>",
+        );
+        let oracle = FakeOracle::saying(
+            "sha256-6899",
+            CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
+        );
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
+
+        let decision = plan_shell_serve(&store, "landing", "index.html", true).await;
+        assert_eq!(
+            decision.incoherence,
+            Some(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
+            "a head that cannot boot must be named, not served silently"
+        );
+        assert_ne!(
+            decision.plan,
+            ShellPlan::ServeWarm,
+            "an unproven head must not pin the shell — Behind buys the upgrade read"
+        );
+
+        // …and the probe was handed the script the SHELL names, from its bytes.
+        assert_eq!(
+            oracle.entries_seen.lock().unwrap().clone(),
+            vec![Some("main-AVSOD6V6.js".to_string())]
+        );
+    }
+
+    /// The wire is what the a2o reader and the operator both see. An incoherent
+    /// serve must be distinguishable from a healthy one — on 2026-09-08 it was
+    /// not, which is why the blank page went unnoticed for 15 hours.
+    #[tokio::test]
+    async fn an_incoherent_head_serves_the_bytes_in_hand_and_says_why_on_the_wire() {
+        let archive = FakeArchive::with_shell(
+            "sha256-6899",
+            "<html><script src=\"main-AVSOD6V6.js\"></script></html>",
+        );
+        let oracle = FakeOracle::saying(
+            "sha256-6899",
+            CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
+        );
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle));
+
+        // The realistic shape: the upstream IS readable (so the head is probed
+        // and judged), the demotion to Behind buys the upgrade read, and the
+        // read does not land — the terminal answer is the bytes in hand, marked.
+        let fetches = Arc::new(AtomicUsize::new(0));
+        let outcome = resolve_shell(
+            &store,
+            "landing",
+            "index.html",
+            true,
+            counting_fetch(fetches.clone(), None),
+        )
+        .await;
+        assert_eq!(
+            fetches.load(Ordering::SeqCst),
+            1,
+            "an unproven head buys exactly one rate-limited upgrade read"
+        );
+
+        match &outcome {
+            ShellOutcome::Behind { shell, reason } => {
+                assert!(shell.html().contains("main-AVSOD6V6.js"));
+                assert_eq!(
+                    reason,
+                    &BehindReason::MissingAsset("main-AVSOD6V6.js".into())
+                );
+            }
+            other => panic!("expected a Behind serve, got {other:?}"),
+        }
+        assert_eq!(
+            outcome
+                .provenance()
+                .and_then(|p| p.header_value())
+                .as_deref(),
+            Some("behind;missing-asset:main-AVSOD6V6.js"),
+            "the exact value the served-shell scenario reads"
+        );
+        assert!(
+            outcome.shell().is_some(),
+            "a page that boots one release behind still beats a blank one"
+        );
+    }
+
+    /// A confirmed head stays confirmed with NO further probes: a head is
+    /// content-addressed, so one confirmation is confirmation forever. This is
+    /// also what stops the `/` hot path buying a probe per request.
+    #[tokio::test]
+    async fn a_confirmed_head_costs_exactly_one_probe_ever() {
+        let archive = FakeArchive::with_shell(
+            "sha256-good",
+            "<html><script src=\"main-A.js\"></script></html>",
+        );
+        let oracle = Arc::new(FakeOracle::default()); // default verdict: Coherent
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
+
+        for _ in 0..5 {
+            let decision = plan_shell_serve(&store, "landing", "index.html", true).await;
+            assert_eq!(decision.plan, ShellPlan::ServeWarm);
+            assert_eq!(decision.incoherence, None);
+        }
+        assert_eq!(
+            oracle.probes(),
+            1,
+            "the verdict is memoised per head — five requests, one probe"
+        );
+        assert_eq!(store.coherence_memo_len(), 1);
+    }
+
+    /// A catch-up window must never UN-prove a head that was already proven —
+    /// otherwise the honest-shed contract turns every upstream blip into a
+    /// `behind;` marker on a page that is demonstrably fine.
+    #[tokio::test]
+    async fn an_unreachable_upstream_cannot_un_prove_a_confirmed_head() {
+        let archive = FakeArchive::with_shell(
+            "sha256-good",
+            "<html><script src=\"main-A.js\"></script></html>",
+        );
+        let oracle = Arc::new(FakeOracle::default());
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
+
+        // Confirm while the upstream answers.
+        assert_eq!(
+            plan_shell_serve(&store, "landing", "index.html", true)
+                .await
+                .incoherence,
+            None
+        );
+
+        // The upstream goes away. The head is still the same bytes.
+        let decision = plan_shell_serve(&store, "landing", "index.html", false).await;
+        assert_eq!(decision.incoherence, None);
+        assert_eq!(decision.plan, ShellPlan::ServeWarm);
+        assert_eq!(
+            oracle.probes(),
+            1,
+            "and no probe was attempted at a dark peer"
+        );
+    }
+
+    /// A head this doorway has NEVER confirmed, with no peer to ask, is honestly
+    /// unconfirmed — not silently current.
+    #[tokio::test]
+    async fn a_never_confirmed_head_with_a_dark_upstream_is_behind_storage_unreachable() {
+        let archive = FakeArchive::with_shell(
+            "sha256-new",
+            "<html><script src=\"main-A.js\"></script></html>",
+        );
+        let oracle = Arc::new(FakeOracle::default());
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
+
+        let decision = plan_shell_serve(&store, "landing", "index.html", false).await;
+        assert_eq!(decision.incoherence, Some(BehindReason::StorageUnreachable));
+        assert_eq!(oracle.probes(), 0, "a dark peer is never probed");
+    }
+
+    /// The two LOCAL behind-reasons need no probe at all.
+    #[tokio::test]
+    async fn an_unknown_declared_head_is_behind_head_unknown() {
+        let archive = Arc::new(FakeArchive::default());
+        archive.files.lock().unwrap().push(StockedFile {
+            slug: "landing".into(),
+            file_path: "index.html".into(),
+            blob_hash: "sha256-whatever".into(),
+            bytes: b"<html>old</html>".to_vec(),
+            head_bound: true,
+        });
+        let oracle = Arc::new(FakeOracle::default());
+        let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
+
+        let decision = plan_shell_serve(&store, "landing", "index.html", true).await;
+        assert_eq!(decision.incoherence, Some(BehindReason::HeadUnknown));
+        assert_eq!(
+            oracle.probes(),
+            0,
+            "nothing to probe AGAINST — the local class says it"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unmarked_doc_at_the_declared_head_is_behind_stale_projection() {
+        let archive = FakeArchive::with_unmarked_shell("sha256-h1", "<html>poisoned era</html>");
+        let store =
+            WarmShellStore::with_oracle(Some(archive), Some(Arc::new(FakeOracle::default())));
+
+        let decision = plan_shell_serve(&store, "landing", "index.html", true).await;
+        assert_eq!(decision.incoherence, Some(BehindReason::StaleProjection));
+    }
+
+    /// A store with no oracle is byte-for-byte the 2026-09-04 provenance-only
+    /// behaviour for the AtHead arm — never worse than today.
+    #[tokio::test]
+    async fn without_an_oracle_at_head_is_unchanged() {
+        let archive = FakeArchive::with_shell(
+            "sha256-a",
+            "<html><script src=\"main-A.js\"></script></html>",
+        );
+        let store = WarmShellStore::new(Some(archive));
+        assert!(!store.is_coherence_judging());
+
+        let decision = plan_shell_serve(&store, "landing", "index.html", true).await;
+        assert_eq!(decision.plan, ShellPlan::ServeWarm);
+        assert_eq!(decision.incoherence, None);
+    }
+
+    /// The bundle-heads reconciler moves the declared head and evicts the warm
+    /// shell; the very next lookup must classify against the NEW head and
+    /// address its fetch by it. This is the seam between D1 and the shell path.
+    #[tokio::test]
+    async fn once_the_head_moves_and_the_shell_is_evicted_the_fetch_is_addressed_by_the_new_head() {
+        let archive = FakeArchive::with_shell("sha256-6899old", "<html>era-1</html>");
+        let store = WarmShellStore::new(Some(archive.clone()));
+
+        // Steady state at the old head.
+        assert_eq!(
+            store.lookup("landing", "index.html").await.0,
+            WarmClass::AtHead
+        );
+
+        // The reconciler observes the move: declaration advances, hot shell out.
+        archive.declare("sha256-e0e2f7new");
+        store.evict("landing");
+
+        let seen: Arc<Mutex<Vec<Option<String>>>> = Arc::new(Mutex::new(Vec::new()));
+        let recorder = Arc::clone(&seen);
+        let outcome = resolve_shell(
+            &store,
+            "landing",
+            "index.html",
+            true,
+            move |_budget, declared| {
+                recorder.lock().unwrap().push(declared.clone());
+                Box::pin(async move {
+                    Some(FetchedShell {
+                        bytes: b"<html>era-2</html>".to_vec(),
+                        content_type: "text/html".to_string(),
+                    })
+                }) as BoxedFetch
+            },
+        )
+        .await;
+
+        assert_eq!(
+            seen.lock().unwrap().clone(),
+            vec![Some("sha256-e0e2f7new".to_string())],
+            "the fetch must address the head the reconciler moved to, not the slug"
+        );
+        assert_eq!(
+            outcome.shell().map(|s| s.blob_hash.clone()),
+            Some("sha256-e0e2f7new".to_string())
+        );
+        assert!(outcome.shell().unwrap().html().contains("era-2"));
     }
 
     // ── (1) boot hydration ───────────────────────────────────────────────────
@@ -1204,7 +1726,18 @@ mod tests {
             counting_fetch(fetches2.clone(), Some(("<html>never</html>", "text/html"))),
         )
         .await;
-        assert!(matches!(again, ShellOutcome::Warm(_)));
+        // Served from what we hold, with no upstream read. It is a `Behind`
+        // serve rather than a `Warm` one because an unknown head is now NAMED
+        // on the wire (`behind;head-unknown`, 2026-09-08) — the bytes and the
+        // zero-fetch property this test exists for are unchanged.
+        assert!(matches!(
+            again,
+            ShellOutcome::Behind {
+                reason: BehindReason::HeadUnknown,
+                ..
+            }
+        ));
+        assert!(again.shell().is_some(), "the bytes in hand still serve");
         assert_eq!(fetches2.load(Ordering::SeqCst), 0);
     }
 
@@ -1269,9 +1802,12 @@ mod tests {
                 counting_fetch(Arc::new(AtomicUsize::new(0)), None),
             )
             .await;
-            let html = match outcome {
-                ShellOutcome::Warm(shell) => shell.html(),
-                other => panic!("round {round}: expected a warm shell, got {other:?}"),
+            // `Behind { HeadUnknown }` since 2026-09-08 — an unknown head is
+            // named rather than served silently. What this test pins is which
+            // BYTES serve, which is unchanged.
+            let html = match outcome.shell() {
+                Some(shell) => shell.html(),
+                None => panic!("round {round}: expected the held bytes to serve"),
             };
             assert!(
                 html.contains("fresh-era") && !html.contains("stale-era"),
@@ -1309,9 +1845,9 @@ mod tests {
         )
         .await;
 
-        match outcome {
-            ShellOutcome::Warm(shell) => assert!(shell.html().contains("held")),
-            other => panic!("a failed upgrade must never shed: {other:?}"),
+        match outcome.shell() {
+            Some(shell) => assert!(shell.html().contains("held")),
+            None => panic!("a failed upgrade must never shed: {outcome:?}"),
         }
         assert_eq!(fetches.load(Ordering::SeqCst), 1);
     }
@@ -1348,12 +1884,26 @@ mod tests {
     fn fresh_bytes_declare_whether_a_head_confirmed_them() {
         assert_eq!(ShellProvenance::for_fresh(true).header_value(), None);
         assert_eq!(
-            ShellProvenance::for_fresh(false).header_value(),
+            ShellProvenance::for_fresh(false).header_value().as_deref(),
             Some("slug-resolved")
         );
         assert_eq!(
-            ShellProvenance::LastReconciled.header_value(),
+            ShellProvenance::LastReconciled.header_value().as_deref(),
             Some("last-reconciled")
+        );
+        // The 2026-09-08 addition is ADDITIVE: the two values above keep their
+        // exact meanings (a2o reads them) and `behind;<reason>` joins them.
+        assert_eq!(
+            ShellProvenance::Behind(BehindReason::MissingAsset("main-X.js".into()))
+                .header_value()
+                .as_deref(),
+            Some("behind;missing-asset:main-X.js")
+        );
+        assert_eq!(
+            ShellProvenance::Behind(BehindReason::HeadUnknown)
+                .header_value()
+                .as_deref(),
+            Some("behind;head-unknown")
         );
     }
 
@@ -1535,9 +2085,9 @@ mod tests {
         )
         .await;
 
-        match outcome {
-            ShellOutcome::Warm(shell) => assert!(shell.html().contains("old")),
-            other => panic!("expected the one-behind shell, got {other:?}"),
+        match outcome.shell() {
+            Some(shell) => assert!(shell.html().contains("old")),
+            None => panic!("expected the one-behind shell, got {outcome:?}"),
         }
         assert_eq!(fetches.load(Ordering::SeqCst), 1);
     }
