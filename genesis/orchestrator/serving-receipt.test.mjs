@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
+  mkdirSync,
   writeFileSync,
   readFileSync,
   existsSync,
@@ -173,6 +174,61 @@ test("default producer source identities accept a complete report despite newer 
     );
     writeFileSync(join(dir, "sprint-report-household-z.json"), "{malformed");
     assert.equal(checkReports(root, dir), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("actual pre-push caller propagates mandatory refusal in default and strict modes", () => {
+  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+  }).trim();
+  const hook = readFileSync(join(root, ".husky/pre-push.bash"), "utf8");
+  const start = hook.indexOf("# ── T2 receipt");
+  const end = hook.indexOf("# ── Project filter", start);
+  assert.ok(
+    start >= 0 && end > start,
+    "exercise the actual hook's receipt block",
+  );
+  const block = hook.slice(start, end);
+  const dir = mkdtempSync(join(tmpdir(), "receipt-caller-"));
+  try {
+    mkdirSync(join(dir, "genesis/orchestrator/scripts"), { recursive: true });
+    writeFileSync(
+      join(dir, "genesis/orchestrator/scripts/t2-receipt.sh"),
+      'printf "%s" "$2" > receipt-path\nexit "$RECEIPT_STATUS"\n',
+    );
+    for (const mode of ["", "strict"]) {
+      for (const status of [0, 1, 2]) {
+        const result = spawnSync(
+          "bash",
+          ["-c", `${block}printf caller-continued`],
+          {
+            cwd: dir,
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              CHANGED: "doorway/doorway-service/src/server/http.rs",
+              T2_RECEIPT: mode,
+              RECEIPT_STATUS: String(status),
+              TMPDIR: dir,
+            },
+          },
+        );
+        assert.equal(
+          result.status,
+          status === 0 ? 0 : 1,
+          `mode=${mode || "default"}, receipt=${status}`,
+        );
+        assert.equal(result.stdout.includes("caller-continued"), status === 0);
+        const list = readFileSync(join(dir, "receipt-path"), "utf8");
+        assert.equal(
+          existsSync(list),
+          false,
+          "caller cleans its temporary list on every outcome",
+        );
+      }
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
