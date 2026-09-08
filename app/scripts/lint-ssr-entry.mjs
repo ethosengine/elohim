@@ -26,21 +26,21 @@
 //
 // usage: lint-ssr-entry.mjs <appDir>   (the directory holding angular.json)
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
 const appDir = process.argv[2];
 if (!appDir) {
-  console.error('usage: lint-ssr-entry.mjs <appDir>');
+  console.error("usage: lint-ssr-entry.mjs <appDir>");
   process.exit(2);
 }
 
-const angularJsonPath = join(appDir, 'angular.json');
+const angularJsonPath = join(appDir, "angular.json");
 if (!existsSync(angularJsonPath)) {
   console.error(`lint-ssr-entry: no angular.json at ${angularJsonPath}`);
   process.exit(2);
 }
-const angularJson = JSON.parse(readFileSync(angularJsonPath, 'utf8'));
+const angularJson = JSON.parse(readFileSync(angularJsonPath, "utf8"));
 
 let failures = 0;
 const fail = (msg) => {
@@ -49,7 +49,8 @@ const fail = (msg) => {
 };
 
 for (const [projName, proj] of Object.entries(angularJson.projects ?? {})) {
-  const opts = proj?.architect?.build?.options ?? proj?.targets?.build?.options ?? {};
+  const opts =
+    proj?.architect?.build?.options ?? proj?.targets?.build?.options ?? {};
   const serverEntry = opts.ssr?.entry ?? opts.server;
   if (!serverEntry) continue; // no SSR declared — rail does not fire
 
@@ -58,24 +59,34 @@ for (const [projName, proj] of Object.entries(angularJson.projects ?? {})) {
     fail(`${projName}: declared server entry ${serverEntry} does not exist`);
     continue;
   }
-  const entry = readFileSync(entryPath, 'utf8');
+  const entry = readFileSync(entryPath, "utf8");
 
   // (1) driver-callable exports
   if (!/export\s+default\s/.test(entry)) {
-    fail(`${projName}: ${serverEntry} must \`export default\` the bootstrap fn (driver calls mod.default)`);
+    fail(
+      `${projName}: ${serverEntry} must \`export default\` the bootstrap fn (driver calls mod.default)`,
+    );
   }
   if (!/export\s+(async\s+)?(function|const)\s+renderApplication/.test(entry)) {
-    fail(`${projName}: ${serverEntry} must export a renderApplication wrapper (driver calls mod.renderApplication)`);
+    fail(
+      `${projName}: ${serverEntry} must export a renderApplication wrapper (driver calls mod.renderApplication)`,
+    );
   }
 
   // (2) document root tag matches the app component selector
-  const componentPath = join(appDir, 'src/app/app.component.ts');
+  const componentPath = join(appDir, "src/app/app.component.ts");
   if (!existsSync(componentPath)) {
-    fail(`${projName}: expected src/app/app.component.ts (convention) to read the root selector`);
+    fail(
+      `${projName}: expected src/app/app.component.ts (convention) to read the root selector`,
+    );
   } else {
-    const selMatch = readFileSync(componentPath, 'utf8').match(/selector:\s*['"]([a-z][a-z0-9-]*)['"]/);
+    const selMatch = readFileSync(componentPath, "utf8").match(
+      /selector:\s*['"]([a-z][a-z0-9-]*)['"]/,
+    );
     if (!selMatch) {
-      fail(`${projName}: could not find a selector in src/app/app.component.ts`);
+      fail(
+        `${projName}: could not find a selector in src/app/app.component.ts`,
+      );
     } else {
       const selector = selMatch[1];
       if (!entry.includes(`<${selector}>`)) {
@@ -88,8 +99,31 @@ for (const [projName, proj] of Object.entries(angularJson.projects ?? {})) {
     }
   }
 
+  // Mounted apps must route the same public URL in both execution contexts.
+  // Without the browser base in the SSR document, /lamad/path/... resolves
+  // against / and can render Not Found despite shipping a valid bundle.
+  const indexInput =
+    typeof opts.index === "string" ? opts.index : opts.index?.input;
+  const indexPath = join(appDir, indexInput ?? "src/index.html");
+  if (existsSync(indexPath)) {
+    const baseHref = (html) =>
+      html.match(/<base\b[^>]*\bhref\s*=\s*['"]([^'"]*)['"]/i)?.[1] ?? "/";
+    const browserBase =
+      opts.baseHref ?? baseHref(readFileSync(indexPath, "utf8"));
+    const serverSource = entry
+      .split("\n")
+      .filter((line) => !/^(\*|\/\/|\/\*)/.test(line.trimStart()))
+      .join("\n");
+    const serverBase = baseHref(serverSource);
+    if (serverBase !== browserBase) {
+      fail(
+        `${projName}: SSR document base href '${serverBase}' differs from browser '${browserBase}' — mounted routes must resolve identically`,
+      );
+    }
+  }
+
   // (3) no browser-only element-registration side effects in the server graph's entry
-  for (const line of entry.split('\n')) {
+  for (const line of entry.split("\n")) {
     const trimmed = line.trimStart();
     if (/^(\*|\/\/|\/\*)/.test(trimmed)) continue; // comments describe, they don't import
     if (/^import\s+['"][^'"]*\/register['"]/.test(trimmed)) {
@@ -102,7 +136,9 @@ for (const [projName, proj] of Object.entries(angularJson.projects ?? {})) {
 }
 
 if (failures > 0) {
-  console.error(`\n${failures} SSR-entry conformance failure(s). Pattern: app/elohim-app/src/main.server.ts`);
+  console.error(
+    `\n${failures} SSR-entry conformance failure(s). Pattern: app/elohim-app/src/main.server.ts`,
+  );
   process.exit(1);
 }
-console.log('lint-ssr-entry: clean');
+console.log("lint-ssr-entry: clean");

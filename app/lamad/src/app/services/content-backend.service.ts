@@ -10,7 +10,8 @@
  */
 
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
+import { pendingUntilEvent } from '@angular/core/rxjs-interop';
 
 // @coverage: 83.2% (2026-02-24)
 
@@ -313,6 +314,10 @@ interface RawPathExtensionData {
 
 @Injectable({ providedIn: 'root' })
 export class ContentBackendService {
+  // ElohimClient uses raw promises outside Angular HttpClient. Register finite
+  // reads with zoneless SSR stability so HTML waits for data, including errors
+  // and cancellation, instead of serializing the initial loading placeholder.
+  private readonly injector = inject(Injector);
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
   private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly blobFetcher: IBlobFetcher = inject(BLOB_FETCHER);
@@ -337,6 +342,7 @@ export class ContentBackendService {
     if (cached) return cached;
 
     const obs = from(this.client.get<RawContentData>('content', id)).pipe(
+      pendingUntilEvent(this.injector),
       switchMap(data => {
         if (!data) return of(null);
 
@@ -396,6 +402,7 @@ export class ContentBackendService {
 
     // Use blob fetcher (Helia verified-fetch with HTTP fallback, handles CID gating internally)
     const obs = from(this.blobFetcher.fetchVerified(normalizedCid)).pipe(
+      pendingUntilEvent(this.injector),
       map(bytes => new TextDecoder().decode(bytes)),
       shareReplay(1)
     );
@@ -417,6 +424,7 @@ export class ContentBackendService {
     };
 
     return from(this.client.query<RawContentData>(query)).pipe(
+      pendingUntilEvent(this.injector),
       map(items => items.map(c => this.transformContent(c))),
       map(items => this.applyLocalFilters(items, filters)),
       catchError(_err => {
@@ -430,6 +438,7 @@ export class ContentBackendService {
    */
   batchGetContent(ids: string[]): Observable<Map<string, ContentNode>> {
     return from(this.client.getBatch<RawContentData>('content', ids)).pipe(
+      pendingUntilEvent(this.injector),
       map(results => {
         const map = new Map<string, ContentNode>();
         for (const [id, content] of results) {
@@ -565,6 +574,7 @@ export class ContentBackendService {
       : `/db/relationships/graph/${contentId}`;
 
     return from(this.client.fetch<RawContentGraphData>(url)).pipe(
+      pendingUntilEvent(this.injector),
       map(data => (data ? this.transformContentGraph(data) : null)),
       catchError(_err => {
         return of(null);
@@ -581,6 +591,7 @@ export class ContentBackendService {
    */
   getKnowledgeMap(id: string): Observable<KnowledgeMap | null> {
     return from(this.client.fetch<RawKnowledgeMapData>(`/db/knowledge-maps/${id}`)).pipe(
+      pendingUntilEvent(this.injector),
       map(data => (data ? this.transformKnowledgeMap(data) : null)),
       catchError(_err => {
         return of(null);
@@ -619,6 +630,7 @@ export class ContentBackendService {
    */
   getPathExtension(id: string): Observable<PathExtension | null> {
     return from(this.client.fetch<RawPathExtensionData>(`/db/path-extensions/${id}`)).pipe(
+      pendingUntilEvent(this.injector),
       map(data => (data ? this.transformPathExtension(data) : null)),
       catchError(_err => {
         return of(null);

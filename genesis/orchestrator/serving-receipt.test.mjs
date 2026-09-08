@@ -29,11 +29,12 @@ const names = [
 const expected = {
   storage: "tree:storage",
   doorway: "tree:doorway",
+  renderer: "tree:renderer",
   a2o: "tree:tests",
 };
 function receipt() {
   return {
-    env: { lane: "household", processControl: true, sutParts: expected },
+    env: { lane: "household", processControl: true, sutParts: { ...expected } },
     summary: {
       byConcern: {
         "doorway-failover": {
@@ -86,6 +87,24 @@ test("refuses different source, unknown source, and fleet receipts", () => {
   report.env.lane = "alpha-fleet";
   assert.equal(validateReceipt(report, expected, names), false);
 });
+test("renderer changes invalidate prior delivery receipts", () => {
+  assert.ok(
+    DEFAULT_SUT_COMPONENTS.some(
+      (c) => c.name === "renderer" && c.path === "elohim/elohim-render",
+    ),
+  );
+  assert.equal(
+    validateReceipt(
+      receipt(),
+      { ...expected, renderer: "tree:new-renderer" },
+      names,
+    ),
+    false,
+  );
+  const old = receipt();
+  delete old.env.sutParts.renderer;
+  assert.equal(validateReceipt(old, expected, names), false);
+});
 test("storage service alone cannot bypass mandatory receipt; caller file survives", () => {
   // Hook git environment may make a relative GIT_WORK_TREE follow the gate cwd.
   const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -95,6 +114,7 @@ test("storage service alone cannot bypass mandatory receipt; caller file survive
     for (const path of [
       "elohim/elohim-storage/src/services/content_service.rs",
       "doorway/doorway-service/src/server/http.rs",
+      "elohim/elohim-render/src/shim/node_builtins.rs",
       "elohim/elohim-storage/src/sync/projector.rs",
       "elohim/elohim-storage/src/routes/apps.rs",
       "genesis/a2o/scripts/browser-shell.ts",

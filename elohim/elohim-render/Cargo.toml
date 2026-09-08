@@ -30,6 +30,7 @@ zip = "2"
 getrandom = "0.3"
 
 [dev-dependencies]
+reqwest.workspace = true
 tokio = { workspace = true }
 tempfile = "3"
 # Example-only: render_url.rs surfaces console.* (routed through tracing) when

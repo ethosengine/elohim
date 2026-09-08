@@ -9,6 +9,16 @@ use elohim_render::runtime::JsRuntime;
 /// sha256("hello") -- the vector produced by the injected crypto shim.
 const SHA256_HELLO: &str = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
 
+#[tokio::test]
+async fn util_types_supports_ws_destructuring_and_checks_real_byte_view_brands() {
+    let mut rt = JsRuntime::with_shims();
+    let html = rt
+        .render_via_module(&fixture("util-types-consumer.mjs"), "/")
+        .await
+        .expect("ws-style util.types import and real byte-view predicates");
+    assert_eq!(html, "<main>util byte-view brands verified</main>");
+}
+
 fn fixture(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures")

@@ -52,6 +52,10 @@ function fixture(t) {
   );
   writeFileSync(join(dir, "src/app/app.component.ts"), "selector: 'app-root'");
   writeFileSync(
+    join(dir, "src/index.html"),
+    '<base href="/"><app-root></app-root>',
+  );
+  writeFileSync(
     join(browser, "index.csr.html"),
     '<base href="/demo/"><app-root></app-root><script src="main.js"></script><link rel="stylesheet" href="styles.css">',
   );
@@ -124,6 +128,11 @@ for (const [name, change, expected] of [
         join(f.dir, "src/app/app.component.ts"),
         "selector: 'different-root'",
       ),
+    /Command failed/,
+  ],
+  [
+    "SSR mount differs from browser",
+    (f) => writeFileSync(join(f.dir, "src/index.html"), '<base href="/demo/">'),
     /Command failed/,
   ],
   [
@@ -453,4 +462,18 @@ test("Angular build prepares declared workspace dependencies before app compilat
     "-r --filter demo^... --if-present run build",
     "run build",
   ]);
+});
+
+test("SSR mount agrees with the browser index before packaging", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.dir, "src/index.html"), '<base href="/demo/">');
+  const entry = join(f.dir, "src/main.server.ts");
+  writeFileSync(
+    entry,
+    readFileSync(entry, "utf8").replace(
+      "<app-root>",
+      "<base href='/demo/'><app-root>",
+    ),
+  );
+  assert.equal(packageApp({ appDir: f.dir }).length, 2);
 });

@@ -1,4 +1,4 @@
-import { NgZone, provideZoneChangeDetection } from '@angular/core';
+import { NgZone, provideZonelessChangeDetection, provideZoneChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LamadLayoutComponent } from './lamad-layout.component';
 import { SyncStatusService } from '../../services/sync-status.service';
@@ -146,68 +146,70 @@ describe('LamadLayoutComponent', () => {
   // =========================================================================
 
   describe('readiness gate renders without an external change-detection trigger', () => {
-    it('swaps the loading state for the router outlet when readiness arrives asynchronously', async () => {
-      TestBed.resetTestingModule();
-      const readiness$ = new Subject<boolean>();
+    it.each(['zone', 'zoneless'])(
+      'swaps loading for the router outlet after async readiness (%s)',
+      async mode => {
+        TestBed.resetTestingModule();
+        const readiness$ = new Subject<boolean>();
 
-      TestBed.configureTestingModule({
-        imports: [LamadLayoutComponent],
-        providers: [
-          // Mirror the real bundle (app.config.ts) — TestBed defaults to zoneless,
-          // which would mask a zone-driven change-detection regression entirely.
-          provideZoneChangeDetection(),
-          provideRouter([]),
-          provideHttpClient(),
-          { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
-          { provide: GOVERNANCE, useValue: {} },
-          {
-            provide: LAMAD_STORAGE_CLIENT,
-            useValue: {
-              getBlobUrl: (h: string) => `https://test/blob/${h}`,
-              getStorageBaseUrl: () => 'https://test',
+        TestBed.configureTestingModule({
+          imports: [LamadLayoutComponent],
+          providers: [
+            // Exercise browser zone mode and the explicit zoneless SSR mode.
+            mode === 'zone' ? provideZoneChangeDetection() : provideZonelessChangeDetection(),
+            provideRouter([]),
+            provideHttpClient(),
+            { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+            { provide: GOVERNANCE, useValue: {} },
+            {
+              provide: LAMAD_STORAGE_CLIENT,
+              useValue: {
+                getBlobUrl: (h: string) => `https://test/blob/${h}`,
+                getStorageBaseUrl: () => 'https://test',
+              },
             },
-          },
-          {
-            provide: DataLoaderService,
-            useValue: {
-              checkReadiness: vi.fn().mockReturnValue(readiness$.asObservable()),
-              getContentIndex: vi.fn().mockReturnValue(of({ nodes: [] })),
-              getContent: vi.fn(),
+            {
+              provide: DataLoaderService,
+              useValue: {
+                checkReadiness: vi.fn().mockReturnValue(readiness$.asObservable()),
+                getContentIndex: vi.fn().mockReturnValue(of({ nodes: [] })),
+                getContent: vi.fn(),
+              },
             },
-          },
-          { provide: RendererInitializerService, useValue: {} },
-          // Caught-up sync status so the strip's poll completes and the zone can
-          // reach stability (an 'unreachable' status re-polls every 4s forever).
-          {
-            provide: SyncStatusService,
-            useValue: {
-              fetch: () =>
-                of({
-                  connectedPeers: 1,
-                  replication: { completed: 1, pending: 0, failed: 0, caughtUp: true },
-                }),
+            { provide: RendererInitializerService, useValue: {} },
+            // Caught-up sync status so the strip's poll completes and the zone can
+            // reach stability (an 'unreachable' status re-polls every 4s forever).
+            {
+              provide: SyncStatusService,
+              useValue: {
+                fetch: () =>
+                  of({
+                    connectedPeers: 1,
+                    replication: { completed: 1, pending: 0, failed: 0, caughtUp: true },
+                  }),
+              },
             },
-          },
-        ],
-      });
+          ],
+        });
 
-      const asyncFixture = TestBed.createComponent(LamadLayoutComponent);
-      asyncFixture.autoDetectChanges(true);
+        const asyncFixture = TestBed.createComponent(LamadLayoutComponent);
+        asyncFixture.autoDetectChanges(true);
 
-      // Initial render: ngOnInit subscribes, nothing has emitted yet.
-      const host = asyncFixture.nativeElement as HTMLElement;
-      expect(host.textContent).toContain('Loading content');
-      expect(host.querySelector('.lamad-main')).toBeNull();
+        // Initial render: ngOnInit subscribes, nothing has emitted yet.
+        const host = asyncFixture.nativeElement as HTMLElement;
+        expect(host.textContent).toContain('Loading content');
+        expect(host.querySelector('.lamad-main')).toBeNull();
 
-      // Readiness arrives out-of-band — in the browser this is the doorway fetch
-      // resolving back inside the Angular zone.
-      TestBed.inject(NgZone).run(() => readiness$.next(true));
-      await asyncFixture.whenStable();
+        // Readiness arrives out-of-band — in the browser this is the doorway fetch
+        // resolving back inside the Angular zone.
+        TestBed.inject(NgZone).run(() => readiness$.next(true));
+        await asyncFixture.whenStable();
 
-      expect(host.querySelector('.lamad-main')).not.toBeNull();
-      expect(host.textContent).not.toContain('Loading content');
+        expect(host.querySelector('.lamad-main')).not.toBeNull();
+        expect(host.textContent).not.toContain('Loading content');
 
-      asyncFixture.destroy();
-    });
+        asyncFixture.destroy();
+      }
+    );
   });
 });

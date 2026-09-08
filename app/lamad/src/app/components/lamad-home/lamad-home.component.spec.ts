@@ -1,3 +1,4 @@
+import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -244,10 +245,30 @@ describe('LamadHomeComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/explore']);
   });
 
+  it('constructs without browser localStorage during SSR', () => {
+    const storage = globalThis.localStorage;
+    try {
+      Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true });
+      const ssr = new LamadHomeComponent(
+        { markForCheck: vi.fn() } as unknown as ChangeDetectorRef,
+        pathService,
+        pathFilterService,
+        router,
+        profileService,
+        agentService,
+        identityService
+      );
+      expect(ssr.viewMode).toBe('paths');
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+    }
+  });
+
   it('should load saved view mode from localStorage', () => {
     localStorageMock['lamad-view-mode'] = 'explore';
 
     const newComponent = new LamadHomeComponent(
+      { markForCheck: vi.fn() } as unknown as ChangeDetectorRef,
       pathService,
       pathFilterService,
       router,
@@ -260,6 +281,7 @@ describe('LamadHomeComponent', () => {
 
   it('should default to paths mode if no saved preference', () => {
     const newComponent = new LamadHomeComponent(
+      { markForCheck: vi.fn() } as unknown as ChangeDetectorRef,
       pathService,
       pathFilterService,
       router,

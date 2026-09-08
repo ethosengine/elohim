@@ -124,6 +124,12 @@ for (const mode of [
 
 const customRoute = 'custom-route';
 const browserMount = 'browser-mount';
+const declarationTransient = 'declaration-transient';
+const declarationChanged = 'declaration-changed';
+const declarationDeadline = 'declaration-deadline';
+const adoptionTransient = 'adoption-transient';
+const renderedHeading = 'A living learning path';
+const headingPresent = 'heading-present';
 const renderedConcept = '/lamad/concept/elohim-host-landing';
 for (const mode of [
   'current',
@@ -134,10 +140,47 @@ for (const mode of [
   'redirect',
   customRoute,
   browserMount,
+  'declaration-missing',
+  'declaration-wrong',
+  'declaration-malformed',
+  'declaration-unreachable',
+  declarationTransient,
+  declarationChanged,
+  declarationDeadline,
+  adoptionTransient,
+  headingPresent,
+  'heading-loading',
+  'heading-state-only',
 ]) {
   void test(`SSR attestation: ${mode}`, async () => {
+    let declarationReads = 0;
+    let healthReads = 0;
     const server = createServer((request, response) => {
-      if (request.url?.startsWith('/health')) {
+      if (request.url === '/db/content/test-app') {
+        declarationReads++;
+        if (
+          mode === 'declaration-unreachable' ||
+          (mode === declarationTransient && declarationReads === 1)
+        ) {
+          response.writeHead(503).end();
+        } else if (mode === 'declaration-malformed') {
+          response.end('not JSON');
+        } else {
+          response.setHeader(contentType, 'application/json');
+          response.end(
+            JSON.stringify({
+              serverBlobHash:
+                mode === 'declaration-missing' || mode === declarationDeadline
+                  ? null
+                  : mode === 'declaration-wrong' ||
+                      (mode === declarationChanged && declarationReads > 1)
+                    ? 'other'
+                    : expectedHead,
+            })
+          );
+        }
+      } else if (request.url?.startsWith('/health')) {
+        healthReads++;
         response.setHeader(contentType, 'application/json');
         response.end(
           JSON.stringify(
@@ -147,7 +190,10 @@ for (const mode of [
                   servedBundleHeads: [
                     {
                       slug: 'test-app',
-                      serverBlobHash: mode === 'stale' ? 'old' : expectedHead,
+                      serverBlobHash:
+                        mode === 'stale' || (mode === adoptionTransient && healthReads === 1)
+                          ? 'old'
+                          : expectedHead,
                       status: mode === 'failed' ? 'failed' : 'current',
                     },
                   ],
@@ -160,7 +206,13 @@ for (const mode of [
         if (mode !== 'csr-fallback' && correctRoute) response.setHeader('x-ssr-rendered', '1');
         if (mode === 'redirect')
           response.writeHead(302, { Location: 'https://other-doorway.invalid/' });
-        response.end('<app-root>Rendered</app-root>');
+        response.end(
+          mode === headingPresent
+            ? `<app-root><h1>A living <span>learning path</span></h1></app-root>`
+            : mode === 'heading-state-only'
+              ? `<app-root>Loading</app-root><script type="application/json">{"title":"${renderedHeading}"}</script>`
+              : '<app-root>Loading</app-root>'
+        );
       }
     });
     await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
@@ -176,12 +228,38 @@ for (const mode of [
           expectedHead,
           '',
           mode === customRoute ? renderedConcept : mode === browserMount ? '/lamad' : '/',
+          mode.startsWith('heading-') ? renderedHeading : '',
         ],
-        { env: { ...process.env, PROJHEAD_CONVERGE_WINDOW: '0' } }
+        {
+          env: {
+            ...process.env,
+            PROJHEAD_CONVERGE_WINDOW: mode === adoptionTransient ? '3' : '0',
+            PROJHEAD_CONVERGE_INTERVAL: '1',
+            PROJHEAD_DECLARE_WINDOW:
+              mode === declarationTransient ? '3' : mode === declarationDeadline ? '1' : '0',
+            PROJHEAD_DECLARE_INTERVAL: '1',
+          },
+        }
       );
-      if (mode === 'current' || mode === customRoute)
+      if (
+        mode === 'current' ||
+        mode === customRoute ||
+        mode === declarationTransient ||
+        mode === headingPresent
+      )
         assert.match((await run).stdout, /projected head propagated/);
-      else await assert.rejects(run);
+      else if (mode === adoptionTransient)
+        assert.match((await run).stdout, /projected head converged/);
+      else if (mode.startsWith('declaration-')) {
+        await assert.rejects(run, (error: unknown) => {
+          assert.match((error as { stderr: string }).stderr, /SSR declaration/);
+          return true;
+        });
+        if (mode !== declarationChanged)
+          assert.equal(healthReads, 0, 'no adoption without declaration');
+        if (mode === declarationDeadline)
+          assert.equal(declarationReads, 1, 'no new request after the declaration deadline');
+      } else await assert.rejects(run);
     } finally {
       await new Promise<void>((done, reject) =>
         server.close(error => (error ? reject(error) : done()))

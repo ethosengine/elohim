@@ -435,10 +435,9 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
 }
 
 // Served-vs-declared propagation probe (Track-4 T4-2). verifyEprMounts (above)
-// proves a routed mount answers 200; stageSpaBlobs/authorHeadOnce prove the
-// content ROW's declared head was PATCHed. Neither proves the running doorway
-// PROCESS has actually materialized that head — a stale-but-200 host passes
-// both. This leg asks each doorway's health surface directly what server
+// proves a routed mount answers 200; authorHeadOnce supplies the desired hash.
+// Each peer must first declare it (90s); only then do we wait for the running
+// doorway to materialize it (400s adoption window). This leg asks what server
 // bundle head it has served and compares it to the hash authorHeadOnce just
 // authored (outcomes["hash|slug|kind"]). Only server-kind bundles are probed:
 // the T4-1 health-surface contract (servedBundleHeads[].serverBlobHash) only
@@ -461,7 +460,7 @@ def verifyProjectedHeads(List<String> doorwayEprUrls, List<Map> bundles, String 
         for (doorwayEprUrl in doorwayEprUrls) {
             def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
             def rc = sh(returnStatus: true,
-                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}' '${bundle.ssrPath}'")
+                    script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}' '${bundle.ssrPath}' '${bundle.ssrHeading ?: ''}'")
             outcomes["projhead|${host}|${bundle.slug}|${kind}".toString()] = (rc == 0)
             if (rc != 0) { failures << "${host}/${bundle.slug}: SSR head not served" }
         }
@@ -571,7 +570,7 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server", ssrPath: "/"],
         [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server", ssrPath: "/lamad/concept/elohim-host-landing"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server", ssrPath: "/lamad/path/elohim-protocol", ssrHeading: "Elohim Protocol: Living Documentation"],
     ]
     def outcomes = [:]
 
@@ -1391,7 +1390,7 @@ VEOF
         }
 
         stage('Apply Ingress (pre-upload)') {
-            // Apply the per-env ingress manifest BEFORE Upload SPA Blob.
+            // Apply the per-env ingress manifest BEFORE Publish and Verify App Delivery.
             //
             // The ingress carries `nginx.ingress.kubernetes.io/proxy-body-size`,
             // which nginx-ingress's default (1 MB) violates for the ~10 MB SPA
@@ -1437,7 +1436,7 @@ VEOF
             }
         }
 
-        stage('Upload SPA Blob') {
+        stage('Publish and Verify App Delivery') {
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   OnInit,
@@ -91,6 +92,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
+    private readonly changeDetector: ChangeDetectorRef,
     private readonly dataLoader: DataLoaderService,
     private readonly router: Router,
     // Injecting RendererInitializerService triggers renderer registration
@@ -106,9 +108,11 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.isReady = true;
+          this.changeDetector.markForCheck();
         },
         error: () => {
           this.isReady = true; // Still mark ready to show error state
+          this.changeDetector.markForCheck();
         },
       });
 

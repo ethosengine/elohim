@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, Inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  OnInit,
+  OnDestroy,
+  Inject,
+} from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // @coverage: 86.3% (2026-02-24)
@@ -76,6 +83,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
+    private readonly changeDetector: ChangeDetectorRef,
     private readonly pathService: PathService,
     private readonly pathFilterService: PathFilterService,
     private readonly router: Router,
@@ -84,7 +92,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     @Inject(LAMAD_IDENTITY) private readonly identityService: ILamadIdentity
   ) {
     // Load saved view mode preference
-    const savedMode = localStorage.getItem('lamad-view-mode');
+    const savedMode =
+      typeof localStorage === 'undefined' ? null : localStorage.getItem('lamad-view-mode');
     if (savedMode === 'explore' || savedMode === 'paths') {
       this.viewMode = savedMode;
     }
@@ -171,10 +180,12 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
             this.allPaths.find(p => p.id === 'elohim-protocol') ?? this.allPaths[0] ?? null;
 
           this.isLoading = false;
+          this.changeDetector.markForCheck();
         },
         error: () => {
           this.error = 'Unable to load learning paths';
           this.isLoading = false;
+          this.changeDetector.markForCheck();
         },
       });
   }
@@ -285,7 +296,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   setViewMode(mode: 'paths' | 'explore'): void {
     this.viewMode = mode;
-    localStorage.setItem('lamad-view-mode', mode);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('lamad-view-mode', mode);
 
     // If explore mode, navigate to graph explorer
     if (mode === 'explore') {

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   OnInit,
   OnDestroy,
@@ -182,6 +183,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   private readonly seoService = inject(SeoService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly contentMasteryService = inject(ContentMasteryService);
   private readonly adaptationService = inject(PathAdaptationService);
   private readonly agentService: ILamadAgent = inject(LAMAD_AGENT);
@@ -303,6 +305,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           }
 
           this.isLoading = false;
+          this.changeDetector.markForCheck();
 
           // Load active recommendations for this path/agent
           const humanId = this.agentService.getCurrentAgentId();
@@ -317,6 +320,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           const errorMsg = err instanceof Error ? err.message : 'Failed to load path';
           this.error = errorMsg;
           this.isLoading = false;
+          this.changeDetector.markForCheck();
         },
       });
   }

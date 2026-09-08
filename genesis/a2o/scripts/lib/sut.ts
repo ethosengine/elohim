@@ -83,6 +83,7 @@ export const DEFAULT_SUT_COMPONENTS: readonly SutComponent[] = [
   { name: 'meshLauncher', path: 'app/elohim-app/scripts/hc-mesh.sh' },
   { name: 'storage', path: 'elohim/elohim-storage' },
   { name: 'doorway', path: 'doorway/doorway-service' },
+  { name: 'renderer', path: 'elohim/elohim-render' },
   { name: 'conductor', path: 'elohim/holochain-conductor' },
   { name: 'dna', path: 'elohim/holochain/dna' },
   { name: 'dnaHash', declaredBy: ['E2E_DNA_HASH', 'ELOHIM_DNA_HASH'] },

@@ -59,8 +59,11 @@ A local Angular package does not prove application boot, hydration, rendering, r
 propagation, or doorway caching. The separate Angular `runtimeCheck` calls the existing
 `verify-served-shell.sh` and `verify-projected-head.sh` against a named published doorway/slug and the
 packages' exact hashes. Browser `mount` and SSR `ssrPath` are separate: `/lamad` boots the
-browser app, while `/lamad/concept/elohim-host-landing` is a declared SSR route for an existing
+browser app, while `/lamad/path/elohim-protocol` is a declared SSR route for an existing
 published resource. SSR packages require an explicit `ssrPath`; it is never inferred from the slug.
+`ssrHeading` optionally requires that exact visible h1 in the server HTML; loading text or
+serialized JSON does not satisfy it. The Angular authoring check also requires matching
+browser and server document base paths.
 For example, after publishing the packages:
 
 ```js
@@ -69,7 +72,8 @@ verifyPackageRuntime({
   doorway: "http://localhost:8888",
   slug: "lamad-spa",
   mount: "/lamad",
-  ssrPath: "/lamad/concept/elohim-host-landing",
+  ssrPath: "/lamad/path/elohim-protocol",
+  ssrHeading: "Elohim Protocol: Living Documentation",
 });
 ```
 

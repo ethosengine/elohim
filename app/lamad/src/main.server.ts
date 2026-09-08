@@ -16,7 +16,7 @@ import { config } from './app/app.config.server';
 // custom elements upgrade client-side after hydration; SSR renders them as
 // inert unknown elements, which is correct and keeps browser-only code out of
 // the V8 render path.
-const SSR_DOCUMENT = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><lamad-root></lamad-root></body></html>`;
+const SSR_DOCUMENT = `<!DOCTYPE html><html><head><meta charset="utf-8"><base href="/lamad/"></head><body><lamad-root></lamad-root></body></html>`; // route-literal-ok: bundle base-href declaration matches src/index.html, not a minted link
 
 // The bootstrap function receives a BootstrapContext from @angular/platform-server's
 // renderApplication(). The context carries the platformRef that @angular/platform-server

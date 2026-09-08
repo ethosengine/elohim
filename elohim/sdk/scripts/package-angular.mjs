@@ -149,7 +149,14 @@ function check({ archive, bundle, appDir, target }) {
   return true;
 }
 
-function runtimeCheck({ packages, doorway, slug, mount = "/", ssrPath }) {
+function runtimeCheck({
+  packages,
+  doorway,
+  slug,
+  mount = "/",
+  ssrPath,
+  ssrHeading = "",
+}) {
   if (!doorway || !slug)
     throw new Error(
       "Angular runtime check needs the published doorway and slug",
@@ -171,7 +178,7 @@ function runtimeCheck({ packages, doorway, slug, mount = "/", ssrPath }) {
     const args =
       bundle.kind === "browser"
         ? [doorway, mount, slug, bundle.hash]
-        : [doorway, slug, bundle.hash, "", ssrPath];
+        : [doorway, slug, bundle.hash, "", ssrPath, ssrHeading];
     execFileSync("bash", [join(root, "scripts/ci", script), ...args], {
       stdio: "inherit",
     });

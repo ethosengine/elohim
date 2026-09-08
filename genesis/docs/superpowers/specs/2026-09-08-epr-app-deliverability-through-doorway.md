@@ -86,6 +86,19 @@ existing canonical-head resolver chooses the app revision; blob identity remains
 and byte transfer uses the existing transport. Passive recovery must not promote an old unverified
 SQL/server hint into the notarized declaration.
 
+**CI phase diagnostics.** Publication, peer declaration, renderer adoption, and an actual
+render are separate observations. `verify-projected-head.sh` first requires this doorway’s
+storage route to expose the intended canonical `serverBlobHash` within 90 seconds. Only that
+observation admits the 400-second renderer-adoption window. It rechecks the declaration after
+adoption and requires an actual SSR response; a healthy registry alone cannot pass. Missing
+metadata names the authoring/peer-propagation leg instead of spending the renderer window
+waiting for a head the peer has not declared. Changes to `elohim-render` also invalidate the
+household receipt, because runtime compatibility is part of delivery. Lamad is checked at its
+actual `/lamad/path/elohim-protocol` route and must return the learning path’s rendered h1,
+not only serialized state. Its old `/concept` probe path was not an app route. Angular
+packaging rejects browser/server base-path drift; finite SDK reads contribute to Angular
+SSR stability through the Angular adapter, and async view changes notify its scheduler.
+
 **SSR responsibilities and the two trips.** Peers retain and exchange the app's declared bundle
 identities and content-addressed bytes. Doorways fetch, materialize, render, and cache locally;
 web visitor traffic must not require rendering once per request on household peers. Rendering

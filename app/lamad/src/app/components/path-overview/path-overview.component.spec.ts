@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute, Router } from '@angular/router';
-import { of, throwError, BehaviorSubject } from 'rxjs';
+import { of, throwError, BehaviorSubject, Subject } from 'rxjs';
 import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
@@ -224,6 +224,19 @@ describe('PathOverviewComponent', () => {
 
     fixture = TestBed.createComponent(PathOverviewComponent);
     component = fixture.componentInstance;
+  });
+
+  it('renders the path heading after asynchronous data in zoneless mode', async () => {
+    const result = new Subject<LearningPath>();
+    pathService.getPath.mockReturnValue(result);
+    fixture.autoDetectChanges();
+    expect(fixture.nativeElement.querySelector('h1.path-title')).toBeNull();
+    result.next(mockPath);
+    result.complete();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('h1.path-title')?.textContent).toContain(
+      mockPath.title
+    );
   });
 
   it('should create', () => {

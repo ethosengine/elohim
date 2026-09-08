@@ -40,6 +40,8 @@
 //!   interop section below). Non-builtin ids stay loud.
 //! - `util.promisify` — commonly called at module-eval time to wrap callback
 //!   APIs; a correct minimal implementation avoids an eval-time throw.
+//! - `util.types.isUint8Array` — `ws` destructures it at module evaluation;
+//!   the intrinsic typed-array brand check also recognizes Buffer instances.
 //! - `events.setMaxListeners` — a listener-cap raise; a no-op is semantically
 //!   safe for a single-shot SSR render.
 //! - `buffer.Buffer` — re-exports the REAL global `Buffer` (a `Uint8Array`
@@ -208,7 +210,7 @@ const BUILTIN_SURFACE: &[BuiltinSurface] = &[
     },
     BuiltinSurface {
         name: "util",
-        named: &["promisify"],
+        named: &["promisify", "types"],
         cjs_primary: None,
     },
     BuiltinSurface {
@@ -247,6 +249,14 @@ fn surface(name: &str) -> Option<&'static BuiltinSurface> {
 /// [`member_body`]).
 fn real_member(builtin: &str, member: &str) -> Option<&'static str> {
     match (builtin, member) {
+        // ws destructures util.types.isUint8Array at module evaluation. Use the
+        // intrinsic typed-array brand getter, not instanceof or a spoofable
+        // Object.prototype.toString tag. This also accepts Buffer subclasses.
+        ("util", "types") => Some(
+            "(() => { const tag = Object.getOwnPropertyDescriptor(\
+            Object.getPrototypeOf(Uint8Array.prototype), Symbol.toStringTag).get; \
+            return { isUint8Array(value) { return tag.call(value) === 'Uint8Array'; } }; })()",
+        ),
         // A correct minimal promisify: wrap a Node error-first callback API in a
         // Promise. Commonly invoked at module-eval time, so a loud stub would
         // throw before the render even starts.
