@@ -53,8 +53,12 @@ impl AdoptionController {
                 // (C5) The path, re-read through THIS peer's own conductor —
                 // the same read `verify_path` consumes, so "revoked" means one
                 // thing.
-                path_evidence::fetch_path_evidence_for_cid(self.hc.as_ref(), self.db.as_ref(), &cid)
-                    .await
+                path_evidence::fetch_path_evidence_for_cid(
+                    self.conductor().as_ref(),
+                    self.db.as_ref(),
+                    &cid,
+                )
+                .await
             },
             |cid| async move {
                 // **Task 14b.** The sunset that names that path, down the same
@@ -65,8 +69,12 @@ impl AdoptionController {
                 if self.sunsetter.is_none() {
                     return Answer::Absent;
                 }
-                path_evidence::fetch_sunset_evidence_for(self.hc.as_ref(), self.db.as_ref(), &cid)
-                    .await
+                path_evidence::fetch_sunset_evidence_for(
+                    self.conductor().as_ref(),
+                    self.db.as_ref(),
+                    &cid,
+                )
+                .await
             },
             // THIS peer's own carry, off the applied-release row the crossing
             // left behind. Threaded rather than read inline so the arm's

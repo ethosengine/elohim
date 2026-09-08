@@ -53,6 +53,7 @@ use super::{
 };
 use crate::blob_store::BlobStore;
 use crate::conductor_admission::AdmissionClass;
+use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::ContentHeadWire;
 use crate::services::release_attestation::{self, ReleaseAttestationCtx};
@@ -505,6 +506,124 @@ impl InstalledRealitySource for PassportInstalledReality {
 }
 
 // ---------------------------------------------------------------------------
+// The conductor leg — a LIVE handle source, never a captured one
+// ---------------------------------------------------------------------------
+
+/// Where the controller gets a conductor handle, **re-read on every use**.
+///
+/// # Why this is a trait and not an `Arc<HcClient>` field
+///
+/// `holochain_client` 0.8 has no reconnect, and a conductor restart both closes
+/// the sockets AND invalidates the in-memory app-auth token, so recovery is a
+/// full re-mint rather than a socket-level reconnect. That re-mint already
+/// exists exactly once in this crate:
+/// [`crate::hc_client_registry::HcClientRegistry::spawn_bridge_supervisor`]
+/// probes each supervised role every [`crate::hc_client_registry::BRIDGE_PROBE_INTERVAL`],
+/// and on a failed ping clears the registry slot and re-runs
+/// `connect_role_forever`, storing a FRESH `Arc<HcClient>` in the slot.
+///
+/// That supervisor's own doc names this defect: *"Anything holding an Arc clone
+/// keeps failing until it re-reads."* The adoption controller held an
+/// `Arc<HcClient>` cloned out of the registry at boot
+/// (`main.rs`: `hc_registry_for_http…lamad_client()` → `with_conductor`) and
+/// never re-read it, so every sweep after the first conductor roll called a
+/// corpse and reported `conductor_unavailable` forever — while the projector
+/// path, which re-reads the same slot, kept working. This trait makes
+/// "re-read" the shape of the type rather than a remembered step.
+///
+/// **There is exactly one reconnect strategy in this crate and it is the
+/// supervisor's.** An implementation here re-READS a handle; it must never
+/// mint one.
+#[async_trait::async_trait]
+pub trait ConductorBridge: Send + Sync {
+    /// The handle to use RIGHT NOW. `None` while the bridge is being re-minted
+    /// — honest backpressure, and the next sweep asks again.
+    fn handle(&self) -> Option<Arc<HcClient>>;
+
+    /// One `Background`-classed zome call through [`Self::handle`].
+    ///
+    /// Defaulted rather than duplicated: every implementation gets the same
+    /// admission class and the same "no handle is `Connection`, not a decode
+    /// failure" mapping, and a test fake overrides only this method.
+    async fn call_zome(
+        &self,
+        zome: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, StorageError> {
+        let Some(hc) = self.handle() else {
+            return Err(StorageError::Connection(
+                "release-adoption: no conductor bridge (being re-minted)".to_string(),
+            ));
+        };
+        hc.call_zome_timed(zome, fn_name, payload, AdmissionClass::Background)
+            .await
+            .map(|(bytes, _timing)| bytes)
+    }
+}
+
+/// The production bridge: the registry slot the bridge supervisor owns.
+///
+/// Holds the registry, never a client — so a conductor roll is ordinary churn
+/// and the controller's next sweep resolves through the re-minted handle.
+pub struct RegistryConductorBridge {
+    registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+    role: &'static str,
+    /// Identity of the last handle this bridge handed out, as a raw pointer
+    /// value. Only ever compared, never dereferenced.
+    last_seen: std::sync::atomic::AtomicUsize,
+}
+
+impl RegistryConductorBridge {
+    /// The `lamad` role — the registry slot that carries the `content_store`
+    /// zome this controller resolves heads through.
+    pub fn lamad(registry: Arc<crate::hc_client_registry::HcClientRegistry>) -> Self {
+        Self {
+            registry,
+            role: "lamad",
+            last_seen: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ConductorBridge for RegistryConductorBridge {
+    fn handle(&self) -> Option<Arc<HcClient>> {
+        let hc = self.registry.client(self.role)?;
+        // Count the moment this controller picks up a DIFFERENT handle than the
+        // one it last used — i.e. the supervisor re-minted the bridge under us
+        // and we followed it. Counted here rather than in the supervisor
+        // because the supervisor's own reconnect counter cannot say whether the
+        // adoption controller ever noticed, which is precisely what was wrong.
+        let ptr = Arc::as_ptr(&hc) as usize;
+        let previous = self
+            .last_seen
+            .swap(ptr, std::sync::atomic::Ordering::Relaxed);
+        if previous != 0 && previous != ptr {
+            crate::metrics::RELEASE_CHANNEL_CONDUCTOR_RECONNECT.inc();
+            tracing::info!(
+                role = self.role,
+                "release-adoption: picked up a RE-MINTED conductor bridge — a conductor roll is \
+                 ordinary churn, and this sweep resolves through the fresh handle"
+            );
+        }
+        Some(hc)
+    }
+}
+
+/// A bridge over one fixed handle. Correct only for a process that outlives no
+/// conductor restart — kept for callers (and tests) that hold a client
+/// directly. Production wires [`RegistryConductorBridge`].
+pub struct StaticConductorBridge(pub Arc<HcClient>);
+
+#[async_trait::async_trait]
+impl ConductorBridge for StaticConductorBridge {
+    fn handle(&self) -> Option<Arc<HcClient>> {
+        Some(self.0.clone())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The controller
 // ---------------------------------------------------------------------------
 
@@ -518,7 +637,11 @@ impl InstalledRealitySource for PassportInstalledReality {
 /// declared class, and a node not under readable pressure. Four independent
 /// conditions, each with a typed refusal, none of them a default.
 pub struct AdoptionController {
-    hc: Option<Arc<HcClient>>,
+    /// The conductor leg. A SOURCE, never a captured handle — see
+    /// [`ConductorBridge`]. Held as the bridge rather than as an
+    /// `Arc<HcClient>` so a conductor roll cannot leave the controller talking
+    /// to a corpse for the life of the process.
+    bridge: Option<Arc<dyn ConductorBridge>>,
     artifacts: Option<Arc<dyn ArtifactSource>>,
     installed: Option<Arc<dyn InstalledRealitySource>>,
     /// The vehicles this node is equipped with. `None` means every `apply`
@@ -553,7 +676,7 @@ pub struct AdoptionController {
 impl AdoptionController {
     pub fn new(staging_root: impl Into<PathBuf>) -> Self {
         Self {
-            hc: None,
+            bridge: None,
             artifacts: None,
             installed: None,
             apply: None,
@@ -569,9 +692,28 @@ impl AdoptionController {
 
     /// The conductor this peer resolves heads through. Without one every sweep
     /// reports `conductor_unavailable` — honestly, and without guessing.
+    ///
+    /// Takes a client and pins it for the life of the controller. Correct only
+    /// where no conductor restart is possible; production wires
+    /// [`Self::with_conductor_bridge`] so a roll heals in one sweep.
     pub fn with_conductor(mut self, hc: Arc<HcClient>) -> Self {
-        self.hc = Some(hc);
+        self.bridge = Some(Arc::new(StaticConductorBridge(hc)));
         self
+    }
+
+    /// The conductor leg as a LIVE source. Production's wiring: the registry
+    /// slot the bridge supervisor re-mints, so a conductor pod roll costs one
+    /// or two refused sweeps rather than parking the channel until the process
+    /// restarts. See [`ConductorBridge`].
+    pub fn with_conductor_bridge(mut self, bridge: Arc<dyn ConductorBridge>) -> Self {
+        self.bridge = Some(bridge);
+        self
+    }
+
+    /// The handle to use for THIS read. Re-resolved every time on purpose —
+    /// the whole point of [`ConductorBridge`].
+    fn conductor(&self) -> Option<Arc<HcClient>> {
+        self.bridge.as_ref().and_then(|b| b.handle())
     }
 
     pub fn with_artifact_source(mut self, source: Arc<dyn ArtifactSource>) -> Self {
@@ -770,23 +912,21 @@ impl AdoptionController {
     /// way its declare path already has one — it belongs to another lane, so
     /// this reuses the type rather than editing the file.)
     async fn resolve_head(&self, channel_id: &str) -> Answer<ContentHeadWire> {
-        let Some(hc) = self.hc.as_ref() else {
+        let Some(bridge) = self.bridge.as_ref() else {
             return Answer::Unreachable;
         };
         let payload = match rmp_serde::to_vec_named(&channel_id.to_string()) {
             Ok(p) => p,
             Err(_) => return Answer::Unreachable,
         };
-        let bytes = match hc
-            .call_zome_timed(
-                "content_store",
-                "resolve_content_head_local",
-                payload,
-                AdmissionClass::Background,
-            )
+        // Through the BRIDGE, never a captured handle: this is the read that
+        // has to notice a re-minted conductor, because it is also the read the
+        // backoff bypass depends on.
+        let bytes = match bridge
+            .call_zome("content_store", "resolve_content_head_local", payload)
             .await
         {
-            Ok((bytes, _timing)) => bytes,
+            Ok(bytes) => bytes,
             Err(e) => {
                 tracing::debug!(
                     channel = %channel_id,
@@ -826,7 +966,7 @@ impl AdoptionController {
     /// exist as a release on this channel" requires looking at what that
     /// action actually carries, never guessing from the action hash alone.
     async fn resolve_record_summary(&self, action_hash_b64: &str) -> Answer<RecordSummary> {
-        let Some(hc) = self.hc.as_ref() else {
+        let Some(bridge) = self.bridge.as_ref() else {
             return Answer::Unreachable;
         };
         let action_hash =
@@ -846,16 +986,11 @@ impl AdoptionController {
             Ok(p) => p,
             Err(_) => return Answer::Unreachable,
         };
-        let bytes = match hc
-            .call_zome_timed(
-                "content_store",
-                "get_content",
-                payload,
-                AdmissionClass::Background,
-            )
+        let bytes = match bridge
+            .call_zome("content_store", "get_content", payload)
             .await
         {
-            Ok((bytes, _timing)) => bytes,
+            Ok(bytes) => bytes,
             Err(e) => {
                 tracing::debug!(
                     action_hash = %action_hash_b64,
@@ -929,7 +1064,7 @@ impl AdoptionController {
         channel_id: &str,
         candidate_cid: &str,
     ) -> Option<ContentHeadWire> {
-        let hc = self.hc.as_ref()?;
+        let bridge = self.bridge.as_ref()?;
 
         let served_payload = rmp_serde::to_vec_named(
             &crate::services::conductor_writes::GetRecordForActionInput {
@@ -937,16 +1072,11 @@ impl AdoptionController {
             },
         )
         .ok()?;
-        let served_bytes = match hc
-            .call_zome_timed(
-                "content_store",
-                "get_record_for_action",
-                served_payload,
-                AdmissionClass::Background,
-            )
+        let served_bytes = match bridge
+            .call_zome("content_store", "get_record_for_action", served_payload)
             .await
         {
-            Ok((bytes, _timing)) => bytes,
+            Ok(bytes) => bytes,
             Err(e) => {
                 tracing::debug!(
                     channel = %channel_id,
@@ -972,16 +1102,15 @@ impl AdoptionController {
             },
         )
         .ok()?;
-        let proof_bytes = match hc
-            .call_zome_timed(
+        let proof_bytes = match bridge
+            .call_zome(
                 "content_store",
                 "validate_carried_head_record",
                 proof_payload,
-                AdmissionClass::Background,
             )
             .await
         {
-            Ok((bytes, _timing)) => bytes,
+            Ok(bytes) => bytes,
             Err(e) => {
                 tracing::debug!(
                     channel = %channel_id,
@@ -1021,7 +1150,10 @@ impl AdoptionController {
         release_cid: &str,
         manifest: &super::ReleaseManifest,
     ) -> Option<release_attestation::QualifyingEvidence> {
-        let hc = self.hc.as_ref()?;
+        // The whole client, re-read: the attestation rail needs a signer, not
+        // just a call. Re-resolved per read for the same reason as everything
+        // else here.
+        let hc = self.conductor()?;
         let discipline = manifest
             .adoption_discipline
             .for_release(manifest.provenance.builder_agent.clone());
@@ -1594,7 +1726,7 @@ impl AdoptionController {
             // peer's own projection. Absent for every artifact class but
             // `happ-lineage`, which costs a non-lineage sweep exactly nothing.
             path: super::path_evidence::fetch_path_evidence(
-                self.hc.as_ref(),
+                self.conductor().as_ref(),
                 self.db.as_ref(),
                 &manifest,
             )
@@ -2567,6 +2699,103 @@ mod tests {
             other => panic!("expected conductor_unavailable, got {other:?}"),
         }
         assert!(channel.resolved_head.is_none(), "unreachable is not a head");
+    }
+
+    /// **A conductor roll is ordinary churn** (alpha, 2026-09-08).
+    ///
+    /// The shape this reproduces: a storage pod connects to its conductor once
+    /// at boot, the conductor pod rolls minutes later, and every subsequent
+    /// sweep reports `conductor_unavailable`. The registry's bridge supervisor
+    /// re-mints the handle within one probe interval, so the substrate was
+    /// healthy the whole time — the controller was holding a corpse.
+    ///
+    /// The assertion that matters is `handle_reads == resolves`: the controller
+    /// asks its SOURCE for a handle on every read. A controller that captures
+    /// an `Arc<HcClient>` at wiring time (what shipped) cannot satisfy it — it
+    /// asks once, ever, which is why the second read below could never have
+    /// answered.
+    ///
+    /// Unreachable → Absent is the load-bearing transition: `Absent` is only
+    /// reachable when a conductor ANSWERED, so the second read proves the
+    /// re-minted bridge is actually carrying the call.
+    #[tokio::test]
+    async fn a_rolled_conductor_is_re_resolved_and_the_next_read_answers() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        /// A bridge that is dead for its first `dead_reads` calls — the
+        /// conductor pod rolling — and answers from a re-minted handle after.
+        struct RollingBridge {
+            handle_reads: AtomicUsize,
+            dead_reads: usize,
+        }
+
+        #[async_trait::async_trait]
+        impl ConductorBridge for RollingBridge {
+            fn handle(&self) -> Option<Arc<HcClient>> {
+                // A fake holds no real client; `call_zome` below stands in for
+                // the whole leg and counts the re-read this trait exists for.
+                None
+            }
+
+            async fn call_zome(
+                &self,
+                _zome: &str,
+                _fn_name: &str,
+                _payload: Vec<u8>,
+            ) -> Result<Vec<u8>, StorageError> {
+                let n = self.handle_reads.fetch_add(1, Ordering::SeqCst);
+                if n < self.dead_reads {
+                    // Verbatim shape of what a rolled conductor gives a
+                    // captured handle.
+                    return Err(StorageError::Connection(
+                        "Websocket closed: No connection".to_string(),
+                    ));
+                }
+                // The re-minted conductor answers honestly: no head declared.
+                // Encoded as a bare msgpack nil — `ContentHeadWire` is a
+                // decode-only wire mirror, and nil is exactly what the zome
+                // returns for `Option<ContentHeadWire>::None`.
+                Ok(rmp_serde::to_vec_named(&Option::<()>::None).unwrap())
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let bridge = Arc::new(RollingBridge {
+            handle_reads: AtomicUsize::new(0),
+            dead_reads: 1,
+        });
+        let controller = AdoptionController::new(dir.path())
+            .with_conductor_bridge(bridge.clone() as Arc<dyn ConductorBridge>);
+
+        // Sweep 1 — the conductor rolled. Unreachable, never absence.
+        assert!(
+            matches!(
+                controller
+                    .resolve_head("runtime:coordinators:elohim:roll-a")
+                    .await,
+                Answer::Unreachable
+            ),
+            "a dead bridge is unreachable"
+        );
+
+        // Sweep 2 — the supervisor re-minted the bridge. The controller must
+        // FOLLOW it, not keep calling the corpse.
+        assert!(
+            matches!(
+                controller
+                    .resolve_head("runtime:coordinators:elohim:roll-a")
+                    .await,
+                Answer::Absent
+            ),
+            "the re-minted conductor ANSWERED — a roll is ordinary churn, not a park"
+        );
+
+        assert_eq!(
+            bridge.handle_reads.load(Ordering::SeqCst),
+            2,
+            "the conductor leg is re-read per sweep; a handle captured at wiring \
+             time is asked once and is a corpse from the first roll onward"
+        );
     }
 
     /// A blob the store does not hold is `artifact_unavailable` — transient, so

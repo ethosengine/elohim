@@ -942,7 +942,43 @@ impl RefusalReason {
                 | RefusalReason::BootstrapOutOfBand
         )
     }
+
+    /// The highest [`state::BACKOFF_LADDER_SECS`] rung this refusal class may
+    /// climb to.
+    ///
+    /// **Why a class-specific ceiling exists at all.** The ladder answers "how
+    /// much of the per-sweep budget may a channel that keeps refusing keep
+    /// asking for", and for every refusal about the CHANNEL that is the right
+    /// question — a peer that read the substrate and did not like what it read
+    /// has learned something, and re-reading it every 60 s learns nothing more.
+    ///
+    /// `conductor_unavailable` is the one refusal that is not about the channel
+    /// at all. It says *we could not ask* — a topology fact about US. A peer
+    /// that could not ask has learned NOTHING, so throttling it is throttling
+    /// our own recovery, and the throttle compounds: the resolve that would
+    /// notice the cure is the same resolve the backoff is suppressing.
+    ///
+    /// Measured on alpha 2026-09-08: seven channels sat at the 1800 s rung for
+    /// 3+ hours after an ordinary conductor pod roll (~20 min of churn), each
+    /// with `consecutiveRefusals` 9–10 and `transient: true`. Half an hour of
+    /// parking to observe a twenty-minute outage is not patience, it is
+    /// self-inflicted blindness. The 120 s rung keeps the cost bounded (one
+    /// Background-classed local resolve per channel per two minutes — well
+    /// inside `watch::MAX_CHANNELS_PER_SWEEP`) while making recovery from a
+    /// roll a one-or-two-sweep event, which is what "a roll is ordinary churn"
+    /// has to mean.
+    pub fn max_backoff_rung(self) -> usize {
+        match self {
+            // Our outage, not the channel's verdict — capped at the 120 s rung.
+            RefusalReason::ConductorUnavailable => OUR_OUTAGE_MAX_BACKOFF_RUNG,
+            _ => state::BACKOFF_LADDER_SECS.len() - 1,
+        }
+    }
 }
+
+/// The ladder rung a refusal about OUR OWN reachability may climb to —
+/// `BACKOFF_LADDER_SECS[2]`, 120 s. See [`RefusalReason::max_backoff_rung`].
+pub const OUR_OUTAGE_MAX_BACKOFF_RUNG: usize = 2;
 
 /// A refusal with its evidence. The `reason` is what the metric counts; the
 /// payload is what the operator reads on `/admin/adoption`.

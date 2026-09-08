@@ -678,8 +678,16 @@ impl ChannelAdoptionState {
             Verdict::Refused { refusal } => {
                 self.consecutive_refusals = self.consecutive_refusals.saturating_add(1);
                 if refusal.reason_code().is_transient() {
-                    let rung =
-                        (self.consecutive_refusals as usize).min(BACKOFF_LADDER_SECS.len() - 1);
+                    // Two ceilings, both floors on how blind a channel may go:
+                    // the ladder's own length, and the refusal CLASS's ceiling.
+                    // `conductor_unavailable` caps at the 120 s rung because it
+                    // is a statement about US — a peer that could not ask has
+                    // learned nothing, and parking it for half an hour makes
+                    // our own recovery invisible to us. See
+                    // [`super::RefusalReason::max_backoff_rung`].
+                    let rung = (self.consecutive_refusals as usize)
+                        .min(BACKOFF_LADDER_SECS.len() - 1)
+                        .min(refusal.reason_code().max_backoff_rung());
                     BACKOFF_LADDER_SECS[rung]
                 } else {
                     // Terminal: only a NEW release changes this. Park at the
@@ -1272,6 +1280,69 @@ mod tests {
             previous = delay;
         }
         assert_eq!(previous, TERMINAL_BACKOFF_SECS as i64);
+    }
+
+    /// **The 2026-09-08 self-heal exhaustion, as a test.** `conductor_unavailable`
+    /// is a refusal about US, not about the channel — a peer that could not ask
+    /// has learned nothing, so it must never climb past the 120 s rung.
+    ///
+    /// Measured on alpha: seven channels at `consecutiveRefusals` 9–10, every
+    /// one parked on the 1800 s rung, three hours after a conductor pod roll
+    /// whose churn window is ~20 minutes. Half an hour of blindness to observe
+    /// a twenty-minute outage.
+    #[test]
+    fn our_own_outage_never_climbs_past_the_two_minute_rung() {
+        let mut state = ChannelAdoptionState::new(&observe("c"));
+        for sweep in 1..=12 {
+            let now = sweep * 10_000;
+            state.record(
+                now,
+                None,
+                Verdict::Refused {
+                    refusal: AdoptionRefusal::new(
+                        RefusalReason::ConductorUnavailable,
+                        "this peer could not resolve the channel through its own conductor",
+                    ),
+                },
+                None,
+            );
+            let delay = state.next_check_not_before.unwrap() - now;
+            assert!(
+                delay <= BACKOFF_LADDER_SECS[super::super::OUR_OUTAGE_MAX_BACKOFF_RUNG] as i64,
+                "sweep {sweep}: our own outage parked at {delay}s — a conductor roll is ordinary \
+                 churn, and the resolve that would notice the cure is the one being suppressed"
+            );
+        }
+        // It still CLIMBS to that cap — the point is a ceiling, not a
+        // permanently hot loop.
+        assert_eq!(
+            state.next_check_not_before.unwrap() - 120_000,
+            BACKOFF_LADDER_SECS[2] as i64
+        );
+        assert_eq!(state.consecutive_refusals, 12);
+    }
+
+    /// The cap is CLASS-scoped, never a global softening of the ladder: a
+    /// transient refusal that IS about the channel still climbs to the
+    /// ceiling, because re-asking it every two minutes learns nothing.
+    #[test]
+    fn the_our_outage_cap_does_not_leak_into_other_transient_classes() {
+        assert_eq!(
+            RefusalReason::ConductorUnavailable.max_backoff_rung(),
+            super::super::OUR_OUTAGE_MAX_BACKOFF_RUNG
+        );
+        for reason in [
+            RefusalReason::ArtifactUnavailable,
+            RefusalReason::ThresholdUnmet,
+            RefusalReason::QuorumUnmet,
+            RefusalReason::InstalledRealityUnknown,
+        ] {
+            assert_eq!(
+                reason.max_backoff_rung(),
+                BACKOFF_LADDER_SECS.len() - 1,
+                "{reason:?} is a refusal ABOUT THE CHANNEL — it keeps the full ladder"
+            );
+        }
     }
 
     /// A terminal refusal parks at the ceiling on the FIRST sweep. Climbing to

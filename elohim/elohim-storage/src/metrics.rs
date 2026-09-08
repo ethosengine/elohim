@@ -739,6 +739,22 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Times the release-adoption controller picked up a RE-MINTED conductor
+    /// bridge — i.e. the bridge supervisor replaced the registry slot's
+    /// `HcClient` after a conductor roll and the controller FOLLOWED it.
+    ///
+    /// Deliberately distinct from the supervisor's own reconnect signal: that
+    /// one says the bridge was re-minted, this one says the adoption controller
+    /// noticed. Before 2026-09-08 the controller held a boot-time `Arc` clone
+    /// and this series would have stayed flat at zero through every roll while
+    /// all seven alpha channels refused `conductor_unavailable` — which is
+    /// exactly the question a flat series here now answers.
+    pub static ref RELEASE_CHANNEL_CONDUCTOR_RECONNECT: IntCounter = IntCounter::new(
+        "elohim_release_channel_conductor_reconnect_total",
+        "Release-adoption controller picked up a re-minted conductor bridge after a roll.",
+    )
+    .unwrap();
+
     /// Ghost-witness re-author call FAILURES, by class — the two per-row
     /// failure modes minted as saga-06-heads-converge stations (2026-07-26
     /// story-harvest of live Loki evidence, elohim-alpha namespace): previously
@@ -2333,6 +2349,10 @@ pub fn register_all() {
         // `apply` arm is deliberately left absent), so this registers the
         // family and delegates the honesty.
         let _ = REGISTRY.register(Box::new(RELEASE_ADOPTION_DECISIONS.clone()));
+        // Registered (and therefore visible at zero) from boot: a series that
+        // only appears once a roll happens cannot distinguish "no roll yet"
+        // from "the controller never noticed one" — the 2026-09-08 defect.
+        let _ = REGISTRY.register(Box::new(RELEASE_CHANNEL_CONDUCTOR_RECONNECT.clone()));
         crate::services::release_adoption::watch::pretouch_metrics();
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));

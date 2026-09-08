@@ -5891,7 +5891,18 @@ async fn async_main(
             controller = controller.with_db(pool.clone());
         }
         if let Some(hc) = hc_for_adoption.clone() {
-            controller = controller.with_conductor(hc.clone());
+            // **The conductor leg is a SOURCE, not a captured handle.** The
+            // registry slot is what the bridge supervisor re-mints after a
+            // conductor pod roll; a cloned `Arc<HcClient>` is a corpse from the
+            // moment that roll happens (alpha, 2026-09-08: seven channels stuck
+            // on `conductor_unavailable` for 3+ hours after an ordinary roll).
+            // `with_conductor` is kept only as the no-registry fallback.
+            controller = match hc_registry_for_http.as_ref() {
+                Some(registry) => controller.with_conductor_bridge(std::sync::Arc::new(
+                    watch::RegistryConductorBridge::lamad(registry.clone()),
+                )),
+                None => controller.with_conductor(hc.clone()),
+            };
             // T5's rail. Requires a conductor to author through, so it is
             // wired here and nowhere else; without it an apply is un-attested
             // rather than falsely attested.
