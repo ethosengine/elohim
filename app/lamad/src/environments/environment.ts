@@ -9,7 +9,9 @@ export const environment = {
   environment: 'development',
   gitHash: 'local-dev',
   cache: {
-    preferWasm: true,
+    // This bundle does not ship cache-core WASM. Enable only when its assets
+    // are explicitly provided by the serving environment.
+    preferWasm: false,
   },
   client: {
     doorwayUrl: 'http://localhost:8888',

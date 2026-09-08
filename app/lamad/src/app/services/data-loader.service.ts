@@ -52,6 +52,7 @@ import type { ContentGraphNode } from './content-backend.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
+import { environment } from '../../environments/environment';
 
 import type { IGovernance } from '@elohim/service';
 import type {
@@ -285,7 +286,7 @@ export class DataLoaderService {
       }
 
       // Initialize ContentResolver and register sources
-      await this.contentResolver.initialize();
+      await this.contentResolver.initialize({ preferWasm: environment.cache.preferWasm });
       this.contentResolver.registerStandardSource('indexeddb');
       if (this.projectionApi.enabled) {
         this.contentResolver.registerStandardSource('projection');

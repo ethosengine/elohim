@@ -13,8 +13,12 @@ import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 describe('DataLoaderService', () => {
+  it('defaults to the TypeScript cache when this bundle ships no WASM assets', () => {
+    expect(environment.cache.preferWasm).toBe(false);
+  });
   let service: DataLoaderService;
   let httpMock: HttpTestingController;
   let mockHolochainContent: any;
@@ -194,6 +198,17 @@ describe('DataLoaderService', () => {
 
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  it.each([false, true])('passes the explicit WASM preference (%s) to the resolver', async preferWasm => {
+    const previous = environment.cache.preferWasm;
+    environment.cache.preferWasm = preferWasm;
+    try {
+      await (service as unknown as { initCaches(): Promise<void> }).initCaches();
+      expect(mockContentResolver.initialize).toHaveBeenCalledWith({ preferWasm });
+    } finally {
+      environment.cache.preferWasm = previous;
+    }
   });
 
   describe('getPath', () => {
