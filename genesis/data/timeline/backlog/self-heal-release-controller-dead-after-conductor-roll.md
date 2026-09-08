@@ -215,13 +215,42 @@ Supporting reads on the same pass:
 3. `consecutiveRefusals` for that class stops climbing past the point the
    conductor is answering `/db/p2p/conductor-diagnostics`.
 
-## Residue — same disease, not cured here
+## Residue — closed 2026-09-08 (`1416b9b27`)
 
-`SoakAttestor::from_runtime` (`main.rs:5897-5911`) is built from the same
-boot-time `hc_for_adoption` clone and keeps a captured handle
-(`release_adoption/apply.rs:1799`). A post-apply soak attestation attempted
-after a conductor roll will fail the same way. It is the attestation rail, not
-the resolve path, so it does not cause this symptom — but it is the second
-instance of the class and belongs in the same sweep. Left explicitly, not
-silently: it needs the `ReleaseAttestationCtx` to take a bridge rather than a
-client, which is a wider signature change than this cure.
+`SoakAttestor` and `ReleaseAttestationCtx` held the same boot-time
+`Arc<HcClient>` clone. That is the second half of rung 5's receipt — the measure
+is adoption AND attestation (james attested ~+86 s after adopting), so a peer
+adopting through the re-read registry and attesting through a corpse still fails
+the leg the next deploy is meant to prove. The soak observer's window makes it
+structural rather than rare: it is spawned at apply time and makes its ONE call
+`soakSecs` later, and alpha's conductor pods rolled 6-31 minutes after their
+storage pods.
+
+Closed by extending the same seam, not a second one:
+
+- `ConductorBridge` moved out of `release_adoption::watch` into
+  `src/conductor_bridge.rs` — a conductor-leg concern with two consumers, and
+  the same defect had now landed twice. `watch` re-exports it, so `watch::…`
+  paths and the `main.rs` wiring read unchanged.
+- The trait gained `call_zome_classed(…, AdmissionClass)`, with `call_zome`
+  delegating at `Background`. The class is a parameter because the consumers
+  legitimately differ: a controller sweep is `Background`, authoring a soak
+  attestation is the `Interactive` write it has always been. Moving to a bridge
+  must not silently re-class either — the test asserts the class.
+- `ReleaseAttestationCtx` holds `Arc<dyn ConductorBridge>`; `from_bridge` is the
+  production constructor, `new(Arc<HcClient>)` survives wrapping a
+  `StaticConductorBridge` so every existing caller and test stands. The ctx is
+  built **after** the soak sleep, from the bridge, not captured when the
+  observer was spawned. In the threshold reader a mid-re-mint `None` deflates
+  the count as `Unresolved` — the same degrade rule the per-issuer arm already
+  applied, never a failed sweep.
+- `main.rs` builds **one** bridge and hands it to both the controller and the
+  soak attestor, so the two halves of the rung-5 receipt cannot drift apart
+  again.
+
+Test (RED first — pre-cure shape panics
+`ConductorRefused("captured handle")` on the second call):
+`release_attestation::tests::an_attestation_lands_after_the_conductor_rolled_during_the_soak_window`
+— one `ReleaseAttestationCtx`, refused while the bridge is mid-re-mint, landing
+once the supervisor re-minted it, `handle_reads == 2`. A ctx holding an
+`Arc<HcClient>` cannot express that: there is nothing to flip.
