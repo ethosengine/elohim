@@ -11,7 +11,9 @@
 //! Plan: genesis/docs/superpowers/plans/2026-05-08-ssr-capability-implementation.md
 
 pub mod breaker;
+pub mod bundle_heads;
 pub mod capability;
+pub mod coherence;
 pub mod registry;
 pub mod types;
 pub mod warm_shell;
