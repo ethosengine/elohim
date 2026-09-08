@@ -1032,6 +1032,19 @@ Agents cannot do these; they are listed so they are not lost.
    a *household* result until that lands.
 6. **Fix `compute-executor cid` on explicit JSON null** — already filed
    (`compute-executor-cid-refuses-null-retention-field.md`); §5.1 works around it.
+7. **`MESH_RESTART_ENV_OVERLAY`, not a plain `export`, is the only way to arm the local
+   compute API across a `just mesh storage-restart`.** Measured 2026-09-08: `restart_storage`
+   (`app/elohim-app/scripts/hc-mesh.sh:1893-1909`) re-execs each storage binary with the
+   environment captured live from `/proc/<pid>/environ`, overlaid only by
+   `restart_env_overlay()`'s fixed key set (`hc-mesh.sh:2010-2047`) plus whatever
+   `MESH_RESTART_ENV_OVERLAY="K=V K=V"` names. A caller who merely `export`s
+   `ELOHIM_COMPUTE_LOCAL_API=1`/`ELOHIM_COMPUTE_LOCAL_TOKEN` before the restart sees it
+   silently dropped. Both the requester's and the provider's storage need the surface armed
+   this way (`workspace.mjs` defaults `COMPUTE_API_URL` to the requester's own `:8090`, and
+   `compute_tasks.rs`'s `same_actor` check requires the requester to hold the surface
+   against its own cell). Cosmetic fix for a future landing: teach `just mesh
+   storage-restart` a documented `--env K=V` flag rather than requiring the caller to know
+   the overlay env-var name.
 
 ---
 

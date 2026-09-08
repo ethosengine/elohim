@@ -252,3 +252,37 @@ The stage builder is `genesis/agentic/compute/stage/build-stage-task.mjs` (templ
 `PEER_STAGE_A2O_CONFIG`, mirroring `COMPUTE_A2O_CONFIG` above but never sharing state with
 it). A run's receipt lands under `genesis/a2o/reports/peer-stage/<date>/` (gitignored,
 durable), parallel to `genesis/a2o/reports/compute/`.
+
+**Arming the requester's own local compute API is not optional.** `workspace.mjs`
+defaults `COMPUTE_API_URL` to `http://127.0.0.1:8090` (matthew) for `submit`, `poll` and
+`listen` alike, and `elohim-storage/src/api/compute_tasks.rs:285-310`'s
+`same_actor(performer, hc.agent_key_uhcak())` check requires the requester to submit
+against *its own* cell with `ELOHIM_COMPUTE_LOCAL_API=1` armed there too — not only on the
+provider. Both peers need the surface up before task 6 of the peer-stage landing.
+
+**`MESH_RESTART_ENV_OVERLAY` is the only way to reach a restarted peer's environment.**
+`app/elohim-app/scripts/hc-mesh.sh`'s `restart_storage` re-execs each storage binary with
+the environment captured live from `/proc/<pid>/environ`, overlaid only by
+`restart_env_overlay()`'s fixed key set (`hc-mesh.sh:2010-2047`: transport, runtime-config
+path, `AGENT_PUBKEY`, doorway URL, ark env, optional `MESH_RESTART_APPLY_PROFILE` knobs)
+plus whatever `MESH_RESTART_ENV_OVERLAY="K=V K=V"` names (read at `hc-mesh.sh:2046`). A
+plain shell `export ELOHIM_COMPUTE_LOCAL_API=1` before `just mesh storage-restart <peer>`
+does **not** reach the restarted process — arm the surface with
+`MESH_RESTART_ENV_OVERLAY="ELOHIM_COMPUTE_LOCAL_API=1 ELOHIM_COMPUTE_LOCAL_TOKEN=<token>" just mesh storage-restart matthew jessica`.
+
+**Two stale-artifact permission traps, same root cause.** `just test mesh <scope>` writes
+a scoped cucumber config to `genesis/a2o/reports/cucumber-<profile>-scoped.mjs`
+(`justfile:128`, `printf … > "$cfg"`) and — unless `CUCUMBER_HTML_REPORT` is also
+exported — cucumber's base config writes `genesis/a2o/reports/cucumber-report.html` by
+default (`cucumber.mjs`'s `htmlReportPath`). The stage-runner template (§6.2 of the design)
+exports `CUCUMBER_JSON_REPORT` to a scratch path but not `CUCUMBER_HTML_REPORT`, so the
+guest (UID 65534) still tries to truncate the shared, root-owned default HTML report. A
+world-writable *directory* (§5.3's `chmod o+w genesis/a2o/reports`) lets the guest create
+new files but does not retroactively make an *existing* file in it writable — an artifact
+left behind by an earlier run under a different owner blocks the guest with `EACCES` on
+open, surfacing as `STAGE-NO-REPORT` even though the stage itself is sound. Measured
+2026-09-08: both `cucumber-mesh-scoped.mjs` and `cucumber-report.html` needed an explicit
+`chmod o+w` before a peer-executed run of this stage could complete. A future landing
+should either `chmod o+w` both generated-artifact paths in the §5.3 grant, or have the
+stage runner also export `CUCUMBER_HTML_REPORT` to scratch (the same fix already applied
+to the JSON report).
