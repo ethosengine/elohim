@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   A2O_DIR,
   buildStageTask,
   parseScenarioNames,
   slugify,
 } from "./build-stage-task.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const EXECUTOR =
   process.env.COMPUTE_EXECUTOR ||
@@ -62,6 +65,39 @@ test("slugify matches the verbatim §3 D6 expression on the pinned scenario name
     slugify(scenario),
     "two-doorways-that-disagree-about-a-page-converge-on-the-elected-version-without-anyone-re-upload",
   );
+});
+
+test("stage-runner template exports every process.env var the embedded node snippet reads", async () => {
+  // Regression for `REPORT="$SCRATCH/cucumber.json"` being set but never exported (§47):
+  // the embedded node snippet reads process.env.REPORT and got `undefined` in a subshell
+  // where only CUCUMBER_JSON_REPORT had been exported for the `just` invocation.
+  const templatePath = join(HERE, "stage-runner.template.sh");
+  const template = await readFile(templatePath, "utf8");
+
+  const nodeSnippetMatch = template.match(/"\$NODE_BIN"\s+-e\s+'([\s\S]*?)'[^\n]*\n/);
+  assert.ok(nodeSnippetMatch, "expected an embedded `\"$NODE_BIN\" -e '...'` snippet");
+  const nodeSnippet = nodeSnippetMatch[1];
+
+  const readEnvVars = new Set(
+    [...nodeSnippet.matchAll(/process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(
+      (m) => m[1],
+    ),
+  );
+  assert.ok(
+    readEnvVars.size > 0,
+    "expected the node snippet to read at least one process.env var",
+  );
+
+  // Only the shell text ABOVE the node invocation can export what the snippet reads.
+  const shellAboveNode = template.slice(0, nodeSnippetMatch.index);
+  for (const name of readEnvVars) {
+    assert.match(
+      shellAboveNode,
+      new RegExp(`export ${name}=`),
+      `stage-runner.template.sh must \`export ${name}\` before the node snippet reads ` +
+        `process.env.${name}`,
+    );
+  }
 });
 
 test("parseScenarioNames finds Scenario: and Scenario Outline: lines without a Gherkin parser", () => {

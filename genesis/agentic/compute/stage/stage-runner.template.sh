@@ -44,7 +44,7 @@ fi
 for p in "${WRITABLE[@]}"; do [ -w "$p" ] || refuse "not writable: $p"; done
 
 # ---- run -----------------------------------------------------------------------
-REPORT="$SCRATCH/cucumber.json"
+export REPORT="$SCRATCH/cucumber.json"
 rm -f "$REPORT"
 printf 'running %d test\n' "${#SCENARIOS[@]}"
 cd "$REPO" || refuse "cannot cd $REPO"
