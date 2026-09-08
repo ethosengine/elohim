@@ -1,5 +1,5 @@
 ---
-title: "EPR-app deliverability through the doorway — the served shell converges from storage, is judged before it is served, says so in a typed view, and is proven on the household mesh before a push"
+title: "EPR-app deliverability through the doorway — the served shell converges from storage, is judged before it is served, is judged before it is served, and is proven on the household mesh before a push"
 id: epr-app-deliverability-through-doorway
 status: Draft
 class: protocol-canonical
@@ -46,44 +46,41 @@ head from this reconciler instead of its own `resolve_declared`. Falsifier: a do
 conductor subscription is dead, or that booted while storage was down, converges within one tick
 after storage answers.
 
-**D2 — Deliverability is judged through the doorway before a shell is served, and the verdict
-is a typed view.** A shell is classified `AtHead` only when (i) it was fetched by that head
-(existing `head_bound`) AND (ii) the head's entry script resolves through this doorway
-(`HEAD /apps/{head}/{entry-script}` → 200, or storage's `X-Deliverability: boots` for the head,
-memoised per head). An incoherent head is never served as current; the last coherent shell
-serves with `x-elohim-bundle: <head12>;behind;<reason>`; if no coherent shell exists at all the
+**D2 — Deliverability is judged through the doorway before a shell is served, and the verdict is
+readable in the headers the test already sees.** A shell is classified `AtHead` only when (i) it
+was fetched by that head (existing `head_bound`) AND (ii) the head's entry script resolves through
+this doorway (`HEAD /apps/{head}/{entry-script}` → 200, or storage's `X-Deliverability: boots` for
+the head, memoised per head). An incoherent head is never served as current; the last coherent
+shell serves with `x-elohim-bundle: behind;<reason>`; if no coherent shell exists at all the
 doorway answers **503 with a one-line converging page** and `Retry-After`, never a blank 200.
-New view `elohim/sdk/schemas/v1/views/bundle-deliverability-view.schema.json`
-(Category C: doorway-local operational, reconstructed per request) served at
-`GET /admin/bundles` and `GET /admin/bundles/{slug}` — fields per slug: `slug`,
-`storageBrowserHead`, `storageServerHead`, `projectedBrowserHead`, `projectedServerHead`,
-`servedBrowserHead`, `servedShellProvenance` (`at-head|behind|none`), `deliverability`
-(`boots|broken|unjudged`), `deliverabilityReason`, `lastReconcileAt`, `lastReconcileError`,
-`ssrAdopted` (bool), `doorwayId`. Wire header `x-elohim-bundle` gains the same vocabulary. The
-app's own `/version.json` build stamp must equal the served head's stamp (the 2026-09-06 finding);
-the view reports `versionStamp` and the scenario asserts it.
+Diagnostics stay on the wire (`x-elohim-bundle`, `x-elohim-freshness`, storage's
+`X-Deliverability`/`-Reason`), extended with the reason vocabulary; a typed admin view is NOT in
+this slice — it is added only if the integration test's failure output proves to need more than
+the headers carry.
 
 **D3 — `serverBlobHash` converges peer to peer.** The diesel-direct server-head write in
 `content_service::patch_content` emits `content.updated` on the storage event bus and bumps the
 content sync document exactly as the browser-head path does. Falsifier: after one PATCH on peer A,
 every peer's `/db/content/{slug}` carries the same `serverBlobHash` within one sync round.
 
-**D4 — Proven before push, and blocking.** New Act I feature
-`genesis/a2o/features/dataplane/epr-app-deliverability.feature` under
-`@concern:doorway-failover @requires:multi-node`, stations: (1) bundle N+1 byte-seeded to all
-peers, head PATCHed via doorway A only → within 2 ticks BOTH doorways serve a shell whose every
-named script/stylesheet resolves through that doorway and whose `version.json` stamp matches the
-declared head; (2) `serverBlobHash` equal on all three peers; (3) doorway B restarted while its
-storage is down → after storage returns, B converges within 2 ticks with no operator action;
-(4) a deliberately broken bundle (entry script missing) is refused: `/admin/bundles/{slug}`
-reports `broken`, the served shell stays at the previous coherent head with `behind`, the page is
-never blank. Pre-push: the T2-receipt leg becomes `strict` for `doorway-service/src/render/**`,
-`doorway-service/src/routes/apps.rs`, `doorway-service/src/projection/**`,
-`elohim-storage/src/services/content_service.rs` — a change there with no newer household
-receipt for `@concern:doorway-failover` refuses the push. Fleet: the edge Dataplane Validation
-served-shell probe becomes a hard FAILURE of the edge build (not UNSTABLE), and
-`scripts/ci/verify-projected-head.sh` asserts BOTH doorways' `/admin/bundles/{slug}` read
-`boots` + `at-head` after the app deploy.
+**D4 — The gate is an integration test that boots the app through the doorway, and it blocks.**
+`served-shell-boots.feature` keeps its static clause (every script/stylesheet the page names
+resolves through the SAME doorway; entry script = declared browser head) and gains the dynamic
+clause: a headless browser loads `/` through each doorway and the app BOOTS — no `pageerror`, no
+failed asset request, the app root element rendered, and the served `/version.json` stamp equal
+to the declared head's stamp. Runs in three places, all blocking: (a) **household mesh, Act I**
+(`@act:i` twin scenarios under `@concern:doorway-failover @requires:multi-node`): bundle N+1
+byte-seeded to all peers + head PATCHed via doorway A only → within 2 ticks BOTH doorways boot;
+`serverBlobHash` equal on all peers; doorway B restarted while its storage is down converges after
+storage returns; a deliberately broken bundle (entry script missing) is refused — page never
+blank, header says `behind;missing-asset`. Pre-push: the T2-receipt leg is `strict` for
+`doorway-service/src/{render,routes/apps.rs,projection}/**` and
+`elohim-storage/src/services/content_service.rs` — no newer household receipt for
+`@concern:doorway-failover` ⇒ the push is refused. (b) **App pipeline, Act II**: immediately after
+`authorHeadOnce`, run the feature against BOTH doorways; a red FAILS the app build (`error()`, not
+`unstable`). (c) **Edge Dataplane Validation**: the same feature is a hard failure of the edge
+build. The rule: an EPR app that cannot boot through a doorway does not ship, and the build that
+tried says which doorway, which head, and which asset.
 
 ## Not in scope
 Bundle build content (`version.json` presence is the app job's gate, filed 2026-09-06); the
