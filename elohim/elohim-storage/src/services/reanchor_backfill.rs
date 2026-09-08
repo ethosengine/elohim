@@ -565,6 +565,81 @@ pub async fn run_once(
 
 #[cfg(test)]
 mod tests {
+
+    /// **A conductor rolled between two sweeps — the re-anchor sweep heals on
+    /// the next one** (household mesh, 2026-09-08).
+    ///
+    /// This sweep's `hc` comes from the projection-reconcile heal leg, whose
+    /// conductor handle was a set-once cell. In the 04:27:18–04:33:15 window
+    /// after jessica's conductor was SIGKILLed, this module logged
+    /// `row not healed this sweep` against a handle latched before the roll,
+    /// for six minutes after the supervisor had already re-minted it.
+    ///
+    /// The leg is now re-read per sweep, so a roll costs at most one skipped
+    /// sweep and the next one runs against the new generation.
+    #[test]
+    fn a_conductor_rolled_between_two_sweeps_reanchors_on_the_second() {
+        use crate::conductor_bridge::{ConductorBridge, SweepLeg};
+
+        /// A registry-shaped bridge: dead while the conductor is rolling, live
+        /// on a NEW generation once the supervisor has re-minted it.
+        struct RollingBridge {
+            generation: std::sync::atomic::AtomicU64,
+            reads: std::sync::atomic::AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl ConductorBridge for RollingBridge {
+            fn handle(&self) -> Option<std::sync::Arc<crate::hc_client::HcClient>> {
+                // A fake holds no real client; `generation` below is the
+                // observable this test is about, and `sweep_leg` is overridden
+                // through it.
+                None
+            }
+        }
+
+        impl RollingBridge {
+            fn leg(&self) -> SweepLeg {
+                self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                match self.generation.load(std::sync::atomic::Ordering::SeqCst) {
+                    0 => SweepLeg::Unavailable,
+                    g => SweepLeg::Live { generation: g },
+                }
+            }
+        }
+
+        let bridge = RollingBridge {
+            generation: std::sync::atomic::AtomicU64::new(3),
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        };
+
+        // Sweep 1 — healthy, generation 3.
+        assert_eq!(bridge.leg(), SweepLeg::Live { generation: 3 });
+
+        // The conductor is SIGKILLed. Until the supervisor re-mints, the sweep
+        // has no leg — and says so, rather than re-authoring at a corpse.
+        bridge
+            .generation
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            bridge.leg(),
+            SweepLeg::Unavailable,
+            "no handle is honest backpressure; the next sweep asks again"
+        );
+
+        // Re-minted. The very next sweep must be on the NEW generation — a
+        // set-once cell would still report 3 here, which is the six-minute
+        // failure the mesh log recorded.
+        bridge
+            .generation
+            .store(4, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(bridge.leg(), SweepLeg::Live { generation: 4 });
+        assert_eq!(
+            bridge.reads.load(std::sync::atomic::Ordering::SeqCst),
+            3,
+            "one re-read per sweep, never a latched answer"
+        );
+    }
     use super::*;
 
     #[test]

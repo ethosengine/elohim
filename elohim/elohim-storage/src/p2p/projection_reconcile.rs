@@ -6972,6 +6972,109 @@ mod tests {
         assert_eq!(v["converged"], serde_json::json!(false));
     }
 
+    /// **A conductor rolled between two sweeps — election-obey heals on the
+    /// next one** (household mesh, 2026-09-08).
+    ///
+    /// This loop's conductor leg was a `OnceLock<Arc<HcClient>>`: seeded once,
+    /// read forever. After jessica's conductor was SIGKILLed at 04:27:18 the
+    /// supervisor re-minted the bridge at 04:27:23, but this sweep kept
+    /// reporting `bridge_up = true` against the latched corpse and logged
+    /// `ELECTION READ FAILED … Zome call failed: Websocket` for 812 lines
+    /// through 04:33:15. The death witness authored inside that window never
+    /// anchored, and never replicated — which is how a conductor restart
+    /// becomes a failed death-witness receipt on a healthy substrate.
+    ///
+    /// The assertion that matters is the GENERATION: sweep 2 must run against
+    /// the handle the supervisor re-minted, not the one sweep 1 latched. A
+    /// set-once cell reports `Live { generation: <old> }` on both sweeps and
+    /// cannot express this.
+    #[test]
+    fn a_conductor_rolled_between_two_sweeps_heals_on_the_second() {
+        use crate::conductor_bridge::{ConductorBridge, SweepLeg};
+
+        /// A registry-shaped bridge: dead while the conductor is rolling, live
+        /// on a NEW generation once the supervisor has re-minted it.
+        struct RollingBridge {
+            generation: std::sync::atomic::AtomicU64,
+            reads: std::sync::atomic::AtomicUsize,
+        }
+
+        #[async_trait::async_trait]
+        impl ConductorBridge for RollingBridge {
+            fn handle(&self) -> Option<std::sync::Arc<crate::hc_client::HcClient>> {
+                // A fake holds no real client; `generation` below is the
+                // observable this test is about, and `sweep_leg` is overridden
+                // through it.
+                None
+            }
+        }
+
+        impl RollingBridge {
+            fn leg(&self) -> SweepLeg {
+                self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                match self.generation.load(std::sync::atomic::Ordering::SeqCst) {
+                    0 => SweepLeg::Unavailable,
+                    g => SweepLeg::Live { generation: g },
+                }
+            }
+        }
+
+        // The live sequence, in order: healthy → SIGKILL → supervisor re-mint.
+        // A dead→alive test would NOT discriminate (a set-once cell handles the
+        // late-connect case correctly); it is the ROLL that breaks it.
+        let bridge = RollingBridge {
+            generation: std::sync::atomic::AtomicU64::new(3),
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        };
+
+        // Sweep 1 — healthy. The heal runs against generation 3.
+        let leg = bridge.leg();
+        assert_eq!(leg, SweepLeg::Live { generation: 3 });
+        assert_eq!(
+            heal_decision(!matches!(leg, SweepLeg::Unavailable), false),
+            HealAction::Spawn
+        );
+
+        // 04:27:18 — the conductor is SIGKILLed. Until the supervisor re-mints,
+        // the sweep has NO leg, and must skip rather than spawn a heal that
+        // will spend the whole sweep logging `Zome call failed: Websocket`.
+        bridge
+            .generation
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+        let leg = bridge.leg();
+        assert_eq!(
+            leg,
+            SweepLeg::Unavailable,
+            "a set-once cell still reports the pre-kill handle here — 812 log lines' worth"
+        );
+        assert_eq!(
+            heal_decision(!matches!(leg, SweepLeg::Unavailable), false),
+            HealAction::SkipNoBridge,
+            "a sweep that cannot ask must say so, never spawn a heal at a dead handle"
+        );
+
+        // 04:27:23 — re-minted. The very next sweep must FOLLOW it.
+        bridge
+            .generation
+            .store(4, std::sync::atomic::Ordering::SeqCst);
+        let leg = bridge.leg();
+        assert_eq!(
+            leg,
+            SweepLeg::Live { generation: 4 },
+            "sweep 3 ran against the RE-MINTED handle, not the one sweep 1 latched"
+        );
+        assert_eq!(
+            heal_decision(!matches!(leg, SweepLeg::Unavailable), false),
+            HealAction::Spawn
+        );
+        assert_eq!(
+            bridge.reads.load(std::sync::atomic::Ordering::SeqCst),
+            3,
+            "the conductor leg is re-read per sweep; a set-once cell is read once and \
+             reports the same generation forever"
+        );
+    }
+
     #[test]
     fn heal_decision_covers_bridge_and_single_flight() {
         // Bridge up, nothing running → spawn the heal leg this tick.

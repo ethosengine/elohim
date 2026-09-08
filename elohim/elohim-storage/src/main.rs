@@ -5382,8 +5382,7 @@ async fn async_main(
             }
             (secs, Some(handle), Some(pool)) => {
                 use std::sync::atomic::AtomicBool;
-                use std::sync::{Arc as StdArc, OnceLock};
-                type LamadCell = StdArc<OnceLock<StdArc<elohim_storage::hc_client::HcClient>>>;
+                use std::sync::Arc as StdArc;
 
                 let state = projection_reconcile_state.clone();
                 // Witness-bootstrap (GAP 1.5) publishes its sweep progress to the
@@ -5391,18 +5390,51 @@ async fn async_main(
                 let provide_for_reconcile = provide_loop_state.clone();
                 let mut reconcile_shutdown = shutdown_tx.subscribe();
 
-                // Shared conductor slot. The heal leg reads it per-tick; DISCOVERY
-                // never waits on it. The lamad bridge is acquired OFF the ticker's
-                // critical path so the conductor-free discovery asks (view-federate,
-                // inventory) fire from boot+30s — not 7.5–15.6 min later once the
-                // bridge finally connects.
-                let hc_cell: LamadCell = StdArc::new(OnceLock::new());
-                if let Some(hc) = lamad_hc_boot {
-                    // Fast path: boot-connect already landed lamad — seed the slot.
-                    let _ = hc_cell.set(hc);
+                // Shared conductor LEG. The heal leg re-reads it per tick;
+                // DISCOVERY never waits on it. The lamad bridge is acquired OFF
+                // the ticker's critical path so the conductor-free discovery asks
+                // (view-federate, inventory) fire from boot+30s — not 7.5–15.6
+                // min later once the bridge finally connects.
+                //
+                // **A SOURCE, not a set-once cell.** This was a
+                // `OnceLock<Arc<HcClient>>`: once seeded it reported "bridge up"
+                // forever, including for every tick after the conductor rolled,
+                // when the handle behind it was a corpse. Measured on the
+                // household mesh 2026-09-08 — jessica's conductor SIGKILLed at
+                // 04:27:18, supervisor re-mint logged at 04:27:23, and
+                // election-obey / reanchor / projection-reconcile kept failing
+                // `Zome call failed: Websocket` until 04:33:15 (812 lines). The
+                // death witness authored in that window never anchored, and
+                // never replicated. Reading the registry slot per tick is the
+                // cure; see `elohim_storage::conductor_bridge::sweep_leg`.
+                let reconcile_bridge: StdArc<
+                    dyn elohim_storage::conductor_bridge::ConductorBridge,
+                > = match hc_registry_for_http.as_ref() {
+                    Some(registry) => StdArc::new(
+                        elohim_storage::conductor_bridge::RegistryConductorBridge::lamad(
+                            registry.clone(),
+                        ),
+                    ),
+                    // No registry: nothing can ever re-mint, so a fixed
+                    // handle is the honest shape. `None` on both is a
+                    // permanently-unavailable leg, which the sweep reports
+                    // rather than pretending.
+                    None => match lamad_hc_boot.clone() {
+                        Some(hc) => {
+                            StdArc::new(elohim_storage::conductor_bridge::StaticConductorBridge(hc))
+                        }
+                        None => StdArc::new(elohim_storage::conductor_bridge::NoConductorBridge),
+                    },
+                };
+                if lamad_hc_boot.is_some() {
+                    // Fast path: boot-connect already landed lamad in the
+                    // registry — the bridge reads it, nothing to seed.
                 } else if let Some(inputs) = late_inputs {
-                    // Late path: acquire off-ticker with forever-retry.
-                    let cell = hc_cell.clone();
+                    // Late path: acquire off-ticker with forever-retry, and
+                    // STORE into the registry — the bridge above reads the slot,
+                    // so a private cell would leave the heal leg dark AND
+                    // re-introduce the set-once capture this block just removed.
+                    let cell_registry = hc_registry_for_http.clone();
                     let acq_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
                         info!(
@@ -5417,7 +5449,9 @@ async fn async_main(
                         .await
                         {
                             Some(hc) => {
-                                let _ = cell.set(hc);
+                                if let Some(registry) = cell_registry.as_ref() {
+                                    registry.set_client("lamad", Some(hc));
+                                }
                                 info!("projection-reconcile: lamad bridge connected (late) — heal leg enabled");
                             }
                             None => {
@@ -5541,7 +5575,16 @@ async fn async_main(
                             )
                             .await;
 
-                            let bridge_up = hc_cell.get().is_some();
+                            // RE-READ, every tick. `Unavailable` is honest
+                            // backpressure the next tick retries; a stale
+                            // generation is the thing that used to be latched.
+                            let leg = elohim_storage::conductor_bridge::sweep_leg(
+                                reconcile_bridge.as_ref(),
+                            );
+                            let bridge_up = !matches!(
+                                leg,
+                                elohim_storage::conductor_bridge::SweepLeg::Unavailable
+                            );
                             let in_flight = heal_inflight.load(Ordering::Acquire);
                             match heal_decision(bridge_up, in_flight) {
                                 HealAction::Spawn => {
@@ -5557,8 +5600,15 @@ async fn async_main(
                                         )
                                         .is_ok()
                                     {
-                                        let hc =
-                                            hc_cell.get().expect("bridge_up implies Some").clone();
+                                        // Resolved AGAIN here rather than
+                                        // reusing a value read before the CAS:
+                                        // the window is small, but the whole
+                                        // defect class is "we asked once and
+                                        // kept the answer".
+                                        let Some(hc) = reconcile_bridge.handle() else {
+                                            heal_inflight.store(false, Ordering::Release);
+                                            continue;
+                                        };
                                         let heal_pool = pool.clone();
                                         let heal_state = state.clone();
                                         let heal_provide = provide_for_reconcile.clone();

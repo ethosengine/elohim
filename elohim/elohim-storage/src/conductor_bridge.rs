@@ -97,6 +97,52 @@ pub trait ConductorBridge: Send + Sync {
     }
 }
 
+/// What a long-lived sweep's conductor leg looks like on ONE tick.
+///
+/// The `generation` is the identity of the handle currently behind the bridge.
+/// It changes exactly when the supervisor re-mints, which is what makes
+/// "did this sweep follow the roll?" a testable question rather than a hope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SweepLeg {
+    /// No handle right now — the bridge is mid-re-mint. The sweep skips its
+    /// conductor leg and asks again next tick. Honest, and never a corpse.
+    Unavailable,
+    /// A handle is available, identified by `generation`.
+    Live { generation: u64 },
+}
+
+/// Resolve the conductor leg for ONE sweep.
+///
+/// # The defect this replaces
+///
+/// A long-lived loop that stores its handle in a `OnceLock` (or any set-once
+/// cell) reports "bridge up" forever after the first success — including for
+/// every tick after the conductor rolled, when the handle behind it is a
+/// corpse. Measured on the household mesh 2026-09-08: jessica's conductor was
+/// SIGKILLed at 04:27:18, the supervisor logged a re-mint at 04:27:23, and the
+/// projection-reconcile / election-obey / reanchor sweeps kept failing
+/// `Zome call failed: Websocket` until 04:33:15 — 812 lines against a handle
+/// they had latched six minutes earlier. The death witness authored inside that
+/// window never anchored, which is how a conductor restart turned into a failed
+/// death-witness replication receipt on a peer whose substrate was healthy.
+///
+/// Calling this per tick is the whole cure: a sweep that cannot ask says so and
+/// retries, and the tick after the re-mint runs against the NEW generation.
+pub fn sweep_leg(bridge: &dyn ConductorBridge) -> SweepLeg {
+    match bridge.handle() {
+        None => SweepLeg::Unavailable,
+        Some(hc) => SweepLeg::Live {
+            generation: generation_of(&hc),
+        },
+    }
+}
+
+/// Handle identity as a comparable number. Only ever compared, never
+/// dereferenced.
+pub fn generation_of(hc: &Arc<HcClient>) -> u64 {
+    Arc::as_ptr(hc) as u64
+}
+
 /// The production bridge: the registry slot the bridge supervisor owns.
 ///
 /// Holds the registry, never a client — so a conductor roll is ordinary churn
@@ -144,6 +190,18 @@ impl ConductorBridge for RegistryConductorBridge {
             );
         }
         Some(hc)
+    }
+}
+
+/// A bridge with no conductor at all. Every sweep reports `Unavailable` —
+/// honest for a node wired with neither a registry nor a boot client, and
+/// distinct from a bridge whose handle merely happens to be re-minting.
+pub struct NoConductorBridge;
+
+#[async_trait::async_trait]
+impl ConductorBridge for NoConductorBridge {
+    fn handle(&self) -> Option<Arc<HcClient>> {
+        None
     }
 }
 
