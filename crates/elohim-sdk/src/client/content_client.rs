@@ -7,10 +7,12 @@ use crate::cache::{WriteBuffer, WriteBufferConfig, WriteOp, WritePriority};
 use crate::error::{Result, SdkError};
 use crate::reach::ReachEnforcer;
 use crate::traits::{ContentReadable, ContentWriteable};
-use elohim_storage_client::{StorageClient, StorageConfig};
+use elohim_storage_client::{BulkResult, StorageClient, StorageConfig};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Client deployment mode
 ///
@@ -114,6 +116,8 @@ pub struct ContentClient {
     storage: Option<StorageClient>,
     /// Write buffer for backpressure protection
     write_buffer: WriteBuffer,
+    /// Keep overlapping flushes from sending an older batch after a newer one.
+    flush_lock: Mutex<()>,
     /// Reach enforcer for access control
     reach_enforcer: ReachEnforcer,
     /// HTTP client for browser mode (projection API)
@@ -156,6 +160,7 @@ impl ContentClient {
             app_id,
             storage,
             write_buffer: WriteBuffer::new(buffer_config),
+            flush_lock: Mutex::new(()),
             reach_enforcer: ReachEnforcer::authenticated(),
             http_client: super::schema_conformant_http_client(),
         }
@@ -276,7 +281,12 @@ impl ContentClient {
         self.flush().await
     }
 
-    /// Flush pending writes to backend
+    /// Flush one pending batch to the backend.
+    ///
+    /// Failed, cancelled, skipped or otherwise ambiguous groups remain buffered.
+    /// A group is acknowledged only when its bulk result confirms every insertion.
+    /// Retrying an uncertain outcome is at-least-once; this memory buffer provides
+    /// neither restart durability nor automatic reconciliation of existing IDs.
     pub async fn flush(&self) -> Result<()> {
         if matches!(&self.mode, ClientMode::Native { sync_url: None, .. }) {
             return Err(SdkError::InvalidMode(
@@ -284,7 +294,8 @@ impl ContentClient {
             ));
         }
 
-        let batch = self.write_buffer.take_batch().await;
+        let _flush = self.flush_lock.lock().await;
+        let batch = self.write_buffer.pending_batch().await;
         if batch.is_empty() {
             return Ok(());
         }
@@ -294,7 +305,7 @@ impl ContentClient {
                 doorway_url,
                 api_key,
             } => {
-                self.flush_to_projection(doorway_url, api_key.as_deref(), &batch)
+                self.flush_batch(doorway_url, api_key.as_deref(), &batch, true)
                     .await
             }
             ClientMode::Native {
@@ -303,7 +314,7 @@ impl ContentClient {
             }
             | ClientMode::Node {
                 storage_url: url, ..
-            } => self.flush_to_storage(url, &batch).await,
+            } => self.flush_batch(url, None, &batch, false).await,
             ClientMode::Native { sync_url: None, .. } => Err(SdkError::InvalidMode(
                 "Native mode without sync_url has no storage backend".into(),
             )),
@@ -382,69 +393,57 @@ impl ContentClient {
         Ok(Some(content))
     }
 
-    async fn flush_to_projection(
+    async fn flush_batch(
         &self,
-        doorway_url: &str,
+        base_url: &str,
         api_key: Option<&str>,
-        batch: &[WriteOp],
+        batch: &[Arc<WriteOp>],
+        projection: bool,
     ) -> Result<()> {
-        // Group by content type
-        let mut by_type: HashMap<&str, Vec<&WriteOp>> = HashMap::new();
+        let mut by_type: HashMap<&str, Vec<Arc<WriteOp>>> = HashMap::new();
         for op in batch {
-            by_type.entry(&op.content_type).or_default().push(op);
+            by_type
+                .entry(&op.content_type)
+                .or_default()
+                .push(op.clone());
         }
 
         for (content_type, ops) in by_type {
-            // Use app_id in the URL path for multi-tenant scoping
-            let url = format!("{}/db/{}/{}/bulk", doorway_url, self.app_id, content_type);
+            let url = format!("{}/db/{}/{}/bulk", base_url, self.app_id, content_type);
             let items: Vec<_> = ops.iter().map(|op| &op.data).collect();
-
             let mut request = self.http_client.post(&url).json(&items);
             if let Some(key) = api_key {
                 request = request.header("Authorization", format!("Bearer {}", key));
             }
-
             let response = request.send().await?;
+            let error = |message| {
+                if projection {
+                    SdkError::Network(message)
+                } else {
+                    SdkError::Storage(message)
+                }
+            };
             if !response.status().is_success() {
                 let status = response.status().as_u16();
                 let body = response.text().await.unwrap_or_default();
-                tracing::error!(
-                    "Failed to flush {} items to projection: HTTP {} - {}",
-                    ops.len(),
-                    status,
-                    body
-                );
+                return Err(error(format!("HTTP {} - {}", status, body)));
             }
-        }
 
-        Ok(())
-    }
-
-    async fn flush_to_storage(&self, storage_url: &str, batch: &[WriteOp]) -> Result<()> {
-        // Group by content type
-        let mut by_type: HashMap<&str, Vec<&WriteOp>> = HashMap::new();
-        for op in batch {
-            by_type.entry(&op.content_type).or_default().push(op);
-        }
-
-        for (content_type, ops) in by_type {
-            // Use app_id in the URL path for multi-tenant scoping
-            let url = format!("{}/db/{}/{}/bulk", storage_url, self.app_id, content_type);
-            let items: Vec<_> = ops.iter().map(|op| &op.data).collect();
-
-            let response = self.http_client.post(&url).json(&items).send().await?;
-            if !response.status().is_success() {
-                let status = response.status().as_u16();
-                let body = response.text().await.unwrap_or_default();
-                tracing::error!(
-                    "Failed to flush {} items to storage: HTTP {} - {}",
-                    ops.len(),
-                    status,
-                    body
-                );
+            let result: BulkResult = response.json().await?;
+            // Bulk create skips existing IDs without comparing payloads. Counts
+            // cannot identify which items succeeded in an ambiguous group, so keep
+            // the whole group rather than interpreting free-form error strings.
+            if result.inserted != ops.len() as u64
+                || result.skipped != 0
+                || !result.errors.is_empty()
+            {
+                return Err(error(format!(
+                    "Unconfirmed bulk write for {}: expected {} inserted, got {} inserted, {} skipped, errors {:?}; group retained for reconciliation",
+                    content_type, ops.len(), result.inserted, result.skipped, result.errors
+                )));
             }
+            self.write_buffer.acknowledge(&ops).await;
         }
-
         Ok(())
     }
 }

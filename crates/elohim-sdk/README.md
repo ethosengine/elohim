@@ -29,11 +29,12 @@ commit.
 
 **Where the crate is.** Early. Version `0.1.0`, a small surface, and nine sharp
 edges — three with copy-paste reproductions — in [Rough edges](#rough-edges). Three of them will change
-how you write your first working program, and the first is the one that costs data:
+how you write your first working program:
 
-- Against the only publicly reachable endpoint, a `Browser`-mode write reports success
-  and discards everything (edge 8).
-- `flush()` returns `Ok(())` even when the endpoint rejects your batch (edge 2).
+- A `Browser`-mode write requires a served write route; rejection retains its pending
+  group and returns an error (edge 8).
+- `flush()` retains ambiguous creates for application reconciliation, including skipped
+  existing IDs after an uncertain retry (edge 2).
 - `Browser`-mode reads currently miss the doorway's cached types (edge 1).
 
 Composed, edges 1 and 8 mean **neither reading nor writing works against a public
@@ -146,7 +147,7 @@ Three consequences, which are most of what you need to hold:
    |---|---|
    | A doorway, reachable over HTTP | Yes. `https://doorway-alpha.elohim.host` is live and open, and step 2 uses it to prove the boundary works. A development deployment with no uptime commitment. |
    | To actually **read** content through this crate | Not against that doorway. `Browser` `get()` structurally misses its cached types (rough edge 1), so a working read needs your own `elohim-storage` service. |
-   | To actually **write** content through this crate | Same answer, and worse: writes through a public doorway are discarded silently (rough edge 8). |
+   | To actually **write** content through this crate | Same answer, and worse: an unserved write route returns an error and retains pending writes (rough edge 8). |
    | An `elohim-storage` service | **You have to run one.** It is not on crates.io, has no public container image, and no public deployment serves `/db/…`. Step 3 brings one up. |
 
    In short: steps 1 and 2 need nothing you don't already have; **every path that moves
@@ -166,9 +167,8 @@ Three consequences, which are most of what you need to hold:
    "matched crate-and-endpoint release" that makes `views` types trustworthy (see
    [Your types vs. `views` types](#your-types-vs-views-types)) is something you cannot
    currently construct from the outside. Practically: check out the default branch, expect
-   some drift, and remember that a shape mismatch shows up as a *silently rejected write*
-   (rough edge 2) rather than as a type error. That is the single best reason to keep
-   error-level `tracing` on while you develop.
+   some drift, and remember that a shape mismatch shows up as a runtime flush error
+   (rough edge 2) rather than as a type error. Handle that error before retrying.
 
 ## Quickstart
 
@@ -311,7 +311,8 @@ symmetric about this — `Node`/`Native` reads report an HTTP error as
 **This step is a boundary smoke test, not a read.** Any `GOT THROUGH` output proves the
 endpoint answered; receiving content is not the criterion. A `request/response failed`
 line is ambiguous because this API maps both transport and response-decode failures to
-`SdkError::Network`; use the `curl` below to resolve which side failed. Data comes back
+`SdkError::Network`; the `curl` below checks doorway availability through a different route; it cannot
+prove that the SDK request reached its endpoint or distinguish its decode failure. Data comes back
 in step 3.
 
 Expected output — **this is rough edge 1 showing itself, not a mistake on your part**
@@ -339,6 +340,11 @@ response. A doorway outage is not a crate defect.
 
 This is the first step that returns data. It needs an `elohim-storage` service, which you
 run yourself — see [Prerequisites](#prerequisites) item 5 for the extra toolchain.
+
+This is a **first-create example**: `hello` must not already exist in this app scope.
+The endpoint skips existing IDs rather than updating them, and the SDK reports that
+as an unresolved flush error. For another run, choose a fresh ID consistently in the
+write, read and diagnostic commands; do not delete existing content merely to rerun it.
 
 From a monorepo checkout: `pnpm install` at the repo root, then `pnpm run hc:start` from
 `app/elohim-app/`. That brings up a Holochain conductor, an `elohim-storage` service, and
@@ -392,8 +398,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dht_anchor_hash: Some("demo-local-anchor".into()),
     }).await?;
 
-    // flush() reports Ok(()) even if the endpoint rejects the batch (rough edge
-    // 2), so the read-back below IS the verification — not this line.
+    // flush() checks the bulk acknowledgement; read-back verifies the content
+    // visible at this endpoint. Neither proves remote custody.
     client.flush().await?;
 
     match client.get::<Content>("hello").await? {
@@ -425,25 +431,10 @@ separates them. Work down it in order.
    service actually holds — that is the authoritative answer for a stack you run yourself.
 3. **Did the write land at all?**
    `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8090/db/lamad/content/hello`
-   Turn on error logging first, because this is the branch `flush()` hides. Add **both**
-   crates to `Cargo.toml` — the snippet names types from each:
-
-   ```toml
-   tracing = "0.1"
-   tracing-subscriber = { version = "0.3", features = ["fmt"] }
-   ```
-
-   then put this first in `main`:
-
-   ```rust
-   tracing_subscriber::fmt().with_max_level(tracing::Level::ERROR).init();
-   ```
-
-   - A `tracing` error line at flush time → **the endpoint rejected your batch** and
-     `flush()` swallowed it (rough edge 2). The message carries the status and body; most
-     often the item did not match the write schema.
-   - `404` with **no** error line → the row was accepted and is being **hidden by the
-     provenance gate**. Go to step 4.
+   Inspect the result of `flush()` first. An HTTP rejection, a bulk operation error,
+   an incomplete response or a skipped item returns `Err` and keeps that group pending.
+   A successfully flushed row can still be invisible through the read path; check its
+   provenance and app scope before retrying a create operation.
 4. **Did you omit `dhtAnchorHash`?** That is what the provenance gate checks. See the note
    below — a row without it is stored and then invisible to `get()`, which looks identical
    to never having been written.
@@ -489,7 +480,7 @@ three links and this crate only performs the first.
 Two practical consequences. A single local stack has no peers to announce to, so link 2 is
 real but unobservable there — do not read "nothing propagated" as a defect on a one-node
 setup. And nothing in this crate reports on links 2 or 3: `flush()` returning `Ok(())`
-tells you about link 1 at best (rough edge 2 says even that much is unreliable), never
+confirms insertion for that selected batch at link 1, never
 about propagation.
 
 **Stopping the stack.** The services run in the foreground of the `hc:start` shell —
@@ -556,8 +547,8 @@ POST {host}/db/{app_id}/{content_type()}/bulk
 
 The body is a JSON array of your serialized items, grouped by content type, in camelCase.
 The endpoint validates each item against its own content schema — your struct must
-serialize into a shape it accepts, or it rejects the whole batch (silently, per rough
-edge 2).
+serialize into a shape it accepts, or the flush returns an error and retains that
+group (rough edge 2).
 
 **Where that schema is.** In the `views` re-export. For `content`, the accepted write
 shape is `views::lamad::CreateContentInputView`: `id` and `title` are the only required
@@ -580,7 +571,7 @@ GET {doorway_url}/api/v1/cache/{lowercased type name}/{id}    # Browser — no a
 type from the client: the `elohim-storage` service serves a fixed list of resources, and
 `elohim-views` is its inventory (`cargo doc -p elohim-views` — each writable resource has
 a `Create…InputView`). A type name the endpoint does not serve fails exactly the way a
-wrong app scope does: reads return `Ok(None)` and writes are rejected silently. The
+wrong app scope does: reads return `Ok(None)` and a rejected write returns an error. The
 `ManifestoDraft` name above illustrates the lowercasing rule; it is not a usable resource.
 
 **What to do about it:** name your struct so that its lowercased name equals the
@@ -611,8 +602,8 @@ camelCase for the types it serves today.
 `Authorization: Bearer <key>` on both the cache read and the bulk write. Whether a given
 doorway requires one is a deployment question — the public alpha's cache route is open,
 so `None` works there. A rejected key surfaces as
-`Err(SdkError::Network("HTTP 401 - …"))` from `get()`; on `flush()` it is only logged
-(rough edge 2). The other modes have no credential field: an `elohim-storage` service is
+`Err(SdkError::Network("HTTP 401 - …"))` from both `get()` and `flush()`.
+A rejected flush retains its pending group (rough edge 2). The other modes have no credential field: an `elohim-storage` service is
 expected to be reached over a trusted network path.
 
 ## What each mode does
@@ -702,7 +693,8 @@ Four call semantics worth stating outright:
   items and is not a delivery confirmation. See rough edge 2.
 - **`get_batch(&[&str])`** collects hits into a `HashMap`; misses are simply absent.
 - **`queue()`** on `WriteBuffer` (which `save` calls) returns
-  `Err(SdkError::BackpressureFull(100))` once the buffer is at its ceiling. Watch
+  `Err(SdkError::BackpressureFull(100))` for a new key once the buffer is at its ceiling.
+  Replacing an existing key remains allowed, including a change of priority. Watch
   `backpressure()` — a `u8` from 0 to 100 — and slow down before that happens.
 
 `ContentReadable` requires `content_type()` and `content_id()`, and offers three
@@ -745,8 +737,10 @@ tokio::spawn(async move {
         // For configured modes, an empty buffer returns early. Native without
         // sync_url always refuses with InvalidMode; see rough edge 3.
         if let Err(e) = flusher.flush().await {
-            // The attempted batch is not requeued. See rough edge 2.
+            // Failed/ambiguous groups remain pending. Stop for application
+            // reconciliation instead of blindly retrying a skipped create.
             tracing::error!("flush failed: {e}");
+            break;
         }
     }
 });
@@ -756,9 +750,10 @@ tokio::spawn(async move {
 
 For `Browser`, `Node`, or `Native` with a `sync_url`, one `flush()` attempts at most one
 batch. At shutdown, repeat until the pending counts are empty; there is no flush-on-drop.
-This proves only that every queued batch was attempted, not that it landed — current
-error handling can consume a failed batch (rough edge 2). Native without a `sync_url`
-cannot drain by design; choose a configured mode before using this loop.
+A confirmed batch requires a valid bulk response reporting every item inserted, none
+skipped and no errors. Failed, cancelled and ambiguous groups remain pending. Stop or
+back off on errors: blind retries cannot resolve a skipped create. Native without a
+`sync_url` cannot drain by design; choose a configured mode before using this loop.
 
 **The preset is fixed by the mode**, per the mode table — `Browser` gets
 `for_interactive`, `Node` gets `for_seeding`, `Native` gets `default`. `ContentClient` has
@@ -939,13 +934,22 @@ repository (see [Project links](#project-links)) before working around it.
    `ContentClient`; or use `Node` mode against an
    `elohim-storage` service, whose resource names are lowercase and do line up.
 
-2. **Configured modes take a batch before they know it landed, and never requeue it.** A
-   transport failure (connection refused, DNS, TLS, timeout) surfaces as `Err`; an HTTP
-   `4xx` or `5xx` is logged at `error` level through `tracing` and swallowed as `Ok(())`.
-   Either way the taken operations are gone from memory. A batch spanning content types
-   can also partly land before a later request fails. Install a tracing subscriber and
-   confirm writes by reading them back; neither `flush()` nor `save_immediate()` is a
-   delivery acknowledgement.
+2. **Retries after uncertain outcomes can require reconciliation.** `flush()` retains
+   each group until a valid `BulkResult` reports all its items inserted, zero skipped,
+   and no errors. HTTP rejection, transport/decode failure, bulk errors, skipped items,
+   or incomplete counts return `Err`; task cancellation also leaves unacknowledged
+   writes pending. Earlier confirmed groups are not replayed. A newer same-key write
+   survives an older acknowledgement, even when its priority changes; overlapping
+   flushes run in sequence.
+
+   The content bulk endpoint is create-only: it skips an existing ID without comparing
+   payloads. A skipped response therefore cannot prove that your content landed. If the
+   endpoint inserted a write but its response was lost, retry can remain unresolved as a
+   skip. Preserve the pending write and reconcile it with authoritative readback; this
+   SDK does not implement that reconciliation or an idempotency protocol. Retrying an
+   uncertain request is at-least-once, not exactly-once. Dropping the client or restarting
+   the process still loses this in-memory buffer. Explicit `take_batch()` and `clear()`
+   remain destructive caller-controlled operations.
 
 3. **`Native` without a `sync_url` has no storage backend.** `get()` and `flush()` return
    `SdkError::InvalidMode`; `flush()` refuses before taking a batch, so queued operations
@@ -983,13 +987,10 @@ repository (see [Project links](#project-links)) before working around it.
    DHT behind the storage service, not in this surface. This crate's plane is the content
    projection.
 
-8. **A `Browser`-mode write against the public alpha vanishes silently.** This is the
-   composite of two facts above, and it is worth stating on its own because it is the
-   most likely way to lose data with this crate. `Browser` `flush()` posts to
-   `{doorway}/db/…`; `doorway-alpha.elohim.host` does not serve that route and returns
-   `404`; rough edge 2 swallows the `404` and returns `Ok(())`. So a `Browser` client
-   pointed at the only publicly reachable endpoint reports every write as successful while
-   discarding all of them. Verify the missing route:
+8. **A `Browser`-mode write needs a doorway that serves the write route.**
+   `Browser` `flush()` posts to `{doorway}/db/…`. An unserved route returns an HTTP
+   error and leaves the group pending; it does not become a successful write. Check the
+   deployment's route before using it. The historical public-alpha reproduction was:
 
    ```bash
    curl -s -o /dev/null -w '%{http_code}\n' https://doorway-alpha.elohim.host/db/stats   # 404
@@ -1027,8 +1028,8 @@ priority ordering and last-write-wins dedup, which is real work you would otherw
 write. `ClientMode` makes the destination a constructor argument, so the same code runs
 against a doorway or a peer. And `contracts` hands you `Answer<T>` and `ReasonLabel` —
 boundary types you would otherwise re-derive from your own incidents. What it does *not*
-yet buy you is reliable error reporting on writes, offline capability, or reach
-enforcement; for those you are still reading this section.
+yet buy you is restart persistence, automatic reconciliation of ambiguous creates,
+or reach enforcement; for those you are still reading this section.
 
 ## Next steps
 
@@ -1040,10 +1041,12 @@ enforcement; for those you are still reading this section.
   return it yet. It is the cheapest place to stop conflating "absent" with "never
   answered."
 - **Reach for `AutomergeSync`** when you need convergent documents rather than
-  last-write-wins rows — and address them with the scope/`doc_id` convention above.
-- **Install a `tracing` subscriber before you trust anything.** Several failure paths in
-  this crate — including every rejected write — report only through `tracing`. The
-  two-line setup is in quickstart step 3's diagnostics ladder.
+  buffered create-only content writes — and address them with the scope/`doc_id`
+  convention above. Last-write-wins deduplication applies only to pending buffer
+  entries; it does not turn the endpoint into an update API.
+- **Handle flush errors explicitly.** Preserve the client while deciding whether to
+  retry a temporary failure or reconcile an ambiguous create. Dropping it discards the
+  in-memory pending writes.
 
 ## Project links
 

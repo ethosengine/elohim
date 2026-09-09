@@ -133,6 +133,8 @@ impl WriteBufferConfig {
     }
 }
 
+type WriteQueues = HashMap<WritePriority, HashMap<String, Arc<WriteOp>>>;
+
 /// Write buffer with backpressure protection
 ///
 /// # Example
@@ -161,7 +163,7 @@ impl WriteBufferConfig {
 pub struct WriteBuffer {
     config: WriteBufferConfig,
     /// Operations by priority, deduplicated by cache_key
-    queues: Arc<Mutex<HashMap<WritePriority, HashMap<String, WriteOp>>>>,
+    queues: Arc<Mutex<WriteQueues>>,
 }
 
 impl WriteBuffer {
@@ -190,15 +192,19 @@ impl WriteBuffer {
         let mut queues = self.queues.lock().await;
         let total_size: usize = queues.values().map(|q| q.len()).sum();
 
-        if total_size >= self.config.max_size {
+        let key = op.cache_key();
+        let replacing = queues.values().any(|queue| queue.contains_key(&key));
+        if total_size >= self.config.max_size && !replacing {
             return Err(SdkError::BackpressureFull(100));
         }
 
-        let key = op.cache_key();
-        let priority = op.priority;
-
-        if let Some(queue) = queues.get_mut(&priority) {
-            queue.insert(key, op);
+        // A priority change is still the same buffered identity. Remove the old
+        // version from every class so it cannot be replayed after the new one.
+        for queue in queues.values_mut() {
+            queue.remove(&key);
+        }
+        if let Some(queue) = queues.get_mut(&op.priority) {
+            queue.insert(key, Arc::new(op));
         }
 
         Ok(())
@@ -242,7 +248,7 @@ impl WriteBuffer {
                     .collect();
                 for key in keys {
                     if let Some(op) = queue.remove(&key) {
-                        batch.push(op);
+                        batch.push((*op).clone());
                     }
                     if batch.len() >= self.config.batch_size {
                         break;
@@ -255,6 +261,50 @@ impl WriteBuffer {
         }
 
         batch
+    }
+
+    /// Snapshot without consuming writes. Holding the Arc distinguishes exact
+    /// versions even when a replacement has identical bytes and a timestamp.
+    #[cfg(feature = "client")]
+    pub(crate) async fn pending_batch(&self) -> Vec<Arc<WriteOp>> {
+        let queues = self.queues.lock().await;
+        let mut batch = Vec::new();
+        for priority in [
+            WritePriority::High,
+            WritePriority::Normal,
+            WritePriority::Bulk,
+        ] {
+            if let Some(queue) = queues.get(&priority) {
+                batch.extend(
+                    queue
+                        .values()
+                        .take(self.config.batch_size - batch.len())
+                        .cloned(),
+                );
+            }
+            if batch.len() >= self.config.batch_size {
+                break;
+            }
+        }
+        batch
+    }
+
+    /// Only remove versions confirmed by this request; a concurrent replacement
+    /// remains pending. Cancellation before this lock is acquired retains writes.
+    #[cfg(feature = "client")]
+    pub(crate) async fn acknowledge(&self, batch: &[Arc<WriteOp>]) {
+        let mut queues = self.queues.lock().await;
+        for op in batch {
+            if let Some(queue) = queues.get_mut(&op.priority) {
+                let key = op.cache_key();
+                if queue
+                    .get(&key)
+                    .is_some_and(|current| Arc::ptr_eq(current, op))
+                {
+                    queue.remove(&key);
+                }
+            }
+        }
     }
 
     /// Clear all pending operations
