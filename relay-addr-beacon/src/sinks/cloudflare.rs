@@ -244,6 +244,7 @@ pub struct CloudflareSink {
     enable_v6: bool,
     shared: Vec<SharedRecordConfig>,
     api_base: String,
+    shared_serving: tokio::sync::Mutex<bool>,
 }
 
 impl CloudflareSink {
@@ -263,15 +264,79 @@ impl CloudflareSink {
             enable_v6,
             shared,
             api_base: CF_API_BASE.to_string(),
+            shared_serving: tokio::sync::Mutex::new(true),
         }
     }
 
     /// Point this sink at a different API base (e.g. a wiremock server).
     /// Test-only — production always uses [`CF_API_BASE`].
     #[cfg(test)]
-    fn with_api_base(mut self, base: impl Into<String>) -> Self {
+    pub(crate) fn with_api_base(mut self, base: impl Into<String>) -> Self {
         self.api_base = base.into();
         self
+    }
+
+    /// Start opt-in membership withdrawn before any address publisher runs.
+    pub fn with_serving_probe(mut self, enabled: bool) -> Self {
+        self.shared_serving = tokio::sync::Mutex::new(!enabled);
+        self
+    }
+
+    /// Reconcile only our shared contribution. Serialize against address refresh
+    /// so an in-flight publisher cannot re-add a record after withdrawal.
+    pub async fn reconcile_membership(
+        &self,
+        serving: bool,
+        update: Option<&AddrUpdate>,
+    ) -> Result<()> {
+        let mut allowed = self.shared_serving.lock().await;
+        if self.shared.is_empty() {
+            return Ok(());
+        }
+        if !serving {
+            *allowed = false;
+        }
+        let zone = self.zone_id().await?;
+        if serving {
+            let update = update.context("membership join awaits a detected address")?;
+            for shared in &self.shared {
+                self.publish_shared_lane(&zone, shared, "A", &update.wan_v4.to_string())
+                    .await?;
+                if let Some(v6) = update.wan_v6.filter(|_| self.enable_v6) {
+                    self.publish_shared_lane(&zone, shared, "AAAA", &v6.to_string())
+                        .await?;
+                }
+            }
+            *allowed = true;
+        } else {
+            for shared in &self.shared {
+                // Include old AAAA contributions after an IPv6 configuration change.
+                for kind in ["A", "AAAA"] {
+                    for record in self.list_records(&zone, kind, &shared.record_name).await? {
+                        if record
+                            .comment
+                            .as_deref()
+                            .and_then(parse_owner_comment)
+                            .is_some_and(|stamp| stamp.owner == shared.owner)
+                        {
+                            let response = self
+                                .client
+                                .delete(format!(
+                                    "{}/zones/{zone}/dns_records/{}",
+                                    self.api_base, record.id
+                                ))
+                                .bearer_auth(&self.token)
+                                .send()
+                                .await
+                                .context("withdraw own shared record")?;
+                            parse_cf::<serde_json::Value>(response, "withdraw own shared record")
+                                .await?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn zone_id(&self) -> Result<String> {
@@ -591,6 +656,10 @@ impl CloudflareSink {
     /// A true no-op (`Ok(())`, zero network calls) with no shared config.
     #[allow(dead_code)]
     pub async fn publish_shared_only(&self, update: &AddrUpdate) -> Result<()> {
+        let serving = self.shared_serving.lock().await;
+        if !*serving {
+            return Ok(());
+        }
         if self.shared.is_empty() {
             return Ok(());
         }
@@ -687,6 +756,10 @@ impl CloudflareSink {
                     .await?;
             }
         }
+        let serving = self.shared_serving.lock().await;
+        if !*serving {
+            return Ok(());
+        }
         for shared in &self.shared {
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
@@ -715,6 +788,10 @@ impl Sink for CloudflareSink {
             if let Some(v6) = update.wan_v6 {
                 self.upsert(&zone_id, "AAAA", &v6.to_string()).await?;
             }
+        }
+        let serving = self.shared_serving.lock().await;
+        if !*serving {
+            return Ok(());
         }
         for shared in &self.shared {
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())

@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, ValueEnum};
 
 /// One sibling-safe shared DNS record lane contributed by this beacon.
@@ -136,6 +136,24 @@ pub struct Config {
     #[arg(long, env = "BEACON_SHARED_STALE_SECS", default_value_t = 900)]
     pub shared_stale_secs: u64,
 
+    /// Opt-in doorway serving contract. Only HTTP 200 serves; redirects,
+    /// errors and silence do not. Body parsing is deliberately unnecessary.
+    /// Shared lanes start withdrawn; exclusive diagnostic names are unaffected.
+    #[arg(long, env = "BEACON_SERVING_PROBE_URL")]
+    pub serving_probe_url: Option<String>,
+
+    /// Independent health polling interval (WAN discovery cannot block it).
+    #[arg(long, env = "BEACON_SERVING_PROBE_INTERVAL_SECS", default_value_t = 15)]
+    pub serving_probe_interval_secs: u64,
+
+    /// Consecutive non-serving probes required to withdraw shared membership.
+    #[arg(long, env = "BEACON_SERVING_LEAVE_AFTER", default_value_t = 3)]
+    pub serving_leave_after: u64,
+
+    /// Consecutive serving probes required to join, including after restart.
+    #[arg(long, env = "BEACON_SERVING_JOIN_AFTER", default_value_t = 2)]
+    pub serving_join_after: u64,
+
     // ---- pkarr sink -----------------------------------------------------
     /// Dedicated pkarr secret-key file (hex, 0600). Generated if absent. Do NOT
     /// reuse an iroh/libp2p key here.
@@ -234,6 +252,38 @@ impl Config {
     /// are shared-mode invariants, not per-sink construction concerns.
     pub fn validate(&self) -> Result<()> {
         self.shared_record_lanes()?;
+        if self.serving_probe_interval_secs == 0
+            || self.serving_leave_after == 0
+            || self.serving_join_after == 0
+        {
+            return Err(anyhow!(
+                "serving probe interval and join/leave counts must be positive"
+            ));
+        }
+        if let Some(url) = &self.serving_probe_url {
+            let lanes = self.shared_record_lanes()?;
+            if !self.sinks.contains(&SinkName::Cloudflare) || lanes.is_empty() {
+                return Err(anyhow!(
+                    "serving probe requires a Cloudflare shared record lane"
+                ));
+            }
+            if lanes.iter().any(|lane| {
+                self.record_name.as_deref().is_some_and(|name| {
+                    name.trim_end_matches('.')
+                        .eq_ignore_ascii_case(lane.record_name.trim_end_matches('.'))
+                })
+            }) {
+                return Err(anyhow!(
+                    "serving shared lanes must not own the exclusive diagnostic name"
+                ));
+            }
+
+            let parsed = reqwest::Url::parse(url).context("invalid serving probe URL")?;
+            if !matches!(parsed.scheme(), "http" | "https") {
+                return Err(anyhow!("serving probe URL must use http or https"));
+            }
+        }
+
         if self.shared_stale_secs <= self.shared_refresh_secs {
             return Err(anyhow!(
                 "--shared-stale-secs ({}) must be greater than --shared-refresh-secs ({}) — \
@@ -270,6 +320,13 @@ impl std::fmt::Debug for Config {
             .field("record_owner", &self.record_owner)
             .field("shared_refresh_secs", &self.shared_refresh_secs)
             .field("shared_stale_secs", &self.shared_stale_secs)
+            .field("serving_probe_url", &self.serving_probe_url)
+            .field(
+                "serving_probe_interval_secs",
+                &self.serving_probe_interval_secs,
+            )
+            .field("serving_leave_after", &self.serving_leave_after)
+            .field("serving_join_after", &self.serving_join_after)
             .field("pkarr_key_file", &self.pkarr_key_file)
             .field("pkarr_relay", &self.pkarr_relay)
             .field("coturn_base_conf", &self.coturn_base_conf)

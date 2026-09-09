@@ -122,3 +122,27 @@ mod tests {
         assert!(has_changed(Some(&a), &b));
     }
 }
+
+/// Ephemeral serving evidence, rebuilt after every restart. DNS is its projection,
+/// never evidence that a doorway is currently serving.
+#[derive(Default)]
+pub struct Membership {
+    pub serving: bool,
+    consecutive: u64,
+    last_probe: Option<bool>,
+    pub applied: Option<bool>,
+}
+
+impl Membership {
+    pub fn observe(&mut self, serving: bool, leave_after: u64, join_after: u64) {
+        self.consecutive = if self.last_probe == Some(serving) {
+            self.consecutive.saturating_add(1)
+        } else {
+            1
+        };
+        self.last_probe = Some(serving);
+        if self.consecutive >= if serving { join_after } else { leave_after } {
+            self.serving = serving;
+        }
+    }
+}

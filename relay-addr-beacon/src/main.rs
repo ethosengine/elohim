@@ -87,14 +87,17 @@ fn build_sinks(cfg: &Config, client: &reqwest::Client) -> Result<Vec<ActiveSink>
                         stale_secs: cfg.shared_stale_secs,
                     })
                     .collect();
-                sinks.push(ActiveSink::Cloudflare(CloudflareSink::new(
-                    client.clone(),
-                    token,
-                    zone,
-                    record_name,
-                    cfg.enable_v6,
-                    shared,
-                )));
+                sinks.push(ActiveSink::Cloudflare(
+                    CloudflareSink::new(
+                        client.clone(),
+                        token,
+                        zone,
+                        record_name,
+                        cfg.enable_v6,
+                        shared,
+                    )
+                    .with_serving_probe(cfg.serving_probe_url.is_some()),
+                ));
             }
             SinkName::Pkarr => {
                 sinks.push(ActiveSink::Pkarr(PkarrSink::new(
@@ -288,6 +291,89 @@ async fn cycle(
     Ok(all_ok)
 }
 
+/// One health cycle: status is the contract; a malformed 200 is still serving.
+/// Uses its own no-redirect bounded client, independent of WAN discovery.
+async fn serving_cycle(
+    cfg: &Config,
+    client: &reqwest::Client,
+    sinks: &[ActiveSink],
+    membership: &mut state::Membership,
+) -> Result<()> {
+    let url = cfg
+        .serving_probe_url
+        .as_deref()
+        .context("serving probe URL unset")?;
+    let serving = client
+        .get(url)
+        .send()
+        .await
+        .is_ok_and(|response| response.status() == reqwest::StatusCode::OK);
+    membership.observe(serving, cfg.serving_leave_after, cfg.serving_join_after);
+    apply_membership(cfg, sinks, membership).await
+}
+
+async fn apply_membership(
+    cfg: &Config,
+    sinks: &[ActiveSink],
+    membership: &mut state::Membership,
+) -> Result<()> {
+    let previous = if membership.serving {
+        state::load(&cfg.state_file)?
+    } else {
+        None
+    };
+    let mut all_ok = true;
+    for sink in sinks {
+        if let ActiveSink::Cloudflare(cf) = sink {
+            if let Err(error) = cf
+                .reconcile_membership(membership.serving, previous.as_ref())
+                .await
+            {
+                all_ok = false;
+                warn!(error = %error, "shared membership projection failed; retrying next probe");
+            }
+        }
+    }
+    if !all_ok {
+        return Err(anyhow!("shared membership projection incomplete"));
+    }
+    if membership.applied != Some(membership.serving) {
+        info!(
+            serving = membership.serving,
+            "shared membership projection applied"
+        );
+        membership.applied = Some(membership.serving);
+    }
+    Ok(())
+}
+
+fn build_probe_client(interval: u64) -> Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(interval.min(15)))
+        .build()
+        .context("building serving probe client")
+}
+
+async fn address_loop(cfg: &Config, client: &reqwest::Client, sinks: &[ActiveSink]) {
+    loop {
+        if let Err(e) = cycle(cfg, client, sinks, false).await {
+            error!(error = %format!("{e:#}"), "cycle failed — retrying next interval");
+        }
+        tokio::time::sleep(Duration::from_secs(cfg.interval_secs)).await;
+    }
+}
+
+async fn serving_loop(cfg: &Config, client: &reqwest::Client, sinks: &[ActiveSink]) {
+    let mut membership = state::Membership::default();
+    loop {
+        if let Err(e) = serving_cycle(cfg, client, sinks, &mut membership).await {
+            warn!(error = %e, "serving cycle failed — retrying next interval");
+        }
+        tokio::time::sleep(Duration::from_secs(cfg.serving_probe_interval_secs)).await;
+    }
+}
+
 async fn run(cfg: Config) -> Result<()> {
     cfg.validate()?;
     let client = build_http_client()?;
@@ -301,21 +387,39 @@ async fn run(cfg: Config) -> Result<()> {
     );
 
     if cfg.once {
+        let mut membership = state::Membership::default();
+        if cfg.serving_probe_url.is_some() {
+            // Withdraw stale contributions before detection, even if WAN is down.
+            apply_membership(&cfg, &sinks, &mut membership).await?;
+        }
         let ok = cycle(&cfg, &client, &sinks, true).await?;
+        if cfg.serving_probe_url.is_some() {
+            serving_cycle(
+                &cfg,
+                &build_probe_client(cfg.serving_probe_interval_secs)?,
+                &sinks,
+                &mut membership,
+            )
+            .await?;
+        }
         if ok {
             Ok(())
         } else {
             Err(anyhow!("--once: at least one sink failed"))
         }
     } else {
-        let interval = Duration::from_secs(cfg.interval_secs);
-        loop {
-            if let Err(e) = cycle(&cfg, &client, &sinks, false).await {
-                // A whole-cycle error (e.g. no endpoint reachable) is logged and
-                // retried — a transient outage should not kill the daemon.
-                error!(error = %format!("{e:#}"), "cycle failed — retrying next interval");
-            }
-            tokio::time::sleep(interval).await;
+        if cfg.serving_probe_url.is_some() {
+            let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
+            tokio::join!(
+                address_loop(&cfg, &client, &sinks),
+                serving_loop(&cfg, &probe_client, &sinks)
+            );
+        } else {
+            address_loop(&cfg, &client, &sinks).await;
         }
+        Ok(())
     }
 }
+
+#[cfg(test)]
+mod membership_tests;
