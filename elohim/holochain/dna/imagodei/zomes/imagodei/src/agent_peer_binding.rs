@@ -77,6 +77,10 @@ pub struct AgentPeerBindingView {
     pub device_archetype: String,
     /// ActionHash of the binding that supersedes this one; `None` when current.
     pub superseded_by: Option<ActionHashB64>,
+    /// Original signed Record, only for the bounded own-recovery query.
+    /// Legacy queries omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<Vec<u8>>,
 }
 
 impl AgentPeerBindingView {
@@ -95,6 +99,7 @@ impl AgentPeerBindingView {
             valid_until_micros: b.valid_until.map(|t| t.as_micros()),
             device_archetype: archetype_str,
             superseded_by: b.superseded_by.map(|h| h.into()),
+            record: None,
         }
     }
 }
@@ -222,6 +227,8 @@ pub fn create_agent_peer_binding(
 ///
 /// Returns only currently-valid bindings (superseded entries are filtered out).
 /// Callers needing historical bindings should query the entry directly.
+/// The additive own-recovery query returns original signed candidates instead;
+/// its consumer must still verify cross-signature, validity and supersession.
 #[hdk_extern]
 pub fn get_agent_peer_bindings(
     agent_pubkey: AgentPubKey,
@@ -262,7 +269,13 @@ pub fn get_agent_peer_bindings(
 /// Returns only currently-valid bindings (superseded entries are filtered out).
 /// Callers needing historical bindings should query the entry directly.
 #[hdk_extern]
-pub fn get_bindings_for_peer(peer_id: String) -> ExternResult<Vec<AgentPeerBindingView>> {
+pub fn get_bindings_for_peer(input: PeerBindingQuery) -> ExternResult<Vec<AgentPeerBindingView>> {
+    let peer_id = match input {
+        PeerBindingQuery::Own { peer_id, agent_key } => {
+            return recoverable_own_bindings(&peer_id, &agent_key);
+        }
+        PeerBindingQuery::Legacy(peer_id) => peer_id,
+    };
     let peer_anchor = StringAnchor::new("peer_binding", &peer_id);
     let peer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(peer_anchor))?;
 
@@ -287,6 +300,136 @@ pub fn get_bindings_for_peer(peer_id: String) -> ExternResult<Vec<AgentPeerBindi
 
     results.retain(|v| v.superseded_by.is_none());
     Ok(results)
+}
+
+/// Additive read mode; existing String callers retain their original query.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PeerBindingQuery {
+    Legacy(String),
+    Own {
+        #[serde(rename = "peerId")]
+        peer_id: String,
+        #[serde(rename = "agentKey")]
+        agent_key: String,
+    },
+}
+
+// Matches the existing bounded lineage observation budget. Link enumeration is
+// still a host operation; this caps distinct local record reads, not DB history.
+const MAX_RECOVERY_RECORDS: usize = 64;
+
+fn recovery_unavailable(reason: &str) -> WasmError {
+    wasm_error!(WasmErrorInner::Guest(format!(
+        "binding recovery unavailable: {reason}"
+    )))
+}
+
+fn recoverable_own_bindings(
+    peer_id: &str,
+    agent_key: &str,
+) -> ExternResult<Vec<AgentPeerBindingView>> {
+    let own = agent_info()?.agent_initial_pubkey;
+    if own.to_string() != agent_key {
+        return Err(recovery_unavailable(
+            "query is not for the caller's own key",
+        ));
+    }
+    let anchor = hash_entry(&EntryTypes::StringAnchor(StringAnchor::new(
+        "peer_binding",
+        peer_id,
+    )))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::PeerToBinding)?,
+        GetStrategy::Local,
+    )?;
+    let mut hashes = std::collections::HashSet::new();
+    for link in links {
+        if link.author != own {
+            continue;
+        }
+        let hash = link
+            .target
+            .into_action_hash()
+            .ok_or_else(|| recovery_unavailable("own link has a non-action target"))?;
+        hashes.insert(hash);
+        if hashes.len() > MAX_RECOVERY_RECORDS {
+            return Err(recovery_unavailable("record budget exceeded"));
+        }
+    }
+    let expected: EntryType = UnitEntryTypes::AgentPeerBinding.try_into()?;
+    let mut results = Vec::new();
+    for hash in hashes {
+        let Some(Details::Record(details)) = get_details(hash.clone(), GetOptions::local())? else {
+            return Err(recovery_unavailable(
+                "own linked record is not locally available",
+            ));
+        };
+        if details.validation_status != ValidationStatus::Valid
+            || !details.updates.is_empty()
+            || !details.deletes.is_empty()
+        {
+            return Err(recovery_unavailable(
+                "record has unresolved validation or evolution",
+            ));
+        }
+        let record = details.record;
+        if record.action_address() != &hash
+            || record.action().author() != &own
+            || record.action().entry_type() != Some(&expected)
+            || !matches!(record.action().data, ActionData::Create(_))
+        {
+            return Err(recovery_unavailable("wrong own binding record"));
+        }
+        let binding: AgentPeerBinding = record
+            .entry()
+            .to_app_option()
+            .map_err(|_| recovery_unavailable("malformed binding"))?
+            .ok_or_else(|| recovery_unavailable("binding entry missing"))?;
+        let entry_hash = hash_entry(&EntryTypes::AgentPeerBinding(binding.clone()))?;
+        if record.action().entry_hash() != Some(&entry_hash) {
+            return Err(recovery_unavailable("binding entry hash mismatch"));
+        }
+        if binding.peer_id != peer_id {
+            return Err(recovery_unavailable("own link points to another transport"));
+        }
+        // Legacy Human-slug bindings are not this key's cross-signed binding.
+        if binding.agent_cid != agent_key {
+            continue;
+        }
+        let bytes = holochain_serialized_bytes::encode(&record)
+            .map_err(|_| recovery_unavailable("record serialization failed"))?;
+        let mut view = AgentPeerBindingView::from_entry(hash, binding);
+        view.record = Some(bytes);
+        results.push(view);
+    }
+    results.sort_by(|a, b| a.action_hash.to_string().cmp(&b.action_hash.to_string()));
+    Ok(results)
+}
+
+#[cfg(test)]
+mod recovery_query_tests {
+    use super::*;
+
+    #[test]
+    fn binding_recovery_query_preserves_legacy_string_and_explicit_own_mode() {
+        let legacy = holochain_serialized_bytes::encode(&"peer").unwrap();
+        let decoded: PeerBindingQuery = holochain_serialized_bytes::decode(&legacy).unwrap();
+        assert!(matches!(decoded, PeerBindingQuery::Legacy(peer) if peer == "peer"));
+        let own = serde_json::json!({"peerId": "peer", "agentKey": "key"});
+        let bytes = holochain_serialized_bytes::encode(&own).unwrap();
+        let decoded: PeerBindingQuery = holochain_serialized_bytes::decode(&bytes).unwrap();
+        assert!(
+            matches!(decoded, PeerBindingQuery::Own { peer_id, agent_key }
+            if peer_id == "peer" && agent_key == "key")
+        );
+        for invalid in [
+            serde_json::json!({"peerId": "peer"}),
+            serde_json::json!({"agentKey": "key"}),
+        ] {
+            assert!(serde_json::from_value::<PeerBindingQuery>(invalid).is_err());
+        }
+    }
 }
 
 // =============================================================================

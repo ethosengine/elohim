@@ -24,6 +24,42 @@ seamLocus: >
   (authorize_canonical_head_declarer).
 
 decisionPoints:
+  - name: observe_with
+    kind: verdict-fn
+    sourceLocation:
+      file: src/commitment_observation.rs
+      modulePath: content_store::commitment_observation::observe_with
+    summary: >
+      Observes one existing Commitment root and its validated Update graph under
+      one bounded read cache. Same-author immutable-identity-preserving updates
+      order by signed action sequence; observed equal-sequence conflicts refuse.
+      Legacy same-author sibling Updates remain readable. No global freshness,
+      absence of unseen forks/revocations, or provider authority is asserted.
+    concernIds:
+      - { id: C0, status: answered, justification: "Reads existing signed lifecycle records; creates no new entity or head and does not mistake an observed state for global authority." }
+      - { id: C1, status: n-a, justification: "No canonical election or self-candidacy occurs." }
+      - { id: C2, status: answered, justification: "Eligible exact-root updates order by signed action_seq; equal-sequence conflicting actions refuse, irrespective of metadata enumeration order or updated_at." }
+      - { id: C3, status: partial, justification: "Missing required records refuse and can be retried; graph histories exceeding the shared 64-record bound require a later compaction policy." }
+      - { id: C4, status: answered, justification: "Unavailable dependencies and bounded truncation error rather than silently returning an old head; an empty observation is not proof of absent revocation." }
+      - { id: C5, status: answered, justification: "Validated-record loader checks exact action, entry type and entry hash; graph policy checks predecessor action/entry and immutable fields before selecting state." }
+      - { id: C6a, status: answered, justification: "One total distinct-record cache bounds backward and forward traversal; duplicate actions are cached and queued once." }
+      - { id: C6b, status: answered, justification: "Readback has no material writes; duplicate targets and metadata do not create a second lifecycle event." }
+      - { id: C7, status: partial, justification: "Only observed validated records are returned; DHT discovery can remain incomplete and no globally current lifecycle is advertised." }
+      - { id: C8, status: partial, justification: "Distinct error text identifies unavailable/conflicting observations; there is no new typed metric vocabulary." }
+      - { id: C9, status: partial, justification: "The root's exact signed author is preserved; key rotation and provider identity binding are outside this observation repair." }
+      - { id: C10, status: answered, justification: "Existing inputs and ReaCommitmentOutput wire shapes remain unchanged; coordinator-only code preserves DNA integrity bytes." }
+      - { id: C11, status: partial, justification: "Processing and record reads are bounded; host get_links/get_details metadata enumeration itself remains the existing host-function boundary." }
+      - { id: C12, status: partial, justification: "Coordinator updater checks exact root author, but Commitment integrity currently does not enforce provider authority and this repair makes no such claim." }
+      - { id: C13, status: n-a, justification: "No social-tier authorization gradient is introduced." }
+      - { id: C14, status: partial, justification: "Refusals are explicit existing zome errors; no new residual-witness envelope is introduced." }
+    contractTests:
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/commitment_observation.rs, testName: observed_commitment_lifecycle_follows_updates_and_legacy_siblings, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/commitment_observation.rs, testName: observed_commitment_foreign_or_changed_undertakings_confer_no_state, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/commitment_observation.rs, testName: observed_commitment_conflicts_missing_records_and_invalid_edges_refuse, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/commitment_observation.rs, testName: observed_commitment_record_budget_is_total_and_missing_updates_are_not_revocation_proof, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/commitment_observation.rs, testName: observed_commitment_own_chain_update_does_not_wait_for_reverse_metadata, kind: unit }
+      - { path: elohim/holochain/tests/sweettest/src/tests/rea_commitment_replication.rs, testName: project_epr_commitment_replicates_to_peer_b, kind: sweettest }
+
   - name: select_canonical_winner
     kind: pure-decision-predicate
     sourceLocation:

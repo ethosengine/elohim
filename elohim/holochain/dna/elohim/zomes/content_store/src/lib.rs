@@ -42,6 +42,7 @@ pub use feedback_signal::{
 
 // Accountable correction (slice 1) — exact-root lineage, explicit-predecessor
 // amendment, and the ONE shared version-DAG total order. Coordinator only.
+mod commitment_observation;
 pub mod correction;
 pub use correction::{
     amend_content, get_content_lineage, AmendContentInput, AmendContentPatch, ContentLineageOutput,
@@ -15930,32 +15931,9 @@ pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<Re
 
 #[hdk_extern]
 pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput>> {
-    let id_anchor = StringAnchor::new("commitment_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitment)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
-        let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("Commitment record not found".into()))
-        })?;
-        let commitment: Commitment = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
-        let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
-        Ok(Some(ReaCommitmentOutput {
-            action_hash,
-            entry_hash,
-            commitment: commitment_to_wire(&commitment),
-        }))
-    } else {
-        Ok(None)
-    }
+    commitment_observation::observe(&id)?
+        .map(commitment_observation::output)
+        .transpose()
 }
 
 /// The EPR scopes THIS agent has committed to steward, read from its OWN
@@ -15990,20 +15968,40 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
 ///
 /// Only LIVE custody undertakings count — a finished or cancelled commitment is
 /// a promise discharged or withdrawn, and re-fetching for it would be work no
-/// one asked for. Best-effort per record: an undecodable entry is skipped
-/// rather than failing the sweep, matching the household-cid precedent.
+/// one asked for. Discovery skips undecodable entries; each discovered
+/// undertaking then requires a complete bounded observation of its known
+/// lifecycle. Missing or conflicting observed records refuse the sweep.
 #[hdk_extern]
 pub fn get_my_custody_epr_scopes(_: ()) -> ExternResult<Vec<String>> {
-    let records = query(ChainQueryFilter::new().include_entries(true))?;
-    let mut scopes: Vec<String> = Vec::new();
+    let own_author = agent_info()?.agent_initial_pubkey;
+    let records = query(
+        ChainQueryFilter::new()
+            .entry_type(UnitEntryTypes::Commitment.try_into()?)
+            .include_entries(true),
+    )?;
+    let mut ids: std::collections::BTreeMap<String, Vec<ActionHash>> =
+        std::collections::BTreeMap::new();
     for record in &records {
-        let Some(c) = record.entry().to_app_option::<Commitment>().ok().flatten() else {
-            continue;
-        };
-        if c.finished || c.state == "cancelled" {
+        if let Some(c) = record.entry().to_app_option::<Commitment>().ok().flatten() {
+            ids.entry(c.id)
+                .or_default()
+                .push(record.action_address().clone());
+        }
+    }
+    let mut scopes = Vec::new();
+    for (id, targets) in ids {
+        // Read the observed lifecycle once per undertaking, not once per historic
+        // state. Known cancellation must suppress its original live version.
+        let observed = commitment_observation::observe_targets(&id, targets)?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "own Commitment root unavailable".into()
+            ))
+        })?;
+        if observed.record.action().author() != &own_author {
             continue;
         }
-        if !action_is_custody(&c.action) {
+        let c = observed.commitment;
+        if c.finished || c.state == "cancelled" || !action_is_custody(&c.action) {
             continue;
         }
         for scope in decode_in_scope_of(&c.in_scope_of_json) {
@@ -16044,42 +16042,16 @@ fn decode_in_scope_of(json: &str) -> Vec<String> {
 pub fn update_rea_commitment_state(
     input: UpdateReaCommitmentStateInput,
 ) -> ExternResult<ReaCommitmentOutput> {
-    // 1. Locate the latest action_hash via the id_anchor link.
-    let id_anchor = StringAnchor::new("commitment_id", &input.id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitment)?;
-    let links = get_links(query, GetStrategy::default())?;
-    let link = links.first().ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "update_rea_commitment_state: no commitment found for id {}",
-            input.id
-        )))
-    })?;
-    let prev_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest(
-            "update_rea_commitment_state: invalid action hash on id link".to_string(),
-        ))
-    })?;
-
-    // 2. Fetch + decode the previous entry.
-    let record = get(prev_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "update_rea_commitment_state: previous record not found".to_string(),
-        ))
-    })?;
-    let mut commitment: Commitment = record
-        .entry()
-        .to_app_option()
-        .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "update_rea_commitment_state: decode previous Commitment: {e}"
-            )))
-        })?
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "update_rea_commitment_state: no entry in record".to_string(),
-            ))
-        })?;
+    let observed = commitment_observation::observe(&input.id)?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment root unavailable".into())))?;
+    // This coordinator restriction is not a network-enforced provider binding.
+    if observed.record.action().author() != &agent_info()?.agent_initial_pubkey {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the Commitment root author may update its observed lifecycle".into()
+        )));
+    }
+    let prev_action_hash = observed.record.action_address().clone();
+    let mut commitment = observed.commitment;
 
     // 3. Mutate state + finished + updated_at.
     commitment.state = input.state;
@@ -16114,20 +16086,36 @@ pub fn get_commitments_by_agreement(
     let query = LinkQuery::try_new(agreement_anchor_hash, LinkTypes::AgreementToCommitment)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let mut results = Vec::new();
+    let mut ids = std::collections::BTreeSet::new();
     for link in &links {
-        let action_hash = ActionHash::try_from(link.target.clone())
+        let hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
-        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-            if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten() {
-                let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
-                results.push(ReaCommitmentOutput {
-                    action_hash,
-                    entry_hash,
-                    commitment: commitment_to_wire(&commitment),
-                });
-            }
+        let record = must_get_valid_record(hash)?;
+        let commitment = record
+            .entry()
+            .to_app_option::<Commitment>()
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Malformed Commitment".into())))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment bytes missing".into())))?;
+        if commitment.clause_of.as_deref() != Some(agreement_id.as_str()) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Agreement link names another undertaking".into()
+            )));
         }
+        ids.insert(commitment.id);
+    }
+    let mut results = Vec::new();
+    for id in ids {
+        let observed = commitment_observation::observe(&id)?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Agreement Commitment root unavailable".into()
+            ))
+        })?;
+        if observed.commitment.clause_of.as_deref() != Some(agreement_id.as_str()) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Observed Commitment belongs to another agreement".into()
+            )));
+        }
+        results.push(commitment_observation::output(observed)?);
     }
 
     Ok(results)

@@ -1,0 +1,35 @@
+seamRegistryVersion: 1
+crate: imagodei
+crateRoot: elohim/holochain/dna/imagodei/zomes/imagodei
+seamLocus: Bounded readback of the caller's original notarized AgentPeerBinding records.
+decisionPoints:
+  - name: recoverable_own_bindings
+    kind: verdict-fn
+    sourceLocation:
+      file: src/agent_peer_binding.rs
+      modulePath: imagodei::agent_peer_binding::recoverable_own_bindings
+    summary: >
+      Returns exact locally observed signed Create records through the existing
+      peer-binding query, restricted to the caller's initial key and transport.
+      No new entry, head or lifecycle write; storage retains cross-signature,
+      validity and supersession verification before projection adoption.
+    concernIds:
+      - { id: C0, status: answered, justification: "Recovers existing notarized records without minting replacement authority." }
+      - { id: C1, status: n-a, justification: "No election or candidacy." }
+      - { id: C2, status: n-a, justification: "Returns candidates; it does not choose a current binding." }
+      - { id: C3, status: partial, justification: "Local missing dependencies refuse; an empty local index cannot establish historical absence." }
+      - { id: C4, status: answered, justification: "Missing, invalid or evolved linked records error rather than producing fabricated proof." }
+      - { id: C5, status: answered, justification: "Validated-record floor plus exact Create author, type, action, entry hash, peer and key checks precede byte export." }
+      - { id: C6a, status: answered, justification: "At most 64 distinct own-linked record reads; duplicates are deduplicated." }
+      - { id: C6b, status: answered, justification: "Repeated queries return the same original records and perform no writes." }
+      - { id: C7, status: partial, justification: "Local observed evolution refuses; unseen supersession or revocation absence is not asserted." }
+      - { id: C8, status: partial, justification: "Existing zome errors report refusal; no new metrics vocabulary." }
+      - { id: C9, status: partial, justification: "Only exact initial agent key is supported; no key-rotation or provider-authority inference." }
+      - { id: C10, status: answered, justification: "Legacy String input and record-absent output remain unchanged; explicit own query adds signed bytes." }
+      - { id: C11, status: partial, justification: "Record processing is bounded; host link/details metadata enumeration retains its existing boundary." }
+      - { id: C12, status: partial, justification: "DHT validation is structural; transport cross-signature and adoption authority remain consumer checks." }
+      - { id: C13, status: n-a, justification: "No social-tier gradient is introduced." }
+      - { id: C14, status: partial, justification: "Refusals use existing errors, without a new residual capsule." }
+    contractTests:
+      - { path: elohim/holochain/dna/imagodei/zomes/imagodei/src/agent_peer_binding.rs, testName: binding_recovery_query_preserves_legacy_string_and_explicit_own_mode, kind: unit }
+      - { path: elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs, testName: binding_creates_and_is_readable, kind: sweettest }

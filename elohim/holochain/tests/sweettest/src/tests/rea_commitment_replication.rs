@@ -151,6 +151,24 @@ struct ReaCommitmentOutput {
     pub commitment: CommitmentWire,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct UpdateCommitmentStateInput {
+    id: String,
+    state: String,
+    finished: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GetRecordForActionInput {
+    action_hash: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CarriedRecordOutput {
+    action_hash: String,
+    record: Vec<u8>,
+}
+
 // ---------------------------------------------------------------------------
 // Scenario: Alice creates a project-epr commitment; Bob reads it after gossip.
 // ---------------------------------------------------------------------------
@@ -194,7 +212,7 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         has_beginning: None,
         has_end: None,
         due: None,
-        clause_of: None,
+        clause_of: Some(format!("agreement-{commitment_id}")),
         in_scope_of: vec!["doorway:test-doorway|epr:lamad-spa".to_string()],
         note: None,
         metadata_json: None,
@@ -292,6 +310,127 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         bob_output.action_hash, alice_output.action_hash,
         "ActionHash must be byte-identical across peers"
     );
+
+    // Existing commitments are observations of a lifecycle, not just Creates.
+    // Refuse a foreign coordinator update before any write is attempted.
+    let foreign: holochain::conductor::api::error::ConductorApiResult<ReaCommitmentOutput> = cb
+        .call_fallible(
+            &zome_b,
+            "update_rea_commitment_state",
+            UpdateCommitmentStateInput {
+                id: commitment_id.clone(),
+                state: "active".into(),
+                finished: Some(false),
+            },
+        )
+        .await;
+    // Keep both baseline observations visible: an accepted foreign write must
+    // not hide the independent stale-origin readback failure below.
+    eprintln!("foreign lifecycle update refused: {}", foreign.is_err());
+
+    let scope = "doorway:test-doorway|epr:lamad-spa".to_string();
+    let before: Vec<String> = ca
+        .call(&cell_a.zome(ZOME), "get_my_custody_epr_scopes", ())
+        .await;
+    assert!(before.contains(&scope));
+    let mut previous = alice_output.action_hash;
+    for (state, finished) in [("active", false), ("cancelled", true)] {
+        let changed: ReaCommitmentOutput = ca
+            .call(
+                &cell_a.zome(ZOME),
+                "update_rea_commitment_state",
+                UpdateCommitmentStateInput {
+                    id: commitment_id.clone(),
+                    state: state.into(),
+                    finished: Some(finished),
+                },
+            )
+            .await;
+        assert_ne!(changed.action_hash, previous);
+        let carried: Option<CarriedRecordOutput> = ca
+            .call(
+                &cell_a.zome(ZOME),
+                "get_record_for_action",
+                GetRecordForActionInput {
+                    action_hash: holo_hash::ActionHashB64::from(changed.action_hash.clone())
+                        .to_string(),
+                },
+            )
+            .await;
+        let carried = carried.expect("signed update record");
+        assert_eq!(
+            carried.action_hash,
+            holo_hash::ActionHashB64::from(changed.action_hash.clone()).to_string()
+        );
+        let signed: holochain_types::prelude::Record =
+            holochain_serialized_bytes::decode(&carried.record)?;
+        let holochain_types::prelude::ActionData::Update(update) = &signed.action().data else {
+            anyhow::bail!("state update did not produce an Update action");
+        };
+        assert_eq!(
+            update.original_action_address, previous,
+            "update must name the selected observed predecessor"
+        );
+        let origin: Option<ReaCommitmentOutput> = ca
+            .call(
+                &cell_a.zome(ZOME),
+                "get_rea_commitment",
+                commitment_id.clone(),
+            )
+            .await;
+        let origin = origin.expect("origin observes its own updated commitment");
+        eprintln!(
+            "origin lifecycle state: expected={state}, observed={}, exact_action={}",
+            origin.commitment.state,
+            origin.action_hash == changed.action_hash
+        );
+        assert_eq!(origin.action_hash, changed.action_hash);
+        assert_eq!(origin.entry_hash, changed.entry_hash);
+        assert_eq!(origin.commitment.state, state);
+        assert_eq!(origin.commitment.finished, finished);
+
+        await_consistency_s(60, [&cell_a, &cell_b])
+            .await
+            .map_err(|e| anyhow::anyhow!("DHT consistency timeout after state {state}: {e}"))?;
+        let remote = tokio::time::timeout(Duration::from_secs(60), async {
+            loop {
+                let read: holochain::conductor::api::error::ConductorApiResult<
+                    Option<ReaCommitmentOutput>,
+                > = cb
+                    .call_fallible(&zome_b, "get_rea_commitment", commitment_id.clone())
+                    .await;
+                if let Ok(Some(row)) = read {
+                    if row.action_hash == changed.action_hash {
+                        break row;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("Bob did not observe signed {state} update"))?;
+        assert_eq!(remote.entry_hash, changed.entry_hash);
+        assert_eq!(remote.commitment.state, state);
+        assert_eq!(remote.commitment.finished, finished);
+        let agreement_rows: Vec<ReaCommitmentOutput> = cb
+            .call(
+                &zome_b,
+                "get_commitments_by_agreement",
+                format!("agreement-{commitment_id}"),
+            )
+            .await;
+        assert_eq!(agreement_rows.len(), 1);
+        assert_eq!(agreement_rows[0].action_hash, changed.action_hash);
+        previous = changed.action_hash;
+    }
+    let after: Vec<String> = ca
+        .call(&cell_a.zome(ZOME), "get_my_custody_epr_scopes", ())
+        .await;
+    assert!(
+        !after.contains(&scope),
+        "cancelled history must not preserve the original undertaking"
+    );
+    assert!(foreign.is_err(), "Bob must not update Alice's undertaking");
 
     Ok(())
 }

@@ -170,6 +170,77 @@ async fn binding_creates_and_is_readable() -> Result<()> {
         "reverse link must resolve to the correct agent_cid"
     );
 
+    assert!(
+        by_peer[0].get("record").is_none(),
+        "legacy wire shape stays unchanged"
+    );
+    let own_query = serde_json::json!({"peerId": peer_id, "agentKey": agent.to_string()});
+    let legacy_only: Vec<serde_json::Value> = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "get_bindings_for_peer",
+            own_query.clone(),
+        )
+        .await;
+    assert!(
+        legacy_only.is_empty(),
+        "a legacy CID binding is not an own-key binding"
+    );
+    let foreign: holochain::conductor::api::error::ConductorApiResult<Vec<serde_json::Value>> =
+        conductor
+            .call_fallible(
+                &cell.zome("imagodei"),
+                "get_bindings_for_peer",
+                serde_json::json!({"peerId": peer_id, "agentKey": "another-key"}),
+            )
+            .await;
+    assert!(foreign.is_err(), "own recovery cannot query another key");
+
+    // This fixture proves signed Record readback, not the separate transport
+    // cross-signature verifier: that storage consumer must still validate it.
+    let own_created: CreateAgentPeerBindingOutput = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "create_agent_peer_binding",
+            CreateAgentPeerBindingInput {
+                peer_id: peer_id.clone(),
+                agent_cid: agent.to_string(),
+                valid_from_micros: 1_000_000_000,
+                valid_until_micros: None,
+                device_archetype: "node".into(),
+                signature: vec![0xABu8; 64],
+            },
+        )
+        .await;
+    let recovered: Vec<serde_json::Value> = conductor
+        .call(
+            &cell.zome("imagodei"),
+            "get_bindings_for_peer",
+            own_query.clone(),
+        )
+        .await;
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0]["agentCid"], agent.to_string());
+    assert_eq!(
+        recovered[0]["actionHash"],
+        own_created.action_hash.to_string()
+    );
+    let bytes: Vec<u8> = serde_json::from_value(recovered[0]["record"].clone())?;
+    let record: holochain_types::prelude::Record = holochain_serialized_bytes::decode(&bytes)?;
+    assert_eq!(record.action_address(), &own_created.action_hash);
+    assert_eq!(record.action().author(), &agent);
+    assert!(matches!(
+        record.action().data,
+        holochain_types::prelude::ActionData::Create(_)
+    ));
+    let again: Vec<serde_json::Value> = conductor
+        .call(&cell.zome("imagodei"), "get_bindings_for_peer", own_query)
+        .await;
+    assert_eq!(
+        again, recovered,
+        "recovery preserves the same original record without minting"
+    );
+
     let _ = SweetAgents::one; // keep import used
     Ok(())
 }
