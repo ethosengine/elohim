@@ -153,3 +153,37 @@ the ingest holder, a cold reader reconstructs identical bytes from at least four
 surviving distinct shard indices, with P2P source evidence and no whole-copy shortcut.
 Run only after doorway faults restore, under the same exclusive mesh lock. Three local
 peers cannot prove physical household loss or fractional DHT responsibility sharding.
+
+- [ ] After one steward cancels a project-epr commitment on one household peer, every peer resolves that updated commitment from its own conductor and withdraws the projected route without a second cancellation or reseed.
+
+Chain / between canonical commitment update and route withdrawal / missing node:
+latest witnessed commitment read plus complete lifecycle projection. Probe the returned
+ActionHash, state and finished flag on all three peers, then both doorway route views;
+a shared old anchor or a green reconcile counter alone cannot discharge this station.
+
+Observed in isolated run `20260909-isolated-current-source-full5-a3r4-d7ac422b`:
+Matthew received new cancellation hashes, then its own-conductor reconcile restored
+the original anchors while preserving cancelled SQL state. Jessica and James kept the
+same original anchors with proposed state. Later sweeps reported zero divergence.
+Evidence: `genesis/a2o/reports/delivery-20260909-current-source/isolated-full5-attempt3/root-state-terminal-resume4.json`
+and the accompanying retained mesh logs. Refresh or quiesce cannot repair this mapping.
+
+Source diagnosis: `get_rea_commitment` reads the first IdToCommitment link and
+`update_rea_commitment_state` writes an update without advancing that index. The shared
+storage projection omits state/finished. An atomic repair must handle existing unindexed
+updates and delayed signals; projecting lifecycle alone could reactivate an obsolete
+state. Preserve actions whose lifecycle is governed by separate state links or local
+transitions. Reuse existing latest-link/head selection and projection boundaries before
+adding another policy. The implementation decision and its multi-peer proof remain open.
+
+P2P gate: reuse the existing Notarized Commitment in lamad's content_store_integrity
+and content_store coordinator; SQL remains its derived projection. Existing identifiers,
+ActionHash/EntryHash outputs and reach stay unchanged. No new entity, HTTP route,
+Automerge document or head row is needed (additional seed/year-one heads: zero).
+A coordinator-only repair can preserve the DNA hash; migration or integrity changes
+are not implied. Bound any historical update traversal and measure its quiesce cost.
+
+This is separate from the existing five-station serving receipt: that feature explicitly
+uses per-peer canonical cancellation for its own cleanup and does not test revocation
+gossip. Its unchanged unclaimed-root precondition remains mandatory. Preparing only the
+disposable household through that documented cleanup does not discharge this station.
