@@ -198,3 +198,32 @@ fingerprint's `last_build` at triage time). No `decompose_on_confirm` stamp — 
 carries an open residual (the persona-login gap above) that should stay visible in the
 backlog even after the fingerprint itself disappears on a green streak, so the harvester
 should NOT auto-decompose this backlog file on confirmation.
+
+## Distinct recurrence, 2026-09-09 — direct browser-shell proof ran before Chromium installation
+
+Edge #1450 exposed a separate Playwright prerequisite-ordering defect. It is **not** the
+older `PlaywrightDevice`/`@browser-only` topology issue above. The two failing served-shell
+scenarios are intentionally part of the advisory dataplane measure and call
+`chromium.launch()` directly through `genesis/a2o/scripts/browser-shell.ts`; they do not use
+the world's optional `PlaywrightDevice` path. Both failed because the pinned Playwright
+Chromium executable did not yet exist in `/root/.cache/ms-playwright/`.
+
+The pipeline ordering explains the failure. `runDataplaneValidation()` invokes
+`scripts/ci/run-dataplane-validation.sh` first, and that script installs the filtered a2o
+Node dependencies before immediately starting Cucumber. The same Jenkins stage then invokes
+`scripts/ci/verify-served-shell.sh`, whose own setup runs
+`playwright install --with-deps chromium`. All three calls execute inside the same
+`container('builder')`; edge #1450 subsequently installed the browser under the same
+`/root/.cache/ms-playwright/` cache and its mandatory served-shell browser checks passed.
+The observed failure is therefore ordering within one container/user/cache, rather than a
+cross-container or cache-ownership mismatch.
+
+The smallest pipeline-owned repair is to run the same package-pinned
+`playwright install --with-deps chromium` command in
+`scripts/ci/run-dataplane-validation.sh` after its dependency install and immediately before
+the advisory Cucumber suite. Keep `verify-served-shell.sh` self-sufficient so direct callers
+retain its prerequisite check. A focused wrapper test should prove dependency install →
+browser install → Cucumber ordering while preserving the existing tags, assertions, and
+failure propagation. Acceptance requires a later edge run in which the two scenarios reach
+their browser assertions without the missing-executable error; it does not imply that
+independent dataplane convergence or coverage failures are fixed.
