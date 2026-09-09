@@ -187,3 +187,26 @@ This is separate from the existing five-station serving receipt: that feature ex
 uses per-peer canonical cancellation for its own cleanup and does not test revocation
 gossip. Its unchanged unclaimed-root precondition remains mandatory. Preparing only the
 disposable household through that documented cleanup does not discharge this station.
+
+- [ ] A visitor receives a browser shell and its referenced assets from the same declared bundle through each doorway, including while a storage peer retains an older slug mapping.
+
+Chain / between declared shell delivery and browser bootstrap / missing node:
+asset resolution preserves the shell's content-addressed bundle identity. Probe the
+declared immutable index, each referenced same-origin asset, and the browser bootstrap;
+an independently readable immutable bundle does not prove the public root can serve it.
+Preserve coherent held-shell delivery while a newer declaration is unavailable.
+
+Fresh edge build 1449 (`f11915648`) exposed this after successful doorway rollouts and
+sustained fleet quiescence. Alpha's declared bundle `sha256-13197af7...` contains
+`main-2O7U4VGN.js` (immutable read 200, 1,702,032 bytes), but the same-origin asset
+returns 404 while `/version.json` still reports `45e54e7d`. Both SSR checks pass.
+Evidence: `genesis/a2o/reports/delivery-20260909-current-source/fresh-edge-initial/alpha-declared-vs-root-assets.json`
+and the unchanged served-shell checks in that directory. The edge's mandatory shell
+gate failed; this station remains open until production routing and fresh public
+browser verification agree. Republish alone is not evidence of a repaired resolver.
+
+The bounded repair binds asset reads to the proven warm shell head, retaining the
+older head when a newer declaration cannot be served. Root-relative asset requests
+still carry no per-page snapshot identity: a concurrent head replacement between
+HTML delivery and its asset fetch remains a distinct open request-binding concern.
+Do not infer that stronger guarantee from a stable-head or held-head regression.

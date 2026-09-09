@@ -3363,7 +3363,7 @@ async fn dispatch_to_projected_epr(
         }
     }
 
-    // Proxy to storage's /apps/{epr_id}/{sub_path} — the existing bundle-serving surface.
+    // Proxy to storage's /apps/{address}/{sub_path} — the existing bundle-serving surface.
     // Storage's slug_index and AppFileCacheService handle caching; doorway proxies, not owns.
     //
     // Doorway is contract-authoritative for `spa_fallback` (§12.2). Storage's
@@ -3373,9 +3373,41 @@ async fn dispatch_to_projected_epr(
     // the two layers stay consistent.
     // Address the SHELL read by the head captured above (the same binding
     // `routes/apps.rs::resolved_app_path` makes), so the bytes that come back
-    // are provably the bytes of the head they will be stocked under. Every
-    // other sub-path keeps the slug address it has always used.
-    let dispatch_address = shell_head.as_deref().unwrap_or(projection.epr_id.as_str());
+    // are provably the bytes of the head they will be stocked under. Browser
+    // ASSETS must use the same release as the shell this doorway can
+    // actually serve. Prefer a proven, non-empty warm-shell head: while a new
+    // declaration is unavailable or incoherent, `/` deliberately serves that
+    // held shell, and sending its hashed asset names to the newer declaration
+    // recreates the blank-page failure this binding closes. With no warm shell,
+    // use the declared head; with neither, preserve the legacy slug fallback. An
+    // unbound warm shell also uses the slug because it proves no address.
+    //
+    // This is a stable-head decision for THIS asset request. It does not claim
+    // atomicity across a hot-head swap between an earlier HTML response and this
+    // later request; the shell cache's held-head behavior is the local continuity
+    // guarantee available at this unversioned root URL.
+    // Extension-less non-asset paths keep their existing semantics.
+    let asset_head = if sub_path != projection.entry_file && !is_spa_route_subpath(&sub_path) {
+        let (_, warm, declared) = state
+            .warm_shell
+            .lookup_with_declared(&projection.epr_id, &projection.entry_file)
+            .await;
+        match warm {
+            Some(shell) if shell.head_bound && !shell.blob_hash.is_empty() => Some(shell.blob_hash),
+            // These are the bytes the shell path may hold and serve, but they
+            // prove no content address. A declaration beside them cannot safely
+            // label them, so retain the moving-slug fallback for this legacy
+            // state instead of inventing a binding.
+            Some(_) => None,
+            None => declared,
+        }
+    } else {
+        None
+    };
+    let dispatch_address = shell_head
+        .clone()
+        .or(asset_head)
+        .unwrap_or_else(|| projection.epr_id.clone());
     let storage_apps_path = if projection.spa_fallback {
         format!("{}/apps/{}/{}", storage_url, dispatch_address, sub_path)
     } else {
@@ -3635,6 +3667,188 @@ mod epr_dispatch_breaker_tests {
             seeded_at: "2026-06-06T00:00:00Z".into(),
             seeded_by: "test".into(),
         }
+    }
+
+    #[derive(Default)]
+    struct AssetBindingArchive {
+        declared: Option<String>,
+        latest: Option<crate::render::warm_shell::ArchivedShell>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::render::warm_shell::ShellArchive for AssetBindingArchive {
+        async fn declared_blob_hash(&self, _slug: &str) -> Option<String> {
+            self.declared.clone()
+        }
+
+        async fn load(
+            &self,
+            _slug: &str,
+            _file_path: &str,
+            blob_hash: &str,
+        ) -> Option<crate::render::warm_shell::ArchivedShell> {
+            self.latest
+                .as_ref()
+                .filter(|shell| shell.blob_hash == blob_hash)
+                .cloned()
+        }
+
+        async fn load_latest(
+            &self,
+            _slug: &str,
+            _file_path: &str,
+        ) -> Option<crate::render::warm_shell::ArchivedShell> {
+            self.latest.clone()
+        }
+
+        async fn store(
+            &self,
+            _slug: &str,
+            _file_path: &str,
+            _blob_hash: &str,
+            _content_type: &str,
+            _bytes: Vec<u8>,
+        ) {
+        }
+    }
+
+    fn asset_binding_state(storage_url: &str, archive: Arc<AssetBindingArchive>) -> AppState {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(storage_url.to_string());
+        let mut state = AppState::new(args);
+        state.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(Some(
+            archive,
+        )));
+        state
+    }
+
+    async fn hydrate_asset_binding_shell(state: &AppState) {
+        state
+            .warm_shell
+            .hydrate(&[("elohim-host-landing".into(), "index.html".into())])
+            .await;
+    }
+
+    /// Regression for the live alpha split: `/` came from the new declared head,
+    /// but its relative `main-*.js` and `version.json` requests were sent through
+    /// the stale moving slug. Exercise the actual proxy against a mock storage
+    /// server so the asserted bytes prove the requested upstream paths.
+    #[tokio::test]
+    async fn projected_root_assets_share_one_bundle_head_address() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let storage = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-new/index.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html")
+                    .set_body_string(r#"<app-root></app-root><script src="main-NEW.js"></script>"#),
+            )
+            .expect(1)
+            .mount(&storage)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-new/main-NEW.js"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/javascript")
+                    .set_body_bytes(b"new-main"),
+            )
+            .expect(1)
+            .mount(&storage)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-new/version.json"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/json")
+                    .set_body_bytes(br#"{"commit":"new"}"#),
+            )
+            .expect(1)
+            .mount(&storage)
+            .await;
+
+        let archive = Arc::new(AssetBindingArchive {
+            declared: Some("head-new".into()),
+            latest: None,
+        });
+        let state = asset_binding_state(&storage.uri(), archive);
+        let projection = shell_projection(true);
+
+        let root = dispatch_to_projected_epr(&state, "/", projection.clone(), "{}", true).await;
+        assert_eq!(root.status(), StatusCode::OK);
+        let root_body = root.into_body().collect().await.unwrap().to_bytes();
+        assert!(String::from_utf8_lossy(&root_body).contains("main-NEW.js"));
+
+        let main =
+            dispatch_to_projected_epr(&state, "/main-NEW.js", projection.clone(), "{}", false)
+                .await;
+        assert_eq!(main.status(), StatusCode::OK);
+        assert_eq!(
+            main.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(b"new-main")
+        );
+
+        let version =
+            dispatch_to_projected_epr(&state, "/version.json", projection.clone(), "{}", false)
+                .await;
+        assert_eq!(version.status(), StatusCode::OK);
+        assert_eq!(
+            version.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(br#"{"commit":"new"}"#)
+        );
+    }
+
+    #[tokio::test]
+    async fn asset_binding_prefers_bound_held_shell_and_never_labels_unbound_shell() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn exercise(latest_bound: bool, expected_address: &str) {
+            let storage = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(format!("/apps/{expected_address}/main-OLD.js")))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"old-main"))
+                .expect(1)
+                .mount(&storage)
+                .await;
+            let archive = Arc::new(AssetBindingArchive {
+                declared: Some("head-new".into()),
+                latest: Some(crate::render::warm_shell::ArchivedShell {
+                    blob_hash: "head-old".into(),
+                    content_type: "text/html".into(),
+                    bytes: br#"<script src="main-OLD.js"></script>"#.to_vec(),
+                    head_bound: latest_bound,
+                }),
+            });
+            let state = asset_binding_state(&storage.uri(), archive);
+            hydrate_asset_binding_shell(&state).await;
+            let response = dispatch_to_projected_epr(
+                &state,
+                "/main-OLD.js",
+                shell_projection(true),
+                "{}",
+                false,
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.into_body().collect().await.unwrap().to_bytes(),
+                Bytes::from_static(b"old-main")
+            );
+        }
+
+        // A coherent held shell remains one release: its assets follow its own
+        // proven head even while a newer declaration exists.
+        exercise(true, "head-old").await;
+        // Legacy/unbound warm bytes carry no address. The newer declaration must
+        // not be attached to them; preserve the honest moving-slug fallback.
+        exercise(false, "elohim-host-landing").await;
     }
 
     #[test]
