@@ -52,6 +52,31 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCH_JENKINSFILE = resolve(__dirname, 'Jenkinsfile');
 
+describe('build-state continuity and stable history (#1844)', () => {
+    const source = readFileSync(ORCH_JENKINSFILE, 'utf8');
+    const continuity = source.slice(source.indexOf('def maintainBuildStateContinuity()'),
+        source.indexOf('\n/**', source.indexOf('def maintainBuildStateContinuity()')));
+
+    it('bridges the Kubernetes state into post instead of trusting controller leftovers', () => {
+        assert.match(continuity, /if \(env\.BUILD_STATE_JSON\) \{\s*writeFile file: 'build-state.json', text: env\.BUILD_STATE_JSON/);
+        assert.match(continuity, /dir\("build-state-recovery-\$\{env.BUILD_NUMBER\}"\)/);
+        assert.match(continuity, /selector: lastCompleted\(\)/);
+        assert.doesNotMatch(continuity, /if \(!fileExists\('build-state.json'\)\)/);
+        assert.match(source, /buildGraph\.saveBuildState[^\n]*\n\s*env\.BUILD_STATE_JSON = readFile\('build-state.json'\)/);
+        assert.match(source, /writeJSON\(file: 'build-state.json', json: bState, pretty: 2\)\s*env\.BUILD_STATE_JSON = readFile\('build-state.json'\)/);
+    });
+
+    it('does not add stages based on the selected dependency graph', () => {
+        const execution = source.slice(source.indexOf('levels.eachWithIndex { level, idx ->'),
+            source.indexOf('// Actual Build Graph artifact'));
+        assert.ok(execution.length > 0);
+        assert.doesNotMatch(execution, /\bstage\s*\(/);
+        assert.match(execution, /parallel parallelBuilds/);
+        assert.match(execution, /if \(levelFailed\)/);
+        assert.match(execution, /pipelines.contains\('elohim-genesis'\)/);
+    });
+});
+
 /**
  * Identifiers that are always considered "in scope" — Jenkins built-ins,
  * Groovy keywords, common globals defined above `pipeline {}`. If a

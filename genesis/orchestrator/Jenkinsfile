@@ -1160,20 +1160,32 @@ def runReconciliationBackstop() {
  * orchestrator build doesn't cold-start every pipeline.
  */
 def maintainBuildStateContinuity() {
-    if (!fileExists('build-state.json')) {
+    // post.always runs on the controller, not the Kubernetes workspace.
+    // Never trust a controller-local file left by an earlier build.
+    if (env.BUILD_STATE_JSON) {
+        writeFile file: 'build-state.json', text: env.BUILD_STATE_JSON
+    } else {
         try {
-            copyArtifacts(
-                projectName: env.JOB_NAME,
-                selector: lastSuccessful(),
-                filter: 'build-state.json',
-                optional: true,
-                fingerprintArtifacts: false
-            )
+            dir("build-state-recovery-${env.BUILD_NUMBER}") {
+                copyArtifacts(
+                    projectName: env.JOB_NAME,
+                    selector: lastCompleted(),
+                    filter: 'build-state.json',
+                    optional: true,
+                    fingerprintArtifacts: false
+                )
+                if (fileExists('build-state.json')) {
+                    env.BUILD_STATE_JSON = readFile('build-state.json')
+                }
+            }
+            if (env.BUILD_STATE_JSON) {
+                writeFile file: 'build-state.json', text: env.BUILD_STATE_JSON
+            }
         } catch (Exception e) {
             echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
         }
     }
-    if (fileExists('build-state.json')) {
+    if (env.BUILD_STATE_JSON) {
         archiveArtifacts artifacts: 'build-state.json', fingerprint: true
         echo "[baseline:post] build-state.json archived (continuity)"
     } else {
@@ -1343,6 +1355,7 @@ def runBuildGraph(List changedFiles) {
     // changes were already built when the previous run NPE'd before builds ran.
     def previousCommit = result.previousState?.lastSuccessfulCommit ?: null
     buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, previousCommit, result.previousState)
+    env.BUILD_STATE_JSON = readFile('build-state.json')
 
     // Stash registry as JSON env var so all later stages can read pipeline
     // metadata without re-parsing build-manifest.json files.
@@ -1888,101 +1901,81 @@ spec:
 │  Plan: ${levelDesc}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Execute in dependency-level order (parallel within each level).
-                        // Each level is wrapped in a nested stage() so Blue Ocean
-                        // surfaces the dependency-graph structure with per-level
-                        // and per-pipeline timing — what `groupByDependencyLevel`
-                        // computes is what the UI now shows.
-                        // Behaviour-preserving: the level-failed guard, baseline
-                        // updates, and parallel-wait semantics are unchanged.
+                        // Keep Stage View columns stable across dispatch plans.
+                        // Levels and job names remain in logs and graph artifacts.
                         levels.eachWithIndex { level, idx ->
-                            def levelLabel = level.size() > 1
-                                ? "Level ${idx}: ${level.join(' + ')}"
-                                : "Level ${idx}: ${level[0]}"
+                            echo ''
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            echo "📦 Level ${idx}: ${level.join(' + ')}"
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            stage(levelLabel) {
-                                echo ''
-                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                                echo "📦 Level ${idx}: ${level.join(' + ')}"
-                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-
-                                if (level.size() == 1) {
-                                    def name = level[0]
-                                    echo "🔨 Building: ${name}"
-                                    // wait=null → triggerPipeline auto-derives from
-                                    // build-manifest.json longRunning flag (bug #5 fix).
-                                    def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
-                                    results[name] = result
-                                    recordPipelineResult(name, result, pipelineBaselines)
-                                } else {
-                                    def parallelBuilds = [:]
-                                    level.each { name ->
-                                        parallelBuilds[name] = {
-                                            stage(name) {
-                                                echo "🔨 Building: ${name}"
-                                                // wait=null → auto-derive per longRunning
-                                                def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
-                                                results[name] = result
-                                                recordPipelineResult(name, result, pipelineBaselines)
-                                            }
-                                        }
+                            if (level.size() == 1) {
+                                def name = level[0]
+                                echo "🔨 Building: ${name}"
+                                // wait=null → triggerPipeline auto-derives from
+                                // build-manifest.json longRunning flag (bug #5 fix).
+                                def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
+                                results[name] = result
+                                recordPipelineResult(name, result, pipelineBaselines)
+                            } else {
+                                def parallelBuilds = [:]
+                                level.each { name ->
+                                    parallelBuilds[name] = {
+                                        echo "🔨 Building: ${name}"
+                                        // wait=null → auto-derive per longRunning
+                                        def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
+                                        results[name] = result
+                                        recordPipelineResult(name, result, pipelineBaselines)
                                     }
-                                    parallel parallelBuilds
                                 }
+                                parallel parallelBuilds
+                            }
 
-                                // Fail fast: abort if any pipeline in this level failed.
-                                // Inside the level stage so the failure marks THIS level
-                                // red in Blue Ocean, not the outer Execute Builds stage.
-                                def levelFailed = level.findAll { !results[it]?.success }
-                                if (levelFailed) {
-                                    error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
-                                }
+                            // Fail fast: abort if any pipeline in this level failed.
+                            def levelFailed = level.findAll { !results[it]?.success }
+                            if (levelFailed) {
+                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
                         env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
-                        // Run genesis if requested. Wrapped in its own stage so
-                        // Blue Ocean shows the trailing genesis dispatch as a
-                        // distinct column (it's NOT a level — runs after all
-                        // build levels succeed, per the dependency contract).
+                        // Genesis still runs after all dependency levels succeed.
                         if (pipelines.contains('elohim-genesis')) {
-                            stage('elohim-genesis') {
-                                echo ''
-                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                                echo '🌱 Running Genesis (seed + test)'
-                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            echo ''
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            echo '🌱 Running Genesis (seed + test)'
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                                def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true, changedFiles)
+                            def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true, changedFiles)
 
-                                // Hydrate stageAnnotations from genesis's
-                                // conductor-readiness + seed-results artifacts.
-                                // Best-effort — empty map on copy failure.
-                                // Embedded into actual-build-graph.json so the
-                                // reconciler can surface peer-level findings
-                                // as investigation pointers (Path C).
-                                def genesisAnnotations = hydrateStageAnnotations('elohim-genesis', genesisResult.buildNumber, env.BRANCH_NAME)
-                                if (genesisAnnotations) {
-                                    genesisResult.stageAnnotations = genesisAnnotations
-                                    def keys = genesisAnnotations.keySet().toList()
-                                    if (keys) {
-                                        echo "[stageAnnotations] elohim-genesis hydrated: ${keys.join(', ')}"
-                                    }
+                            // Hydrate stageAnnotations from genesis's
+                            // conductor-readiness + seed-results artifacts.
+                            // Best-effort — empty map on copy failure.
+                            // Embedded into actual-build-graph.json so the
+                            // reconciler can surface peer-level findings
+                            // as investigation pointers (Path C).
+                            def genesisAnnotations = hydrateStageAnnotations('elohim-genesis', genesisResult.buildNumber, env.BRANCH_NAME)
+                            if (genesisAnnotations) {
+                                genesisResult.stageAnnotations = genesisAnnotations
+                                def keys = genesisAnnotations.keySet().toList()
+                                if (keys) {
+                                    echo "[stageAnnotations] elohim-genesis hydrated: ${keys.join(', ')}"
                                 }
-                                results['elohim-genesis'] = genesisResult
-
-                                if (genesisResult.success) {
-                                    echo '✅ elohim-genesis: SUCCESS'
-                                    pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
-                                } else {
-                                    echo "❌ elohim-genesis: ${genesisResult.result}"
-                                    unstable('Genesis failed - seeding or tests may have issues')
-                                }
-
-                                env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-                                env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                             }
+                            results['elohim-genesis'] = genesisResult
+
+                            if (genesisResult.success) {
+                                echo '✅ elohim-genesis: SUCCESS'
+                                pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
+                            } else {
+                                echo "❌ elohim-genesis: ${genesisResult.result}"
+                                unstable('Genesis failed - seeding or tests may have issues')
+                            }
+
+                            env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
 
                         // Actual Build Graph artifact — what Execute Builds
@@ -2004,6 +1997,7 @@ spec:
                             def bState = readJSON(file: 'build-state.json')
                             bState.lastSuccessfulCommit = env.GIT_COMMIT_FULL
                             writeJSON(file: 'build-state.json', json: bState, pretty: 2)
+                            env.BUILD_STATE_JSON = readFile('build-state.json')
                             archiveArtifacts(artifacts: 'build-state.json', fingerprint: true)
                         }
 
