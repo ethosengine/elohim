@@ -138,3 +138,52 @@ recipes:
     edges:
       - { from: epic, to: scenario, meaningful: false, validators: [] }
       - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
+
+  - id: doorway-continuity
+    version: 1
+    description: >
+      Doorway-failover from owned proof to identified fleet delivery. The explicit
+      predecessor graph is carried by native cite-seal edges between scenario
+      resources; these declare source dependencies, not passing test results.
+      Current-source app delivery uses an unclaimed root, then canonical fixture
+      readiness and app delivery join before the broader household failover drill.
+      Actual apex transition also needs serving-aware shared membership and a real
+      host-to-sibling selection path; WAN ingress is a distinct predecessor.
+      Kubernetes/DNS project this contract on the bootstrap test bench; EPR-governed
+      peer capability, selection and recovery remain the architecture.
+      Full-feature run reports are ingested with epr flow fulfill. V1 recipe edges
+      do not enforce run order, and partial-feature green reports must not be used
+      to fulfil a whole feature. Skipped/absent stations remain unfulfilled.
+    stages:
+      - name: epic
+        artifactKind: "doc:roadmap"
+        paths:
+          - "genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
+      - name: plan
+        artifactKind: "doc:plan"
+        paths:
+          - "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md"
+      - name: intent
+        artifactKind: "gap-item"
+        paths:
+          - ".claude/memory-kit/gap-items/plans__2026-09-09-doorway-continuity-proof-chain.json"
+      - name: scenario
+        artifactKind: "a2o:feature"
+        paths:
+          - "genesis/a2o/features/dataplane/epr-app-deliverability.feature"
+          - "genesis/a2o/features/dataplane/doorway-fixture-readiness.feature"
+          - "genesis/a2o/features/dataplane/doorway-runtime-endpoint.feature"
+          - "genesis/a2o/features/dataplane/doorway-sibling-reader.feature"
+          - "genesis/a2o/features/dataplane/doorway-failover.feature"
+          - "genesis/a2o/features/dataplane/doorway-apex-transition.feature"
+          - "genesis/a2o/features/dataplane/served-shell-boots.feature"
+      - name: validation
+        artifactKind: "a2o:verdict"
+        paths:
+          - "genesis/a2o/reports/sprint-report-household-*.json"
+          - "genesis/a2o/reports/sprint-report-dataplane-*.json"
+    edges:
+      - { from: epic, to: plan, meaningful: true, validators: [cite-seal] }
+      - { from: plan, to: intent, meaningful: true, validators: [decompose] }
+      - { from: plan, to: scenario, meaningful: true, validators: [a2o-parse] }
+      - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }

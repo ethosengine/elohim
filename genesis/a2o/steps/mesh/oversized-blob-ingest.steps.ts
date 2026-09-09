@@ -49,7 +49,7 @@ function storageUrl(): string {
   return process.env['E2E_STORAGE_URL'] ?? 'http://localhost:8090';
 }
 
-interface OversizedArtifact {
+export interface OversizedArtifact {
   bytes: Uint8Array;
   /** Canonical `sha256-{hex}` address. */
   hash: string;
@@ -71,7 +71,7 @@ function hcMeshScriptPath(): string {
  */
 const artifacts = new WeakMap<E2EWorld, OversizedArtifact>();
 
-function artifact(world: E2EWorld): OversizedArtifact {
+export function artifact(world: E2EWorld): OversizedArtifact {
   const found = artifacts.get(world);
   assert.ok(found, 'no artifact was built for this scenario — the Given step did not run');
   return found;
@@ -85,7 +85,7 @@ function artifact(world: E2EWorld): OversizedArtifact {
  * LCG gives reproducible entropy without pulling a dependency or spending
  * 68 MiB of real randomness.
  */
-function deterministicBytes(len: number): Uint8Array {
+export function deterministicBytes(len: number): Uint8Array {
   const out = new Uint8Array(len);
   const view = new DataView(out.buffer);
   let state = 0x9e3779b97f4a7c15n;
@@ -104,7 +104,7 @@ function deterministicBytes(len: number): Uint8Array {
   return out;
 }
 
-function sha256Address(bytes: Uint8Array): string {
+export function sha256Address(bytes: Uint8Array): string {
   return `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
@@ -162,18 +162,21 @@ When(
   }
 );
 
-Then('the storage peer accepts the artifact', function (this: E2EWorld) {
-  const held = heldForOwnership('assert the oversized PUT was accepted');
-  if (held) return held;
-  const art = artifact(this);
-  assert.ok(
-    art.putStatus === 200 || art.putStatus === 201,
-    `PUT /blob/${art.hash} → ${String(art.putStatus)} (body: ${art.putBody ?? ''}). ` +
-      'An artifact above the inline threshold must be accepted whole; a dropped connection ' +
-      'here means the ingest task failed on shard arithmetic.'
-  );
-  return undefined;
-});
+Then(
+  /^(?:the storage peer accepts the artifact|Matthew returns HTTP 200 or 201 for the artifact)$/,
+  function (this: E2EWorld) {
+    const held = heldForOwnership('assert the oversized PUT was accepted');
+    if (held) return held;
+    const art = artifact(this);
+    assert.ok(
+      art.putStatus === 200 || art.putStatus === 201,
+      `PUT /blob/${art.hash} → ${String(art.putStatus)} (body: ${art.putBody ?? ''}). ` +
+        'An artifact above the inline threshold must be accepted whole; a dropped connection ' +
+        'here means the ingest task failed on shard arithmetic.'
+    );
+    return undefined;
+  }
+);
 
 When('the storage peer restarts', { timeout: 320_000 }, function () {
   const peer = process.env['E2E_MESH_RESTART_PEER'] ?? 'matthew';

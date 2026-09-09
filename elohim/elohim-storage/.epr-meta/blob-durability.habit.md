@@ -16,6 +16,10 @@ retire-when: >
   silent and irreversible — nobody reports the blob they can no longer fetch — which is
   exactly the class that must not depend on someone remembering to look.
 ---
+DELTA 2026-09-09: `peer-byteplane-reconstruction.feature` adds the cold 68 MiB RS4+3 source-loss obligation; owned run `20260909-byteplane-source-loss-v9` returned EXIT=1 before ingest/fault (0 eligible remote custody peers despite 2 connections; tagged cleanup passed), and `just gate genesis-a2o gherkin-prepush-lint` returned EXIT=0. Remote custody convergence is plan gap 6; archive/interactive scheduling and network QoS remain open gaps 4–5. Existing measured green scope is unchanged; no new live reconstruction or household-diversity claim.
+
+DELTA 2026-09-09 (bounded native transfer station verified): `just gate elohim-storage` EXIT=0 (3668 unit tests plus integrations) and `just test-iroh` EXIT=0 (3821 library tests plus Iroh integrations) prove actual 17 MiB shards from 68 MiB RS4+3 artifacts across real libp2p and Iroh transports, with bounded frames and unchanged small-wire encoding; independent native gap-1 review APPROVED. Evidence: `genesis/a2o/reports/byteplane-20260909/task-shard-frame-report.md`. This does not certify global memory admission, arbitrary-size streaming, live source-loss reconstruction, or WAN failover.
+
 DELTA 2026-09-05: `nachalah-allotment.feature` declares device-loss and household-loss reconstruction and the seven-diverse-hub gold floor as @wip acceptance obligations; ark identity tests provide no new reconstruction or physical-diversity evidence, so the existing measured green scope is unchanged.
 
 DELTA 2026-09-01 (GREEN preserved; sequential-chunk restart receipt):

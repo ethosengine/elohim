@@ -1,44 +1,18 @@
-# Doorway failover — the "two doorways, one name" invariant the resiliency saga
-# ends on. Chapter 4 of that saga (features/dataplane/resiliency-saga/) proves
-# hosting is real in steady state (GET / serves the shell); THIS concern asserts
-# the stronger thing: hosting SURVIVES — a person hitting the apex name gets the
-# landing shell even while one doorway is dead or in its post-deploy catch-up
-# shed window.
+# Doorway-failover household observations and one controlled storage-blob fault.
+# The full concern spans this file, app deliverability, fixture readiness,
+# apex transition and deployed served-shell proof. This file does not alone
+# prove public-name continuity during a doorway loss or catch-up shed.
 #
-# The vocabulary the scenarios run on — serving/shedding/dead, green/amber,
-# knowledge/authority — is defined in the Feature block below, NOT up here: a
-# scenario a reader cannot follow without its comments is not yet a story. What
-# stays in comments is provenance and wire detail.
+# Historical origin: on 2026-07-31 elohim.host returned503 while alpha served.
+# The former apex scenario only sampled a root GET; its actual induced-shed
+# promise now lives in doorway-apex-transition.feature. Freshness/startup checks
+# below inspect encountered states, preserving the original wire assertions.
+# The blob scenario explicitly induces and restores a primary-storage stall.
 #
-# Spine node: doorway-failover (genesis/manifests/habits.yaml). Sprint plan:
-# genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md.
-#
-# Measurement philosophy (v1): NO synthetic chaos. The post-deploy
-# arc-convergence window on the peer named adam reopens for hours after every
-# edge deploy (self-heal-adam-projection-catchup-exhaustion-full-arc.md), so the
-# live pair organically supplies real shed windows; scenarios assert the
-# invariants that must hold THROUGH those windows. v2 escalation (not built):
-# the kill-on-purpose shape from features/federation/peer-loss-failover.feature
-# applied at the doorway layer.
-#
-# Wire detail behind the vocabulary (steps/dataplane/failover.steps.ts):
-#   shedding is confirmed by the 503's own {"status":"catching-up"} body, or by
-#     an open upstream circuit / rising admission.shedTotal in status.json —
-#     spec: 2026-07-19-doorway-catching-up-page-design
-#   freshness rides response headers — x-elohim-freshness (green|amber) and
-#     x-elohim-freshness-class (knowledge|value|authority) on every proxied GET;
-#     on amber also x-elohim-stocked-at + x-elohim-served-head; on a shed,
-#     x-elohim-freshness-required. The advertised policy is the `freshness`
-#     block on status.json / /health/serving.
-#
-# Born red 2026-07-31: scenario "The apex name survives its doorway's shed"
-# live-probed 503 (elohim.host mid-catch-up) while doorway-alpha served 200.
-# The assertion IS the specification for the cure (apex multi-A + client
-# fallback + warm-boot shell cache + the adam-peer provisioning ceiling) — do
-# not weaken it to pass.
-# Born red 2026-08-21: the three freshness scenarios. No deploy carries the
-# graded-freshness cure yet, so today these reads shed instead of declaring a
-# colour, and no doorway emits a freshness header at all.
+# Wire detail: steps/dataplane/failover.steps.ts and
+# src/framework/dataplane/surfaces.ts own serving/shedding/dead classification,
+# freshness receipts and bounded probes. Doorway-failover's habit atom owns
+# graduation; no single observed-state pass supplies missing transition proof.
 @e2e @dataplane @concern:doorway-failover @act:i
 Feature: Doorway failover — two doorways, one name, one truth
   A person reaching for elohim.host should never inherit a single doorway's bad
@@ -52,8 +26,8 @@ Feature: Doorway failover — two doorways, one name, one truth
   THE PAIR. "alpha-A" and "elohim.host" are two doorways holding the same
   converged content, each reachable at its own address. "elohim.host" is also
   the APEX NAME — the address a person actually types — and it is pinned to its
-  own doorway, so that doorway's bad hour becomes the public name's bad hour
-  unless failover holds. "alpha-A" is the sibling that keeps serving through it.
+  own doorway in the current broken topology, so that doorway's bad hour
+  becomes the public name's bad hour unless failover holds. "alpha-A" is the sibling that keeps serving through it.
   The DECLARED HEAD both must agree on is the notarized identity of the current
   version of a piece of content: same head, same answer. The content most of these
   scenarios read, "elohim-host-landing", is the landing page itself — the first
@@ -62,10 +36,28 @@ Feature: Doorway failover — two doorways, one name, one truth
   where the difference is introduced: it needs content that more than one peer
   holds.
 
+  STEP VOCABULARY. A peer named "alpha-A" or "elohim.host" in these steps is
+  a doorway endpoint. Storage peers are the separately named holders behind it.
+  FAULT SAFETY. The harness registers unconditional restoration before inducing
+  the blob fault. It restores the primary even when a later assertion fails;
+  the scenario's final recovery assertion checks that restoration was observed.
+  SAME-HEAD SCOPE. The same-head assertion refuses zero serving doorways. With
+  one serving doorway it checks that doorway can resolve the declared head;
+  with two it also requires their heads to agree. A single survivor does not
+  prove that the unavailable sibling has converged.
+
   HOW A DOORWAY IS CLASSIFIED. Serving = it answers GET / with 200. Shedding =
   it answers 503 carrying the specified catching-up contract — behind, and
   saying so out loud. Dead = it answers neither / nor /health at all. Shedding
   is honest degradation and clears the classification bar; dead does not.
+
+  MEASUREMENT SCOPE. The knowledge, authority and startup-consistency scenarios
+  below inspect the state they encounter. They check the wire contract for
+  that state; they do not manufacture catch-up, force an amber response or
+  prove that a closed breaker later opens correctly. The blob scenario alone
+  induces a storage fault here. Public-name shed and recovery are separate
+  transition promises in doorway-apex-transition.feature. A steady-state pass
+  in this file cannot fulfil those unmeasured transitions.
 
   HOW AN ANSWER DECLARES ITS FRESHNESS. Green = the doorway answered from its
   live upstream, the current DHT-witnessed projection. Amber = it answered from
@@ -156,13 +148,10 @@ Feature: Doorway failover — two doorways, one name, one truth
     # outside its deploy window; a correlated outage turns it red honestly.
     Then at least one of doorways "alpha-A" and "elohim.host" is serving
 
-  Scenario: The apex name survives its doorway's shed
-    # THE BORN-RED. elohim.host (the apex) is pinned to its own doorway — the B
-    # side of the pair; when that doorway enters its hours-long post-deploy
-    # catch-up, the NAME sheds even though the healthy sibling "alpha-A" holds
-    # the identical converged content. Saga chapter 4 accepts
-    # steady-state green; this scenario does not — the name, not the pod, is
-    # what a person trusts.
+  Scenario: The apex name serves the landing page before a fault
+    # Steady-state prerequisite only. The actual induced-shed, sibling-selection
+    # and recovery contract lives in doorway-apex-transition.feature. A pass here
+    # cannot fulfil that feature or prove DNS/ingress failover.
     When I query "/" on peer "elohim.host" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"
@@ -178,14 +167,14 @@ Feature: Doorway failover — two doorways, one name, one truth
     Then the blob still arrives through doorway "alpha-A", from a holder that is not the stalled primary
     And I restore doorway "alpha-A"'s primary storage peer, and it answers again
 
-  Scenario: Whoever serves, serves the same declared truth
+  Scenario: Serving doorways resolve a declared head and serving siblings agree
     # Failover that changes the answer is worse than an outage. Every doorway
     # currently classified as serving must resolve the declared head for the
     # landing content — and when both serve, their heads must be identical
-    # (the ch10 "two doorways, one truth" bar, held through failover).
+    # (the ch10 "two doorways, one truth" bar, sampled in this run's state).
     Then every serving doorway among "alpha-A" and "elohim.host" resolves the same declared head for content "elohim-host-landing"
 
-  Scenario: Being behind is a signal, not an outage
+  Scenario: Knowledge reads answer with an explicit freshness receipt
     # The landing page is knowledge, not authority: someone reading it is not
     # casting a vote or moving a head. Refusing that read because a background
     # circuit is open teaches them the commons is DOWN when it is merely BEHIND —
@@ -199,7 +188,7 @@ Feature: Doorway failover — two doorways, one name, one truth
     Then the knowledge read "/db/content/elohim-host-landing" on doorway "alpha-A" is answered and declares its freshness
     And the knowledge read "/db/content/elohim-host-landing" on doorway "elohim.host" is answered and declares its freshness
 
-  Scenario: Authority reads never ride amber
+  Scenario: Observed authority responses satisfy the green-only policy
     # A head-record read is how one peer learns what another peer swears is
     # current — the same answer the "one truth" scenario above compares across
     # the pair. Serving that from stocked bytes would let a doorway swear to
@@ -212,13 +201,10 @@ Feature: Doorway failover — two doorways, one name, one truth
     Then the authority read "/db/content/elohim-host-landing/head-record" on doorway "alpha-A" is green or honestly shed
     And the authority read "/db/content/elohim-host-landing/head-record" on doorway "elohim.host" is green or honestly shed
 
-  Scenario: What the doorway advertises is what it serves
-    # A trust signal nobody can read ahead of time is not a contract. The doorway
-    # publishes its stage and the freshness each class of read requires, so an
-    # operator — or a sibling doorway, or a client deciding whether to retry —
-    # can predict the answer before spending a request on it, and can catch a
-    # doorway whose advertised policy has drifted from what it actually serves.
-    # BORN RED 2026-08-21 with the two scenarios above — same missing cure.
+  Scenario: The doorway publishes its freshness stage and required colours
+    # A visitor or operator can inspect the declared policy before requesting
+    # content. This checks that publication and its required vocabulary only;
+    # it does not correlate the declaration with the other scenarios' responses.
     Then doorway "alpha-A" advertises a freshness stage, with authority green-only and knowledge amber-ok
     And doorway "elohim.host" advertises a freshness stage, with authority green-only and knowledge amber-ok
 
@@ -236,7 +222,7 @@ Feature: Doorway failover — two doorways, one name, one truth
     Then a completed warmup on doorway "alpha-A" has a servable head to show for it
     And a completed warmup on doorway "elohim.host" has a servable head to show for it
 
-  Scenario: The startup surface and the shed decision read one breaker
+  Scenario: Startup reporting agrees with the doorway's observed serving state
     # An operator who trusts a lying startup page cannot fix a shedding
     # doorway they believe is healthy — so the person at the door stays
     # locked out longer than the outage itself required.
