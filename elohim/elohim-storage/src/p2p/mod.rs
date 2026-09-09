@@ -543,7 +543,9 @@ pub use identity_map::{
     CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
 };
 pub use private_receive::{preauthorize_private_record, PrivateReceiveVerdict};
-pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
+pub use shard_protocol::{
+    ShardCodec, ShardProtocol, ShardRequest, ShardResponse, SHARD_TRANSFER_MAX_FRAME_SIZE,
+};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 pub use view_federation::{
     ViewFederationCodec, ViewFederationProtocol, MAX_PAYLOAD as VIEW_FEDERATION_MAX_PAYLOAD,
@@ -570,8 +572,9 @@ pub struct P2PConfig {
     /// Addresses to announce to the network (e.g., public IP/DNS multiaddrs)
     pub announce_addresses: Vec<String>,
     /// T21: maximum response size for the `/elohim/blob/1.0.0` request-response
-    /// protocol. Default 16 MiB (matches `MAX_INLINE_SIZE` in `blob_store.rs`);
-    /// hard-capped at 64 MiB by the codec regardless of this value.
+    /// protocol. Q4 uses it for targeted RS-shard reads, so its default is the
+    /// shared 64 MiB shard-transfer frame budget. The codec hard-caps any
+    /// configured override at that same bound.
     pub max_blob_response_size: usize,
     /// T22: device archetype this peer reports as (e.g. `"node"`, `"desktop"`,
     /// `"mobile"`, `"steward"`). Drives the default cadence for the inventory

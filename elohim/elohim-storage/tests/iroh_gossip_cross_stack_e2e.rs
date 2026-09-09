@@ -270,6 +270,7 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
         standing_impact: StandingImpact::DebitFirm,
         signed_by: "C".repeat(43),
         signature: "D".repeat(88),
+        act_ref: None,
     };
     let signal_bytes = rmp_serde::to_vec_named(&signal).expect("encode FeedbackSignal");
     let signal_topic = format!("/elohim/feedback-signal/{}", signal.target_cid);

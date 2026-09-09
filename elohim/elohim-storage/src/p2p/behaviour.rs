@@ -376,7 +376,7 @@ impl ElohimStorageBehaviour {
 
         // T21: Blob fetch request-response protocol — explicit-peer fetch for
         // the T17/T20 race-fetch helper. `with_codec` lets us plumb the
-        // configurable max response size (default 16 MiB, hard-capped at 64 MiB).
+        // configurable shard-bearing response size (default and hard cap 64 MiB).
         let blob_protocol = RequestResponse::with_codec(
             BlobCodec::with_max_response_size(config.max_blob_response_size),
             [(BlobProtocol, ProtocolSupport::Full)],

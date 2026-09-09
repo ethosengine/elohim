@@ -27,7 +27,9 @@ seamLocus: >
   (T12, 2026-08-08) to the head-plane trust-gradient program's AIMD batch-pacing +
   corpus-digest fold (src/p2p/reconcile_rails.rs), the batch-extern fallback seam
   (src/services/head_batch_resolver.rs), and the INERT trust-gradient decision surface
-  (src/trust/{stage,pricer,snapshot}.rs; plan §3 L5).
+  (src/trust/{stage,pricer,snapshot}.rs; plan §3 L5). EXTENDED (2026-09-09) to the
+  bounded shard-bearing MessagePack frame decision shared by libp2p and Iroh
+  (src/p2p/shard_protocol.rs).
 
 decisionPoints:
   - name: ghost_decay_authorizes_author
@@ -172,6 +174,106 @@ decisionPoints:
       - path: elohim/elohim-storage/src/p2p/transport_paths.rs
         testName: degraded_is_avoided_and_never_explored_twice_in_a_row
         kind: unit
+  - name: serialize_bounded_messagepack
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/shard_protocol.rs
+      modulePath: p2p::shard_protocol::serialize_bounded_messagepack
+      line: 28
+    summary: >
+      Serializes the existing positional libp2p or named Iroh MessagePack wire into a
+      per-frame bounded buffer, returning a refusal before any transport bytes are written
+      when the encoded body exceeds the shared 64 MiB shard-bearing budget.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          This is an ephemeral T2 byteplane buffer decision; it does not alter notarized
+          content, head truth, storage identity, or whole-blob admission.
+      - { id: C1, status: n-a, justification: "Frame serialization elects no author or head." }
+      - { id: C2, status: n-a, justification: "Frame serialization moves no authority." }
+      - id: C3
+        status: answered
+        justification: >
+          Real 17 MiB shards emitted by the existing 68 MiB RS4+3 boundary traverse both
+          native transports inside the declared frame budget.
+      - id: C4
+        status: answered
+        justification: >
+          Oversize bodies and claimed lengths return explicit InvalidData refusals; neither
+          is represented as absent, not found, or successful.
+      - id: C5
+        status: answered
+        justification: >
+          The codec transports bytes only. Integrity and custody remain receiver-derived in
+          ShardService; a peer's ability to send a frame confers no authority.
+      - id: C6a
+        status: answered
+        justification: >
+          Each serialization stops during encoding at the declared frame budget, and each
+          read rejects the length prefix before payload allocation. This is a per-frame
+          bound; aggregate process pressure is recorded under C11.
+      - id: C6b
+        status: answered
+        justification: >
+          The function is pure, and retry identity remains the immutable shard hash consumed
+          by the existing idempotent BlobStore and ShardService path.
+      - id: C7
+        status: answered
+        justification: >
+          Non-ignored two-swarm libp2p and real-QUIC tests push and fetch the same generated
+          RS shard through the production codecs and ShardService backend.
+      - id: C8
+        status: partial
+        justification: >
+          Callers receive explicit size-bearing errors and tests witness every new refusal;
+          the codec does not yet increment a typed success/refusal counter.
+      - { id: C9, status: n-a, justification: "The unchanged frame carries no new identity or lineage field." }
+      - id: C10
+        status: answered
+        justification: >
+          Byte-exact fixtures pin the bounded writers to the historical positional libp2p
+          and named Iroh encodings for both shard requests and responses.
+      - id: C11
+        status: partial
+        justification: >
+          Hostile length prefixes are declined before allocation and outbound bodies stop at
+          the per-frame cap. Concurrent decoded bytes, encoded frames, four-shard races and
+          detached losers can overlap, so this station proves no finite process-global peak.
+      - id: C12
+        status: answered
+        justification: >
+          Both real transport tests terminate at the existing ShardService, preserving its
+          acting-node custody authorization checks instead of adding a codec-side shortcut.
+      - { id: C13, status: n-a, justification: "The frame budget creates no role, grant, or lower authority tier." }
+      - id: C14
+        status: partial
+        justification: >
+          Oversize is witnessed as an explicit error and the supported boundary is exercised;
+          versioned streaming for artifacts whose shard frames exceed 64 MiB remains the named
+          successor rather than being represented as delivered.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/shard_protocol.rs
+        testName: bounded_writer_preserves_the_existing_small_request_wire
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/shard_protocol.rs
+        testName: shard_reader_refuses_oversize_prefix_before_payload_read
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/shard_protocol.rs
+        testName: shard_writer_refuses_oversize_body_before_any_network_bytes_are_written
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/blob_protocol.rs
+        testName: configured_response_limit_refuses_before_any_network_bytes_are_written
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p_iroh/codec.rs
+        testName: bounded_serializer_preserves_iroh_shard_request_and_response_bytes
+        kind: unit
+      - path: elohim/elohim-storage/tests/shard_frame_budget.rs
+        testName: rs_68_mib_shard_pushes_and_fetches_over_real_libp2p_codecs
+        kind: integration
+      - path: elohim/elohim-storage/tests/iroh_shard_real_backend.rs
+        testName: rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend
+        kind: integration
   - name: decide_head_action
     kind: pure-decision-predicate
     sourceLocation:

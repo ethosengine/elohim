@@ -278,6 +278,7 @@ fn feedback_signal_byte_parity() {
         standing_impact: StandingImpact::DebitFirm,
         signed_by: "A".repeat(43),
         signature: "B".repeat(88),
+        act_ref: None,
     };
     let bytes = rmp_serde::to_vec_named(&signal).expect("encode FeedbackSignal");
     let topic = "/elohim/feedback-signal/bafyrei_target_003";

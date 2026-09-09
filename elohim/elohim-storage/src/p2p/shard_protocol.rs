@@ -9,6 +9,78 @@ use std::io;
 /// Protocol identifier for shard transfer
 pub const SHARD_PROTOCOL_ID: &str = "/elohim/shard/1.0.0";
 
+/// Maximum serialized frame accepted by a shard-bearing transport.
+///
+/// This is deliberately distinct from the generic 16 MiB control-frame
+/// default used by the iroh codec. A 68 MiB RS4+3 artifact produces 17 MiB
+/// raw shards, and the existing MessagePack `Vec<u8>` wire shape can expand
+/// those bytes beyond 16 MiB. The ceiling bounds that existing wire shape; it
+/// is not a whole-blob admission limit or an arbitrary-size streaming claim.
+pub const SHARD_TRANSFER_MAX_FRAME_SIZE: usize = 64 * 1024 * 1024;
+
+/// Serialize into a buffer that refuses growth beyond `max_size`.
+///
+/// The limit is enforced by the `Write` implementation while MessagePack is
+/// encoding, rather than after an unbounded `to_vec` allocation. `named`
+/// preserves the two established wire encodings: libp2p uses positional
+/// structs and iroh uses named structs.
+pub(crate) fn serialize_bounded_messagepack<T: Serialize>(
+    value: &T,
+    max_size: usize,
+    named: bool,
+    label: &str,
+) -> io::Result<Vec<u8>> {
+    struct BoundedBuffer {
+        bytes: Vec<u8>,
+        max_size: usize,
+        rejected_size: Option<usize>,
+    }
+
+    impl io::Write for BoundedBuffer {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let next_size =
+                self.bytes.len().checked_add(buf.len()).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "frame size overflow")
+                })?;
+            if next_size > self.max_size {
+                self.rejected_size = Some(next_size);
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "serialized frame exceeds configured limit",
+                ));
+            }
+            std::io::Write::write(&mut self.bytes, buf)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut output = BoundedBuffer {
+        bytes: Vec::new(),
+        max_size,
+        rejected_size: None,
+    };
+    let result = if named {
+        let mut serializer = rmp_serde::encode::Serializer::new(&mut output).with_struct_map();
+        value.serialize(&mut serializer)
+    } else {
+        let mut serializer = rmp_serde::encode::Serializer::new(&mut output);
+        value.serialize(&mut serializer)
+    };
+    if let Err(error) = result {
+        if let Some(size) = output.rejected_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{label} frame too large: {size} > {max_size}"),
+            ));
+        }
+        return Err(io::Error::new(io::ErrorKind::InvalidData, error));
+    }
+    Ok(output.bytes)
+}
+
 /// Shard protocol definition
 #[derive(Debug, Clone)]
 pub struct ShardProtocol;
@@ -139,6 +211,45 @@ impl ShardResponse {
 #[derive(Debug, Clone, Default)]
 pub struct ShardCodec;
 
+async fn read_bounded_frame<T, R>(io: &mut R, label: &str) -> io::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    R: AsyncRead + Unpin + Send,
+{
+    let mut len_buf = [0u8; 4];
+    io.read_exact(&mut len_buf).await?;
+    let len = u32::from_be_bytes(len_buf) as usize;
+    if len > SHARD_TRANSFER_MAX_FRAME_SIZE {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{label} frame too large: {len} > {SHARD_TRANSFER_MAX_FRAME_SIZE}"),
+        ));
+    }
+
+    let mut buf = vec![0u8; len];
+    io.read_exact(&mut buf).await?;
+    rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+}
+
+async fn write_bounded_frame<T, W>(io: &mut W, value: &T, label: &str) -> io::Result<()>
+where
+    T: Serialize,
+    W: AsyncWrite + Unpin + Send,
+{
+    // Keep positional encoding here: changing to named fields or MessagePack
+    // bin values would change the established `/elohim/shard/1.0.0` wire.
+    let data = serialize_bounded_messagepack(value, SHARD_TRANSFER_MAX_FRAME_SIZE, false, label)?;
+    let len = u32::try_from(data.len()).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{label} frame exceeds u32 length prefix: {}", data.len()),
+        )
+    })?;
+    io.write_all(&len.to_be_bytes()).await?;
+    io.write_all(&data).await?;
+    io.flush().await
+}
+
 #[async_trait]
 impl request_response::Codec for ShardCodec {
     type Protocol = ShardProtocol;
@@ -153,17 +264,7 @@ impl request_response::Codec for ShardCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        // Read length prefix
-        let mut len_buf = [0u8; 4];
-        io.read_exact(&mut len_buf).await?;
-        let len = u32::from_be_bytes(len_buf) as usize;
-
-        // Read data
-        let mut buf = vec![0u8; len];
-        io.read_exact(&mut buf).await?;
-
-        // Deserialize
-        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        read_bounded_frame(io, "shard request").await
     }
 
     async fn read_response<T>(
@@ -174,17 +275,7 @@ impl request_response::Codec for ShardCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        // Read length prefix
-        let mut len_buf = [0u8; 4];
-        io.read_exact(&mut len_buf).await?;
-        let len = u32::from_be_bytes(len_buf) as usize;
-
-        // Read data
-        let mut buf = vec![0u8; len];
-        io.read_exact(&mut buf).await?;
-
-        // Deserialize
-        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        read_bounded_frame(io, "shard response").await
     }
 
     async fn write_request<T>(
@@ -196,19 +287,7 @@ impl request_response::Codec for ShardCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        // Serialize
-        let data = rmp_serde::to_vec(&request)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        // Write length prefix
-        let len_buf = (data.len() as u32).to_be_bytes();
-        io.write_all(&len_buf).await?;
-
-        // Write data
-        io.write_all(&data).await?;
-        io.flush().await?;
-
-        Ok(())
+        write_bounded_frame(io, &request, "shard request").await
     }
 
     async fn write_response<T>(
@@ -220,19 +299,7 @@ impl request_response::Codec for ShardCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        // Serialize
-        let data = rmp_serde::to_vec(&response)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        // Write length prefix
-        let len_buf = (data.len() as u32).to_be_bytes();
-        io.write_all(&len_buf).await?;
-
-        // Write data
-        io.write_all(&data).await?;
-        io.flush().await?;
-
-        Ok(())
+        write_bounded_frame(io, &response, "shard response").await
     }
 }
 
@@ -276,5 +343,69 @@ mod tests {
         let summary = resp.summary();
         assert!(summary.len() < 64, "got: {summary}");
         assert!(summary.contains("5000000 bytes"));
+    }
+
+    #[tokio::test]
+    async fn bounded_writer_preserves_the_existing_small_request_wire() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let request = ShardRequest::Push {
+            hash: "sha256-small".to_string(),
+            data: b"existing-wire".to_vec(),
+        };
+        let historical = rmp_serde::to_vec(&request).expect("historical serializer");
+        let mut framed = Vec::new();
+        let mut writer = Cursor::new(&mut framed);
+        ShardCodec
+            .write_request(&ShardProtocol, &mut writer, request)
+            .await
+            .expect("bounded writer");
+
+        assert_eq!(&framed[..4], &(historical.len() as u32).to_be_bytes());
+        assert_eq!(&framed[4..], historical.as_slice());
+    }
+
+    #[tokio::test]
+    async fn shard_reader_refuses_oversize_prefix_before_payload_read() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let claimed = u32::try_from(SHARD_TRANSFER_MAX_FRAME_SIZE + 1).unwrap();
+        let mut reader = Cursor::new(claimed.to_be_bytes().to_vec());
+        let error = ShardCodec
+            .read_request(&ShardProtocol, &mut reader)
+            .await
+            .expect_err("the length prefix alone must be enough to refuse");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("frame too large"));
+        assert_eq!(reader.position(), 4, "no payload bytes may be requested");
+    }
+
+    #[tokio::test]
+    async fn shard_writer_refuses_oversize_body_before_any_network_bytes_are_written() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        // 0xff is encoded as a two-byte MessagePack integer in the existing
+        // Vec<u8> array wire shape, so 33 MiB crosses the 64 MiB frame ceiling.
+        let request = ShardRequest::Push {
+            hash: "sha256-oversize".to_string(),
+            data: vec![0xff; 33 * 1024 * 1024],
+        };
+        let mut framed = Vec::new();
+        let mut writer = Cursor::new(&mut framed);
+        let error = ShardCodec
+            .write_request(&ShardProtocol, &mut writer, request)
+            .await
+            .expect_err("serialized request must exceed the hard frame budget");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("frame too large"));
+        assert!(
+            framed.is_empty(),
+            "a refused frame must write no prefix or body"
+        );
     }
 }

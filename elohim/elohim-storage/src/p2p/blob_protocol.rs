@@ -14,10 +14,10 @@
 //!
 //! Maximum response size is configurable via [`BlobCodec::with_max_response_size`]
 //! and capped at [`HARD_MAX_RESPONSE_SIZE`] (64 MiB) at the codec layer to bound
-//! memory usage on the receive side regardless of what the peer claims to send.
-//! The default cap ([`DEFAULT_MAX_RESPONSE_SIZE`], 16 MiB) matches `MAX_INLINE_SIZE`
-//! in `blob_store.rs`; larger blobs are stored as chunked content and would need
-//! a chunked-fetch variant to traverse this protocol.
+//! memory usage on both sides regardless of what either peer claims to send.
+//! The default uses the shared shard-transfer budget because Q4 fetches
+//! individual RS shards through this targeted-peer protocol. A serialized shard
+//! larger than that budget needs the versioned streaming successor.
 
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -25,16 +25,18 @@ use libp2p::request_response;
 use serde::{Deserialize, Serialize};
 use std::io;
 
+use super::shard_protocol::{serialize_bounded_messagepack, SHARD_TRANSFER_MAX_FRAME_SIZE};
+
 /// Protocol identifier for explicit-peer blob fetch.
 pub const BLOB_PROTOCOL_ID: &str = "/elohim/blob/1.0.0";
 
-/// Default cap on response size if no override is configured. 16 MiB matches
-/// `MAX_INLINE_SIZE` in `blob_store.rs`.
-pub const DEFAULT_MAX_RESPONSE_SIZE: usize = 16 * 1024 * 1024;
+/// Default cap on response size if no override is configured. Shard healing
+/// uses this protocol, so it shares the shard byteplane's bounded frame budget.
+pub const DEFAULT_MAX_RESPONSE_SIZE: usize = SHARD_TRANSFER_MAX_FRAME_SIZE;
 
 /// Hard upper bound on response size regardless of config. Prevents OOM from
 /// a malicious peer claiming a multi-GB length prefix.
-pub const HARD_MAX_RESPONSE_SIZE: usize = 64 * 1024 * 1024;
+pub const HARD_MAX_RESPONSE_SIZE: usize = SHARD_TRANSFER_MAX_FRAME_SIZE;
 
 /// Hard cap on the size of an inbound `BlobFetchRequest` frame. The request
 /// payload is just a content-address string (≤ ~80 bytes for sha256-hex);
@@ -254,8 +256,8 @@ impl request_response::Codec for BlobCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let data = rmp_serde::to_vec(&request)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let data =
+            serialize_bounded_messagepack(&request, MAX_REQUEST_SIZE, false, "blob fetch request")?;
         // T21 review fix #2: guard against silent truncation in the `usize → u32`
         // length-prefix conversion. The receive side caps payload size, but the
         // write side could otherwise emit a corrupted frame if a caller bypassed
@@ -283,8 +285,12 @@ impl request_response::Codec for BlobCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let data = rmp_serde::to_vec(&response)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let data = serialize_bounded_messagepack(
+            &response,
+            self.max_response_size,
+            false,
+            "blob fetch response",
+        )?;
         // T21 review fix #2: see `write_request`.
         let len: u32 = data.len().try_into().map_err(|_| {
             io::Error::new(
@@ -549,5 +555,60 @@ mod tests {
             }
             other => panic!("expected Found, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn bounded_writer_preserves_the_existing_small_response_wire() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let response = BlobFetchResponse::found(b"existing-wire".to_vec());
+        let historical = rmp_serde::to_vec(&response).expect("historical serializer");
+        let mut framed = Vec::new();
+        let mut writer = Cursor::new(&mut framed);
+        BlobCodec::default()
+            .write_response(&BlobProtocol, &mut writer, response)
+            .await
+            .expect("bounded writer");
+
+        assert_eq!(&framed[..4], &(historical.len() as u32).to_be_bytes());
+        assert_eq!(&framed[4..], historical.as_slice());
+    }
+
+    #[tokio::test]
+    async fn configured_response_limit_refuses_before_any_network_bytes_are_written() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let response = BlobFetchResponse::found(vec![0xff; 1024]);
+        let mut framed = Vec::new();
+        let mut writer = Cursor::new(&mut framed);
+        let error = BlobCodec::with_max_response_size(1024)
+            .write_response(&BlobProtocol, &mut writer, response)
+            .await
+            .expect_err("MessagePack array expansion must cross the configured limit");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("frame too large"));
+        assert!(
+            framed.is_empty(),
+            "a refused frame must write no prefix or body"
+        );
+    }
+
+    #[tokio::test]
+    async fn configured_response_limit_refuses_a_claimed_length_before_payload_read() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let mut reader = Cursor::new(1025_u32.to_be_bytes().to_vec());
+        let error = BlobCodec::with_max_response_size(1024)
+            .read_response(&BlobProtocol, &mut reader)
+            .await
+            .expect_err("the length prefix alone must be enough to refuse");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("1025 > 1024"));
+        assert_eq!(reader.position(), 4, "no payload bytes may be requested");
     }
 }

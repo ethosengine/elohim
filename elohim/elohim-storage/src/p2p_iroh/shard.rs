@@ -25,17 +25,16 @@ use iroh::{
     Endpoint, NodeAddr,
 };
 
-use super::codec::{read_frame_default, write_frame};
-use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
+use super::codec::{read_frame, write_frame_bounded};
+use crate::p2p::shard_protocol::{ShardRequest, ShardResponse, SHARD_TRANSFER_MAX_FRAME_SIZE};
 use crate::services::custody_standing::Requester;
 
 /// Iroh-side ALPN for shard transfer. Distinct from libp2p's
 /// `/elohim/shard/1.0.0` — version 2.0.0 marks "iroh transport,
 /// identical MessagePack payloads."
 ///
-/// Push-style payloads can hit the codec's [`super::codec::DEFAULT_MAX_FRAME_SIZE`]
-/// (16 MiB) — sufficient for current shard sizes. Larger payloads need
-/// `read_frame(stream, custom_cap)` with a higher ceiling.
+/// Shard-bearing requests and responses use the shared bounded 64 MiB frame
+/// budget. Other iroh protocols retain the generic 16 MiB default.
 pub const SHARD_ALPN: &[u8] = b"/elohim/shard/2.0.0";
 
 #[async_trait::async_trait]
@@ -81,9 +80,13 @@ impl ProtocolHandler for IrohShardProtocol {
                 Ok(streams) => streams,
                 Err(_) => return Ok(()),
             };
-            let req: ShardRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
+            let req: ShardRequest = read_frame(&mut recv, SHARD_TRANSFER_MAX_FRAME_SIZE)
+                .await
+                .map_err(io_to_accept)?;
             let res = self.backend.handle(&requester, req).await;
-            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            write_frame_bounded(&mut send, &res, SHARD_TRANSFER_MAX_FRAME_SIZE)
+                .await
+                .map_err(io_to_accept)?;
             send.finish()
                 .map_err(|e| AcceptError::from_err(io::Error::other(e.to_string())))?;
         }
@@ -102,9 +105,9 @@ impl<'a> IrohShardClient<'a> {
     pub async fn request(&self, peer: NodeAddr, req: &ShardRequest) -> Result<ShardResponse> {
         let conn = self.endpoint.connect(peer, SHARD_ALPN).await?;
         let (mut send, mut recv) = conn.open_bi().await?;
-        write_frame(&mut send, req).await?;
+        write_frame_bounded(&mut send, req, SHARD_TRANSFER_MAX_FRAME_SIZE).await?;
         send.finish()?;
-        let res: ShardResponse = read_frame_default(&mut recv).await?;
+        let res: ShardResponse = read_frame(&mut recv, SHARD_TRANSFER_MAX_FRAME_SIZE).await?;
         Ok(res)
     }
 }

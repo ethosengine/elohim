@@ -21,14 +21,14 @@ use tracing::info;
 
 use super::{
     blob_store::IrohBlobStore,
-    codec::{read_frame, write_frame, HARD_MAX_FRAME_SIZE},
+    codec::{read_frame, write_frame_bounded, HARD_MAX_FRAME_SIZE},
     config::IrohConfig,
     endpoint::BuildEndpointError,
     gossip::IrohGossip,
     peer_book::IrohPeerBook,
     shard::SHARD_ALPN,
 };
-use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
+use crate::p2p::shard_protocol::{ShardRequest, ShardResponse, SHARD_TRANSFER_MAX_FRAME_SIZE};
 
 /// An ALPN bound to a protocol handler — the unit of registration on the
 /// shared iroh `Router`. Used by [`IrohNode::start_with_protocols`] so
@@ -256,7 +256,7 @@ pub async fn fetch_blob_over_iroh(
     let req = ShardRequest::Get {
         hash: content_address.to_string(),
     };
-    write_frame(&mut send, &req)
+    write_frame_bounded(&mut send, &req, SHARD_TRANSFER_MAX_FRAME_SIZE)
         .await
         .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
     send.finish()

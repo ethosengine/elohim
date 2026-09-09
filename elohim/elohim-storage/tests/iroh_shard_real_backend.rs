@@ -30,7 +30,10 @@ use elohim_storage::p2p_iroh::{
 };
 use elohim_storage::services::custody_standing::ProjectionCustodyStanding;
 use elohim_storage::shard_service::ShardService;
+use elohim_storage::sharding::{ShardConfig, ShardEncoder};
 use tempfile::tempdir;
+
+const MIB: usize = 1024 * 1024;
 
 /// Ark passport `node` of the berth that produced the witness — an agent CID,
 /// so the serving peer can name the ward from the row alone.
@@ -182,6 +185,67 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
         blob_store.exists(&canonical.hash).await,
         "provider BlobStore should contain pushed shard"
     );
+
+    fixture.shutdown().await?;
+    Ok(())
+}
+
+/// A real shard from the 68 MiB RS4+3 boundary crosses the production iroh
+/// ALPN in both directions. The all-0xff fixture makes the unchanged
+/// MessagePack Vec<u8> representation expand beyond the old 16 MiB default.
+#[tokio::test]
+async fn rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend() -> Result<()> {
+    let artifact = vec![0xff; 68 * MIB];
+    let encoder = ShardEncoder::new(ShardConfig::default());
+    let manifest = encoder.create_manifest(&artifact, "application/octet-stream", "commons")?;
+    assert_eq!(manifest.encoding, "rs-4-7");
+    assert_eq!(manifest.data_shards, 4);
+    assert_eq!(manifest.total_shards, 7);
+    assert_eq!(manifest.shard_size, (17 * MIB) as u64);
+    let shard = encoder
+        .create_shards(&artifact, &manifest.encoding)?
+        .into_iter()
+        .next()
+        .expect("first data shard");
+    let hash = manifest.shard_hashes[0].clone();
+    let frame = rmp_serde::to_vec_named(&ShardRequest::Push {
+        hash: hash.clone(),
+        data: shard.clone(),
+    })?;
+    assert!(frame.len() > 16 * MIB, "fixture must cross the old cap");
+    assert!(
+        frame.len() <= elohim_storage::p2p::SHARD_TRANSFER_MAX_FRAME_SIZE,
+        "fixture must remain inside the declared shard budget"
+    );
+
+    let provider_dir = tempdir()?;
+    let fetcher_dir = tempdir()?;
+    let (fixture, blob_store) =
+        fixture_with_real_provider_backend(provider_dir.path(), fetcher_dir.path()).await?;
+    let client = IrohShardClient::new(fixture.fetcher.endpoint());
+
+    let push = client
+        .request(
+            fixture.provider_addr.clone(),
+            &ShardRequest::Push {
+                hash: hash.clone(),
+                data: shard.clone(),
+            },
+        )
+        .await?;
+    assert!(matches!(push, ShardResponse::PushAck));
+    assert!(
+        blob_store.exists(&hash).await,
+        "PushAck requires stored bytes"
+    );
+
+    let get = client
+        .request(fixture.provider_addr.clone(), &ShardRequest::Get { hash })
+        .await?;
+    match get {
+        ShardResponse::Data(bytes) => assert_eq!(bytes, shard),
+        other => panic!("expected Data, got {other:?}"),
+    }
 
     fixture.shutdown().await?;
     Ok(())
