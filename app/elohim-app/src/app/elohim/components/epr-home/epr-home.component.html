@@ -126,7 +126,7 @@
                 </a>
               </div>
             } @else {
-              <app-epr-focal [slug]="a.id"></app-epr-focal>
+              <app-epr-focal [slug]="a.id" [anonymousPublicRead]="!signedIn()"></app-epr-focal>
             }
           </section>
         }
@@ -186,7 +186,7 @@
                     </a>
                   </div>
                 } @else {
-                  <app-epr-focal [slug]="a.id"></app-epr-focal>
+                  <app-epr-focal [slug]="a.id" [anonymousPublicRead]="!signedIn()"></app-epr-focal>
                 }
               </section>
             }

@@ -77,7 +77,7 @@ export class EprHomeComponent {
       map(p => p.get('resourceId') ?? ''),
       distinctUntilChanged(),
       switchMap(id =>
-        this.storage.getContent(id).pipe(
+        this.storage.getContent(id, !this.auth.isAuthenticated()).pipe(
           map(
             (raw): LoadState =>
               raw === null

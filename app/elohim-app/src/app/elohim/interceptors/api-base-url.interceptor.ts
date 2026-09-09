@@ -18,10 +18,12 @@ import {
   DoorwayResolution,
   gatewayCandidates,
 } from '@elohim/service';
-
-import { isWorkspaceOrigin } from '@workspace/runtime';
+import { FederationPeerResolver } from '@elohim/service/keep';
 
 import { environment } from '../../../environments/environment';
+import { resolveDoorwayUrl } from '../utils/runtime-doorway';
+
+import { ANONYMOUS_CONTENT_READ } from './anonymous-content-read';
 
 const DOORWAY_PATH_PREFIXES = ['/api/', '/db/', '/blob/', '/apps/', '/health'];
 
@@ -63,43 +65,12 @@ function isTauri(): boolean {
   return typeof globalThis !== 'undefined' && '__TAURI__' in globalThis;
 }
 
-function isLocalDevOrigin(origin: string): boolean {
-  return origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
-}
-
-function safeOrigin(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolves the "preferred" absolute base for non-browser-origin cases
- * (Tauri sidecar) or the cross-origin doorway host. Returns '' whenever the
- * caller should fall back to the browser's own origin instead — workspace/local-dev
- * (dev-proxy same-origin routing, avoids CORS-header stripping) and the
- * same-origin-as-doorway topology (there is no separate doorway origin to
- * route to). '' is not "no base" here — see effectivePrimary in the
- * interceptor, which ORs this against the live browser origin.
- */
+/** Select the configured native sidecar or the serving browser doorway. */
 function resolveBaseUrl(): string {
   if (isTauri()) {
     return environment.client?.storageUrl ?? environment.holochain?.storageUrl ?? '';
   }
-
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard, optional chaining short-circuits to undefined when globalThis.location is absent server-side, falling back to '' via ?? ''
-  const origin = globalThis.location?.origin ?? '';
-  if (!origin) return '';
-  if (isWorkspaceOrigin(origin) || isLocalDevOrigin(origin)) return '';
-
-  const doorwayUrl = environment.client?.doorwayUrl ?? '';
-  if (!doorwayUrl) return '';
-
-  if (origin === safeOrigin(doorwayUrl)) return '';
-
-  return doorwayUrl;
+  return resolveDoorwayUrl(environment.client?.doorwayUrl);
 }
 
 /**
@@ -121,11 +92,15 @@ let preferredBase: string | null = null;
  * in `buildCandidates` — see `PRIMARY_REPROBE_INTERVAL_MS`.
  */
 let preferredSetAt = 0;
+let publicPreferred: string | null = null;
+let publicSelectedAt = 0;
 
 /** Test-only: reset sticky failover state between specs. */
 export function resetDoorwayFailoverState(): void {
   preferredBase = null;
   preferredSetAt = 0;
+  publicPreferred = null;
+  publicSelectedAt = 0;
 }
 
 /** Records a newly-confirmed (or newly-assumed) sticky preference with its timestamp. */
@@ -196,10 +171,99 @@ function rewriteTo(req: HttpRequest<unknown>, base: string): HttpRequest<unknown
   return req.clone({ url: `${normalizeHost(base)}${req.url}` });
 }
 
-export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
-  if (isAbsolute(req.url) || !matchesDoorwayPath(req.url)) {
-    return next(req);
+function eligibleAnonymous(req: HttpRequest<unknown>): boolean {
+  return (
+    !isTauri() &&
+    RETRIABLE_METHODS.has(req.method.toUpperCase()) &&
+    /^\/(?:db\/content|blob)\/[^/?#]+$/.test(req.url) &&
+    req.params.keys().length === 0 &&
+    !req.withCredentials &&
+    req.credentials !== 'include' &&
+    req.headers.keys().every(name => ['accept', 'content-type'].includes(name.toLowerCase()))
+  );
+}
+
+function normalizeAnonymous(
+  req: HttpRequest<unknown>,
+  primary: string
+): HttpRequest<unknown> | null {
+  if (isTauri()) return null;
+  try {
+    const url = new URL(req.url);
+    if (url.origin !== new URL(primary).origin || url.username || url.password || url.hash)
+      return null;
+    const normalized = req.clone({ url: url.pathname + url.search });
+    return eligibleAnonymous(normalized) ? normalized : null;
+  } catch {
+    return null;
   }
+}
+
+function dispatchAnonymous(
+  req: HttpRequest<unknown>,
+  next: Parameters<HttpInterceptorFn>[1],
+  resolver: FederationPeerResolver,
+  effectivePrimary: string,
+  origin: string
+): Observable<HttpEvent<unknown>> {
+  if (!resolver.isWarm) void resolver.warm();
+  // Independently identified peers are not aliases of the custodian.
+  const siblings = resolver
+    .peers()
+    .flatMap(peer => peer.endpoints)
+    .filter(endpoint => endpoint.service === 'gateway')
+    .map(endpoint => {
+      try {
+        const url = new URL(endpoint.url);
+        return ['http:', 'https:'].includes(url.protocol) &&
+          !url.username &&
+          !url.password &&
+          !(new URL(origin).protocol === 'https:' && url.protocol === 'http:') &&
+          url.pathname === '/' &&
+          !url.search &&
+          !url.hash
+          ? url.origin
+          : '';
+      } catch {
+        return '';
+      }
+    })
+    .filter(Boolean);
+  const primary = normalizeHost(effectivePrimary);
+  const available = dedupe([primary, ...siblings]).slice(0, 4);
+  if (publicPreferred && !available.includes(publicPreferred)) publicPreferred = null;
+  const probeDue = Date.now() - publicSelectedAt >= PRIMARY_REPROBE_INTERVAL_MS;
+  const candidates =
+    publicPreferred && !probeDue ? dedupe([publicPreferred, ...available]) : available;
+  const attemptPublic = (index: number): Observable<HttpEvent<unknown>> => {
+    const base = candidates[index];
+    const request = rewriteTo(req, base).clone({ withCredentials: false, credentials: 'omit' });
+    return next(request).pipe(
+      timeout(PER_ATTEMPT_TIMEOUT_MS),
+      tap(event => {
+        if (event instanceof HttpResponse && publicPreferred !== base) {
+          publicPreferred = base;
+          publicSelectedAt = Date.now();
+        }
+      }),
+      catchError((error: unknown) => {
+        if (!isNetworkFailure(error) || index + 1 >= candidates.length)
+          return throwError(() => error);
+        if (base === primary) publicSelectedAt = Date.now();
+        return attemptPublic(index + 1);
+      })
+    );
+  };
+  return attemptPublic(0);
+}
+
+function shouldBypass(url: string, publicRead: boolean): boolean {
+  return isAbsolute(url) ? !publicRead : !matchesDoorwayPath(url);
+}
+
+export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
+  const publicRead = req.context.get(ANONYMOUS_CONTENT_READ);
+  if (shouldBypass(req.url, publicRead)) return next(req);
 
   // SSR-safety: with no browser location (SSR/elohim-render context), pass
   // the request through untouched and never read or write the module-level
@@ -211,9 +275,14 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const effectivePrimary = resolveBaseUrl() || origin;
+  // Only the explicit reader may translate its own absolute content URL.
+  if (publicRead && isAbsolute(req.url)) {
+    const normalized = normalizeAnonymous(req, effectivePrimary);
+    if (!normalized) return next(req);
+    req = normalized;
+  }
   const isRetriable = RETRIABLE_METHODS.has(req.method.toUpperCase());
-  const identity =
-    environment.client?.doorwayIdentity ?? environment.client?.doorwayUrl ?? effectivePrimary;
+  const identity = environment.client?.doorwayIdentity ?? effectivePrimary;
   let resolver: DoorwayAddressResolver | null = null;
   if (!isTauri()) {
     try {
@@ -231,6 +300,11 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
       fallbackUrls: environment.client?.doorwayFallbacks,
     },
   ]);
+
+  const anonymousEligible = publicRead && eligibleAnonymous(req);
+  if (anonymousEligible && resolver instanceof FederationPeerResolver) {
+    return dispatchAnonymous(req, next, resolver, effectivePrimary, origin);
+  }
 
   const dispatch = (resolution: DoorwayResolution): Observable<HttpEvent<unknown>> => {
     const resolvedCandidates = gatewayCandidates(resolution);

@@ -22,6 +22,7 @@ import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.com
 import { EPR_RESOLUTION_PROVIDER } from './elohim/providers/epr-resolution.provider';
 import { EprNavService } from './elohim/services/epr-nav.service';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { resolveDoorwayUrl } from './elohim/utils/runtime-doorway';
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 
@@ -271,7 +272,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const response = await fetch(`${doorwayUrl}/health`, {
+      const response = await fetch(`${resolveDoorwayUrl(doorwayUrl)}/health`, {
         signal: controller.signal,
       });
 

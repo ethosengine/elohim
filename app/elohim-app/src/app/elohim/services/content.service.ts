@@ -16,6 +16,8 @@ import { Injectable, inject } from '@angular/core';
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
+import { CID } from 'multiformats/cid';
+import { sha256 } from 'multiformats/hashes/sha2';
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
@@ -257,12 +259,15 @@ export class ContentBackendService {
    * Get a single content node by ID
    * Automatically fetches blob content when contentBody is null but blobCid exists
    */
-  getContent(id: string): Observable<ContentNode | null> {
+  getContent(id: string, anonymousPublicRead = false): Observable<ContentNode | null> {
     // Check cache first
-    const cached = this.contentCache.get(id);
+    const cached = anonymousPublicRead ? undefined : this.contentCache.get(id);
     if (cached) return cached;
 
-    const obs = from(this.client.get<RawContentData>('content', id)).pipe(
+    const source = anonymousPublicRead
+      ? (this.storageClient.getContent(id, true) as Observable<RawContentData | null>)
+      : from(this.client.get<RawContentData>('content', id));
+    const obs = source.pipe(
       switchMap(data => {
         if (!data) return of(null);
 
@@ -278,12 +283,13 @@ export class ContentBackendService {
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
         if (needsBlobFetch && blobCid) {
-          return this.fetchBlobContent(blobCid).pipe(
+          return this.fetchBlobContent(blobCid, anonymousPublicRead).pipe(
             map(blobContent => {
               // Inject blob content as contentBody
               return this.transformContent({ ...data, contentBody: blobContent });
             }),
             catchError(_err => {
+              if (anonymousPublicRead) throw _err;
               // Fall back to transforming without blob content
               return of(this.transformContent(data));
             })
@@ -298,7 +304,7 @@ export class ContentBackendService {
       shareReplay(1)
     );
 
-    this.contentCache.set(id, obs);
+    if (!anonymousPublicRead) this.contentCache.set(id, obs);
     return obs;
   }
 
@@ -309,7 +315,35 @@ export class ContentBackendService {
    * 1. Helia verified-fetch (CID blobs only, 5s timeout)
    * 2. Doorway HTTP (`/blob/{cid}`)
    */
-  private fetchBlobContent(blobCid: string): Observable<string> {
+  private fetchBlobContent(blobCid: string, anonymousPublicRead = false): Observable<string> {
+    if (anonymousPublicRead) {
+      return this.storageClient.fetchBlob(blobCid, true).pipe(
+        switchMap(async bytes => {
+          const digest = await sha256.digest(new Uint8Array(bytes));
+          const cid = blobCid.startsWith('bafk') ? CID.parse(blobCid) : null;
+          if (
+            cid &&
+            (cid.version !== 1 ||
+              cid.code !== 0x55 ||
+              cid.multihash.code !== sha256.code ||
+              cid.multihash.size !== 32)
+          ) {
+            throw new Error('Public content requires a raw SHA256 CID');
+          }
+          const expected = cid
+            ? Array.from(cid.multihash.digest)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+            : blobCid.replace(/^sha256[:-]/, '');
+          const actual = Array.from(digest.digest)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+          if (actual !== expected)
+            throw new Error('Public content blob failed integrity verification');
+          return new TextDecoder().decode(bytes);
+        })
+      );
+    }
     // Normalize content address: CIDv1 (bafkrei...) passes through,
     // legacy formats normalized to sha256-{hex}. Backend handles all formats.
     const normalizedCid = blobCid.startsWith('bafk')

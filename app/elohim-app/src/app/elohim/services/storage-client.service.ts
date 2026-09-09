@@ -17,7 +17,7 @@
  * `app/workspace-runtime/` — never sniffed here.
  */
 
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 // @coverage: 90.5% (2026-02-24)
@@ -25,7 +25,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { ANONYMOUS_CONTENT_READ } from '../interceptors/anonymous-content-read';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
+import { resolveDoorwayUrl } from '../utils/runtime-doorway';
 
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
@@ -115,12 +117,17 @@ export class StorageClientService {
   /**
    * Fetch blob data by hash.
    */
-  fetchBlob(blobHash: string): Observable<ArrayBuffer> {
+  fetchBlob(blobHash: string, anonymousPublicRead = false): Observable<ArrayBuffer> {
     const url = this.getBlobUrl(blobHash);
-    return this.http.get(url, { responseType: 'arraybuffer' }).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError((error: HttpErrorResponse) => this.handleError('fetchBlob', error))
-    );
+    return this.http
+      .get(url, {
+        responseType: 'arraybuffer',
+        context: new HttpContext().set(ANONYMOUS_CONTENT_READ, anonymousPublicRead),
+      })
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError((error: HttpErrorResponse) => this.handleError('fetchBlob', error))
+      );
   }
 
   /**
@@ -142,18 +149,22 @@ export class StorageClientService {
   /**
    * Get content node by ID.
    */
-  getContent(id: string): Observable<StorageContentNode | null> {
+  getContent(id: string, anonymousPublicRead = false): Observable<StorageContentNode | null> {
     const baseUrl = this.getStorageBaseUrl();
     // Doorway proxies /db/* routes to elohim-storage (no /api/ prefix for db)
     const endpoint = `${baseUrl}/db/content/${encodeURIComponent(id)}`;
 
-    return this.http.get<StorageContentNode>(endpoint).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError((error: HttpErrorResponse) => {
-        if (error.status === 404) return of(null);
-        return this.handleError('getContent', error);
+    return this.http
+      .get<StorageContentNode>(endpoint, {
+        context: new HttpContext().set(ANONYMOUS_CONTENT_READ, anonymousPublicRead),
       })
-    );
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError((error: HttpErrorResponse) => {
+          if (error.status === 404) return of(null);
+          return this.handleError('getContent', error);
+        })
+      );
   }
 
   /**
@@ -235,7 +246,10 @@ export class StorageClientService {
     const hc = environment.holochain;
     return {
       mode: this.strategy.mode,
-      adminUrl: hc?.adminUrl ?? '',
+      // Doorway HTTP configuration follows the package's serving origin. Direct
+      // strategies retain their conductor/sidecar configuration unchanged.
+      adminUrl:
+        this.strategy.mode === 'doorway' ? resolveDoorwayUrl(hc?.adminUrl) : (hc?.adminUrl ?? ''),
       appUrl: hc?.appUrl ?? '',
       proxyApiKey: hc?.proxyApiKey,
       storageUrl: hc?.storageUrl,

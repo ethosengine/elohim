@@ -1,6 +1,9 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { of, throwError } from 'rxjs';
+import { of, throwError, firstValueFrom } from 'rxjs';
+import { sha256 } from 'multiformats/hashes/sha2';
+import { CID } from 'multiformats/cid';
+import { create as createDigest } from 'multiformats/hashes/digest';
 
 import { ContentBackendService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
@@ -33,6 +36,41 @@ describe('ContentBackendService', () => {
     relatedNodeIds: [],
     reach: 'commons',
   };
+
+  it('loads an anonymous body through the marked storage path and verifies its hash without reusing SDK cache', async () => {
+    const bytes = new Uint8Array(Array.from('# Authentic public body', c => c.charCodeAt(0)));
+    const digest = await sha256.digest(bytes);
+    const hash = Array.from(digest.digest)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    mockStorageClient.getContent = vi
+      .fn()
+      .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: `sha256-${hash}` }));
+    mockStorageClient.fetchBlob = vi.fn().mockReturnValue(of(bytes.buffer));
+    const node = await firstValueFrom(service.getContent('manifesto', true));
+    expect(node?.content).toBe('# Authentic public body');
+    expect(mockStorageClient.getContent).toHaveBeenCalledWith('manifesto', true);
+    expect(mockStorageClient.fetchBlob).toHaveBeenCalledWith(`sha256-${hash}`, true);
+    expect(mockClient.get).not.toHaveBeenCalled();
+    mockStorageClient.fetchBlob.mockReturnValue(of(new TextEncoder().encode('tampered').buffer));
+    expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
+  });
+
+  it('rejects a CID claiming a different hash algorithm even when its digest bytes match SHA256', async () => {
+    const bytes = new Uint8Array([116, 101, 115, 116]);
+    const digest = await sha256.digest(bytes);
+    const valid = CID.createV1(0x55, digest).toString();
+    const wrongAlgorithm = CID.createV1(0x55, createDigest(0x13, digest.digest)).toString();
+    mockStorageClient.getContent = vi
+      .fn()
+      .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: valid }));
+    mockStorageClient.fetchBlob = vi.fn().mockReturnValue(of(bytes.buffer));
+    expect((await firstValueFrom(service.getContent('manifesto', true)))?.content).toBe('test');
+    mockStorageClient.getContent.mockReturnValue(
+      of({ ...mockContentNode, contentBody: null, blobCid: wrongAlgorithm })
+    );
+    expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
+  });
 
   const mockPathData = {
     id: 'test-path-1',

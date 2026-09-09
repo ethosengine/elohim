@@ -11,6 +11,10 @@ import { InjectionToken, Provider } from '@angular/core';
 // @coverage: 100.0% (2026-02-24)
 
 import { ElohimClient, ElohimClientConfig } from '@elohim/service/client';
+import {
+  ELOHIM_CLIENT as LIBRARY_CLIENT,
+  provideElohimClient as provideLibraryClient,
+} from '@elohim/service/client/angular-provider';
 
 /**
  * Local injection token for ElohimClient
@@ -29,12 +33,7 @@ export function elohimClientFactory(config: ElohimClientConfig): ElohimClient {
  * Provider for ElohimClient with configuration
  */
 export function provideElohimClient(config: ElohimClientConfig): Provider[] {
-  return [
-    {
-      provide: ELOHIM_CLIENT,
-      useFactory: () => elohimClientFactory(config),
-    },
-  ];
+  return [...provideLibraryClient(config), { provide: ELOHIM_CLIENT, useExisting: LIBRARY_CLIENT }];
 }
 
 // Re-export class and functions (values)

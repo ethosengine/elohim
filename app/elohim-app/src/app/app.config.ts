@@ -25,7 +25,6 @@ import {
   BLOB_FETCHER,
   BUNDLE_ROUTE_CONTEXT,
   CONTENT_SYNC_STORAGE_BASE_URL,
-  ELOHIM_CLIENT,
   ELOHIM_ENV,
   GOVERNANCE,
   GovernanceApiService,
@@ -37,11 +36,7 @@ import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';
 import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
-import {
-  provideElohimClient,
-  detectClientMode,
-  ELOHIM_CLIENT as LOCAL_ELOHIM_CLIENT,
-} from './elohim/providers/elohim-client.provider';
+import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
 import {
   provideEprResolution,
   EPR_RESOLUTION_PROVIDER,
@@ -61,31 +56,9 @@ import { HolochainClientService } from './elohim/services/holochain-client.servi
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { StorageApiService } from './elohim/services/storage-api.service';
 import { StorageClientService } from './elohim/services/storage-client.service';
+import { resolveDoorwayUrl } from './elohim/utils/runtime-doorway';
 import { ELOHIM_OWNS_UNIVERSAL_ROUTE, ELOHIM_ROUTE_CLAIMS } from './generated/route-claims';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
-
-/**
- * Resolve the doorway URL at runtime.
- *
- * When served as a projected /apps/{slug}/ bundle from doorway (alpha or prod),
- * window.location.origin IS the doorway — use it so API calls route to the correct
- * instance without baking a specific hostname into the build.
- *
- * In local dev (hostname === 'localhost') the Angular dev-server proxy forwards
- * /api, /db, /blob to doorway at :8888 — honour the configured URL so the proxy
- * keeps working.
- *
- * Tauri mode: detectClientMode() returns type:'tauri' regardless of doorwayUrl;
- * the value is passed through as an optional fallback and does not block boot.
- */
-function resolveDoorwayUrl(configured: string | undefined): string {
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof window guard
-    return window.location.origin;
-  }
-  return configured ?? 'http://localhost:8888';
-}
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -97,7 +70,7 @@ export const appConfig: ApplicationConfig = {
     // keeping API calls co-origin with the serving doorway (alpha or prod).
     ...provideElohimClient({
       mode: detectClientMode({
-        doorwayIdentity: environment.client?.doorwayIdentity ?? environment.client?.doorwayUrl,
+        doorwayIdentity: environment.client?.doorwayIdentity,
         doorwayUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
         doorwayFallbacks: environment.client?.doorwayFallbacks,
         apiKey: environment.client?.apiKey,
@@ -132,6 +105,8 @@ export const appConfig: ApplicationConfig = {
           ? {
               adminUrl: environment.client.holochainConductorUrl,
               appUrl: environment.client.holochainConductorUrl,
+              // HTTP projection consumers use this before the WebSocket fallback.
+              authUrl: resolveDoorwayUrl(environment.client?.doorwayUrl),
             }
           : undefined,
       },
@@ -228,14 +203,6 @@ export const appConfig: ApplicationConfig = {
     // injected directly by content-viewer.component. AgentService satisfies
     // IAgentContext via getCurrentAgentId() (mirrors lamad app.config.ts).
     { provide: AGENT_CONTEXT, useExisting: AgentService },
-    // §12.3 cross-pillar viewer chain — lamad's ContentBackendService (reached via
-    // DataLoaderService -> ProjectionAPIService) injects the LIBRARY @elohim/service
-    // ELOHIM_CLIENT token, whereas this shell's provideElohimClient registers the
-    // LOCAL @app/elohim provider token. The two tokens share the description
-    // 'ElohimClient' but are distinct object references — this useExisting bridges
-    // the library token to the shell-resolved local instance so both consumers share
-    // one ElohimClient (the mirror-image of lamad app.config.ts's local->library alias).
-    { provide: ELOHIM_CLIENT, useExisting: LOCAL_ELOHIM_CLIENT },
     // Shefa metrics and custodian selection services
     CustodianCommitmentService,
     PerformanceMetricsService,

@@ -95,13 +95,13 @@ describe('apiBaseUrlInterceptor', () => {
     resetDoorwayFailoverState();
   });
 
-  describe('cross-origin SPA host (alpha/prod)', () => {
+  describe('package served by a different doorway than its build configuration', () => {
     beforeEach(() => setOrigin('https://alpha.elohim.host'));
 
     it('prefixes relative /api/v1/* with doorway URL', () => {
       const { handler, received } = captureUrl();
       apiBaseUrlInterceptor(new HttpRequest('POST', '/api/v1/mastery', {}), handler).subscribe();
-      expect(received()).toBe('https://doorway-alpha.elohim.host/api/v1/mastery');
+      expect(received()).toBe('https://alpha.elohim.host/api/v1/mastery');
     });
 
     it('prefixes /db/, /blob/, /apps/, /health', () => {
@@ -109,7 +109,7 @@ describe('apiBaseUrlInterceptor', () => {
       for (const path of cases) {
         const { handler, received } = captureUrl();
         apiBaseUrlInterceptor(new HttpRequest('GET', path), handler).subscribe();
-        expect(received()).toBe(`https://doorway-alpha.elohim.host${path}`);
+        expect(received()).toBe(`https://alpha.elohim.host${path}`);
       }
     });
 
@@ -155,12 +155,8 @@ describe('apiBaseUrlInterceptor', () => {
   });
 
   describe('development workspace runtime (per-endpoint hostnames)', () => {
-    // resolveBaseUrl() still returns '' for a workspace host (dodging the cross-origin
-    // doorwayUrl), but effectivePrimary now falls back to the browser's own
-    // origin so the failover ladder can engage — a same-origin absolute URL
-    // behaves identically to a relative one (no CORS boundary crossed), so
-    // this is a legitimate ladder-change adaptation of the prior "untouched"
-    // expectation, not a functional regression.
+    // HTTP stays on the workspace's app origin, where the development server
+    // proxies it. The separate WebSocket endpoint remains workspace-owned.
     it('rewrites to its own origin (still same-origin, no doorwayUrl) on a .devspaces. workspace host', () => {
       setOrigin('https://workspace-angular-dev.devspaces.example.com');
       const { handler, received } = captureUrl();
@@ -197,12 +193,8 @@ describe('apiBaseUrlInterceptor', () => {
   });
 
   describe('same-origin as doorway', () => {
-    // This is FIX 1's exact target: the canonical served-from-doorway
-    // topology. resolveBaseUrl() still returns '' (no separate doorway
-    // origin to route to), but effectivePrimary now falls back to the
-    // browser's own (== doorway) origin, so the ladder engages and can fail
-    // over — see the "multi-host failover" describe block below for the
-    // case with doorwayFallbacks configured.
+    // Matching build configuration and serving origin follows the same runtime
+    // policy as a package moved to another doorway.
     it('rewrites to its own (doorway) origin when no fallbacks are configured', () => {
       setOrigin('https://doorway-alpha.elohim.host');
       const { handler, received } = captureUrl();
@@ -212,7 +204,7 @@ describe('apiBaseUrlInterceptor', () => {
   });
 
   describe('multi-host failover (§3a — logical anycast)', () => {
-    const PRIMARY = 'https://doorway-alpha.elohim.host';
+    const PRIMARY = 'https://alpha.elohim.host';
     const FALLBACK = 'https://elohim.host';
 
     beforeEach(() => {

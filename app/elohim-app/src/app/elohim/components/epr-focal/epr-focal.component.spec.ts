@@ -10,6 +10,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ContentService } from '@app/lamad/services/content.service';
 import { RendererRegistryService } from '@app/lamad/renderers/renderer-registry.service';
 
+import { ContentBackendService } from '../../services/content.service';
 import { EprFocalComponent } from './epr-focal.component';
 
 const mockNode = {
@@ -38,6 +39,10 @@ describe('EprFocalComponent', () => {
       imports: [EprFocalComponent],
       providers: [
         { provide: ContentService, useValue: contentServiceSpy },
+        {
+          provide: ContentBackendService,
+          useValue: { getContent: vi.fn().mockReturnValue(of(mockNode)) },
+        },
         { provide: RendererRegistryService, useValue: registrySpy },
       ],
     }).compileComponents();
@@ -48,6 +53,16 @@ describe('EprFocalComponent', () => {
     fixture.componentRef.setInput('slug', slug);
     fixture.detectChanges();
   }
+
+  it('uses the explicit anonymous reader for body loading only when opted in', () => {
+    fixture.componentRef.setInput('anonymousPublicRead', true);
+    setSlug('manifesto');
+    expect(TestBed.inject(ContentBackendService).getContent).toHaveBeenCalledWith(
+      'manifesto',
+      true
+    );
+    expect(contentServiceSpy.getContentBySlug).not.toHaveBeenCalled();
+  });
 
   it('loads the node for the slug and emits nodeLoaded', () => {
     const loaded = vi.fn();

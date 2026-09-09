@@ -21,6 +21,7 @@ import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/conten
 import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
 
 import { environment } from '../../../environments/environment';
+import { resolveDoorwayUrl } from '../utils/runtime-doorway';
 
 import { ContentBackendService } from './content.service';
 import { StorageClientService } from './storage-client.service';
@@ -120,8 +121,9 @@ export class ProjectionAPIService implements IStorageApi {
 
   /** Base URL for cache API */
   private get baseUrl(): string {
-    const doorwayUrl =
-      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080';
+    const doorwayUrl = resolveDoorwayUrl(
+      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080'
+    );
     const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
     return `${httpUrl}/api/v1/cache`;
   }

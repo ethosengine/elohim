@@ -103,10 +103,26 @@ describe('AppComponent', () => {
   afterEach(() => {
     // Clean up all component instances and their timers
     TestBed.resetTestingModule();
+    vi.unstubAllGlobals();
     // Restore doorwayUrl
     if (environment.client) {
       environment.client.doorwayUrl = savedDoorwayUrl ?? '';
     }
+  });
+
+  it('probes the serving doorway during boot even with production build configuration', async () => {
+    const origin = 'http://localhost:8890';
+    vi.stubGlobal('location', { origin });
+    const fetchProbe = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchProbe);
+    environment.client!.doorwayUrl = 'https://doorway.elohim.host';
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fetchProbe).toHaveBeenCalledWith(`${origin}/health`, {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetchProbe.mock.calls.every(([url]) => url === `${origin}/health`)).toBe(true);
   });
 
   it('should create the app', () => {

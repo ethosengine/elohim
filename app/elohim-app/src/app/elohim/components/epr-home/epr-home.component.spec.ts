@@ -66,7 +66,14 @@ describe('epr-home.model', () => {
       feltStatus: {
         headline: 'Held by only 1 household — invite another to help hold these',
         reassurance: 'needs-help',
-        heldBy: [{ id: 'household-dowell', kind: 'household', label: 'Dowell Household', intraHubPeers: 2 }],
+        heldBy: [
+          {
+            id: 'household-dowell',
+            kind: 'household',
+            label: 'Dowell Household',
+            intraHubPeers: 2,
+          },
+        ],
         floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 1 },
         suggestedAction: 'Invite a household to help hold these',
       },
@@ -94,8 +101,13 @@ describe('epr-home.model', () => {
   });
 });
 
-@Component({ selector: 'app-epr-focal', standalone: true, template: '<div class="focal-stub"></div>' })
+@Component({
+  selector: 'app-epr-focal',
+  standalone: true,
+  template: '<div class="focal-stub"></div>',
+})
 class EprFocalStub {
+  @Input() anonymousPublicRead = false;
   @Input() slug = '';
   @Output() nodeLoaded = new EventEmitter<unknown>();
   @Output() notFound = new EventEmitter<string>();
@@ -148,7 +160,10 @@ describe('EprHomeComponent', () => {
           provide: ActivatedRoute,
           useValue: { paramMap: of(convertToParamMap({ resourceId })) },
         },
-        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) } },
+        {
+          provide: ResilienceService,
+          useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) },
+        },
         {
           provide: DistributionService,
           useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },
@@ -220,9 +235,7 @@ describe('EprHomeComponent', () => {
   it('uses the reading shape for markdown', async () => {
     storage.getContent.mockReturnValue(of({ ...rawSimulation, contentFormat: 'markdown' }));
     await mount('succession');
-    expect(q(fixture, 'epr-home-focal')?.classList.contains('epr-home__focal--reading')).toBe(
-      true
-    );
+    expect(q(fixture, 'epr-home-focal')?.classList.contains('epr-home__focal--reading')).toBe(true);
   });
 
   it('renders the out-of-reach gate for a null atom, with no chrome', async () => {
@@ -266,7 +279,10 @@ describe('EprHomeComponent', () => {
           provide: ActivatedRoute,
           useValue: { paramMap: of(convertToParamMap({ resourceId: 'evolution-of-trust' })) },
         },
-        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(snapshot$) } },
+        {
+          provide: ResilienceService,
+          useValue: { getSnapshot: vi.fn().mockReturnValue(snapshot$) },
+        },
         {
           provide: DistributionService,
           useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },
@@ -332,7 +348,10 @@ describe('EprHomeComponent', () => {
         provideRouter([]),
         { provide: StorageClientService, useValue: storage },
         { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
-        { provide: ResilienceService, useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) } },
+        {
+          provide: ResilienceService,
+          useValue: { getSnapshot: vi.fn().mockReturnValue(of(null)) },
+        },
         {
           provide: DistributionService,
           useValue: { getDetails: vi.fn().mockResolvedValue({ summary: { replicaCount: 5 } }) },

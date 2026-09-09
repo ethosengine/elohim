@@ -28,6 +28,8 @@ import {
 } from '@app/lamad/renderers/renderer-registry.service';
 import { ContentService } from '@app/lamad/services/content.service';
 
+import { ContentBackendService } from '../../services/content.service';
+
 /**
  * The node shape the focal slot loads and hands back. Shell consumers import
  * THIS alias so the lamad content substrate is referenced from one shell file
@@ -54,6 +56,7 @@ export type FocalNode = ContentNode;
 })
 export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy {
   @Input({ required: true }) slug!: string;
+  @Input() anonymousPublicRead = false;
   // Chrome opt-in: the atom home renders no title of its own, but the legacy
   // delivery page still needs one when the format falls through to the raw
   // fallback (no registered renderer, not plaintext/html). Default false
@@ -74,6 +77,7 @@ export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy
   private pendingRendererLoad = false;
   private readonly destroy$ = new Subject<void>();
   private readonly contentService = inject(ContentService);
+  private readonly publicContent = inject(ContentBackendService);
   private readonly rendererRegistry = inject(RendererRegistryService);
   // Injecting triggers manifest-driven renderer registration (side effect).
   private readonly _rendererInit = inject(RendererInitializerService);
@@ -104,8 +108,10 @@ export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy
     this.isLoading = true;
     this.node = null;
     this.destroyRenderer();
-    this.contentService
-      .getContentBySlug(slug)
+    (this.anonymousPublicRead
+      ? this.publicContent.getContent(slug, true)
+      : this.contentService.getContentBySlug(slug)
+    )
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: node => {

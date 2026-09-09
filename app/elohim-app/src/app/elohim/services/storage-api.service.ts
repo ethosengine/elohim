@@ -77,6 +77,7 @@ import {
   type CreateMasteryInput,
   type CreateEventInput,
 } from '../interfaces';
+import { resolveDoorwayUrl } from '../utils/runtime-doorway';
 
 import { LoggerService } from './logger.service';
 
@@ -137,9 +138,7 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   constructor() {
     // Use storageUrl from environment or fall back to doorway URL
     this.baseUrl =
-      environment.holochain?.storageUrl ??
-      (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??
-      '';
+      environment.holochain?.storageUrl ?? resolveDoorwayUrl(environment.client?.doorwayUrl ?? '');
   }
 
   // ==========================================================================

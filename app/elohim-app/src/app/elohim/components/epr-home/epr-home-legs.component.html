@@ -48,7 +48,7 @@
     @if (related().length > 0) {
       <p class="leg__ui leg__ui--muted">Named as related</p>
       @for (r of related(); track r.id) {
-        <a class="leg__row leg__row--link" [href]="r.href" [attr.data-related-id]="r.id">
+        <a class="leg__row leg__row--link" [routerLink]="r.href" [attr.data-related-id]="r.id">
           <span>{{ r.label }}</span>
           <span class="pill">not checked from here</span>
         </a>

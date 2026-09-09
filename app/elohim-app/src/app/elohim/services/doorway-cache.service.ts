@@ -22,6 +22,7 @@ import { map, catchError, timeout } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { resolveDoorwayUrl } from '../utils/runtime-doorway';
 
 /**
  * Cache query options
@@ -48,8 +49,9 @@ export class DoorwayCacheService {
 
   /** Base URL for cache API */
   private get baseUrl(): string {
-    const doorwayUrl =
-      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080';
+    const doorwayUrl = resolveDoorwayUrl(
+      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080'
+    );
 
     // Convert WebSocket URL to HTTP
     return doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
