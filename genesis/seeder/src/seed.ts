@@ -2007,7 +2007,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
  *   --ids=a,b,c   Only seed specific IDs
  *   --force       Seed even if data already exists
  */
-async function seed() {
+export async function seed() {
   console.log('🌱 Holochain Content Seeder');
   console.log(`📁 Data directory: ${DATA_DIR}`);
 
@@ -2216,6 +2216,15 @@ async function seed() {
     console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded} inserted + ${seedResult.contentSkipped} already existing of ${seedResult.contentAttempted} content items attempted`);
   }
 
+  // A named content repair is not a deployment. Its authored relationships
+  // and requested verification are complete; leave governance and projections
+  // to their explicit seeders. Full-content and full-deployment runs retain
+  // their existing completion chain.
+  if (CONTENT_ONLY && IDS.length > 0) {
+    console.log('\n✅ Targeted content seed complete; deployment bindings and projections unchanged');
+    return;
+  }
+
   // ========================================
   // STAKES DECLARATION (the deploy-time mint)
   // ========================================
@@ -2338,7 +2347,9 @@ async function seed() {
   }
 }
 
-seed().catch((error) => {
-  console.error('Fatal error:', cleanErrorMessage(error));
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  seed().catch((error) => {
+    console.error('Fatal error:', cleanErrorMessage(error));
+    process.exit(1);
+  });
+}

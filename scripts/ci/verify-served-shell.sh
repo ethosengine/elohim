@@ -21,7 +21,11 @@ DEADLINE_SECS="${DEADLINE_SECS:-90}"
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 # Install in the builder container which actually executes the probe. pnpm uses
 # the checked-in lockfile and Playwright uses its package-pinned Chromium.
-if [ "${CI:-false}" = "true" ] || [ -n "${JENKINS_URL:-}" ]; then
+if [ "${CI:-false}" = "true" ] || {
+  [ "${CI:-}" != "false" ] &&
+    [ -n "${JENKINS_URL:-}" ] &&
+    [ -n "${BUILD_NUMBER:-}" ];
+}; then
   pnpm --dir "$ROOT" install --frozen-lockfile --filter '@elohim/a2o...'
   pnpm --dir "$ROOT/genesis/a2o" exec playwright install --with-deps chromium
 fi

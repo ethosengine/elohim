@@ -1762,20 +1762,21 @@ archive_release_adoption_slot() { # <peer> <slot> <applied|failed> <exe-record> 
 # restart (the live capture still wins — this is only the fallback). Uses python rather
 # than cp/copyFile: a procfs read must be a single read()/write() pair, or the copy lands
 # 0 bytes (2026-08-22), which restart_storage explicitly reports as an EMPTY capture.
-capture_storage_environ() { # <peer-name> <pid> <binary>
-  local name="$1" pid="$2" bin="$3" workdir="${MESH_DIR}/storage-restart"
-  mkdir -p "$workdir" 2>/dev/null || return 0
+capture_storage_environ() { # <peer-name> <pid> <binary> [capture-directory]
+  local name="$1" pid="$2" bin="$3" workdir="${4:-${MESH_DIR}/storage-restart}"
+  mkdir -p "$workdir" 2>/dev/null || return 1
   # The child needs a moment to exec before /proc/<pid>/environ reflects the new image.
   local t=10
   while [ "$t" -gt 0 ] && [ ! -r "/proc/$pid/environ" ]; do sleep 1; t=$((t-1)); done
-  python3 - "$pid" "$workdir/$name.environ" <<'PY' 2>/dev/null || return 0
+  python3 - "$pid" "$workdir/$name.environ" <<'PY' 2>/dev/null || return 1
 import sys
 pid, destination = sys.argv[1:]
 with open(f"/proc/{pid}/environ", "rb") as source:
     raw = source.read()
-if raw:
-    with open(destination, "wb") as target:
-        target.write(raw)
+if not raw:
+    raise RuntimeError("empty process environment")
+with open(destination, "wb") as target:
+    target.write(raw)
 PY
   printf '%s\n' "$bin" > "$workdir/$name.exe"
 }
@@ -3427,9 +3428,32 @@ mesh_blocks() {
 # Fault controls retain the exact running environment and argv. Never select a
 # process by name: the recorded start tick must still match before signalling it.
 stop_storage() { # <peer>
-  local name="$1" pid
+  local name="$1" pid bin capture workdir="${MESH_DIR}/storage-restart"
   pid="$(live_recorded_pid storage "$name")" || { echo "REFUSED: no owned storage $name" >&2; return 1; }
-  capture_storage_environ "$name" "$pid" "$(resolve_exe "$pid" "$STORAGE_BIN")"
+  # A fault must be recoverable with the bytes running now. resolve_exe also
+  # serves intentional upgrades, so its pathname fallback is not proof here.
+  bin="$(readlink "/proc/$pid/exe")"; bin="${bin% (deleted)}"
+  if [ ! -x "$bin" ] || ! cmp -s "/proc/$pid/exe" "$bin"; then
+    echo "REFUSED: storage $name recovery executable is missing or differs from the running bytes: $bin" >&2
+    echo "  Restore a compatible executable and intentionally restart this peer before fault injection." >&2
+    return 1
+  fi
+  assert_storage_transport_capability "$bin" "$(peer_transport "$name")" || return 1
+  mkdir -p "$workdir" || return 1
+  capture="$(mktemp -d "$workdir/.capture-$name.XXXXXX")" || return 1
+  if ! capture_storage_environ "$name" "$pid" "$bin" "$capture"; then
+    rm -rf "$capture"
+    echo "REFUSED: storage $name recovery environment could not be captured" >&2
+    return 1
+  fi
+  if ! mv "$capture/$name.environ" "$capture/$name.exe" "$workdir/"; then
+    rm -rf "$capture"
+    return 1
+  fi
+  rmdir "$capture"
+  # Re-check ownership after capture; a concurrent binary replacement after the
+  # comparison remains possible. This guard does not make pool paths immutable.
+  [ "$(live_recorded_pid storage "$name")" = "$pid" ] || return 1
   kill "$pid"
   local t=30
   while [ "$t" -gt 0 ] && live_recorded_pid storage "$name" >/dev/null; do sleep 1; t=$((t-1)); done

@@ -10,10 +10,10 @@ pid_running() {
 }
 
 tmp="$(mktemp -d)"
-recorded_pid="" port_pid="" stale_pid="" decoy_pid=""
+recorded_pid="" port_pid="" stale_pid="" decoy_pid="" fault_pid=""
 cleanup() {
   local pid
-  for pid in "$recorded_pid" "$port_pid" "$stale_pid" "$decoy_pid"; do
+  for pid in "$recorded_pid" "$port_pid" "$stale_pid" "$decoy_pid" "$fault_pid"; do
     [[ "$pid" =~ ^[0-9]+$ ]] && kill "$pid" 2>/dev/null || true
   done
   rm -rf "$tmp"
@@ -76,5 +76,56 @@ t "stop terminates both recorded and configured-port owners (rc=$rc)" \
 t "stop leaves an argv-only decoy and its caller alive" \
   'pid_running "$decoy_pid" && [[ "$out" != *"process-name fallback"* ]]'
 t "stop clears the PID registry after shutdown" '[ ! -d "$PID_DIR" ]'
+
+# Fault stops must prove the saved pathname can recover the running process
+# before replacing an existing receipt or signalling anything.
+MESH_TRANSPORT_BACKEND_EFFECTIVE=libp2p
+fault_bin="$tmp/storage-fixture"
+cp /bin/bash "$fault_bin"
+"$fault_bin" -c 'sleep 300 & child=$!; trap '\''kill "$child" 2>/dev/null'\'' EXIT; trap '\''exit 0'\'' TERM; wait "$child"' & fault_pid=$!
+sleep 0.1
+record_mesh_pid storage unit "$fault_pid"
+capture_dir="$MESH_DIR/storage-restart"
+mkdir -p "$capture_dir"
+printf 'known-good-env' > "$capture_dir/unit.environ"
+printf 'known-good-exe' > "$capture_dir/unit.exe"
+receipts_unchanged() {
+  [ "$(cat "$capture_dir/unit.environ")" = known-good-env ] &&
+    [ "$(cat "$capture_dir/unit.exe")" = known-good-exe ]
+}
+
+# Atomic pathname replacement leaves /proc/PID/exe pointing at deleted bytes.
+cp /bin/bash "$tmp/replacement"
+printf 'different bytes' >> "$tmp/replacement"
+mv "$tmp/replacement" "$fault_bin"
+out="$(stop_storage unit 2>&1)"; rc=$?
+t "replaced executable refuses fault without killing or overwriting receipts" \
+  '[ "$rc" -ne 0 ] && pid_running "$fault_pid" && receipts_unchanged && [[ "$out" == *"differs from the running bytes"* ]]'
+rm "$fault_bin"
+out="$(stop_storage unit 2>&1)"; rc=$?
+t "missing executable refuses fault and preserves known-good recovery" \
+  '[ "$rc" -ne 0 ] && pid_running "$fault_pid" && receipts_unchanged'
+
+# Restore identical bytes, then require dual: bash lacks the iroh marker.
+cp /bin/bash "$fault_bin"
+MESH_TRANSPORT_BACKEND_EFFECTIVE=dual
+out="$(stop_storage unit 2>&1)"; rc=$?
+t "incompatible transport refuses fault before receipt mutation" \
+  '[ "$rc" -ne 0 ] && pid_running "$fault_pid" && receipts_unchanged && [[ "$out" == *"p2p-iroh marker"* ]]'
+MESH_TRANSPORT_BACKEND_EFFECTIVE=libp2p
+
+# The PID/proc identity functions do not need Python; fail the actual capture.
+python3() { return 1; }
+out="$(stop_storage unit 2>&1)"; rc=$?
+unset -f python3
+t "failed environment capture refuses fault and preserves prior receipt" \
+  '[ "$rc" -ne 0 ] && pid_running "$fault_pid" && receipts_unchanged && [[ "$out" == *"could not be captured"* ]]'
+
+out="$(stop_storage unit 2>&1)"; rc=$?
+t "matching executable and captured environment permit owned fault" \
+  '[ "$rc" -eq 0 ] && ! pid_running "$fault_pid" && [ -s "$capture_dir/unit.environ" ] && [ "$(cat "$capture_dir/unit.exe")" = "$fault_bin" ]'
+kill "$fault_pid" 2>/dev/null || true
+wait "$fault_pid" 2>/dev/null || true
+fault_pid=""
 
 exit "$fail"

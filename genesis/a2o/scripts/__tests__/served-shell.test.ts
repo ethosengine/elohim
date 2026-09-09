@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -10,8 +10,82 @@ import { promisify } from 'node:util';
 const execute = promisify(execFile);
 const contentType = 'Content-Type';
 const expectedHead = 'sha256-test';
+const jenkinsUrl = 'https://jenkins.invalid';
 const sameOriginRedirect = 'same-origin-redirect';
 const ssrWithoutBootstrap = 'ssr-without-bootstrap';
+
+for (const scenario of [
+  {
+    name: 'URL-only local',
+    CI: '',
+    JENKINS_URL: jenkinsUrl,
+    BUILD_NUMBER: '',
+    install: false,
+  },
+  {
+    name: 'CI=false with full Jenkins environment',
+    CI: 'false',
+    JENKINS_URL: jenkinsUrl,
+    BUILD_NUMBER: '1700',
+    install: false,
+  },
+  { name: 'explicit CI=true', CI: 'true', JENKINS_URL: '', BUILD_NUMBER: '', install: true },
+  {
+    name: 'actual Jenkins build context',
+    CI: '',
+    JENKINS_URL: jenkinsUrl,
+    BUILD_NUMBER: '1700',
+    install: true,
+  },
+]) {
+  void test(`served shell install detection: ${scenario.name}`, async () => {
+    const sandbox = await mkdtemp(`${tmpdir()}/served-shell-install-`);
+    const bin = resolve(sandbox, 'bin');
+    const marker = resolve(sandbox, 'pnpm-invoked');
+    const artifacts = resolve(sandbox, 'reports');
+    await mkdir(bin);
+    await writeFile(resolve(bin, 'pnpm'), '#!/usr/bin/env bash\ntouch "$PNPM_MARKER"\nexit 42\n', {
+      mode: 0o755,
+    });
+    try {
+      await assert.rejects(
+        execute(
+          'bash',
+          [
+            resolve('../../scripts/ci/verify-served-shell.sh'),
+            'http://127.0.0.1:1',
+            '/',
+            'test-app',
+            expectedHead,
+          ],
+          {
+            env: {
+              ...process.env,
+              CI: scenario.CI,
+              JENKINS_URL: scenario.JENKINS_URL,
+              BUILD_NUMBER: scenario.BUILD_NUMBER,
+              PATH: `${bin}:${process.env.PATH ?? ''}`,
+              PNPM_MARKER: marker,
+              DEADLINE_SECS: '0',
+              SHELL_REPORT_DIR: artifacts,
+            },
+          }
+        )
+      );
+      let installed = false;
+      try {
+        await access(marker);
+        installed = true;
+      } catch {
+        // The probe reached its network failure without invoking package setup.
+      }
+      assert.equal(installed, scenario.install);
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  });
+}
+
 for (const mode of [
   'valid',
   sameOriginRedirect,
