@@ -2977,6 +2977,8 @@ habits:
       @wip (render, stranger refused, anchored incident). NEXT: station 3b first — the shard replication plane replicates
       PRIVATE rows and their blobs to every household peer with no reach gate (M9, now with a named site), so "a stranger
       is refused" is the substrate's next honest move; then 3a render; then 4 anchoring.
+
+      DELTA 2026-09-09 (native network sprint, launcher and delivery validation; status remains red): late join now starts storage after conductor admin readiness, then requires app and successful HTTP readiness; actual Daniel joined with the final 6d48 storage candidate. Unchanged witness run sprint-report-household-20260909T200744Z-7d2911d7 exited1 (2 passed, 1 failed): direct custodian copies/receipts and anonymous refusal passed; exact Daniel SQL/blob absence and sender withholding were measured, but the required receiver skip counter stayed zero because no private row was handed over. A separate owned process-group regression failed on nohup-only launch and passed with setsid; original Daniel exit cause remains unproven. Five join cases, launcher regressions and just gate elohim-app (225 files/4596 tests) EXIT0; reports in genesis/a2o/reports/network-sprint-20260909/. Receiver deliberate-delivery proof, render and incident attestation remain outstanding.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md (the primitive, the decision register §12, the corrections to the two atoms §1)"
       - "atoms: genesis/data/timeline/backlog/death-witness-runtime-harvests-a-dying-conductors-last-words.md · genesis/data/timeline/backlog/elohim-native-compute-envelope-the-pod-under-the-runtime.md"

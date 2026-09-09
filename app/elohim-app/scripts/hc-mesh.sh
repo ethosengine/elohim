@@ -2493,7 +2493,7 @@ start_storage_peer() { # <peer-name> <peer-index>
     ALLOW_SEED_NETWORK_STAKES=1 \
     ALLOW_SEED_DELEGATES_COMPUTE=1 \
     ALLOW_SEED_SHARD_MANIFEST=1 \
-    nohup "$STORAGE_BIN" --http-port "$(http_port "$i")" > "$LOGDIR/$name.log" 2>&1 &
+    setsid nohup "$STORAGE_BIN" --http-port "$(http_port "$i")" > "$LOGDIR/$name.log" 2>&1 &
     record_mesh_pid storage "$name" "$!" || true
     capture_storage_environ "$name" "$!" "$STORAGE_BIN"
     echo "storage $name: http=$(http_port "$i") p2p=$(p2p_port "$i") transport=$(peer_transport "$name") agent=${agent:0:16}..."
@@ -2638,15 +2638,13 @@ join_peer() { # <fresh-peer-name>
 
   local deadline=$((SECONDS + 180))
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . && \
-       ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q .; then
+    if ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q .; then
       break
     fi
     sleep 3
   done
-  if ! ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . || \
-     ! ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q .; then
-    echo "join-peer: conductor $name did not expose both interfaces — see $conductor_log" >&2
+  if ! ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q .; then
+    echo "join-peer: conductor $name did not expose its admin interface — see $conductor_log" >&2
     return 1
   fi
   record_listener_pid conductor "$name" "$(admin_port "$index")" || true
@@ -2656,13 +2654,22 @@ join_peer() { # <fresh-peer-name>
   # later cold `start` retains the byte-identical configured roster flow.
   PEERS+=("$name")
   start_storage_peer "$name" "$index"
+  # Like the initial ark/direct launch, storage attaches the app interface
+  # through the admin connection. Waiting for that interface before storage
+  # starts creates a dependency cycle; require it alongside HTTP readiness.
   deadline=$((SECONDS + 180))
   while [ "$SECONDS" -lt "$deadline" ]; do
-    curl -s -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null && break
+    if ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . && \
+       ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q . && \
+       curl -fs -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null; then
+      break
+    fi
     sleep 3
   done
-  if ! curl -s -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null; then
-    echo "join-peer: storage $name did not serve — see $LOGDIR/$name.log" >&2
+  if ! ss -H -ltn "sport = :$(admin_port "$index")" 2>/dev/null | grep -q . || \
+     ! ss -H -ltn "sport = :$(app_port "$index")" 2>/dev/null | grep -q . || \
+     ! curl -fs -m 2 "http://localhost:$(http_port "$index")/health" >/dev/null; then
+    echo "join-peer: $name did not expose admin, app, and storage interfaces — see $LOGDIR/$name.log" >&2
     return 1
   fi
   refresh_mesh_pidfiles
