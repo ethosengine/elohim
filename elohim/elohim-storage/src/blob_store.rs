@@ -454,12 +454,16 @@ impl BlobStore {
     /// Get blob size (without loading data)
     pub async fn size(&self, hash: &str) -> Result<u64, StorageError> {
         let blob_path = self.blob_path(hash);
-        if fs::metadata(&blob_path).await.is_err() {
-            return crate::compute_payload_store::get(&self.root_dir, hash)
-                .await
-                .map(|bytes| bytes.len() as u64);
-        }
-        let metadata = fs::metadata(&blob_path).await?;
+        let metadata = match fs::metadata(&blob_path).await {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return crate::compute_payload_store::get(&self.root_dir, hash)
+                    .await
+                    .map(|bytes| bytes.len() as u64);
+            }
+            // A failed local presence probe is not evidence of absence.
+            Err(error) => return Err(error.into()),
+        };
 
         // Check if chunked
         if metadata.len() == 7 {

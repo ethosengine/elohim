@@ -3134,10 +3134,11 @@ impl HttpServer {
                 .header(header::ETAG, format!("\"{}\"", hash))
                 .body(Full::new(Bytes::new()))
                 .unwrap()),
-            Err(_) => Ok(Response::builder()
+            Err(StorageError::NotFound(_)) => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Full::new(Bytes::new()))
                 .unwrap()),
+            Err(error) => Err(error),
         }
     }
 
@@ -17215,6 +17216,40 @@ pub struct HttpTestResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn shard_head_distinguishes_absence_from_storage_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
+        let server = HttpServer::new(store.clone(), "127.0.0.1:0".parse().unwrap());
+        let hash = BlobStore::compute_hash(b"head presence witness");
+        assert_eq!(
+            server.handle_head_shard(&hash).await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+
+        // An obstructing path component yields ENOTDIR even when tests run
+        // as root; permission-bit tests would not exercise the failure.
+        let prefix = &hash.trim_start_matches("sha256-")[..4];
+        let obstruction = dir.path().join("blobs").join(prefix);
+        tokio::fs::create_dir_all(dir.path().join("blobs"))
+            .await
+            .unwrap();
+        tokio::fs::write(&obstruction, b"not a directory")
+            .await
+            .unwrap();
+        assert!(matches!(store.size(&hash).await, Err(StorageError::Io(_))));
+        assert!(matches!(
+            server.handle_head_shard(&hash).await,
+            Err(StorageError::Io(_))
+        ));
+
+        tokio::fs::remove_file(obstruction).await.unwrap();
+        store.store(b"head presence witness").await.unwrap();
+        let present = server.handle_head_shard(&hash).await.unwrap();
+        assert_eq!(present.status(), StatusCode::OK);
+        assert_eq!(present.headers()[header::CONTENT_LENGTH], "21");
+    }
 
     #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
     fn observed_iroh_peer(
