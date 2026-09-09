@@ -389,10 +389,34 @@ pub enum FederationError {
     TransportError,
 }
 
-/// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
-/// Populated by discover() on each ListContent response; drained by drain_gap_queue()
-/// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
-type ReplicationGapQueue = Arc<tokio::sync::Mutex<std::collections::VecDeque<String>>>;
+/// Ordered queue awaiting bounded dispatch. Acquisition retains bare content IDs;
+/// replication pairs each discovered ID with its inventory advertiser.
+type ReplicationGapQueue<T = String> = Arc<tokio::sync::Mutex<std::collections::VecDeque<T>>>;
+
+/// Plan only the existing dispatch budget. An advertiser is an availability hint,
+/// never authority: replies still pass the normal content and blob verification.
+fn take_replication_dispatches(
+    queue: &mut std::collections::VecDeque<(String, PeerId)>,
+    connected: &[PeerId],
+    available: usize,
+) -> Vec<(String, PeerId)> {
+    if connected.is_empty() {
+        return Vec::new();
+    }
+    let count = available.min(queue.len());
+    queue
+        .drain(..count)
+        .enumerate()
+        .map(|(index, (id, advertiser))| {
+            let peer = if connected.contains(&advertiser) {
+                advertiser
+            } else {
+                connected[index % connected.len()]
+            };
+            (id, peer)
+        })
+        .collect()
+}
 
 use dashmap::DashMap;
 
@@ -463,9 +487,9 @@ pub struct DeliveryPeer {
     pub last_seen: u64,
     /// HTTP port for direct file serving (default 8090)
     pub http_port: u16,
-    /// Owning household hub id for this peer, when an active identity binding
-    /// resolves it (`peer_id → agent_cid → household → collective`). `None` when
-    /// the peer has no active binding or the bound agent has no household.
+    /// Owning household hub id resolved through an active cross-signed binding,
+    /// the bound agent's Human projection, and its household collective.
+    /// Missing proof, Human, or collective leaves this `None`.
     ///
     /// Discovery (mDNS/identify) cannot populate this — it requires a DB read —
     /// so the gossip-construction path leaves it `None` and the
@@ -475,19 +499,11 @@ pub struct DeliveryPeer {
     pub household_id: Option<String>,
     /// Distinct active provide-commitment reach tags this peer PROVIDES.
     ///
-    /// Derived (request-time, in the HTTP handler) from `rea_commitments` rows
-    /// where `provider = peer_id` and the commitment is active. The string set
-    /// is the commitment's *reach scope* so the a2o resilience precondition can
-    /// test `commitments.includes("commons")` (see
-    /// `genesis/a2o/steps/resilience.steps.ts`). Decision: custody-blob
-    /// commitments carry no explicit reach column — the seeder
-    /// (`buildCustodyCommitmentBody`) stores only `action`,
-    /// `resource_classified_as = sha256-…`, and a note — so a custody-of-a-blob
-    /// commitment maps to the `"commons"` reach (the resilience scenarios ingest
-    /// commons-reach content and the custody mesh hosts it). When a commitment
-    /// DOES carry an explicit reach (via `in_scope_of`, e.g. a `reach:<class>`
-    /// scope), that class is used verbatim instead. Empty when the peer provides
-    /// no active commitments. See the handler for the full derivation.
+    /// Derived at request time from active, unfinished `provide` commitments
+    /// whose provider is the cross-signed binding's agent key. Explicit
+    /// `content:<reach>` classifications supply the tags; missing scope,
+    /// unrelated actions and custody spool pledges grant no reach consent.
+    /// Unsigned, expired or superseded bindings leave the set empty.
     #[serde(default)]
     pub commitments: Vec<String>,
 }
@@ -835,7 +851,7 @@ pub struct P2PNode {
     /// Ordered queue of content IDs awaiting replication dispatch.
     /// drain_gap_queue() consumes from this at a rate bounded by
     /// MAX_REPLICATION_INFLIGHT, decoupling discovery from dispatch.
-    gap_queue: ReplicationGapQueue,
+    gap_queue: ReplicationGapQueue<(String, PeerId)>,
     /// Acquisition stream state (spec §4) — sibling of replication_state.
     acquisition: acquisition::AcquisitionState,
     /// P1 projection-reconcile stream status, surfaced on `/p2p/status`. The
@@ -5796,7 +5812,10 @@ impl P2PNode {
                                             );
                                             // Enqueue — drain_gap_queue() dispatches adaptively
                                             // on the 5s interval, bounded by MAX_REPLICATION_INFLIGHT.
-                                            self.gap_queue.lock().await.extend(new_gaps);
+                                            self.gap_queue
+                                                .lock()
+                                                .await
+                                                .extend(new_gaps.into_iter().map(|id| (id, peer)));
                                         }
 
                                         // Follow the has_more page cursor (mirrors the
@@ -9317,31 +9336,30 @@ impl P2PNode {
             return; // At capacity — wait for completions to free slots
         }
 
-        let to_dispatch: Vec<String> = {
+        let to_dispatch = {
             let mut queue = self.gap_queue.lock().await;
-            if queue.is_empty() {
-                return;
-            }
-            let len = queue.len();
-            queue.drain(..available.min(len)).collect()
+            take_replication_dispatches(&mut queue, &peers, available)
         };
+        if to_dispatch.is_empty() {
+            return;
+        }
 
         debug!(
             dispatching = to_dispatch.len(),
             in_flight, "Draining replication gap queue"
         );
 
-        // Round-robin fetches across all connected peers so content
-        // can be retrieved from whichever peer actually has it.
-        for (i, id) in to_dispatch.iter().enumerate() {
-            let peer = peers[i % peers.len()];
+        // Prefer the connected advertiser; a departed advertiser falls back to
+        // one connected peer without expanding the dispatch or retry budget.
+        for (id, peer) in &to_dispatch {
             let request = ShardRequest::GetContent { id: id.clone() };
             let mut swarm = self.swarm.write().await;
             let request_id = swarm
                 .behaviour_mut()
                 .shard_protocol
-                .send_request(&peer, request);
+                .send_request(peer, request);
             drop(swarm);
+            debug!(content_id = %id, peer = %peer, request_id = ?request_id, "Dispatched replication content fetch");
             self.pending_replication_fetches
                 .lock()
                 .await
@@ -10166,6 +10184,63 @@ mod bootstrap_peering_tests {
             &connected,
         );
         assert_eq!(needing.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod replication_advertiser_tests {
+    use super::{take_replication_dispatches, PeerId, ReplicationGapQueue};
+    use std::collections::VecDeque;
+
+    #[tokio::test]
+    async fn discovered_gap_asks_its_connected_advertiser_first() {
+        let other = PeerId::random();
+        let advertiser = PeerId::random();
+        let state = super::replication::ReplicationState::new();
+        let gaps = state.discover(vec!["advertised-content".into()]).await;
+        let queue: ReplicationGapQueue<(String, PeerId)> = Default::default();
+        queue
+            .lock()
+            .await
+            .extend(gaps.into_iter().map(|id| (id, advertiser)));
+
+        let planned = {
+            let mut pending = queue.lock().await;
+            take_replication_dispatches(&mut pending, &[other, advertiser], 1)
+        };
+        assert_eq!(planned, vec![("advertised-content".into(), advertiser)]);
+        assert!(queue.lock().await.is_empty());
+        // Routing the request does not certify that any content was received.
+        assert_eq!(state.status().await.pending, 1);
+        assert_eq!(state.status().await.completed, 0);
+    }
+
+    #[test]
+    fn disconnected_advertiser_falls_back_once_within_dispatch_budget() {
+        let departed = PeerId::random();
+        let connected = PeerId::random();
+        let mut queue = VecDeque::from([
+            ("first".into(), departed),
+            ("second".into(), departed),
+            ("third".into(), departed),
+        ]);
+        let planned = take_replication_dispatches(&mut queue, &[connected], 2);
+        assert_eq!(
+            planned,
+            vec![("first".into(), connected), ("second".into(), connected)]
+        );
+        assert_eq!(queue, VecDeque::from([("third".into(), departed)]));
+    }
+
+    #[test]
+    fn unavailable_peers_or_capacity_preserve_queued_work() {
+        let advertiser = PeerId::random();
+        let mut queue = VecDeque::from([("content".into(), advertiser)]);
+        let before = queue.clone();
+        assert!(take_replication_dispatches(&mut queue, &[], 50).is_empty());
+        assert_eq!(queue, before);
+        assert!(take_replication_dispatches(&mut queue, &[advertiser], 0).is_empty());
+        assert_eq!(queue, before);
     }
 }
 

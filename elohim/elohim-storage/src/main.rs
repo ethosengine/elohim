@@ -2931,6 +2931,11 @@ async fn async_main(
     #[cfg(any(feature = "p2p", feature = "p2p-iroh"))]
     let shared_shard_service = Arc::new(shared_shard_service);
 
+    // The mint must not outrun the imagodei signal subscriber that projects it.
+    #[cfg(feature = "p2p")]
+    let (binding_subscription_ready_tx, binding_subscription_ready_rx) =
+        tokio::sync::oneshot::channel();
+
     // Initialize P2P node if enabled.
     // Built when the backend is anything other than pure `Iroh` — i.e. for
     // `Libp2p` AND `Dual`. In `Dual` the iroh node is built alongside (below);
@@ -3289,6 +3294,7 @@ async fn async_main(
                         mint_agent_cid.clone(),
                         mint_transport_keypair.clone(),
                         archetype,
+                        binding_subscription_ready_rx,
                     );
                 }
                 (false, _, _) => info!(
@@ -5009,6 +5015,8 @@ async fn async_main(
             // late success is byte-for-byte as good as early success). If the
             // conductor later disconnects mid-loop, we fall back into the same
             // reconnect loop rather than giving up.
+            #[cfg(feature = "p2p")]
+            let mut binding_subscription_ready_tx = Some(binding_subscription_ready_tx);
             let mut reconcile_shutdown = shutdown_tx.subscribe();
             tokio::spawn(async move {
                 use elohim_storage::hc_client_registry::{
@@ -5077,6 +5085,14 @@ async fn async_main(
                             }
                         }
                     };
+
+                    // connect() returns only after on_signal registration. The
+                    // retained stream queues arrivals before run_loop starts.
+                    // Consume once: reconnect must never schedule another mint.
+                    #[cfg(feature = "p2p")]
+                    if let Some(ready) = binding_subscription_ready_tx.take() {
+                        let _ = ready.send(());
+                    }
 
                     // Build controller. new_with_storage when db_pool available
                     // (enables sweep + compromise_at derivation); new() otherwise.

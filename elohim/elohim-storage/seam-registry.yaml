@@ -32,6 +32,39 @@ seamLocus: >
   (src/p2p/shard_protocol.rs).
 
 decisionPoints:
+  - name: take_replication_dispatches
+    kind: verdict-fn
+    sourceLocation:
+      file: src/p2p/mod.rs
+      modulePath: p2p::take_replication_dispatches
+    summary: >
+      Drains only the existing available replication slots, preserving each content
+      inventory advertiser as an ephemeral routing hint. Connected advertisers are
+      asked first; departed advertisers fall back to one connected peer using the
+      existing round-robin position. No peers or no capacity leaves work queued.
+      Acquisition keeps its separate string queue, transport rotation and budgets.
+    concernIds:
+      - { id: C0, status: answered, justification: "Availability routing only; the discovered-gap test keeps content pending and uncompleted after planning." }
+      - { id: C1, status: n-a, justification: "Selecting a request recipient cannot nominate or elect a content head." }
+      - { id: C2, status: n-a, justification: "No authority ordering, clock or head mutation occurs." }
+      - { id: C3, status: answered, justification: "A disconnected advertiser uses one connected fallback; no peers retain work for a later existing dispatch tick." }
+      - { id: C4, status: answered, justification: "Unavailable peers or capacity retain pending work; routing never marks an absent reply as completion." }
+      - { id: C5, status: answered, justification: "The advertiser only selects a request destination; the production planning test proves no completion is conferred." }
+      - { id: C6a, status: answered, justification: "At most available queued items are drained and one destination is selected per item; bounded fallback and zero-capacity tests pin this." }
+      - { id: C6b, status: answered, justification: "Drained work is removed once; the routing test verifies the queue empties without minting a material completion." }
+      - { id: C7, status: partial, justification: "The connected advertising peer is preferred, but a stale advertisement can still return a miss through existing response handling." }
+      - { id: C8, status: partial, justification: "Existing debug dispatch evidence names content, selected peer and request; no typed routing-outcome counter is introduced." }
+      - { id: C9, status: n-a, justification: "The hint is the observed libp2p PeerId, not an agent identity or lineage binding." }
+      - { id: C10, status: n-a, justification: "Only process-local queue data changes; no wire, schema, config or API contract changes." }
+      - { id: C11, status: partial, justification: "Existing in-flight capacity bounds dispatch, but aggregate incoming gap queue capacity is outside this correction." }
+      - { id: C12, status: n-a, justification: "The hint conveys no permission; unchanged GetContent/Get serving and received-byte verification gates enforce authorization and integrity." }
+      - { id: C13, status: n-a, justification: "No social-tier authority gate is introduced." }
+      - { id: C14, status: partial, justification: "Existing response/failure paths retain their evidence; this routing correction adds no residual capsule mechanism." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/mod.rs, testName: discovered_gap_asks_its_connected_advertiser_first, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/mod.rs, testName: disconnected_advertiser_falls_back_once_within_dispatch_budget, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/mod.rs, testName: unavailable_peers_or_capacity_preserve_queued_work, kind: unit }
+
   - name: ghost_decay_authorizes_author
     kind: pure-decision-predicate
     sourceLocation:

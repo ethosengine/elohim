@@ -55,9 +55,9 @@ lastSeen: number,
  */
 httpPort: number, 
 /**
- * Owning household hub id for this peer, when an active identity binding
- * resolves it (`peer_id → agent_cid → household → collective`). `None` when
- * the peer has no active binding or the bound agent has no household.
+ * Owning household hub id resolved through an active cross-signed binding,
+ * the bound agent's Human projection, and its household collective.
+ * Missing proof, Human, or collective leaves this `None`.
  *
  * Discovery (mDNS/identify) cannot populate this — it requires a DB read —
  * so the gossip-construction path leaves it `None` and the
@@ -68,18 +68,10 @@ householdId: string | null,
 /**
  * Distinct active provide-commitment reach tags this peer PROVIDES.
  *
- * Derived (request-time, in the HTTP handler) from `rea_commitments` rows
- * where `provider = peer_id` and the commitment is active. The string set
- * is the commitment's *reach scope* so the a2o resilience precondition can
- * test `commitments.includes("commons")` (see
- * `genesis/a2o/steps/resilience.steps.ts`). Decision: custody-blob
- * commitments carry no explicit reach column — the seeder
- * (`buildCustodyCommitmentBody`) stores only `action`,
- * `resource_classified_as = sha256-…`, and a note — so a custody-of-a-blob
- * commitment maps to the `"commons"` reach (the resilience scenarios ingest
- * commons-reach content and the custody mesh hosts it). When a commitment
- * DOES carry an explicit reach (via `in_scope_of`, e.g. a `reach:<class>`
- * scope), that class is used verbatim instead. Empty when the peer provides
- * no active commitments. See the handler for the full derivation.
+ * Derived at request time from active, unfinished `provide` commitments
+ * whose provider is the cross-signed binding's agent key. Explicit
+ * `content:<reach>` classifications supply the tags; missing scope,
+ * unrelated actions and custody spool pledges grant no reach consent.
+ * Unsigned, expired or superseded bindings leave the set empty.
  */
 commitments: Array<string>, };

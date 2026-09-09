@@ -6197,6 +6197,48 @@ impl HttpServer {
         }
     }
 
+    /// Rebuild eligibility from canonical projections. Routing-only bindings
+    /// cannot furnish either household identity or provision consent.
+    fn enrich_delivery_peer(
+        conn: &mut diesel::SqliteConnection,
+        ctx: &crate::db::AppContext,
+        peer: &mut crate::p2p::DeliveryPeer,
+        now_iso: &str,
+    ) {
+        peer.household_id = None;
+        peer.commitments.clear();
+        let Ok(Some(binding)) =
+            crate::db::peer_identity_bindings::lookup_active(conn, &peer.peer_id, now_iso)
+        else {
+            return;
+        };
+        if !binding.is_cross_signed() {
+            return;
+        }
+        // A signature proves a bounded window, not that it is active now.
+        // Routing lookup's lexical expiry cut is not consent authority: signed
+        // RFC3339 offsets must be compared as instants, and future starts wait.
+        let (Ok(now), Ok(valid_from), Some(Ok(valid_until))) = (
+            chrono::DateTime::parse_from_rfc3339(now_iso),
+            chrono::DateTime::parse_from_rfc3339(&binding.valid_from),
+            binding
+                .valid_until
+                .as_deref()
+                .map(chrono::DateTime::parse_from_rfc3339),
+        ) else {
+            return;
+        };
+        if now < valid_from || now >= valid_until {
+            return;
+        }
+        peer.household_id =
+            crate::services::hub_resolver::resolve_agent_owning_hub(conn, &binding.agent_cid)
+                .unwrap_or(None);
+        peer.commitments =
+            crate::db::rea_commitments::active_provide_reaches(conn, ctx, &binding.agent_cid)
+                .unwrap_or_default();
+    }
+
     async fn handle_delivery_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         if let Some(ref handle) = self.p2p_handle {
             let mut peers = handle.delivery_peers();
@@ -6213,19 +6255,7 @@ impl HttpServer {
                 let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
                 if let Ok(mut conn) = pool.get() {
                     for peer in peers.iter_mut() {
-                        peer.household_id =
-                            crate::services::hub_resolver::resolve_peer_dwelling_hub(
-                                &mut conn,
-                                &peer.peer_id,
-                                &now_iso,
-                            )
-                            .unwrap_or(None);
-                        peer.commitments = crate::db::rea_commitments::active_provide_reaches(
-                            &mut conn,
-                            &app_ctx,
-                            &peer.peer_id,
-                        )
-                        .unwrap_or_default();
+                        Self::enrich_delivery_peer(&mut conn, &app_ctx, peer, &now_iso);
                     }
                 }
             }
@@ -20059,5 +20089,289 @@ mod lineage_reset_tests {
         let l = LineageRoles::new("elohim", &["node_registry"]);
         l.open_window("node_registry", "elohim@open", None);
         assert!(closed_role_app_ids(&l.snapshot(), "elohim").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod delivery_eligibility_tests {
+    use super::*;
+    use crate::p2p::binding_cross_signature::{
+        canonical_bytes, BindingCore, CrossSignatureProof, AGENT_DOMAIN, SCHEME_VERSION,
+        TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
+    };
+    use crate::p2p::binding_proof_wire::{
+        agent_cid_from_agent_pubkey, classify_binding_signature, encode_proof,
+        libp2p_peer_id_from_ed25519_pubkey,
+    };
+    use diesel::prelude::*;
+    use diesel_migrations::{embed_migrations, MigrationHarness};
+    use ed25519_dalek::{Signer, SigningKey};
+
+    const MIGRATIONS: diesel_migrations::EmbeddedMigrations = embed_migrations!("migrations");
+    const FROM: &str = "2026-09-01T00:00:00Z";
+    const UNTIL: &str = "2026-09-30T00:00:00Z";
+    const NOW: &str = "2026-09-09T00:00:00Z";
+
+    fn fixture() -> (
+        diesel::SqliteConnection,
+        crate::p2p::DeliveryPeer,
+        crate::db::models::NewPeerIdentityBindingRow,
+    ) {
+        fixture_for_window(FROM, UNTIL)
+    }
+
+    fn fixture_for_window(
+        valid_from: &str,
+        valid_until: &str,
+    ) -> (
+        diesel::SqliteConnection,
+        crate::p2p::DeliveryPeer,
+        crate::db::models::NewPeerIdentityBindingRow,
+    ) {
+        let mut conn = diesel::SqliteConnection::establish(":memory:").unwrap();
+        conn.run_pending_migrations(MIGRATIONS).unwrap();
+        let agent_sk = SigningKey::from_bytes(&[61; 32]);
+        let transport_sk = SigningKey::from_bytes(&[62; 32]);
+        let agent = agent_cid_from_agent_pubkey(&agent_sk.verifying_key().to_bytes());
+        let peer_id =
+            libp2p_peer_id_from_ed25519_pubkey(&transport_sk.verifying_key().to_bytes()).unwrap();
+        let core = BindingCore {
+            agent_cid: agent.clone(),
+            transport_id: peer_id.clone(),
+            transport_kind: TRANSPORT_KIND_LIBP2P,
+            valid_from: valid_from.into(),
+            valid_until: Some(valid_until.into()),
+            nonce: "ZGVsaXZlcnk".into(),
+            issued_at: valid_from.into(),
+        };
+        let signature = encode_proof(&CrossSignatureProof {
+            scheme_version: SCHEME_VERSION,
+            transport_kind: TRANSPORT_KIND_LIBP2P,
+            transport_pubkey: transport_sk.verifying_key().to_bytes(),
+            transport_signature: transport_sk
+                .sign(&canonical_bytes(TRANSPORT_DOMAIN, &core))
+                .to_bytes(),
+            agent_pubkey: agent_sk.verifying_key().to_bytes(),
+            agent_signature: agent_sk
+                .sign(&canonical_bytes(AGENT_DOMAIN, &core))
+                .to_bytes(),
+            nonce: core.nonce.clone(),
+            issued_at: valid_from.into(),
+        });
+        let proof_status = classify_binding_signature(
+            &agent,
+            &peer_id,
+            TRANSPORT_KIND_LIBP2P,
+            valid_from,
+            Some(valid_until),
+            &signature,
+        );
+        assert!(proof_status.is_cross_signed());
+        let binding = crate::db::models::NewPeerIdentityBindingRow {
+            peer_id: peer_id.clone(),
+            agent_cid: agent.clone(),
+            dht_anchor_hash: "binding-anchor".into(),
+            valid_from: valid_from.into(),
+            valid_until: Some(valid_until.into()),
+            observed_at: NOW.into(),
+            source: "dht".into(),
+            device_archetype: "node".into(),
+            superseded_by: None,
+            signature,
+            proof_status,
+        };
+        let ctx = crate::db::AppContext::default_lamad();
+        crate::db::collectives::create_collective(
+            &mut conn,
+            &ctx,
+            &crate::db::collectives::CreateCollectiveInput {
+                id: "household-alice".into(),
+                name: "Alice household".into(),
+                description: None,
+                governance_layer: "family".into(),
+                constitutional_parent_id: None,
+                reach: "private".into(),
+                region: None,
+                metadata_json: None,
+                created_by: None,
+            },
+        )
+        .unwrap();
+        crate::db::humans::create_human(
+            &mut conn,
+            crate::db::humans::CreateHumanInput {
+                id: "human-alice".into(),
+                agent_pub_key: Some(agent.clone()),
+                display_name: "Alice".into(),
+                bio: None,
+                affinities: "[]".into(),
+                profile_reach: "commons".into(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: crate::db::HUMANS_HAPP_ID.into(),
+                household_id: Some("household-alice".into()),
+            },
+        )
+        .unwrap();
+        crate::db::rea_commitments::record_provide_from_content_commitment(
+            &mut conn,
+            &ctx.h_app_id,
+            &agent,
+            "commons",
+            Some("provision-anchor"),
+        )
+        .unwrap();
+        let peer = crate::p2p::DeliveryPeer {
+            peer_id,
+            multiaddrs: vec![],
+            network: "lan".into(),
+            capabilities: vec![],
+            serves_extracted: false,
+            serves_compressed: true,
+            cache_tier: "blob-only".into(),
+            last_seen: 0,
+            http_port: 8090,
+            household_id: None,
+            commitments: vec![],
+        };
+        (conn, peer, binding)
+    }
+
+    #[test]
+    fn delivery_eligibility_resolves_three_distinct_namespaces() {
+        let (mut conn, mut peer, binding) = fixture();
+        crate::db::peer_identity_bindings::upsert(&mut conn, &binding).unwrap();
+        HttpServer::enrich_delivery_peer(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            &mut peer,
+            NOW,
+        );
+        assert_eq!(peer.household_id.as_deref(), Some("household-alice"));
+        assert_eq!(peer.commitments, vec!["commons"]);
+        assert_ne!(peer.peer_id, binding.agent_cid);
+        let json = serde_json::to_value(&peer).unwrap();
+        assert_eq!(json["householdId"], "household-alice");
+        assert_eq!(json["commitments"], serde_json::json!(["commons"]));
+    }
+
+    #[test]
+    fn delivery_eligibility_preserves_private_scope_without_commons_default() {
+        let (mut conn, mut peer, binding) = fixture();
+        crate::db::peer_identity_bindings::upsert(&mut conn, &binding).unwrap();
+        use crate::db::diesel_schema::rea_commitments;
+        diesel::delete(rea_commitments::table)
+            .execute(&mut conn)
+            .unwrap();
+        let ctx = crate::db::AppContext::default_lamad();
+        crate::db::rea_commitments::record_provide_from_content_commitment(
+            &mut conn,
+            &ctx.h_app_id,
+            &binding.agent_cid,
+            "private",
+            Some("private-provision-anchor"),
+        )
+        .unwrap();
+        HttpServer::enrich_delivery_peer(&mut conn, &ctx, &mut peer, NOW);
+        assert_eq!(peer.household_id.as_deref(), Some("household-alice"));
+        assert_eq!(peer.commitments, vec!["private"]);
+    }
+
+    #[test]
+    fn delivery_eligibility_checks_signed_window_as_instants() {
+        for (from, until, eligible) in [
+            (NOW, UNTIL, true),
+            (FROM, NOW, false),
+            ("2026-09-10T00:00:00Z", UNTIL, false),
+            // Lexically yesterday, but the start is later than NOW in UTC.
+            ("2026-09-08T23:30:00-02:00", UNTIL, false),
+            // Lexically after NOW, but this expiry instant is already past.
+            (FROM, "2026-09-09T01:00:00+02:00", false),
+        ] {
+            let (mut conn, mut peer, binding) = fixture_for_window(from, until);
+            crate::db::peer_identity_bindings::upsert(&mut conn, &binding).unwrap();
+            HttpServer::enrich_delivery_peer(
+                &mut conn,
+                &crate::db::AppContext::default_lamad(),
+                &mut peer,
+                NOW,
+            );
+            assert_eq!(peer.household_id.is_some(), eligible, "{from} .. {until}");
+            assert_eq!(
+                peer.commitments == vec!["commons"],
+                eligible,
+                "{from} .. {until}"
+            );
+        }
+    }
+
+    #[test]
+    fn delivery_eligibility_refuses_missing_unsigned_expired_and_superseded_bindings() {
+        for state in ["missing", "unsigned", "expired", "superseded"] {
+            let (mut conn, mut peer, mut binding) = fixture();
+            match state {
+                "unsigned" => {
+                    binding.signature = "sentinel".into();
+                    binding.proof_status = classify_binding_signature(
+                        &binding.agent_cid,
+                        &binding.peer_id,
+                        TRANSPORT_KIND_LIBP2P,
+                        FROM,
+                        Some(UNTIL),
+                        &binding.signature,
+                    );
+                }
+                "superseded" => binding.superseded_by = Some("replacement".into()),
+                _ => {}
+            }
+            if state != "missing" {
+                crate::db::peer_identity_bindings::upsert(&mut conn, &binding).unwrap();
+            }
+            peer.household_id = Some("stale-household".into());
+            peer.commitments = vec!["commons".into()];
+            let now = if state == "expired" { UNTIL } else { NOW };
+            HttpServer::enrich_delivery_peer(
+                &mut conn,
+                &crate::db::AppContext::default_lamad(),
+                &mut peer,
+                now,
+            );
+            assert_eq!(peer.household_id, None, "{state}");
+            assert!(peer.commitments.is_empty(), "{state}");
+        }
+    }
+
+    #[test]
+    fn delivery_eligibility_missing_human_or_household_cannot_supply_diversity() {
+        for absent in ["human", "household", "collective"] {
+            let (mut conn, mut peer, binding) = fixture();
+            crate::db::peer_identity_bindings::upsert(&mut conn, &binding).unwrap();
+            use crate::db::diesel_schema::{collectives, humans};
+            match absent {
+                "human" => {
+                    diesel::delete(humans::table).execute(&mut conn).unwrap();
+                }
+                "household" => {
+                    diesel::update(humans::table)
+                        .set(humans::household_id.eq(None::<String>))
+                        .execute(&mut conn)
+                        .unwrap();
+                }
+                _ => {
+                    diesel::delete(collectives::table)
+                        .execute(&mut conn)
+                        .unwrap();
+                }
+            }
+            HttpServer::enrich_delivery_peer(
+                &mut conn,
+                &crate::db::AppContext::default_lamad(),
+                &mut peer,
+                NOW,
+            );
+            assert_eq!(peer.household_id, None, "{absent}");
+            // Authored provision survives missing identity projection; diversity does not.
+            assert_eq!(peer.commitments, vec!["commons"]);
+        }
     }
 }

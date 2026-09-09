@@ -6,14 +6,13 @@
 //! (`Collective` / `Membership` entries in the imagodei DNA). The local SQL state
 //! is Category-A2 derived-via-link — a queryable cache; the DHT is canonical.
 //!
-//! ## Join-key finding (pinned 2026-05-29)
+//! ## Identity namespaces
 //!
-//! `agent_cid` (e.g. `agent:uhCAkXxx`) stored in `peer_identity_bindings.agent_cid` and
-//! `content.created_by` joins to **`humans.id`** — NOT to `humans.agent_pub_key`.
-//! Evidence: `peer_topology_view.rs:369` (`humans::id.eq(&agent_cid)`).
-//! `humans.agent_pub_key` stores the raw pubkey WITHOUT the `agent:` prefix and is used
-//! only for libp2p `peer_id` matching (e.g. `household_resilience.rs:271`).
-//! No prefix-stripping is required when joining `agent_cid → humans.id`.
+//! Historical callers of `resolve_owning_hub` pass a Human id, including seeded
+//! `agent:...` ids. Current cross-signed AgentPeerBindings and standing provision
+//! name the conductor key (`uhCAk...`) stored in `humans.agent_pub_key`.
+//! `resolve_agent_owning_hub` resolves that key through the existing Human lookup
+//! before using the household resolver. Neither namespace is a transport peer id.
 //!
 //! ## Hub identity (operator decision 2026-05-29)
 //!
@@ -81,6 +80,28 @@ pub fn resolve_owning_hub(
         })?;
 
     Ok(row.map(|(cid,)| hub_id_from_row(cid, slug)))
+}
+
+/// Resolve a conductor agent key through the Human projection to its household.
+///
+/// Current signed bindings and provision producers name `humans.agent_pub_key`;
+/// historical callers of `resolve_owning_hub` name `humans.id`. Keep those
+/// namespaces explicit instead of making an ambiguous OR join between them.
+pub fn resolve_agent_owning_hub(
+    conn: &mut SqliteConnection,
+    agent_key: &str,
+) -> Result<Option<String>, StorageError> {
+    let Some(human) = crate::db::humans::get_human_by_agent_key(conn, agent_key)? else {
+        return Ok(None);
+    };
+    // Membership replay writes a collective CID; seeded Humans may carry its
+    // slug alias. A CID is usable only when the collective projection exists.
+    if let Some(household) = human.household_id.as_deref() {
+        if cid_to_slug(conn, household)?.is_some() {
+            return Ok(Some(household.to_string()));
+        }
+    }
+    resolve_owning_hub(conn, &human.id)
 }
 
 /// Resolve the dwelling hub for a libp2p peer.
@@ -405,6 +426,46 @@ mod tests {
         .set(collective_participations::member_cid.eq(Some(member_cid)))
         .execute(conn)
         .expect("set member_cid");
+    }
+
+    #[test]
+    fn agent_key_hub_resolution_preserves_human_and_collective_namespaces() {
+        use crate::db::diesel_schema::humans;
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        seed_collective(&mut conn, "family-alice", Some("collective:alice"));
+        seed_human(&mut conn, "human-alice", Some("family-alice"));
+        diesel::update(humans::table.filter(humans::id.eq("human-alice")))
+            .set(humans::agent_pub_key.eq(Some("uhCAkAlice")))
+            .execute(&mut conn)
+            .unwrap();
+        assert_eq!(
+            resolve_agent_owning_hub(&mut conn, "uhCAkAlice")
+                .unwrap()
+                .as_deref(),
+            Some("collective:alice")
+        );
+        assert_eq!(
+            resolve_agent_owning_hub(&mut conn, "human-alice").unwrap(),
+            None
+        );
+        assert_eq!(resolve_owning_hub(&mut conn, "uhCAkAlice").unwrap(), None);
+        assert_eq!(
+            resolve_owning_hub(&mut conn, "human-alice")
+                .unwrap()
+                .as_deref(),
+            Some("collective:alice")
+        );
+        diesel::update(humans::table.filter(humans::id.eq("human-alice")))
+            .set(humans::household_id.eq(Some("collective:alice")))
+            .execute(&mut conn)
+            .unwrap();
+        assert_eq!(
+            resolve_agent_owning_hub(&mut conn, "uhCAkAlice")
+                .unwrap()
+                .as_deref(),
+            Some("collective:alice")
+        );
     }
 
     // ─── resolve_owning_hub ────────────────────────────────────────────────────

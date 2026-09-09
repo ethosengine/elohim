@@ -407,29 +407,15 @@ pub fn get_commitments_for_agent(
 /// `"proposed"` (not yet committed), `"cancelled"`, `"terminated"`, `"finished"`.
 const ACTIVE_PROVIDE_STATES: [&str; 3] = ["active", "accepted", "in-progress"];
 
-/// Reach tag used for a provide commitment that carries no explicit reach scope.
+/// Return the distinct explicitly provided content reaches for an agent key.
 ///
-/// Custody-blob commitments (the resilience mesh's bread and butter) store no
-/// reach column — only `action="custody-blob"` and `resource_classified_as`
-/// (a `sha256-…` blob hash). The resilience scenarios ingest *commons-reach*
-/// content and the custody mesh hosts it, so hosting a blob == a `"commons"`
-/// provide commitment. See `DeliveryPeer::commitments` for the full rationale.
-const DEFAULT_PROVIDE_REACH: &str = "commons";
-
-/// Return the distinct reach tags a peer/agent actively PROVIDES.
-///
-/// Used by `/api/v1/peers/delivery` to enrich each `DeliveryPeer.commitments`,
-/// which the a2o resilience precondition tests as `commitments.includes(reach)`
-/// (e.g. `"commons"`).
-///
-/// Selection: rows where `provider = provider_id`, `h_app_id` matches the app,
-/// and `state ∈ {active, accepted, in-progress}`.
-///
-/// Reach derivation per row: if `in_scope_of` carries an explicit `reach:<class>`
-/// scope, that `<class>` is used verbatim; otherwise the row contributes the
-/// default `"commons"` reach (custody-of-a-commons-blob). The returned vector is
-/// deduplicated and order-stable (first occurrence wins). Empty when the
-/// provider has no active provide commitments.
+/// This is a read projection of standing provision, matching the canonical
+/// `record_provide_from_content_commitment` producer and placement selector.
+/// Only unfinished `provide` actions with `content:<reach>` classifications
+/// count. The delivery diagnostic retains its accepted/in-progress lifecycle
+/// compatibility; placement currently selects active only. The producer emits active.
+/// A custody spool pledge, capacity offer, or missing scope grants no consent.
+/// Historical bare classifications and canonical JSON lists share the accessor.
 pub fn active_provide_reaches(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -438,34 +424,25 @@ pub fn active_provide_reaches(
     let rows: Vec<Option<String>> = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .filter(rea_commitments::provider.eq(provider_id))
+        .filter(rea_commitments::action.eq("provide"))
         .filter(rea_commitments::state.eq_any(ACTIVE_PROVIDE_STATES))
-        .select(rea_commitments::in_scope_of)
+        .filter(rea_commitments::finished.eq(0))
+        .select(rea_commitments::resource_classified_as)
         .load::<Option<String>>(conn)
         .map_err(|e| StorageError::Internal(format!("Provide-reach query failed: {}", e)))?;
 
     let mut seen = std::collections::HashSet::new();
-    let reaches = rows
-        .into_iter()
-        .map(|scope| reach_from_scope(scope.as_deref()))
-        .filter(|r| seen.insert(r.clone()))
-        .collect();
-
-    Ok(reaches)
-}
-
-/// Derive a reach tag from a commitment's `in_scope_of` value.
-///
-/// Recognises an explicit `reach:<class>` scope (single value or one element of
-/// a `|`-separated scope string); otherwise falls back to [`DEFAULT_PROVIDE_REACH`].
-fn reach_from_scope(scope: Option<&str>) -> String {
-    let Some(scope) = scope else {
-        return DEFAULT_PROVIDE_REACH.to_string();
-    };
-    scope
-        .split('|')
-        .find_map(|part| part.trim().strip_prefix("reach:"))
-        .map(|class| class.to_string())
-        .unwrap_or_else(|| DEFAULT_PROVIDE_REACH.to_string())
+    Ok(rows
+        .iter()
+        .flat_map(|raw| classifications_of(raw.as_deref()))
+        .filter_map(|classification| {
+            classification
+                .strip_prefix("content:")
+                .filter(|reach| !reach.is_empty())
+                .map(str::to_string)
+        })
+        .filter(|reach| seen.insert(reach.clone()))
+        .collect())
 }
 
 // ============================================================================
@@ -1823,7 +1800,7 @@ mod provide_reach_tests {
         conn
     }
 
-    /// Insert a commitment row with explicit control over state + in_scope_of —
+    /// Insert a commitment row with explicit control over state + classification —
     /// `create_commitment` always forces state="proposed", which these tests
     /// need to bypass to exercise the active-state filter.
     #[allow(clippy::too_many_arguments)]
@@ -1833,16 +1810,16 @@ mod provide_reach_tests {
         id: &str,
         provider: &str,
         state: &str,
-        in_scope_of: Option<&str>,
+        classification: Option<&str>,
     ) {
         let row = NewReaCommitment {
             id,
             h_app_id: &ctx.h_app_id,
-            action: "custody-blob",
+            action: "provide",
             provider,
             receiver: "receiver-peer",
             resource_conforms_to: Some("blob"),
-            resource_classified_as: Some("sha256-deadbeef"),
+            resource_classified_as: classification,
             resource_quantity_value: Some(1024.0),
             resource_quantity_unit: Some("B"),
             effort_quantity_value: None,
@@ -1851,7 +1828,7 @@ mod provide_reach_tests {
             has_end: None,
             due: None,
             clause_of: None,
-            in_scope_of,
+            in_scope_of: None,
             medium_of_exchange_id: None,
             state,
             finished: 0,
@@ -1865,12 +1842,19 @@ mod provide_reach_tests {
             .expect("insert commitment");
     }
 
-    /// Seeded active custody-blob (no scope) → "commons" reach exposed.
+    /// An explicit active content-provide declaration exposes its reach.
     #[test]
-    fn active_custody_blob_yields_commons() {
+    fn active_content_provide_yields_commons() {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
-        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
+        insert(
+            &mut conn,
+            &ctx,
+            "c1",
+            "peer-A",
+            "active",
+            Some("content:commons"),
+        );
 
         let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
         assert_eq!(reaches, vec!["commons"]);
@@ -1881,7 +1865,14 @@ mod provide_reach_tests {
     fn unknown_provider_yields_empty() {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
-        insert(&mut conn, &ctx, "c1", "peer-A", "active", None);
+        insert(
+            &mut conn,
+            &ctx,
+            "c1",
+            "peer-A",
+            "active",
+            Some("content:commons"),
+        );
 
         let reaches = active_provide_reaches(&mut conn, &ctx, "peer-NOBODY").unwrap();
         assert!(reaches.is_empty());
@@ -1892,8 +1883,22 @@ mod provide_reach_tests {
     fn proposed_state_excluded() {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
-        insert(&mut conn, &ctx, "c1", "peer-A", "proposed", None);
-        insert(&mut conn, &ctx, "c2", "peer-A", "cancelled", None);
+        insert(
+            &mut conn,
+            &ctx,
+            "c1",
+            "peer-A",
+            "proposed",
+            Some("content:commons"),
+        );
+        insert(
+            &mut conn,
+            &ctx,
+            "c2",
+            "peer-A",
+            "cancelled",
+            Some("content:commons"),
+        );
 
         let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
         assert!(reaches.is_empty(), "non-active states must not contribute");
@@ -1904,8 +1909,22 @@ mod provide_reach_tests {
     fn accepted_and_in_progress_count() {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
-        insert(&mut conn, &ctx, "c1", "peer-A", "accepted", None);
-        insert(&mut conn, &ctx, "c2", "peer-B", "in-progress", None);
+        insert(
+            &mut conn,
+            &ctx,
+            "c1",
+            "peer-A",
+            "accepted",
+            Some("content:commons"),
+        );
+        insert(
+            &mut conn,
+            &ctx,
+            "c2",
+            "peer-B",
+            "in-progress",
+            Some("content:commons"),
+        );
 
         assert_eq!(
             active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap(),
@@ -1917,7 +1936,7 @@ mod provide_reach_tests {
         );
     }
 
-    /// Explicit `reach:<class>` scope overrides the default and is deduplicated.
+    /// Scalar and list classifications preserve non-commons reaches and deduplicate.
     #[test]
     fn explicit_reach_scope_used_and_deduped() {
         let mut conn = setup();
@@ -1929,7 +1948,7 @@ mod provide_reach_tests {
             "c1",
             "peer-A",
             "active",
-            Some("reach:household"),
+            Some("content:household"),
         );
         insert(
             &mut conn,
@@ -1937,10 +1956,17 @@ mod provide_reach_tests {
             "c2",
             "peer-A",
             "active",
-            Some("doorway:alpha|reach:household"),
+            Some(r#"["content:household"]"#),
         );
-        // A third row with default (no scope) → adds "commons".
-        insert(&mut conn, &ctx, "c3", "peer-A", "active", None);
+        // A third explicit commons classification adds "commons".
+        insert(
+            &mut conn,
+            &ctx,
+            "c3",
+            "peer-A",
+            "active",
+            Some("content:commons"),
+        );
 
         let mut reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
         reaches.sort();
@@ -1953,20 +1979,95 @@ mod provide_reach_tests {
         let mut conn = setup();
         let ctx = AppContext::default_lamad();
         let other = AppContext::new("other-app");
-        insert(&mut conn, &other, "c1", "peer-A", "active", None);
+        insert(
+            &mut conn,
+            &other,
+            "c1",
+            "peer-A",
+            "active",
+            Some("content:commons"),
+        );
 
         let reaches = active_provide_reaches(&mut conn, &ctx, "peer-A").unwrap();
         assert!(reaches.is_empty(), "other-app commitment must be invisible");
     }
 
     #[test]
-    fn reach_from_scope_variants() {
-        assert_eq!(reach_from_scope(None), "commons");
-        assert_eq!(reach_from_scope(Some("reach:qahal")), "qahal");
-        assert_eq!(reach_from_scope(Some("doorway:x|reach:family")), "family");
-        // No reach: marker → default.
-        assert_eq!(reach_from_scope(Some("doorway:x|epr:y")), "commons");
-        assert_eq!(reach_from_scope(Some("")), "commons");
+    fn missing_or_unrelated_scope_never_grants_consent() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        for (i, classification) in [
+            None,
+            Some(""),
+            Some("[]"),
+            Some("content:"),
+            Some("capacity:storage"),
+            Some("sha256-deadbeef"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            insert(
+                &mut conn,
+                &ctx,
+                &format!("c{i}"),
+                "agent-A",
+                "active",
+                classification,
+            );
+        }
+        assert!(active_provide_reaches(&mut conn, &ctx, "agent-A")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn unrelated_actions_and_finished_rows_never_grant_consent() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        for (i, action) in ["custody-blob", "offer", "use", "provide"]
+            .into_iter()
+            .enumerate()
+        {
+            let id = format!("c{i}");
+            insert(
+                &mut conn,
+                &ctx,
+                &id,
+                "agent-A",
+                "active",
+                Some("content:commons"),
+            );
+            diesel::update(rea_commitments::table.filter(rea_commitments::id.eq(&id)))
+                .set((
+                    rea_commitments::action.eq(action),
+                    rea_commitments::finished.eq(i32::from(action == "provide")),
+                ))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        assert!(active_provide_reaches(&mut conn, &ctx, "agent-A")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn non_commons_producer_never_defaults_to_commons() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        for reach in ["household", "private"] {
+            record_provide_from_content_commitment(
+                &mut conn,
+                &ctx.h_app_id,
+                "agent-A",
+                reach,
+                Some("anchor"),
+            )
+            .unwrap();
+        }
+        let mut reaches = active_provide_reaches(&mut conn, &ctx, "agent-A").unwrap();
+        reaches.sort();
+        assert_eq!(reaches, vec!["household", "private"]);
     }
 
     // ── record_provide_from_content_commitment (Epic B creation path) ─────────
@@ -2106,8 +2207,7 @@ mod provide_reach_tests {
             None,
         )
         .unwrap();
-        // active_provide_reaches reads in_scope_of (None → default commons), so a
-        // content:commons provide row contributes the commons reach tag.
+        // The canonical content:commons classification supplies the reach tag.
         let reaches = active_provide_reaches(&mut conn, &ctx, "agent:steward-a").unwrap();
         assert_eq!(reaches, vec!["commons"]);
     }

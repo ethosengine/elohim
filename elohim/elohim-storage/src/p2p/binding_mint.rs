@@ -383,7 +383,7 @@ struct CreateAgentPeerBindingOutput {
 /// 1. `ELOHIM_BINDING_MINT_AGENT_EPR` — the operator naming it outright.
 /// 2. The local `humans` projection: the human whose `agent_pub_key` is this
 ///    node's `agent_cid`. On a seeded fleet the Agent EPR id and the human id
-///    are the same string (`create_human` → `create_agent` with `human.id`), so
+///    are the same string (identity onboarding calls both coordinators with `human.id`), so
 ///    this is the ordinary answer wherever identity coherence has landed.
 /// 3. The `agent_cid` itself — correct on any node whose Agent EPR was keyed by
 ///    its agent key rather than a slug.
@@ -598,28 +598,28 @@ pub fn mint_enabled_from_env() -> bool {
 }
 
 /// Retry schedule for the mint task, in seconds. Bounded and short: the
-/// conductor's cells settle within the first minute of pod boot, and a node that
-/// still cannot mint after this has a real identity-coherence gap that retrying
-/// will not close. Stopping loudly beats a forever-loop against a conductor.
+/// conductor connection can precede Human/Agent onboarding. Re-resolve missing
+/// Agent EPR candidates within this bounded budget, then stop loudly rather than
+/// retrying indefinitely against a conductor.
 const MINT_RETRY_BACKOFF_SECS: [u64; 6] = [5, 15, 45, 120, 300, 600];
 
 /// Spawn the boot-time mint task.
 ///
-/// Runs AFTER the swarm identity and the conductor connection are up (the caller
-/// owns that ordering). Retries on transient failure until the projection shows
-/// the cross-signed row; gives up loudly on
-/// [`MintError::AgentCidMismatch`]/[`MintError::NoAgentEpr`], which retrying
-/// cannot fix.
+/// Waits for the caller to acknowledge completed imagodei signal registration,
+/// after the swarm identity and conductor connection are up. Retries on transient failure until the projection shows
+/// the cross-signed row. A missing Agent EPR can arrive during onboarding; an
+/// actual [`MintError::AgentCidMismatch`] remains terminal.
 pub fn spawn_binding_mint_task(
     hc: Arc<HcClient>,
     pool: DbPool,
     agent_cid: String,
     transport_keypair: libp2p::identity::Keypair,
     device_archetype: String,
+    subscription_ready: tokio::sync::oneshot::Receiver<()>,
 ) {
     tokio::spawn(async move {
-        for (attempt, backoff) in MINT_RETRY_BACKOFF_SECS.iter().enumerate() {
-            match mint_own_binding(
+        run_binding_mint_after_subscription(subscription_ready, || {
+            mint_own_binding(
                 &hc,
                 &pool,
                 &agent_cid,
@@ -627,42 +627,64 @@ pub fn spawn_binding_mint_task(
                 &device_archetype,
                 Utc::now(),
             )
-            .await
-            {
-                Ok(MintOutcome::AlreadyCurrent) => {
-                    debug!("binding mint: already current — task done");
-                    return;
-                }
-                Ok(MintOutcome::Minted(_)) => return,
-                // Terminal: no amount of retrying resolves an identity the
-                // conductor will not vouch for. The node keeps its honest
-                // self-asserted binding.
-                Err(e @ (MintError::AgentCidMismatch | MintError::NoAgentEpr)) => {
-                    warn!(
-                        error = %e,
-                        "binding mint: cannot mint on this node — the transport binding stays \
-                         self-asserted (unverified), which is honest. Set \
-                         ELOHIM_BINDING_MINT_AGENT_EPR if an Agent EPR exists under another id."
-                    );
-                    return;
-                }
-                Err(e) => {
-                    warn!(
-                        attempt = attempt + 1,
-                        retry_in_secs = backoff,
-                        error = %e,
-                        "binding mint: attempt failed — retrying"
-                    );
-                    tokio::time::sleep(std::time::Duration::from_secs(*backoff)).await;
-                }
+        })
+        .await;
+    });
+}
+
+// One readiness acknowledgement, no timer or additional publication loop. A
+// dropped readiness sender (failed/disabled subscriber) must never mint.
+async fn run_binding_mint_after_subscription<F, Fut>(
+    subscription_ready: tokio::sync::oneshot::Receiver<()>,
+    mint: F,
+) where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<MintOutcome, MintError>>,
+{
+    if subscription_ready.await.is_err() {
+        warn!("binding mint: signal subscription unavailable — no binding published");
+        return;
+    }
+    run_binding_mint_task(mint).await;
+}
+
+// The production retry driver accepts one mint attempt so tests can advance the
+// real backoff under a paused clock without a live conductor or transport key.
+async fn run_binding_mint_task<F, Fut>(mut mint: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<MintOutcome, MintError>>,
+{
+    for (attempt, backoff) in MINT_RETRY_BACKOFF_SECS.iter().enumerate() {
+        match mint().await {
+            Ok(MintOutcome::AlreadyCurrent) => {
+                debug!("binding mint: already current — task done");
+                return;
+            }
+            Ok(MintOutcome::Minted(_)) => return,
+            Err(e @ MintError::AgentCidMismatch) => {
+                warn!(
+                    error = %e,
+                    "binding mint: identity mismatch — keeping the self-asserted binding"
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    attempt = attempt + 1,
+                    retry_in_secs = backoff,
+                    error = %e,
+                    "binding mint: attempt failed — retrying"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(*backoff)).await;
             }
         }
-        warn!(
-            "binding mint: gave up after {} attempts — this node's binding stays \
-             self-asserted; economic attribution for it will count as unverified",
-            MINT_RETRY_BACKOFF_SECS.len()
-        );
-    });
+    }
+    warn!(
+        "binding mint: gave up after {} attempts — this node's binding stays \
+         self-asserted; economic attribution for it will count as unverified",
+        MINT_RETRY_BACKOFF_SECS.len()
+    );
 }
 
 #[cfg(test)]
@@ -671,6 +693,83 @@ mod tests {
     use ed25519_dalek::{Signer, SigningKey};
 
     use crate::p2p::binding_proof_wire::agent_cid_from_agent_pubkey;
+
+    #[tokio::test(start_paused = true)]
+    async fn mint_waits_for_actual_subscription_readiness() {
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = Arc::clone(&attempts);
+        let task = tokio::spawn(run_binding_mint_after_subscription(ready_rx, move || {
+            observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            std::future::ready(Ok(MintOutcome::Minted("one-owned-action".into())))
+        }));
+        tokio::task::yield_now().await;
+        tokio::time::advance(std::time::Duration::from_secs(300)).await;
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 0);
+        ready_tx.send(()).expect("mint task still waiting");
+        task.await.expect("mint task");
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn failed_subscription_never_attempts_publication() {
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        drop(ready_tx);
+        run_binding_mint_after_subscription(
+            ready_rx,
+            || -> std::future::Ready<Result<MintOutcome, MintError>> {
+                panic!("subscription failure must not call the mint operation")
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_waits_for_agent_onboarding_then_stops_after_mint() {
+        let start = tokio::time::Instant::now();
+        let mut attempts = Vec::new();
+        run_binding_mint_task(|| {
+            attempts.push(start.elapsed().as_secs());
+            std::future::ready(if attempts.len() < 3 {
+                Err(MintError::NoAgentEpr)
+            } else {
+                Ok(MintOutcome::Minted("owned-binding-action".into()))
+            })
+        })
+        .await;
+        assert_eq!(attempts, vec![0, 5, 20]);
+        assert_eq!(start.elapsed().as_secs(), 20);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_missing_agent_epr_exhausts_the_existing_budget() {
+        let start = tokio::time::Instant::now();
+        let mut attempts = 0;
+        run_binding_mint_task(|| {
+            attempts += 1;
+            std::future::ready(Err(MintError::NoAgentEpr))
+        })
+        .await;
+        assert_eq!(attempts, 6);
+        assert_eq!(start.elapsed().as_secs(), 1085);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_identity_mismatch_and_current_binding_stop_immediately() {
+        for outcome in [
+            Err(MintError::AgentCidMismatch),
+            Ok(MintOutcome::AlreadyCurrent),
+        ] {
+            let start = tokio::time::Instant::now();
+            let mut outcome = Some(outcome);
+            run_binding_mint_task(|| {
+                std::future::ready(outcome.take().expect("must not retry terminal outcome"))
+            })
+            .await;
+            assert!(outcome.is_none());
+            assert_eq!(start.elapsed().as_secs(), 0);
+        }
+    }
 
     fn transport_keypair() -> libp2p::identity::Keypair {
         libp2p::identity::Keypair::ed25519_from_bytes([11u8; 32]).expect("keypair")
