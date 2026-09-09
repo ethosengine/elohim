@@ -2157,6 +2157,17 @@ print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswi
   return 0
 }
 
+conductor_restart_pids() {
+  # Reuse the shutdown ownership checks: /proc/exe plus this household's
+  # config path (holochain) or working directory (hc), never argv text alone.
+  local pid exe
+  while IFS= read -r pid; do
+    exe="$(readlink "/proc/$pid/exe" 2>/dev/null)" || continue
+    exe="${exe% (deleted)}"; exe="${exe##*/}"
+    case "$exe" in holochain|hc) echo "$pid" ;; esac
+  done < <(fallback_pattern_pids)
+}
+
 restart_conductors() {
   # Restart the conductors IN PLACE, against the sandboxes that already exist.
   #
@@ -2194,23 +2205,12 @@ restart_conductors() {
   [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ] || \
     [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "ark" ] || assert_toolchain_parity
 
-  # Exact pids only. Every lookup below matches an argv substring unique to the
-  # target process AND excludes this shell — `pkill -f holochain` would match
-  # the caller's own command line, which is how shells have been SIGTERM'd here
-  # before. Nothing in this function's own argv contains these patterns.
+  # An argv search can match the search command itself (including its awk
+  # program). Only nominate executables belonging to this household.
   local pids=() pid
-  for name in "${PEERS[@]}"; do
-    pid="$(ps -eo pid=,args= | awk -v me="$$" -v pat="$LOCAL_DEV_DIR/$name/conductor-config.yaml" \
-      '$1 != me && index($0, "--config-path") && index($0, pat) { print $1; exit }')"
-    [ -n "$pid" ] && { pids+=("$pid"); echo "  conductor $name: pid $pid"; } \
-                  || echo "  conductor $name: not running"
-  done
-  # The `hc sandbox ... run` supervisor and the sh -c that launched it: they
-  # respawn nothing, but leaving them behind orphans the next run's port pins.
   while read -r pid; do
-    [ -n "$pid" ] && { pids+=("$pid"); echo "  hc sandbox run supervisor: pid $pid"; }
-  done < <(ps -eo pid=,args= | awk -v me="$$" \
-    '$1 != me && index($0, "hc sandbox") && index($0, " run ") { print $1 }')
+    [ -n "$pid" ] && { pids+=("$pid"); echo "  owned conductor process: pid $pid"; }
+  done < <(conductor_restart_pids)
 
   if [ ${#pids[@]} -eq 0 ]; then
     echo "no conductors running — use ./hc-mesh.sh start"
