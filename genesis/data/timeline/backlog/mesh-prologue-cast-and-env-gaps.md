@@ -52,9 +52,38 @@ embodies the wrong human cannot be re-keyed: this mesh must be regenerated to re
 | household fixture manifest (`E2E_HOUSEHOLD_FIXTURE_PATH`, `processControl: true`, `E2E_STORAGE_<PEER>`, `E2E_DOORWAY_POOL_STORAGE_URLS`, `E2E_DOORWAY_B` + `_BETA`) | a2o run env | 7 env-reds (peer-loss-failover, doorway-pool-degrade) |
 | `seed-operator-bindings` → `seed-projections` explicitly | seed chain | `--ids` seeding skips both; router empty → `/` sheds |
 | per-peer cgroup sub-tree `<pod>/mesh/<peer>` with `memory.max` from a `compute_envelope` (default unbounded) and `oom.group=1` inside the guest | mesh peer launch | 2026-08-29: the pod's own `oom.group=1` turned one hot rustc into a whole-workspace restart; a guest that dies alone is the cheap rung of [compute-envelope-virtual-peer-contract](epr:compute-envelope-virtual-peer-contract) — `ram-guard` then sheds guests by peer id, not process name |
+| caller/runtime namespace ownership before any lifecycle write | mesh preflight, restart and fixture refresh | 2026-09-09: a sandbox could not see the healthy host mesh, yet shared its PID directory; a restart attempt overwrote the host supervisor record. An absent process in another namespace must not authorize recovery or replacement of shared receipts. |
 
 Scoping trap for every re-measure: `cucumber-js -p local <files>` runs the whole suite (profile paths merge);
 use `--config <empty .mjs, path relative to the REPO ROOT>` or `-p local --name '^…$'`.
+
+### Open station — runtime namespace ownership (2026-09-09)
+
+Chain: doorway continuity / between current-binary preparation and owned fault /
+missing node: the caller proves it observes the namespace and data roots named by
+the mesh ownership receipt before any signal, launch, config write or PID update.
+Concern: `doorway-failover`; implementation belongs in the existing mesh lifecycle
+and ownership checks, with the owning app gate and a process-level regression.
+
+Observed during overnight integration at `6e67c1a4b`: sandbox process/localhost
+probes suggested the mesh was down, while host probes returned 200 from all three
+storage peers and both doorways. A sandbox `conductors-restart` changed inactive
+root-checkout local-dev files and overwrote the shared supervisor PID record.
+The active conductors used the shell-convergence checkout; their PID/start ticks
+and data roots remained intact. The supervisor record was repaired from the
+verified parent chain of all three host conductors. Evidence is preserved under
+`genesis/a2o/reports/delivery-20260909-current-source/`, particularly
+`host-conductor-state-after-sandbox-attempt.json` and
+`conductor-supervisor-registry-repair.json`.
+
+Acceptance remains open: reproduce distinct PID/network namespaces sharing an
+ownership directory; the mismatched caller must refuse before **every** write or
+signal, leaving incumbent configs and receipts byte-identical. A matching caller
+must still perform ordinary recovery successfully. A separately owned household
+must have separate data/receipt roots as well as private process/network scope.
+PID equality alone is insufficient across namespaces. The integration workaround
+uses explicit host probes and a private mount/network/PID household; it is not a
+landed lifecycle guard, and no habit is promoted by this observation.
 
 ## What the corrected Prologue should yield
 
