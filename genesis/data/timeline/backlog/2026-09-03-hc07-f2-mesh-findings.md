@@ -140,6 +140,8 @@ manifests, 2026-09-04).
   the APP pipeline's "Upload SPA Blob" stage, so `/` stays 503 and `/lamad/` 404 until an app run follows the seed —
   the app run that ran before the roll (#1688) declared against the old fleet and is gone with the wipe.
 
+**2026-09-09 recurrence:** Genesis #1569 and #1570 report the identical Matthew conflict: actual `5f27bc9b-df99-4a94-9f68-b1d355b4ddef`, expected `human-matthew-manager` (Seed Substrate node 311 has byte-identical logs; 4 existing, 1 conflict, 2 skipped). The existing identity-aware refusal is working; changing ordering for future fresh conductors does not repair this already-embodied identity. Recovery needs an explicit identity/fixture reconciliation decision, not a blind reinstall or a claim that both IDs are equivalent. In #1570 the separate Verify Projection Sync stage passed, so its older failure did not recur. Doorway asset repair 9b55e82f / edge #1450 is independently green and does not discharge this identity conflict.
+
 ## 12. Apparatus, fixed on the branch (for the record)
 
 - `epr-release-package.ts` stats `elohim/holochain/dna/elohim/workdir/elohim.happ` under the REPO ROOT the
