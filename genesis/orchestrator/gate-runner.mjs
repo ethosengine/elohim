@@ -141,7 +141,7 @@ if (isMain) {
   }
 
   if (projects.length === 0) {
-    process.stdout.write('[gate] no manifest-declared projects selected\n');
+    if (!namesOnly) process.stdout.write('[gate] no manifest-declared projects selected\n');
     process.exit(0);
   }
 

@@ -62,6 +62,36 @@ describe('manifest-driven local gate registry', () => {
     }
   });
 
+
+  test('names-only CLI returns an empty list for a documentation-only change', () => {
+    const command = [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--changed-file-list'];
+    const input = 'genesis/data/timeline/backlog/CLUSTERS.md\n';
+    const names = spawnSync(process.execPath, [...command, '--names'], {
+      cwd: ROOT, encoding: 'utf8', input,
+    });
+    assert.equal(names.status, 0, names.stderr);
+    assert.equal(names.stdout, '', 'pre-push must not interpret status prose as gate names');
+
+    const human = spawnSync(process.execPath, command, { cwd: ROOT, encoding: 'utf8', input });
+    assert.equal(human.status, 0, human.stderr);
+    assert.equal(human.stdout, '[gate] no manifest-declared projects selected\n');
+  });
+
+  test('names-only CLI keeps selected names and rejects an unknown target', () => {
+    const command = [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--names', '--target'];
+    const selected = spawnSync(process.execPath, [...command, 'doorway'], {
+      cwd: ROOT, encoding: 'utf8',
+    });
+    assert.equal(selected.status, 0, selected.stderr);
+    assert.equal(selected.stdout, 'doorway\n');
+
+    const unknown = spawnSync(process.execPath, [...command, 'not-a-project'], {
+      cwd: ROOT, encoding: 'utf8',
+    });
+    assert.notEqual(unknown.status, 0);
+    assert.match(unknown.stderr, /Unknown gate project or path/);
+  });
+
   test('an empty rustflags declaration CLEARS RUSTFLAGS instead of inheriting', () => {
     // Regression: run-local-gate.sh used ${9:-__inherit__}, so `rustflags: ""`
     // — how every native crate drops the ambient WASM getrandom cfg — collapsed
