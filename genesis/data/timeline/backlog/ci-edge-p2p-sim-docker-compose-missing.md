@@ -211,3 +211,25 @@ disappearance.
   verification-gated; nothing became bounded, so the entry holds at `blocked`/low.
 - Sentinel ceiling note (anonymous MCP): confirmation requires an operator-chosen path
   + a build, which the sentinel cannot trigger.
+
+## 2026-09-09 recurrence and verification boundary
+
+Edge 1449 again reached `simulate.sh:44` without `docker-compose`. Current
+`catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE')` makes this an advisory
+stage result; it does not itself make the overall build unstable. That build failed
+later on the separate mandatory served-shell check.
+
+The overnight source review found three prerequisites, rather than a command-name
+replacement: an isolated compatible runtime, current image packaging, and meaningful
+peer/fault assertions. A private Docker-in-Docker sidecar is a candidate for the
+existing Docker calls, but both compose build contexts are stale relative to their
+Dockerfiles/path dependencies; bootstrap identifiers are not valid PeerIds; and
+storage health checks use wget although the storage runtime installs and uses curl. The runner can also warn
+on zero peers or swallow partition errors. Installing Compose alone would not prove
+peer formation or recovery. Preserve these as separate measured stations before
+claiming this advisory simulation passed. The household full5 receipt is a distinct
+proof and cannot discharge this simulation by substitution.
+
+Evidence: edge 1449; current `steward/node/simulation/simulate.sh` and
+`docker-compose.yml`; independent runtime/packaging/assertion review during
+`2026-09-09T04-57-overnight-dev-delivery`. No runner, fixture or assertion was changed.
