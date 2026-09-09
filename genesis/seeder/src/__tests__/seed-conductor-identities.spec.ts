@@ -25,6 +25,7 @@ import { describe, expect, it } from 'vitest';
 import {
   conductorUrlForHuman,
   extractHumanId,
+  ensureOwnAgentProfile,
   humanShortName,
   parseConductorUrls,
   resolveCandidateUrls,
@@ -193,5 +194,133 @@ describe('extractHumanId', () => {
     expect(extractHumanId({ human: null })).toBeUndefined();
     expect(extractHumanId({ human: { id: 42 } })).toBeUndefined();
     expect(extractHumanId('human-adam-firstman')).toBeUndefined();
+  });
+});
+
+describe('own Agent onboarding', () => {
+  const human = {
+    id: 'human-jessica-spouse',
+    display_name: 'Jessica',
+    bio: 'Own profile',
+    affinities: ['education'],
+    profile_reach: 'community',
+    location: null,
+  };
+  const caller = 'own-imagodei-agent-key';
+  const agent = {
+    id: human.id,
+    agent_type: 'human',
+    display_name: human.display_name,
+    bio: human.bio,
+    avatar: null,
+    affinities: human.affinities,
+    visibility: human.profile_reach,
+    location: null,
+    did: null,
+    activity_pub_type: null,
+    holochain_agent_key: caller,
+  };
+
+  function fixture(initial: unknown = null, ownHuman: unknown = human) {
+    let record = initial;
+    const calls: { fn: string; payload: unknown }[] = [];
+    const call = async (fn: string, payload: unknown): Promise<unknown> => {
+      calls.push({ fn, payload });
+      if (fn === 'get_my_human') return { human: ownHuman };
+      if (fn === 'get_agent_by_id') return record;
+      if (fn === 'create_agent') {
+        record = {
+          action_hash: 'owned-agent-action',
+          agent: { ...(payload as object), holochain_agent_key: caller },
+        };
+        return record;
+      }
+      throw new Error(`Unexpected coordinator ${fn}`);
+    };
+    return { call, calls };
+  }
+
+  it('fills a missing Agent for an existing own Human and proves canonical readback', async () => {
+    const f = fixture();
+    await expect(
+      ensureOwnAgentProfile(f.call, human.id, caller),
+    ).resolves.toEqual({
+      created: true,
+      actionHash: 'owned-agent-action',
+      callerAgentKey: caller,
+    });
+    expect(f.calls.map((c) => c.fn)).toEqual([
+      'get_my_human',
+      'get_agent_by_id',
+      'create_agent',
+      'get_agent_by_id',
+    ]);
+    expect(f.calls[2].payload).toEqual({
+      ...agent,
+      holochain_agent_key: undefined,
+    });
+    expect(f.calls[2].payload).not.toHaveProperty('holochain_agent_key');
+  });
+
+  it('reuses a matching existing Agent without authoring another action', async () => {
+    const f = fixture({ action_hash: 'existing-action', agent });
+    await expect(
+      ensureOwnAgentProfile(f.call, human.id, caller),
+    ).resolves.toEqual({
+      created: false,
+      actionHash: 'existing-action',
+      callerAgentKey: caller,
+    });
+    expect(f.calls.map((c) => c.fn)).toEqual([
+      'get_my_human',
+      'get_agent_by_id',
+      'get_agent_by_id',
+    ]);
+  });
+
+  it('refuses another Human on the selected conductor before any Agent call', async () => {
+    const f = fixture(null, { ...human, id: 'human-someone-else' });
+    await expect(
+      ensureOwnAgentProfile(f.call, human.id, caller),
+    ).rejects.toThrow('Own Human does not match');
+    expect(f.calls.map((c) => c.fn)).toEqual(['get_my_human']);
+  });
+
+  it.each([
+    { holochain_agent_key: 'another-caller' },
+    { visibility: 'public' },
+    { display_name: 'Another profile' },
+  ])(
+    'refuses an existing conflicting Agent without overwriting it: %j',
+    async (conflict) => {
+      const f = fixture({
+        action_hash: 'conflicting-action',
+        agent: { ...agent, ...conflict },
+      });
+      await expect(
+        ensureOwnAgentProfile(f.call, human.id, caller),
+      ).rejects.toThrow('conflicts');
+      expect(f.calls.some((c) => c.fn === 'create_agent')).toBe(false);
+    },
+  );
+
+  it.each(['commons', 'draft', 'intimate'])('refuses unsupported Human reach %s before authoring', async reach => {
+    const f = fixture(null, { ...human, profile_reach: reach });
+    await expect(
+      ensureOwnAgentProfile(f.call, human.id, caller),
+    ).rejects.toThrow('existing Agent profile contract');
+    expect(f.calls.map((c) => c.fn)).toEqual(['get_my_human']);
+  });
+
+  it('refuses success when the created record cannot be read back', async () => {
+    const f = fixture();
+    let reads = 0;
+    const call = async (fn: string, payload: unknown) => {
+      if (fn === 'get_agent_by_id' && ++reads === 2) return null;
+      return f.call(fn, payload);
+    };
+    await expect(ensureOwnAgentProfile(call, human.id, caller)).rejects.toThrow(
+      'conflicts',
+    );
   });
 });

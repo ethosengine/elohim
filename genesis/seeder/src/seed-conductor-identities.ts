@@ -1,5 +1,5 @@
 /**
- * Seed Conductor Identities — create Human profiles directly on node/device conductors.
+ * Seed Conductor Identities — create own Human and Agent profiles on conductors.
  *
  * Node and device humans own their own conductors (StatefulSets in K8s). Their
  * identity must be established directly on their conductor BEFORE they register
@@ -91,8 +91,14 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { selectSeedCell, seedCellTarget } from './cell-target.js';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  type AppInfo,
+  encodeHashToBase64,
+} from '@holochain/client';
 import { parseNamedCsv } from './peer-id.js';
+import { CORE_PATH_VISIBILITIES } from './generated/schema-enums.js';
 
 // Canonical artifact filename from build-artifacts.json — single source of
 // truth across Groovy + TypeScript + JS. Resolved once at module load so
@@ -144,6 +150,7 @@ interface ConductorResult {
   conductorUrl: string;
   result: SeedResult;
   error?: string;
+  agentProfile?: AgentProfileReceipt;
 }
 
 // =============================================================================
@@ -427,6 +434,98 @@ export function extractHumanId(result: unknown): string | undefined {
   return undefined;
 }
 
+interface AgentProfileReceipt {
+  created: boolean;
+  actionHash: string;
+  callerAgentKey: string;
+}
+
+interface OwnHumanProfile {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  affinities: string[];
+  profile_reach: string;
+  location: string | null;
+}
+
+/**
+ * Complete the existing Human → Agent onboarding on the same caller's cell.
+ * create_human does not create an Agent EPR; sign_for_agent requires one.
+ * Read the canonical Human, never manufacture an Agent from a receiver's SQL row.
+ */
+export async function ensureOwnAgentProfile(
+  call: (fnName: string, payload: unknown) => Promise<unknown>,
+  expectedHumanId: string,
+  callerAgentKey: string,
+): Promise<AgentProfileReceipt> {
+  const result = await call('get_my_human', null);
+  if (extractHumanId(result) !== expectedHumanId) {
+    throw new Error(
+      `Own Human does not match '${expectedHumanId}'; refusing Agent onboarding`,
+    );
+  }
+  const wrapped = result as { human?: OwnHumanProfile };
+  const human = wrapped.human ?? (result as OwnHumanProfile);
+  // These are the existing Agent visibility values, not a reach conversion.
+  if (
+    typeof human.display_name !== 'string' ||
+    !human.display_name ||
+    !Array.isArray(human.affinities) ||
+    !human.affinities.every((a) => typeof a === 'string') ||
+    !CORE_PATH_VISIBILITIES.some((value) => value === human.profile_reach) ||
+    !(human.bio === null || typeof human.bio === 'string') ||
+    !(human.location === null || typeof human.location === 'string')
+  ) {
+    throw new Error(
+      `Own Human '${expectedHumanId}' cannot map to the existing Agent profile contract`,
+    );
+  }
+  const input = {
+    id: human.id,
+    agent_type: 'human',
+    display_name: human.display_name,
+    bio: human.bio,
+    avatar: null,
+    affinities: human.affinities,
+    visibility: human.profile_reach,
+    location: human.location,
+    did: null,
+    activity_pub_type: null,
+  };
+  const requireMatchingAgent = (value: unknown): string => {
+    const record = value as {
+      action_hash?: unknown;
+      agent?: Record<string, unknown>;
+    } | null;
+    if (
+      !record?.agent ||
+      typeof record.action_hash !== 'string' ||
+      record.agent.holochain_agent_key !== callerAgentKey ||
+      !Object.entries(input).every(
+        ([key, expected]) =>
+          JSON.stringify(record.agent?.[key]) === JSON.stringify(expected),
+      )
+    ) {
+      throw new Error(
+        `Agent profile '${expectedHumanId}' conflicts with the own Human/caller; refusing overwrite`,
+      );
+    }
+    return record.action_hash;
+  };
+  let agent = await call('get_agent_by_id', human.id);
+  const created = agent === null;
+  if (created) agent = await call('create_agent', input);
+  const actionHash = requireMatchingAgent(agent);
+  const readback = await call('get_agent_by_id', human.id);
+  if (requireMatchingAgent(readback) !== actionHash) {
+    throw new Error(
+      `Agent profile '${expectedHumanId}' readback changed action`,
+    );
+  }
+  return { created, actionHash, callerAgentKey };
+}
+
 // =============================================================================
 // Per-human seeding logic
 // =============================================================================
@@ -491,8 +590,19 @@ async function seedHumanOnConductor(
       const existingId = extractHumanId(existing);
 
       if (existingId === human.id) {
+        const agentProfile = await ensureOwnAgentProfile(
+          (fn_name, payload) =>
+            appWs.callZome({
+              cell_id: cellId,
+              zome_name: 'imagodei',
+              fn_name,
+              payload,
+            }),
+          human.id,
+          encodeHashToBase64(cellId[1]),
+        );
         await (appWs.client as unknown as { close(): unknown }).close();
-        return { ...base, conductorUrl, result: 'exists' };
+        return { ...base, conductorUrl, result: 'exists', agentProfile };
       }
 
       if (existingId !== undefined) {
@@ -521,8 +631,19 @@ async function seedHumanOnConductor(
       };
 
       await createHuman(appWs, cellId, input);
+      const agentProfile = await ensureOwnAgentProfile(
+        (fn_name, payload) =>
+          appWs.callZome({
+            cell_id: cellId,
+            zome_name: 'imagodei',
+            fn_name,
+            payload,
+          }),
+        human.id,
+        encodeHashToBase64(cellId[1]),
+      );
       await (appWs.client as unknown as { close(): unknown }).close();
-      return { ...base, conductorUrl, result: 'created' };
+      return { ...base, conductorUrl, result: 'created', agentProfile };
     } catch (err) {
       try {
         await (appWs.client as unknown as { close(): unknown }).close();
@@ -665,6 +786,7 @@ async function main(): Promise<void> {
       result: r.result,
       conductorUrl: r.conductorUrl,
       error: r.error ?? null,
+      agentProfile: r.agentProfile ?? null,
     })),
   };
   try {
