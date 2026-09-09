@@ -796,7 +796,9 @@ assert_no_live_peer_processes() { # <verb> — 0 only when every peer is idle
 # sufficient: embedded migration comments contain that text even in the
 # default-feature binary.
 storage_has_iroh_feature() { # <binary>
-  strings "$1" 2>/dev/null | grep -Fq 'elohim_storage::p2p_iroh'
+  # Drain strings: grep -q can close early and turn a match into SIGPIPE
+  # failure when the caller enables pipefail.
+  strings "$1" 2>/dev/null | grep -F 'elohim_storage::p2p_iroh' >/dev/null
 }
 
 print_iroh_build_command() { # <binary>

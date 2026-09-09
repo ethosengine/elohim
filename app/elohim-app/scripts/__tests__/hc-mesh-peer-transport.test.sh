@@ -39,4 +39,19 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   t "MESH_DOORWAYS=0 overlay has no ELOHIM_DOORWAY_URL" '! restart_env_overlay /dev/null matthew | grep -q ELOHIM_DOORWAY_URL'
   exit $fail ) || fail=1
 
+# 6. capability detection must drain a large binary under pipefail. The marker
+# occurs before enough trailing strings to fill a pipe, as in debug builds.
+( set +e; MESH_PEERS=matthew,jessica source "$here/../hc-mesh.sh" >/dev/null 2>&1
+  set -o pipefail
+  fixture="$(mktemp)" || exit 1
+  trap 'rm -f "$fixture"' EXIT
+  printf 'elohim_storage::p2p_iroh\n' >"$fixture"
+  printf 'trailing debug string %s\n' {1..20000} >>"$fixture"
+  t "Iroh marker before a large tail is accepted under pipefail" \
+    'storage_has_iroh_feature "$fixture"'
+  printf 'migration mentions p2p_iroh, without the tracing target\n' >"$fixture"
+  t "source-path-only marker is refused" '! storage_has_iroh_feature "$fixture"'
+  t "unreadable binary is refused" '! storage_has_iroh_feature "$fixture/missing"'
+  exit $fail ) || fail=1
+
 exit $fail
