@@ -1775,23 +1775,11 @@ fn watchdog_liveness_response(
         .expect("infallible watchdog liveness response")
 }
 
-/// The **honest layered degraded page** served at `/` when the doorway has no root
-/// projection — i.e. the EprRouter is empty because the storage/conductor backend is
-/// unreachable (the connect-refused outage).
-///
-/// Replaces both the prior `302 → /threshold` (which leaked the operator dashboard to
-/// every public visitor) AND a blunt content-less 503. The doorway must be CLEAR about
-/// what it can see *at which layer* (operator framing, 2026-06-22):
-///   - **Layer 1 — this doorway / web2 projection** (federation peers, projection cache,
-///     MongoDB): the doorway sees this directly and reports it.
-///   - **Layer 2 — the substrate dataplane** (Holochain DHT / libp2p / iroh, via the
-///     conductor): NOT VISIBLE when the conductor connection is refused. So
-///     humans-served / content-available / peer-count are **UNKNOWN, not zero**
-///     (unmeasured ≠ zero — `backlog-resilience-unmeasured-vs-zero-honest-denominators`).
-///
-/// Served 503 + `Retry-After` (the requested content is genuinely unavailable, so
-/// clients/crawlers/caches back off) but with a rich honest body, not a bare 503. A true
-/// content-less 503 is the last resort, for when even Layer 1 is broken.
+/// Public fallback served at `/` when no root projection handled the request.
+/// Projection and federation counts do not establish why the site is unavailable:
+/// other routes and a healthy substrate may still be present. Report only these
+/// observed counts and link to the existing status surface for diagnosis.
+/// Retain 503 + `Retry-After` rather than redirecting visitors to the operator dashboard.
 fn root_unavailable_html(routes_loaded: usize, generation: u64, federation_peers: usize) -> String {
     let projection_line = if routes_loaded == 0 {
         "Projection cache: <strong>empty</strong> — no routes loaded from the storage backend yet."
@@ -1805,7 +1793,7 @@ fn root_unavailable_html(routes_loaded: usize, generation: u64, federation_peers
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>elohim.host — reconnecting to the substrate</title>
+<title>elohim.host — site unavailable</title>
 <style>
   :root {{ color-scheme: dark; }}
   html,body {{ height:100%; margin:0; }}
@@ -1827,9 +1815,9 @@ fn root_unavailable_html(routes_loaded: usize, generation: u64, federation_peers
 <body>
 <main>
   <div class="glyph">✺</div>
-  <h1>This corner of the network is catching its breath</h1>
-  <p class="sub">The doorway is up &mdash; but it can't see the substrate right now.
-     Here's exactly what is, and isn't, visible from here.</p>
+  <h1>This site is not available at this address yet</h1>
+  <p class="sub">This doorway has no site projection for this address.
+     You can check its status below or try again later.</p>
 
   <div class="layer">
     <h2>This doorway &middot; web2 projection <span class="up">&#9679; up</span></h2>
@@ -1838,15 +1826,14 @@ fn root_unavailable_html(routes_loaded: usize, generation: u64, federation_peers
   </div>
 
   <div class="layer">
-    <h2>Substrate dataplane &middot; Holochain DHT / libp2p / iroh <span class="unknown">&#9679; not visible</span></h2>
-    <p>The conductor connection could not be established, so the peer-to-peer dataplane
-       cannot be read from this doorway.</p>
-    <p><strong>Humans served, content available, peer count: unknown</strong> &mdash;
-       unmeasured, <em>not zero</em>. This doorway cannot see the substrate right now;
-       these are unseen from here, not absent.</p>
+    <h2>Requested site <span class="unknown">&#9679; unavailable</span></h2>
+    <p>No root projection is available for <strong>/</strong>.</p>
+    <p>These projection counts do not tell us why the site is unavailable.
+       Other content and services may still be reachable.</p>
   </div>
 
-  <p class="op">Reconnecting automatically&hellip; &nbsp;&middot;&nbsp;
+  <p class="op"><a href="/status">Check doorway status</a> &nbsp;&middot;&nbsp;
+     Checking this page again in 30 seconds. &nbsp;&middot;&nbsp;
      <a href="/threshold">operators &rarr; doorway dashboard</a></p>
 </main>
 <script>setTimeout(function(){{location.reload();}}, 30000);</script>
@@ -1887,23 +1874,35 @@ mod root_unavailable_tests {
                 .map(|v| v.to_str().unwrap()),
             Some("text/html; charset=utf-8")
         );
-        assert!(resp.headers().get("Retry-After").is_some());
+        assert_eq!(resp.headers().get("Retry-After").unwrap(), "30");
+        assert_eq!(resp.headers().get("Cache-Control").unwrap(), "no-store");
         // Crucially NOT a redirect to the operator dashboard (the bug this replaces).
         assert!(resp.headers().get("Location").is_none());
     }
 
     #[test]
-    fn root_unavailable_html_is_layered_and_honest_not_zero() {
-        let html = root_unavailable_html(0, 0, 0);
-        // Layered framing present.
-        assert!(html.contains("web2 projection"));
-        assert!(html.contains("Holochain DHT / libp2p / iroh"));
-        assert!(html.contains("not visible"));
-        // The unmeasured-≠-zero honesty (the whole point — never claims "0").
-        assert!(html.contains("unknown"));
-        assert!(html.contains("not zero"));
-        // An empty projection cache is named as empty, not silently a count.
-        assert!(html.contains("empty"));
+    fn missing_root_does_not_diagnose_an_outage_from_projection_counts() {
+        for (routes_loaded, generation, federation_peers) in [(0, 0, 0), (7, 12, 3)] {
+            let html = root_unavailable_html(routes_loaded, generation, federation_peers);
+            assert!(html.contains("No root projection is available"));
+            assert!(html.contains("Other content and services may still be reachable"));
+            assert!(html.contains("href=\"/status\""));
+            assert!(html.contains("href=\"/threshold\""));
+            assert!(html.contains(&format!("Federated doorway peers: {federation_peers}")));
+            // Neither an empty cache nor a missing root among other routes measures
+            // conductor connectivity, absent content, or a reconnection attempt.
+            assert!(!html.contains("conductor connection could not be established"));
+            assert!(!html.contains("can't see the substrate"));
+            assert!(!html.contains("not visible"));
+            assert!(!html.contains("Humans served, content available, peer count: unknown"));
+            assert!(!html.contains("Reconnecting automatically"));
+            assert!(!html.contains("reconnecting to the substrate"));
+            if routes_loaded == 0 {
+                assert!(html.contains("Projection cache: <strong>empty</strong>"));
+            } else {
+                assert!(html.contains("7 route(s) loaded (generation 12)"));
+            }
+        }
     }
 }
 
@@ -5552,7 +5551,7 @@ async fn handle_request(
             }
         }
 
-        // Root path: serve root SPA if configured, otherwise redirect to /threshold.
+        // Root path: report a missing site if the EPR router did not serve a root projection.
         // Preserve WebSocket upgrade for admin in dev mode (legacy path).
         (Method::GET, "/") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
@@ -5562,17 +5561,9 @@ async fn handle_request(
             } else {
                 // Post-B14: ROOT_APP_SLUG is gone. The EPR router (consulted earlier in
                 // handle_request) serves "/" when a projection exists for url_path="/".
-                // We only reach this arm when NO root projection is registered. On a
-                // doorway meant to project a root landing (e.g. elohim.host), an empty
-                // router means the storage/conductor backend is unreachable (the
-                // connect-refused outage) — the EprRouter could not be populated.
-                //
-                // Serve an HONEST LAYERED degraded page — NOT a 302 to the operator
-                // dashboard (leaks ops to public visitors) and NOT a blunt 503. Report
-                // what THIS doorway can see at its own layer (federation peers +
-                // projection cache) and be explicit that the substrate dataplane
-                // (Holochain DHT / libp2p / iroh, via the conductor) is NOT visible —
-                // so humans/content/peers are unknown, NOT zero. (See `root_unavailable_html`.)
+                // This fallback knows the requested site was not served, not why.
+                // Report projection/federation counts without inferring a conductor
+                // outage; a healthy substrate may simply have no root app staged.
                 let routes_loaded = state.epr_router.len();
                 let generation = state.epr_router.generation();
                 let federation_peers =
