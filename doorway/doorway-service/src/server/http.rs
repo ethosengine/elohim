@@ -2156,6 +2156,11 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     );
     info!("Custodian service enabled for P2P blob distribution");
 
+    // Start the doorway's own hourly availability heartbeat (Class C telemetry
+    // backing the /status page's 7-day strip). One write per hour; no-op
+    // without Mongo, where the strip degrades to process-derived buckets.
+    crate::services::self_uptime::spawn_self_heartbeat_task(Arc::clone(&state));
+
     // Start P2P health polling task (every 30 seconds)
     {
         let p2p_health = Arc::clone(&state.p2p_health);
@@ -2410,6 +2415,72 @@ fn infer_gate_event(path: &str) -> Option<gate_client::RelationalImpactEvent> {
 /// are guaranteed to reach their own handlers. Keeping this list exhaustive avoids
 /// the scenario where `/api/v1/content` silently serves an SPA because a root
 /// projection (`url_path = "/"`) matches everything.
+/// Coarse path-family label for the request throughput counters (the REQUESTS
+/// tile and `compute.resources.requests.byCategory` on `/status.json`).
+///
+/// Families mirror the dispatcher's own prefix vocabulary (`is_service_path`)
+/// so a category names a surface an operator can actually reason about. Order
+/// matters: the most specific prefix wins. Unknown paths land in `spa` — the
+/// EPR-router / SPA-bundle fallthrough, which is genuinely what they hit.
+fn request_category(path: &str) -> &'static str {
+    // Probes and self-reporting surfaces — high-frequency, operationally noise.
+    if path.starts_with("/health")
+        || path.starts_with("/ready")
+        || path == "/version"
+        || path == "/metrics"
+        || path.starts_with("/status")
+    {
+        return "probe";
+    }
+    if path.starts_with("/blob/") {
+        return "blob";
+    }
+    if path.starts_with("/apps/") || path.starts_with("/chrome/") || path.starts_with("/app/") {
+        return "assets";
+    }
+    if path.starts_with("/epr/") || path.starts_with("/epr-head/") {
+        return "epr";
+    }
+    if path.starts_with("/api/v1/cache") {
+        return "cache-api";
+    }
+    if path.starts_with("/api/v1/federation") || path.starts_with("/doorway/") {
+        return "federation";
+    }
+    if path.starts_with("/auth") || path.starts_with("/threshold") {
+        return "auth";
+    }
+    if path.starts_with("/.well-known/")
+        || path.starts_with("/1.0/")
+        || path.starts_with("/identity")
+        || path.starts_with("/pkarr/")
+    {
+        return "identity";
+    }
+    if path.starts_with("/admin") || path.starts_with("/hc/") {
+        return "admin";
+    }
+    if path.starts_with("/bootstrap") {
+        return "bootstrap";
+    }
+    if path.starts_with("/signal") {
+        return "signal";
+    }
+    if path.starts_with("/import/") {
+        return "import";
+    }
+    if path.starts_with("/db/") || path.starts_with("/sync/") || path.starts_with("/p2p/") {
+        return "storage-proxy";
+    }
+    if path.starts_with("/api/") {
+        return "api";
+    }
+    if path.starts_with("/debug") {
+        return "debug";
+    }
+    "spa"
+}
+
 fn is_service_path(path: &str) -> bool {
     // Auth paths: only auth-layer-owned paths are service paths.
     // Unowned /auth/* paths (e.g. /auth/portal) fall through to the EPR router.
@@ -5369,6 +5440,14 @@ async fn handle_request(
     let method = req.method().clone();
     let method_str = method.to_string();
     let path = req.uri().path().to_string();
+
+    // ── Request throughput accounting ──────────────────────────────────
+    // Counted HERE, once per inbound request, and nowhere else. The counter
+    // previously lived at a single handler (`routes::api::handle_api_request`),
+    // so the REQUESTS tile reported one route's traffic as the whole doorway's.
+    // Placed before the gates so a shed or refused request still counts as
+    // received — the tile measures inbound load, not successful responses.
+    state.request_counters.increment(request_category(&path));
 
     // ── Wisdom-as-system-auth gate ─────────────────────────────────────────────
     // Fires before any routing for state-changing methods on gate-mapped paths.

@@ -203,8 +203,9 @@ pub async fn handle_api_request(
         }
     };
 
-    // Track request for resource accounting
-    state.request_counters.increment(route.doc_type);
+    // Request accounting happens ONCE, in the dispatcher
+    // (`server::http::handle_request` → `request_category`). Counting again here
+    // would double-count every /api/v1/cache request against the total.
 
     // Parse requester identity from auth header (passed to DNA for access control)
     let requester = parse_requester_identity(auth_header.as_deref(), &state);

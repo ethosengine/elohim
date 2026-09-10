@@ -273,6 +273,13 @@ pub struct StatusResponse {
     /// circuit (C7, the same derive-don't-restate rule `freshness` follows).
     #[serde(rename = "upstreamPolicy")]
     pub upstream_policy: UpstreamPolicyStatus,
+    /// The 7-day hourly availability strip the HTML page renders (168 labels,
+    /// oldest first). Doorway-local Class C telemetry computed alongside
+    /// `federation.selfUptime7d` from the SAME buckets, so the strip and the
+    /// percentage can never disagree. Skipped in JSON: `/status.json` keeps its
+    /// existing wire contract and exposes the derived percentage only.
+    #[serde(skip)]
+    pub uptime_segments: Vec<String>,
     /// The live freshness policy this doorway serves under: the declared stage,
     /// where that declaration came from, the per-class requirement, and the
     /// last-good pantry's occupancy.
@@ -389,9 +396,13 @@ pub struct StatusPageTemplate {
     pub version: String,
     pub node_id: String,
     pub uptime_segments: Vec<String>,
+    /// Federated doorways (web2-projection peers) — NOT dataplane peers.
     pub peer_count: usize,
+    /// Storage's connected P2P peers, or "—" when storage has not answered.
+    pub dataplane_peers: String,
     pub cache_hit_rate: String,
-    pub available_hosts: usize,
+    /// NATS-routed host count, or "—" when NATS routing is not configured.
+    pub hosts_label: String,
     pub region: String,
     pub components: Vec<ComponentView>,
     pub federation_enabled: bool,
@@ -659,20 +670,30 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         "degraded".to_string()
     };
 
-    // Build federation health stats from peer cache
+    // 7-day self-uptime strip — Class C doorway-local telemetry about THIS
+    // process (see `services::self_uptime` for the classification). One bounded
+    // read per render; degrades to process-derived buckets without Mongo.
+    let now = chrono::Utc::now();
+    let uptime_recorded = crate::services::self_uptime::load_recorded(state, now).await;
+    let uptime_strip =
+        crate::services::self_uptime::compute_strip(now, state.started_at, &uptime_recorded);
+
+    // Build federation health stats from peer cache.
+    //
+    // Peer health is MEASURED, not stubbed: each peer's own `/health` is probed
+    // (bounded timeout, all peers concurrently so one slow peer cannot stall the
+    // page) and we report what it says about itself alongside whether we could
+    // reach it at all. The third-party DHT-attestation path is still open —
+    // `peer_attestations` stays empty and keeps its TODO.
     let federation = {
-        let peer_cache = state.peer_cache.read().await;
-        let peers: Vec<PeerHealthSummary> = peer_cache
-            .iter()
-            .map(|peer| PeerHealthSummary {
-                doorway_id: peer.id.clone(),
-                url: peer.url.clone(),
-                self_reported_status: None, // TODO: from DHT heartbeats
-                peer_attestations: vec![],  // TODO: from DHT attestations
-                peers_agree: "0/0".to_string(),
-                consensus_status: "unknown".to_string(),
-            })
-            .collect();
+        let targets: Vec<(String, String)> = {
+            let peer_cache = state.peer_cache.read().await;
+            peer_cache
+                .iter()
+                .map(|peer| (peer.id.clone(), peer.url.clone()))
+                .collect()
+        };
+        let peers: Vec<PeerHealthSummary> = probe_federation_peers(targets).await;
         let peer_count = peers.len();
 
         FederationHealthStats {
@@ -684,7 +705,7 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
                 .or_else(|| Some(state.args.node_id.to_string())),
             self_url: state.args.doorway_url.clone(),
             self_tier: None,
-            self_uptime_7d: None,
+            self_uptime_7d: uptime_strip.uptime_7d,
             peer_count,
             peers,
         }
@@ -785,6 +806,7 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         upstreams,
         admission,
         upstream_policy,
+        uptime_segments: uptime_strip.segments,
         freshness: crate::routes::freshness::status_block(
             state.network_stage,
             state.stage_provenance,
@@ -870,11 +892,21 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
     // Build component list
     let mut components = Vec::new();
 
-    // Gateway (always present)
-    components.push(ComponentView {
-        name: "Gateway".to_string(),
-        dot_color: "green".to_string(),
-        detail: format!("{} hosts available", data.available_hosts),
+    // Gateway (always present). `available_hosts` counts NATS-ROUTED hosts, so
+    // the number is only meaningful when NATS is actually configured — a green
+    // dot over "0 hosts available" was reporting an absent subsystem as healthy.
+    components.push(if data.nats_connected {
+        ComponentView {
+            name: "Gateway".to_string(),
+            dot_color: "green".to_string(),
+            detail: format!("{} hosts available", data.available_hosts),
+        }
+    } else {
+        ComponentView {
+            name: "Gateway".to_string(),
+            dot_color: "gray".to_string(),
+            detail: "NATS routing not configured".to_string(),
+        }
     });
 
     // Conductor Pool
@@ -891,9 +923,12 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
         ),
     });
 
-    // Projection Cache
+    // Response cache — `state.cache` (HTTP response cache). Deliberately NOT
+    // named "Projection Cache": the Resource Usage tiles report the projection
+    // HOT cache, a different store, and two different numbers under one name
+    // read as a contradiction.
     components.push(ComponentView {
-        name: "Projection Cache".to_string(),
+        name: "Response cache".to_string(),
         dot_color: "green".to_string(),
         detail: format!(
             "{} entries, {:.0}% hit rate",
@@ -929,7 +964,7 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
             let dot_color = match p.consensus_status.as_str() {
                 "healthy" => "green",
                 "degraded" => "yellow",
-                "unhealthy" | "offline" => "red",
+                "unhealthy" | "offline" | "unreachable" => "red",
                 _ => "gray",
             };
             // Find the first attestation with a response time
@@ -946,8 +981,25 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
         })
         .collect();
 
-    // 168 hourly segments, all "nodata" for now (placeholder)
-    let uptime_segments: Vec<String> = vec!["nodata".to_string(); 168];
+    // 168 hourly segments computed from the recorded heartbeat (or, without a
+    // store, from this process's own lifetime). Same buckets that produced
+    // `federation.self_uptime_7d` — one measurement, two renderings.
+    let uptime_segments: Vec<String> = data.uptime_segments.clone();
+
+    // Dataplane peers — storage's `/p2p/status` `connectedPeers`, already cached
+    // by the 30s poller. "—" (never 0) when storage has not answered: an absent
+    // measurement is not a measurement of zero.
+    let dataplane_peers = match state.p2p_health.read().await.as_ref() {
+        Some(snapshot) => format_number(snapshot.health().peer_count as u64),
+        None => "\u{2014}".to_string(),
+    };
+
+    // NATS-routed hosts: only a real number when NATS routing exists.
+    let hosts_label = if data.nats_connected {
+        format_number(data.available_hosts as u64)
+    } else {
+        "\u{2014}".to_string()
+    };
 
     let doorway_id = data
         .federation
@@ -1011,8 +1063,9 @@ pub async fn status_page(req: Request<Incoming>, state: Arc<AppState>) -> Respon
         node_id: data.node_id.clone(),
         uptime_segments,
         peer_count: data.federation.peer_count,
+        dataplane_peers,
         cache_hit_rate: format!("{:.0}", data.cache.hit_rate),
-        available_hosts: data.available_hosts,
+        hosts_label,
         region: data.orchestrator.region.clone(),
         components,
         federation_enabled: data.federation.enabled,
@@ -1128,6 +1181,107 @@ async fn build_operator_attestation_log(state: &Arc<AppState>) -> Vec<String> {
     }
 
     log
+}
+
+// =============================================================================
+// Federation Peer Probe
+// =============================================================================
+
+/// Bounded timeout for one federation peer's `/health` probe. Short on purpose:
+/// the status page must never stall behind a slow or dead peer.
+const PEER_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The only field we read off a peer's `/health`: what it says about itself.
+#[derive(serde::Deserialize)]
+struct PeerHealthReport {
+    #[serde(default)]
+    status: Option<String>,
+}
+
+/// Probe every federation peer's `/health` CONCURRENTLY (join, never serially)
+/// and report the honest minimum: the peer's own self-report plus whether we
+/// could reach it. No DHT attestations are involved — see `peer_attestations`.
+async fn probe_federation_peers(targets: Vec<(String, String)>) -> Vec<PeerHealthSummary> {
+    if targets.is_empty() {
+        return Vec::new();
+    }
+
+    let client = match reqwest::Client::builder()
+        .timeout(PEER_PROBE_TIMEOUT)
+        .build()
+    {
+        Ok(client) => client,
+        Err(e) => {
+            // No client, no probe — every peer is honestly unreachable rather
+            // than optimistically "unknown".
+            tracing::warn!("federation peer probe client unavailable: {e}");
+            return targets
+                .into_iter()
+                .map(|(doorway_id, url)| unreachable_peer(doorway_id, url))
+                .collect();
+        }
+    };
+
+    futures_util::future::join_all(targets.into_iter().map(|(doorway_id, url)| {
+        let client = client.clone();
+        async move { probe_one_peer(&client, doorway_id, url).await }
+    }))
+    .await
+}
+
+/// A peer that did not answer at all.
+fn unreachable_peer(doorway_id: String, url: String) -> PeerHealthSummary {
+    PeerHealthSummary {
+        doorway_id,
+        url,
+        self_reported_status: None,
+        // TODO: from DHT attestations — third-party witnesses of this peer.
+        peer_attestations: vec![],
+        peers_agree: "0/1".to_string(),
+        consensus_status: "unreachable".to_string(),
+    }
+}
+
+async fn probe_one_peer(
+    client: &reqwest::Client,
+    doorway_id: String,
+    url: String,
+) -> PeerHealthSummary {
+    let health_url = format!("{}/health", url.trim_end_matches('/'));
+    let self_reported_status: Option<String> = match client.get(&health_url).send().await {
+        Ok(resp) if resp.status().is_success() => resp
+            .json::<PeerHealthReport>()
+            .await
+            .ok()
+            .and_then(|report| report.status),
+        // Reachable but not serving: report exactly what came back rather than
+        // inventing a status the peer never claimed.
+        Ok(resp) => Some(format!("http {}", resp.status().as_u16())),
+        Err(_) => return unreachable_peer(doorway_id, url),
+    };
+
+    // `peers_agree` compares OUR probe (we reached it) against ITS self-report.
+    // "online" is the doorway vocabulary, "ok" the storage-shaped sibling one.
+    let (consensus_status, peers_agree) = match self_reported_status.as_deref() {
+        Some(status)
+            if status.eq_ignore_ascii_case("online") || status.eq_ignore_ascii_case("ok") =>
+        {
+            ("healthy", "1/1")
+        }
+        // Reached, but it does not claim to be serving — our observation and its
+        // self-report disagree.
+        _ => ("degraded", "0/1"),
+    };
+
+    PeerHealthSummary {
+        doorway_id,
+        url,
+        self_reported_status,
+        // TODO: from DHT attestations — third-party witnesses of this peer.
+        peer_attestations: vec![],
+        peers_agree: peers_agree.to_string(),
+        consensus_status: consensus_status.to_string(),
+    }
 }
 
 // =============================================================================
@@ -1345,6 +1499,7 @@ mod tests {
             humans_served: Some(42),
             content_available: Some(1234),
             federated_peers: 1,
+            uptime_segments: vec!["up".to_string(); 168],
             upstreams: vec![UpstreamStatus {
                 endpoint: "http://localhost:8090".to_string(),
                 circuit: "closed".to_string(),

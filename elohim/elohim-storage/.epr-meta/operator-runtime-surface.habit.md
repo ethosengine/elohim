@@ -22,6 +22,14 @@ retire-when: >
   settings surface on a released steward build, with no developer-shaped tool in the path.
   The habit then describes a product, not a practice.
 ---
+DELTA 2026-09-10 (doorway /status audit, uncommitted, gate doorway EXIT=0, 1212 tests):
+apex /status tiles audited against status.json — 4 disconnected (uptime strip hard-coded
+nodata; REQUESTS counted one route; federation consensus stub "0/0 unknown"; no dataplane
+peer count) + 3 mislabeled (PEERS=federated doorways; Gateway green on unconfigured NATS;
+"Projection Cache" = response cache). All wired/relabeled in doorway-service; SUBSCRIBERS 0
+is true (apex DEV_MODE without --dev-signal-subscriber, main.rs:~1221) — operator deploy call.
+Status unchanged until the next edge deploy renders the strip live.
+
 DELTA 2026-08-22 (household lane, run 20260822T170136Z-519d4f6b):
 operator-runtime-surface passed=3 failed=0 on the 3-peer mesh. No change.
 

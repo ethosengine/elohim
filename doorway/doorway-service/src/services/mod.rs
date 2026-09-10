@@ -13,6 +13,7 @@
 //! - **ImportConfig**: Zome-declared import capability discovery
 //! - **Discovery**: Runtime discovery of zome capabilities from conductor
 //! - **RouteRegistry**: Dynamic route management from DNAs and external agents
+//! - **SelfUptime**: doorway-local hourly availability heartbeat (Class C)
 //! - **DIDResolver**: W3C DID resolution for doorway federation
 //! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
@@ -28,6 +29,7 @@ pub mod import_orchestrator;
 pub mod pkarr_resolver;
 pub mod recording;
 pub mod route_registry;
+pub mod self_uptime;
 pub mod shard_resolver;
 pub mod storage_registration;
 pub mod verification;

@@ -85,8 +85,12 @@
     <!-- Stats Row -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="label">Peers</div>
+        <div class="label">Federated doorways</div>
         <div class="value">{{ peer_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Dataplane peers</div>
+        <div class="value">{{ dataplane_peers }}</div>
       </div>
       <div class="stat-card">
         <div class="label">Cache Hit Rate</div>
@@ -94,7 +98,7 @@
       </div>
       <div class="stat-card">
         <div class="label">Hosts</div>
-        <div class="value">{{ available_hosts }}</div>
+        <div class="value">{{ hosts_label }}</div>
       </div>
       <div class="stat-card">
         <div class="label">Region</div>
