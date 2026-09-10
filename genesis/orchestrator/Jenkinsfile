@@ -527,6 +527,12 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
             echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL
         }
+    } else if (result.wasted) {
+        // ABORTED — superseded, or an operator pressed Stop. The work was never
+        // verdicted, so this is neither a pass nor a fail. Baseline deliberately
+        // NOT advanced: the next push touching this pipeline re-dispatches it.
+        echo "⏹️ ${name}: ABORTED — waste, not a verdict; baseline held so the next push re-dispatches"
+        if (result.error) echo "   Interrupted: ${result.error}"
     } else {
         echo "❌ ${name}: ${result.result}"
         if (result.error) echo "   Error: ${result.error}"
@@ -620,6 +626,10 @@ def dispatchResult(Object result, boolean waited) {
     return [
         success: result.result in ['SUCCESS', 'UNSTABLE'],
         unstable: result.result == 'UNSTABLE',
+        // The non-throwing abort path: a downstream that ends ABORTED without
+        // interrupting this build step still returns here. Same contract as the
+        // FlowInterruptedException branch in triggerPipeline — waste, not failure.
+        wasted: result.result == 'ABORTED',
         result: result.result,
         duration: result.duration,
         url: result.absoluteUrl,
@@ -775,6 +785,37 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
                 success: true,
                 skipped: true,
                 result: 'NOT_PROVISIONED',
+                error: e.message
+            ]
+        }
+        // An ABORT is not a verdict on the work — it is waste.
+        //
+        // `propagate: false` suppresses downstream RESULT propagation but NOT
+        // interruption: when the downstream build is aborted (operator presses
+        // Stop, or a newer run supersedes it), the waiting `build` step still
+        // throws FlowInterruptedException into this frame. Flattening that into
+        // the generic ERROR branch below destroys the abort's identity and makes
+        // a deliberate stop indistinguishable from a genuine failure.
+        //
+        // That is exactly how orchestrator/dev #1845 went UNSTABLE with
+        // "Genesis failed - seeding or tests may have issues" after an operator
+        // aborted elohim-genesis/dev #1574 — manufacturing a red build and a
+        // CI-findings fingerprint out of a human pressing Stop.
+        //
+        // pipeline-results.mjs is the declared source of truth for this split:
+        // ABORTED ∈ WASTED_RESULTS, never TERMINAL_FAILURE_RESULTS. Waste holds
+        // the baseline (see recordPipelineResult) because the work was never
+        // verdicted, so the next push touching this pipeline re-dispatches it.
+        //
+        // Not rethrown: this catch already swallowed the interruption before
+        // this branch existed, so classifying it changes no control flow. A
+        // genuine abort of the ORCHESTRATOR itself still terminates it at the
+        // next step boundary.
+        if (e.getClass().getName().contains('FlowInterruptedException')) {
+            return [
+                success: false,
+                wasted: true,
+                result: 'ABORTED',
                 error: e.message
             ]
         }
@@ -1074,9 +1115,10 @@ def buildCiSummary(results, preflight, postflight, verification, successCount, u
             builds_failed: failCount,
             services_healthy: healthyCount,
             services_total: postflight.size(),
-            failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+            failed_pipelines: results.findAll { k, v -> !v?.success && !v?.wasted }.keySet().toList(),
+            wasted_pipelines: results.findAll { k, v -> v?.wasted }.keySet().toList(),
             triage_priority: calculateTriagePriority(failCount, unhealthyCount),
-            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success && !v?.wasted }.collect { name, r ->
                 "${name}: ${getRemediationHint(name)}"
             } : []
         ]
@@ -1969,6 +2011,9 @@ spec:
                             if (genesisResult.success) {
                                 echo '✅ elohim-genesis: SUCCESS'
                                 pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
+                            } else if (genesisResult.wasted) {
+                                // Aborted ≠ failed — see triggerPipeline's catch.
+                                echo '⏹️ elohim-genesis: ABORTED — waste, not a verdict; baseline held so the next push re-dispatches'
                             } else {
                                 echo "❌ elohim-genesis: ${genesisResult.result}"
                                 unstable('Genesis failed - seeding or tests may have issues')
@@ -2330,7 +2375,9 @@ spec:
 
                 def successCount = results.count { k, v -> v?.success && !v?.unstable }
                 def unstableCount = results.count { k, v -> v?.unstable }
-                def failCount = results.count { k, v -> !v?.success }
+                // ABORTED is waste, not failure (pipeline-results.mjs).
+                def wastedCount = results.count { k, v -> v?.wasted }
+                def failCount = results.count { k, v -> !v?.success && !v?.wasted }
                 def healthyCount = postflight.count { k, v -> v?.healthy }
                 def verifiedCount = verification.count { k, v -> v?.match }
 
@@ -2343,7 +2390,7 @@ spec:
   Branch:       ${env.BRANCH_NAME}
   Mode:         ${params.MODE}
 
-  BUILDS:       ✅ ${successCount} succeeded │ ⚠️ ${unstableCount} unstable │ ❌ ${failCount} failed
+  BUILDS:       ✅ ${successCount} succeeded │ ⚠️ ${unstableCount} unstable │ ❌ ${failCount} failed │ ⏹️ ${wastedCount} aborted
   SERVICES:     ${healthyCount}/${postflight.size()} healthy
   VERIFIED:     ${verifiedCount}/${verification.size()} deployments match commit
 
@@ -2355,7 +2402,7 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
 
                 if (failCount > 0) {
                     echo 'Failed pipelines:'
-                    results.findAll { k, v -> !v?.success }.each { name, result ->
+                    results.findAll { k, v -> !v?.success && !v?.wasted }.each { name, result ->
                         echo "  ❌ ${name}: ${result?.result ?: 'UNKNOWN'}"
                         if (result?.url) echo "     ${result.url}"
                     }

@@ -188,3 +188,103 @@ describe('pipeline-list.json drift', () => {
     );
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// ABORTED is waste, not failure — Jenkinsfile ↔ pipeline-results.mjs
+//
+// pipeline-results.mjs is the declared single source of truth:
+//   TERMINAL_FAILURE_RESULTS = {FAILURE};  WASTED_RESULTS = {ABORTED}
+// The orchestrator Jenkinsfile is a Groovy consumer that cannot import
+// it, so these tests hold the two in agreement statically.
+//
+// Regression: orchestrator/dev #1845 went UNSTABLE with "Genesis failed
+// - seeding or tests may have issues" because an operator pressed Stop
+// on elohim-genesis/dev #1574. `propagate: false` suppresses downstream
+// RESULT propagation but NOT interruption, so the abort arrived as a
+// FlowInterruptedException and triggerPipeline's catch flattened it to
+// ERROR alongside genuine failures. That manufactured a red build and a
+// CI-findings fingerprint (9b7f3c58a51a) out of a deliberate human stop.
+// ══════════════════════════════════════════════════════════════════
+
+describe('ABORTED classification (Jenkinsfile honours pipeline-results.mjs)', () => {
+  const jenkinsfile = readFileSync(
+    resolve(__dirname, 'Jenkinsfile'), 'utf8'
+  );
+
+  test('triggerPipeline classifies an interruption as ABORTED, not ERROR', () => {
+    assert.ok(
+      /FlowInterruptedException/.test(jenkinsfile),
+      'triggerPipeline must recognise FlowInterruptedException — otherwise a ' +
+      'downstream abort is flattened into the generic ERROR branch'
+    );
+    const catchBlock = jenkinsfile.slice(
+      jenkinsfile.indexOf('} catch (Exception e) {'),
+      jenkinsfile.indexOf('def autoModeAnalyze()')
+    );
+    assert.ok(
+      catchBlock.includes('FlowInterruptedException'),
+      'the interruption check must live inside triggerPipeline\'s catch block'
+    );
+    assert.ok(
+      catchBlock.indexOf('FlowInterruptedException') <
+        catchBlock.indexOf("result: 'ERROR'"),
+      'the ABORTED branch must precede the generic ERROR fallthrough'
+    );
+    assert.ok(
+      /result: 'ABORTED'/.test(catchBlock),
+      'the interruption branch must report ABORTED so downstream reporting can ' +
+      'tell waste from a verdict'
+    );
+  });
+
+  test('dispatchResult carries a wasted flag keyed on ABORTED', () => {
+    assert.ok(
+      /wasted: result\.result == 'ABORTED'/.test(jenkinsfile),
+      'dispatchResult must flag ABORTED as wasted for the non-throwing path ' +
+      '(a downstream that ends ABORTED without interrupting the parent)'
+    );
+  });
+
+  test('a wasted downstream never marks the orchestrator UNSTABLE', () => {
+    // The genesis handler is the only downstream report that calls unstable().
+    const genesisIdx = jenkinsfile.indexOf(
+      "unstable('Genesis failed - seeding or tests may have issues')"
+    );
+    assert.ok(genesisIdx > 0, 'genesis unstable() call site not found');
+    // Walk back to the start of the if/else chain that guards it.
+    const chain = jenkinsfile.slice(
+      jenkinsfile.lastIndexOf('if (genesisResult.success)', genesisIdx),
+      genesisIdx
+    );
+    assert.ok(
+      /else if \(genesisResult\.wasted\)/.test(chain),
+      'the genesis result chain must short-circuit on wasted BEFORE reaching ' +
+      'unstable() — an abort is not evidence that seeding or tests failed'
+    );
+  });
+
+  test('recordPipelineResult reports waste distinctly from failure', () => {
+    const fn = jenkinsfile.slice(
+      jenkinsfile.indexOf('def recordPipelineResult('),
+      jenkinsfile.indexOf('def parseBuildTagTokens(')
+    );
+    assert.ok(
+      /else if \(result\.wasted\)/.test(fn),
+      'recordPipelineResult must branch on wasted so the generic dispatch path ' +
+      'matches the genesis path'
+    );
+  });
+
+  test('the summary fail count excludes waste', () => {
+    assert.ok(
+      /def failCount = results\.count \{ k, v -> !v\?\.success && !v\?\.wasted \}/
+        .test(jenkinsfile),
+      'failCount must exclude wasted builds — otherwise the summary reports ' +
+      '"ATTENTION: Build failures detected!" for a deliberate stop'
+    );
+    assert.ok(
+      /def wastedCount = results\.count \{ k, v -> v\?\.wasted \}/.test(jenkinsfile),
+      'waste needs its own count so supersede-thrash and operator-aborts stay visible'
+    );
+  });
+});

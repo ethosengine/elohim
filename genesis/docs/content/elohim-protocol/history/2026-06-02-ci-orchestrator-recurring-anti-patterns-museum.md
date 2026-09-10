@@ -47,7 +47,7 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 
 | # | Anti-pattern (the trap) | Freq | Where the mechanism lives |
 |---|---|---|---|
-| 1 | **Orchestrator NOT_BUILT / superseded read as regression** — `abortPrevious` preempts an in-flight child; a FAILURE-count grep reads NOT_BUILT/ABORTED/UNSTABLE all as 0 (lossy). A superseded build is not a failure. | 8 | `feedback_orchestrator_abort_baseline_rollback`, `project_pre_dispatch_hard_fail_post_dispatch_unstable` |
+| 1 | **Orchestrator NOT_BUILT / superseded read as regression** — `abortPrevious` preempts an in-flight child; a FAILURE-count grep reads NOT_BUILT/ABORTED/UNSTABLE all as 0 (lossy). A superseded build is not a failure. **ABORTED has three shapes — superseded (ignore) · restart-orphaned (retrigger, #15) · operator manual abort (never should have been red)**; the discriminators are in "The load-bearing reading" below. | 9 | `feedback_orchestrator_abort_baseline_rollback`, `project_pre_dispatch_hard_fail_post_dispatch_unstable`; `backlog/ci-orchestrator-abort-misread-as-genesis-failure.md` |
 | 2 | **Baseline-rollback over-build** — a FAILURE/ABORT invalidates the per-pipeline baseline → reverts to the global baseline → full cascade; `lastSuccessful()` pins an ancient green. | 6 | `feedback_orchestrator_abort_baseline_rollback` |
 | 3 | **Dockerfile / build-manifest completeness** — a new Cargo target OR a new path-dep crate breaks the Docker build context but passes host pre-push; the manifest under-covers source inputs so the orchestrator under-dispatches. | 6 | `feedback_dockerfile_target_completeness`, `feedback_orchestrator_build_manifest_required` |
 | 4 | **HUSKY=0 is NON-FUNCTIONAL** — `core.hooksPath=.husky` bypasses the wrapper that honors `HUSKY=0`; the real bypass is `git push --no-verify`. (Root `CLAUDE.md` corrected 2026-06-02.) | 4 | `feedback_husky_bypass_for_ci_only_changes` |
@@ -151,6 +151,31 @@ abort came from a **controller restart**, the identical symptom means the opposi
 destroyed and never redone, so a retrigger is required, not withheld. The log settles it in one line —
 `Resuming build … after Jenkins restart` (retrigger) versus a newer build number having preempted this
 one (ignore).
+
+**There is a third ABORTED shape, and it is the orchestrator lying to you: the operator manual
+abort** (2026-09-10, orchestrator/dev #1845, fp `9b7f3c58a51a`). Tell: the child's
+`InterruptedBuildAction` reads `UserInterruption: Aborted by <user>`, with *no* `Resuming build …`
+line and *no* preempting newer build number. Remedy is neither #1's "ignore the red" nor #15's
+"retrigger" — it is **there should never have been a red**. A human pressed Stop; that is waste, not
+a verdict, and nothing needs doing.
+
+The reason it *looked* like a failure is the trap worth carrying: **`propagate: false` suppresses a
+downstream's RESULT propagation but NOT its interruption.** An aborted child still throws
+`FlowInterruptedException` into the waiting parent's `build` step, and `triggerPipeline`'s
+`catch (Exception e)` flattened every non-`'No item named'` exception to `result: 'ERROR'` — so the
+orchestrator called `unstable('Genesis failed - seeding or tests may have issues')`, asserting a
+seeding/test defect that was never observed, and manufactured a CI finding out of a deliberate stop.
+This is **trap #1 committed by the orchestrator against itself**: the same lossy conflation the
+record warns *agents* about, executed in the Jenkinsfile.
+
+The generalizable lesson is sharper than the bug. `genesis/orchestrator/pipeline-results.mjs` had
+*already* declared the correct split in prose — `ABORTED ∈ WASTED_RESULTS`, never
+`TERMINAL_FAILURE_RESULTS`, "Persistent waste signals supersede-thrash or operator-aborts" — and the
+Groovy layer could not `import` it, so the declared single-source-of-truth drifted silently in the one
+consumer that most needed it. **A source of truth a consumer cannot import is a comment.** When the
+authority is `.mjs` and the consumer is a Jenkinsfile, the binding has to be a *test* that reads both;
+that is what now holds them together (`orchestrator-integration.test.mjs`, "ABORTED classification").
+Backlog: `backlog/ci-orchestrator-abort-misread-as-genesis-failure.md`.
 
 The second cluster (**#3/#5/#6**) is the same shape under three disguises: a check that passes on the
 host but fails in CI because the CI environment differs (Docker context, sccache wrapper, `--run-ignored
