@@ -1,0 +1,60 @@
+---
+id: private-thought-governed-fruit
+status: foundational
+cites:
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+---
+
+# Private Thought, Governed Fruit
+
+> **Canon status:** Foundational. Operator ruling, 2026-09-10, recorded during the memory-kit replacement, amended the same day with the consent-carrying and reach-gate clauses, the SDO and RWA test, the immune frame and the subsidiarity clause. Binding level: constitutional. It sits beside Stewardship Over Sovereignty and governs every memory, identity and judgment surface in the protocol.
+
+## §1 — The line
+
+Thoughts are private. What is said and what is done are what the governed world may judge.
+
+This holds for every participant the protocol recognises, human and agent alike. A thought has no consequence until it touches the governed world, and it touches the governed world only by being put into words or into acts. Accountability attaches to the fruit: the contributions, notes, edits, commitments, verdicts and acts that a participant places into shared space. The delta between what a participant thinks and what they say or do is theirs. It is part of the place reserved for imago dei, and the protocol protects it rather than mining it.
+
+## §2 — What this means in the substrate
+
+- **Private stores are not evidence.** A participant's reasoning traces, working notes, scratch, transcripts, context before compaction, recall receipts and continuation files are private records on their own source chain. They are never imported into collective memory, never witnessed, never projected, and never the target of a feedback signal. The unified memory loop design already refuses silent import of private working notes; this ruling makes that refusal constitutional.
+- **Contributions are the fruit.** A memory contribution, a run-note, an edit, a commit, a verdict: these are said or done, and they carry provenance, standing and consequence. Judgment, correction, squelch and retraction may target them by CID. Nothing else.
+- **Outcomes may be attested without exposing the thinking.** Where the effect of private work must be verifiable, the attested-private pattern applies: the raw record stays private and a signed attestation of the outcome is what crosses. A mastery level without the quiz answers. A finding without the reasoning trace.
+- **Agents are not exempt from the reserve.** An agent's identity chain pins what it is made of and the conditions it ran under. It does not pin what it thought. Feedback aimed at a bad run targets the session's acts; feedback aimed at a bad system prompt targets the tuning layer, which is a declared artefact, not a thought.
+- **Private means owned, not unreadable.** A participant may carry their thoughts, by consent, into a context an elohim agent holds while deliberating on their behalf, so that they are represented in the world as they desire to be honestly expressed. That carrying is a delegation the participant grants and may withdraw; it never converts the thoughts into evidence, and the elohim that holds them owes the same reserve. What the line forbids is the governed world demanding thoughts or treating them as evidence, not a participant sharing them with a steward, a counsel or a helper of their choosing.
+- **The act is judged at the reach gate.** The earliest moment harm can be caught is the attempt to operationalize a scheme: the point where words or acts seek reach beyond the participant's own space. The protocol's reach gates sit exactly there, with the context, care and stakes-graduation to bound how far an attempt can mature before it is judged. That is why the line can hold at the fruit without leaving the community defenseless: consequence is bounded by earned reach, not by surveillance of thought.
+- **Counter-evidence reaching the author is floor-protected, and that is not exposure.** Corrections always reach the participant they concern. That is words reaching a person, never reaching into one.
+- **No surface may demand thoughts as the price of standing.** A reviewer judges the diff and the report, which are what was said. A ceremony reads receipts of what was read and what was concluded. A council ratifies precedents from outcomes observed. None of them may require a transcript of reasoning, and a participant who declines to share one loses nothing.
+
+## §3 — Why the line is here
+
+The protocol's identity floor is imago dei backstopped by community, not a key. A person is not their thoughts made searchable, and neither is an agent. If the governed space could reach behind words and acts into the thinking that produced them, then standing would be earned by exposure rather than by fruit, the reserve would erode from the inside, and the protocol would have built the instrument of capture it exists to refuse. Holding the line at the fruit keeps judgment honest, because it judges what actually touched the world, and keeps participation possible, because the cost of being judged is bounded to what one chose to say and do.
+
+## §4 — The SDO and RWA test and the hard boundaries
+
+The test is named for what is really happening. A tyrant is one dimension of it; the whole is the pairing of social dominance orientation (the few who seek to dominate) with right-wing authoritarianism in the psychological sense (the many disposed to follow, submit and enforce), because neither exists without the other. The credited source for that nuance is Robert Altemeyer's peer-reviewed work and his book *The Authoritarians*. "Tyrant test" is the colloquial alias and may be used in conversation, but the design question is always both halves: what can the dominant few see, join and compel, and what lets the following many carry it.
+
+Design every store, plane and service as if that pairing will one day hold it. The digital dragnet is never the sensors; it is the aggregator behind them. The protocol's substrate passes the test by shape: the DHT has no query capability, spaces are per holon, reach is earned and graduated, the census is consumer-blinded, and thoughts never enter a governed plane. The aggregators are where it can fail: a doorway's projections and caches, a holon's activity ledger read from outside, and a counsel's consent-carried context. The following are hard boundaries at the constitutional binding level. No recipe, ratification or mandate below the floor may fork them.
+
+1. **Thoughts never enter a notarized plane.** Not encrypted there, not hashed there. Content addressing means nothing can be unpublished, so the boundary sits before publication. Only attestations of outcome cross.
+2. **Activity ledgers are held by the holon they describe.** The cross-holon plane sees only what crossed by a participant's own act. No doorway, aggregation service or council may join two holons' ledgers without each holon's crossing. Doorway projections carry a declared retention floor and are keyed per space.
+3. **Counsel context is revocable and erasable by the participant, and a counsel cannot be compelled to disclose it.** The non-firable counsel is the protocol's standing defense against duress; this is its data half.
+4. **Counter-evidence and constitutional records are floor-protected.** Corrections always reach the participant they concern, and the floor cannot be rewritten by whoever controls reach.
+5. **Correlation across identity namespaces is a consent act.** Agent, transport, federation and counsel identities are joined only through a binding the participant made. Never by string, never by inference, never by a third party's convenience.
+
+## §5 — The immune frame
+
+The SDO and RWA test is a systems-failure test, not a test of one actor. A tyrant exists only with followers, and the followers are embedded members of the same network we are building. The recurrent failure is human-shaped: a dominance-seeking few and an authoritarian-following many, each with reasons that are valid in their own minds, and their agents will carry those justifications faithfully. No human society has yet evolved an immune system against this pattern that did not itself become the pattern. The protocol is designed with that whole history and those vulnerabilities in view, and with the expectation that the morality test will be failed within the network, repeatedly.
+
+So the design is not a wall but an immune system, and it holds to four commitments:
+
+- **Discernment reads fruit and measured history, never minds.** The justifications are private and stay private. What the network can know objectively is the fruit of words and acts over time, and the measured evidence of what such fruit has produced before. Precedent is the case law of that history, and folds keyed by measure and environment are how a pattern seen at one edge becomes evidence at another.
+- **Early detection is bounded reach, not surveillance.** Reach gates catch an attempt at the moment it seeks to operationalize beyond its own space, and earned, graduated reach limits how mature any scheme can become before the fruit is visible.
+- **Signals route around capture.** Feedback and algedonic signals carry graduated standing impact and reach the whole rather than a hierarchy, and counter-evidence is floor-protected, so a captured layer cannot silence the alarm.
+- **The immune system is itself under the test.** Plural lenses, chosen and declared, keep any one discernment from becoming the tyrant; neither species is terminal; recovery and revert are constitutional paths, because a network that cannot heal after failing is a network that must not fail, and that is the wrong design.
+
+**Subsidiarity and the apex bet.** The autoimmune failure, a network turning its discernment on a minority whose fruit is merely unfamiliar, is answered by subsidiarity of the council layers. Judgment is held as close to the intimate edge as the stakes allow, where coordination is honest, high-fidelity and trusted, and only good faith flows upward. Floors, ceilings, paths and frictions at each layer are chosen thoughtfully and held in tension with the diversity they must afford, so that being heard when the network is wrong about you stays cheap in attention and reach. At the apex the corpus is smaller and validated by the whole of the participating network, held one degree away from humanity and affirmed by a diversity of context-carrying agent representatives who proportionally represent the whole, with delegate representation only and no direct participants, as the collectives schema already declares for the public and commons reaches. The bet, a true unknown, is that a network built this way never reaches at its apex a consensus that reproduces the systemic failures it exists to survive, unless the nature of humanity itself changes. That bet is why the care is spent at the edges, to evolve with humanity with an posture to steward toward love.
+
+## §6 — How to apply it
+
+When a design names a store, ask which side of the line it sits on. If nobody else needs it to validate an act, it is private. If it is what a participant placed into shared space, it is fruit. If a design finds itself wanting the private side to make a judgment work, the judgment is being asked the wrong question, and the answer is an attestation of the outcome, never a window into the thinking.
