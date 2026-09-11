@@ -1103,6 +1103,69 @@ Task 11 rendered the strip from the only wire-true hosting fact available, `cond
 
 ---
 
+## Task 13c — Agent-key canonical form, capacity dedupe, steward-cell targeting (found by Task 17 rerun)
+
+**Drains:** nothing new — it unblocks Task 13's promise leg, which was 500ing on every hosted registration, so story 07's hosting scenarios could never go green. **Tier:** Opus (rust-architect). **Slice:** doorway-service only. **Surfaced by:** household run `20260911T0319–0326Z-8618c2dd` (`genesis/a2o/reports/sprint-report-household-*.json`).
+
+Three defects, one shared root: the doorway wrote agent keys in a spelling nothing else in the protocol uses, and then counted those spellings as if each were a person.
+
+- [x] **Step 1 — the grant recipient is a real HoloHash now.** `36b0e053a46462277804a38f69eb3c0f98dcd339`.
+
+  Symptom: `WARN pool compute refused a hosted-cell grant status="500" body="Error: Invalid input: compute grant: recipient must be a Holochain agent key"`. `provisioner.rs` set `ProvisionedAgent::agent_pub_key` to BARE base64 of the raw 39 bytes (`hCAk…`, the form visible in the Prologue roster); `elohim-storage/src/api/compute_grants.rs:87` does `AgentPubKey::try_from(recipient)`, which answers `Holo Hash missing 'u' prefix` on anything but the canonical multibase form.
+
+  **The form was chosen from an inventory, not a guess** (every producer and reader of `agent_pub_key` in the crate, ~350 references / 31 files). It found FOUR string forms in flight — bare url-safe (provisioner, discovery, the startup walk), bare STANDARD (the startup walk, the chaperone's browser payload), canonical `uhCAk…`, and a 32-byte Ed25519 key that is not a HoloHash at all (`custodial_keys/service.rs:121`, the non-provisioned path). The decisive evidence that canonical is the contract and bare is the drift: **zero** bare `hCAk…` literals exist anywhere in `src/`, while all 118 `uhCAk` literals — every test fixture, the `pool_compute_performer` config doc (`config.rs:285`), the op-gate performer doc (`server/http.rs:1446`), and the dev-mode key mint (`auth_routes.rs:1249`) — already assume canonical. The crate's own tests encoded a belief its production code did not honour, which is exactly why nothing caught this.
+
+  Landed: `conductor::agent_key` (`canonical_agent_key` / `normalize_agent_key` / `is_agent_key_form` / `lookup_forms`) and `provisioner::provisioned_agent_key`, applied at **both** producers — fresh provision and the idempotent `find_existing_app` reuse path, which must move in lockstep or a returning human's promise leg fails where a newcomer's succeeds. Registration fans out over every string form so a JWT or Mongo row of any vintage still routes; `get_conductor_for_agent` and `unregister_agent` became spelling-agnostic, which covers the ~13 registry-lookup readers the inventory flagged intolerant in one place. Two hard-parse readers that have been failing SILENTLY all along now normalize their input: account-closed self-revocation (`auth_routes.rs:2844` — `.ok()?` swallowed the refusal, so the revocation never reached the DHT) and `zome_helpers::call_get_human_by_agent_key`.
+
+  Tests, written first and watched fail with the real fleet error: `a_provisioned_agents_grant_recipient_parses_as_a_holochain_agent_key` (the provisioner's own minting fn → the real grant body → the exact `AgentPubKey::try_from` the grant surface calls) and `the_drifted_bare_base64_form_is_refused_by_the_same_parse` (so the assertion has teeth), plus eight normalizer cases covering both input vintages, idempotence, and placeholder pass-through. Fixtures are REAL keys minted via `from_raw_32` — a hand-rolled 39 bytes answers `BadChecksum` and would prove the wrong thing.
+
+  **Migration note, deliberately not fixed here.** `UserDoc.agent_pub_key` rows written before this commit keep their bare spelling. Registry lookups tolerate that; two ADMIN Mongo filters that query `UserDoc` by string equality do not — `routes/admin_conductors.rs:731` (force-graduation) and `:756` (the steward flag) — so an operator must still pass the legacy spelling for a pre-canonical account. Both are operator-driven and low-traffic; widening them to an `$in` over `lookup_forms` is the follow-up. Also found and left: `worker/zome_call.rs:267` decodes with `STANDARD` what `services/discovery.rs:292` encodes with `URL_SAFE_NO_PAD` — a latent pre-existing mismatch on a path this change does not touch.
+
+  Seam row: `normalize_agent_key` in `doorway/doorway-service/seam-registry.yaml` (C9 identity-lineage continuity, C10 contract-evolution honesty, C7 advertise/serve symmetry, C6b idempotent effect), citing all eleven tests.
+
+- [x] **Step 2 — capacity counts humans, not spellings.** `36b0e053a46462277804a38f69eb3c0f98dcd339` (same commit as the normalizer it depends on; the key-canonicalization fan-out is only safe once this landed, so it is the earlier of the two commits).
+
+  `provisioner.rs` registered every agent twice (url-safe + STANDARD) and `registry.rs` incremented `capacity_used` once per call, while `seed_capacity_from_agents` DID dedupe — so the live count ran at 2x and a restart silently halved it. The fleet default `DOORWAY_MAX_AGENTS_PER_CONDUCTOR=50` was really admitting about 25, and the cap moved when nothing about the conductor had.
+
+  Fixed at the registry: `capacity_used` is now RECOUNTED (never incremented) from the agent map through one predicate, `count_distinct_agents_by_conductor`, which the live path (`recount_capacity`, on every register AND unregister) and the restart seed both call — live and seeded are equal by construction, not by two implementations agreeing. Both lookup encodings are kept as aliases, since readers need them.
+
+  That predicate's unit is the **normalized agent key**, which retires the earlier `(conductor_id, app_id)` proxy. `app_id` was only ever a stand-in for identity adopted because no normalizer existed, and it leaked the other way: every row carrying the bare default `"elohim"` app id — a legacy Mongo row, a `ConductorRouter` miss-path auto-registration, a hand-driven `/admin/conductors/assign` — collapsed onto ONE count however many humans it represented. An undercount on the surface that enforces the cap is a cap that silently stops biting, and the retired proxy's own doc called this out as a "known undercount" it accepted.
+
+  Tests: `registering_one_agent_under_every_encoding_costs_one_capacity` (register one agent under every form → `capacity_used == 1`, then seed → still 1, i.e. restart-seeded equals live), `any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it`, and three rewritten predicate tests — the previous ones used fake keys (`"uhCAk_adam_std"`) that cannot exercise a normalizer, so they now use real key encodings. `distinct_agents_handles_empty_and_default_app_id_rows` pins the retired proxy's undercount as a regression.
+
+  Seam row: `count_distinct_agents_by_conductor` (C6b idempotent effect, C7 advertise/serve symmetry across a restart, C4 honest absence), citing six tests.
+
+- [x] **Step 3 — steward-cell targeting: DIAGNOSED, and the defect is NOT in the doorway.** Report only; no code change (the defect sits in `genesis/`, outside this task's write set).
+
+  Symptom after real hosting landed: `seed-agent-bindings` failed with `imagodei::agent_peer_binding:155: Guest("signer mismatch: caller 'uhCAkKR1eEp…' does not match Agent EPR 'human-matthew-manager'")` — a call meant to be signed by the steward's own cell was signed by a HOSTED human's cell on the same conductor.
+
+  **The doorway binds by exact app id and is correct.** `doorway/doorway-service/src/services/zome_caller.rs:832-834`:
+
+  ```rust
+  let app_info = apps
+      .iter()
+      .find(|a| a.installed_app_id == installed_app_id)
+  ```
+
+  String EQUALITY against the configured `args.installed_app_id` — a hosted app can never satisfy it. (It then authorizes signing credentials for all provisioned cells *of that one app*, `:842-865`, so provenance is the steward's key by construction.)
+
+  **The selection defect is a PREFIX match in the seeder.** `genesis/seeder/src/seed-agent-bindings.ts:197-198`:
+
+  ```ts
+  const apps = await adminWs.listApps({});
+  const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+  ```
+
+  with `appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim'` (`:424`). The doorway mints hosted app ids as `format!("{app_id}-{conductor_id}-{short_hash}")` (`doorway-service/src/conductor/provisioner.rs:388`) → `elohim-conductor-0-a1b2c3`, which **satisfies `.startsWith('elohim')`**. `listApps` guarantees no ordering, so once a conductor holds the steward's app plus N hosted apps, `.find()` can return a hosted human's app; `selectSeedCell(matchingApp.cell_info, 'imagodei')` (`:208`) then picks the imagodei cell of the WRONG app, and the zome's signer-match gate refuses exactly as it should.
+
+  This is the same first-match-wins class the file's own header documents at `:21-32` (genesis #1119/#1380–#1386) — fixed once for conductor affinity across pods, and still live for app selection *within* one conductor. The prefix match was safe only while a conductor held exactly one app; real hosting ended that precondition. Fix (not taken here): match the steward's app id EXACTLY, the way the doorway does, rather than by prefix.
+
+**Verification.** `just gate doorway` EXIT=0 — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --lib --bins`: **1251 lib tests passed, 0 failed, 2 ignored** (up from 1238 at Task 13b), plus 4 bin tests. No schema changed, so no `schema_contract` leg. `seam-registry.yaml` validates against `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json` at 57 decision points (55 + the 2 added here).
+
+**Habit delta line this produces:** `hosted-human-lifecycle` — "a provisioned agent key is the canonical HoloHash form (`uhCAk…`), so the hosted-cell compute grant's recipient parses on the surface that issues it; legacy bare-base64 rows are normalized on read, never orphaned. Conductor capacity counts distinct agent identities through one predicate shared by the live recount and the restart seed, so the cap no longer halves on restart. `just gate doorway` EXIT=0 (1251 lib tests)."
+
+---
+
 ## Task 14 — `humansServed` is derived (D3) and the backlog atom closes
 
 **Drains:** new — D3. Closes `genesis/data/timeline/backlog/doorway-landing-humans-served-source-2026-06-23.md`.
@@ -1373,6 +1436,26 @@ Expected: a file newer than every dataplane source change in this batch. Pre-pus
 **Habit delta lines this produces:**
 - `hosted-human-lifecycle` — "household lane run `<id>`: 05-leaving `<n>`/`<n>` passed, 07-hosted-by-a-household `<n>`/`<n>`, doorway-humans-served `<n>`/`<n>`; 0 undefined, 0 skipped."
 - `doorway-failover` — "household lane run `<id>`: doorway-failover.feature `<n>`/`<n>`; apex-transition MEASURED (0 undefined) and failing at `<step>`."
+
+---
+
+## Task 17b — Mesh: version stamp, portal arm, hosted-cast allow-list, seeder steward assumption (found by Task 17 rerun)
+
+**Drains:** the four non-product reds Task 17's household run charged against product concerns. **Tier:** mesh operator (Fable). **Slice:** `app/elohim-app/scripts/hc-mesh{,-prologue}.sh`, `genesis/seeder/src/`, root `justfile`. No `doorway/**` or `elohim/**` source — the doorway's own cell-targeting defect is Task 19b's neighbour and was diagnosed concurrently.
+
+Run 20260911T03{19–26}Z-8618c2dd charged four reds to product concerns that were mesh-side. Each one is a household precondition that CI happens to meet and a local build never does, or a cast sized under a bug:
+
+- [x] **Step A: A plain `pnpm build` leaves no `version.json`, and staging refuses the archive.** `elohim/sdk/scripts/package-angular-check.py:34-56` refuses a browser or SSR archive whose `version.json` is absent or whose `commit` is empty, and for `kind=server` requires the server stamp to equal the browser one. Only the CI Jenkinsfile and `package-angular.mjs build` write that file — the latter as a side effect of a full rebuild, which the Prologue must never do to the dists it is staging. So the Prologue now stamps the dists itself, mirroring `package-angular.mjs:53,:117` exactly (`commit` = full `git rev-parse HEAD`, `dirty`, `buildTime`, `service` = the angular.json application name, `environment: "local"`), and never overwrites a stamp that is already there. Landed `<sha-A>` — `app/elohim-app/scripts/hc-mesh-prologue.sh` `stamp_build_version()`.
+
+- [x] **Step B: nothing restarts the sign-in portal.** The portal is a bare `ng serve` on `THRESHOLD_PORT` with no supervisor; the workspace RAM guard sheds it like any other fat node process, and the only symptom was every browser scenario timing out inside `threshold-register-display-name` with nothing naming the cause. `hc-mesh.sh` now carries `portal_ready` / `start_portal` / `restart_portal` (a `portal-restart` arm, mirroring the storage and doorway arms), `status` distinguishes "no portal on :8081" from "doorway proxy fault" instead of printing one `down`, and `just test mesh-browser` REFUSES before launch when `<doorway>/threshold/login` is not 200, naming `just mesh portal-restart`. Landed `<sha-B>`.
+
+- [x] **Step C: the hosted cast blows the conductor's RAM — a cast decision, not a bug.** Registering is provisioning now (`should_provision`, 60fb28a39): ~157 MB of conductor heap per cell × 5 cells ≈ 786 MB per registered human. The standing 29 personas took matthew's conductor from 1.1 GB to 22.8 GB and the guard shed the lane (`exit 143`). Until 60fb28a39 those personas rode the `dev_mode` singleton for free — **the cast was designed under a bug**. Decision (chief): on a household mesh only the humans a2o actually signs in as are provisioned. There is no "credential without a cell" path to fall back on — both register branches a registry-configured doorway can take (`hosted`, `node`/`device`) call `provision_agent`, which installs the app when it finds none — so the rest are simply not registered here, and the seeder prints each one with the reason. `seed-humans.ts` carries `HOUSEHOLD_HOSTED_CAST` (14 names, each commented with the feature that signs in as it), applied when `DOORWAY_URL` is loopback; `MESH_HOSTED_CAST=all` restores the standing cast, `=lane` forces the allow-list. `MESH_DOORWAY_MAX_AGENTS` default drops 200 → 34 (14 + the 3 `prologue-hosted-*` = 17, doubled for the doorway's double-count, which comes back out when Task 19b's accounting defect lands). Landed `<sha-C>`.
+
+- [x] **Step D: the seeder assumed the steward is the only agent on their conductor.** `seed-conductor-identities` resolved the steward's app by `installed_app_id.startsWith('elohim')` — but a doorway-provisioned hosted app is `elohim-conductor-0-<6hex>`, which matches the same prefix, so the seeder read a stranger's `get_my_human` and reported `[C] Matthew doorway — conductor already embodies '<uuid>'`. A conductor hosting other people's cells IS story 07's topology; the assumption was the defect. The steward is now the agent of the steward's OWN installed app — exact `INSTALLED_APP_ID` match first, a non-hosted-shaped prefix match second, the old prefix match last. `seed-agent-bindings`' signer mismatch is **left red on purpose**: it is the same cell-targeting question one layer down (`genesis/seeder/src/seed-agent-bindings.ts:198` picks the cell by the same prefix; `:248-257` then calls `imagodei.create_agent_peer_binding` on it over the conductor app websocket from `CONDUCTOR_URLS` — no doorway route is involved), and the doorway-side diagnosis owns it. Landed `<sha-D>`.
+
+- [x] **Step E: rerun the lanes these fixes affect.** Cold recast (`just mesh stop && just mesh start && just mesh wait --timeout 900` — `start` wipes and regenerates the sandboxes when peer 0's admin port is free, which is what makes the allow-list bite: the previous run's 33 provisioned apps are otherwise still installed and still resident), then `just mesh prologue`, then `just test mesh features/dataplane/doorway-failover.feature` and `A2O_RUN_WIP=1 just test mesh features/dataplane/doorway-apex-transition.feature`. The hosted-human lanes stay for a final run after the doorway cell-targeting fix lands. Evidence in the run report below.
+
+**Habit delta line this produces:** `doorway-failover` — "household staging legs green on a locally-built dist (version.json stamped by the Prologue); hosted cast cut 29 → <N> by the lane allow-list, conductor RssAnon <X> GB."
 
 ---
 
