@@ -42,6 +42,35 @@ function closeRefusalMessage(refusal: unknown): string {
   return 'The doorway could not close this account, and nothing was changed. Please try again.';
 }
 
+/**
+ * An instant the `DatePipe` can be trusted with, or nothing.
+ *
+ * `DatePipe` THROWS (`NG02100`) on a string it cannot parse, and a throw
+ * part-way through a template abandons every node below it — on the account
+ * page that meant the usage gauges, the whole agency pipeline and the
+ * graduation CTA vanished because ONE date row could not be formatted
+ * (household run 20260911T041337Z-faca0d95: the a2o glue found no `.step`
+ * elements at all and reported `Agency pipeline has no "Hosted" step`).
+ *
+ * So no raw wire string reaches the pipe: an instant the browser cannot read
+ * is said to be unknown, in its own row, and the rest of the page stands.
+ *
+ * TODO(rust-fix): the unreadable instant is a WIRE defect, not a display one.
+ * `doorway-service/src/routes/auth_routes.rs` builds `createdAt` /
+ * `lastLoginAt` / `stewardshipAt` with `d.to_string()` — the `time` crate's
+ * `Display` (`2026-09-11 4:36:34.217 +00:00:00`), not RFC3339 — while
+ * `hostedCellValidUntil` on the very same response IS RFC3339. The truth layer
+ * owns the format; this guard deliberately does NOT re-implement it here (a
+ * tolerant parser in TypeScript would become a second, unguarded home for a
+ * timestamp convention). Until the doorway formats with `Rfc3339`, those two
+ * rows read "—".
+ */
+function instantOrNull(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
 /** Agency pipeline step definition */
 interface PipelineStep {
   key: AgencyStep;
@@ -112,13 +141,21 @@ const AGENCY_STEPS: PipelineStep[] = [
             <div class="info-item">
               <span class="info-label">Member Since</span>
               <span class="info-value">
-                {{ $safeNavigationMigration(account()?.createdAt) | date: 'mediumDate' }}
+                @if (memberSince(); as at) {
+                  {{ at | date: 'mediumDate' }}
+                } @else {
+                  &mdash;
+                }
               </span>
             </div>
             <div class="info-item">
               <span class="info-label">Last Login</span>
               <span class="info-value">
-                {{ $safeNavigationMigration(account()?.lastLoginAt) | date: 'medium' }}
+                @if (lastLogin(); as at) {
+                  {{ at | date: 'medium' }}
+                } @else {
+                  &mdash;
+                }
               </span>
             </div>
           </div>
@@ -462,7 +499,13 @@ export class DoorwayAccountComponent implements OnInit {
   readonly hostedByHousehold = computed(() => this.account()?.hostedByHousehold ?? null);
 
   /** RFC3339 instant the hosting is promised until (S2 Task 13's grant bound). */
-  readonly hostedUntil = computed(() => this.account()?.hostedCellValidUntil ?? null);
+  readonly hostedUntil = computed(() => instantOrNull(this.account()?.hostedCellValidUntil));
+
+  /** When the doorway says this account began, when it can be read at all. */
+  readonly memberSince = computed(() => instantOrNull(this.account()?.createdAt));
+
+  /** The last sign-in the doorway recorded, when it can be read at all. */
+  readonly lastLogin = computed(() => instantOrNull(this.account()?.lastLoginAt));
 
   readonly storageColor = computed(() => quotaGaugeColor(this.storagePercent()));
   readonly queriesColor = computed(() => quotaGaugeColor(this.queriesPercent()));
@@ -581,13 +624,31 @@ export class DoorwayAccountComponent implements OnInit {
     }
   }
 
+  /**
+   * The step the human is AT — the STAGE axis, the one elohim-app's agency
+   * badge uses, not the next gate they could pass.
+   *
+   * `agency-pipeline-coherence.feature` left the axis open ("the doorway
+   * tracks the next GATE while the badge tracks the current STAGE … a decision
+   * for the surface owners"). `hosted-human/05-leaving.feature` — which is not
+   * @wip and is the finish line for a hosted human's whole life — decides it:
+   * "the agency pipeline on the account page calls this stage 'Hosted' … the
+   * first stage of agency", and asserts the pipeline marks it CURRENT for a
+   * freshly registered human. A human who has only ever been hosted was being
+   * shown "Key Export" as where they are, which is a gate, not a place.
+   *
+   * Exactly one step is current, and it is the furthest stage reached:
+   * a steward is at "Steward" (still uncompleted while their cell is
+   * doorway-hosted — the hosted-steward in-between the banner names), someone
+   * running their own conductor is at "Install App", someone who has exported
+   * their keys is at "Key Export", and everyone else is at "Hosted".
+   */
   isCurrentStep(step: AgencyStep): boolean {
     const acct = this.account();
     if (!acct) return step === 'hosted';
-    if (step === 'steward' && this.stewardAccessingThroughDoorway()) return true;
-    if (step === 'steward' && !acct.isSteward && this.runsOwnConductor()) return true;
-    if (step === 'install_app' && !this.runsOwnConductor() && acct.keyExported) return true;
-    if (step === 'key_export' && !acct.keyExported) return true;
-    return false;
+    if (acct.isSteward) return step === 'steward';
+    if (this.runsOwnConductor()) return step === 'install_app';
+    if (acct.keyExported) return step === 'key_export';
+    return step === 'hosted';
   }
 }

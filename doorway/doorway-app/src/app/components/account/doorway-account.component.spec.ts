@@ -141,7 +141,11 @@ describe('DoorwayAccountComponent — hosted-steward is an in-between state', ()
       expect(component.isStepCompleted('steward')).toBe(false);
       expect(fixture.nativeElement.querySelector('.context-banner')).toBeNull();
       expect(fixture.nativeElement.querySelector('.graduation-cta')).not.toBeNull();
-      expect(component.isCurrentStep('key_export')).toBe(true);
+      // A human who has only ever been hosted is AT "Hosted". Key export is the
+      // next GATE — the graduation CTA above names it — not where they are.
+      // See `isCurrentStep`, and hosted-human/05-leaving.feature.
+      expect(component.isCurrentStep('hosted')).toBe(true);
+      expect(component.isCurrentStep('key_export')).toBe(false);
     });
   });
 });
@@ -359,5 +363,159 @@ describe('DoorwayAccountComponent — closing an account and the hosting strip',
       expect(testId('account-hosted-by-household')).toBeNull();
       expect(testId('account-hosted-until')?.textContent?.trim()).toBeTruthy();
     });
+  });
+});
+
+/**
+ * The agency pipeline a hosted human actually sees
+ * (genesis/a2o/features/auth/hosted-human/05-leaving.feature, "A newcomer creates
+ * an account, is hosted as themselves, and closes it again").
+ *
+ * Two claims the household run 20260911T041337Z-faca0d95 measured RED at once:
+ *
+ *  1. ONE BAD INSTANT MUST NOT BLANK THE PAGE. The doorway serves `createdAt`
+ *     as `2026-09-11 4:36:34.217 +00:00:00` (the time crate's `Display`, not
+ *     RFC3339 — `doorway-service/src/routes/auth_routes.rs` builds it with
+ *     `d.to_string()`). `DatePipe` THROWS `NG02100` on a string it cannot parse,
+ *     and a throw part-way through this template abandons everything below it:
+ *     the gauges, the stepper, the CTA. The a2o glue reads `.step` / `.step-label`
+ *     and found NO steps at all — "Agency pipeline has no "Hosted" step" is what a
+ *     crashed render looks like from outside.
+ *
+ *  2. "HOSTED" IS THE STEP A HOSTED HUMAN IS AT. The story calls it "the first
+ *     stage of agency"; the pipeline marks the stage the human is IN, not the
+ *     next gate they could pass. This is the axis `agency-pipeline-coherence.feature`
+ *     left open — 05-leaving, which is not @wip, decides it for the stage.
+ */
+describe('DoorwayAccountComponent — the agency pipeline a hosted human sees', () => {
+  let fixture: ComponentFixture<DoorwayAccountComponent>;
+  let originalLocation: Location;
+
+  /** A freshly registered hosted human, exactly as `/auth/account` answers. */
+  const FRESHLY_HOSTED: AccountResponse = {
+    humanId: 'human-newcomer',
+    identifier: 'newcomer@alpha.elohim.host',
+    permissionLevel: 'AUTHENTICATED',
+    storageBytes: 0,
+    storageLimit: 104_857_600,
+    storagePercent: 0,
+    projectionQueries: 0,
+    dailyQueryLimit: 1000,
+    queriesPercent: 0,
+    bandwidthBytes: 0,
+    dailyBandwidthLimit: 524_288_000,
+    bandwidthPercent: 0,
+    conductorId: 'conductor-0',
+    isSteward: false,
+    keyExported: false,
+    displayName: 'Newcomer',
+    createdAt: '2026-09-11T04:36:34Z',
+    lastLoginAt: '2026-09-11T04:36:34Z',
+  };
+
+  /** What the a2o glue reads: every `.step`, its label, and its classes. */
+  function pipelineSteps(): { label: string; classes: string[] }[] {
+    return [...fixture.nativeElement.querySelectorAll('.step')].map((step: HTMLElement) => ({
+      label: step.querySelector<HTMLElement>('.step-label')?.textContent?.trim() ?? '',
+      classes: [...step.classList],
+    }));
+  }
+
+  async function renderAccount(account: AccountResponse): Promise<void> {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [DoorwayAccountComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: DoorwayAdminService,
+          useValue: {
+            getAccount: vi.fn().mockReturnValue(of(account)),
+            getPortalHostUrl: vi.fn().mockResolvedValue({ hostUrl: null }),
+            mintSessionToken: vi.fn(),
+            closeAccount: vi.fn(),
+          },
+        },
+      ],
+    });
+
+    fixture = TestBed.createComponent(DoorwayAccountComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    originalLocation = globalThis.location;
+    Object.defineProperty(globalThis, 'location', {
+      value: {
+        href: 'https://doorway-alpha.elohim.host/threshold/account',
+        origin: 'https://doorway-alpha.elohim.host',
+        hostname: 'doorway-alpha.elohim.host',
+      },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it('marks "Hosted" as the step a freshly hosted human is at', async () => {
+    await renderAccount(FRESHLY_HOSTED);
+    const steps = pipelineSteps();
+
+    expect(steps.map(step => step.label)).toEqual([
+      'Hosted',
+      'Key Export',
+      'Install App',
+      'Steward',
+    ]);
+    const hosted = steps.find(step => step.label === 'Hosted');
+    expect(hosted?.classes).toContain('current');
+    // Exactly one step is where the human IS.
+    expect(steps.filter(step => step.classes.includes('current'))).toHaveLength(1);
+  });
+
+  it('marks no step after the current one completed', async () => {
+    await renderAccount(FRESHLY_HOSTED);
+    const steps = pipelineSteps();
+    const current = steps.findIndex(step => step.classes.includes('current'));
+
+    expect(current).toBeGreaterThanOrEqual(0);
+    expect(steps.slice(current + 1).every(step => !step.classes.includes('completed'))).toBe(true);
+  });
+
+  it('still renders the pipeline when the doorway sends an instant DatePipe cannot read', async () => {
+    // Measured on the household mesh, run 20260911T041337Z-faca0d95.
+    await renderAccount({
+      ...FRESHLY_HOSTED,
+      createdAt: '2026-09-11 4:36:34.217 +00:00:00',
+      lastLoginAt: '2026-09-11 4:36:34.217 +00:00:00',
+    });
+
+    expect(pipelineSteps().map(step => step.label)).toContain('Hosted');
+    // Everything below the bad row survives it.
+    expect(fixture.nativeElement.querySelector('.gauge-grid')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.close-account')).not.toBeNull();
+    // The unreadable instant is said to be unknown, not silently shown as blank.
+    const text = (fixture.nativeElement.textContent ?? '').replaceAll(/\s+/g, ' ');
+    expect(text).toContain('Member Since —');
+  });
+
+  it('reads a hosted human’s promised-until date off the wire', async () => {
+    await renderAccount({ ...FRESHLY_HOSTED, hostedCellValidUntil: '2026-10-11T04:36:33Z' });
+
+    const until: HTMLElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="account-hosted-until"]'
+    );
+    expect(until?.textContent?.trim()).toBeTruthy();
   });
 });
