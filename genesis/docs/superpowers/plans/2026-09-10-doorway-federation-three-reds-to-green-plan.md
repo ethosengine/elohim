@@ -977,9 +977,11 @@ git commit -m "feat(doorway-app): close-account surface and hosted-by-a-househol
 
 **Acceptance evidence (restated):** the cleanup for API-registered ephemeral humans calls `POST /auth/close-account` with that human's bearer, falling back to the admin soft-delete **only** if the route is absent; the "not swept afterwards" caveat retires from the neighbourhood feature's preamble; a full auth-lane run on the household mesh leaves the doorway's user count unchanged before and after, asserted in the run log.
 
-- [ ] **Step 1: Rewrite the cleanup**
+- [x] **Step 1: Rewrite the cleanup** — done in `genesis/a2o/steps/auth-lifecycle.steps.ts`: the registration `When`'s `this.onCleanup(...)` now calls `closeAccountCleanup()`, which POSTs `/auth/close-account` with the registering human's own bearer (`{ confirmIdentifier }`), logs which path fired, and falls back to the pre-existing admin soft-delete **only** on `404`/`405` (route absent) or a request-level throw — never on a genuine non-2xx from the route itself, and never rethrows. Covers the `features/auth/*` auth-lane (`auth-lifecycle.feature`, `operator-onboarding.feature`, `user-management.feature`) that `just test mesh features/auth` runs.
 
-- [ ] **Step 2: Prove the count is unchanged**
+  **Found tree/plan mismatch — feature-preamble retirement withheld, not done.** The neighbourhood feature's Background step (`a hosted human is registered on doorway "alpha"`, `features/browser/doorway-portal-login-neighbourhood.feature:23`) does **not** route through `auth-lifecycle.steps.ts` at all — it matches a differently-worded step in `genesis/a2o/steps/ui/doorway-portal-login.steps.ts:123`, whose only `onCleanup` (line 186) closes the Playwright device, never the account. So the "not swept afterwards" caveat this task names is still literally true for that Background; retiring it as this task's acceptance evidence asks would put a false claim in the feature preamble. Missing node: `chain / auth-lane product-path cleanup (auth-lifecycle.steps.ts, Act I) → ??? → neighbourhood Background registration (doorway-portal-login.steps.ts:123, Act II) / missing node: wire an equivalent close-account cleanup into doorway-portal-login.steps.ts's registration step + probe: does the neighbourhood pipeline's fleet user count stop growing per run / current state: unwired — that file is out of this task's write set, left untouched`. The feature file is unchanged; only `auth-lifecycle.steps.ts` is committed below.
+
+- [ ] **Step 2: Prove the count is unchanged** — not run this pass (no mesh started; scope says this is S4's job).
 
 ```bash
 cd /projects/elohim
@@ -990,12 +992,12 @@ echo "BEFORE=$BEFORE AFTER=$AFTER"
 ```
 Expected: `BEFORE` equals `AFTER`. (Before Task 14 both read `None`; re-run this step after Task 14 for the real assertion, and record the numbers in the delta.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit** — pathspec-limited to the one file actually changed (see Step 1 note: the feature file was deliberately left untouched).
 
 ```bash
 cd /projects/elohim
-git add genesis/a2o/steps/auth-lifecycle.steps.ts genesis/a2o/features/browser/doorway-portal-login-neighbourhood.feature
-git commit -m "test(a2o): harness cleanup closes accounts through the product path (hosted-human Task 6)"
+git add genesis/a2o/steps/auth-lifecycle.steps.ts
+git commit -m "test(a2o): harness cleanup closes accounts through the product path (hosted-human Task 6)" -- genesis/a2o/steps/auth-lifecycle.steps.ts
 ```
 
 **Habit delta line this produces:** `hosted-human-lifecycle` — "a2o auth-lane cleanup uses POST /auth/close-account; household user count before/after run `<id>`: `<n>`/`<n>`."
