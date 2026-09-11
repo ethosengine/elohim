@@ -23,7 +23,10 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   without the doorway being able to take it back. The POOL is the set of conductors —
   network runtimes — a doorway operates on other people's behalf; one conductor holds many
   cells, each cell its own person's, and each pool conductor belongs to one household. That
-  household's STEWARD is the peer holding the key that speaks for it on the notary. A
+  household's STEWARD is the peer holding the key that speaks for it on the notary. Which
+  steward a pool conductor answers to is, today, that peer's own assertion about itself —
+  a cross-signed binding is a separate story, not claimed here; this one proves the promise
+  names the key the peer names, and no more. A
   steward is not the doorway: the doorway arranges the hosting, the steward's machine
   performs it, and it is the steward's key the promise must carry — the doorway's own
   PORTAL, the account pages it shows a person in a browser, is a face on the arranger, not
@@ -109,8 +112,9 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   Scenario: Closing the account withdraws the promise
     Given a newcomer who has created an account at this doorway
     And the agent key of the cell the doorway runs for them
+    And the identifier of their live "hosted-cell" commitment
     And the notary records a live "hosted-cell" commitment for them
     When they close their account through the portal
     Then no pool conductor holds a cell for that agent key
     And the notary records no live "hosted-cell" commitment for that agent key
-    And a household peer that is not the doorway's pool still reads that commitment back, carrying the date it was made and the date it ended
+    And a household peer that is not the doorway's pool still reads the commitment with that identifier back, carrying the date it was made and the date it ended
