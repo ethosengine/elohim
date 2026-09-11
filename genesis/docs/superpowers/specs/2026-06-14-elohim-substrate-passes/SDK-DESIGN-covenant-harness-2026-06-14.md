@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — Covenant + Constitution Harness: Binding an AI Agent Honestly"
+id: sdk-design-covenant-harness-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

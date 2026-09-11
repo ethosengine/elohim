@@ -1,5 +1,6 @@
 ---
 title: Social Reach — the sense-respond nervous system, and the legitimate user-side filter
+id: social-reach-nervous-system
 tier: architecture
 status: Architecture pattern (governs every surface that gates, propagates, or filters content)
 created: 2026-06-03

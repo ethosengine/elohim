@@ -9,9 +9,9 @@ graduation-trigger: ratified-and-decomposed OR superseded-by-upstream-merge
 created: 2026-08-08
 topic: [conductor, holochain-fork, upstream-contribution, zome-call, deadline, backpressure, head-plane, admission-control]
 cites:
-  - head-plane-trust-gradient-program-plan | Parent program: this is its T13 spike; the plan states the uncancellable-call constraint (evidence item 4) that §1-2 here qualify, and owns the elohim_head_batch_queue_wait_ms probe the decision memo depends on | sha256:69f96e0a10dc54dd | path: genesis/docs/superpowers/plans/2026-08-08-head-plane-trust-gradient-program-plan.md
+  - "head-plane-trust-gradient-program-plan | Parent program: this is its T13 spike; the plan states the uncancellable-call constraint (evidence item 4) that §1-2 here qualify, and owns the elohim_head_batch_queue_wait_ms probe the decision memo depends on | sha256:aee96a34080d4efa | path: genesis/docs/superpowers/plans/2026-08-08-head-plane-trust-gradient-program-plan.md"
   - genesis/data/timeline/backlog/2026-08-04-conductor-fork-rebase-0-6-3.md
-  - adam-slow-link-write-guard-saturation | The constraint of record: write-guard saturation is the load under which abandoning a queued zome call actually returns a database permit, which is what makes an app-interface deadline worth anything | sha256:556142ddd510a091 | path: genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md
+  - "adam-slow-link-write-guard-saturation | The constraint of record: write-guard saturation is the load under which abandoning a queued zome call actually returns a database permit, which is what makes an app-interface deadline worth anything | sha256:556142ddd510a091 | path: genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md"
 ---
 
 # App-Interface Zome-Call Deadlines — conductor capability spike

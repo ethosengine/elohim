@@ -15,7 +15,7 @@ informed-by:
   - genesis/orchestrator/data/deployments.json ($computeEnvelopeRatification — the prose no code reads)
   - genesis/data/rakia/compute-capacity.json (promoted 2026-09-05 from Prometheus by hand after four months stale)
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:ac9364d4b024290f | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - genesis/data/timeline/backlog/2026-08-29-compute-envelope-virtual-peer-contract.md
   - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - bridges/CLAUDE.md

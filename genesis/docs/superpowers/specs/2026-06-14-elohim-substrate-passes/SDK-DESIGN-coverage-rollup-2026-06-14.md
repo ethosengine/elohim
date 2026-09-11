@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — CoverageRollup / the Recursion SDK (the keystone)"
+id: sdk-design-coverage-rollup-2026-06-14
 subtitle: "aggregate-with-descent + descend + layer-node, as a developer-callable surface on the existing SDK"
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code

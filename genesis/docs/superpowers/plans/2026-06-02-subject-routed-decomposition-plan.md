@@ -7,12 +7,12 @@ class: process-meta
 process_subdomain: doc-lifecycle
 sprint: bootstrap
 cites:
-  - "subject-routed-decomposition-design | the spec this plan implements — its load-bearing phase order builds the readers before the manifest | sha256:0d910143a8498b64 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md"
+  - "subject-routed-decomposition-design | the spec this plan implements — its load-bearing phase order builds the readers before the manifest | sha256:fca639d89e25ade7 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md"
   - .claude/scripts/_lib/frontmatter.py
   - .claude/scripts/memory-kit/decompose.py
   - .claude/commands/brainstorm.md
-  - "placement | the contract this plan proposes the subject-class axis section for | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md"
-  - "map | the product-domain lattice this plan adds Axis 0 subject class above | sha256:4d707bfda967a21a | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
+  - "placement | current subject-class home contract; the originally proposed section is present, without proving gate implementation | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
+  - "map | current subject-class routing above the product D1–D10/pillar lattice; the original absence diagnosis is historical | sha256:d43860fc500b5d8b | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
 derived_from:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md  # dogfood breadcrumb (vocabulary only)
 requires_env: []   # pure dev-tooling (python/yaml/markdown) — testable on household-nodes, no shem/harbor/alpha
@@ -23,6 +23,8 @@ requires_env: []   # pure dev-tooling (python/yaml/markdown) — testable on hou
 Implements `2026-06-02-subject-routed-decomposition-design.md`. **The order is load-bearing** (spec §6): the *readers* (Phases 2–4) must exist before the manifest is relied on, and the relocations (Phase 6) must run only after the BACK reader can route them. Verification is process-meta-shaped: **"verified" = the test passes / the script exits 0 / the gate fires** — there is no pillar a2o scenario or CI-green for this work. Each phase names its files, its gap-item, and a concrete check.
 
 This plan is itself `class: process-meta` — the dogfood: the plan that builds the class gate is classed by the taxonomy the gate will enforce, with no `domain: D#`.
+
+**Source reconciliation (2026-09-09):** Phase 5 records the original authoring tasks. Current `MAP.md §1` already contains Axis 0 above the substrate D1–D10/pillar lattice and Axis 0b for composition seams; current `PLACEMENT.md` already names the subject-class axis and `.claude/subject-routing.yaml`. Reuse those prose surfaces rather than adding the sections again. The updated spec distinguishes its dated absence diagnosis from these current observations. No checkbox or reader/gate acceptance is discharged by this source inspection; the named checks remain required.
 
 ## Phase 1 — The parent constitution
 

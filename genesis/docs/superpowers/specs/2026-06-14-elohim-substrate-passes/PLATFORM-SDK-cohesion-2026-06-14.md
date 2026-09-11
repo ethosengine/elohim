@@ -1,5 +1,6 @@
 ---
 title: "PLATFORM SELF-DEVELOPMENT COHESION — how the catalog grows without becoming AWS-sprawl"
+id: platform-sdk-cohesion-2026-06-14
 subtitle: "One SDK on many APIs: a new capability is born ONLY as a new instantiation of the one primitive, and the oracle keeps the catalog one machine as it grows"
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code

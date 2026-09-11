@@ -6,11 +6,11 @@ class: process-meta
 process_subdomain: memory
 topic: [memory, stasis, converge, loop, ceremony, context-coverage, orchestration, cadence-convergence]
 cites:
-  - converge-skill-design | the dreaming-to-execution loop this partially supersedes by folding it into one scoreboard | sha256:3034b991de8d3d87 | path: genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md
-  - verification-result-index-design | the system-state store this loop reads to auto-resolve the back half of a claim | sha256:8d6b292dafc4a44e | path: genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md
+  - "converge-skill-design | the dreaming-to-execution loop this partially supersedes by folding it into one scoreboard | sha256:3034b991de8d3d87 | path: genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md"
+  - "verification-result-index-design | the system-state store this loop reads to auto-resolve the back half of a claim | sha256:8d6b292dafc4a44e | path: genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md"
   - genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md
-  - memory-lifecycle-design | the comet-shaped product seed whose vocabulary this loop dogfoods for doc hygiene | sha256:b6545e6548573fa4 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md
-  - placement | the contract defining the three doc homes this loop tends toward stasis | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
+  - "memory-lifecycle-design | the comet-shaped product seed whose vocabulary this loop dogfoods for doc hygiene | sha256:6a3557a18e2ceb09 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md"
+  - "placement | the contract defining the three doc homes this loop tends toward stasis | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
   - .claude/workflows/memory-stasis-loop.js
   - .claude/skills/memory-ceremony/SKILL.md
   - .claude/skills/memory-kit/SKILL.md
@@ -19,6 +19,11 @@ supersedes_partial: genesis/docs/superpowers/specs/2026-05-10-converge-skill-des
 ---
 
 # Unified Memory Loop — One Scoreboard, One Loop (Two Readouts), One Ceremony
+
+> Current design direction: the [2026-09-09 revision](#2026-09-09--collective-memory-and-progressive-discovery)
+> below supersedes the scoreboard-as-authority and gospel-rewrite-only framing.
+> Earlier sections retain the historical proposal; the ceremony remains judgment,
+> never a score. This revision serves `dev-system-equilibrium` and is not an implementation claim.
 
 ## The problem
 
@@ -243,3 +248,179 @@ signal* and a *post-hoc read-only indicator*, never its grade.
 - `.claude/workflows/memory-stasis-loop.js` — the loop skeleton being generalized.
 - `.claude/skills/{memory-ceremony,memory-kit,converge}/SKILL.md` — the cadences being collapsed.
 - Operator dialogue 2026-06-01 — ratified: one loop (two readouts), ceremony stays out.
+
+## 2026-09-09 — Collective memory and progressive discovery
+
+### Boundary and purpose
+
+EPRFS agent memory is the shared, governed memory capability of a collaborating
+collective, first exercised in a local development workspace. Native agent memory
+remains complementary: private working notes and runtime-managed stores are not
+silently imported, made authoritative, or overwritten by package projection.
+A new collective type or core EprKind is not established by this design.
+
+Operator clarification: memory-kit is a transitional subsystem to be deprecated,
+subsumed into two owners: the native-agent memory collective for shared knowledge
+and collaboration, and EPRFS objects governed by `.epr-meta` for files, documents,
+algorithms and code. Useful deterministic analyzers survive under those owners;
+memory-kit does not survive as a third authority, cadence or queue. Retirement is
+earned by replacement coverage, not by renaming the toolkit. The ceremony remains
+the purpose-bearing tending experience spanning both owners.
+
+The experience remains: orient → choose a concern → understand its story → follow
+evidence → act → review → reconcile. The agent reads a compact, ephemeral projection
+from governed memory. Purpose persists across navigation; history expands on demand.
+The executor carries selection, provenance and lifecycle bookkeeping underneath.
+Sacred Attention means warranted decisions with preserved uncertainty and less
+avoidable investigation; lower token use or fewer files alone cannot establish it.
+
+### Authority and subsystem ownership
+
+| Surface | Authoritative home and integration boundary |
+|---|---|
+| Shared assertions and coherent topics | Existing content/claim/observation vocabulary, exact version references and evidence relationships; author/observer, steward, subject, governing scope and permitted reach remain distinct. Unresolved alternatives survive as alternatives. |
+| Memory governance and selection recipes | Directory-local `.epr-meta` governance plus existing package/algorithm contracts. Declare defaults, selection, omissions, dependencies, authorship, permitted changes and method provenance. No unwired governance keys. |
+| Ceremony and maintenance lifecycle | Existing Intent, Commitment, ProcessSpec, Process, fulfillment, review and acceptance records in EPR-REA. These record acts; they are not all core EprKind variants. |
+| Context consumed in flight | Bounded recall/ceremony projections: purpose, selected assertion references, qualifications, omissions and expansion/actions. Their content is disposable; they confer no new authority. |
+| Runtime memory integration | Adapters project selected managed context into a distinct runtime surface and accept proposed contributions back. Runtime-authored memory remains independently owned until explicit adoption. |
+| Reports, boards and aggregates | Deterministic lenses over governed inputs and pinned observations. No writable parallel status or work queue. Judgment and opaque ranking remain attributed inputs, not invented deterministic explanations. |
+
+An assertion is the smallest default contribution; a coherent topic can group it.
+Content-derived versions retain derivation and supersession relationships. Paths,
+run labels and scope names are locators, not evidence of identity or authority.
+Concurrent contradictory contributions must not resolve by last writer, file mtime
+or retrieval rank. The governing process selects an applicable version or records
+that judgment remains open. A memory-specific package specialization is justified
+only if selection, contribution, retention and projection semantics cannot be
+expressed cleanly by existing packages. AgentDocPackage has useful machinery but
+its current adapters assume agent instruction documents; portability is not proven.
+
+### Holonic scope and graduation
+
+Session, workspace, repository stewardship and wider collectives form governed,
+potentially overlapping scopes. Reuse `.epr-meta` locality and inheritance for rules;
+inheriting a rule never widens disclosure. Authorship, stewardship, membership,
+subject rights, reach, version selection and byte availability are separate facts.
+Subject-bearing derived memory inherits the standing of its inputs.
+
+Push is a reach boundary at which a graduation can be evaluated, not an automatic
+promotion of all local memory. A repository finding may graduate while private
+investigation remains local. The proposed graduation names exact content, audience,
+authorizing governance, attribution, review and available supporting evidence.
+If necessary evidence cannot be disclosed, the receiving scope sees the limitation
+and cannot receive an inflated claim of verification. Git tracking is not consent.
+Local review is not peer attestation. Network publication needs its own existing
+primitive mapping and gate before implementation; it is not delivered here.
+
+### Ephemeral context with accountable provenance
+
+Each context projection has a lightweight receipt connecting the actual reviewed
+content to exact input versions, method version, purpose/scope and selection bounds.
+Expandable detail explains selection where knowable, with uncertainty and material
+omissions visible immediately. An opaque provider stays visibly opaque. Authorized
+provider alternatives use the same contract without restructuring the ceremony.
+
+Feedback targets either the source assertion or the projection: stale knowledge,
+misleading compression, omitted contradiction and poor selection are different
+failures. Feedback preserves the projection reference and the challenged passage;
+correction reconciles affected relationships without rewriting prior decisions.
+Ordinary projection bodies can expire. A consequential decision or challenge pins
+sufficient exact context and provenance for review under the applicable retention
+policy. A CID without retrievable bytes is insufficient; a receipt that exposes
+private passages must not graduate merely because it is called metadata.
+
+Continuation retains intent, baseline references, decisions, unresolved concerns,
+visited evidence versions and the next useful action. Resume checks changed inputs
+and reuses valid evidence rather than rerunning population audits. Projection
+expiry must permit bounded regeneration or an honest unavailable result.
+
+### Measurement and retirement
+
+Reuse `genesis/scripts/memory-balance.sh`'s existing entry/close measurement purpose.
+Bind an explicit baseline/close pair to each run, with method, scope, sampling window,
+completeness and evidence references. Never pair with merely the latest snapshot.
+Method changes require a new comparable series or an explicit non-comparison.
+Native note timestamps currently derive from Git HEAD time; measurement evidence
+must carry actual sampling times. Structured numerical ingestion is not implemented
+by `flow note --kind observation`, which currently emits a unit run-note event.
+
+Separate warranted outcomes and preserved uncertainty from attention costs and
+physical burden. Count unique authored content, generated projections, retained
+historical evidence and private operational storage separately. Report additions
+as well as deletions; archival relocation is not net removal. Include the run's own
+code/docs/reports, with a declared sampling cutoff and separately accounted closing
+artifacts. Attribute shared-tree changes cautiously. Unknown token usage stays
+unknown; bounded recall bytes do not account for direct shell reads or orchestration.
+
+| Existing machinery | Disposition and retirement condition |
+|---|---|
+| Deterministic cleanup, dedupe, placement and currency analyzers | Keep as specialist lenses/actions; migrate observations and lifecycle references into the shared substrate. |
+| Balance collector | Repair root/path-safe counting, authoritative/projection partitioning, bounded optional providers, snapshot identity and flag semantics before treating it as a trustworthy paired measure. Keep a compatibility entry point. |
+| Memory-kit and ceremony instructions | Converge package-first around shared inputs, compatible ownership and cadence; remove contradictory rewrite limits, MEMORY.md editing guidance and repeat auditing after equivalent behavior is covered. |
+| State ledgers, rankings and repeated report summaries | Derive from the same records; retire duplicate storage only after reader coverage and reproducibility are verified. Never mechanically label agent judgment deterministic. |
+| Retention scripts and recall execution directories | Make reference-aware. Existing dated report deletion assumes Git recovery despite ignored directories; nondated recall-executions lacks that aging path. Preserve pinned evidence and verify actual recoverability before deletion. |
+| Superseded topics and duplicate sections | Consolidate into evidence-bearing assertions and progressive links; retire originals only when provenance, qualification and discovery survive. |
+
+The September ceremony has no contemporaneous paired balance snapshots; a later
+snapshot cannot establish its net savings. Existing instruments are being integrated,
+not retroactively treated as measurements they did not take.
+
+### First integrated acceptance
+
+Use one real shared concern and the existing ceremony entry point. Agent A contributes
+an evidenced assertion; agent B arrives with only the context projection, recovers
+purpose, follows evidence, recognizes a contested alternative and corrects either
+the assertion or a misleading projection. Reset B's context and resume from the
+continuation without repeating valid investigation. Review the outcome independently.
+
+Exercise repository graduation with a local-only passage: the permitted finding and
+its sufficient evidence can be selected, while restricted content and revealing
+receipt data stay local. Exercise rejection, unavailable evidence, stale projection,
+concurrent contradiction and replay; repeated reconciliation must not duplicate acts.
+This is a local reach rehearsal, not proof of network enforcement.
+
+Render familiar balance, stale-edge, placement and outcome reports from the same
+pinned run inputs. Compare explicit baseline/close pairs and a controlled consolidation:
+prove reduced active burden without losing discoverability or uncertainty, and count
+retained storage plus measurement overhead. A fresh reader must explain both why an
+edge was followed and what lay outside its view. Responsible unresolved completion
+is valid; neither a score increase nor a one-item quota defines ceremony success.
+
+### Design gate and remaining proof
+
+Atlas routing: SDK composition owns artifact contracts; the client owns progressive
+presentation; local runtime/resource governance owns bounded execution and retention.
+This pass introduces private/local authored memory (B) and disposable projections (C).
+No A/A2 entity, DHT entry, coordinator write, gossip signal or HTTP route is introduced:
+new network heads at seed and one year are zero. No network stage is inferred from
+local development. Later graduation must classify its actual payload and preserve
+floor-protected authorization and counter-evidence at every declared network stage.
+
+Concern canon: `.claude/epr-meta/concerns.yaml`, with active C2 and C6a enforcement
+in `.claude/epr-meta/policies.yaml`. The integration has no contract tests yet; all
+applicable concerns below are **partial**, not answered by this prose.
+
+| Concern | Proposed boundary; remaining proof |
+|---|---|
+| C0 | Separate reach, declared version and availability; exercise local graduation. |
+| C1 | Contribution/projection cannot self-accept; exercise independent decision paths. |
+| C2 | Explicit version dependencies, no arrival-time authority; test concurrent replay. |
+| C3 | Correct, contest, defer or stop; test a legal transition from each nonterminal state. |
+| C4 | Distinguish absent, inaccessible, refused and unverifiable; test adapters. |
+| C5 | Receipts and local reviews confer only their warranted scope; test misleading evidence. |
+| C6a | Budget selection, providers, collection and retries; test cancellation and bounds. |
+| C6b | Repeated contribution/reconciliation has no duplicate effect; test fixed points. |
+| C7 | Advertised evidence and adapters must be available; test expired/missing bytes. |
+| C8 | Retain selection provenance and typed, counted decision reasons; test correction routing and reason coverage. |
+| C9 | Preserve actor/source lineage across adapters, key rotation and graduation; test attribution without orphaned state. |
+| C10 | Pin method/schema versions; reject or count unknown fields; test incompatible snapshots. |
+| C11 | Declare and count defer/refusal policy under external pressure; test backpressure and recovery. |
+| C12 | Verify authorization at the acting boundary for content and receipts; test refusal paths. |
+| C13 | Local acceptance does not imply network authority; successor and re-evaluation must be named at the graduation gate. Network mapping remains unbound. |
+| C14 | Retain contested and unmeasured residuals; unexpected failures use existing runtime-findings/triage intake. Test witnessed stopping and recovery without a second incident queue. |
+
+Implementation should extend existing EPRFS/recall/package seams under the existing
+habit, not create another memory queue or a second overarching design. Relevant
+source contracts are the doc-lifecycle-as-epr-development-substrate design, the
+digital-memory-standing-ontology design, `elohim/epr/src/kind.rs`,
+`elohim/epr-rea/src/model.rs` and the existing package projection machinery.

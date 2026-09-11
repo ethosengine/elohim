@@ -8,8 +8,8 @@ steward: cartographer
 graduation-trigger: decompose-complete OR superseded-by-implementation
 created: 2026-06-13
 cites:
-  - actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:e46a55190a70c79b | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md
-  - self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:23e24b020eed9564 | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:e46a55190a70c79b | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:23e24b020eed9564 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
 ---
 
 # Self-Healing & User-Agency Opportunity Map

@@ -6,9 +6,9 @@ class: protocol-canonical
 domain: D7
 sprint: tiered-quilt-wave-minus-1
 cites:
-  - attestation-consolidation-design | the canonical design this completes — the consolidation primitive (Content attestation:<subtype>) it builds the residual tails on | sha256:220c0a2a68c2a805 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md
-  - tiered-quilt-wave-0-substrate-cleanup | the wave-0 plan whose Stage-A attestation-dedupe this supersedes/completes; tiered-quilt unblock chain | sha256:206f564eada640f8 | path: genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md
-  - attestation-consolidation-phase2a-dedup | the history record proving Phase-2a (commit 34fcf1070) landed Stage A→G — this plan is ONLY the residual tails it left | sha256:b5bb7b0f18a4ac8e | path: genesis/docs/content/elohim-protocol/history/2026-06-02-attestation-consolidation-phase2a-dedup.md
+  - "attestation-consolidation-design | the canonical design this completes — the consolidation primitive (Content attestation:<subtype>) it builds the residual tails on | sha256:220c0a2a68c2a805 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md"
+  - "tiered-quilt-wave-0-substrate-cleanup | the wave-0 plan whose Stage-A attestation-dedupe this supersedes/completes; tiered-quilt unblock chain | sha256:6a5dd8fcbc27cd0f | path: genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md"
+  - "attestation-consolidation-phase2a-dedup | the history record proving Phase-2a (commit 34fcf1070) landed Stage A→G — this plan is ONLY the residual tails it left | sha256:b5bb7b0f18a4ac8e | path: genesis/docs/content/elohim-protocol/history/2026-06-02-attestation-consolidation-phase2a-dedup.md"
 # The big consolidation LANDED in Phase-2a (commit 34fcf1070, Stage A→G). This plan is ONLY the
 # residual tails the scoping pass found. NO doc-level requires_env (mixed): Slice 2 (HTTP dead-code) is
 # native/household-nodes; Slice 1 touches the INTEGRITY zome → DNA-hash-changing → its LIVE reinstall is

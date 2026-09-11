@@ -9,9 +9,9 @@ topic: [governance, mishpat, lens-market, facings, fold, commitment-action, affi
 refines:
   - genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md
 cites:
-  - plural-mishpat-lenses-over-epr-design | the spec this plan implements (Wave-1 = gap-items #1-#9); plan refines it and corrects the binding-key to slug-id (A3) | sha256:ab0055896398ef95 | path: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md
-  - resilience-facings-select-fold-aggregate-design | the select-fold-aggregate fold idiom (free-fn static dispatch, no trait, no-diesel firewall) the affinity/contention/selector folds follow | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - per-substrate-limitarian-governor-design | the concentration_snapshot C-class migration + measure.rs fold are the template for the affinity/contention C-class projections | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md
+  - "plural-mishpat-lenses-over-epr-design | the spec this plan implements (Wave-1 = gap-items #1-#9); plan refines it and corrects the binding-key to slug-id (A3) | sha256:ab0055896398ef95 | path: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md"
+  - "resilience-facings-select-fold-aggregate-design | the select-fold-aggregate fold idiom (free-fn static dispatch, no trait, no-diesel firewall) the affinity/contention/selector folds follow | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "per-substrate-limitarian-governor-design | the concentration_snapshot C-class migration + measure.rs fold are the template for the affinity/contention C-class projections | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md"
   - elohim/elohim-facings/src/fold.rs
   - elohim/elohim-facings/src/folds/rea.rs
   - elohim/elohim-facings/src/folds/operational_weave.rs

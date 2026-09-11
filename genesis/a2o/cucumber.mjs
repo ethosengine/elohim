@@ -43,6 +43,19 @@ const base = {
 export default function () {
   return {
     default: { ...base, paths: ['features/**/*.feature'] },
+    // Isolated native fixtures: no deployed environment or global E2E hooks.
+    ceremony: {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/ceremony-reconciliation.steps.ts'],
+      paths: ['features/devflow/ceremony-reconciliation.feature'],
+      format: ['progress'],
+    },
+    'collective-memory': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/collective-memory.steps.ts'],
+      paths: ['features/devflow/collective-memory.feature'],
+      format: ['progress'],
+    },
     // Scoped saga profile: cucumber-js MERGES a profile's paths with CLI
     // positionals instead of replacing them, so running the saga dir under
     // `default` executes ~800+ scenarios (content ingests included) — a heavy

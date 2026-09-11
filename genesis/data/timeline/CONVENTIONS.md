@@ -145,6 +145,45 @@ This is the **same lifecycle** stories and feature files use. One vocabulary, th
 
 `regression` is orthogonal-sideways: when `/deliver` re-judges a previously-delivered feature as `partial`/`error_state`/`missing` after a prior `delivered`, the entry flips to `regression` and `regression_from` preserves the prior level. The historian surfaces these as risk-precedent annotations; the cartographer ranks them high in next-actions for repair.
 
+## In-flight classification — reusable categories on existing sources
+
+Classification is part of maintaining a concern while working on it. Reuse the source's
+existing `tags` vocabulary; do not create another backlog, roadmap, or copied narrative
+just to make a discovery retrievable. These are cross-cutting categories, distinct from
+an entry's `kind`, lifecycle status, and the `@concern:` identifier joining assertion to proof.
+
+Use two questions: **what is this about?** (reuse the subject tag already used by its cluster)
+and **what does it contribute?** The following contribution tags have narrow meanings:
+
+| Tag | Apply when the source contains |
+|---|---|
+| `risk` | A foreseeable failure condition; retain its trigger and mitigation (see below) |
+| `decision` | A choice with rationale and a link to its actual decision authority |
+| `constraint` | An evidenced operating limit or required precondition, with applicability |
+| `lesson` | A causal explanation of what happened and what a future agent should do differently |
+| `open-question` | A specific unresolved question and the evidence or reviewer needed to answer it |
+
+Use only tags supported by the content. An emerging concern without a measurable trigger
+can be an `open-question`; do not manufacture a number to qualify it as a risk. These labels
+are a starter vocabulary, not an exhaustive ontology. Before adding a synonym, inspect nearby
+sources and reuse their term. Add a category when a concrete retrieval question needs it;
+record its meaning here rather than silently assigning several meanings to the same label.
+
+Any agent may classify an existing source within its authorized editing scope while doing
+useful work. Preserve the source's format: do not add unsupported metadata to code or invent
+native EPR kinds. If the source cannot carry tags, classify its existing owning document and
+point to the exact assertion, section, or symbol. A document tag selects a candidate document;
+it does not classify every row inside it. Keep decisions and acceptance in their authoritative
+records, linked from the categorized source. Tags never confer verification or acceptance.
+
+For recall, select candidates by category and subject, then inspect the matching assertion,
+its evidence date, and authority. Semantic similarity can supplement discovery; it cannot
+prove exact tag membership. Check that the changed source is in the index's actual ingestion
+scope before claiming it searchable, and refresh only the relevant supported index when needed.
+A useful ceremony checks whether a fresh reader can answer a concrete question from these
+sources, and merges redundant labels encountered in flight while preserving historical meaning.
+No population-wide retagging is required before continuing useful work.
+
 ## Risks — a view, not a kind (tag `risk`)
 
 A **project risk** is a concern with a *measurable trigger that has not fired yet*. It is not a

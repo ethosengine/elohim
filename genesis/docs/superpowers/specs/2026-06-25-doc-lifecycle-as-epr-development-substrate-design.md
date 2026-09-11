@@ -13,11 +13,11 @@ context-tier: disclosed
 steward: cartographer
 graduation-trigger: decompose-complete OR superseded-by-implementation
 cites:
-  - placement | Genesis Docs Placement Contract | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md
-  - spec-plan-compaction-loop-design | Spec/Plan Compaction Loop | sha256:5f9d3f0baabfe199 | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md
-  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:54b5809fb8e688d1 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "placement | Genesis Docs Placement Contract | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
+  - "spec-plan-compaction-loop-design | Spec/Plan Compaction Loop | sha256:5f9d3f0baabfe199 | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - .claude/skills/epr-content-addressing/SKILL.md
-  - dht-pii-leak-remediation-plan | DHT PII Leak Remediation | sha256:1972892ab3363c4e | path: genesis/docs/superpowers/plans/2026-06-23-dht-pii-leak-remediation-plan.md
+  - "dht-pii-leak-remediation-plan | DHT PII Leak Remediation | sha256:1972892ab3363c4e | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-06-23-dht-pii-leak-remediation-plan.md"
   - genesis/seeder/src/seed-epr-atom.ts
 ---
 

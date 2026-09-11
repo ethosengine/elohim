@@ -1,5 +1,6 @@
 ---
 title: Mutual Storage Replication (Dwelling-Hub Tier) Implementation Plan
+id: mutual-storage-replication-dwelling-hub-plan
 status: landed
 landed_commit: a169ab72c
 verified_by: ci-investigator 2026-06-06 — delivery-stasis claim verification; 19/20 tasks verified on disk (T1–T20 commits d51993d90..a169ab72c resolve; services/schemas/migrations/sweettest/a2o features all present). Sole gap — replicates_dwelling_integration.rs (File Structure line ~96) was aspirational, never task-assigned, never committed.

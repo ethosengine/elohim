@@ -1,5 +1,6 @@
 ---
 title: "THE RECURSION OPERATOR — Aggregation that Preserves Descent"
+id: vision-recursion-aggregate-with-descent-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

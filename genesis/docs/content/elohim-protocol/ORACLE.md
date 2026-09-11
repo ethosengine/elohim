@@ -5,7 +5,7 @@ created: 2026-06-14
 class: substrate
 artifact_kind: oracle-index
 cites:
-  - "elohim-protocol-manifesto | Rung 0 (WHY): the crisis this substrate answers and the love-centered alternative every rung below serves. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "elohim-protocol-manifesto | Rung 0 (WHY): the crisis this substrate answers and the love-centered alternative every rung below serves. | sha256:cd62d3cc869bada5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "escalated-architecture-design | Rung 1 horizontal: the one Commitment + Governor + coverage + two-quilt primitive at a single node. | sha256:c4aa7dc9f9be30a8 | path: genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md"
   - "recursive-architecture-design | Rung 1 vertical: how that one primitive recurses up the layers via CoverageRollup (aggregate-with-descent). | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
   - "elohim-sdk-design | Rung 2: the agency-gradient composition grammar, human-sovereign below and veil-holding above. | sha256:f8d76384f0a8095b | path: genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md"

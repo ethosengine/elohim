@@ -20,8 +20,8 @@ steward: cartographer
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md
 cites:
-  - epr-meta-compose-gate | `.epr-meta` | sha256:42f61de93a17196f | path: genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md
-  - doc-lifecycle-as-epr-development-substrate | Doc-Lifecycle as EPR | sha256:4b87bca1eb683441 | path: genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md
+  - "epr-meta-compose-gate | `.epr-meta` | sha256:42f61de93a17196f | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md"
+  - "doc-lifecycle-as-epr-development-substrate | Doc-Lifecycle as EPR | sha256:4b87bca1eb683441 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md"
 ---
 
 # `.epr-meta` Compose-Gate Implementation Plan (P1)

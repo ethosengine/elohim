@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "The vision × readiness sprint roadmap (the maintained prioritization home)"
 slug: "vision-readiness-sprint-roadmap"
 written: "2026-06-02"
-regenerated: "2026-08-26"
+regenerated: "2026-09-09"
 author: "cartographer"
 status: "active"
 target_window: "open-ended"
@@ -32,9 +32,19 @@ tags: [roadmap, prioritization, maintained-artifact, regenerated-each-ceremony, 
 > memory ceremony and `/converge` from the decomposed gap ledger, the current environment focus,
 > and the gospel-tier vision axis.
 >
-> **Current regeneration: 2026-08-26** (substrate-currency ceremony, Phase 1b). The body was stale:
-> `notary-authority` had flipped green, alpha had returned, the environment hold had drained to zero,
-> and the prior §4 still named a completed action. This pass re-ranks from today's measured inputs.
+> **Current regeneration: 2026-09-09** (bounded ceremony, operator-approved). Live ledger and
+> declared environment scope were re-read; the household vision was recalled from MemPalace's
+> manifesto source. Existing sprint counts were checked against gap-item states. Their ordering
+> is retained as prior judgment, not newly verified implementation readiness. §4 replaces an
+> August deployment instruction with the selected doorway concern's unresolved reader frontier.
+> Repeat currency check (2026-09-09): ledger/focus counts re-read; the vision and ranking
+> judgments above are inherited from the earlier ceremony, without another vision re-mine.
+>
+> **Latest maintenance is partial:** the bounded acceptance-state correction below is not a
+> full regeneration under the contract at the end. The existing `regenerated` stamp identifies
+> the earlier input pass; it does not certify this correction's ranking or aggregate currency.
+> §4 is a proposed investigation, not a new assignment. Scoreboard order and §1's readiness
+> labels are inherited judgments requiring task-specific revalidation before a claim.
 
 ---
 
@@ -51,48 +61,36 @@ default walk. The ranking rule remains:
 - **Rank down** breadth-first collective or network work unless it is required to make the household
   substrate itself honest. The seed composes outward without re-architecture.
 
-This regeneration used the local gospel sources because the named anchor is represented through
-`manifesto.md` and `MAP.md`; the ranking did not move.
+This regeneration searched `project_household_living_core_lived_contrast_diffusion` in MemPalace;
+the returned manifesto passage still makes lived household contrast the diffusion mechanism.
+No new global ranking is inferred from that recall.
 
 ---
 
-## What moved since the last regeneration (2026-08-11 → 2026-08-26)
+## What moved since the last regeneration (2026-08-26 → 2026-09-09)
 
-- **The prior §4 move is complete.** `notary-authority` flipped red → green on 2026-08-17 with edge
-  #1362 evidence. It no longer belongs at the top of a current roadmap.
-- **Alpha returned on 2026-08-20.** `placement-audit.py --focus` now reports five available
-  capabilities (`alpha-cluster-6peer`, `harbor-registry`, `household-nodes`, `observability`, `shem`),
-  37 declared markdown surfaces in scope, and **0 BLOCKED-BY-ENV**. `owned-substrate` remains false,
-  correctly, for a shared fleet; no declared markdown gap is blocked by it.
-- **Iroh delivery moved onto the testable plate.** Its master still carries 22 OPEN gaps and a stale
-  2026-06 verification block, while August landed discovery, sync initiation, eager announce,
-  heal-on-read, transport-matrix parity, and recovery evidence. It is now verify-and-reconcile work,
-  not environment-held work and not a license to replay the old plan blindly.
-- **`doorway-failover` flipped green** on household-lane evidence (10/10) after edge #1381 proved the
-  fleet lane intentionally holds its Act-I scenarios. The current first red is
-  **`dataplane-convergence`**.
-- **The ledger widened:** 4,332 OPEN / 672 CLAIMED across 221 docs with items (231 files scanned), up
-  from 4,249 / 651 across 217 docs (226 files scanned). This is an upper bound, not a workload
-  estimate: landed-but-unchecked plans still inflate OPEN.
-- **Pressure grew 220 → 253 files:** MEM-UNLINKED 154, UNKNOWN-STATUS 55, NEEDS-TRIAGE 28,
-  CLAIMED-ONLY 10, SUPERSEDED 6. That remains a parallel memory lane, not a gate on product work.
-- **Measure-ontology slice 1 moved from implementation to verification:** 0 OPEN / 21 CLAIMED. It
-  leaves the forward-sprint list and joins §2.
+- The old §4 prescribed deployment of August fixes. This pass does not establish those revisions'
+  current fleet state and does not carry that deployment instruction forward.
+- The earlier read reported five `acceptance-unestablished` assertions (#1–#5) and one
+  `revalidation-required` assertion (#6). A bounded acceptance-state correction on 2026-09-09
+  now observes #6 accepted for the recorded anonymous dirty-bundle continuity experience only;
+  #1–#5, #7 and #8 remain `acceptance-unestablished` in current native scope. See §4 for limits.
+  This correction does not refresh the ledger counts, vision axis or inherited ranking below.
+- The ledger now reports 4,430 OPEN / 672 CLAIMED across 232 documents with items (242 scanned).
+  These are authored gap states, not independent assertions or accepted outcomes.
+- Declared markdown scope is 41 in scope and zero BLOCKED-BY-ENV. This is a declaration read,
+  not a live runtime probe. `local-conductor` and `owned-substrate` are unavailable.
 
----
+## The ledger in one breath (read 2026-09-09)
 
-## The ledger in one breath (measured 2026-08-26)
+- **702 files accounted:** 395 settled and 307 under pressure.
+- **4,430 OPEN / 672 CLAIMED** decomposed gaps, with no acceptance implied by a checked box.
+- **Pressure queue:** 199 MEM-UNLINKED · 61 UNKNOWN-STATUS · 28 NEEDS-TRIAGE ·
+  13 CLAIMED-ONLY · 6 SUPERSEDED.
 
-- **606 files accounted:** 353 settled and 253 under pressure.
-- **4,332 OPEN** decomposed gaps to implement and **672 CLAIMED** gaps to verify across 221 docs with
-  items; 231 files were scanned.
-- **37 environment-declaring markdown surfaces are testable now; 0 are BLOCKED-BY-ENV.**
-- **Pressure queue:** 154 MEM-UNLINKED · 55 UNKNOWN-STATUS · 28 NEEDS-TRIAGE · 10 CLAIMED-ONLY ·
-  6 SUPERSEDED.
-
-The units matter. OPEN/CLAIMED are decomposed gaps; pressure counts are files. A checked box is not
-a verdict, and a nonzero OPEN count on a `verified_by:` plan may be stale bookkeeping rather than
-unfinished behavior.
+The units matter: file pressure, decomposed gaps, native assertions and evidence runs are different
+measures. The retained sprint rows below had their counts checked; readiness labels remain the
+prior roadmap's judgment and require local revalidation before execution.
 
 ---
 
@@ -117,7 +115,7 @@ unfinished behavior.
   First reconcile every gate against current code, the 3×3 transport matrix, recovery evidence, and
   edge #1380/#1381; only then schedule genuinely missing soaks or rollback proof.
 - **Why #2:** It is network-shaped work, so the household axis normally down-ranks it. It rises here
-  because the current top red is serving-critical convergence and the now-available verification
+  because the prior ranking prioritized serving-critical convergence and the declared verification
   surface can distinguish landed truth from stale checkboxes at low incremental cost.
 
 ### Sprint 3 — Grandma-standard recovery completion + mutual-aid reciprocal pair
@@ -167,11 +165,14 @@ delivery lane instead of letting infrastructure outrank the living core.
 
 ---
 
-## §2 — Verification track (parallel, never a gate)
+## §2 — Corpus verification track (parallel, not a global gate)
 
-The corpus carries **672 CLAIMED gaps**. Ten files are CLAIMED-ONLY pressure items; the queue includes
+The corpus carries **672 CLAIMED gaps**. Thirteen files are CLAIMED-ONLY pressure items; the queue includes
 auth-wire contracts, SDK entrypoints, seed-bearer gating, facings extraction, and Mishpat lenses.
 Run this track alongside §1, not in front of it.
+The corpus-wide queue does not block all work. Evidence checks required by a selected task,
+including Sprint 2's Iroh reconciliation, remain prerequisites for that task; its results also
+serve this verification lane and should not be investigated twice.
 
 Three bounded first passes:
 
@@ -191,8 +192,8 @@ the household seed.
 **None in the declared markdown surface.** Today's focus readout is:
 
 - AVAILABLE: `alpha-cluster-6peer`, `harbor-registry`, `household-nodes`, `observability`, `shem`
-- UNAVAILABLE: `owned-substrate` (correct for a shared fleet)
-- IN SCOPE: 37
+- UNAVAILABLE: `local-conductor`, `owned-substrate` (the latter is correct for a shared fleet)
+- IN SCOPE: 41
 - BLOCKED-BY-ENV: **0**
 
 The old alpha hold is retired. If a capability degrades, move only its resolved gap-items out; if
@@ -201,44 +202,53 @@ pretending the shared alpha fleet owns its substrate.
 
 ---
 
-## §4 — Single highest-leverage next move
+## §4 — Proposed next investigation (priority not revalidated)
 
-**Measure the latest apex convergence cure on the fleet, then let that evidence choose the next
-dataplane action.** `dataplane-convergence` is the habits register's first red. Commit `971857934`
-pins `/apps/{resolved-hash}/{file}` cache misses to the bundle hash already resolved, while
-`28799e3f5` gives the multi-doorway app pipeline a stage-bounded seed authority. Both are locally
-proved and fleet-unmeasured.
+**Make the acquired public atom a formatted, readable document, then obtain acceptance for
+that additional reading experience.** Retain the proposed rendering investigation associated with
+`plans__2026-09-09-doorway-continuity-proof-chain#6`; its already-accepted anonymous continuity
+scope does not establish formatted reading. Inspect the existing renderer registry selection/mount
+path before proposing a repair; the cause and regression status remain unclassified.
 
-*Pre-authored Objective (drop-in for `/shift`):* Deploy the edge revision carrying `28799e3f5` and
-`971857934`; run a fresh app landing so all four `seed elohim.host` legs are green; then run
-`pnpm look https://elohim.host/` and prove the SSR shell's named main chunk returns 200 with no failed
-request in `capture.json`. Record the edge/app build numbers on `dataplane-convergence`. If the apex
-is clean, return to the independently observed `p2p.caughtUp` flap and measure that residual before
-writing another cure; if the apex still fails, the failed seed or immutable bundle fetch identifies
-the next bounded defect.
+The bounded native recheck reports #6 `accepted`, with exact fulfillment, technical review,
+appointment and acceptance records. The appointed reader observed real manifesto body delivery
+through a discovered sibling during a primary pause, credential exclusion, one browser document
+and fresh landing delivery through the recovered primary. Acceptance applies only to the observed
+household bundle reporting dirty revision `45e54e7d7ba8fafcf0cb5ef674d6bfefc5934ffb`.
+Formatted rendering, current-HEAD release, cold bootstrap, sessions, WAN and fleet behavior remain
+outside that acceptance. Raw-markdown rendering remains a separate reading concern; it does not
+make the accepted transport experience unaccepted.
 
-**Why this is the move:**
+*Pre-authored Objective (retained, not newly ranked):* Reproduce the raw-markdown fallback using
+the current packaged household app; trace the existing renderer registration and selection;
+repair the smallest proven defect. Verify formatted headings and links on desktop and mobile
+while preserving the recorded anonymous sibling-delivery/recovery behavior. Record source/run
+identity and obtain acceptance for the explicitly exercised additional scope. Keep apex ingress,
+authenticated migration, cold bootstrap and fleet delivery outside it unless independently observed.
 
-- It serves the root work contract: move the first red toward green with proof.
-- It is household-serving truth — a household cannot live the substrate if its canonical app shell
-  cannot arrive — not breadth for breadth's sake.
-- It tests two already-landed cures at deployment cost instead of opening a speculative fourth fix.
-- It immediately sharpens Sprint 2: a clean apex isolates remaining convergence work to the peer
-  plane; a failed apex keeps the work at the doorway/app boundary.
+Evidence authority: run `epr flow context genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md --json`.
+The current scope is `bafkreifqfmsjvjzn5cjjnrgsr267esqdmhb2yktktnfcsvbizyhuz4c53u`;
+#6 commitment `bafyreid6dzi22ky2wbdjktw3leb5napwbzrerevgaha3rwamipif3ajffe` carries acceptance
+`bafyreibmamp2if2uk42tduttbn3cpmougucgwmgfayktnofgmhv2ooyzay` and appointment
+`bafyreigeqmuslnolsqyhmx2p7kzxpaglrko7273vw2montyuipbazakjcq`.
+Read the pinned report at `genesis/a2o/reports/doorway-acceptance-next-report.json` for the exercised
+actions, served revision and exclusions; local appointment does not establish peer authority.
+Earlier viewport witnesses are `reports/look/sibling-manifesto-desktop/viewport.png` and
+`reports/look/sibling-manifesto-mobile/viewport.png` relative to the a2o workspace. This correction
+read native records and the acceptance report; it did not independently render those viewports.
 
-**Then start Sprint 1, REA rails, in parallel.** The deploy-and-measure loop should not park the
-forward household sprint.
-
-This is the move the next `next-actions.md` must name first. If that handoff and this section
-disagree, the disagreement is the drift.
+Why retain this proposed move: the household vision depends on usable reading after bytes arrive.
+That additional experience remains outside the recorded acceptance. Its priority is inherited,
+not newly established by this scoped correction; neither the whole habit nor the broader roadmap
+has been revalidated. The next `next-actions.md` should preserve this scope distinction.
 
 ---
 
-## Vision × readiness scoreboard (regeneration 2026-08-26)
+## Vision × readiness scoreboard (counts checked 2026-09-09; inherited scores)
 
 | # | Sprint | Vision | Readiness | Measured gap surface | Environment |
 |---|--------|:------:|:---------:|----------------------|-------------|
-| ⚑ | Measure apex cure for `dataplane-convergence` | 10 | 9 | 0 new; deploy + observe landed fixes | available |
+| ⚑ | Formatted public-atom reading + fresh acceptance | 10 | bounded diagnosis | #6 accepted for narrow continuity; formatted reading outside acceptance | household declaration available |
 | 1 | REA rails — emit + graduation | 10 | 9 | 21 OPEN | household available |
 | 2 | Iroh delivery verification | 7 | 8 | 22 OPEN, stale tracker | harbor + alpha available |
 | 3 | Grandma recovery + mutual-aid pair | 9 | 7 | 104 OPEN + 26 CLAIMED | available |
@@ -258,7 +268,7 @@ disagree, the disagreement is the drift.
   asks for operator blessing before expansion. It is a natural downstream of Sprint 1.
 - The shared alpha fleet deliberately does not provide `owned-substrate`; destructive process-control
   stories belong on the Act-I household mesh.
-- **Horizon freshness:** latest report is 2026-08-13, 13 days old. It is under the 90-day gate, so no
+- **Horizon freshness:** latest report is 2026-09-06, three days old. It is under the 90-day gate, so no
   horizon scan was invoked in this ceremony leg.
 
 ---

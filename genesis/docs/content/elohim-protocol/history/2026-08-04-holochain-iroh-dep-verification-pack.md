@@ -16,7 +16,7 @@ topic:
     dependency-verification,
   ]
 cites:
-  - holochain-iroh-convergence-upgrade-campaign | the governing campaign whose Wave 1 Task D1 this primary-source verification pack closes and whose Wave 2 transport flip consumes these verdicts | sha256:b61c697ad5814c52 | path: genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md
+  - "holochain-iroh-convergence-upgrade-campaign | the governing campaign whose Wave 1 Task D1 this primary-source verification pack closes and whose Wave 2 transport flip consumes these verdicts | sha256:b61c697ad5814c52 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md"
   - genesis/data/timeline/backlog/2026-08-04-holochain-iroh-dep-verification-pack.md
 ---
 

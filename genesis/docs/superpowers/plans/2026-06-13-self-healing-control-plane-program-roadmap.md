@@ -3,9 +3,9 @@ title: Self-Healing Control Plane — Program Roadmap
 id: self-healing-control-plane-program-roadmap
 status: Draft
 cites:
-  - actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:e46a55190a70c79b | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md
-  - self-healing-user-agency-opportunity-map | Self-Healing & User-Agency Opportunity Map | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md
-  - conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:18cbb190f6a8a3a1 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:e46a55190a70c79b | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
+  - "self-healing-user-agency-opportunity-map | Self-Healing & User-Agency Opportunity Map | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md"
+  - "conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:9ae7987743bec6bc | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md"
   - genesis/docs/superpowers/plans/2026-06-13-auto-config-resource-probe-plan.md
   - genesis/docs/superpowers/plans/2026-06-13-upstream-self-protection-plan.md
   - genesis/docs/superpowers/plans/2026-06-13-inbound-admission-backpressure-plan.md

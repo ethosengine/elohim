@@ -1,5 +1,6 @@
 ---
 title: "VISION RECURSION PASS — The Covenant That Binds the Veil-Walker"
+id: vision-recursion-ai-covenant-recursion-2026-06-14
 subtitle: "What we owe the AI, recursively — the bound power at every layer, told the truth about its binding"
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code

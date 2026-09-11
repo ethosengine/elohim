@@ -6,8 +6,8 @@ class: protocol-canonical
 domain: D8
 sprint: doorway-membrane-wave-b
 cites:
-  - doorway-membrane-prosocial-routing-design | the arc spec this plan implements (Wave-2: §2 unit-2 membrane policy stage, the first guard consumer) | sha256:560686edf977447a | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
-  - elohim-peer-fabric-spine-plan | the Wave-1 plan that built the guard crate this stage consumes | sha256:dd4fe05da91829de | path: genesis/docs/superpowers/plans/2026-06-20-elohim-peer-fabric-spine-plan.md
+  - "doorway-membrane-prosocial-routing-design | the arc spec this plan implements (Wave-2: §2 unit-2 membrane policy stage, the first guard consumer) | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md"
+  - "elohim-peer-fabric-spine-plan | the Wave-1 plan that built the guard crate this stage consumes | sha256:281287f351ea3be3 | path: genesis/docs/superpowers/plans/2026-06-20-elohim-peer-fabric-spine-plan.md"
 refines: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
 # Single-host buildable: unit tests (derive_source, EdgeGuardStore, verdict-mapping, shadow) are DB-free.
 # Execution is DISK-GATED: doorway-service is a multi-GB native build; the 85% hard ceiling denies it

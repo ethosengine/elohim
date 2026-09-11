@@ -6,13 +6,13 @@ class: protocol-canonical
 domain: D8
 sprint: vision-deferred
 cites:
-  - epr-reachability-economics | KEYSTONE — the Role-2 finance-bridge this spec elaborates; §9 open questions = the forks; the purely-compensatory invariant (toll != availability) | sha256:19e359867f22af5a | path: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md
-  - doorway-membrane-prosocial-routing-design | the membrane arc whose §7.1 binding canon this composes (zero new entry types; facilitate-not-bank; bridge = external-system interop) | sha256:10ba2875185c52b0 | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
-  - per-substrate-limitarian-governor-design | the limitarian ceiling that caps the market; §9 substrate_signal gate blocks toll-reward concentration capping (built for attention/token only) | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md
-  - vision-gap-limit-governor-stub | the limit-governor stub (un-blessed) + the conceptual-only donut floor/ceiling governor — the upstream gate on the capped-by property | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
-  - mutual-storage-replication-dwelling-hub-design | commons-pool + donut split ratios + COMMONS_MIN_FLOOR + proposed->active graduation on ProvideAnnounce | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
-  - non-commons-provide-commitments-design | the replicates-* capacity-variant Commitment — commons-pool membership / opt-in hosting backing | sha256:936b660644fde390 | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
-  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
+  - "epr-reachability-economics | KEYSTONE — the Role-2 finance-bridge this spec elaborates; §9 open questions = the forks; the purely-compensatory invariant (toll != availability) | sha256:19e359867f22af5a | path: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md"
+  - "doorway-membrane-prosocial-routing-design | the membrane arc whose §7.1 binding canon this composes (zero new entry types; facilitate-not-bank; bridge = external-system interop) | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md"
+  - "per-substrate-limitarian-governor-design | the limitarian ceiling that caps the market; §9 substrate_signal gate blocks toll-reward concentration capping (built for attention/token only) | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md"
+  - "vision-gap-limit-governor-stub | the limit-governor stub (un-blessed) + the conceptual-only donut floor/ceiling governor — the upstream gate on the capped-by property | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md"
+  - "mutual-storage-replication-dwelling-hub-design | commons-pool + donut split ratios + COMMONS_MIN_FLOOR + proposed->active graduation on ProvideAnnounce | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md"
+  - "non-commons-provide-commitments-design | the replicates-* capacity-variant Commitment — commons-pool membership / opt-in hosting backing | sha256:6d3400a1aca8aa9e | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md"
+  - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
 refines: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md
 # DESIGN-ONLY / vision-deferred. NO doc-level requires_env — but implementation is gated on TWO real
 # upstream items (see §5): the limitarian governor's `substrate_signal` field (to cap toll-reward

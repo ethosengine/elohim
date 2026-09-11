@@ -2,8 +2,8 @@
 id: "plan-epr-meta-native-capability-dogfood-and-graph"
 status: "active"
 cites:
-  - epr-meta-native-capability-dogfood-and-graph | Dogfood .epr-meta Native Governance + Certify Claude→Elohim-Native Translation (+ eprfs Package Graph) | sha256:33681d28fbbdf425 | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md
-  - epr-meta-eprfs-elohim-native-sotu-2026-07-09 | EPR Meta / EPRFS / Elohim-Native Capability SOTU | sha256:b4c6c115da8d0e24 | path: genesis/docs/analysis/2026-07-09-epr-meta-eprfs-elohim-native-sotu.md
+  - "epr-meta-native-capability-dogfood-and-graph | Dogfood .epr-meta Native Governance + Certify Claude→Elohim-Native Translation (+ eprfs Package Graph) | sha256:33681d28fbbdf425 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md"
+  - "epr-meta-eprfs-elohim-native-sotu-2026-07-09 | EPR Meta / EPRFS / Elohim-Native Capability SOTU | sha256:b4c6c115da8d0e24 | status: stale — target content moved on; re-verify | path: genesis/docs/analysis/2026-07-09-epr-meta-eprfs-elohim-native-sotu.md"
 ---
 
 # EPR-Meta Native Capability Dogfood + Graph — Implementation Plan

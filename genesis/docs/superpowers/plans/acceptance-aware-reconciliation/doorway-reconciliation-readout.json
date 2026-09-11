@@ -1,0 +1,81 @@
+{
+  "version": "acceptance-reconciliation-v1",
+  "evaluator": {
+    "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+    "id": "elohim-epr-cli",
+    "version": "0.1.0"
+  },
+  "scope_cid": "bafkreiavkfctvqewnwexkfzqjsaydwx3jrl5yeu2g6uc2xaybmwjueplni",
+  "record_set_fingerprint": "sha256:48c638cee9fc7acdf8711daeb507f4c4fbc57f2c470ee183d16723c0e2af6f7b",
+  "assertions": [
+    {
+      "intent": "bafyreiebn4bjsckvynh23cwalsrtnm6lebfmc53pts4ilvkxjskrkryg64",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#4",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "claim and implement the assertion, then review and accept"
+    },
+    {
+      "intent": "bafyreif4xzlg6ul5ka4zxjm4tbtrvcvma7337wwxls7kbgfmwohb3co6pm",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#5",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "claim and implement the assertion, then review and accept"
+    },
+    {
+      "intent": "bafyreifp2frpzbswkos4yx56l5tffcodvimxs5c6k6ush6hgru5arud4oy",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#1",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "claim and implement the assertion, then review and accept"
+    },
+    {
+      "intent": "bafyreigw7vkcku7f3rbvls5vsikbnunmmg6tsxtw2lbwhh6jwgm5zriuea",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#3",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "claim and implement the assertion, then review and accept"
+    },
+    {
+      "intent": "bafyreigx2ahzrm3wpz5mhdizv4xjttnn7oars3v3vxpzcb5nv25nqbevle",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#2",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "claim and implement the assertion, then review and accept"
+    },
+    {
+      "intent": "bafyreihqu7ytcasuvlnc5owvpuzzz4yb6hwvffqqrnqpnvcpmcpdbjisoe",
+      "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#6",
+      "authored_state": "gap:open",
+      "issues": [],
+      "commitments": [
+        {
+          "commitment": "bafyreigoskjqcxu2iuq4vcparibvyafepkan4v4pgenoz5cfgahis3bijm",
+          "fulfillments": [
+            "bafyreid6paulq4yljvwfoplynwmaar7n2iwdr7dg4va6bc7houmv4h6lci"
+          ],
+          "technical_reviews": [
+            "bafyreiglwxnjp3j7uxu5fgeodc23okrt2zsvyeqzh5mkarlu5mgel6lzya"
+          ],
+          "acceptance_records": [],
+          "unrecognized_records": [],
+          "acceptance": "acceptance-unestablished",
+          "issues": []
+        }
+      ],
+      "acceptance": "acceptance-unestablished",
+      "remaining_action": "complete missing fulfillment, technical review, or independent acceptance"
+    }
+  ],
+  "historical_candidates": []
+}

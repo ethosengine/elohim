@@ -10,13 +10,13 @@ process_subdomain: memory
 derived_from:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md  # the comet (dogfood breadcrumb — lineage, NOT a domain claim; see history/2026-06-02-d4-name-collision)
 cites:
-  - scope-tree-reconciler-design | the file-moving reconciler that depends on these content-addressed cites to move safely | sha256:1f7847ac624b0df7 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md
-  - spec-plan-compaction-loop-design | the compaction loop whose path cites this upgrades to slug+fingerprint with a dissolution gate | sha256:958940bdf5a41b40 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md
-  - unified-memory-loop-design | the loop this adds a cites_legacy scoreboard dimension and cite discipline to | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
+  - "scope-tree-reconciler-design | the file-moving reconciler that depends on these content-addressed cites to move safely | sha256:5332b1422eb86eb2 | path: genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md"
+  - "spec-plan-compaction-loop-design | the compaction loop whose path cites this upgrades to slug+fingerprint with a dissolution gate | sha256:5f9d3f0baabfe199 | path: genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md"
+  - "unified-memory-loop-design | the loop this adds a cites_legacy scoreboard dimension and cite discipline to | sha256:99100efd20d10129 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md"
   - .claude/scripts/memory-kit/memory-coherence-audit.py
   - .claude/skills/epr-content-addressing/SKILL.md
-  - placement | the contract whose three doc homes these content-addressed links survive moves between | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md
-  - managed-surface-edit-discipline-design | the 2026-06-05 sibling: edit-time registry + PRE/POST hooks that enforce this discipline at the surface (see §9.1) | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
+  - "placement | the contract whose three doc homes these content-addressed links survive moves between | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
+  - "managed-surface-edit-discipline-design | the 2026-06-05 sibling: edit-time registry + PRE/POST hooks that enforce this discipline at the surface (see §9.1) | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md"
 refines:
   - genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md  # upgrades its path-based cites: to content-addressed; adds the dissolution-time hard gate
 proposed_amendments:

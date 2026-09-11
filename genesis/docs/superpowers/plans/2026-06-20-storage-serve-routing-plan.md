@@ -6,8 +6,8 @@ class: protocol-canonical
 domain: D1
 sprint: doorway-membrane-wave-c
 cites:
-  - doorway-membrane-prosocial-routing-design | the arc spec this plan implements (Wave-3: capability-aware serve-routing, the score consumer, D1 byte axis) | sha256:10ba2875185c52b0 | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
-  - elohim-peer-fabric-spine-plan | the Wave-1 plan that built the score module this serve-routing consumes | sha256:dd4fe05da91829de | path: genesis/docs/superpowers/plans/2026-06-20-elohim-peer-fabric-spine-plan.md
+  - "doorway-membrane-prosocial-routing-design | the arc spec this plan implements (Wave-3: capability-aware serve-routing, the score consumer, D1 byte axis) | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md"
+  - "elohim-peer-fabric-spine-plan | the Wave-1 plan that built the score module this serve-routing consumes | sha256:281287f351ea3be3 | path: genesis/docs/superpowers/plans/2026-06-20-elohim-peer-fabric-spine-plan.md"
 refines: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
 # Mixed-env. Household-now: the selection LOGIC + the agent_cid-native serve fold + DbPool-fixture
 # integration. @requires:shem (T7): live cross-WAN RTT-based ORDERING — household is local P2P (~0 RTT,

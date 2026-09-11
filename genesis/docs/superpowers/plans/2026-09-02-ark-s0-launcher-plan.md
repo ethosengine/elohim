@@ -2,7 +2,7 @@
 id: ark-s0-launcher-plan
 status: landed
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:25153362aae54306 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
 ---
 
 # Tevah S0 — the `ark` launcher on the household mesh — Implementation Plan
@@ -599,7 +599,7 @@ pub trait WitnessSink {
 
 **Task 9 amendment (A6):** build `RuntimeScope` once from `berth.manifest` + `berth.node`; thread it into the sink; new assertion in `supervise_death.rs`: after the flapper's third death, `epr_rea::fold::resource_state` over `flows.jsonl` shows three `Consume` events in `process-ms`, and `FlowStore::open_pain()` is empty under `ManifestPolicy` (honest absence, not a zero).
 
-**Missing nodes minted for the substrate, not built in S0** (story-maintainer shape — chain / between / assertion / probe): M2 `runtime:` `classified_as` prefix registered beside the resource-classification vocabulary — between "REA vocabulary" and "runtime flows" — assertion: a lifecycle flow is fully expressible with the six verbs + tag — probe: `epr flow` folds ark's sidecar to a non-empty `resource_state` in `process-ms`. M3 compute `ResourceSpecification` units (`cpu-seconds`, `byte-seconds`, `bytes-egress`, `process-ms`) in `elohim/sdk/schemas/v1/` as app-manifest vocabulary (never `_dna`) — probe: schema-contract test. M4 `MeasureKind::Duration { per }` in `elohim/epr/src/measure.rs` (spec Q15) — probe: `divide` tests extended. M5 `custody-spool` arm in the mishpat coordinator's action match (spec §7) — probe: sweettest `create_commitment{action:"custody-spool"}` Ok.
+**Missing nodes minted for the substrate, not built in S0** (story-maintainer shape — chain / between / assertion / probe): M2 `runtime:` `classified_as` prefix registered beside the resource-classification vocabulary — between "REA vocabulary" and "runtime flows" — assertion: a lifecycle flow is fully expressible with the six verbs + tag — probe: `epr flow` folds ark's sidecar to a non-empty `resource_state` in `process-ms`. M3 compute `ResourceSpecification` units (`cpu-seconds`, `byte-seconds`, `bytes-egress`, `process-ms`) in `elohim/sdk/schemas/v1/` as app-manifest vocabulary (never `_dna`) — probe: schema-contract test. M4 `MeasureKind::Duration { per }` in `elohim/epr/src/measure.rs` (spec Q15) — probe: `divide` tests extended. M5 was originally proposed as a `custody-spool` arm in the mishpat coordinator’s action match. **Withdrawn for this path** by the spec’s station-2 correction (§6.5): custody uses the elohim DNA’s `content_store::create_rea_commitment`, which forwards `input.action` without that whitelist (`content_store/src/lib.rs`, re-read 2026-09-09). This correction does not claim a new sweettest passed or discharge any other substrate node.
 
 ---
 

@@ -13,8 +13,8 @@ domain: D2
 topic: [correction, feedback-signal, head-adoption, successor-authority, discovery, replay, idempotency, standing]
 boundary: "Slice 0 of the reimplementation sequence sealed 2026-09-06 (decisions D0–D10 in the second-opinion plan). This contract governs ONE record kind (a content EPR with a declared head) and ONE act (a FeedbackSignal of kind correction). It is the entrance gate for slice 1. It does not decide space placement, cross-context evidence, or the app redesign."
 cites:
-  - "ai-stewarded-commons-reimplementation-plan | A Commons That Keeps Its Promises | sha256:77200f7c2cde7b00 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
-  - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:931b9b05cae78c40 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
+  - "ai-stewarded-commons-reimplementation-plan | A Commons That Keeps Its Promises | sha256:0d5f1300b5d615dc | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
+  - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:931b9b05cae78c40 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
   - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
 ---
 

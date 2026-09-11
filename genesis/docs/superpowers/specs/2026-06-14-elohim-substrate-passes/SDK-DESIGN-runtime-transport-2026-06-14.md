@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — Runtime / Transport / Deploy: the edge-device substrate the SDK runs on"
+id: sdk-design-runtime-transport-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT code, NOT a decision
 author: rust-architect (truth layer)

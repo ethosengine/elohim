@@ -8,7 +8,7 @@ actor: agent:implementer@gpt-6
 habits: [runtime-upgrade-propagation]
 commits: []
 cites:
-  - "nachalah-supervised-activation-sprint-handoff | Nachalah next sprint | sha256:e506a9619f975483 | path: genesis/docs/superpowers/plans/2026-09-05-nachalah-supervised-activation-sprint-handoff.md"
+  - "nachalah-supervised-activation-sprint-handoff | Nachalah next sprint | sha256:ce355b7759e4ed56 | path: genesis/docs/superpowers/plans/2026-09-05-nachalah-supervised-activation-sprint-handoff.md"
 ---
 
 Exact signed grant record authentication is verified for #1b-a only. Parent #1b

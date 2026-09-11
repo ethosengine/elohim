@@ -15,7 +15,7 @@ informed-by:
   - genesis/a2o/features/delivery/runtime-upgrade-propagation.feature (Stations 1–9)
   - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:8f8e2a7dcedea7aa | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - "runtime-artifacts-elected-content | Runtime Artifacts as Elected Content | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - genesis/a2o/features/delivery/runtime-upgrade-propagation.feature
   - elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md

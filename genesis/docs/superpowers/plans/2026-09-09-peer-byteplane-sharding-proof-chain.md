@@ -6,7 +6,7 @@ class: substrate
 serves: blob-durability
 date: 2026-09-09
 cites:
-  - "doorway-continuity-proof-chain | Doorway continuity from owned fixtures to public delivery | sha256:1551453ac0966d89 | path: genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md"
+  - "doorway-continuity-proof-chain | Doorway continuity from owned fixtures to public delivery | sha256:b02b249aa72de892 | path: genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md"
   - "live-distribute-shards-household-observation-plan | Wave 1.3 | sha256:1cc01de165e2e0ef | path: genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md"
 ---
 

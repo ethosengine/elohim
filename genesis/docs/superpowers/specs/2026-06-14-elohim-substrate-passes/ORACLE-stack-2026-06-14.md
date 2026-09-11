@@ -1,5 +1,6 @@
 ---
 title: "THE ORACLE STACK — the cite-sealed layered entry index down the rungs"
+id: oracle-stack-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: librarian (present / hygiene lens)

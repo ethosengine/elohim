@@ -8,9 +8,9 @@ sovereignty-frame: adversary
 companion_to:
   - genesis/docs/content/elohim-protocol/hardware-spec.md
 cites:
-  - "hardware-spec | the physical form-factor, participation, power, serviceability, and sustainability vision whose cybernetic proof obligations this companion makes explicit | sha256:b0400feead19f37f | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
+  - "hardware-spec | the physical form-factor, participation, power, serviceability, and sustainability vision whose cybernetic proof obligations this companion makes explicit | sha256:b0400feead19f37f | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "resilience-protocol-spec | the operator-as-household-complexity-collapse canon and live-versus-gap substrate assessment this epic extends from digital resilience into physical care | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
-  - "values-forward | the strict owned-by-no-one, non-extractive, structurally unenclosable commons claim this rack proof must earn rather than merely repeat | sha256:58f62ae2be4a704a | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "values-forward | the strict owned-by-no-one, non-extractive, structurally unenclosable commons claim this rack proof must earn rather than merely repeat | sha256:58f62ae2be4a704a | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "observer-protocol | the witness-not-surveillance privacy posture governing source-proximate hardware, energy, presence, and location observations | sha256:19be3eea323ecd8b | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
   - "observation-event-layer-design | the raw-observation to durable-attestation graduation boundary that keeps telemetry off the DHT while preserving consequential proof | sha256:2b57787e60a0ddc6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
   - "requests-offers-application-design | the cooperative procurement, logistics, fulfillment, and commons-allocation composition reused for parts and service | sha256:321ac092b956fe8e | path: genesis/docs/content/elohim-protocol/architecture/applications/requests-offers-application-design.md"

@@ -12,9 +12,9 @@ domain: T10
 habits: [operator-runtime-surface]
 boundary: "Design only. This document decides how ONE existing envelope carries a CI stage, how a household provider peer executes it, and how the requester reads the result back and finds the attestation. It adds no envelope field, no HTTP route, no DHT entry type, no zome change and no change to the operator-owned rakia executor. It does not design a stage DAG scheduler, does not move the compute worker onto Adam, and does not decide whether the storage cargo gate becomes a compute task."
 cites:
-  - genesis/docs/superpowers/plans/2026-09-08-sprint-velocity-quiescence-holochain-close.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md
-  - genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md
+  - sprint-velocity-quiescence-holochain-close | Sprint 2026-09-08 → 09-14 | sha256:1e2863ecb8af29e6 | path: genesis/docs/superpowers/plans/2026-09-08-sprint-velocity-quiescence-holochain-close.md
+  - holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:ac1de36d2423be82 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md
+  - cell-qualified-projection-and-sync-contract | Cell-qualified projection and sync | sha256:54ff98e31c7f793a | path: genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md
   - genesis/agentic/compute/operations.md
   - elohim/elohim-storage/.epr-meta/operator-runtime-surface.habit.md
   - genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md

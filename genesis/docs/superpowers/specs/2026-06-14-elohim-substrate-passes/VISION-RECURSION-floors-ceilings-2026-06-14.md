@@ -1,5 +1,6 @@
 ---
 title: "THE DONUT AT EVERY RECURSION — Floors and Ceilings That Compose"
+id: vision-recursion-floors-ceilings-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

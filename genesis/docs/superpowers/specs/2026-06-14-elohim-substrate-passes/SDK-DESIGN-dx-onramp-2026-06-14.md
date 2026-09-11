@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — The On-Ramp: create-elohim-app, hello-household → hello-collective"
+id: sdk-design-dx-onramp-2026-06-14
 subtitle: "How a developer actually STARTS rebuilding the world, agency-at-the-root and veil-at-the-collective by default"
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code

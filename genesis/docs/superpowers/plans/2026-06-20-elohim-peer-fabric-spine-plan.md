@@ -6,8 +6,8 @@ class: protocol-canonical
 domain: D8
 sprint: doorway-membrane-wave-a
 cites:
-  - doorway-membrane-prosocial-routing-design | the spec this plan implements (Wave-A spine = §2 elohim-peer-fabric crate) | sha256:560686edf977447a | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
-  - elohim-facings-crate-extraction-plan | the pure-crate extraction pattern this plan follows (deps-graph boundary, no-diesel, byte-identical discipline) | sha256:d301f34b3b7e66d4 | path: genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md
+  - "doorway-membrane-prosocial-routing-design | the spec this plan implements (Wave-A spine = §2 elohim-peer-fabric crate) | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md"
+  - "elohim-facings-crate-extraction-plan | the pure-crate extraction pattern this plan follows (deps-graph boundary, no-diesel, byte-identical discipline) | sha256:d301f34b3b7e66d4 | path: genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md"
 refines: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
 # Single-host / DB-free: the crate is pure logic with hand-built test inputs — needs NO node/cluster.
 # (No requires_env: this whole plan is buildable+testable on a dev box.)
@@ -581,7 +581,7 @@ git commit -m "docs(peer-fabric): add crate CLAUDE.md (purity boundary + consume
 
 - **Doorway membrane policy stage** (consumes `guard`): a new stage in `handle_request` + an in-memory `GuardStore` + an `is_service_path`-style unit test. Separate plan.
 - **Storage serve-routing** (consumes `score`): extend `services/distribution_view.rs` to call `rank`/`select_diverse`; a SQLite `OperationalView`/`GuardStore`. Separate plan.
-- **Self-heal loop, recognition epoch rollups, the toll/`bridges/fiat` layer, cross-WAN/DNS legs** — later waves / design-only per the spec's §8.
+- **Self-heal loop, recognition epoch rollups, the toll/`bridges/fiat` layer, cross-WAN/DNS legs** — later waves outside this spine plan. The spec’s §8 distinguishes cross-WAN reroute/latency ordering (`@requires:shem`) from DNS/anycast/BGP (operator infrastructure); neither is made available by this plan. Read current substrate evidence before scheduling either leg (source reconciliation 2026-09-09).
 
 ## Self-Review
 

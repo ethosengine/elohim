@@ -3,7 +3,7 @@ title: "Elohim Protocol Hardware Ecosystem: Technical Specification"
 id: hardware-spec
 status: Vision envelope
 cites:
-  - hardware-providence-commons | the companion acceptance epic that turns this hardware vision into observable cybernetic, circularity, energy, and anti-enclosure proof obligations | sha256:0079c3507a8e64e0 | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md
+  - "hardware-providence-commons | the companion acceptance epic that turns this hardware vision into observable cybernetic, circularity, energy, and anti-enclosure proof obligations | sha256:0079c3507a8e64e0 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
 ---
 
 # Elohim Protocol Hardware Ecosystem: Technical Specification

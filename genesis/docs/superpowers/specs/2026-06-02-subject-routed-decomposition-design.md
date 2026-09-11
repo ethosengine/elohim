@@ -8,9 +8,9 @@ class: process-meta
 process_subdomain: doc-lifecycle
 topic: [decomposition, routing, subject-class, manifest, brainstorm-gate, placement, meta-vs-substrate, gospel-diff, decompose-flow, MAP-axis, process-meta, method-bridge, run-output, lossless-discard]
 cites:
-  - "placement | the contract this proposes a subject-class axis section for, mirroring its cluster-state env pointer | sha256:f84d7cb16bea9379 | status: stale — target content moved on; re-verify | path: genesis/docs/PLACEMENT.md"
+  - "placement | current subject-class home contract; the originally proposed section is present, without proving gate implementation | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
   - genesis/docs/claude.md
-  - "map | the product-domain lattice this proposes Axis 0 above — subject class before D#+pillar | sha256:4d707bfda967a21a | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
+  - "map | current subject-class routing above the product D1–D10/pillar lattice; the original absence diagnosis is historical | sha256:d43860fc500b5d8b | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
   - .claude/scripts/memory-kit/decompose.py
   - .claude/commands/brainstorm.md
   - .claude/memory-kit/CLAUDE.md
@@ -28,13 +28,15 @@ requires_env: []
 
 # Subject-Routed Decomposition
 
-> Grounded by the `subject-routed-decomposition` workflow (corpus survey + single-flow map + mis-placement audit + gospel inventory + adversarial verify). Where this spec asserts a corpus fact, the workflow verified it on disk.
+> Grounded by the `subject-routed-decomposition` workflow (corpus survey + single-flow map + mis-placement audit + gospel inventory + adversarial verify). Corpus facts below record that workflow’s 2026-06-02 baseline; they are not current implementation acceptance.
 
-## 1. The gap
+## 1. The gap at design time (2026-06-02)
 
 A spec's *subject* determines how it should decompose, but nothing classifies subject. The decompose flow is **single-flow** — it routes every spec, regardless of subject, through one substrate-shaped fate table (`compaction-loop §5.2`: durable truth → `architecture/`, verified behavior → `a2o/<pillar>` + pillar code, lesson → `history/`). That flow **assumes the spec is protocol/product-shaped**. But ~30 of ~53 sampled specs are **process-meta** (they build the dev machinery — memory-kit, skills, agents, CI, the loops), and ~9 are **method-bridge** (process work that dogfoods product primitives). For those, the substrate legs are wrong: there is no `<pillar>` scenario and no `architecture/` seed; the durable residue is a **CLAUDE.md gospel-diff + a `.claude/` tool**, and the prose is scaffolding to discard.
 
-**Root cause (verified):** `MAP.md §1` has exactly two axes — the D1–D10 concern lattice and the pillar code-location axis — **both substrate-scoped** (`map_has_meta_axis: false`). A process spec has no honest D# and no pillar, so its author reaches for the nearest-sounding product domain, and it is **always D4** ("Memory Lifecycle — the comet"), because the dev tooling *dogfoods the protocol's own vocabulary* (compact / merge / forget / the comet / cites-as-edges). The collision is irresistible: a doc-citation audit borrows "the comet — links survive dissolution," files under D4, and cites the product seed `memory-lifecycle-design.md` as canonical parent. `PLACEMENT.md §12` already admits the consequence: *"Dev-doc / functional-doc home undefined… a fourth home risks re-opening a dumping ground."* The fourth home is not a new directory — it is the `.claude/`+CLAUDE.md gospel-diff target the process classes already decompose into; it just has no *classifier* routing residue there.
+**Root cause (verified at design time):** `MAP.md §1` had exactly two axes — the D1–D10 concern lattice and the pillar code-location axis — **both substrate-scoped** (`map_has_meta_axis: false`). A process spec has no honest D# and no pillar, so its author reaches for the nearest-sounding product domain, and it is **always D4** ("Memory Lifecycle — the comet"), because the dev tooling *dogfoods the protocol's own vocabulary* (compact / merge / forget / the comet / cites-as-edges). The collision is irresistible: a doc-citation audit borrows "the comet — links survive dissolution," files under D4, and cites the product seed `memory-lifecycle-design.md` as canonical parent. `PLACEMENT.md §12` already admits the consequence: *"Dev-doc / functional-doc home undefined… a fourth home risks re-opening a dumping ground."* The fourth home is not a new directory — it is the `.claude/`+CLAUDE.md gospel-diff target the process classes already decompose into; it just has no *classifier* routing residue there.
+
+**Source reconciliation (2026-09-09):** current `MAP.md §1` contains Axis 0, which routes process-meta work outside the product D1–D10/pillar lattice, and Axis 0b for composition seams. `PLACEMENT.md` contains the subject-class section and points to `.claude/subject-routing.yaml`. The original absence diagnosis above is historical. The later MAP reassessment keeps subject-domain labels distinct from proposed decision labels and does not alter this routing. These prose observations do not verify the resolver, FRONT/BACK gates, migration, or unchecked implementation tasks below.
 
 ## 2. Two axes, not one
 

@@ -1,11 +1,11 @@
 ---
 id: native-content-graph-seam-design
 cites:
-  - "confession | Settled-theology doctrinal doc, seeded as the primary markdown EPR witness whose cites-mesh edges plus a computed tag-neighbor prove the resolver end-to-end | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
-  - "theology | Disputation doctrinal doc, seeded as a markdown EPR witness for the shared exploration sidebar and the explicit-vs-discovered rendering | sha256:4daef6885e3cc420 | path: genesis/docs/content/elohim-protocol/theology.md"
-  - "elohim-protocol-manifesto | Vision doctrinal doc, the only one already seeded as an EPR node; the cites mesh extends its relatedNodeIds to the other three as explicit RELATES_TO edges | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "constitution | Law doctrinal doc, newly seeded as a markdown EPR node so the four-doc graph resolves; an explicit-edge target in the cites mesh | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
-  - "epr-route-claims-link-conformance-design | EPR routing, redirect governance and link-integrity conformance — the substrate that serves /epr/{slug} for the seeded docs and the route-claims context the standalone viewer depends on | sha256:30b7cd1baf222922 | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
+  - "confession | Settled-theology doctrinal doc, seeded as the primary markdown EPR witness whose cites-mesh edges plus a computed tag-neighbor prove the resolver end-to-end | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "theology | Disputation doctrinal doc, seeded as a markdown EPR witness for the shared exploration sidebar and the explicit-vs-discovered rendering | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
+  - "elohim-protocol-manifesto | Vision doctrinal doc, the only one already seeded as an EPR node; the cites mesh extends its relatedNodeIds to the other three as explicit RELATES_TO edges | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "constitution | Law doctrinal doc, newly seeded as a markdown EPR node so the four-doc graph resolves; an explicit-edge target in the cites mesh | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "epr-route-claims-link-conformance-design | EPR routing, redirect governance and link-integrity conformance — the substrate that serves /epr/{slug} for the seeded docs and the route-claims context the standalone viewer depends on | sha256:1d9969399472335d | path: genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md"
 ---
 
 # Native Content-Graph Seam — Bringing the Genesis Graph Model Alive

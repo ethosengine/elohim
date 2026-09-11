@@ -7,8 +7,8 @@ sprint: next
 kind: handoff
 cites:
   - genesis/research/meadows-systems-dynamics-cross-pollination-2026-08-11.md
-  - measure-dynamics-confidence-ontology-design | the sealed canon this slice inherits — its six laws are the constructs slice 2 builds on, and its Q10-Q13 are the gaps that will bite a stock model on day one; its §4 network list is the OTHER slice 2 and explicitly not this sprint | sha256:2220560b22326a6e | path: genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md
-  - measure-ontology-slice1-epr-local-first | the completed predecessor — what it established (kind/confidence vocabulary, closure law, both governance gates, one meter) and the landmines its run uncovered that this handoff carries forward | sha256:80c86e9af8f35b5e | path: genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md
+  - "measure-dynamics-confidence-ontology-design | the sealed canon this slice inherits — its six laws are the constructs slice 2 builds on, and its Q10-Q13 are the gaps that will bite a stock model on day one; its §4 network list is the OTHER slice 2 and explicitly not this sprint | sha256:52d601baa6117450 | path: genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md"
+  - "measure-ontology-slice1-epr-local-first | the completed predecessor — what it established (kind/confidence vocabulary, closure law, both governance gates, one meter) and the landmines its run uncovered that this handoff carries forward | sha256:80c86e9af8f35b5e | path: genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md"
   - genesis/data/timeline/backlog/measure-family-borrows-backlog.md
   - genesis/data/timeline/backlog/2026-08-11-carrying-capacity-cumulative-vs-rate-unit-error.md
 ---

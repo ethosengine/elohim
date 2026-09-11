@@ -8,8 +8,8 @@ topic: [ssr, doorway, projection, content-addressing, app-bundle, build-decouple
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 cites:
-  - doorway-ssr-runtime | SSR-as-compute-capability architecture seed (D8); this spec moves its bundle distribution from image-bake to substrate content, reusing its cold-start + pod-resource-floor budget | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
-  - elohim-seam-map-concern-routing | Seam placement (D8 projection); names the brittle sed that strips V8/SSR from the storage image that this spec retires | sha256:54b5809fb8e688d1 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "doorway-ssr-runtime | SSR-as-compute-capability architecture seed (D8); this spec moves its bundle distribution from image-bake to substrate content, reusing its cold-start + pod-resource-floor budget | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "elohim-seam-map-concern-routing | Seam placement (D8 projection); names the brittle sed that strips V8/SSR from the storage image that this spec retires | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 requires_env: [household-nodes]
 ---
 

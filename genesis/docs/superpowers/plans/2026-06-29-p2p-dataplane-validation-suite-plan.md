@@ -10,10 +10,10 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
 cites:
   - genesis/docs/superpowers/plans/2026-06-14-dataplane-proofs-plan.md
-  - resilience-dimensions-proof-suite | 2026-06-12-resilience-dimensions-proof-suite-design | sha256:a89f58ec4906e152 | path: genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md
-  - resilience-facings-select-fold-aggregate-design | Resilience Facings | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - p2p-dataplane-sync-engine-design-arc | History: The P2P dataplane + sync-engine design arc (March 2026) | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
-  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:54b5809fb8e688d1 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "resilience-dimensions-proof-suite | 2026-06-12-resilience-dimensions-proof-suite-design | sha256:a89f58ec4906e152 | path: genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md"
+  - "resilience-facings-select-fold-aggregate-design | Resilience Facings | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "p2p-dataplane-sync-engine-design-arc | History: The P2P dataplane + sync-engine design arc (March 2026) | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # P2P Dataplane Validation Suite — Implementation Plan

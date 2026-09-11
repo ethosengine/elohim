@@ -8,12 +8,12 @@ steward: cartographer
 graduation-trigger: decompose-complete OR superseded-by-implementation
 created: 2026-06-13
 cites:
-  - conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:18cbb190f6a8a3a1 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
-  - conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:7fb163dd262e129c | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md
-  - self-healing-user-agency-opportunity-map | Self-Healing & User-Agency Opportunity Map | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md
-  - self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:23e24b020eed9564 | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md
-  - conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:049eccfdb959ebd6 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md
-  - conductor-leak-rca-native-heap-reframe | Conductor leak | sha256:ec6d6d1baa3bbbf6 | path: genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+  - "conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:9ae7987743bec6bc | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md"
+  - "conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:597157e7bb552d73 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md"
+  - "self-healing-user-agency-opportunity-map | Self-Healing & User-Agency Opportunity Map | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md"
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:23e24b020eed9564 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+  - "conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:049eccfdb959ebd6 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md"
+  - "conductor-leak-rca-native-heap-reframe | Conductor leak | sha256:ec6d6d1baa3bbbf6 | path: genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md"
 ---
 
 # Actuatable Self-Healing Control Plane

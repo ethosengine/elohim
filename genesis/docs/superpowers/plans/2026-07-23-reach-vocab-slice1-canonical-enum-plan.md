@@ -9,7 +9,7 @@ graduation-trigger: superseded-by-implementation — graduate once slice 1 lands
 created: 2026-07-23
 topic: [reach, vocabulary-drift, epr, elohim-storage, schema-contract, slice-1]
 cites:
-  - reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:d0303e0209f57b76 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - elohim/epr/src/reach.rs
   - elohim/elohim-storage/src/services/epr_kind.rs

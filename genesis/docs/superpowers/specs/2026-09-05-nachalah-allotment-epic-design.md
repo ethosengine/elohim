@@ -23,7 +23,7 @@ informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md (verify-locally-then-serve; the probes that name a red)
   - elohim/holochain/conductor-image (the conductor pipeline that already builds and pins a fork; today wired to the che-devworkspaces submodule, outside the webhook)
 cites:
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:2c06f0a9579446b9 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - "runtime-artifacts-elected-content | Runtime Artifacts as Elected Content | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"

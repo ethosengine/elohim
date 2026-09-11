@@ -9,13 +9,13 @@ graduation-trigger: slice-1 (delivery flow) landed AND slice-2 (zome+floor) rati
 created: 2026-08-10
 topic: [algedonic, feedback-signal, viability, counter-evidence, floor-protected, limit-governor, band-edge, concern-address, rea, witness]
 cites:
-  - sense-respond-governance-classifier | The Sense-and-Respond Governance Classifier | sha256:c716a519ee6cc953 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md
-  - vision-gap-limit-governor-stub | Vision-Gap STUB | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
-  - dna-signal-as-epr-envelope | DnaSignal as EPR Envelope | sha256:507652ee91a75aa1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md
-  - trust-as-efficiency-signal | Trust is an Efficiency Signal | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md
-  - evidence-ladder-push-left | Evidence Ladder + Push-Left Pressure | sha256:ac39aeb003dada60 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md
+  - "sense-respond-governance-classifier | The Sense-and-Respond Governance Classifier | sha256:c716a519ee6cc953 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
+  - "vision-gap-limit-governor-stub | Vision-Gap STUB | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md"
+  - "dna-signal-as-epr-envelope | DnaSignal as EPR Envelope | sha256:e6d46225dd34020f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md"
+  - "trust-as-efficiency-signal | Trust is an Efficiency Signal | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
+  - "evidence-ladder-push-left | Evidence Ladder + Push-Left Pressure | sha256:ac39aeb003dada60 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md"
   - genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md
-  - eprfs-witnessed-interaction-primitive | The eprfs Witnessed-Interaction Primitive | sha256:6a24773ffd7b83f4 | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md
+  - "eprfs-witnessed-interaction-primitive | The eprfs Witnessed-Interaction Primitive | sha256:6a24773ffd7b83f4 | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md"
   - elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json
 ---
 

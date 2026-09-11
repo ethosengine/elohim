@@ -13,23 +13,37 @@ area: "imagodei/identity-transport-binding"
 domain: "D2"
 jobs: [elohim-edge]
 cites:
-  - genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md
-  - genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md
+  - "identity-head-key-lineage-plan | Identity Head + Agent-Key Lineage | sha256:70f0a3d32f0aa184 | path: genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md"
+  - "identity-head-key-lineage | Identity Head + Agent-Key Lineage | sha256:95950b918c8803bc | path: genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md"
   - genesis/data/timeline/backlog/keyrotation-mint-path-witness-backed.md
-tags: [identity, agent-peer-binding, transport-id, signature, security, did-elohim, alsoKnownAs, witnessed-binding]
+tags: [identity, agent-peer-binding, transport-id, signature, security, did-elohim, alsoKnownAs, witnessed-binding, constraint]
 ---
 
 # Sign the AgentPeerBinding — the deferred witnessed-binding leg (identity-head C2)
 
+## Current source state (2026-09-09)
+Code paths in this section are relative to `elohim/elohim-storage/src/`.
+C2-S2 has a production libp2p mint implementation (`p2p/binding_mint.rs:225–348,428–586`)
+and default-on boot wiring when the p2p path, imagodei client and DB pool are available
+(`main.rs:3269–3304`). It assembles, signs, self-verifies and commits its own binding;
+this source inspection does not establish deployed fleet success. Pure Iroh bypasses
+this boot arm; Dual retains libp2p minting. Iroh-kind proofs remain rejected by transport
+derivation (`p2p/binding_proof_wire.rs:364–373`), and outgoing handshake payloads still
+do not carry minted envelopes (`p2p/mod.rs:5478–5493`). Generic mint assembly is no longer
+an absent prerequisite. Freshness, lineage, integrity and durable-consumer work remain
+previously declared scope pending targeted verification. Fleet success, enforcement posture,
+DHT/gossip delivery, habit state and experiential acceptance were not verified by this read.
+
 ## Why this exists
-The identity-head arc (Waves A–C1) ships the primitive: `did:elohim` resolves real
+At the original 2026-07-18 writing, the identity-head arc (Waves A–C1) ships the primitive: `did:elohim` resolves real
 controllers + lineage. It also emits transport ids (libp2p PeerId / iroh NodeId) as
-`alsoKnownAs` entries — but those are **self-asserted / unverified today**
-(`STAGE1_SIGNATURE_SENTINEL = "c3RhZ2UtMS1zaWduYXR1cmU="` at
+`alsoKnownAs` entries — recorded then as **self-asserted / unverified**
+(`STAGE1_SIGNATURE_SENTINEL = "c3RhZ2UtMS1zaWduYXR1cmU="` at the then-current
 `elohim/elohim-storage/src/p2p/identity_binding_gossip.rs:129`; the binding gossip
-payload carries the sentinel instead of a real signature). The DID document reflects
-this honestly (phase-1 behavior C1 preserves): a transport-id `alsoKnownAs` is a
-claim, not a proof.
+payload carried the sentinel instead of a real signature). The original DID framing
+was honest (phase-1 behavior C1 preserves): a transport-id `alsoKnownAs` is a
+claim, not a proof. This historical rationale does not establish current DID bridge behavior;
+see the dated source-state note above for the landed producer and remaining path gaps.
 
 ## The work (C2 — security-critical, design-first)
 Replace the sentinel with a real signature so a transport-id binding is
@@ -123,7 +137,7 @@ but source-chain-monotonic and DHT-validated, un-backdatable below a real supers
 - **Revocation authorization:** supersede/revoke a binding for `agent_cid` only under a proof from
   `agent_cid`'s current head (blocks force-revoke DoS; enables compromised-transport-key cut).
 
-### Bite-sized session decomposition (each independently executable to clean delivery)
+### Original 2026-07-18 session decomposition (historical scope; landed work noted above and below)
 - **C2-S1 — algebra core (no deps, DNA-neutral):** `BindingCore` + length-prefixed domain-separated
   encoder (present/absent flag on `valid_until`) + `CrossSignatureProof` (WITHOUT `binding_action_hash`)
   + shared pure `verify_cross_signature(core, proof, head_resolver)` + unit tests (injectivity,
@@ -152,7 +166,7 @@ but source-chain-monotonic and DHT-validated, un-backdatable below a real supers
   shape-only entries don't retro-invalidate; else fresh DHT + re-mint-under-current-head.
 
 ### Dependencies + honest state
-- **C2-S1…S5 + S6-R1 are buildable now, DNA-hash-neutral, deliver R1** (current-head bindings verified).
+- **The 2026-07-18 design assessed C2-S1…S5 + S6-R1 as buildable, DNA-hash-neutral, delivering R1** (current-head bindings verified). This was a design-readiness assessment, not a current inventory of unbuilt sessions.
 - **R2 (lineage inheritance) ships INERT** until: (a) the B1b **redesign** (see
   `keyrotation-mint-path-witness-backed.md` "Design review" — B1b as originally specced is unsound),
   (b) pubkey-timeline populated by a real `on_key_rotation` (today a no-op stub, `controller.rs:277`),
@@ -185,18 +199,20 @@ Habit `identity-cross-signed` moved `unwired -> red` on this work. What is now i
 - **All four writers classify at write** — gossip receive, handshake (against the
   TRANSPORT-verified PeerId, not the payload's self-report), and DHT arrival. The
   DHT-arrival signal now *carries the entry's signature through* instead of discarding it,
-  and the gossip re-publish forwards it rather than substituting a sentinel, so a real proof
-  will propagate the moment C2-S2 mints one.
+  and the gossip re-publish forwards it rather than substituting a sentinel. C2-S2 now
+  has a libp2p producer; successful DHT/gossip propagation was not verified by the
+  2026-09-09 source inspection.
 - **The consumer cut** — `AttributableBindings`, taken by type by the economic joins
   (reciprocity ledger REST + GraphQL, `external_committed_bytes`, the per-device `stewarded`
   triptych) while routing/display keeps `list_active_for_agent` and its honest self-asserted
   rows.
 - **Posture** — `ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce|observe`, default **observe** +
-  the counter `elohim_attribution_unverified_bindings_total`. Deliberate: no peer can mint a
-  proof until C2-S2, so enforcing now would blank every economic surface without making
-  anything safer. The counter is the measure that says how much attribution rides
-  self-asserted identity today; draining it to zero under `posture="enforce"` is the habit's
-  flip-to-green.
+  the counter `elohim_attribution_unverified_bindings_total`. The recorded 2026-08-18
+  rationale was that no peer could mint until C2-S2 and enforcement would blank economic
+  surfaces. That absent-producer rationale is superseded by the libp2p mint implementation;
+  current enforcement posture and consequences still require measurement. The counter was
+  designated to measure attribution riding self-asserted identity; draining it to zero under
+  `posture="enforce"` was the declared habit flip-to-green criterion, not a result verified here.
 - **Proof**: `tests/binding_attribution_refuses_sentinel.rs` (the standing red — was 2
   failed / 0 passed against honest stubs, and is no longer `#[ignore]`d, which was a CI
   no-op) + `tests/binding_attribution_cut.rs` (7 tests: sentinel projects unverified,
@@ -204,11 +220,13 @@ Habit `identity-cross-signed` moved `unwired -> red` on this work. What is now i
   refusal, `Observe` is behaviour-preserving, a legacy-shaped row defaults to unverified, a
   poisoned signature neither panics nor attributes, a lifted proof does not attach).
 
-**Still NOT done, and not implied by the above**: C2-S2 (minting), C2-S3 (notarized-timestamp
-freshness anchoring — the pincer stands), C2-S6 lineage currency, C2-S7 integrity fold
-(verification here is receiver-local, NOT notarized), and the durable-placement half of C2-S5
-— see the shard-push-redirect finding immediately below, which needs C2-S2 first because
-gating it today would stop shard distribution outright.
+**Remaining scope, reconciled 2026-09-09:** C2-S2 libp2p minting is implemented and boot-wired;
+iroh-kind producer/derivation coverage and outgoing handshake envelope coverage remain gaps
+in inspected source. C2-S3 notarized-timestamp freshness anchoring, C2-S6 lineage currency,
+C2-S7 integrity fold, and the durable-placement half of C2-S5 remain previously declared work
+pending fresh focused verification. See the historical shard-push-redirect finding below;
+generic mint absence is no longer its prerequisite, and this read did not measure whether
+consumer enforcement would stop shard distribution.
 
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: "THE API/SDK BOUNDARY — one composition grammar over many capability APIs"
+id: platform-sdk-boundary-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

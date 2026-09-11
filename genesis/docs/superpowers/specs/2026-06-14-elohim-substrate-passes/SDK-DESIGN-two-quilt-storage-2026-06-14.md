@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — Two-Quilt Storage: content-addressing, byte-quilt custody, trust-plane heads"
+id: sdk-design-two-quilt-storage-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

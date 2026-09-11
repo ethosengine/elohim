@@ -7,7 +7,7 @@ artifact_kind: plan
 written: 2026-06-13
 implements: non-commons-provide-commitments-design
 cites:
-  - non-commons-provide-commitments-design | the DECIDED design this plan implements — §9.2 Option A (integrity enforces structural reach), §4-§8 surfaces | sha256:55d67eec29f98580 | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
+  - "non-commons-provide-commitments-design | the DECIDED design this plan implements — §9.2 Option A (integrity enforces structural reach), §4-§8 surfaces | sha256:55d67eec29f98580 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md"
 requires_env: []
 ---
 

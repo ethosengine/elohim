@@ -6,11 +6,11 @@ class: substrate
 domain: substrate (conductor + storage dataplane transport lineage)
 sprint: proposed (multi-wave campaign; Waves 1a-1d are the first schedulable sprint)
 cites:
-  - conductor-leak-upstream-research-tx5-pin-verdict | Conductor anon-heap leak | sha256:ccbf95a2af47c660 | path: genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md
-  - conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:049eccfdb959ebd6 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md
-  - iroh-parallel-stack | 2026-05-07-iroh-parallel-stack | sha256:933a487c90b606f2 | path: genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
+  - "conductor-leak-upstream-research-tx5-pin-verdict | Conductor anon-heap leak | sha256:ccbf95a2af47c660 | path: genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md"
+  - "conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:049eccfdb959ebd6 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md"
+  - "iroh-parallel-stack | 2026-05-07-iroh-parallel-stack | sha256:933a487c90b606f2 | path: genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md"
   - genesis/docs/superpowers/sprints/2026-06-15-iroh-dataplane-toggle-sprint-result.md
-  - substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:cb76e9f0ae6bacfc | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
 memory_anchors:
   - project_iroh_dataplane_actual_state
   - project_dna_hash_blind_to_coordinator_zomes

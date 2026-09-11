@@ -6,11 +6,11 @@ derived_from:
   - app/lamad/docs/IMPLEMENTATION_PLAN.md   # retired to git 2026-06-11 (lamad island recompose)
   - app/lamad/docs/IMPLEMENTATION_ARCHIVE.md
 cites:
-  - lamad-bundle-gospel | CLAUDE | sha256:e589f6c439666a7f | path: app/lamad/CLAUDE.md
-  - lamad-domain-gospel | CLAUDE | sha256:0c7e351784c6df66 | path: elohim/sdk/domains/lamad/CLAUDE.md
+  - "lamad-bundle-gospel | CLAUDE | sha256:e589f6c439666a7f | path: app/lamad/CLAUDE.md"
+  - "lamad-domain-gospel | CLAUDE | sha256:0c7e351784c6df66 | status: stale — target content moved on; re-verify | path: elohim/sdk/domains/lamad/CLAUDE.md"
   - app/lamad/src/app/services/data-loader.service.ts
   - app/lamad/src/app/services/practice.service.ts
-  - subject-routing-locus-graph-design | 2026-06-11-subject-routing-locus-graph-design | sha256:a884cdf639a04699 | path: genesis/docs/superpowers/specs/2026-06-11-subject-routing-locus-graph-design.md
+  - "subject-routing-locus-graph-design | 2026-06-11-subject-routing-locus-graph-design | sha256:a884cdf639a04699 | path: genesis/docs/superpowers/specs/2026-06-11-subject-routing-locus-graph-design.md"
 ---
 
 # The Lamad MVP Implementation Arc (Plan v5.0)

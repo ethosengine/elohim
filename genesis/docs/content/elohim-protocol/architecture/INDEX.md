@@ -198,6 +198,13 @@ Each epic that has been realized by an architecture spec carries a "Technical Re
 
 New architecture specs (including new application archetypes and horizon graduations) MUST add their backlinks to the epics they realize before being marked Landed.
 
+### Topology reassessment and proposed commons reimplementation
+
+- [Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider](./2026-09-06-holons-are-spaces-how-we-use-holochain.md) — `reference`; links the manifesto and existing substrate to a topology reassessment. §3's fleet observations are dated; §0b retires automatic household→DNA placement and hands sequencing to the companion plan. Group clone spaces remain a gated candidate.
+- [A Commons That Keeps Its Promises — From a Human Day to the Reimplementation](./2026-09-06-ai-stewarded-commons-reimplementation-plan.md) — `proposed; implementation-plan`; connects the human care story to accountable correction, cross-context valueflows, bounded stewardship, confidentiality, and app composition. §7 defines staged proof; §12 holds later product goals. Source inspection and existing UI captures do not establish those outcomes.
+
+Their domain intersections and household reading branch are in [MAP](./MAP.md#reassessment-across-domains--topology-and-the-connected-commons). Existing seeds retain their authority; neither reference closes a gap or marks a habit green by being indexed.
+
 ## How to use this directory
 
 **If you are designing a new feature or pillar**: read the architecture specs whose primitives you'll touch. Cite them as `informed-by:` in your sprint spec. If you find yourself wanting to introduce a new substrate primitive, propose an architecture spec amendment instead of inventing it locally.

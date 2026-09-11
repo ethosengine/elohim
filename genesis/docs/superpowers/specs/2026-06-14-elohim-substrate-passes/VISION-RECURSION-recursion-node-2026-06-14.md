@@ -1,5 +1,6 @@
 ---
 title: "VISION RECURSION PASS — The Viable-System Node: Instantiating an Elohim-Layer (VSM System 3/4/5)"
+id: vision-recursion-recursion-node-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

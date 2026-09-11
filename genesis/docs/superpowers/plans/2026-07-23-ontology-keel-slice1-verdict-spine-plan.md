@@ -7,7 +7,7 @@ created: 2026-07-23
 domain: D2
 topic: [ontology, verdict, ceiling-marker, epistemic, peer-review, rea, keel]
 cites:
-  - reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2f5835c40fb02a81 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
   - genesis/research/owl2-graduation-floor-ceiling-ontology-2026-07-23.md
   - genesis/research/letter-to-rea-practitioners-observed-presence-2026-07-22.md
   - elohim/epr/src/reach.rs

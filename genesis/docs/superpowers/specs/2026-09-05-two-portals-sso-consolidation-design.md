@@ -10,7 +10,7 @@ habits: [hosted-human-lifecycle]
 graduation-trigger: the consolidation plan lands (elohim-app renders no password field and posts no registration; both identity routes redirect to the discovered doorway portal) and the hosted-human station-1 "registering because an application asked me" scenario passes on the household mesh — then this spec decomposes into the doorway/app gospel paragraphs it names
 topic: [auth, portal, sso, oauth, imagodei, doorway, elohim-app]
 cites:
-  - "two-portals-sso-consolidation-plan | Two-portals SSO consolidation | sha256:613ab0adf9e530fc | path: genesis/docs/superpowers/plans/2026-09-05-two-portals-sso-consolidation-plan.md"
+  - "two-portals-sso-consolidation-plan | Two-portals SSO consolidation | sha256:613ab0adf9e530fc | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-09-05-two-portals-sso-consolidation-plan.md"
   - "hosted-human-lifecycle-e2e-plan | Hosted-human lifecycle E2E | sha256:17e945afeb8ea4ca | path: genesis/docs/superpowers/plans/2026-09-04-hosted-human-lifecycle-e2e-plan.md"
   - genesis/a2o/features/auth/oauth-authorization-code.feature
   - genesis/a2o/features/auth/auth-discovery.feature

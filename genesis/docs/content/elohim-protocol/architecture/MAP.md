@@ -96,6 +96,21 @@ column — **where it ends** (the boundary to the next domain).
 **Cross-cutting:** D1's envelope + the IoC integrator-compatibility contract are foundational to all
 of D2–D9; no single domain owns them.
 
+### Reassessment across domains — topology and the connected commons
+
+These later documents cross existing domain boundaries. Their placement below adds a reading route;
+it does not replace the seeds or establish that proposed mechanisms are delivered. Their sealed
+**decision labels D0–D10 are separate from this MAP's subject-domain labels D1–D10**.
+
+| Reference | Domain placement and boundary | Evidence and status to carry forward |
+|---|---|---|
+| [Holons, Spaces, and Holochain](./2026-09-06-holons-are-spaces-how-we-use-holochain.md) | **D6** topology reassessment, meeting **D7** at admission and authority, **D1** at witness identity, **D5** at off-DHT custody/transport, and **D8** at doorway projection. | `reference`: §3 records the dated fleet layout; §0b governs how to read the later proposals. Automatic household→DNA placement is retired; group clone spaces remain a candidate requiring authority, admission, and device-budget proof. The companion plan owns sequencing. |
+| [A Commons That Keeps Its Promises](./2026-09-06-ai-stewarded-commons-reimplementation-plan.md) | **D1/D2** accountable acts and portable evidence (§§4, 6.2, 6.7); **D3/D7** correction, successor authority, and repair (§§5.2–5.4); **D5/D7** confidential custody distinct from readership and authority (§5.5); **D9** related REA valueflow/coverage work (§§5.6, 6.3), beyond the existing bridge seed's narrow remit; **D6** witness/runtime placement (§§5.1, 6.8). Package, SDK, and client composition (§§10–11) also use **Axis 0b**, not a new domain. | `proposed; implementation-plan`: existing source anchors and rendered surfaces are grounding, not acceptance. §7 starts with sensorless accountable correction in one space, then a cross-context loop; custody and validation-space changes have later gates. §12's product goals remain held. |
+
+The plan gives proposed treatments for the **Elohim-agent** and **pillar-service interface** gaps
+below (§5.2 and §§10–11 respectively); it does not establish either completed contract or close those
+gaps. It also does not settle the D3↔D4 reconciliation or widen D10's in-process testing boundary.
+
 **The second axis — pillar (where the *code* lives):**
 
 | Pillar | Path alias | Owns code in | Shaped by domains |
@@ -133,6 +148,14 @@ five-step reading order for working on that pillar.
    [`applications/mint-monarch-application-design.md`](./applications/mint-monarch-application-design.md)
    (the household exemplar), plus [`memory-lifecycle-design`](./2026-05-10-memory-lifecycle-design.md)
    (D4, so a small node's ledger doesn't melt) and a thin edge-elohim (D6).
+   **Reimplementation branch (proposed):** after those seeds, read
+   [Holons, Spaces, and Holochain](./2026-09-06-holons-are-spaces-how-we-use-holochain.md)
+   **§0b → §3** for the decision qualifiers and dated topology baseline, then
+   [A Commons That Keeps Its Promises](./2026-09-06-ai-stewarded-commons-reimplementation-plan.md)
+   **§1 → §§2–4 → §7** for the human day, authority/evidence inventory, and first correction proof.
+   Follow §§5–6 for the affected domain and §§10–11 for composition; §12 marks held goals.
+   Resume the pillar/code/scenario walk below. The plan's accountable-correction scenario is the
+   focused starting point; neither the complete ambient story nor a new household DNA is slice-1 proof.
 3. **Pillar guides** → [`shefa/CLAUDE.md`](../../../../../app/elohim-app/src/app/shefa/CLAUDE.md)
    (REA events) + [`lamad CLAUDE.md`](../../../../../app/lamad/CLAUDE.md) (observation vocabulary).
 4. **Code** → `elohim/elohim-storage/src/` (the REA substrate) + `app/elohim-app/src/app/shefa/` +
@@ -213,8 +236,8 @@ pass** — they are implementation-spec work, listed here so the walk is honest.
 
 | Gap | Kind | Status | Tracked at |
 |-----|------|--------|------------|
-| **Elohim-agent subsystem** — crate/service/sdk/specialists/mcp exist (`elohim/elohim-agent/`) but no `tier: architecture` seed; an architect can't answer "what is an elohim-agent's role in the three-layer truth model" from canonical. The seed must establish the **observed-not-flagged invariant**: `Phase::ElohimActive` vs `DevContext` is derived from whether real inference actually ran (the `/wisdom/invoke` response is the source of truth, threaded into the attestation) — never assigned from a config flag, or reputation accumulation off those attestations would be corruptible | CODE-NO-DOC | OPEN (largest hole; thin seed needed first) | `gap-items/specs__2026-05-28-conductor-agent-info-substrate-gossip-design.json` |
-| **Pillar-service interface spec** — six pillar modules exist in `app/elohim-app/src/app/` but no canonical seed defines "what makes a pillar service" (interface, composition rules, truth-layer mapping); described only through application archetypes | CODE-NO-DOC | OPEN | `gap-items/plans__2026-05-25-pillar-epr-decomposition-plan.json`, `gap-items/specs__2026-05-25-pillar-epr-decomposition-design.json` |
+| **Elohim-agent subsystem** — crate/service/sdk/specialists/mcp exist (`elohim/elohim-agent/`) but its completed architecture contract remains absent; the proposed commons plan §5.2 now supplies a treatment, not acceptance evidence. An architect still can't answer "what is an elohim-agent's role in the three-layer truth model" from canonical. The seed must establish the **observed-not-flagged invariant**: `Phase::ElohimActive` vs `DevContext` is derived from whether real inference actually ran (the `/wisdom/invoke` response is the source of truth, threaded into the attestation) — never assigned from a config flag, or reputation accumulation off those attestations would be corruptible | CODE-NO-DOC | OPEN (largest hole; thin seed needed first) | `gap-items/specs__2026-05-28-conductor-agent-info-substrate-gossip-design.json` |
+| **Pillar-service interface spec** — six pillar modules exist in `app/elohim-app/src/app/` but no completed canonical contract defines "what makes a pillar service" (interface, composition rules, truth-layer mapping); the proposed commons plan §§10–11 adds a composition design beyond the application archetypes, with public APIs and runtime contracts still open | CODE-NO-DOC | OPEN | `gap-items/plans__2026-05-25-pillar-epr-decomposition-plan.json`, `gap-items/specs__2026-05-25-pillar-epr-decomposition-design.json` |
 | **Chain-layer consensus mechanics** — named in multi-collective ("consensus weight = care-aggregate"); [`upgrade-revert-and-constitutional-consensus`](./2026-07-14-upgrade-revert-and-constitutional-consensus.md) now specifies amendment-by-consensus-at-reach, but declares itself `truth:VISION` in §11 — **the mechanism is designed, not built**, so this stays open as *implementation*, no longer as *design* | OPEN | NARROWED (spec'd at vision tier; executable mechanics absent) | `gap-items/plans__2026-05-19-doorway-stewardship-chain-design.json` |
 | **Bridge governance-acceptance gate** — records-lifecycle "Gap 9" (normative for all bridges) but no seed defines a bridge's governance gate; blocks any new `bridges/<vendor>` | OPEN | OPEN | `gap-items/specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design.json`; `bridges/CLAUDE.md` |
 | **Governance multi-factor merge check** — memory-lifecycle §3.3 names it load-bearing (content-reach / authoritative-governance / valueflows-to-stewards / resiliency) but defers to sibling specs that don't exist | OPEN | OPEN (known dependency) | `gap-items/plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.json` |

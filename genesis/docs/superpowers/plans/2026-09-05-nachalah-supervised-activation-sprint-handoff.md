@@ -11,7 +11,7 @@ graduation-trigger: >
   rollback through the existing release channel, with preserved identity, verified running binaries,
   and adoption evidence; the resulting implementation and receipts supersede this handoff.
 cites:
-  - "nachalah-allotment-epic | The accepted holding epic this sprint enables by bringing conductor adoption forward | sha256:4a52c69d33f2ea0c | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md"
+  - "nachalah-allotment-epic | The accepted holding epic this sprint enables by bringing conductor adoption forward | sha256:210aba054878c407 | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md"
   - "runtime-artifacts-elected-content | The existing release election, verification, adoption discipline, and evidence machinery this sprint must extend | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - "holochain-evolution-epic | The existing DNA-lineage vehicle preserved while this sprint replaces only the conductor runtime | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
 ---

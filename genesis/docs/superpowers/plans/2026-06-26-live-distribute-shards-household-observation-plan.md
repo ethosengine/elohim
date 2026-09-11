@@ -11,13 +11,13 @@ refines:
   - genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
   - genesis/docs/superpowers/plans/2026-06-19-resilience-card-lighting-plan.md
 cites:
-  - resiliency-card-p2p-weave-sprint-plan | the parent sprint; this plan executes its Wave 1.3 (the single highest-leverage first slice) | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md
-  - epr-durability-replication-arc-plan | the distribute_shards home — Workstreams A (custody/DHT leg) + D (stewarded aggregates), the Phase-0 observe-first discipline, and the /p2p/status counter contract | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
-  - resilience-card-lighting-plan | the card-lighting arc this continues (commitmentBacked already lit; this lights stewarding) | sha256:be6dfb65e5e8a433 | path: genesis/docs/superpowers/plans/2026-06-19-resilience-card-lighting-plan.md
-  - resilience-facings-select-fold-aggregate-design | the fold layer this observes — §8 clean-read-projection P2P-gate verdict + §9 slices; the lens is built, this feeds it | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - che-live-peer-dev-loop-design | the local-runner x live-mesh observation pattern Task 1 uses to capture the green run | sha256:f976477c2f2baba0 | path: genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md
-  - qahal-epr-household-lattice-design | the household/hub topology the holder-relation groups by | sha256:ed5c1d3d2698b567 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
-  - dht-is-a-notary-not-a-byte-store | the binding constraint — shard_locations is gossip+projection (Category-C), never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md
+  - "resiliency-card-p2p-weave-sprint-plan | the parent sprint; this plan executes its Wave 1.3 (the single highest-leverage first slice) | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md"
+  - "epr-durability-replication-arc-plan | the distribute_shards home — Workstreams A (custody/DHT leg) + D (stewarded aggregates), the Phase-0 observe-first discipline, and the /p2p/status counter contract | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md"
+  - "resilience-card-lighting-plan | the card-lighting arc this continues (commitmentBacked already lit; this lights stewarding) | sha256:be6dfb65e5e8a433 | path: genesis/docs/superpowers/plans/2026-06-19-resilience-card-lighting-plan.md"
+  - "resilience-facings-select-fold-aggregate-design | the fold layer this observes — §8 clean-read-projection P2P-gate verdict + §9 slices; the lens is built, this feeds it | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "che-live-peer-dev-loop-design | the local-runner x live-mesh observation pattern Task 1 uses to capture the green run | sha256:f976477c2f2baba0 | path: genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md"
+  - "qahal-epr-household-lattice-design | the household/hub topology the holder-relation groups by | sha256:ed5c1d3d2698b567 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md"
+  - "dht-is-a-notary-not-a-byte-store | the binding constraint — shard_locations is gossip+projection (Category-C), never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md"
   - genesis/a2o/features/resilience/observable-distribution.feature
   - genesis/a2o/features/resilience/grandma-photos-survive-node-loss.feature
   - genesis/a2o/features/federation/peer-recovery.feature

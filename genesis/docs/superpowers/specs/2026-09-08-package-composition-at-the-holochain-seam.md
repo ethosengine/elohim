@@ -10,7 +10,7 @@ actor: agent:orchestrator@fable-5.1
 written: 2026-09-08
 habits: [dataplane-convergence, runtime-upgrade-propagation, happ-lineage-migration, operator-runtime-surface]
 cites:
-  - "ai-stewarded-commons-reimplementation-plan | §5.1 bounded witnessing below the application; §8 keep/deepen/replace decision experiment; §10.3 the six boundaries the default hApp obscures; §10.6 what a developer composes | sha256:bf2f1a4c94e70670 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
+  - "ai-stewarded-commons-reimplementation-plan | §5.1 bounded witnessing below the application; §8 keep/deepen/replace decision experiment; §10.3 the six boundaries the default hApp obscures; §10.6 what a developer composes | sha256:0d5f1300b5d615dc | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
   - "holons-are-spaces-how-we-use-holochain | §0b sealed decisions D0–D10; §6 hard constraints; §6½ arcs; §9.1 holon granularity | sha256:ac1de36d2423be82 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
   - "elohim-seam-map-concern-routing | what-do-you-ADD disambiguator: manifest → SDK seam, crate → bridge seam, native code → mod seam; participation tracks T1–T4 | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "runtime-artifacts-elected-content | runtime artifacts are elected content heads the storage plane replicates; rung 5 | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"

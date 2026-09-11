@@ -9,9 +9,9 @@ derived_from:
   - genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
   - genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
 cites:
-  - subject-routed-decomposition-design | the class-axis cascade this graph's ROUTING projection extends — class → {write_location, decomposition_flow}; this design adds the citation + scope projections over the same loci | sha256:0d910143a8498b64 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
-  - semantic-computable-links-design | the cite-envelope + reverse-index propagation this design GENERALIZES from doc↔doc cites to the derived_from / cascade / code-subject edges | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
-  - managed-surface-edit-discipline-design | the edit-time surface registry (in_cite_graph) that answers node membership — the single scope source this graph's nodes draw on | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md
+  - "subject-routed-decomposition-design | the class-axis cascade this graph's ROUTING projection extends — class → {write_location, decomposition_flow}; this design adds the citation + scope projections over the same loci | sha256:fca639d89e25ade7 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md"
+  - "semantic-computable-links-design | the cite-envelope + reverse-index propagation this design GENERALIZES from doc↔doc cites to the derived_from / cascade / code-subject edges | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md"
+  - "managed-surface-edit-discipline-design | the edit-time surface registry (in_cite_graph) that answers node membership — the single scope source this graph's nodes draw on | sha256:e5afb16c974b109b | path: genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md"
   - .claude/subject-routing.yaml
   - genesis/data/timeline/backlog/subject-routing-locus-census.md
 ---

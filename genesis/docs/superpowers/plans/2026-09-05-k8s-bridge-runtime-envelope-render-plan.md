@@ -9,8 +9,8 @@ graduation-trigger: Four station commitments discharged with named tests and gat
 date: 2026-09-05
 serves: dev-system-equilibrium
 cites:
-  - "k8s-bridge-runtime-envelope-render | k8s bridge | sha256:63e7994caba5a53a | path: genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md"
-  - "compute-envelope-tevah | Tevah | sha256:ac9364d4b024290f | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "k8s-bridge-runtime-envelope-render | k8s bridge | sha256:63e7994caba5a53a | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
 ---
 
 # k8s bridge — runtime envelope render — plan

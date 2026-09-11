@@ -13,7 +13,7 @@ domain: peer-hoster dataplane (T2) × confidentiality plane (3.13) × custody/RE
 habits: [blob-durability, dataplane-convergence, reach-enforced-everywhere]
 topic: [sharding, reed-solomon, swarm, inventory-gossip, bitfield, blind-custody, key-ring, x25519, custody-commitment, witnessed-harm-limit, quarantine, iroh, libp2p, red-teamed]
 cites:
-  - "doorway-federated-continuity-roadmap | Lanes S and C6 this spec is the design pass for; grounding corrections and the S0 prerequisite rows flow back to it | sha256:4c661dbbb6927763 | path: genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
+  - "doorway-federated-continuity-roadmap | Lanes S and C6 this spec is the design pass for; grounding corrections and the S0 prerequisite rows flow back to it | sha256:6e79cd43ecef2594 | path: genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
   - "private-layer-blind-custody-resiliency-floor | the gate output this spec inherits and explicitly changes (§7): ring travels with the ciphertext, no Shamir in the ring, dual-key via key-stewardship reuse; bond-decay deferred unchanged | sha256:1dd9950a41c2ff73 | path: genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md"
   - "ownership-custody-inalienable-red-team-design | floor rows designed against — CSAM refusal-to-instantiate (quarantine vs refuse), guardian-excluded composition (§4.2), erasure and revocation limits stated plainly | sha256:d80fea9b7bf8843f | path: genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md"
   - genesis/research/witnessed-harm-limit-research-2026-08-09.md

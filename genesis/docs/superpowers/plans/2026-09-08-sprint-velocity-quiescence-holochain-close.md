@@ -8,7 +8,7 @@ habits: [dataplane-convergence, runtime-upgrade-propagation, operator-runtime-su
 commits: []
 cites:
   - "holons-are-spaces-how-we-use-holochain | Architecture grounding for the sprints Holochain integration close (D-D/D-C) — spaces/holons framing this sprint budgets and contracts against. | sha256:ac1de36d2423be82 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
-  - "ai-stewarded-commons-reimplementation-plan | T12 appends the chosen decision-experiment budgets to this plans section 8, finishing the re-evaluated Holochain integration strategy. | sha256:bf2f1a4c94e70670 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
+  - "ai-stewarded-commons-reimplementation-plan | T12 appends the chosen decision-experiment budgets to this plans section 8, finishing the re-evaluated Holochain integration strategy. | sha256:0d5f1300b5d615dc | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
   - "accountable-correction-contract | T7a/T7b implement stations 1-2 and 4 of this contract; T13 designs a companion D6 contract beside it. | sha256:691e8b89f394214c | path: genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md"
   - "ratchet-to-delivery-dataplane-sdk-lanes | Execution-scaffold ratchet spec this sprints batch/push-gate cadence and habit-delta discipline follow. | sha256:162f2cde07f0de8e | path: genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md"
   - genesis/data/timeline/backlog/runtime-steward-adoption-of-fleet-cut-release.md

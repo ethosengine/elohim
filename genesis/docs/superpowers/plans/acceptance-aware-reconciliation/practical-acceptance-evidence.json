@@ -1,0 +1,545 @@
+{
+  "scope": "Native local reconciliation CLI only",
+  "live": {
+    "version": "acceptance-reconciliation-v1",
+    "evaluator": {
+      "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+      "id": "elohim-epr-cli",
+      "version": "0.1.0"
+    },
+    "scope_cid": "bafkreiavkfctvqewnwexkfzqjsaydwx3jrl5yeu2g6uc2xaybmwjueplni",
+    "record_set_fingerprint": "sha256:a274448d4f0543a49324ad8d4165320ed498013d3eeab4329a51d01dfdbc6cd6",
+    "assertions": [
+      {
+        "intent": "bafyreiebn4bjsckvynh23cwalsrtnm6lebfmc53pts4ilvkxjskrkryg64",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#4",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "claim and implement the assertion, then review and accept"
+      },
+      {
+        "intent": "bafyreif4xzlg6ul5ka4zxjm4tbtrvcvma7337wwxls7kbgfmwohb3co6pm",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#5",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "claim and implement the assertion, then review and accept"
+      },
+      {
+        "intent": "bafyreifp2frpzbswkos4yx56l5tffcodvimxs5c6k6ush6hgru5arud4oy",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#1",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "claim and implement the assertion, then review and accept"
+      },
+      {
+        "intent": "bafyreigw7vkcku7f3rbvls5vsikbnunmmg6tsxtw2lbwhh6jwgm5zriuea",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#3",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "claim and implement the assertion, then review and accept"
+      },
+      {
+        "intent": "bafyreigx2ahzrm3wpz5mhdizv4xjttnn7oars3v3vxpzcb5nv25nqbevle",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#2",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "claim and implement the assertion, then review and accept"
+      },
+      {
+        "intent": "bafyreihqu7ytcasuvlnc5owvpuzzz4yb6hwvffqqrnqpnvcpmcpdbjisoe",
+        "gap_id": "plans__2026-09-09-doorway-continuity-proof-chain#6",
+        "authored_state": "gap:open",
+        "issues": [],
+        "commitments": [
+          {
+            "commitment": "bafyreigoskjqcxu2iuq4vcparibvyafepkan4v4pgenoz5cfgahis3bijm",
+            "fulfillments": [
+              "bafyreid6paulq4yljvwfoplynwmaar7n2iwdr7dg4va6bc7houmv4h6lci"
+            ],
+            "technical_reviews": [
+              "bafyreiglwxnjp3j7uxu5fgeodc23okrt2zsvyeqzh5mkarlu5mgel6lzya"
+            ],
+            "acceptance_records": [],
+            "unrecognized_records": [],
+            "acceptance": "acceptance-unestablished",
+            "issues": []
+          }
+        ],
+        "acceptance": "acceptance-unestablished",
+        "remaining_action": "complete missing fulfillment, technical review, or independent acceptance"
+      }
+    ],
+    "historical_candidates": []
+  },
+  "fixture": {
+    "accepted": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+      "record_set_fingerprint": "sha256:7d35724660cd586eb8d479c9098c48e460d5caaf4590ab0077a08b19d5404c81",
+      "assertions": [
+        {
+          "intent": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "gap_id": "scope#1",
+          "authored_state": "gap:open",
+          "issues": [],
+          "commitments": [
+            {
+              "commitment": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+              "fulfillments": [],
+              "technical_reviews": [],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "acceptance-unestablished",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+              "fulfillments": [
+                "bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi"
+              ],
+              "technical_reviews": [
+                "bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy"
+              ],
+              "acceptance_records": [
+                "bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra"
+              ],
+              "unrecognized_records": [],
+              "acceptance": "accepted",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+              "fulfillments": [
+                "bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4"
+              ],
+              "technical_reviews": [
+                "bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi",
+                "bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ]
+            }
+          ],
+          "acceptance": "revalidation-required",
+          "remaining_action": "inspect changed or contrary evidence and obtain a fresh acceptance"
+        }
+      ],
+      "historical_candidates": []
+    },
+    "changed-evidence": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+      "record_set_fingerprint": "sha256:7d35724660cd586eb8d479c9098c48e460d5caaf4590ab0077a08b19d5404c81",
+      "assertions": [
+        {
+          "intent": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "gap_id": "scope#1",
+          "authored_state": "gap:open",
+          "issues": [],
+          "commitments": [
+            {
+              "commitment": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+              "fulfillments": [],
+              "technical_reviews": [],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "acceptance-unestablished",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+              "fulfillments": [
+                "bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi"
+              ],
+              "technical_reviews": [
+                "bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy"
+              ],
+              "acceptance_records": [
+                "bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra"
+              ],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "acceptance bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra: invalid arguments: acceptance: evidence changed: /tmp/acceptor-practical-fixture/evidence.txt"
+              ]
+            },
+            {
+              "commitment": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+              "fulfillments": [
+                "bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4"
+              ],
+              "technical_reviews": [
+                "bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi",
+                "bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ]
+            }
+          ],
+          "acceptance": "revalidation-required",
+          "remaining_action": "inspect changed or contrary evidence and obtain a fresh acceptance"
+        }
+      ],
+      "historical_candidates": []
+    },
+    "missing-evidence": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+      "record_set_fingerprint": "sha256:7d35724660cd586eb8d479c9098c48e460d5caaf4590ab0077a08b19d5404c81",
+      "assertions": [
+        {
+          "intent": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "gap_id": "scope#1",
+          "authored_state": "gap:open",
+          "issues": [],
+          "commitments": [
+            {
+              "commitment": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+              "fulfillments": [],
+              "technical_reviews": [],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "acceptance-unestablished",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+              "fulfillments": [
+                "bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi"
+              ],
+              "technical_reviews": [
+                "bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy"
+              ],
+              "acceptance_records": [
+                "bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra"
+              ],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "acceptance bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra: invalid arguments: acceptance: evidence must resolve to a file"
+              ]
+            },
+            {
+              "commitment": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+              "fulfillments": [
+                "bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4"
+              ],
+              "technical_reviews": [
+                "bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi",
+                "bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ]
+            }
+          ],
+          "acceptance": "revalidation-required",
+          "remaining_action": "inspect changed or contrary evidence and obtain a fresh acceptance"
+        }
+      ],
+      "historical_candidates": []
+    },
+    "conflict": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+      "record_set_fingerprint": "sha256:92aeda574dcb45143743a2dbedd41b7a2e9f6b2db9a3c782b1ec985fe9559527",
+      "assertions": [
+        {
+          "intent": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "gap_id": "scope#1",
+          "authored_state": "gap:open",
+          "issues": [],
+          "commitments": [
+            {
+              "commitment": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+              "fulfillments": [],
+              "technical_reviews": [],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "acceptance-unestablished",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+              "fulfillments": [
+                "bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi"
+              ],
+              "technical_reviews": [
+                "bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy"
+              ],
+              "acceptance_records": [
+                "bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra",
+                "bafyreihke52djunejfkzmhfcurih46xdwh63apyuhjo5koaut2di3w32im"
+              ],
+              "unrecognized_records": [],
+              "acceptance": "contested",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+              "fulfillments": [
+                "bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4"
+              ],
+              "technical_reviews": [
+                "bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi",
+                "bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ]
+            }
+          ],
+          "acceptance": "contested",
+          "remaining_action": "resolve conflicting unsuperseded decisions explicitly"
+        }
+      ],
+      "historical_candidates": []
+    },
+    "stale-branch": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+      "record_set_fingerprint": "sha256:4f5be754b3e918bc4b9c60ce523dc98d23d377342f08723724ab8911cd118441",
+      "assertions": [
+        {
+          "intent": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "gap_id": "scope#1",
+          "authored_state": "gap:open",
+          "issues": [],
+          "commitments": [
+            {
+              "commitment": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+              "fulfillments": [],
+              "technical_reviews": [],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "acceptance-unestablished",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+              "fulfillments": [
+                "bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi"
+              ],
+              "technical_reviews": [
+                "bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy"
+              ],
+              "acceptance_records": [
+                "bafyreicsq5uy2hfyeprrg72rht6hy74ze5bxwobn4mmqm23ktcjrinpjda",
+                "bafyreigeorqupkezkfdfyyqr5tkvpz2dgts6vofgzvendbdstt4do4arra",
+                "bafyreihke52djunejfkzmhfcurih46xdwh63apyuhjo5koaut2di3w32im"
+              ],
+              "unrecognized_records": [],
+              "acceptance": "contested",
+              "issues": []
+            },
+            {
+              "commitment": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+              "fulfillments": [
+                "bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4"
+              ],
+              "technical_reviews": [
+                "bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi",
+                "bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ],
+              "acceptance_records": [],
+              "unrecognized_records": [],
+              "acceptance": "revalidation-required",
+              "issues": [
+                "subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee"
+              ]
+            }
+          ],
+          "acceptance": "contested",
+          "remaining_action": "resolve conflicting unsuperseded decisions explicitly"
+        }
+      ],
+      "historical_candidates": []
+    },
+    "changed-scope": {
+      "version": "acceptance-reconciliation-v1",
+      "evaluator": {
+        "cid": "sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63",
+        "id": "elohim-epr-cli",
+        "version": "0.1.0"
+      },
+      "scope_cid": "bafkreigydx3hszjkci6cwkzprusqjlbsnsx5ndslprz3toei3cypcdxkea",
+      "record_set_fingerprint": "sha256:4f5be754b3e918bc4b9c60ce523dc98d23d377342f08723724ab8911cd118441",
+      "assertions": [],
+      "historical_candidates": [
+        {
+          "record": "bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y",
+          "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+          "label": "scope.md",
+          "linkage": "unverified historical label match"
+        },
+        {
+          "record": "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+          "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+          "label": "scope.md",
+          "linkage": "unverified historical label match"
+        },
+        {
+          "record": "bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu",
+          "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+          "label": "scope.md",
+          "linkage": "unverified historical label match"
+        },
+        {
+          "record": "bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje",
+          "scope_cid": "bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu",
+          "label": "scope.md",
+          "linkage": "unverified historical label match"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "args": [
+        "flow",
+        "context",
+        "scope.md",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"identity\": {\n    \"path\": \"scope.md\",\n    \"cid\": \"bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu\",\n    \"labels\": [\n      \"scope.md\"\n    ]\n  },\n  \"reconciliation\": {\n    \"version\": \"acceptance-reconciliation-v1\",\n    \"evaluator\": {\n      \"cid\": \"sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63\",\n      \"id\": \"elohim-epr-cli\",\n      \"version\": \"0.1.0\"\n    },\n    \"scope_cid\": \"bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu\",\n    \"record_set_fingerprint\": \"sha256:859c3c3bcaee0ab0b2e50734b97f56b0b509ef3056a7537d5254c210c4a068d8\",\n    \"assertions\": [\n      {\n        \"intent\": \"bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje\",\n        \"gap_id\": \"scope#1\",\n        \"authored_state\": \"gap:open\",\n        \"issues\": [],\n        \"commitments\": [\n          {\n            \"commitment\": \"bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y\",\n            \"fulfillments\": [],\n            \"technical_reviews\": [],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"acceptance-unestablished\",\n            \"issues\": []\n          },\n          {\n            \"commitment\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n            \"fulfillments\": [],\n            \"technical_reviews\": [],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"acceptance-unestablished\",\n            \"issues\": []\n          },\n          {\n            \"commitment\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n            \"fulfillments\": [\n              \"bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4\"\n            ],\n            \"technical_reviews\": [\n              \"bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi\",\n              \"bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\"\n            ],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"revalidation-required\",\n            \"issues\": [\n              \"subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\"\n            ]\n          }\n        ],\n        \"acceptance\": \"revalidation-required\",\n        \"remaining_action\": \"inspect changed or contrary evidence and obtain a fresh acceptance\"\n      }\n    ],\n    \"historical_candidates\": []\n  },\n  \"intents\": [\n    {\n      \"cid\": \"bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje\",\n      \"gap_id\": \"scope#1\",\n      \"state\": \"gap:open\",\n      \"raised_by\": \"tool:decompose\"\n    }\n  ],\n  \"commitments\": [\n    {\n      \"cid\": \"bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y\",\n      \"provider\": \"agent:maker@gpt-6\",\n      \"state\": \"Active\",\n      \"gap_id\": \"scope#1\",\n      \"brief\": null,\n      \"habit\": null,\n      \"latest_event\": null\n    },\n    {\n      \"cid\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n      \"provider\": \"agent:producer@gpt-6\",\n      \"state\": \"Active\",\n      \"gap_id\": \"scope#1\",\n      \"brief\": null,\n      \"habit\": null,\n      \"latest_event\": null\n    }\n  ],\n  \"notes\": [\n    {\n      \"cid\": \"bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\",\n      \"kind\": \"run:verdict\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:reviewer@gpt-6\",\n      \"reason\": \"Contrary review: observed result still needs correction\",\n      \"switched_to\": null,\n      \"verdict\": \"changes-requested\",\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    },\n    {\n      \"cid\": \"bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi\",\n      \"kind\": \"run:verdict\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:reviewer@gpt-6\",\n      \"reason\": \"Technical fixture review passed\",\n      \"switched_to\": null,\n      \"verdict\": \"approved\",\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    },\n    {\n      \"cid\": \"bafyreig4eacplp277nd6nkeausygctmufyzwlxt2nbq73mc6hxxhmygc2u\",\n      \"kind\": \"run:observation\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:producer@gpt-6\",\n      \"reason\": \"Producer identity for fixture\",\n      \"switched_to\": null,\n      \"verdict\": null,\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    }\n  ],\n  \"seals\": {\n    \"edges\": [],\n    \"stale_downstream\": 0\n  },\n  \"habits\": [],\n  \"gate\": null,\n  \"habit_scope\": null,\n  \"governance\": {\n    \"authority\": null,\n    \"cascade_depth\": 0,\n    \"rule_count\": 0\n  },\n  \"scope_note\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "actor",
+        "claim",
+        "--as",
+        "agent:acceptor@gpt-6",
+        "--session",
+        "fixture-acceptor",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"claimed\": \"agent:acceptor@gpt-6\",\n  \"session\": \"fixture-acceptor\",\n  \"claimedAt\": \"2026-09-09T03:22:21Z\",\n  \"definitionCid\": null,\n  \"recordCid\": \"bafyreidqicryh2t5umoof6bfrycjrwcl5xrxvegpthaso37anh4fmkbn6i\",\n  \"appended\": false,\n  \"superseded\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "flow",
+        "note",
+        "--on",
+        "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+        "--kind",
+        "ruling",
+        "--reason",
+        "Appoint independent CLI acceptance",
+        "--appoint",
+        "bafyreidqicryh2t5umoof6bfrycjrwcl5xrxvegpthaso37anh4fmkbn6i",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"kind\": \"run:ruling\",\n  \"on\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n  \"resource\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n  \"reason\": \"Appoint independent CLI acceptance\",\n  \"switched_to\": null,\n  \"occurred_at\": \"2026-09-09T03:22:21Z\",\n  \"record_cid\": \"bafyreid4so3qkabszvrzvfnhhumg6jyuxj5l3ncn6etleqmyawewo6frzy\",\n  \"appended\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "flow",
+        "fulfill",
+        "--on",
+        "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+        "--report",
+        "production.md",
+        "--status",
+        "DONE",
+        "--as",
+        "agent:producer@gpt-6",
+        "--session",
+        "fixture-producer",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"commitment\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n  \"gap_id\": \"scope#1\",\n  \"status\": \"DONE\",\n  \"report\": \"production.md\",\n  \"evidence\": \"bafkreigerrh5ofir5cecmhevboujrrw4nsn7ulqktap6647l2cwcqbyc4u\",\n  \"commits\": [],\n  \"provider\": \"agent:producer@gpt-6\",\n  \"steward\": \"practical@example.invalid\",\n  \"occurred_at\": \"2026-09-09T03:22:21Z\",\n  \"record_cid\": \"bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi\",\n  \"appended\": true,\n  \"already_fulfilled\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "flow",
+        "note",
+        "--on",
+        "bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u",
+        "--kind",
+        "verdict",
+        "--verdict",
+        "approved",
+        "--reason",
+        "Technical fixture review passed",
+        "--as",
+        "agent:reviewer@gpt-6",
+        "--session",
+        "fixture-reviewer",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"kind\": \"run:verdict\",\n  \"on\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n  \"resource\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n  \"reason\": \"Technical fixture review passed\",\n  \"switched_to\": null,\n  \"verdict\": \"approved\",\n  \"actor\": \"agent:reviewer@gpt-6\",\n  \"steward\": \"practical@example.invalid\",\n  \"occurred_at\": \"2026-09-09T03:22:21Z\",\n  \"record_cid\": \"bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy\",\n  \"appended\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "flow",
+        "context",
+        "scope.md",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"identity\": {\n    \"path\": \"scope.md\",\n    \"cid\": \"bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu\",\n    \"labels\": [\n      \"scope.md\"\n    ]\n  },\n  \"reconciliation\": {\n    \"version\": \"acceptance-reconciliation-v1\",\n    \"evaluator\": {\n      \"cid\": \"sha256:5f631cb0c5f3f50e378b5dec40a56403496b6e7bb901681f663a54074e2d9f63\",\n      \"id\": \"elohim-epr-cli\",\n      \"version\": \"0.1.0\"\n    },\n    \"scope_cid\": \"bafkreidlqq4ud2lza2ycjiqmy5ydju7wdjwte7n36vkydkmshw2ccittsu\",\n    \"record_set_fingerprint\": \"sha256:dc17116b250b0b179fae9a32910136f6a1f83dd8cbfaa2f1a4f7c6391b96136f\",\n    \"assertions\": [\n      {\n        \"intent\": \"bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje\",\n        \"gap_id\": \"scope#1\",\n        \"authored_state\": \"gap:open\",\n        \"issues\": [],\n        \"commitments\": [\n          {\n            \"commitment\": \"bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y\",\n            \"fulfillments\": [],\n            \"technical_reviews\": [],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"acceptance-unestablished\",\n            \"issues\": []\n          },\n          {\n            \"commitment\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n            \"fulfillments\": [\n              \"bafyreiazopc3mfnioxssrij32ttszhbp7f25ttwfbpci3nplhad7m5foxi\"\n            ],\n            \"technical_reviews\": [\n              \"bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy\"\n            ],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"acceptance-unestablished\",\n            \"issues\": []\n          },\n          {\n            \"commitment\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n            \"fulfillments\": [\n              \"bafyreicc27htgxwd7zemlisbt2wx7pklboew6ck4ogdbr3m4a3uzslg6e4\"\n            ],\n            \"technical_reviews\": [\n              \"bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi\",\n              \"bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\"\n            ],\n            \"acceptance_records\": [],\n            \"unrecognized_records\": [],\n            \"acceptance\": \"revalidation-required\",\n            \"issues\": [\n              \"subsequent evidence requires revalidation: bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\"\n            ]\n          }\n        ],\n        \"acceptance\": \"revalidation-required\",\n        \"remaining_action\": \"inspect changed or contrary evidence and obtain a fresh acceptance\"\n      }\n    ],\n    \"historical_candidates\": []\n  },\n  \"intents\": [\n    {\n      \"cid\": \"bafyreihae7ncheorfguiqve5rtshnapen6t5wwcspgqub36hgwxuoeqqje\",\n      \"gap_id\": \"scope#1\",\n      \"state\": \"gap:open\",\n      \"raised_by\": \"tool:decompose\"\n    }\n  ],\n  \"commitments\": [\n    {\n      \"cid\": \"bafyreidp6rzqk7fufqadc2vo6faqofrneeyfe337mchx4vwekyf2tuoy3y\",\n      \"provider\": \"agent:maker@gpt-6\",\n      \"state\": \"Active\",\n      \"gap_id\": \"scope#1\",\n      \"brief\": null,\n      \"habit\": null,\n      \"latest_event\": null\n    }\n  ],\n  \"notes\": [\n    {\n      \"cid\": \"bafyreiaugahxdoixp6wfbvmnaw2gp4t6p2nobpprbgbnqz63cccreb33gy\",\n      \"kind\": \"run:verdict\",\n      \"subject\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n      \"actor\": \"agent:reviewer@gpt-6\",\n      \"reason\": \"Technical fixture review passed\",\n      \"switched_to\": null,\n      \"verdict\": \"approved\",\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    },\n    {\n      \"cid\": \"bafyreid4so3qkabszvrzvfnhhumg6jyuxj5l3ncn6etleqmyawewo6frzy\",\n      \"kind\": \"run:ruling\",\n      \"subject\": \"bafyreiedu2bd64obg6wuxtfmkaxpcd6jmlidxqrkompgux5vog2s3n5s5u\",\n      \"actor\": \"practical@example.invalid\",\n      \"reason\": \"Appoint independent CLI acceptance\",\n      \"switched_to\": null,\n      \"verdict\": null,\n      \"steward\": null,\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": [\n        \"appoint:bafyreidqicryh2t5umoof6bfrycjrwcl5xrxvegpthaso37anh4fmkbn6i\"\n      ]\n    },\n    {\n      \"cid\": \"bafyreifwyyfflpgqwbgidke5lrzrbmpv2xqia2tiqgewrzewv2fa3ic7ee\",\n      \"kind\": \"run:verdict\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:reviewer@gpt-6\",\n      \"reason\": \"Contrary review: observed result still needs correction\",\n      \"switched_to\": null,\n      \"verdict\": \"changes-requested\",\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    },\n    {\n      \"cid\": \"bafyreibbgp3tmkrvyhcpyyi4ipbq3kfo7ls5aoo6psnrcnfrzdf4535yzi\",\n      \"kind\": \"run:verdict\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:reviewer@gpt-6\",\n      \"reason\": \"Technical fixture review passed\",\n      \"switched_to\": null,\n      \"verdict\": \"approved\",\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    },\n    {\n      \"cid\": \"bafyreig4eacplp277nd6nkeausygctmufyzwlxt2nbq73mc6hxxhmygc2u\",\n      \"kind\": \"run:observation\",\n      \"subject\": \"bafyreig26nvgu4rnurnrijfhrk63hb7ea2czwo62gqg2rqwzcw4oyhhueu\",\n      \"actor\": \"agent:producer@gpt-6\",\n      \"reason\": \"Producer identity for fixture\",\n      \"switched_to\": null,\n      \"verdict\": null,\n      \"steward\": \"practical@example.invalid\",\n      \"occurred_at\": \"2026-09-09T03:22:21Z\",\n      \"via\": \"scope#1\",\n      \"extra\": []\n    }\n  ],\n  \"seals\": {\n    \"edges\": [],\n    \"stale_downstream\": 0\n  },\n  \"habits\": [],\n  \"gate\": null,\n  \"habit_scope\": null,\n  \"governance\": {\n    \"authority\": null,\n    \"cascade_depth\": 0,\n    \"rule_count\": 0\n  },\n  \"scope_note\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "deterministic_repeat": true,
+  "usability": "Registered actor pin requires --session without --as on flow claim; initial unpinned claims were preserved."
+}

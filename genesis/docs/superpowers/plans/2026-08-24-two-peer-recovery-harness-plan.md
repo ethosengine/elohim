@@ -7,7 +7,7 @@ domain: local mesh harness × peer-hoster dataplane (T2) × quiescence measureme
 sprint: proposed (Plan 1 of 2 for the transport self-awareness arc; Plan 2 = PathObservation/select_path, written after this baseline exists)
 habits: [dataplane-convergence]
 cites:
-  - "transport-self-awareness-diversity-harness-design | the spec this plan implements the baseline half of (§3.0, §3.3, §3.4, §3.5 witness); §3.1-3.2 and the flag-on measure are Plan 2 | sha256:9713242ed4162305 | path: genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md"
+  - "transport-self-awareness-diversity-harness-design | the spec this plan implements the baseline half of (§3.0, §3.3, §3.4, §3.5 witness); §3.1-3.2 and the flag-on measure are Plan 2 | sha256:96730ca15491ce76 | path: genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md"
   - app/elohim-app/scripts/hc-mesh.sh
   - app/elohim-app/scripts/hc-mesh-quiesce.sh
   - app/elohim-app/scripts/hc-mesh-transport-matrix.sh

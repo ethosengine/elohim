@@ -1,5 +1,6 @@
 ---
 title: "VISION DESIGN PASS — D12: A Home / Covenant for AI (the bounded covenant agent)"
+id: vision-design-ai-covenant-2026-06-14
 date: 2026-06-14
 status: PROPOSAL-FOR-OPERATOR-BLESSING (working draft)
 kind: vision-design-pass / path-or-pivot

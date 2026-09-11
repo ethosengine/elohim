@@ -2,7 +2,7 @@
 id: omnibar-consolidation-epr-native-links-plan
 status: active
 cites:
-  - omnibar-consolidation-epr-native-links-design | the design spec this plan implements task-by-task — omnibar consolidation, EPR-native link interceptor, shared elohim-core theme/locale stores | sha256:92df16eea8d9bcf8 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md
+  - "omnibar-consolidation-epr-native-links-design | the design spec this plan implements task-by-task — omnibar consolidation, EPR-native link interceptor, shared elohim-core theme/locale stores | sha256:3b018cf87bf8a809 | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md"
 ---
 
 # Omnibar Consolidation + EPR-Native Links — Implementation Plan

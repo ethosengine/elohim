@@ -1,5 +1,6 @@
 ---
 title: "THE CORPUS-OF-HUMAN-SOFTWARE COMPOSITION PROOF — one SDK, many APIs, every app re-substrated"
+id: platform-sdk-corpus-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

@@ -3,10 +3,10 @@ title: DHT PII Leak Remediation
 id: dht-pii-leak-remediation-plan
 status: Draft
 cites:
-  - genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md
+  - social-reach-nervous-system | Social Reach | sha256:d85af6961ce566c6 | path: genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md
   - imagodei-surfaces | Imagodei | sha256:e0abac6f6a6a0906 | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md
   - imagodei-profile-page-viewer-lens-design | Imagodei Profile-vs-Page | sha256:05caf5687b42f4ba | path: genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md
-  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:54b5809fb8e688d1 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
   - .claude/skills/p2p-design-gate/SKILL.md
 domain: D-imagodei-identity   # imagodei identity surfaces + confidentiality plane (seam-map §3.13)
 sprint: security-remediation  # off-vision-rung; gates the privacy promise of the identity surface (adjacent Sprint 2 imagodei/recovery)

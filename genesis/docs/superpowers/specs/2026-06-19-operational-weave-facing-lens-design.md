@@ -11,8 +11,8 @@ informed-by:
   - genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
   - genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
 cites:
-  - resilience-facings-select-fold-aggregate-design | the select→fold→aggregate lens framework (§11) this facing is a child of — its materialized-relation + pure-fold + typed-view substrate | sha256:93279fd25a0600d1 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - lens-complete-epr-resolution-four-leg-coupling-design | the four-leg coupling law + §2 projection law this lens facing ultimately descends from | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md
+  - "resilience-facings-select-fold-aggregate-design | the select→fold→aggregate lens framework (§11) this facing is a child of — its materialized-relation + pure-fold + typed-view substrate | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "lens-complete-epr-resolution-four-leg-coupling-design | the four-leg coupling law + §2 projection law this lens facing ultimately descends from | sha256:79f821217c1c8e11 | path: genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md"
 requires_env: [household-nodes, observability]
 ---
 

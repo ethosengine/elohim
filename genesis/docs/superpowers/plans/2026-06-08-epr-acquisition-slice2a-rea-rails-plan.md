@@ -9,9 +9,9 @@ requires_env: [household-nodes]
 cites:
   - epr-acquisition-pull-queue-design | the spec whose §6.4 split this plan implements — Slice 2a delivers the REA emit/graduation rails Slice 2b composes | sha256:96164edffcbaf94e | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
   - mutual-storage-replication-dwelling-hub-design | the REA compute-commitment instance-1 design whose floor-check gap + replicates-commons reservation this rail unblocks | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
-  - genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md
+  - mutual-storage-replication-dwelling-hub-plan | Mutual Storage Replication (Dwelling-Hub Tier) Implementation Plan | sha256:93ace1704f7173e9 | path: genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md
   - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md
+  - sprint3-storage-replication-implementation-notes | Sprint 3 | sha256:fd42f1983afa05fd | path: genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md
 ---
 
 # Slice 2a — REA Economic-Event Emit + Commitment Graduation Rails

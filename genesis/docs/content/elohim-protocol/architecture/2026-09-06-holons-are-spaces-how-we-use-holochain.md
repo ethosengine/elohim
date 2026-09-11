@@ -7,19 +7,19 @@ author: orchestrator (overnight shift, 2026-09-06; grounded in the 0.7 fleet lin
 tier: architecture
 stewardship-frame: adversary
 cites:
-  - "elohim-protocol-manifesto | The purpose governing this reassessment: intelligence and coordination that scale to human complexity while restoring dignity and resisting capture. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | The declared constraints on commons enclosure, accountable trust, concentrated power, and phased AI authority that the technical design must honor. | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
-  - "hardware-spec | The physical participation and inclusion vision connecting everyday devices and household capacity to the protocol promise. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
-  - "hardware-providence-commons | The existing proof obligations for dependable household operation, bounded automated care, practical substitution, and resistance to rent extraction. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
-  - "resilience-protocol-spec | The convenience requirement: ordinary people must receive dependable services through reciprocal infrastructure without becoming system administrators or captive tenants. | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
-  - "genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md"
-  - "trust-as-efficiency-signal | Trust as reciprocal reduction of distribution and verification cost, distinct from a permanent privilege or a global score. | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
-  - "ubiquitous-wisdom-dissolves-chokepoint | Distributed judgment at authoring, relay, and consumption as the anti-capture deployment thesis behind social reach. | sha256:ad2345f8adb56ee9 | path: genesis/docs/content/elohim-protocol/architecture/ubiquitous-wisdom-dissolves-chokepoint.md"
-  - "genesis/docs/content/elohim-protocol/social_medium/epic.md"
-  - "nachalah-allotment-epic | Nachalah | sha256:855a5cb52df7f201 | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md"
-  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:597157e7bb552d73 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md"
+  - elohim-protocol-manifesto | The purpose governing this reassessment: intelligence and coordination that scale to human complexity while restoring dignity and resisting capture. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md
+  - values-forward | The declared constraints on commons enclosure, accountable trust, concentrated power, and phased AI authority that the technical design must honor. | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md
+  - hardware-spec | The physical participation and inclusion vision connecting everyday devices and household capacity to the protocol promise. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md
+  - hardware-providence-commons | The existing proof obligations for dependable household operation, bounded automated care, practical substitution, and resistance to rent extraction. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md
+  - resilience-protocol-spec | The convenience requirement: ordinary people must receive dependable services through reciprocal infrastructure without becoming system administrators or captive tenants. | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - social-reach-nervous-system | Social Reach | sha256:d85af6961ce566c6 | path: genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md
+  - trust-as-efficiency-signal | Trust as reciprocal reduction of distribution and verification cost, distinct from a permanent privilege or a global score. | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md
+  - ubiquitous-wisdom-dissolves-chokepoint | Distributed judgment at authoring, relay, and consumption as the anti-capture deployment thesis behind social reach. | sha256:ad2345f8adb56ee9 | path: genesis/docs/content/elohim-protocol/architecture/ubiquitous-wisdom-dissolves-chokepoint.md
+  - genesis/docs/content/elohim-protocol/social_medium/epic.md
+  - nachalah-allotment-epic | Nachalah | sha256:210aba054878c407 | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md
+  - holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md
+  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:597157e7bb552d73 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md
 ---
 
 # Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider

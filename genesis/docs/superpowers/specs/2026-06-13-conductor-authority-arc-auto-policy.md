@@ -6,8 +6,8 @@ class: substrate
 artifact_kind: spec
 written: 2026-06-13
 cites:
-  - conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:0efe97d01b797d5d | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
-  - tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - "conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:9ae7987743bec6bc | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md"
+  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - genesis/plans/2026-04-13-device-archetypes-design.md
 ---
 

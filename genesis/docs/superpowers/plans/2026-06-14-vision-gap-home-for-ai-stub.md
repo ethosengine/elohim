@@ -1,5 +1,6 @@
 ---
 title: "Vision-Gap Stub — O4: A Home / Covenant for AI (Substrate Definition)"
+id: vision-gap-home-for-ai-stub
 date: 2026-06-14
 status: SCOPING-MEMO / GREENLIGHT-TO-EXPAND
 owner: rust-architect (substrate)

@@ -2,7 +2,7 @@
 id: ark-s1-station3b-custody-read-gate-plan
 status: in-flight
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:25153362aae54306 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "ark-s1-station2-custody-plan | 2026-09-02-ark-s1-station2-custody-plan | sha256:36afd7fdbedd66a5 | path: genesis/docs/superpowers/plans/2026-09-02-ark-s1-station2-custody-plan.md"
 ---
 

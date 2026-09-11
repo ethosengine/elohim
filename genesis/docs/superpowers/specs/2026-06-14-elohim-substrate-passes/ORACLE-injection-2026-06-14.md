@@ -1,5 +1,6 @@
 ---
 title: "ORACLE — Sprint-Zero Injection: Vision-Hat Before Developer-Brain"
+id: oracle-injection-2026-06-14
 date: 2026-06-14
 status: PROPOSAL / AWAITING-OPERATOR-BLESSING (working draft — NOT cite-sealed)
 author: cartographer (future-perspective; oracle component design)

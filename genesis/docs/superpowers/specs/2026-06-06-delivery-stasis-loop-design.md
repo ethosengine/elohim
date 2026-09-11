@@ -6,9 +6,9 @@ class: process-meta
 process_subdomain: doc-lifecycle
 topic: [delivery, stasis, ceremony, scoreboard, ceiling, floor, conveyor, shift, deliver, converge, gap-items, claimed-unverified, pilot]
 cites:
-  - unified-memory-loop-design | the parent loop shape — one scoreboard, measure→dispatch→re-measure to stasis — instantiated here one level up at the development cycle | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
-  - findings-sentinel-pattern-design | the sibling instantiation whose floor/ceiling rails vocabulary and self-draining finding classes this loop composes as already-handled pressures | sha256:c284074fe38e2450 | path: genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md
-  - agentic-developer-loop-design | the /shift station this loop pre-authors Objectives for — the kickoff stays operator-fired (ceiling), the rails inside the shift hold the CI floor | sha256:42b461f7c0b7a870 | path: genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md
+  - "unified-memory-loop-design | the parent loop shape — one scoreboard, measure→dispatch→re-measure to stasis — instantiated here one level up at the development cycle | sha256:99100efd20d10129 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md"
+  - "findings-sentinel-pattern-design | the sibling instantiation whose floor/ceiling rails vocabulary and self-draining finding classes this loop composes as already-handled pressures | sha256:c284074fe38e2450 | path: genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md"
+  - "agentic-developer-loop-design | the /shift station this loop pre-authors Objectives for — the kickoff stays operator-fired (ceiling), the rails inside the shift hold the CI floor | sha256:42b461f7c0b7a870 | path: genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md"
 informed-by: [genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md]
 ---
 

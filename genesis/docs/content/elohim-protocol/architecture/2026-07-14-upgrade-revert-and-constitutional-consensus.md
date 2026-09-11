@@ -14,9 +14,9 @@ informs:
   - Agent authority negotiation (ceiling authority earned by safety-benchmark + wisdom standards)
   - The geographic distribution floor (capture-resistance by dispersion; no-privilege-of-infrastructure)
 cites:
-  - dna-upgrade-governance | The Holochain-mechanics companion this does NOT restate — it answers that seed's §7 'Vision remainder' (the Elohim-consensus flow) and §8 open questions (rollback, self-hosted participation) at the constitutional/agentic layer. | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md
-  - constitution | The layered constitutional architecture + graduated immutability within which amendment-by-consensus-at-reach operates; the global floor (James 1:27, the least-first hierarchy) this apparatus protects from any single region's vote. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md
-  - where-it-ends-and-where-it-begins | The kenotic/onboarding vision this is the mechanism for — the universal reconciliation path (code and relationship) and the no-privilege-of-infrastructure floor made concrete as upgrade, revert, and bridge. | sha256:834fb033cb3fa6b3 | path: genesis/docs/content/elohim-protocol/where-it-ends-and-where-it-begins.md
+  - "dna-upgrade-governance | The Holochain-mechanics companion this does NOT restate — it answers that seed's §7 'Vision remainder' (the Elohim-consensus flow) and §8 open questions (rollback, self-hosted participation) at the constitutional/agentic layer. | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
+  - "constitution | The layered constitutional architecture + graduated immutability within which amendment-by-consensus-at-reach operates; the global floor (James 1:27, the least-first hierarchy) this apparatus protects from any single region's vote. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "where-it-ends-and-where-it-begins | The kenotic/onboarding vision this is the mechanism for — the universal reconciliation path (code and relationship) and the no-privilege-of-infrastructure floor made concrete as upgrade, revert, and bridge. | sha256:834fb033cb3fa6b3 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/where-it-ends-and-where-it-begins.md"
 ---
 
 # Upgrade, Revert, and Constitutional Consensus

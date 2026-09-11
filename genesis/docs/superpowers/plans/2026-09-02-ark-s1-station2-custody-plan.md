@@ -2,8 +2,8 @@
 id: ark-s1-station2-custody-plan
 status: landed
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:25153362aae54306 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
-  - "ark-s0-launcher-plan | 2026-09-02-ark-s0-launcher-plan | sha256:12ad4b4fd51225b8 | path: genesis/docs/superpowers/plans/2026-09-02-ark-s0-launcher-plan.md"
+  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "ark-s0-launcher-plan | 2026-09-02-ark-s0-launcher-plan | sha256:e73607fce1c4c94a | path: genesis/docs/superpowers/plans/2026-09-02-ark-s0-launcher-plan.md"
 ---
 
 # Tevah S1 · Station 2 — the custodians Jessica already has hold the witness — Implementation Plan

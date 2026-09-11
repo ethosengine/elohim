@@ -7,7 +7,7 @@ domain: D8
 sprint: unranked — born 2026-06-11; Stage A of the CI-substrate-authorization ladder
 cites:
   - genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md
-  - che-network-agency-arc-design | the agency ladder this borrows — jenkins is the same non-human actor shape as the Che agent; same DoorwaySessionClient identity-through-doorway pattern | sha256:d73e30ea0a205c13 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md
+  - "che-network-agency-arc-design | the agency ladder this borrows — jenkins is the same non-human actor shape as the Che agent; same DoorwaySessionClient identity-through-doorway pattern | sha256:c318623e18ba56a5 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md

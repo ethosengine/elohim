@@ -9,9 +9,9 @@ graduation-trigger: decompose-complete OR superseded-by-implementation
 created: 2026-07-09
 maintainers: Matthew Dowell + Opus 4.8
 cites:
-  - genesis/docs/superpowers/plans/2026-06-14-federation-bootstrap-plan.md | The landed bootstrap-store sharing (MongoK2Store on the fixed elohim-bootstrap DB) — the endpoint↔backing decoupling this generalizes
-  - genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md | The notary/trust plane whose green signal is DHT-membership-blind without the discovery backing
-  - genesis/data/timeline/backlog/dna-conductor-dht-gossip-gap.md | The gossip layer beneath discovery — Bootstrap overloaded, dropping put
+  - "genesis/docs/superpowers/plans/2026-06-14-federation-bootstrap-plan.md | The landed bootstrap-store sharing (MongoK2Store on the fixed elohim-bootstrap DB) — the endpoint↔backing decoupling this generalizes | status: dead — target no longer resolves"
+  - "genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md | The notary/trust plane whose green signal is DHT-membership-blind without the discovery backing | status: dead — target no longer resolves"
+  - "genesis/data/timeline/backlog/dna-conductor-dht-gossip-gap.md | The gossip layer beneath discovery — Bootstrap overloaded, dropping put | status: dead — target no longer resolves"
 ---
 
 # Peer Discovery as Fractal Federation — the anti-capture composition for the Elohim Protocol's discovery plane

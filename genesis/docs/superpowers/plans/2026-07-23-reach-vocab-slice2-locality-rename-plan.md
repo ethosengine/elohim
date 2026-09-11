@@ -18,7 +18,7 @@ graduation-trigger: superseded-by-implementation — graduate once slice 2 lands
 created: 2026-07-23
 topic: [reach, locality, vocabulary-drift, reach-class, distribution, slice-2]
 cites:
-  - reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:d0303e0209f57b76 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - elohim/sdk/storage-client-ts/src/protocol-core.model.ts
   - elohim/elohim-views/src/infrastructure.rs

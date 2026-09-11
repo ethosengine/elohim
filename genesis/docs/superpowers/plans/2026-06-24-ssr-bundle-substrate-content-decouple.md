@@ -8,7 +8,7 @@ topic: [ssr, doorway, projection, content-addressing, app-bundle, build-decouple
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md
 cites:
-  - ssr-bundle-substrate-content-decouple-design | The design spec this plan implements task-by-task; carries the gate answers, rollout phases, and decisions | sha256:78ab3f3b8646d0e7 | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md
+  - "ssr-bundle-substrate-content-decouple-design | The design spec this plan implements task-by-task; carries the gate answers, rollout phases, and decisions | sha256:8a2e71a5b235206e | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md"
 requires_env: [household-nodes]
 ---
 
@@ -20,7 +20,7 @@ requires_env: [household-nodes]
 
 **Goal:** Distribute the Angular SSR *server* bundle as content-addressed substrate content (like its browser sibling) and materialize it at boot in every rendering runtime, retiring the doorway image bake and the storage sed-strip.
 
-**Architecture:** App pipeline zips `dist/elohim-app/server`, PUTs it as a blob, PATCHes content row `elohim-host-landing-ssr`. At boot, doorway (HTTP→`STORAGE_URL`) and SSR-enabled storage (local) resolve the slug → blobHash → fetch → verify → unzip into `SSR_BUNDLE_PATH`. Shared logic lives in a new `elohim-render::bootstrap` module. Fetch-at-boot + lazy-on-miss; graceful fall-through preserved.
+**Architecture:** App pipeline zips `dist/elohim-app/server`, PUTs it as a blob, PATCHes content row `elohim-host-landing-ssr`. At boot, doorway (HTTP→`STORAGE_URL`) and SSR-enabled storage (local) resolve the slug → blobHash → fetch → verify → unzip into `SSR_BUNDLE_PATH`. Shared logic lives in a new `elohim-render::bootstrap` module. Fetch-at-boot is v1; lazy-on-miss remains phase 2, matching Task 2 and the spec's 2026-06-25 operator decision. Graceful fall-through is preserved; this scope reconciliation does not discharge any unchecked task.
 
 **Tech Stack:** Rust (elohim-render/doorway/elohim-storage), bash CI (`scripts/ci/stage-spa-blob.sh`), Groovy (`Jenkinsfile`), k8s YAML manifests, `zip`+`sha2` crates.
 

@@ -1,5 +1,6 @@
 ---
 title: Cluster Topology — the live P2P modeling canvas
+id: cluster-topology
 tier: architecture
 status: Living document
 created: 2026-06-03

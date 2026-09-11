@@ -6,12 +6,12 @@ class: substrate
 domain: D-substrate-distribution
 sprint: composes 2026-06-13-non-commons-provide-commitments-design §11 (the set→list decision) and 2026-06-18-genesis-seed-stabilization-postleakfix-plan (supersedes its pre-probe premise with the U1/U2 findings)
 cites:
-  - non-commons-provide-commitments-design | §11 addendum decides uniform JSON-list + typed accessor; this plan implements it | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md
-  - genesis-seed-stabilization-postleakfix-plan | the pre-probe RCA/plan this supersedes — U1/U2 replace its agent_pub_key-never-populated premise with the serialization root cause | sha256:68252229e83056bc | path: genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md
+  - "non-commons-provide-commitments-design | §11 addendum decides uniform JSON-list + typed accessor; this plan implements it | path: genesis/docs/superpowers/specs/2026-06-13-non-commons-provide-commitments-design.md"
+  - "genesis-seed-stabilization-postleakfix-plan | the pre-probe RCA/plan this supersedes — U1/U2 replace its agent_pub_key-never-populated premise with the serialization root cause | sha256:58bfe2677daff470 | path: genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md"
   - genesis/data/timeline/backlog/resilience-card-membership-humans-projection-gap-2026-06-19.md
   - genesis/data/timeline/backlog/resilience-card-self-cid-provide-loop-gate.md
   - genesis/data/timeline/backlog/qahal-collective-cid-formation-projection-gap.md
-  - epr-durability-replication-arc-plan | Sprint 4 owner — stewardingCollectives via real P2P distribute_shards lands in this arc, not here | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
+  - "epr-durability-replication-arc-plan | Sprint 4 owner — stewardingCollectives via real P2P distribute_shards lands in this arc, not here | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md"
   - elohim/elohim-storage/src/services/household_resilience.rs
   - elohim/elohim-storage/src/db/rea_commitments.rs
   - elohim/elohim-storage/src/services/peer_selection.rs

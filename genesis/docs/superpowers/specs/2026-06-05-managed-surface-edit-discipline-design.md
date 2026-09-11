@@ -8,8 +8,8 @@ topic: [managed-memory, hooks, registry, cite-graph, gospel, CLAUDE.md, edit-dis
 class: process-meta
 process_subdomain: memory
 cites:
-  - semantic-computable-links-design | the envelope/graph discipline this registry gives an edit-time enforcement surface (its §9.1 records the path:/refresh/gospel deltas) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
-  - subject-routed-decomposition-design | the CLASS axis this SURFACE axis composes with — same homes, orthogonal question, cross-checked by test | sha256:0d910143a8498b64 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md
+  - "semantic-computable-links-design | the envelope/graph discipline this registry gives an edit-time enforcement surface (its §9.1 records the path:/refresh/gospel deltas) | sha256:1460bc102580ab0d | path: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md"
+  - "subject-routed-decomposition-design | the CLASS axis this SURFACE axis composes with — same homes, orthogonal question, cross-checked by test | sha256:fca639d89e25ade7 | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md"
   - .claude/scripts/_lib/managed_surfaces.py
   - .claude/hooks/managed-surface-context.py
   - .claude/hooks/cite-seal-signal.py

@@ -1,5 +1,6 @@
 ---
 title: "VISION RECURSION PASS — No-Runaway as Structure: Bounding Externality Amplification Across Layers"
+id: vision-recursion-anti-runaway-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

@@ -6,10 +6,10 @@ class: protocol-canonical
 domain: D8
 sprint: unranked — born 2026-06-10; sequenced AFTER sdk-core-entrypoints-plan (identity package churn). Operational wire-contract only — no storage, no DHT.
 cites:
-  - che-network-agency-arc-design | parent arc — Stage A created DoorwaySessionClient and the connection-matrix rails this plan completes the consumer migration for | sha256:ede3841e83bc2b65 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md
+  - "che-network-agency-arc-design | parent arc — Stage A created DoorwaySessionClient and the connection-matrix rails this plan completes the consumer migration for | sha256:c318623e18ba56a5 | path: genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md"
   - genesis/data/timeline/backlog/doorway-auth-view-schema-contract.md
   - genesis/data/timeline/backlog/angular-auth-onto-doorway-session-client.md
-  - sdk-core-entrypoints-plan | the packaging plan this one is sequenced behind — identity exports must settle before Angular consumers migrate | sha256:2c8f646aec32b42a | path: genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md
+  - "sdk-core-entrypoints-plan | the packaging plan this one is sequenced behind — identity exports must settle before Angular consumers migrate | sha256:ac7c780dbbe05b27 | path: genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md"
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
 ---

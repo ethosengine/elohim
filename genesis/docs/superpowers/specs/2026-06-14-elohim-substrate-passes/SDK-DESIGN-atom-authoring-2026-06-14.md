@@ -1,5 +1,6 @@
 ---
 title: "SDK SURFACE — Atom Authoring (human-sovereign): the EPR atom, the person's commitments, the person's capabilities + revocation"
+id: sdk-design-atom-authoring-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

@@ -1,5 +1,6 @@
 ---
 title: "THE TIME-AXIS RECURSION — The Substrate That Outlives Its Authors"
+id: vision-recursion-generational-time-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 recursion_axis: TIME (decentralization across generations; the cohort turns over before the work is done)

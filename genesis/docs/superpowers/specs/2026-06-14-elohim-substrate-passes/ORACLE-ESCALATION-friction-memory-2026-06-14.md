@@ -1,5 +1,6 @@
 ---
 title: "ORACLE-ESCALATION — The Friction-Signal Memory (HOW the signals that trigger escalation are built)"
+id: oracle-escalation-friction-memory-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 component_of: the friction-escalation organ (the algedonic System-4 trigger that REPLACES the per-sprint vision-hat ritual)

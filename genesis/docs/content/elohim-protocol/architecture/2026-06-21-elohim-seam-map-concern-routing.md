@@ -5,15 +5,15 @@ date: 2026-06-21
 status: reference
 author: workflow:elohim-seam-map-atlas
 cites:
-  - platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md
-  - elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
-  - weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md
-  - doorway-ssr-runtime | Doorway SSR Runtime | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
-  - tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - hardware-spec | Elohim Protocol Hardware Ecosystem: Technical Specification | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md
-  - dna-upgrade-governance | DNA Upgrade Governance | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md
-  - wave3-valueflows-hrea-interop-design | Wave 3 | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
-  - elohim-sdk-gospel | CLAUDE | sha256:100bb3131875b676 | path: elohim/sdk/CLAUDE.md
+  - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
+  - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
+  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "hardware-spec | Elohim Protocol Hardware Ecosystem: Technical Specification | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
+  - "dna-upgrade-governance | DNA Upgrade Governance | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
+  - "wave3-valueflows-hrea-interop-design | Wave 3 | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md"
+  - "elohim-sdk-gospel | CLAUDE | sha256:af345e7273686ea3 | path: elohim/sdk/CLAUDE.md"
 ---
 
 # The Elohim Seam Map — A Concern-Routing Atlas

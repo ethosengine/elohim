@@ -5,8 +5,8 @@ status: Landed
 domain: D5
 sprint: facings-framework-migration
 cites:
-  - resilience-facings-select-fold-aggregate-design | the framework spec whose §11 migration slice + gap-item #12 this plan executes | sha256:60f173daec6a0e0c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
-  - qahal-epr-household-lattice-design | the canonical household/hub lattice the resiliency facing (being migrated) folds over | sha256:ed5c1d3d2698b567 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
+  - "resilience-facings-select-fold-aggregate-design | the framework spec whose §11 migration slice + gap-item #12 this plan executes | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
+  - "qahal-epr-household-lattice-design | the canonical household/hub lattice the resiliency facing (being migrated) folds over | sha256:ed5c1d3d2698b567 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md"
 requires_env: [household-nodes]
 ---
 

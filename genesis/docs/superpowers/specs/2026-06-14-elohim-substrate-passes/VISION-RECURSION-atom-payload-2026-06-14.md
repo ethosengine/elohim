@@ -1,5 +1,6 @@
 ---
 title: "THE ATOM THAT CARRIES ITS OWN WHY — Story+Value+Governance+Process as One Inseparable Claim"
+id: vision-recursion-atom-payload-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: rust-architect (truth layer)

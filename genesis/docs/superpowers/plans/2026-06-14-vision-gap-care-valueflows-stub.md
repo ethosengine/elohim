@@ -1,5 +1,6 @@
 ---
 title: "O2 — Native Observed-Care → REA Valueflow Emitter (vision-gap stub)"
+id: vision-gap-care-valueflows-stub
 status: GREENLIGHT-TO-EXPAND
 kind: vision-gap-stub
 objective: O2 — trust-economy as REA ValueFlows of intimate OBSERVED CARE

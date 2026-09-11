@@ -1,5 +1,6 @@
 ---
 title: "ORACLE — The Escalation Trigger: WHEN to escalate (automatic algedonic + the manual door)"
+id: oracle-escalation-escalation-when-2026-06-14
 date: 2026-06-14
 status: PROPOSAL FOR OPERATOR BLESSING — working draft, NOT cite-sealed, NOT a decision, NOT code
 author: cartographer (future-perspective / oracle escalation-trigger component)

@@ -14,10 +14,10 @@ graduation-trigger: decompose-complete OR superseded-by-implementation
 refines:
   - genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md
 cites:
-  - doc-lifecycle-as-epr-development-substrate | Doc-Lifecycle as EPR | sha256:4b87bca1eb683441 | path: genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md
+  - "doc-lifecycle-as-epr-development-substrate | Doc-Lifecycle as EPR | sha256:4b87bca1eb683441 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md"
   - .claude/skills/epr-content-addressing/SKILL.md
-  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:54b5809fb8e688d1 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
-  - placement | Genesis Docs Placement Contract | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "placement | Genesis Docs Placement Contract | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
 ---
 
 # `.epr-meta` — The Directory-Local Compose-Gate (P1)

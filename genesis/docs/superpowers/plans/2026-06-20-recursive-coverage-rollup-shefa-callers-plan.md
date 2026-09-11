@@ -6,10 +6,10 @@ class: protocol-canonical
 domain: D5
 sprint: weave-epic-wave-b
 cites:
-  - recursive-architecture-design | the canon this drains — §3.1 names CoverageRollup + re-express the two shefa builders as its first callers; §1.3 the descent-erasure identity | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md
-  - weave-epic-arc-design | the epic this is subsystem #1 of (recursive aggregation); its #1 fork (CoverageDomain capacity mapping) is the deferred lens-wiring | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md
-  - operational-weave-facing-lens-design | the just-landed lens whose cluster aggregate is the DEFERRED recursive-rollup target (needs the CoverageDomain fork) | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md
-  - resilience-facings-select-fold-aggregate-design | the select->fold->aggregate framework the shefa builders + the operational lens share | sha256:8f2136ecd8678e6c | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md
+  - "recursive-architecture-design | the canon this drains — §3.1 names CoverageRollup + re-express the two shefa builders as its first callers; §1.3 the descent-erasure identity | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
+  - "weave-epic-arc-design | the epic this is subsystem #1 of (recursive aggregation); its #1 fork (CoverageDomain capacity mapping) is the deferred lens-wiring | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
+  - "operational-weave-facing-lens-design | the just-landed lens whose cluster aggregate is the DEFERRED recursive-rollup target (needs the CoverageDomain fork) | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md"
+  - "resilience-facings-select-fold-aggregate-design | the select->fold->aggregate framework the shefa builders + the operational lens share | sha256:738c9220d105e9e4 | path: genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md"
 # Mixed-env: NO doc-level requires_env. Slice 0 is pure/DB-free. Slices 1-2 re-express graph-view
 # builders — testable on household-nodes via the Cozo engine; the in-repo proof is the rollup logic.
 # The council N-level recursion, the trait-Governor lift, and the operational-lens cluster->council
