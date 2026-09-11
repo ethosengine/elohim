@@ -420,3 +420,26 @@ fn density_drops_ordinary_candidates_but_never_a_floor_one() {
         "{candidates_section}"
     );
 }
+
+// ── governed-discovery station 2.1: `open --purpose bootstrap` ────────────────────────────────────
+
+/// `--purpose bootstrap` with no `--need`: the session's intent is minted from the register's own
+/// top red habit — `<id>: <first check>` — never a term match, and the view carries the
+/// `ProjectionRequest`-shaped envelope (`purpose`/`audience`/`inputs`/`omissions`) around it.
+#[test]
+fn bootstrap_purpose_carries_the_top_red_as_intent_and_declares_its_inputs() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: alpha\n  status: red\n  active: true\n  checks: ['a2o @concern:alpha']\n  invariant: alpha holds\n",
+    );
+    let v = view_in(dir.path(), "boot", &["open", "--purpose", "bootstrap"]);
+    assert!(v["orientation"]["intent"]
+        .as_str()
+        .unwrap()
+        .starts_with("alpha"));
+    assert_eq!(v["projection"]["purpose"], "bootstrap");
+    assert_eq!(v["projection"]["audience"], "private");
+    assert!(!v["projection"]["inputs"].as_array().unwrap().is_empty());
+}

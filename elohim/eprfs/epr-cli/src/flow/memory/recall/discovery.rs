@@ -763,6 +763,176 @@ pub(super) fn first_screen(
     })))
 }
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Bootstrap — the session's own top red as its intent (governed-discovery station 2.1)
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Where the flows sidecar is projected. Read, never written, by this executor — the second of the
+/// two well-known inputs a `--purpose bootstrap` open declares.
+pub const FLOWS_REL: &str = ".eprfs/status/flows.jsonl";
+
+/// A bounded whole-file read of one FIXED, well-known register — never gated by `source_roots`
+/// (those bound what a QUESTION may traverse; `habits.yaml` and `flows.jsonl` are cross-cutting
+/// paths this executor already knows by name, the same way `HABITS_REL` is read unconditionally
+/// above) but still confined under the repository root and capped by the habit register's own
+/// declared budget, the only one either file has. Absence, an escape, or a budget overrun is
+/// **named** in `omissions` rather than silently dropped — ruling: "missing files are named in
+/// omissions, never silently skipped."
+fn read_bootstrap_input(
+    root: &Path,
+    contract: &Contract,
+    rel: &str,
+    usage_key: &str,
+    usage: &mut Value,
+    omissions: &mut Vec<String>,
+) -> FlowResult<Option<Vec<u8>>> {
+    let path = match confine_under(root, &root.join(rel)) {
+        Ok(path) => path,
+        Err(_) => {
+            omissions.push(format!(
+                "{rel} escapes the repository; omitted from projection inputs"
+            ));
+            return Ok(None);
+        }
+    };
+    if !path.is_file() {
+        omissions.push(format!("{rel} is absent; omitted from projection inputs"));
+        return Ok(None);
+    }
+    let budget = contract.limit_usize("habit_register_bytes");
+    let mut data = Vec::new();
+    File::open(&path)
+        .and_then(|file| {
+            file.take(budget as u64 + 1)
+                .read_to_end(&mut data)
+                .map(|_| ())
+        })
+        .map_err(|source| FlowError::Read { path, source })?;
+    if data.len() > budget {
+        omissions.push(format!(
+            "{rel} exceeds its declared budget; omitted from projection inputs"
+        ));
+        return Ok(None);
+    }
+    add_usage(usage, &json!({usage_key: data.len()}));
+    Ok(Some(data))
+}
+
+/// The register's own first check line for one habit, from its `checks:` sequence — the FIRST
+/// entry only, exactly as declared order names it. `None` when the habit carries no checks.
+fn first_check(habit: &serde_yaml::Value) -> String {
+    habit
+        .get("checks")
+        .and_then(serde_yaml::Value::as_sequence)
+        .and_then(|checks| checks.first())
+        .and_then(serde_yaml::Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// One habit as `--purpose bootstrap` needs it: which one, and its own first check line. A named
+/// struct rather than a bare `(String, String)` tuple so a caller reads `.id`/`.check` instead of
+/// `.0`/`.1`, and so [`bootstrap_projection`]'s return type stays simple enough for clippy's
+/// `type_complexity` lint without an `#[allow]`.
+pub(super) struct TopRedHabit {
+    pub(super) id: String,
+    pub(super) check: String,
+}
+
+/// The register's own top red — never a term match. First habit in DECLARED order with
+/// `active: true` and `status: red`; else the first with `status: red`; else `None`. A full parse
+/// (not the hand-rolled line scan `matching_habits` uses to stay cheap under a term filter) because
+/// this reads the whole small register exactly once and needs its real structure, including the
+/// inline-array `checks:` shape a fixture may use as well as the block-folded shape the generated
+/// register actually carries.
+fn top_red_habit(text: &str) -> Option<TopRedHabit> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(text).ok()?;
+    let habits = doc.get("habits")?.as_sequence()?;
+    let mut first_red: Option<TopRedHabit> = None;
+    let mut first_active_red: Option<TopRedHabit> = None;
+    for habit in habits {
+        if habit.get("status").and_then(serde_yaml::Value::as_str) != Some("red") {
+            continue;
+        }
+        let id = habit
+            .get("id")
+            .and_then(serde_yaml::Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let check = first_check(habit);
+        if first_red.is_none() {
+            first_red = Some(TopRedHabit {
+                id: id.clone(),
+                check: check.clone(),
+            });
+        }
+        let active = habit
+            .get("active")
+            .and_then(serde_yaml::Value::as_bool)
+            .unwrap_or(false);
+        if active && first_active_red.is_none() {
+            first_active_red = Some(TopRedHabit { id, check });
+        }
+    }
+    first_active_red.or(first_red)
+}
+
+/// `--purpose bootstrap`'s whole contribution: the session's [`TopRedHabit`], the
+/// `ProjectionRequest`-shaped `inputs` (raw CIDs of the exact bytes read, `{path, cid}`), and every
+/// omission along the way.
+pub(super) struct BootstrapProjection {
+    pub(super) top_red: Option<TopRedHabit>,
+    pub(super) inputs: Vec<Value>,
+    pub(super) omissions: Vec<String>,
+}
+
+/// The `eprfs_agent::memory::ProjectionRequest` struct itself is not imported here — its
+/// `collective: FileRef` field has no meaning for a bootstrap orientation (no collective-memory
+/// request is being authored), so this returns [`BootstrapProjection`]'s three fields
+/// (`purpose`/`audience` are constants the caller adds) instead of a partially-populated struct.
+pub(super) fn bootstrap_projection(
+    root: &Path,
+    contract: &Contract,
+    usage: &mut Value,
+) -> FlowResult<BootstrapProjection> {
+    let mut omissions: Vec<String> = Vec::new();
+    let mut inputs: Vec<Value> = Vec::new();
+    let mut top_red: Option<TopRedHabit> = None;
+
+    if let Some(data) = read_bootstrap_input(
+        root,
+        contract,
+        HABITS_REL,
+        "habit_register_bytes",
+        usage,
+        &mut omissions,
+    )? {
+        inputs.push(json!({"path": HABITS_REL, "cid": BlobCid::compute_raw(&data).to_string()}));
+        top_red = top_red_habit(&String::from_utf8_lossy(&data));
+    }
+
+    if let Some(data) = read_bootstrap_input(
+        root,
+        contract,
+        FLOWS_REL,
+        "flows_register_bytes",
+        usage,
+        &mut omissions,
+    )? {
+        inputs.push(json!({"path": FLOWS_REL, "cid": BlobCid::compute_raw(&data).to_string()}));
+    }
+
+    if top_red.is_none() {
+        omissions.push("no red habit; orient".into());
+    }
+
+    Ok(BootstrapProjection {
+        top_red,
+        inputs,
+        omissions,
+    })
+}
+
 /// Decode a bounded read, discarding a character the budget cut in half.
 ///
 /// A byte budget ends wherever it ends, very often mid-character; that is a property of the reader,

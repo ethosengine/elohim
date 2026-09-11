@@ -698,6 +698,12 @@ pub(super) fn execute(
         });
     }
     let new_ceremony = state.is_null();
+    // Set only for a bootstrap open (governed-discovery station 2.1) so it can be folded into
+    // `view` once `view` itself exists, below — `state` is built before that and carries only
+    // `intent`, never the `ProjectionRequest`-shaped envelope around it.
+    let mut bootstrap_projection_value: Option<Value> = None;
+    let mut bootstrap_render: Option<Value> = None;
+    let mut bootstrap_usage = Value::Null;
     if new_ceremony {
         if args.operation != "open" {
             return Err(refused("start with open; no ceremony continuation exists"));
@@ -717,20 +723,49 @@ pub(super) fn execute(
         // documented entry is `open --need '<question>'`; before this, that question was recorded
         // nowhere and every later receipt, finish and measurement was accounted against the
         // recipe's generic purpose — an intent nobody carried.
-        let intent = args
-            .intent
-            .clone()
-            .or_else(|| {
-                args.need_explicit
-                    .then(|| args.need.trim().to_string())
-                    .filter(|need| !need.is_empty())
-            })
-            .unwrap_or_else(|| {
-                contract.value["purpose"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string()
+        //
+        // `--purpose bootstrap` with neither `--need` nor `--intent` is a THIRD source, ranked
+        // below an explicit human question: the session's own top red habit, read from the
+        // register rather than typed. It carries its own `ProjectionRequest`-shaped envelope
+        // (`purpose`/`audience`/`inputs`/`omissions`) so the choice of habit is exactly as
+        // auditable as any other projection this executor renders.
+        let bootstrap_active = args.purpose.as_deref() == Some("bootstrap")
+            && args.intent.is_none()
+            && !args.need_explicit;
+        let intent = if bootstrap_active {
+            let mut usage = json!({});
+            let projection = bootstrap_projection(&args.root, contract, &mut usage)?;
+            let intent = match &projection.top_red {
+                Some(habit) => format!("{}: {}", habit.id, habit.check),
+                None => "no red habit; orient".to_string(),
+            };
+            bootstrap_render = Some(match &projection.top_red {
+                Some(habit) => json!({"id": habit.id, "check": habit.check}),
+                None => json!({"id": "none", "check": "no red habit; orient"}),
             });
+            bootstrap_projection_value = Some(json!({
+                "purpose": "bootstrap",
+                "audience": "private",
+                "inputs": projection.inputs,
+                "omissions": projection.omissions,
+            }));
+            bootstrap_usage = usage;
+            intent
+        } else {
+            args.intent
+                .clone()
+                .or_else(|| {
+                    args.need_explicit
+                        .then(|| args.need.trim().to_string())
+                        .filter(|need| !need.is_empty())
+                })
+                .unwrap_or_else(|| {
+                    contract.value["purpose"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string()
+                })
+        };
         state = json!({
             "intent": intent,
             "scope": scope,
@@ -760,6 +795,15 @@ pub(super) fn execute(
         "usage": {},
         "unresolved": [],
     });
+    if let Some(projection) = bootstrap_projection_value {
+        view["projection"] = projection;
+    }
+    if let Some(render_info) = bootstrap_render {
+        view["bootstrap"] = render_info;
+    }
+    if !bootstrap_usage.is_null() {
+        add_usage(&mut view["usage"], &bootstrap_usage);
+    }
 
     let has_measurements = !recipe["measurements"].is_null();
     if new_ceremony && has_measurements {

@@ -88,6 +88,9 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
         select_shown_candidates(candidates, lens.choice_count as usize, floor);
 
     out.push_str(&render_floor_line(view, lens, floor, dropped_by_choice));
+    if let Some(line) = render_bootstrap_line(view) {
+        out.push_str(&line);
+    }
 
     if minimal {
         out.push_str(&render_candidate_block(&shown, lens));
@@ -108,7 +111,13 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
         for (key, value) in map {
             if matches!(
                 key.as_str(),
-                "orientation" | "actions" | "execution_method" | "first_screen" | "lens"
+                "orientation"
+                    | "actions"
+                    | "execution_method"
+                    | "first_screen"
+                    | "lens"
+                    | "bootstrap"
+                    | "projection"
             ) {
                 continue;
             }
@@ -188,6 +197,22 @@ fn render_floor_line(
         "{recipe_label} {recipe} · {lens_label} {lens_cid} · {selection_label}: {selection} · \
          {omissions_label}: {omissions} · {receipts_label}: {receipts}\n"
     )
+}
+
+/// Governed-discovery station 2.1: `open --purpose bootstrap` names its top red right after the
+/// honesty floor line, before the first-screen/habit lines it points into — one line, every lens,
+/// the same "print it once, as a line" rule the floor itself follows. `None` for every other view
+/// (`view["projection"]["purpose"]` absent from a plain `open`/`resume`/`select`/… view indexes to
+/// `Value::Null`, so this is a no-op there, not a panic).
+fn render_bootstrap_line(view: &Value) -> Option<String> {
+    if view["projection"]["purpose"].as_str() != Some("bootstrap") {
+        return None;
+    }
+    let id = view["bootstrap"]["id"].as_str().unwrap_or("none");
+    let check = view["bootstrap"]["check"]
+        .as_str()
+        .unwrap_or("no red habit; orient");
+    Some(format!("Bootstrap: top red: {id} — {}\n", clip(check, 120)))
 }
 
 /// The rule this view actually ranked candidates by, from whichever door produced them — the

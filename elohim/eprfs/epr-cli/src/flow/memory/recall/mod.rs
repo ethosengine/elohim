@@ -62,8 +62,8 @@ mod measure;
 use measure::measure;
 
 mod discovery;
+use discovery::{bootstrap_projection, first_screen, outline};
 pub use discovery::{discover, discover_scored};
-use discovery::{first_screen, outline};
 
 mod providers;
 pub use providers::bounded_process;
@@ -740,6 +740,10 @@ pub struct Args {
     pub operation: String,
     pub scope: Option<String>,
     pub intent: Option<String>,
+    /// `--purpose bootstrap`: with no `--need` and no `--intent`, `open` mints the session's own
+    /// intent from the register's top red habit instead of the recipe's generic purpose — see
+    /// `discovery::bootstrap_projection`. No other value is accepted.
+    pub purpose: Option<String>,
     pub path: Option<String>,
     pub lines: Option<String>,
     pub finding: Option<String>,
@@ -793,6 +797,7 @@ impl Args {
             operation: String::new(),
             scope: None,
             intent: None,
+            purpose: None,
             path: None,
             lines: None,
             finding: None,
@@ -916,6 +921,8 @@ fn push_unresolved(view: &mut Value, message: impl Into<String>) {
 pub fn usage() -> String {
     format!(
         "usage: epr flow memory recall <{}> --session <id> [--need TEXT] [--json] [--root DIR]\n\
+         \x20      epr flow memory recall open --session <id> --purpose bootstrap; with no --need, \
+mints the session's intent from the register's own top red habit\n\
          \x20      epr flow memory recall --adopt-receipts [--from-dir DIR] [--dry-run] [--json]\n\
          \x20      search|source accept --tag <t> (repeatable, EXACT frontmatter membership, local provider only)\n\
          \x20      --lens <level> widens/narrows the READER lens (minimal|simple|standard|detail|debug|trace); \
@@ -1019,6 +1026,7 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
             }
             "--scope" => args.scope = Some(value),
             "--intent" => args.intent = Some(value),
+            "--purpose" => args.purpose = Some(value),
             "--path" => args.path = Some(value),
             "--lines" => args.lines = Some(value),
             "--finding" => args.finding = Some(value),
@@ -1097,6 +1105,9 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
     }
     if !["repair", "judgment", "observation"].contains(&args.kind.as_str()) {
         return Err(refused("--kind must be repair|judgment|observation"));
+    }
+    if args.purpose.as_deref().is_some_and(|p| p != "bootstrap") {
+        return Err(refused("--purpose must be bootstrap"));
     }
     for text in [
         &args.need,

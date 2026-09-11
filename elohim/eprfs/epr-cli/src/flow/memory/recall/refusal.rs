@@ -7,7 +7,7 @@ use super::*;
 /// message. Naming them is one line of prose against an unbounded number of wrong tries.
 pub(super) fn accepted_flags(operation: &str) -> &'static str {
     match operation {
-        "open" => "--need --intent --scope --limit --offset",
+        "open" => "--need --intent --purpose bootstrap --scope --limit --offset",
         "select" => "--edge --need",
         "read" => "--path --lines START:END --need",
         "source" => "--path --tag --query --search-scope --name --need",
