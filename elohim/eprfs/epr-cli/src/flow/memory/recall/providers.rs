@@ -10,10 +10,18 @@
 //! `providers_for` are new — `retrieve()` (still in `mod.rs`, still the explicit-provider
 //! dispatcher every currently-declared `--provider` test exercises) is untouched, so its rich,
 //! per-kind JSON shape (`candidates`/`groups`/`selection`/`omissions`/…) stays byte-identical.
-//! The trait's narrower [`ProviderResult`] exists for the one thing it is needed for so far — the
-//! `search` operation's *default* provider (no `--provider`, no persisted session choice) walking
-//! the declared providers in order and settling on the first that actually returns something,
-//! instead of a hard-coded `"local"` literal.
+//!
+//! **`providers_for` is a naming lookup, not a trial run — today.** The `search` operation's
+//! *default* provider (no `--provider`, no persisted session choice) reads `providers_for(...)
+//! .first().id()` to name the declared default (today: `"local"`) and then runs the SAME single
+//! `retrieve()` traversal every other path does. It deliberately does NOT call
+//! `Provider::candidates` to "check" a provider first — that would run `discover_scored` a
+//! second time (once to check, once inside `retrieve()` to actually answer) and double-charge
+//! `view["usage"]` for one `search` (2026-09-11 review finding on this task). `Provider::candidates`
+//! and [`ProviderResult`] therefore have no production caller yet — only this file's own unit
+//! tests — until a richer caller (task 0.5's `journey.rs`) needs to compare more than one
+//! provider's actual answer, at which point calling it once, deliberately, to compare (not to
+//! probe-then-redo) is the right shape.
 use super::discovery::discover_scored;
 use super::*;
 
@@ -26,14 +34,14 @@ pub(super) type ProviderId = String;
 /// One provider's answer to one question: what it ranked (or merely returned), whether the
 /// ranking is a known method or an honestly unknown one, the method pinned to it (if any), and
 /// what asking it cost.
+///
+/// No production code constructs or reads this yet (see the module doc — `providers_for` names a
+/// provider without asking it anything); it is exercised by this file's own unit tests, ahead of
+/// a caller (task 0.5's `journey.rs`) that actually needs one provider's real answer.
+#[allow(dead_code)]
 pub(super) struct ProviderResult {
     pub ranked: Vec<Value>,
-    // `mod.rs`'s current only consumer (the `search` operation's default-provider probe) reads
-    // only `ranked` and `usage`; `ranking_known`/`method` are read today by this file's own unit
-    // tests and are the fields a richer caller (task 0.5's `journey.rs`) needs next.
-    #[allow(dead_code)]
     pub ranking_known: bool,
-    #[allow(dead_code)]
     pub method: Option<String>,
     pub usage: Value,
 }
@@ -43,6 +51,8 @@ pub(super) struct ProviderResult {
 /// `session_root`.
 pub(super) trait Provider {
     fn id(&self) -> ProviderId;
+    // See the module doc: exercised by this file's unit tests, not yet by production code.
+    #[allow(dead_code)]
     fn candidates(
         &self,
         terms: &[String],
@@ -56,6 +66,10 @@ pub(super) trait Provider {
 /// under it) back into the root-relative string `discover_scored` understands — `.` when it
 /// names `session_root` itself, otherwise the path beneath it. A `scope` that is already relative
 /// (the CLI's own `--search-scope`) passes through unchanged.
+///
+/// A `LocalLexical::candidates` helper — dead in production today for the same reason
+/// `Provider::candidates` is (see the module doc).
+#[allow(dead_code)]
 fn scope_string(scope: &Path, session_root: &Path) -> String {
     let relative = if scope.is_absolute() {
         scope.strip_prefix(session_root).unwrap_or(scope)
@@ -221,7 +235,9 @@ pub(super) fn process_result(program: &str, args: &[String], contract: &Contract
 ///
 /// `palace` is the recipe-declared location, relative to `session_root` unless it is already
 /// absolute (the shape a test double supplies to point at a fixed, possibly nonexistent, path).
+/// Read only inside `candidates` (see the module doc — not yet called by production code).
 pub(super) struct MemPalace {
+    #[allow(dead_code)]
     pub palace: PathBuf,
 }
 
@@ -273,6 +289,13 @@ impl Provider for MemPalace {
 /// whenever declared with kind `mempalace`. A declared `fixture` provider (test interchange only,
 /// never live-fit) is not a `Provider` and is not returned here; `retrieve()` still answers it
 /// directly by name.
+///
+/// **A coupling to keep in step:** each returned `Provider`'s `id()` is a hard-coded literal
+/// (`"local"`/`"mempalace"`) matched by `kind`, not by the declaration's own JSON key —
+/// `retrieve()` then looks that `id()` up by KEY at `/ceremony/providers/{id}`. Every pinned
+/// recipe today names its provider keys identically to their kinds, so the two agree; a recipe
+/// that ever declared a `kind: "local"` provider under some other key would make that lookup
+/// refuse ("provider is not declared by the pinned recipe") even though `providers_for` found it.
 pub(super) fn providers_for(contract: &Contract) -> Vec<Box<dyn Provider>> {
     let mut providers: Vec<Box<dyn Provider>> = Vec::new();
     let Some(declared) = contract

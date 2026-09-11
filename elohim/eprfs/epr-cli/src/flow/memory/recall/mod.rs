@@ -2099,33 +2099,20 @@ fn execute(
                 .or_else(|| state["provider"].as_str().map(str::to_string))
             {
                 Some(provider) => provider,
-                // Neither the CLI nor a resumed session named one: consult the pinned recipe's
-                // own declared providers, in their own order, and settle on the first that
-                // actually returns something — the recipe has always declared `local` first and
-                // it has always been what this repository has installed, so this is the same
-                // default as before, now read from the declaration instead of hard-coded. Each
-                // provider actually asked is charged for real, same as any other probe of source
-                // bytes; the loop stops asking as soon as one answers, so an unconsulted provider
-                // (mempalace, once local already found something) is never charged at all.
-                None => {
-                    let mut chosen: Option<String> = None;
-                    for candidate in providers_for(contract) {
-                        let Ok(found) = candidate.candidates(
-                            &[],
-                            Path::new(&args.search_scope),
-                            contract,
-                            &args.root,
-                        ) else {
-                            continue;
-                        };
-                        add_usage(&mut view["usage"], &found.usage);
-                        if !found.ranked.is_empty() {
-                            chosen = Some(candidate.id());
-                            break;
-                        }
-                    }
-                    chosen.unwrap_or_else(|| "local".to_string())
-                }
+                // Neither the CLI nor a resumed session named one: the recipe's own declared
+                // providers, in their own declared order, name the default — today that is
+                // always `local`, because the recipe has always declared it first. This is a
+                // SELECTION, not a trial run: it names the id and lets the single `retrieve()`
+                // call below do the one traversal. Calling `Provider::candidates` here to
+                // "check" first would run `discover_scored` a second time — once to decide,
+                // once inside `retrieve()`'s `"local"` arm to actually answer — double-charging
+                // `view["usage"]` for one `search`, and the two scans are not guaranteed to
+                // agree (a budget-bounded traversal is not idempotent under concurrent repo
+                // writes), which would make the "checked" provider's own candidates unreliable.
+                None => providers_for(contract)
+                    .first()
+                    .map(|candidate| candidate.id())
+                    .unwrap_or_else(|| "local".to_string()),
             };
             // The evidence question stands in for a missing `--query` — EXCEPT when tags were
             // named, because then the tags are the filter and folding the need's prose in as a

@@ -347,6 +347,70 @@ fn provider_substitution_and_refusal_preserve_intent() {
     );
 }
 
+/// 2026-09-11 review fix (task 0.4 round 1): naming the declared default provider must not run a
+/// second traversal. A bare `search` — no `--provider`, no prior session choice — selects the
+/// recipe's declared default by NAME only (`providers_for(...).first().id()`) and then runs the
+/// exact same single `retrieve()` traversal an explicit `--provider local` does; it must never call
+/// `Provider::candidates` to "check" a provider before running it for real, which would scan the
+/// tree twice and double-charge `usage` for one `search`.
+#[test]
+fn a_bare_search_selects_the_declared_default_provider_with_one_traversal() {
+    let default_dir = repo();
+    let default_root = default_dir.path();
+    begin(default_root);
+    let default_result = view(
+        default_root,
+        &[
+            "search",
+            "--search-scope",
+            "docs",
+            "--name",
+            "*.md",
+            "--query",
+            "purpose",
+        ],
+    );
+
+    let explicit_dir = repo();
+    let explicit_root = explicit_dir.path();
+    begin(explicit_root);
+    let explicit_result = view(
+        explicit_root,
+        &[
+            "search",
+            "--provider",
+            "local",
+            "--search-scope",
+            "docs",
+            "--name",
+            "*.md",
+            "--query",
+            "purpose",
+        ],
+    );
+
+    assert_eq!(default_result["retrieval"]["provider"], "local");
+    assert_eq!(
+        default_result["retrieval"]["candidates"], explicit_result["retrieval"]["candidates"],
+        "a bare search must find exactly what an explicit --provider local finds"
+    );
+    // Every scan-cost counter but `elapsed_seconds` (measured wall-clock, noisy run to run — the
+    // golden test redacts it for the same reason) must match: a second, redundant traversal to
+    // "choose" the provider would double `scan_bytes`/`scanned_files`/`scanned_entries`.
+    for key in [
+        "scan_bytes",
+        "scanned_files",
+        "scanned_entries",
+        "search_queries",
+    ] {
+        assert_eq!(
+            default_result["usage"][key], explicit_result["usage"][key],
+            "usage.{key} must match — selecting the default provider must not add a second \
+             traversal's cost"
+        );
+    }
+}
+
 /// Python: `test_prepared_repair_does_not_execute_and_finish_does_not_accept`.
 #[test]
 fn prepared_repair_does_not_execute_and_finish_does_not_accept() {
