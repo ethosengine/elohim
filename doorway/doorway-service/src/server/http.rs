@@ -2622,6 +2622,7 @@ pub(crate) const AUTH_OWNED_PATHS: &[&str] = &[
     "/auth/refresh",
     "/auth/me",
     "/auth/account",
+    "/auth/close-account",
     "/auth/authorize",
     "/auth/token",
     "/auth/native-handoff",

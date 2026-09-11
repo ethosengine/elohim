@@ -2565,3 +2565,123 @@ decisionPoints:
       - path: doorway/doorway-service/src/main.rs
         testName: a_read_replica_never_subscribes
         kind: unit
+
+  - name: close_account_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::close_account_verdict
+      line: 342
+    summary: >
+      What POST /auth/close-account does for a (typed confirmation, session identifier,
+      credential row) triple. The confirmation is checked FIRST and in isolation, so a
+      mismatch can never become a side effect; only then is the row consulted, and a row
+      that is missing or already closed answers AlreadyClosed rather than closing twice.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          close_account_mismatched_confirmation_changes_nothing pins that a bearer token is
+          not by itself consent to END an account — a stolen token lands on the arm that
+          touches nothing. The human re-typing their own identifier is the authorization,
+          verified at the acting node rather than inferred from possession of the session.
+      - id: C6b
+        status: answered
+        justification: >
+          close_account_is_idempotent_and_never_404s pins that replay against a settled row
+          mints nothing: the second call neither re-deprovisions a cell nor re-stamps the
+          closure, it reports alreadyClosed.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: close_account_mismatched_confirmation_changes_nothing
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: close_account_is_idempotent_and_never_404s
+        kind: unit
+    notes: >
+      The route's advertise/serve symmetry (closeAccount in /.well-known/elohim-auth vs
+      AUTH_OWNED_PATHS) is pinned separately by every_advertised_endpoint_is_an_owned_auth_path
+      in src/server/http.rs and discovery_advertises_close_account in routes/auth_discovery.rs.
+
+  - name: CloseVerdict
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::CloseVerdict
+      line: 319
+    summary: >
+      The three answers POST /auth/close-account may give: ConfirmationMismatch (400,
+      nothing changes), AlreadyClosed (200 alreadyClosed), Close. Gone and already-closed
+      collapse deliberately into AlreadyClosed; neither is ever a 404.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          close_account_is_idempotent_and_never_404s pins that "your row is not here" is
+          answered as already-closed, not as absent. A 404 on this route would tell a human
+          who just closed their account that it never existed — an absence answer standing in
+          for a settled outcome.
+      - id: C14
+        status: answered
+        justification: >
+          The three arms close the outcome set and the handler matches all of them; there is
+          no fall-through arm that drops a request without an answer.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: close_account_is_idempotent_and_never_404s
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: close_account_mismatched_confirmation_changes_nothing
+        kind: unit
+
+  - name: active_user_filter
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::active_user_filter
+      line: 385
+    summary: >
+      The credential-row filter handle_login selects a candidate with. Extracted so "a closed
+      account cannot sign back in" is a property of one expression login actually runs, rather
+      than an is_active literal buried in a lookup loop where dropping it still compiles.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          closed_row_cannot_log_in pins that the filter demands is_active — the exact field
+          close_account_row_update sets false — so a human who closed their account cannot
+          re-authenticate with the same credentials.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: closed_row_cannot_log_in
+        kind: unit
+
+  - name: close_account_row_update
+    kind: state-transition
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::close_account_row_update
+      line: 367
+    summary: >
+      The $set that ENDS a credential row: is_active false, metadata.is_deleted true,
+      closed_at stamped. Its registrable claim is the shape of the effect — a settled
+      terminal state written by assignment, never an accreting log — so a repeated close
+      converges on the same row rather than double-applying.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          closed_row_cannot_log_in reads the update document itself and pins the three
+          terminal fields. Every field is an assignment to a fixed value, so replaying the
+          update against an already-closed row is a no-op on the row's meaning.
+      - id: C9
+        status: partial
+        justification: >
+          closed_at is stamped distinctly from metadata.deleted_at so "I left" and "I was
+          removed by an operator" stay separable in the record. What the closure does NOT yet
+          do is carry that distinction onto the substrate as lineage; the notarized
+          account-closed self-revocation (S2 Task 13) is the successor that does.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: closed_row_cannot_log_in
+        kind: unit

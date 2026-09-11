@@ -61,13 +61,19 @@ pub struct AuthEndpoints {
     pub exchange_session: &'static str,
     /// Where a graduated steward's own portal is discovered, per human.
     pub portal_host: &'static str,
+    /// Where a hosted human ENDS their account — reclaims sessions, cell and row.
+    ///
+    /// Advertised for the same reason `register` is: a client that can create an
+    /// account here must be able to find the door out without being told where it
+    /// is. Leaving is a first-class endpoint, not an admin-only back office.
+    pub close_account: &'static str,
 }
 
 impl AuthEndpoints {
     /// Every path this document advertises, for the symmetry guard in
     /// `server/http.rs` that asserts each one is an owned auth path. Kept beside
     /// the fields so adding an endpoint without adding it here is visible.
-    pub fn paths(&self) -> [&'static str; 10] {
+    pub fn paths(&self) -> [&'static str; 11] {
         [
             self.register,
             self.login,
@@ -79,6 +85,7 @@ impl AuthEndpoints {
             self.session_token,
             self.exchange_session,
             self.portal_host,
+            self.close_account,
         ]
     }
 
@@ -96,6 +103,7 @@ impl AuthEndpoints {
             session_token: "/auth/session-token",
             exchange_session: "/auth/exchange-session",
             portal_host: "/auth/portal-host",
+            close_account: "/auth/close-account",
         }
     }
 }
@@ -289,6 +297,18 @@ mod tests {
     #[test]
     fn the_portal_is_the_doorway_hosted_sign_in_path() {
         assert_eq!(doc()["portal"], "/threshold/login");
+    }
+
+    /// The auth-discovery contract for leaving.
+    ///
+    /// A human who can be told where to REGISTER must be able to find where to
+    /// CLOSE without being told separately; an app that has to hard-code the
+    /// exit path is exactly the auth configuration this document abolishes.
+    /// Pairs with `every_advertised_endpoint_is_an_owned_auth_path` in
+    /// `server/http.rs`, which refuses the advertise/serve asymmetry.
+    #[test]
+    fn discovery_advertises_close_account() {
+        assert_eq!(doc()["endpoints"]["closeAccount"], "/auth/close-account");
     }
 
     #[test]

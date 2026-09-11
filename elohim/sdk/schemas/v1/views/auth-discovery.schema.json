@@ -34,7 +34,8 @@
         "token",
         "sessionToken",
         "exchangeSession",
-        "portalHost"
+        "portalHost",
+        "closeAccount"
       ],
       "properties": {
         "register": { "$ref": "#/$defs/relativePath" },
@@ -61,6 +62,10 @@
         "portalHost": {
           "$ref": "#/$defs/relativePath",
           "description": "Where a graduated steward's own portal is discovered, per human."
+        },
+        "closeAccount": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Where a hosted human ends their account — reclaims their sessions, their provisioned cell and their credential row. Advertised for the same reason register is: a client that can create an account here must be able to find the door out without being told where it is."
         }
       }
     }

@@ -199,6 +199,14 @@ pub struct UserDoc {
     /// None for legacy users or dev mode registrations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conductor_id: Option<String>,
+
+    /// When this human closed their OWN account via `POST /auth/close-account`.
+    ///
+    /// Distinct from `metadata.deleted_at`, which an operator's soft-delete
+    /// writes: the two look identical in the row otherwise, and "I left" and
+    /// "I was removed" are not the same fact about a person.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<DateTime>,
 }
 
 fn default_identifier_type() -> String {
@@ -243,6 +251,7 @@ impl UserDoc {
             is_steward: false,
             stewardship_at: None,
             conductor_id: None,
+            closed_at: None,
         }
     }
 

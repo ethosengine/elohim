@@ -282,6 +282,110 @@ pub struct SuccessResponse {
     pub message: String,
 }
 
+/// Body of `POST /auth/close-account`.
+///
+/// The human types their own identifier back. That is the whole confirmation
+/// ceremony: a bearer token alone is not consent to END an account, because a
+/// token is exactly what an attacker who got this far already has.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseAccountRequest {
+    pub confirm_identifier: String,
+}
+
+/// Response of `POST /auth/close-account`.
+///
+/// `warnings` is ALWAYS present (possibly empty). Every step after the
+/// confirmation is best-effort by design — a human must be able to leave even
+/// when the conductor that hosts their cell is unreachable — so the honest
+/// shape is "closed, and here is what could not be reclaimed", never a 500 that
+/// leaves them holding an account they asked to end.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseAccountResponse {
+    pub closed: bool,
+    pub cell_uninstalled: bool,
+    pub already_closed: bool,
+    pub warnings: Vec<String>,
+}
+
+/// What `POST /auth/close-account` should DO for this (confirmation, row) pair.
+///
+/// Pure. The three arms are the three answers this route may give, and keeping
+/// them in one function is what makes "a mismatch changes nothing" and "a second
+/// call is 200, never 404" properties of the decision rather than properties of
+/// whichever branch the handler happened to take.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloseVerdict {
+    /// The typed identifier is not this session's identifier. Refuse with
+    /// `400 CONFIRMATION_MISMATCH` and touch NOTHING.
+    ConfirmationMismatch,
+    /// The row is gone or already closed. Answer `200 { alreadyClosed: true }`.
+    ///
+    /// Never 404: a 404 here would mean "your account does not exist", which is
+    /// both frightening and, for a human who just closed it, false. Idempotence
+    /// is also what lets the a2o harness close the same human twice without
+    /// having to know whether an earlier step got there first.
+    AlreadyClosed,
+    /// Close it.
+    Close,
+}
+
+/// Decide what a close-account request does.
+///
+/// `confirm_identifier` and `session_identifier` must BOTH already be
+/// gateway-normalized by the caller (see `normalize_identifier`), so a human who
+/// types the bare local-part and a human who types the fully-qualified address
+/// are answered identically — the doorway is gateway-scoped, and making them
+/// differ here would mean the exit door rejects the name the sign-in door
+/// accepted.
+pub fn close_account_verdict(
+    confirm_identifier: &str,
+    session_identifier: &str,
+    row: Option<&UserDoc>,
+) -> CloseVerdict {
+    // Confirmation FIRST. A mismatch must not even look at the row, so a
+    // wrong answer can never become a side effect.
+    if confirm_identifier.is_empty() || confirm_identifier != session_identifier {
+        return CloseVerdict::ConfirmationMismatch;
+    }
+    match row {
+        None => CloseVerdict::AlreadyClosed,
+        Some(u) if !u.is_active || u.metadata.is_deleted => CloseVerdict::AlreadyClosed,
+        Some(_) => CloseVerdict::Close,
+    }
+}
+
+/// The `$set` document that ENDS an account.
+///
+/// One builder so the closure stamp cannot drift between the close route and
+/// anything that later audits it: `is_active` false (this is what `handle_login`
+/// and `session_revoked_by_user_doc` already refuse on), `metadata.is_deleted`
+/// true (what the admin listing filters on), and `closed_at` — the human's own
+/// act, distinct from `metadata.deleted_at`, which an operator's soft-delete
+/// writes.
+pub fn close_account_row_update(now: bson::DateTime) -> bson::Document {
+    doc! {
+        "$set": {
+            "is_active": false,
+            "metadata.is_deleted": true,
+            "metadata.deleted_at": now,
+            "metadata.updated_at": now,
+            "closed_at": now,
+        }
+    }
+}
+
+/// The filter `handle_login` selects a candidate row with.
+///
+/// Extracted so "a closed row cannot log in" is a property of ONE expression
+/// that login actually runs, rather than an `is_active` literal repeated inside
+/// a loop where dropping it would still compile and still pass every test that
+/// never registered a closed human.
+pub fn active_user_filter(identifier: &str) -> bson::Document {
+    doc! { "identifier": identifier, "is_active": true }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountResponse {
@@ -1774,10 +1878,7 @@ async fn handle_login(
 
     let mut found_user: Option<UserDoc> = None;
     for candidate in &lookup_candidates {
-        match collection
-            .find_one(doc! { "identifier": candidate, "is_active": true })
-            .await
-        {
+        match collection.find_one(active_user_filter(candidate)).await {
             Ok(Some(u)) => {
                 found_user = Some(u);
                 break;
@@ -2322,6 +2423,251 @@ async fn handle_account(
             last_login_at: user.last_login_at.map(|d| d.to_string()),
         },
     )
+}
+
+/// POST /auth/close-account
+///
+/// A hosted human ends their own account. Bearer-authorised, confirmed by typing
+/// their own identifier back, and ordered so the reclaim is monotone: authority
+/// first, then compute, then the row.
+///
+/// 1. **Revoke the live session surface** — pending session-transfer tokens, any
+///    unspent OAuth authorization code, and the human's cached signing session.
+///    This runs FIRST because everything after it can fail, and a half-closed
+///    account that still mints tokens is worse than one that still owns a cell.
+/// 2. **Return the cell** — `deprovision_agent` uninstalls the app and
+///    unregisters the agent. Non-fatal and reported: a conductor that is down
+///    must not trap a human inside an account they asked to leave.
+/// 3. **End the row** — `is_active=false`, `metadata.is_deleted=true`,
+///    `closed_at=now`. `handle_login` then refuses it (it selects on
+///    `active_user_filter`) and `handle_me` then refuses it (via
+///    `session_revoked_by_user_doc`), so an already-minted JWT stops
+///    authenticating without a token blacklist.
+///
+/// A second call answers `200 { alreadyClosed: true }`, never `404`.
+async fn handle_close_account(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    let auth_header = get_auth_header(&req);
+    let token = match extract_token_from_header(auth_header) {
+        Some(t) => t.to_string(),
+        None => {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                &ErrorResponse {
+                    error: "No token provided".into(),
+                    code: None,
+                },
+            )
+        }
+    };
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+    let result = jwt.verify_token(&token);
+    if !result.valid {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            &ErrorResponse {
+                error: result
+                    .error
+                    .unwrap_or_else(|| "Invalid or expired token".into()),
+                code: None,
+            },
+        );
+    }
+    let claims = result.claims.unwrap();
+
+    let body: CloseAccountRequest = match parse_json_body(req).await {
+        Ok(b) => b,
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: format!("Invalid JSON body: {e}"),
+                    code: None,
+                },
+            )
+        }
+    };
+
+    // Gateway-scope BOTH sides before comparing, exactly as handle_login does,
+    // so the bare local-part a human sees on their account page confirms the
+    // fully-qualified identifier their session actually carries.
+    let domain = gateway_domain(state.args.doorway_url.as_deref());
+    let normalize = |v: &str| match &domain {
+        Some(d) => normalize_identifier(v, d),
+        None => v.to_string(),
+    };
+    let confirm = normalize(body.confirm_identifier.trim());
+    let session_identifier = normalize(&claims.identifier);
+
+    let Some(mongo) = &state.mongo else {
+        // No credential store means there is no row to end. Saying "closed"
+        // would be a comfortable lie; a human who cannot actually leave must be
+        // told so.
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &ErrorResponse {
+                error: "Database not available".into(),
+                code: Some("DB_UNAVAILABLE".into()),
+            },
+        );
+    };
+    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+        Ok(c) => c,
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {e}"),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    // Keyed on `identifier` — the account-unique key — never `human_id`, which
+    // collides across hosted accounts wherever a shared singleton agent was
+    // used (see handle_me). The lookup deliberately does NOT filter on
+    // `is_active`: a closed row must still be FOUND, so the second call can
+    // answer `alreadyClosed` instead of 404.
+    let row = match collection
+        .find_one(doc! { "identifier": &session_identifier })
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {e}"),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    match close_account_verdict(&confirm, &session_identifier, row.as_ref()) {
+        CloseVerdict::ConfirmationMismatch => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: "The identifier you typed does not match this account".into(),
+                    code: Some("CONFIRMATION_MISMATCH".into()),
+                },
+            );
+        }
+        CloseVerdict::AlreadyClosed => {
+            return json_response(
+                StatusCode::OK,
+                &CloseAccountResponse {
+                    closed: true,
+                    cell_uninstalled: false,
+                    already_closed: true,
+                    warnings: Vec::new(),
+                },
+            );
+        }
+        CloseVerdict::Close => {}
+    }
+
+    let user = row.expect("CloseVerdict::Close is only returned for an existing row");
+    let mut warnings: Vec<String> = Vec::new();
+
+    // ── (1) Revoke the live session surface ────────────────────────────────
+    revoke_session_transfer_tokens(&session_identifier).await;
+    state.signing.sessions().remove_human(&user.human_id);
+    if let Ok(oauth) = mongo
+        .collection::<OAuthSessionDoc>(OAUTH_SESSION_COLLECTION)
+        .await
+    {
+        if let Err(e) = oauth
+            .inner()
+            .delete_many(doc! { "identifier": &session_identifier })
+            .await
+        {
+            warn!("close-account: failed to drop OAuth codes: {}", e);
+            warnings.push("Pending sign-in codes could not be dropped".into());
+        }
+    }
+
+    // ── (2) Return the cell ────────────────────────────────────────────────
+    let mut cell_uninstalled = false;
+    if user.conductor_id.is_some() {
+        if let Some(registry) = &state.conductor_registry {
+            let provisioner = AgentProvisioner::new(Arc::clone(registry))
+                .with_app_id(state.args.installed_app_id.clone())
+                .with_bundle_path(state.args.happ_bundle_path.clone());
+            match provisioner.deprovision_agent(&user.agent_pub_key).await {
+                Ok(()) => {
+                    cell_uninstalled = true;
+                    info!(
+                        identifier = %session_identifier,
+                        agent = %user.agent_pub_key,
+                        "close-account: cell uninstalled and agent unregistered"
+                    );
+                }
+                Err(e) => {
+                    warn!("close-account: deprovision failed (non-fatal): {}", e);
+                    warnings.push(format!("The hosted cell could not be uninstalled: {e}"));
+                }
+            }
+        } else {
+            warnings.push("No conductor pool is configured; the cell was not uninstalled".into());
+        }
+    }
+
+    // ── (3) End the row ────────────────────────────────────────────────────
+    if let Err(e) = collection
+        .update_one(
+            doc! { "identifier": &session_identifier },
+            close_account_row_update(bson::DateTime::now()),
+        )
+        .await
+    {
+        // The row is the only step that is NOT best-effort: if it survives, the
+        // human is still hosted and must be told the close did not take.
+        error!("close-account: failed to end the row: {}", e);
+        return json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &ErrorResponse {
+                error: format!("Failed to close account: {e}"),
+                code: Some("DB_ERROR".into()),
+            },
+        );
+    }
+
+    info!(
+        identifier = %session_identifier,
+        cell_uninstalled,
+        warnings = warnings.len(),
+        "Account closed by its own human"
+    );
+
+    json_response(
+        StatusCode::OK,
+        &CloseAccountResponse {
+            closed: true,
+            cell_uninstalled,
+            already_closed: false,
+            warnings,
+        },
+    )
+}
+
+/// Drop every pending session-transfer token minted for this identifier.
+///
+/// The store is a 60 s single-use map, so this is a small sweep — but leaving a
+/// live transfer token behind would let a tab that was mid-handoff resurrect a
+/// session into an account that no longer exists.
+async fn revoke_session_transfer_tokens(identifier: &str) {
+    let store = session_transfer_store();
+    let mut guard = store.write().await;
+    guard.retain(|_, entry| entry.identifier != identifier);
 }
 
 // =============================================================================
@@ -4647,6 +4993,7 @@ pub async fn handle_auth_request(
         (&Method::POST, "/auth/refresh") => handle_refresh(req, state).await,
         (&Method::GET, "/auth/me") => handle_me(req, state).await,
         (&Method::GET, "/auth/account") => handle_account(req, state).await,
+        (&Method::POST, "/auth/close-account") => handle_close_account(req, state).await,
 
         // OAuth 2.0 endpoints
         (&Method::GET, "/auth/authorize") => handle_authorize(req, state).await,
@@ -4691,6 +5038,7 @@ pub async fn handle_auth_request(
         | (_, "/auth/refresh")
         | (_, "/auth/me")
         | (_, "/auth/account")
+        | (_, "/auth/close-account")
         | (_, "/auth/authorize")
         | (_, "/auth/token")
         | (_, "/auth/native-handoff")
@@ -5234,5 +5582,133 @@ mod tests {
                 "{stage:?} must not reach the synthetic-identity fallback"
             );
         }
+    }
+
+    // ── Closing an account (hosted-human Task 3) ────────────────────────────
+    //
+    // Every test below feeds the REAL decision functions the handler calls, not
+    // a restatement of them: `close_account_verdict` is what the route branches
+    // on, `active_user_filter` is the filter `handle_login` actually queries
+    // with, and `session_revoked_by_user_doc` is what `handle_me` actually
+    // consults. A mirrored copy would pass forever after the handler stopped
+    // calling it.
+
+    fn hosted_row(identifier: &str) -> UserDoc {
+        UserDoc::new(
+            identifier.to_string(),
+            "email".to_string(),
+            "argon2-hash".to_string(),
+            "uhCHk-human".to_string(),
+            "uhCAk-agent".to_string(),
+            None,
+        )
+    }
+
+    fn closed_row(identifier: &str) -> UserDoc {
+        let mut u = hosted_row(identifier);
+        u.is_active = false;
+        u.metadata.is_deleted = true;
+        u
+    }
+
+    /// A wrong confirmation must not even consult the row — the mismatch arm is
+    /// the one that has to be side-effect-free, because it is the arm an
+    /// attacker holding a stolen bearer token lands on.
+    #[test]
+    fn close_account_mismatched_confirmation_changes_nothing() {
+        let row = hosted_row("ruth@alpha.elohim.host");
+        assert_eq!(
+            close_account_verdict(
+                "naomi@alpha.elohim.host",
+                "ruth@alpha.elohim.host",
+                Some(&row)
+            ),
+            CloseVerdict::ConfirmationMismatch
+        );
+        assert_eq!(
+            close_account_verdict("", "ruth@alpha.elohim.host", Some(&row)),
+            CloseVerdict::ConfirmationMismatch,
+            "an empty confirmation is a mismatch, never a silent match against an empty session"
+        );
+        // A mismatch on a row that is ALREADY closed is still a mismatch, not
+        // an alreadyClosed disclosure: the wrong answer learns nothing.
+        let gone = closed_row("ruth@alpha.elohim.host");
+        assert_eq!(
+            close_account_verdict("someone-else", "ruth@alpha.elohim.host", Some(&gone)),
+            CloseVerdict::ConfirmationMismatch
+        );
+    }
+
+    /// The second call is a 200, not a 404. A human who just closed their
+    /// account and refreshes must not be told their account never existed, and
+    /// the a2o harness must be able to close the same human twice.
+    #[test]
+    fn close_account_is_idempotent_and_never_404s() {
+        let ident = "ruth@alpha.elohim.host";
+        assert_eq!(
+            close_account_verdict(ident, ident, Some(&hosted_row(ident))),
+            CloseVerdict::Close,
+            "the first call closes"
+        );
+        assert_eq!(
+            close_account_verdict(ident, ident, Some(&closed_row(ident))),
+            CloseVerdict::AlreadyClosed,
+            "the second call reports alreadyClosed"
+        );
+        assert_eq!(
+            close_account_verdict(ident, ident, None),
+            CloseVerdict::AlreadyClosed,
+            "a row that is gone entirely is alreadyClosed — never a 404"
+        );
+        // Deactivated-but-not-deleted (an operator suspension) also reads as
+        // closed rather than re-closing and re-deprovisioning a cell.
+        let mut suspended = hosted_row(ident);
+        suspended.is_active = false;
+        assert_eq!(
+            close_account_verdict(ident, ident, Some(&suspended)),
+            CloseVerdict::AlreadyClosed
+        );
+    }
+
+    /// The closure is what login refuses on. `handle_login` selects candidates
+    /// with `active_user_filter`; a filter that stopped demanding `is_active`
+    /// would still compile and would let a closed human sign straight back in.
+    #[test]
+    fn closed_row_cannot_log_in() {
+        let filter = active_user_filter("ruth@alpha.elohim.host");
+        assert_eq!(
+            filter.get_bool("is_active").ok(),
+            Some(true),
+            "login must select only ACTIVE rows — close_account_row_update sets is_active=false"
+        );
+        assert_eq!(
+            filter.get_str("identifier").ok(),
+            Some("ruth@alpha.elohim.host")
+        );
+        // And the update the close route writes is the thing that filter excludes.
+        let update = close_account_row_update(bson::DateTime::now());
+        let set = update.get_document("$set").expect("$set");
+        assert_eq!(set.get_bool("is_active").ok(), Some(false));
+        assert_eq!(set.get_bool("metadata.is_deleted").ok(), Some(true));
+        assert!(
+            set.get("closed_at").is_some(),
+            "the human's own closing act is stamped distinctly from an operator soft-delete"
+        );
+    }
+
+    /// A still-held JWT stops authenticating the moment the row is closed —
+    /// this is the same durable-state check `handle_me` runs, so there is no
+    /// token blacklist to keep in sync across replicas.
+    #[test]
+    fn closed_row_is_refused_by_handle_me() {
+        let ident = "ruth@alpha.elohim.host";
+        assert!(
+            session_revoked_by_user_doc(Some(&closed_row(ident))),
+            "/auth/me must refuse a closed account's still-valid token"
+        );
+        assert!(
+            !session_revoked_by_user_doc(Some(&hosted_row(ident))),
+            "an open account keeps working"
+        );
     }
 }
