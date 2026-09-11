@@ -821,6 +821,31 @@ print_iroh_build_command() { # <binary>
   echo "  CARGO_TARGET_DIR='$target_dir' RUSTFLAGS='--cfg getrandom_backend=\"custom\"' cargo build$profile --features \"p2p p2p-iroh\" --bin elohim-storage"
 }
 
+# A pool binary that PREDATES the source it is built from is the quietest way to
+# spend a household run measuring code that is not running. Measured 2026-09-11:
+# the doorway's canonical-agent-key and capacity-recount fixes were committed at
+# 03:49/03:50, the pool slot still held 02:16 bytes (the gate's
+# `cargo test --lib --bins` does not refresh the `--bin` artifact), and a full
+# cold recast launched the OLD doorway — the run would have charged the old
+# behaviour to the new commit. Mirrors the storage feature-marker refusal: check
+# the artifact against the source, refuse before launch, never warn.
+#
+# The reference is the newest COMMIT touching the crate's src, not the worktree
+# mtime: an uncommitted edit is work in progress, and refusing on it would make
+# every source-editing session unable to start a mesh.
+# MESH_ALLOW_STALE_BINARY=1 overrides (measuring an older binary on purpose).
+assert_binary_newer_than_source() { # <binary> <src-path…>
+  local bin="$1"; shift
+  local bin_ts src_ts
+  [ -x "$bin" ] || return 0
+  bin_ts="$(stat -c %Y "$bin" 2>/dev/null)" || return 0
+  src_ts="$(git -C "$REPO_ROOT" log -1 --format=%ct -- "$@" 2>/dev/null)"
+  [ -n "$src_ts" ] || return 0
+  [ "$bin_ts" -ge "$src_ts" ] && return 0
+  echo "built $(date -u -d "@$bin_ts" +%Y-%m-%dT%H:%M:%SZ), newest commit touching $* is $(date -u -d "@$src_ts" +%Y-%m-%dT%H:%M:%SZ) ($(git -C "$REPO_ROOT" log -1 --format=%h -- "$@"))" >&2
+  return 1
+}
+
 assert_storage_transport_capability() { # <binary> <mode>
   local bin="$1" mode="$2"
   case "$mode" in libp2p) return 0 ;; dual|iroh) ;; *)
@@ -2853,6 +2878,30 @@ preflight() {
     fi
   else
     echo "ok iroh-relay binary: skipped (relay_url=$relay_url MESH_RELAY=${MESH_RELAY:-1} MESH_DOORWAYS=$MESH_DOORWAYS_EFFECTIVE)"
+  fi
+
+  # 5b. the pool binaries are not older than the source they are built from.
+  #     A stale artifact is measured as if it were the fix (see
+  #     assert_binary_newer_than_source).
+  if [ "${MESH_ALLOW_STALE_BINARY:-0}" = "1" ]; then
+    echo "ok binary freshness: skipped (MESH_ALLOW_STALE_BINARY=1)"
+  else
+    tmp="$(mktemp)"
+    if assert_binary_newer_than_source "$STORAGE_BIN" elohim/elohim-storage/src 2>"$tmp"; then
+      echo "ok elohim-storage binary is not older than elohim/elohim-storage/src"
+    else
+      echo "REFUSED elohim-storage binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it (\`just gate elohim-storage\`, or RUSTFLAGS=\"--cfg getrandom_backend=\\\"custom\\\"\" cargo build --bin elohim-storage in the pool slot) or set MESH_ALLOW_STALE_BINARY=1"
+      fail=1
+    fi
+    if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+      if assert_binary_newer_than_source "$DOORWAY_BIN" doorway/doorway-service/src 2>"$tmp"; then
+        echo "ok doorway binary is not older than doorway/doorway-service/src"
+      else
+        echo "REFUSED doorway binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it (RUSTFLAGS=\"\" cargo build --bin doorway in the pool slot; the gate's \`cargo test --lib --bins\` does NOT refresh the --bin artifact) or set MESH_ALLOW_STALE_BINARY=1"
+        fail=1
+      fi
+    fi
+    rm -f "$tmp"
   fi
 
   # 6. storage transport/iroh capability marker per peer — the exact check
