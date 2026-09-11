@@ -1,7 +1,7 @@
 ---
 id: shefa-domain-gospel
 cites:
-  - genesis/docs/content/elohim-protocol/shefa.md
+  - shefa-economic-infrastructure | Shefa | sha256:d3eb56a79069a6cc | path: genesis/docs/content/elohim-protocol/shefa.md
 ---
 
 # Shefa Domain
