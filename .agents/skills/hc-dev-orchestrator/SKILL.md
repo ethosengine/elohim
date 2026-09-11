@@ -50,13 +50,17 @@ doorway: `doorway-a`, `doorway-b`). Without the binary (`MONGOD_BIN` unset and
 no `mongod` on `$PATH`/`~/bin`) the doorways run archive-less with an INERT
 warm-shell store — the production shape 18a65fd0d found un-wired — and
 `mesh status` says so. Both doorways launch with `--dev-mode
---dev-signal-subscriber` (env twin `DEV_SIGNAL_SUBSCRIBER`): dev mode alone
-skips the multi-peer signal subscriber (most dev contexts have no conductor),
-but the mesh fronts real conductors, so the opt-in lights the subscriber and
-`status.json` `compute.peers[]` populates — the surface the
-peer-conductor-resilience a2o reads. The image ships `mongod` (che-devworkspaces udi-plus);
+--dev-signal-subscriber` (env twin `DEV_SIGNAL_SUBSCRIBER`), and `hc-mesh.sh`
+still passes it, but **the flag is a no-op since `f64d8c5bf`** — it parses
+and is otherwise ignored. Signal subscription is gated by
+`should_subscribe_to_signals(projection_writer)` alone (one input, no mode
+flag): a projection WRITER subscribes to the multi-peer signal subscriber
+under every stage, dev or fleet, and `status.json` `compute.peers[]`
+populates from that — the surface the peer-conductor-resilience a2o reads. A
+read replica (`PROJECTION_WRITER=false`) never subscribes. The image ships
+`mongod` (che-devworkspaces udi-plus);
 a2o resolves `alpha-A`/`elohim.host` to `E2E_DOORWAY_ALPHA`/`E2E_DOORWAY_B`,
-so the failover feature runs against the local pair unchanged:
+so the failover feature runs against the local pair unchanged. **A cold start drops the doorway archive too (2026-09-11).** When peer 0's admin port is silent, `start_all` `rm -rf`s every conductor sandbox — but the doorways' Mongo archive holding account rows (identifier, password hash, `human_id`, `agent_pub_key`, `installed_app_id`) used to survive it, naming cells that no longer exist: `/auth/register` then answers 409, the stale login succeeds, and nothing re-provisions. The archive now goes with the sandboxes on every cold start; `MESH_KEEP_DOORWAY_DB=1` keeps it, for deliberately studying that skew:
 
 ```bash
 just mesh start                # mongod → doorway A → doorway B → conductors → storage peers
@@ -73,6 +77,8 @@ MESH_RELAY_BIN=<dir>/bin/iroh-relay just mesh start   # holochain 0.7: the condu
 **Conductor selection (2026-09-07):** `hc-mesh.sh` auto-detects the pinned fork at `$MESH_TOOLS_DIR/hc-fork-<submodule-pin12>/bin` (pin read from the `elohim/holochain-conductor` gitlink) and REFUSES a conductor whose line differs from the DNA's `hdk` line (`assert_conductor_matches_dna`; `MESH_ALLOW_TOOLCHAIN_SKEW=1` overrides). The workspace image ships stock 0.7.0 in `/opt/holochain/bin` (rebuilt 2026-09-07); the stock binary is a fallback, the fork is what the mesh launches.
 
 **Detached start, preflight, and wait (2026-09-08).** `just mesh start` runs `preflight` first, then re-execs itself detached (`setsid nohup`, its own session) and returns in about a second — a `start` that blocked inline in the calling shell/tool-task used to get reaped along with the whole mesh process group when the tool call's own timeout fired (the 2026-09-07 fixtures-clone hand-off). `MESH_FOREGROUND=1` keeps the old inline/blocking behavior exactly. `just mesh preflight` (also run automatically by `start`) checks every refusal `start_all` can hit — binaries incl. the fork-pair pin, per-peer transport capability, every mesh-owned port free-or-ours, toolchain/DNA-line parity — before anything is generated or launched; a port already served by a live, PID-recorded process of this same mesh reads `ok ... (reusing)`, not a refusal. `just mesh wait [--timeout N]` (default 900s) polls the same readiness ladders `start_all` always blocked on and tails `start.log`, exiting 1 immediately the moment a line matches a refusal pattern instead of waiting out the full timeout. `MESH_RELAY_BIN` resolution now has a fallback: when unset, `detect_relay_bin()` picks the newest `$MESH_TOOLS_DIR/iroh-relay-*/bin/iroh-relay` (`sort -V`) — the same path `start_all`'s relay launch already used, so `preflight`'s relay check and the actual launch agree; a relay this exact mesh already launched reads `ok iroh-relay: already up on :3340 (reusing)` regardless of whether `MESH_RELAY_BIN` resolves in the calling shell.
+
+**Stale-binary refusal (2026-09-11).** Preflight also REFUSES a pool `elohim-storage`/`doorway` binary older than the newest TRACKED source file under its crate's `src` (`assert_binary_newer_than_source`, compared by mtime, not commit time — a build-then-commit is current). `just gate` runs `cargo test --lib --bins`, which never refreshes a `--bin` artifact, so a pool slot commonly goes stale after a source fix lands: rebuild it directly (`cargo build --bin elohim-storage` with `RUSTFLAGS="--cfg getrandom_backend=\"custom\""`, or `cargo build --bin doorway` with `RUSTFLAGS=""`) in the pool slot. `MESH_ALLOW_STALE_BINARY=1` overrides for a deliberate measurement of an older binary.
 ```
 
 `MESH_TRANSPORT_BACKEND=libp2p|dual|iroh` selects the elohim-storage Track-2
@@ -214,7 +220,9 @@ paint; nothing else in the mesh depends on it), its port joins `mesh_owned_ports
 `mesh stop` reaps it, and `mesh status` probes it THROUGH the doorway — a 502 there means
 the proxy has no portal behind it. Drive it through the doorway, never against
 `THRESHOLD_PORT` directly: `doorway-app`'s `environment.doorwayUrl` is `''` (same-origin),
-so its API calls follow whatever serves it and would 404 against the dev server. `hc-mesh-recovery.sh`'s backpressure witness reads
+so its API calls follow whatever serves it and would 404 against the dev server.
+
+**`portal-restart` (2026-09-11).** The portal is a bare `ng serve` with no supervisor of its own, so the workspace RAM guard sheds it like any other fat node process — the only symptom was every `@browser` scenario timing out inside `threshold-register-display-name` with nothing naming the cause. `just mesh portal-restart` reaps the recorded pid (or notes it was already shed), relaunches, and BLOCKS until first paint (`MESH_PORTAL_WAIT`, default 180s) — unlike `start`, its caller is waiting on this surface specifically. `mesh status` now distinguishes "no portal on :8081" from a doorway proxy fault instead of printing one flat `down`, and `just test mesh-browser` REFUSES before launch when `<doorway>/threshold/login` isn't 200, naming this arm. `hc-mesh-recovery.sh`'s backpressure witness reads
 the CONDUCTOR log (`$LOCAL_DEV_DIR/.sandbox_run_log[.<peer>]`) for
 `conductor_receipt_max_s` (JSON `null` when no receipt-latency line falls in
 the window) and records `conductor_receipt_scope` per peer (`per-peer` vs
@@ -250,6 +258,54 @@ just mesh start                # bring the mesh up first — the Prologue never 
 ```
 
 `just mesh prologue` is routed by the root `justfile` (`mesh` recipe whitelist); `hc-mesh.sh prologue` is the same entry point.
+
+**Hosted provisioning is real (2026-09-11).** A `--dev-mode` doorway used to skip
+provisioning entirely and every hosted registration rode a singleton-Human
+recovery path (one shared key); `should_provision` removed that path by
+design, so the doorway must install a real cell per hosted human from a
+bundle that exists on this host. `hc-mesh.sh` wires `HAPP_BUNDLE_PATH` at
+the packed bundle the sandboxes install (the binary default,
+`/app/elohim.happ`, is a container path that is `NotFound` on the mesh), and
+`POOL_COMPUTE_URL` / `POOL_COMPUTE_TOKEN` / `POOL_COMPUTE_PERFORMER` name
+the storage peer that NOTARIZES each hosted cell as a promise
+(`POST /api/v1/compute/grants`) — all three required together or the leg is
+skipped silently. The grant surface refuses unless
+`ELOHIM_COMPUTE_LOCAL_API=1` on that peer, the bearer matches its
+`ELOHIM_COMPUTE_LOCAL_TOKEN` (a fixed dev default,
+`MESH_COMPUTE_LOCAL_TOKEN` overrides it), and `X-Verified-Performer` is the
+peer's OWN cell actor (`same_actor`) — `peer_agent_key` supplies that,
+cached to disk because the doorways boot BEFORE the conductors and cannot
+know it on a cold start (`reconcile_doorway_pool_performer` corrects and
+restarts the one doorway that booted wrong, once storage answers).
+
+**Cast scope (`MESH_HOSTED_CAST=lane|all`).** `seed-humans.ts`'s
+`HOUSEHOLD_HOSTED_CAST` allow-list (14 names — the humans some household-lane
+a2o scenario actually signs in as) is the default cast once `DOORWAY_URL` is
+loopback; a deployed fleet (alpha) keeps the full standing cast unchanged.
+`MESH_HOSTED_CAST=lane` forces the allow-list even against a remote doorway;
+`MESH_HOSTED_CAST=all` restores the full standing cast for someone who has
+the RAM (~23GB of conductor heap for 29). `DOORWAY_MAX_AGENTS_PER_CONDUCTOR`
+(`MESH_DOORWAY_MAX_AGENTS`, default 25) is the per-conductor hosted-agent
+ceiling this cast is sized against — the fleet default of 50 is an operator
+ceiling on kitsune2's per-space gossip budget that stalls arc convergence
+past ~30 agents on one conductor; 25 = the 14-name lane cast + 3
+`prologue-hosted-*` registrants (`seed-hosted-humans.ts`) + 8 headroom for
+story-created humans that register and close again within one scenario.
+Each hosted human costs ~786MB of conductor heap that closing a session does
+not free — recycle it between hosted lanes with
+`just mesh conductors-restart && just mesh storage-restart <peers>`.
+
+**Build stamp (`version.json`).** `package-angular-check.py` refuses a
+browser or SSR archive whose `version.json` is absent or whose `commit` is
+empty, and for `kind=server` additionally requires the server stamp to equal
+the browser one. Only the CI Jenkinsfile and `package-angular.mjs build`
+(a side effect of a full rebuild) normally write that file — a plain
+`pnpm build`/`ng build`, what a household dist is built with, leaves none,
+so every stage leg is refused before a byte is uploaded. The Prologue now
+stamps `version.json` on any locally-built dist BEFORE staging
+(`stamp_build_version`, mirroring `package-angular.mjs`'s five fields
+exactly), but never overwrites a stamp that is already there — a dist from
+`just dev package` or unpacked from CI carries the authoritative bytes.
 
 **The cast fix — named `CONDUCTOR_URLS`.** An unnamed loopback conductor URL
 (`ws://localhost:4445,ws://localhost:4455,...`) resolves by first-reachable-
