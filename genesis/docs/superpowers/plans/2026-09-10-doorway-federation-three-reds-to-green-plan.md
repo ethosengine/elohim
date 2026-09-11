@@ -1513,6 +1513,20 @@ Expected: both `/version.json` name the new build's commit, and both `/status.js
 
 ---
 
+## Task 19b — Fleet doorways need the pool-compute wiring the mesh needed (found by Task 17, 2026-09-11)
+
+**Drains:** D2 on the fleet. **Tier:** operator values + Haiku/Sonnet manifest edit. **Slice:** `genesis/orchestrator/manifests/doorway/{alpha,alpha-b}.yaml` (+ the storage side under `manifests/edgenode/` if `ELOHIM_COMPUTE_LOCAL_API` is not already set there). Repo manifests are the cleanup surface; the cluster is the operator's — never `kubectl`.
+
+Task 17 found the household mesh never provisioned a hosted human until 60fb28a39 (dev_mode singleton path), and that `hc-mesh.sh` set neither `HAPP_BUNDLE_PATH` nor `POOL_COMPUTE_URL/TOKEN/PERFORMER`. The fleet is half-wired: every doorway manifest sets `HAPP_BUNDLE_PATH` (grep 2026-09-11: alpha.yaml:238, alpha-b.yaml:289, …), so after the Task 19 push hosted registration on alpha provisions a real cell with its own key (the 2026-09-04 "register returns the operator's profile" baseline is cured by that alone). But `POOL_COMPUTE_*` appears in no manifest, so the grant leg is skipped (tested: `hosted_register_without_pool_compute_config_still_registers`) and `humansServed` reads `Some(0)` — honest, not the number.
+
+- [ ] **Step 1 (operator):** decide the pool provider per doorway — alpha → `elohim-adam-alpha` storage (`/status.json` names it as alpha's storage); alpha-b → its primary. Supply `POOL_COMPUTE_PERFORMER` = that storage peer's own conductor agent key (`hc.agent_key_uhcak()`; read it from the peer, never from the doorway) and `POOL_COMPUTE_TOKEN` = the bearer the grant surface expects under `ELOHIM_COMPUTE_LOCAL_API=1` (a k8s Secret, referenced by name — never a literal in the manifest).
+- [ ] **Step 2:** add the three env entries to both doorway manifests beside `HAPP_BUNDLE_PATH`; add `ELOHIM_COMPUTE_LOCAL_API=1` to the corresponding storage manifests if absent (grep first). Comment the WHY inline (the singleton path is gone; a hosted cell is a notarized promise).
+- [ ] **Step 3:** rides the next edge deploy; evidence = `humansServed > 0` on `/status.json` after a real registration, and a `hostedCellGrantCid` on that registration's response.
+
+**Habit delta line this produces:** `hosted-human-lifecycle` — "fleet doorways carry POOL_COMPUTE_* (edge #N); first fleet hosted-cell grant cid <cid>."
+
+---
+
 ## Task 20 — (d) Ledger deltas and flips
 
 **Drains:** hosted-human plan **Task 8**; doorway-failover plan's habit bookkeeping.
